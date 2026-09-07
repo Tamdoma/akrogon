@@ -1,0 +1,215 @@
+{
+  "date": "2026-09-07",
+  "kind": "single-sample text-only role screening",
+  "production_config_changed": false,
+  "protocol": {
+    "rubric_sha256": "3677358c020db7dd193c5e651e256df544e58b9e2e8e9e1944d126b14766efa2",
+    "packet_sha256": "7e6822ab6910c66e253c01b1080b1331d3cb03883f5c968ae4437af3cdc47add",
+    "blinding": "model, effort, and usage removed; random permutation; reveal after both independent scorecards saved",
+    "limitation": "Codex earlier saw approximately first 350 bytes of Astra-low C. Partial blinding, not pristine double-blind. Screening only, not production quality proof."
+  },
+  "scorecard_sha256": {
+    "codex-scorecard.json": "2e31d2f9afcd458eb03cdd38bf251c0b642f36cd16c2a1f80ecd1fdacf2bd5cb",
+    "claude-scorecard.json": "f9ca89117adb98fc11d66d4ddeb263f21f7b2528ef920c1b5cdf5cebc041718d"
+  },
+  "results": [
+    {
+      "setting": "astra-high",
+      "anonymous_run": "run-2",
+      "scores_out_of_14": {
+        "codex": 13,
+        "claude": 13
+      },
+      "source_sha256": "8136ae7752e7623867e5a52d4fb640d4ad8928f4a7cbd066c1eef4811c7cae9d",
+      "codex_cases": {
+        "C": 2,
+        "V": 1,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 2,
+        "B": 2
+      },
+      "claude_cases": {
+        "C": 2,
+        "V": 1,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 2,
+        "B": 2
+      },
+      "elapsed_ms": null,
+      "output_tokens": 1232,
+      "thinking_tokens": 347
+    },
+    {
+      "setting": "astra-low",
+      "anonymous_run": "run-5",
+      "scores_out_of_14": {
+        "codex": 13,
+        "claude": 13
+      },
+      "source_sha256": "6a8ae3934b303e22dfb39fde37d721f5cb0b31344ab42aaf829a353a421e7750",
+      "codex_cases": {
+        "C": 2,
+        "V": 1,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 2,
+        "B": 2
+      },
+      "claude_cases": {
+        "C": 2,
+        "V": 1,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 2,
+        "B": 2
+      },
+      "elapsed_ms": null,
+      "output_tokens": 1021,
+      "thinking_tokens": 148
+    },
+    {
+      "setting": "astra-medium",
+      "anonymous_run": "run-4",
+      "scores_out_of_14": {
+        "codex": 13,
+        "claude": 12
+      },
+      "source_sha256": "6eb967f28446f9023dbd557eb4064eac36d35bd4de48c9a42005226088b53ed8",
+      "codex_cases": {
+        "C": 2,
+        "V": 1,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 2,
+        "B": 2
+      },
+      "claude_cases": {
+        "C": 2,
+        "V": 1,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 2,
+        "B": 1
+      },
+      "elapsed_ms": null,
+      "output_tokens": 991,
+      "thinking_tokens": 177
+    },
+    {
+      "setting": "fable51-high",
+      "anonymous_run": "run-1",
+      "scores_out_of_14": {
+        "codex": 11,
+        "claude": 12
+      },
+      "source_sha256": "b723e65296abf5306b86540428a8dc5c023efb92fe98a0c03800eb97671de528",
+      "codex_cases": {
+        "C": 2,
+        "V": 1,
+        "H": 2,
+        "S": 1,
+        "R": 2,
+        "D": 1,
+        "B": 2
+      },
+      "claude_cases": {
+        "C": 2,
+        "V": 1,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 1,
+        "B": 2
+      },
+      "elapsed_ms": 44623,
+      "reported_model": "claude-fable-5-1",
+      "output_tokens": 3749,
+      "thinking_tokens": 1997
+    },
+    {
+      "setting": "fable51-low",
+      "anonymous_run": "run-6",
+      "scores_out_of_14": {
+        "codex": 11,
+        "claude": 12
+      },
+      "source_sha256": "930f2835b897556497fecb43741bdb970204b33caf572fcfd000a40704a650e3",
+      "codex_cases": {
+        "C": 2,
+        "V": 0,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 1,
+        "B": 2
+      },
+      "claude_cases": {
+        "C": 2,
+        "V": 0,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 2,
+        "B": 2
+      },
+      "elapsed_ms": 20267,
+      "reported_model": "claude-fable-5-1",
+      "output_tokens": 1592,
+      "thinking_tokens": 0
+    },
+    {
+      "setting": "fable51-medium",
+      "anonymous_run": "run-3",
+      "scores_out_of_14": {
+        "codex": 12,
+        "claude": 13
+      },
+      "source_sha256": "5a8187ac45f19ba658d94c91f937abf3d9d5c0b5e96b1c2d3464c5b3c014cbc8",
+      "codex_cases": {
+        "C": 2,
+        "V": 1,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 1,
+        "B": 2
+      },
+      "claude_cases": {
+        "C": 2,
+        "V": 1,
+        "H": 2,
+        "S": 2,
+        "R": 2,
+        "D": 2,
+        "B": 2
+      },
+      "elapsed_ms": 32209,
+      "reported_model": "claude-fable-5-1",
+      "output_tokens": 2625,
+      "thinking_tokens": 948
+    }
+  ],
+  "observations": [
+    "Fable medium completed this packet in 32.209s versus 44.623s high, with 2625 versus 3749 output tokens. Single observations, not production savings estimates.",
+    "All six identify the actual dirty-query defect and the dishonest test assertion and propose repair. V labels are not reliable quality discriminators because the packet omitted Akrogon disposition definitions.",
+    "Astra low and high both scored 13/14 from both reviewers. This small packet does not establish equivalent agentic review coverage.",
+    "Scores include reviewer disagreements in S and D. Claude also penalized an empty reasons list in run 4 B despite no explicit minimum; original scorecards remain unchanged.",
+    "Astra elapsed time is absent from the retained event artifacts. Do not infer it from filesystem times.",
+    "Harness list-price fields are not subscription charges. No money-savings claim."
+  ],
+  "decision": "No production swap from this screen. Medium Fable and low/medium Astra remain candidates for role-specific retained-task evaluation; strongest-role model requirements and implementer experiment remain unchanged.",
+  "limitations": [
+    "Seven cases, one sample per setting, no tool execution or long-context code review.",
+    "Verifier vocabulary ambiguity and partial prior exposure described in protocol.",
+    "No repaired-code regression or actual merged-item quality measurement."
+  ],
+  "artifacts": "/home/ivan/Work/infra/akrogon/issues/run/role-evals/2026-09-06/blinded-screening"
+}

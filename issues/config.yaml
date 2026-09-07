@@ -1,0 +1,15 @@
+issues_root: issues
+scripts_dir: issues/.scripts
+worktree_root: issues/worktrees
+branch_prefix: worktree-
+repos:
+  akrogon:
+    path: ~/Work/infra/akrogon-new
+    remote: origin
+    default_branch: main
+    worktree_root: issues/worktrees
+broadcast:
+  discord:
+    webhook_env:
+      - DISCORD_WEBHOOK_URL
+grounding: none

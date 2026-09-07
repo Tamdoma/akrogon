@@ -1,0 +1,4 @@
+interface:
+  display_name: "explain-issue"
+  short_description: "Explain an issue in plain language"
+  default_prompt: "Use $explain-issue to explain this issue with a noob-friendly mental model built from first principles."

@@ -1,0 +1,508 @@
+{
+  "framework_revision": "9cc65bf3",
+  "machinery_revision": "4d7bf2d2",
+  "typecheck_errors": 345,
+  "typecheck_duplicate_identifier_errors": 0,
+  "lint_files": 1127,
+  "lint_raw_error_count": 6567,
+  "lint_fatal_count": 4,
+  "lint_rule_counts": {
+    "no-empty": 21,
+    "complexity": 273,
+    "max-lines": 59,
+    "max-params": 101,
+    "no-useless-escape": 47,
+    "max-lines-per-function": 75,
+    "sonarjs/cognitive-complexity": 128,
+    "@typescript-eslint/no-unused-vars": 126,
+    "max-depth": 211,
+    "@typescript-eslint/no-explicit-any": 81,
+    "@typescript-eslint/no-unsafe-argument": 198,
+    "@typescript-eslint/no-unsafe-return": 52,
+    "@typescript-eslint/no-unsafe-member-access": 1160,
+    "@typescript-eslint/no-unsafe-assignment": 627,
+    "@typescript-eslint/no-base-to-string": 59,
+    "@typescript-eslint/no-unnecessary-type-assertion": 204,
+    "@typescript-eslint/no-non-null-assertion": 375,
+    "@typescript-eslint/no-require-imports": 217,
+    "preserve-caught-error": 16,
+    "@typescript-eslint/no-unsafe-call": 919,
+    "@typescript-eslint/restrict-template-expressions": 24,
+    "no-control-regex": 6,
+    "@typescript-eslint/no-redundant-type-constituents": 22,
+    "@typescript-eslint/consistent-type-imports": 138,
+    "no-restricted-syntax": 66,
+    "@typescript-eslint/no-floating-promises": 921,
+    "no-useless-assignment": 7,
+    "no-case-declarations": 3,
+    "parse": 4,
+    "no-irregular-whitespace": 1,
+    "@typescript-eslint/no-duplicate-type-constituents": 2,
+    "@typescript-eslint/require-await": 196,
+    "@typescript-eslint/unbound-method": 3,
+    "no-constant-condition": 1,
+    "@typescript-eslint/await-thenable": 190,
+    "no-undef": 30,
+    "@typescript-eslint/no-unused-expressions": 1,
+    "no-unsafe-finally": 1,
+    "@typescript-eslint/only-throw-error": 1,
+    "@typescript-eslint/no-unsafe-enum-comparison": 1
+  },
+  "complexity_policy": "Existing untouched-function findings are informational; measured 788. No policy change.",
+  "architecture_violations": [
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/commit-reference-index-rows.ts",
+      "to": "issues/.scripts/child-process.ts",
+      "unresolvedTo": "./child-process",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "child-process-capability-imports-are-adapted"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/format-staged-check.ts",
+      "to": "issues/.scripts/child-process.ts",
+      "unresolvedTo": "./child-process",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "child-process-capability-imports-are-adapted"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/lifecycle/run-status-block-repository.ts",
+      "to": "issues/.scripts/child-process.ts",
+      "unresolvedTo": "../child-process",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "child-process-capability-imports-are-adapted"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/lifecycle/run-status-blocks/environmental-probe-runner.ts",
+      "to": "issues/.scripts/child-process.ts",
+      "unresolvedTo": "../../child-process",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "child-process-capability-imports-are-adapted"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/lifecycle/run-status-blocks/environmental-probe.ts",
+      "to": "issues/.scripts/child-process.ts",
+      "unresolvedTo": "../../child-process",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "child-process-capability-imports-are-adapted"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/lifecycle/worktree-provision.ts",
+      "to": "issues/.scripts/child-process.ts",
+      "unresolvedTo": "../child-process",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "child-process-capability-imports-are-adapted"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/quality/gate-memo.ts",
+      "to": "issues/.scripts/child-process.ts",
+      "unresolvedTo": "../child-process",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "child-process-capability-imports-are-adapted"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/quality/quality-lane-scope.ts",
+      "to": "issues/.scripts/child-process.ts",
+      "unresolvedTo": "../child-process",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "child-process-capability-imports-are-adapted"
+      }
+    },
+    {
+      "type": "cycle",
+      "from": ".claude/hooks/infrastructure/git-signals.ts",
+      "to": ".claude/hooks/infrastructure/hook-state-core.ts",
+      "unresolvedTo": "./hook-state-core",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "no-circular-runtime-dependencies"
+      },
+      "cycle": [
+        {
+          "name": ".claude/hooks/infrastructure/hook-state-core.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        },
+        {
+          "name": ".claude/hooks/infrastructure/git-signals.ts",
+          "dependencyTypes": [
+            "local",
+            "type-import"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "cycle",
+      "from": ".claude/hooks/infrastructure/pack-manifest-shared.ts",
+      "to": ".claude/hooks/infrastructure/interception-capability-registry.ts",
+      "unresolvedTo": "./interception-capability-registry",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "no-circular-runtime-dependencies"
+      },
+      "cycle": [
+        {
+          "name": ".claude/hooks/infrastructure/interception-capability-registry.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        },
+        {
+          "name": ".claude/hooks/infrastructure/pack-manifest-shared.ts",
+          "dependencyTypes": [
+            "local",
+            "type-only",
+            "import"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "cycle",
+      "from": ".claude/skills/test-audit-satellite-network/scripts/audit-core.ts",
+      "to": ".claude/skills/test-audit-satellite-network/scripts/audit-io.ts",
+      "unresolvedTo": "./audit-io",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "no-circular-runtime-dependencies"
+      },
+      "cycle": [
+        {
+          "name": ".claude/skills/test-audit-satellite-network/scripts/audit-io.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        },
+        {
+          "name": ".claude/skills/test-audit-satellite-network/scripts/audit-core.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "cycle",
+      "from": ".claude/skills/write-satellite-content/scripts/llm/provider.ts",
+      "to": ".claude/skills/write-satellite-content/scripts/llm/anthropic.ts",
+      "unresolvedTo": "./anthropic",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "no-circular-runtime-dependencies"
+      },
+      "cycle": [
+        {
+          "name": ".claude/skills/write-satellite-content/scripts/llm/anthropic.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        },
+        {
+          "name": ".claude/skills/write-satellite-content/scripts/llm/provider.ts",
+          "dependencyTypes": [
+            "local",
+            "type-only",
+            "import"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "cycle",
+      "from": ".claude/skills/write-satellite-content/scripts/llm/provider.ts",
+      "to": ".claude/skills/write-satellite-content/scripts/llm/replay.ts",
+      "unresolvedTo": "./replay",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "no-circular-runtime-dependencies"
+      },
+      "cycle": [
+        {
+          "name": ".claude/skills/write-satellite-content/scripts/llm/replay.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        },
+        {
+          "name": ".claude/skills/write-satellite-content/scripts/llm/provider.ts",
+          "dependencyTypes": [
+            "local",
+            "type-only",
+            "import"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "cycle",
+      "from": ".claude/skills/write-satellite-content/scripts/llm/replay.ts",
+      "to": ".claude/skills/write-satellite-content/scripts/llm/anthropic.ts",
+      "unresolvedTo": "./anthropic",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "no-circular-runtime-dependencies"
+      },
+      "cycle": [
+        {
+          "name": ".claude/skills/write-satellite-content/scripts/llm/anthropic.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        },
+        {
+          "name": ".claude/skills/write-satellite-content/scripts/llm/provider.ts",
+          "dependencyTypes": [
+            "local",
+            "type-only",
+            "import"
+          ]
+        },
+        {
+          "name": ".claude/skills/write-satellite-content/scripts/llm/replay.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "cycle",
+      "from": "issues/.scripts/merge-branch.ts",
+      "to": "issues/.scripts/merge-branch-self-test.ts",
+      "unresolvedTo": "./merge-branch-self-test",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "no-circular-runtime-dependencies"
+      },
+      "cycle": [
+        {
+          "name": "issues/.scripts/merge-branch-self-test.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        },
+        {
+          "name": "issues/.scripts/merge-branch-self-test-gates.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        },
+        {
+          "name": "issues/.scripts/merge-branch.ts",
+          "dependencyTypes": [
+            "local",
+            "type-only",
+            "import"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "cycle",
+      "from": "issues/.scripts/verification/verification-runner.ts",
+      "to": "issues/.scripts/verification/verification-effects.ts",
+      "unresolvedTo": "./verification-effects",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "no-circular-runtime-dependencies"
+      },
+      "cycle": [
+        {
+          "name": "issues/.scripts/verification/verification-effects.ts",
+          "dependencyTypes": [
+            "local",
+            "import"
+          ]
+        },
+        {
+          "name": "issues/.scripts/verification/verification-runner.ts",
+          "dependencyTypes": [
+            "local",
+            "type-only",
+            "import"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/merge-branch.ts",
+      "to": "issues/.scripts/merge-branch-self-test.ts",
+      "unresolvedTo": "./merge-branch-self-test",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "production-does-not-import-tests"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/quality.ts",
+      "to": "issues/.scripts/quality/quality-count-fixtures.ts",
+      "unresolvedTo": "./quality/quality-count-fixtures.ts",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "production-does-not-import-tests"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/quality.ts",
+      "to": "issues/.scripts/quality/self-test-memo.ts",
+      "unresolvedTo": "./quality/self-test-memo.ts",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "production-does-not-import-tests"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/quality/quality-effective-config.ts",
+      "to": "issues/.scripts/quality/quality-count-fixtures.ts",
+      "unresolvedTo": "./quality-count-fixtures.ts",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "production-does-not-import-tests"
+      }
+    },
+    {
+      "type": "dependency",
+      "from": "issues/.scripts/quality/quality-schedule.ts",
+      "to": "issues/.scripts/quality/quality-count-fixtures.ts",
+      "unresolvedTo": "./quality-count-fixtures.ts",
+      "dependencyTypes": [
+        "local",
+        "import"
+      ],
+      "rule": {
+        "severity": "error",
+        "name": "production-does-not-import-tests"
+      }
+    }
+  ],
+  "duplication": {
+    "clones": 48,
+    "lines": 950
+  },
+  "formatting": "Historical six-scope probe: 2325 files. Not remeasured after payload refresh.",
+  "commands": [
+    "bun run --cwd issues/.scripts quality",
+    "bun run --cwd issues/.scripts lint",
+    "bun run --cwd issues/.scripts architecture"
+  ],
+  "gate_status": "red; successful build/self-tests/dead-code/secrets do not waive typecheck/lint/architecture/duplication findings",
+  "lint_fatal_class": "Four parser project-membership mismatches in nested .claude browser-policy fixtures. Configuration mismatch, not four source defects."
+}

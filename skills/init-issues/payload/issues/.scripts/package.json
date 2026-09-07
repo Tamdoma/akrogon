@@ -1,0 +1,8 @@
+{
+  "name": "@tamdoma/issues-lifecycle-scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "js-yaml": "5.2.2"
+  }
+}
