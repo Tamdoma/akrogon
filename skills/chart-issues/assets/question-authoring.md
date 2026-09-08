@@ -18,13 +18,33 @@ contained so a copied chart skill does not depend on a repository document.
 
 Teach each question in this form:
 
-```text
-Question N
-<plain-language background, the decision, and why it matters>
-Option A (recommended): <the concrete behavior this authorizes and why it is preferable>
-Option B: <the concrete alternative and its tradeoff>
-Reply with N-A, or give a numbered free-text answer.
+```markdown
+### Q<N> · <the question itself, ending in a question mark>
+
+<one to three plain sentences: what this thing is, with a concrete example,
+and what changes depending on the answer>
+
+- **A (recommended)** <what happens if you pick this, and the one reason it wins>
+- **B** <what happens if you pick this, and its cost>
+
+A beginner would miss: <the pitfall behind this choice, one sentence>
+
+Reply `N-A`, or a numbered free-text answer.
 ```
+
+The research is done before the batch is written, never as a step the
+operator sees. Each Question and its options carry what practitioners with a
+track record do here, what they disagree on, and the agent's own reasoning on
+top of that, so the operator answers from evidence rather than supplying it.
+The beginner line names the mistake the operator could make without noticing
+and the option order guides away from it.
+
+Write for someone who has never seen this system. The heading is a real
+question a person would ask out loud, never a topic label. The background
+first says what the thing is, with one concrete example, then what changes
+with the answer. One question decides one thing. Short plain sentences, one
+consequence per option, no jargon without a one-word gloss, background capped
+at three sentences, because a wall of text hides the choice.
 
 Use two to four lettered options. Gather all currently material questions into
 one batch. Number continuously from 1 within a batch and restart at 1 in the

@@ -306,15 +306,15 @@ for leaf in chart-leaf-one chart-leaf-two; do
   assert_contains "$leaf_dir/state.yaml" 'priority: n'
   assert_contains "$leaf_dir/state.yaml" 'repo: akrogon'
   assert_not_contains "$leaf_dir/state.yaml" 'chart-skill-version:'
-  assert_one_stamp "$leaf_dir/brief.md" 'Chart skill version: 1'
-  assert_stamp_after_title "$leaf_dir/brief.md" "# Brief: $leaf" 'Chart skill version: 1'
-  assert_stamp_after_title "$leaf_dir/design.md" "# Design: $leaf" 'Chart skill version: 1'
-  assert_one_stamp "$leaf_dir/state.yaml" '# Chart skill version: 1'
+  assert_one_stamp "$leaf_dir/brief.md" 'Chart skill version: 3'
+  assert_stamp_after_title "$leaf_dir/brief.md" "# Brief: $leaf" 'Chart skill version: 3'
+  assert_stamp_after_title "$leaf_dir/design.md" "# Design: $leaf" 'Chart skill version: 3'
+  assert_one_stamp "$leaf_dir/state.yaml" '# Chart skill version: 3'
 done
 series_index="$handoff_root/issues/open/SERIES-fixture-series.md"
 assert_file "$series_index"
-assert_one_stamp "$series_index" 'Chart skill version: 1'
-assert_stamp_after_title "$series_index" '# Series Index: fixture-series' 'Chart skill version: 1'
+assert_one_stamp "$series_index" 'Chart skill version: 3'
+assert_stamp_after_title "$series_index" '# Series Index: fixture-series' 'Chart skill version: 3'
 assert_contains "$series_index" '| Order | Leaf'
 assert_contains "$series_index" 'serial: chart-leaf-one'
 assert_not_contains "$series_index" '| Status |'
@@ -373,9 +373,9 @@ assert_file "$seed_beside_leaf/state.yaml"
 assert_three_files "$seed_beside_leaf"
 assert_contains "$seed_beside_leaf/brief.md" '# Brief: chart-leaf-one'
 assert_numbered_done_criteria "$seed_beside_leaf/brief.md"
-assert_one_stamp "$seed_beside_leaf/brief.md" 'Chart skill version: 1'
-assert_stamp_after_title "$seed_beside_leaf/brief.md" '# Brief: chart-leaf-one' 'Chart skill version: 1'
-assert_stamp_after_title "$seed_beside_leaf/design.md" '# Design: chart-leaf-one' 'Chart skill version: 1'
+assert_one_stamp "$seed_beside_leaf/brief.md" 'Chart skill version: 3'
+assert_stamp_after_title "$seed_beside_leaf/brief.md" '# Brief: chart-leaf-one' 'Chart skill version: 3'
+assert_stamp_after_title "$seed_beside_leaf/design.md" '# Design: chart-leaf-one' 'Chart skill version: 3'
 assert_contains "$seed_beside_leaf/state.yaml" 'slug: chart-leaf-one'
 assert_equal '4' "$(find "$seed_beside_root/issues/open" -type f | wc -l)" 'seed-beside-leaf run emitted file count'
 pass 'a tracked intake seed beside the leaf path did not stop the handoff'
@@ -391,8 +391,8 @@ assert_equal '1' "$(find "$seat_root/issues/open" -type f | wc -l)" 'machine sea
 seat_seed="$(find "$seat_root/issues/open" -maxdepth 1 -type f -name '*.md' -print -quit)"
 [[ -n "$seat_seed" ]] || fail 'machine seat wrote no proposal seed'
 assert_contains "$seat_seed" '# Seeded Issue'
-assert_one_stamp "$seat_seed" 'Chart skill version: 1'
-assert_stamp_after_title "$seat_seed" '# Seeded Issue' 'Chart skill version: 1'
+assert_one_stamp "$seat_seed" 'Chart skill version: 3'
+assert_stamp_after_title "$seat_seed" '# Seeded Issue' 'Chart skill version: 3'
 pass 'a machine seat in an akrogon checkout emitted a proposal seed and no leaf'
 
 # Attended session, ground false: the checkout is not the configured akrogon repository. The
@@ -407,8 +407,8 @@ assert_equal '1' "$(find "$ground_root/issues/open" -type f | wc -l)" 'ungrounde
 ground_seed="$(find "$ground_root/issues/open" -maxdepth 1 -type f -name '*.md' -print -quit)"
 [[ -n "$ground_seed" ]] || fail 'ungrounded session wrote no proposal seed'
 assert_contains "$ground_seed" '# Seeded Issue'
-assert_one_stamp "$ground_seed" 'Chart skill version: 1'
-assert_stamp_after_title "$ground_seed" '# Seeded Issue' 'Chart skill version: 1'
+assert_one_stamp "$ground_seed" 'Chart skill version: 3'
+assert_stamp_after_title "$ground_seed" '# Seeded Issue' 'Chart skill version: 3'
 pass 'an attended session outside the akrogon ground emitted a proposal seed and no leaf'
 
 # Absent series confirmation, in the one mode that may materialize.
@@ -438,9 +438,9 @@ done
 assert_contains "$attended_fixture/brief.md" '# Brief: fixture-leaf'
 assert_contains "$attended_fixture/brief.md" '## Done-criteria'
 assert_numbered_done_criteria "$attended_fixture/brief.md"
-assert_stamp_after_title "$attended_fixture/brief.md" '# Brief: fixture-leaf' 'Chart skill version: 1'
-assert_stamp_after_title "$attended_fixture/design.md" '# Design: fixture-leaf' 'Chart skill version: 1'
-assert_stamp_after_title "$attended_fixture/SERIES-fixture.md" '# Series Index: fixture' 'Chart skill version: 1'
+assert_stamp_after_title "$attended_fixture/brief.md" '# Brief: fixture-leaf' 'Chart skill version: 3'
+assert_stamp_after_title "$attended_fixture/design.md" '# Design: fixture-leaf' 'Chart skill version: 3'
+assert_stamp_after_title "$attended_fixture/SERIES-fixture.md" '# Series Index: fixture' 'Chart skill version: 3'
 assert_contains "$ASSET_DIR/materialization-contract.md" '`Done-criteria` is a numbered list.'
 assert_contains "$attended_fixture/design.md" '## Binding decisions, verbatim'
 assert_contains "$attended_fixture/design.md" '## Leaf architecture'
@@ -458,7 +458,7 @@ pass 'leaf and series fixture shapes'
 proposal_fixture="$FIXTURE_DIR/proposal-seed.md"
 assert_file "$proposal_fixture"
 assert_contains "$proposal_fixture" '# Seeded Issue'
-assert_stamp_after_title "$proposal_fixture" '# Seeded Issue' 'Chart skill version: 1'
+assert_stamp_after_title "$proposal_fixture" '# Seeded Issue' 'Chart skill version: 3'
 assert_contains "$proposal_fixture" '## Observed Behavior'
 assert_contains "$proposal_fixture" '## Expected Behavior'
 assert_contains "$proposal_fixture" '## Where It Happened'
@@ -495,7 +495,7 @@ after_status="$(git -C "$ROOT_DIR" status --porcelain -- . ':(exclude).evidence'
 assert_equal "$before_status" "$after_status" 'repository intake write status'
 
 for mirror in "$HOME/.claude/skills/chart-issues" "$HOME/.codex/skills/chart-issues" "$HOME/.pi/agent/skills/chart-issues"; do
-  diff -r --no-dereference "$ROOT_DIR/skills/chart-issues" "$mirror" >/dev/null || fail "chart mirror differs: $mirror"
+  diff -r "$ROOT_DIR/skills/chart-issues" "$mirror" >/dev/null || fail "chart mirror differs: $mirror"
 done
 for mirror in "$HOME/.claude/skills/create-issue/SKILL.md" "$HOME/.codex/skills/create-issue/SKILL.md" "$HOME/.pi/agent/skills/create-issue/SKILL.md"; do
   cmp -s "$ROOT_DIR/skills/create-issue/SKILL.md" "$mirror" || fail "create-issue mirror differs: $mirror"

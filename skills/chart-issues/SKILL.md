@@ -4,7 +4,7 @@ description: Chart the route for work whose destination is nameable but whose pa
 disable-model-invocation: true
 ---
 
-Chart skill version: 1
+Chart skill version: 3
 
 # Chart Issues
 
@@ -135,8 +135,8 @@ Chart files are not lifecycle artifacts, so `budget-check` never measures them.
 
 | Type        | Mode   | Behavior                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ----------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `grilling`  | HITL   | operator conversation. Use [`assets/question-authoring.md`](assets/question-authoring.md) for the one Question and Option protocol. Deliver one batch, end the turn, resume from the operator's inline reply, and close the round with its visible challenge check                                                                                                                                          |
-| `research`  | AFK    | read docs, APIs, and the codebase; append what was found to `## Findings` with its source. No operator turn. Several research decisions may run in parallel                                                                                                                                                                                                                                                 |
+| `grilling`  | HITL   | operator conversation. Research comes before the questions: gather the practitioner evidence and the agent's own knowledge first, then write the batch so each Question already carries what practitioners do and what a beginner would miss. Use [`assets/question-authoring.md`](assets/question-authoring.md) for the one Question and Option protocol. Deliver one batch, end the turn, resume from the operator's inline reply, and close the round with its visible challenge check |
+| `research`  | AFK    | read docs, APIs, and the codebase; append what was found to `## Findings` with its source. No operator turn, and no decision taken: the findings back the questions and recommendations of the grilling decisions that named it, and the operator settles those. Several research decisions may run in parallel                                                                                                |
 | `prototype` | HITL   | propose a normal prototype Question with a minutes estimate (10 minutes by default) and one-letter `Veto`. If chosen, run the smallest sandboxed, time-boxed measurement, keep only the measured finding, and discard all code. Never merged, never a later issue's starting point                                                                                                                          |
 | `debate`    | HITL   | both slots write one independent recommendation of at most 50 lines into `## Findings`, headed `Slot A` and `Slot B`, neither reading the other first; the operator picks                                                                                                                                                                                                                                   |
 | `setup`     | either | manual work that must happen before a decision can be made: provision access, sign up so an API can be judged, move data so its shape is visible. The one type that acts rather than decides, and it earns that only by unblocking a decision. Agent-driven where it can be; otherwise hand the operator a precise checklist. `## Resolution` records what was done plus any fact later decisions depend on |
@@ -160,6 +160,18 @@ Lower-tier returns are redone when a higher tier was reasonably available.
 Every return records the tier, source or reason the tier was unavailable, the
 finding, and what decision it changes. A model-knowledge return must say that
 no better source was available.
+
+Practitioners first. A research return names the people who have done this
+work at scale, says in one line why each is worth listening to, then compares
+them: where they agree, where they disagree, and which conditions flip their
+advice. The finding is a synthesis of that evidence with the agent's own
+reasoning, one paragraph, not a source list. Material the operator has placed
+in `issues/chart/sources/` (course notes, transcripts, PDFs, books) is the
+strongest source available and is read before any web search.
+
+Research never settles anything. It decides which questions get asked, which
+pitfalls the questions name, and which option is recommended. The operator
+settles every decision.
 
 Prototype settle-mode follows the normal question in
 [`assets/question-authoring.md`](assets/question-authoring.md). The operator's

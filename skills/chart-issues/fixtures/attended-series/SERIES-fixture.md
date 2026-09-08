@@ -1,6 +1,6 @@
 # Series Index: fixture
 
-Chart skill version: 1
+Chart skill version: 3
 
 ## Leaves
 

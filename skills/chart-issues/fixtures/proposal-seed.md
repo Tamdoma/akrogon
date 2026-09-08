@@ -1,6 +1,6 @@
 # Seeded Issue
 
-Chart skill version: 1
+Chart skill version: 3
 
 ## Observed Behavior
 

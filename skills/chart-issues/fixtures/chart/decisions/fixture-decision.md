@@ -1,6 +1,6 @@
 # Fixture decision
 
-Chart skill version: 1
+Chart skill version: 3
 
 Status: resolved
 Type: grilling
