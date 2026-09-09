@@ -1,0 +1,9 @@
+# Chart skill version: 4
+slug: pull-close
+phase: plan.positions
+created: '2026-09-09'
+priority: n
+repo: akrogon
+consult: no
+debate: yes
+blocked-by: [status]

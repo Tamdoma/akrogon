@@ -289,3 +289,11 @@ What happens to the issues in flight in akrogon and framework right now, finish 
 ## Notes as they come
 
 (newest last)
+
+Sometimes I will be running more than one chart at the same time, and the current chart folder only anticipates one: a single CHART.md and a single decisions folder under issues/chart. I want the simplest and most elegant shape for several charts side by side, something like one subfolder per chart under issues/chart, each with its own chart file and decisions, and the handoff archives that subfolder. Whether the intake stays one file or each chart carries its own is part of the same question. Open, to be decided in the chart.
+
+Everything the chart process is learning applies to the create-issue skill as well: slot B blind at every step, questions in the plain-language form, learnings kept. The difference is size, one issue and a few decisions instead of a territory. Open question, maybe one skill instead of two: chart-issues could also serve the small issues create-issue serves now.
+
+The implementers will be cheaper models running as subagents. The handoff has to squeeze the most out of a model that cannot think but implements well: a proper format, checklists or sub-checklists, which files to reference and which not, detailed instructions. Needs research, is its own decision, and ties into the code quality audit.
+
+When a leaf creates tests, explore test impact analysis, TIA, running only the tests the change can affect. Not mandatory, an option to take into account wherever testing is decided.

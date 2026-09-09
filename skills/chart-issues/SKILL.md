@@ -4,7 +4,7 @@ description: Chart the route for work whose destination is nameable but whose pa
 disable-model-invocation: true
 ---
 
-Chart skill version: 3
+Chart skill version: 6
 
 # Chart Issues
 
@@ -135,13 +135,13 @@ Chart files are not lifecycle artifacts, so `budget-check` never measures them.
 
 | Type        | Mode   | Behavior                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ----------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `grilling`  | HITL   | operator conversation. Research comes before the questions: gather the practitioner evidence and the agent's own knowledge first, then write the batch so each Question already carries what practitioners do and what a beginner would miss. Use [`assets/question-authoring.md`](assets/question-authoring.md) for the one Question and Option protocol. Deliver one batch, end the turn, resume from the operator's inline reply, and close the round with its visible challenge check |
+| `grilling`  | HITL   | operator conversation. Research comes before the questions: gather the practitioner evidence and the agent's own knowledge first, then write the batch so each Question already carries what practitioners do and which pitfalls it anticipates. Use [`assets/question-authoring.md`](assets/question-authoring.md) for the one Question and Option protocol. Deliver one batch, end the turn, resume from the operator's inline reply, and close the round with its visible challenge check |
 | `research`  | AFK    | read docs, APIs, and the codebase; append what was found to `## Findings` with its source. No operator turn, and no decision taken: the findings back the questions and recommendations of the grilling decisions that named it, and the operator settles those. Several research decisions may run in parallel                                                                                                |
 | `prototype` | HITL   | propose a normal prototype Question with a minutes estimate (10 minutes by default) and one-letter `Veto`. If chosen, run the smallest sandboxed, time-boxed measurement, keep only the measured finding, and discard all code. Never merged, never a later issue's starting point                                                                                                                          |
 | `debate`    | HITL   | both slots write one independent recommendation of at most 50 lines into `## Findings`, headed `Slot A` and `Slot B`, neither reading the other first; the operator picks                                                                                                                                                                                                                                   |
 | `setup`     | either | manual work that must happen before a decision can be made: provision access, sign up so an API can be judged, move data so its shape is visible. The one type that acts rather than decides, and it earns that only by unblocking a decision. Agent-driven where it can be; otherwise hand the operator a precise checklist. `## Resolution` records what was done plus any fact later decisions depend on |
 
-`grilling` is the default; choose another type only when the decision needs evidence or access the operator does not already hold. Every operator-facing question follows the local authoring asset, including its beginner teaching, consequence-bearing options, continuous batch numbering, explicit reply key, and visible `Challenge check` close.
+`grilling` is the default; choose another type only when the decision needs evidence or access the operator does not already hold. Every operator-facing question follows the local authoring asset, including its plain-language teaching, its pitfalls line, consequence-bearing options, continuous batch numbering, explicit reply key, and visible `Challenge check` close.
 
 Research returns must name their source tier and credibility:
 
@@ -153,6 +153,12 @@ Research returns must name their source tier and credibility:
    training.
 3. `model-knowledge`: the interviewer model's own knowledge when no stronger
    source is available.
+
+Within a tier, newer wins. Every finding carries its date, and a source from
+the last twelve months outranks an older one of the same tier when they
+disagree. On agent workflows, harness behavior and model capability the
+window is six months, because the ground moves that fast. An older source
+still stands when nothing newer covers the point, and the return says so.
 
 Use the highest available tier. A return that used a lower tier while a higher
 tier was reasonably available is rejected and the research decision is redone.
@@ -187,13 +193,22 @@ A `debate` is dispatched by hand in v1 — the operator opens the configured cro
 The first chart action is a territory-mapping pass. Before asking any
 destination or decision question, present a proportional first-principles map
 to the operator with three visible parts: the main forks, the questions an
-experienced practitioner would ask, and the mistakes a beginner could make
+experienced practitioner would ask, and the pitfalls anyone could fall into
 without noticing. Include what the repository and notes show, then add the
 domain questions they cannot show. The operator sees this map before any
 grilling. It is the root from which the decision tree grows, so newly surfaced
 decisions enter the chart rather than remaining assumptions.
 
-Use the map shape and the complete-beginner Question and Option rules in
+When the operator elected a second slot for this chart, the map is a blind
+two-slot pass like every decision after it: slot B writes its own map from
+the intake and `CHART.md` with no view of slot A's, slot A merges, and each
+fork in the merged map names the slot that raised it. A map drawn by one slot
+fixes the forks every later batch is asked inside, so the second view has to
+enter here or it never enters. A second slot is elected at the door, in one
+word: worth it for a chart whose decisions reference each other, not for a
+single fuzzy issue.
+
+Use the map shape and the plain-language Question and Option rules in
 [`assets/question-authoring.md`](assets/question-authoring.md). Do not replace
 the map with an inventory of files or with a list of decisions already noticed.
 
@@ -223,17 +238,17 @@ One session. Produces the chart and the first decisions, then stops.
 
 ## Work Lane
 
-Repeatable. One decision per session, `research` excepted.
+Repeatable. One decision at a time, `research` excepted.
 
 1. Read `CHART.md` and nothing else. It is low resolution on purpose. Open a decision file only when you are about to work it, or when the one you are working names it. Reading every decision file to gather context is the one habit that makes a chart cost more than the rework it prevents.
 2. Pick one ready decision — `Status: open`, unblocked, unclaimed. Prefer the one that unblocks the most others.
 3. Claim it by writing `Status: claimed` before any work; the operator may run two unblocked decisions in parallel sessions, and the claim is the only guard. Then load the skills `## Notes` names and settle it by its type. Use the local Question Authoring rules for every operator round and visibly run its expert-challenge check before preparing the next frontier.
 4. Write `## Resolution`, set `Status: resolved`, and append one line to `## Decisions So Far`: the answer and a link. A prototype resolution contains only its measured finding, never its code or scratch artifact.
 5. Unblock: any decision whose `blocked-by` named this one returns to `Status: open`.
-6. Graduate: the answer usually makes part of `## Not Yet Specified` specifiable. Move that part into fresh decision files and delete it from that section. If the answer instead invalidates a decision, update or delete it; if it puts one past the destination, rule it out per `## Scope And Specifiability`.
-7. Stop.
+6. Reshape: the territory map is the set of open Questions, and every answer redraws it. Reread every open Question against the new answer and do one of three things to each: narrow it, widen it with a dated coverage line, or rule it out. A fork the answer exposes becomes a new decision file. Then graduate: the answer usually makes part of `## Not Yet Specified` specifiable, so move that part into fresh decision files and delete it from that section. Record what moved as one dated line in the resolved decision's `## Findings` so the next session sees the reshape. A decision past the destination is ruled out per `## Scope And Specifiability`.
+7. After reshaping, automatically continue with the next ready decision. Pause when operator input is required; if no decision is ready, follow Termination or report what blocks progress.
 
-Settling several decisions in one session defeats the point: each answer reshapes what is still unknown, and a second decision taken before that reshape is taken against a stale chart. Several `research` decisions in one session are fine — they gather, they do not decide.
+Reshape after each settled decision before starting the next, so it is worked against the updated chart. Several `research` decisions may run together — they gather, they do not decide.
 
 ## Scope And Specifiability
 
