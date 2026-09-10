@@ -1,0 +1,16 @@
+id = "akrogon"
+name = "akrogon"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+platforms = ["linux"]
+
+[[startup]]
+command = ["sh", "next.sh", "--all"]
+
+[[events]]
+on = "pane.agent_status_changed"
+command = ["sh", "next.sh"]
+
+[[events]]
+on = "pane.exited"
+command = ["sh", "next.sh"]
