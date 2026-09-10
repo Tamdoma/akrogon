@@ -7,13 +7,14 @@
  * Supports multiple configured webhook environment names for broadcasting to multiple channels.
  *
  * Usage:
- *   echo '{"summary":"...","whats_new":["...","...","..."]}' | bun scripts/discord-send.js
+ *   echo '{"summary":"...","whats_new":["...","...","..."]}' | bun scripts/discord-send.ts --target issue:<slug>
  *
  * Or with command line argument:
- *   bun scripts/discord-send.js '{"summary":"...","whats_new":["...","...","..."]}'
+ *   bun scripts/discord-send.ts --target issue:<slug> '{"summary":"...","whats_new":["...","...","..."]}'
  *
  * Flags:
  *   --dry-run  Preview message without sending
+ *   --non-lifecycle  Send an explicit non-lifecycle operator alert without a target
  *
  * Environment:
  *   Configure env-var names in issues/config.yaml:
@@ -29,9 +30,27 @@
  *   1 - Error (configuration, validation, or any delivery failure)
  */
 
-const https = require('https');
-const path = require('path');
-const fs = require('fs');
+import * as https from 'node:https';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { BroadcastTargetError, assertBroadcastTargetAllowed } from './broadcast-target';
+import { BROADCAST_LOG_RELATIVE_PATH, recordBroadcastDelivery, deliveredWebhooks } from './broadcast-record';
+
+import type { YamlNode } from '../../../issues/.scripts/lifecycle/run-status-protocol';
+interface Message {
+  readonly summary: string;
+  readonly whats_new: readonly YamlNode[];
+}
+interface Webhook {
+  readonly name: string;
+  readonly url: string;
+}
+type DiscordError = Error & { statusCode?: number };
+interface DiscordResult {
+  readonly success: true;
+  readonly statusCode: number;
+}
+type UrlValidation = { readonly valid: true } | { readonly valid: false; readonly error: string };
 
 const DEFAULT_WEBHOOK_ENV_NAMES = ['DISCORD_WEBHOOK_URL'];
 const ENV_PATH = path.join(path.dirname(__dirname), '.env');
@@ -43,8 +62,8 @@ const INITIAL_RETRY_DELAY_MS = 1000;
 /**
  * Sleep for specified milliseconds
  */
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -52,7 +71,7 @@ function sleep(ms) {
  * Falls back to dotenv if available.
  * Loads only the .env file next to the running skill; existing process env values win.
  */
-function loadEnv() {
+function loadEnv(): void {
   if (!fs.existsSync(ENV_PATH)) {
     return;
   }
@@ -60,7 +79,8 @@ function loadEnv() {
   try {
     require('dotenv').config({ path: ENV_PATH, override: false, quiet: true });
     return;
-  } catch (e) {
+  } catch (cause) {
+    if (!(cause instanceof Error)) throw cause;
     // dotenv not installed, parse manually
   }
 
@@ -85,8 +105,7 @@ function loadEnv() {
       let value = trimmed.slice(eqIndex + 1).trim();
 
       // Remove quotes if present
-      if ((value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))) {
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
         value = value.slice(1, -1);
       }
 
@@ -94,12 +113,14 @@ function loadEnv() {
         process.env[key] = value;
       }
     }
-  } catch (e) {
+  } catch (cause) {
+    if (!(cause instanceof Error)) throw cause;
+    const e: Error = cause;
     console.error(`[discord-send] Warning: Could not parse .env at ${ENV_PATH}: ${e.message}`);
   }
 }
 
-function findIssuesConfig(startDir) {
+function findIssuesConfig(startDir: string): string | null {
   let currentDir = startDir;
 
   while (true) {
@@ -117,12 +138,12 @@ function findIssuesConfig(startDir) {
   }
 }
 
-function getIndent(line) {
+function getIndent(line: string): number {
   const match = line.match(/^ */);
   return match ? match[0].length : 0;
 }
 
-function readConfiguredWebhookEnvNames(configPath) {
+function readConfiguredWebhookEnvNames(configPath: string): string[] {
   const lines = fs.readFileSync(configPath, 'utf8').split(/\r?\n/);
   let broadcastIndent = -1;
   let discordIndent = -1;
@@ -164,7 +185,9 @@ function readConfiguredWebhookEnvNames(configPath) {
       if (indent > discordIndent && trimmed.startsWith('webhook_env:')) {
         const value = trimmed.slice('webhook_env:'.length).trim();
         if (value) {
-          throw new Error(`Malformed broadcast.discord.webhook_env in ${configPath}: use block-list entries like "- DISCORD_WEBHOOK_URL"`);
+          throw new Error(
+            `Malformed broadcast.discord.webhook_env in ${configPath}: use block-list entries like "- DISCORD_WEBHOOK_URL"`
+          );
         }
         webhookIndent = indent;
       }
@@ -198,7 +221,7 @@ function readConfiguredWebhookEnvNames(configPath) {
   return names;
 }
 
-function getConfiguredWebhookEnvNames() {
+function getConfiguredWebhookEnvNames(): string[] {
   const configPath = findIssuesConfig(process.cwd());
   return configPath ? readConfiguredWebhookEnvNames(configPath) : DEFAULT_WEBHOOK_ENV_NAMES;
 }
@@ -206,7 +229,7 @@ function getConfiguredWebhookEnvNames() {
 /**
  * Validate webhook URL format
  */
-function validateWebhookUrl(url, name = 'DISCORD_WEBHOOK_URL') {
+function validateWebhookUrl(url: string, name: string = 'DISCORD_WEBHOOK_URL'): UrlValidation {
   if (!url) {
     return { valid: false, error: `${name} is not set` };
   }
@@ -220,7 +243,9 @@ function validateWebhookUrl(url, name = 'DISCORD_WEBHOOK_URL') {
       return { valid: false, error: `${name}: URL must be a Discord webhook path` };
     }
     return { valid: true };
-  } catch (e) {
+  } catch (cause) {
+    if (!(cause instanceof Error)) throw cause;
+    const e: Error = cause;
     return { valid: false, error: `${name}: Invalid URL: ${e.message}` };
   }
 }
@@ -228,7 +253,7 @@ function validateWebhookUrl(url, name = 'DISCORD_WEBHOOK_URL') {
 /**
  * Collect webhook URLs from the env-var names configured in issues/config.yaml.
  */
-function collectWebhookUrls() {
+function collectWebhookUrls(): Webhook[] {
   const webhooks = [];
   const webhookEnvNames = getConfiguredWebhookEnvNames();
 
@@ -250,7 +275,7 @@ function collectWebhookUrls() {
 /**
  * Validate input message structure
  */
-function validateInput(data) {
+function validateInput(data: Message): string[] {
   const errors = [];
 
   if (!data.summary || typeof data.summary !== 'string') {
@@ -269,8 +294,8 @@ function validateInput(data) {
 
   if (!Array.isArray(data.whats_new)) {
     errors.push("'whats_new' is required and must be an array");
-  } else if (data.whats_new.length < 3) {
-    errors.push("'whats_new' must have at least 3 items");
+  } else if (data.whats_new.length < 1) {
+    errors.push("'whats_new' must have at least one item");
   }
 
   return errors;
@@ -279,12 +304,14 @@ function validateInput(data) {
 /**
  * Format message content for Discord
  */
-function formatMessage(data) {
+function formatMessage(data: Message, continuation: boolean): string {
   const lines = [];
 
   // Test tube emoji + summary
-  lines.push(`\uD83E\uDDEA ${data.summary}`);
-  lines.push('');
+  if (!continuation) {
+    lines.push(`\uD83E\uDDEA ${data.summary}`);
+    lines.push('');
+  }
   for (const item of data.whats_new) {
     lines.push(`- ${item}`);
   }
@@ -295,7 +322,7 @@ function formatMessage(data) {
 /**
  * Send message to Discord webhook
  */
-function sendToDiscord(webhookUrl, content) {
+function sendToDiscord(webhookUrl: string, content: string): Promise<DiscordResult> {
   return new Promise((resolve, reject) => {
     const url = new URL(webhookUrl);
 
@@ -319,15 +346,15 @@ function sendToDiscord(webhookUrl, content) {
     const req = https.request(options, (res) => {
       let data = '';
 
-      res.on('data', chunk => {
+      res.on('data', (chunk) => {
         data += chunk;
       });
 
       res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve({ success: true, statusCode: res.statusCode });
+        if (res.statusCode! >= 200 && res.statusCode! < 300) {
+          resolve({ success: true, statusCode: res.statusCode! });
         } else {
-          const error = new Error(`Discord API error: ${res.statusCode} - ${data}`);
+          const error: DiscordError = new Error(`Discord API error: ${res.statusCode} - ${data}`);
           error.statusCode = res.statusCode;
           reject(error);
         }
@@ -352,13 +379,15 @@ function sendToDiscord(webhookUrl, content) {
 /**
  * Send with retry logic and exponential backoff
  */
-async function sendWithRetry(webhookUrl, content) {
+async function sendWithRetry(webhookUrl: string, content: string): Promise<DiscordResult> {
   let lastError;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       return await sendToDiscord(webhookUrl, content);
-    } catch (e) {
+    } catch (cause) {
+      if (!(cause instanceof Error)) throw cause;
+      const e: DiscordError = cause;
       lastError = e;
 
       // Don't retry on validation errors (4xx except 429)
@@ -369,7 +398,9 @@ async function sendWithRetry(webhookUrl, content) {
       // Rate limited (429) - use longer exponential backoff
       if (e.statusCode === 429 || e.message.includes('429')) {
         const retryAfter = Math.pow(2, attempt) * INITIAL_RETRY_DELAY_MS;
-        console.error(`[discord-send] Rate limited. Waiting ${retryAfter / 1000}s before retry ${attempt}/${MAX_RETRIES}`);
+        console.error(
+          `[discord-send] Rate limited. Waiting ${retryAfter / 1000}s before retry ${attempt}/${MAX_RETRIES}`
+        );
         await sleep(retryAfter);
         continue;
       }
@@ -390,9 +421,13 @@ async function sendWithRetry(webhookUrl, content) {
 /**
  * Read input from stdin or command line
  */
-async function getInput() {
+async function getInput(): Promise<string> {
   // Filter out flags from arguments
-  const args = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
+  const args = process.argv.slice(2).filter((arg, index, values) => {
+    if (arg === '--target' || arg === '--event') return false;
+    if (index > 0 && ['--target', '--event'].includes(values[index - 1])) return false;
+    return !arg.startsWith('--');
+  });
 
   // Check for command line argument (non-flag)
   if (args.length > 0) {
@@ -407,7 +442,7 @@ async function getInput() {
 
     // Handle piped input
     if (!process.stdin.isTTY) {
-      process.stdin.on('data', chunk => {
+      process.stdin.on('data', (chunk) => {
         data += chunk;
       });
 
@@ -424,24 +459,60 @@ async function getInput() {
 /**
  * Check for --dry-run flag
  */
-function isDryRun() {
+function isDryRun(): boolean {
   return process.argv.includes('--dry-run');
+}
+
+function isNonLifecycle(): boolean {
+  return process.argv.includes('--non-lifecycle');
+}
+
+function targetArgument(): string | undefined {
+  const index = process.argv.indexOf('--target');
+  if (index < 0) return undefined;
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith('--')) throw new Error('--target requires an issue or series target');
+  if (process.argv.indexOf('--target', index + 1) >= 0) throw new Error('--target may appear once');
+  return value;
+}
+
+function eventArgument(): string | undefined {
+  const index: number = process.argv.indexOf('--event');
+  if (index < 0) return undefined;
+  const value: string | undefined = process.argv[index + 1];
+  if (!value || value.startsWith('--')) throw new Error('--event requires a completion identity');
+  if (process.argv.indexOf('--event', index + 1) >= 0) throw new Error('--event may appear once');
+  return value;
 }
 
 /**
  * Main execution
  */
-async function main() {
+async function main(): Promise<void> {
   const dryRun = isDryRun();
+  const nonLifecycle = isNonLifecycle();
+  const event: string | undefined = eventArgument();
+
+  if (nonLifecycle && process.argv.includes('--target')) {
+    console.error('[discord-send] --non-lifecycle cannot be combined with --target');
+    process.exit(1);
+  }
+  if (nonLifecycle && event !== undefined) throw new Error('--event requires a lifecycle --target');
+  const target = nonLifecycle ? undefined : targetArgument();
+  if (!nonLifecycle) {
+    assertBroadcastTargetAllowed({ cwd: process.cwd(), target });
+  }
 
   // Load environment variables
   loadEnv();
 
   // Collect all webhook URLs
-  let webhooks;
+  let webhooks: Webhook[];
   try {
     webhooks = collectWebhookUrls();
-  } catch (e) {
+  } catch (cause) {
+    if (!(cause instanceof Error)) throw cause;
+    const e: Error = cause;
     console.error(`[discord-send] ${e.message}`);
     console.error('[discord-send] See setup-guide.md for instructions');
     process.exit(1);
@@ -467,7 +538,7 @@ async function main() {
 
     if (invalidWebhooks.length > 0) {
       console.error('[discord-send] Invalid webhook URL(s):');
-      invalidWebhooks.forEach(err => console.error(`  - ${err}`));
+      invalidWebhooks.forEach((err) => console.error(`  - ${err}`));
       process.exit(1);
     }
 
@@ -479,16 +550,20 @@ async function main() {
 
   if (!input) {
     console.error('[discord-send] No input provided');
-    console.error('[discord-send] Usage: echo \'{"summary":"...","whats_new":["...","...","..."]}\' | bun scripts/discord-send.js');
+    console.error(
+      '[discord-send] Usage: echo \'{"summary":"...","whats_new":["...","...","..."]}\' | bun scripts/discord-send.ts --target issue:<slug>'
+    );
     console.error('[discord-send] Flags: --dry-run (preview without sending)');
     process.exit(1);
   }
 
   // Parse input
-  let data;
+  let data: Message;
   try {
     data = JSON.parse(input);
-  } catch (e) {
+  } catch (cause) {
+    if (!(cause instanceof Error)) throw cause;
+    const e: Error = cause;
     console.error(`[discord-send] Invalid JSON input: ${e.message}`);
     process.exit(1);
   }
@@ -497,12 +572,17 @@ async function main() {
   const validationErrors = validateInput(data);
   if (validationErrors.length > 0) {
     console.error('[discord-send] Validation errors:');
-    validationErrors.forEach(err => console.error(`  - ${err}`));
+    validationErrors.forEach((err) => console.error(`  - ${err}`));
     process.exit(1);
   }
 
+  const delivered: ReadonlySet<string> =
+    event === undefined ? new Set<string>() : deliveredWebhooks(process.cwd(), event);
+  const skipped: string[] = webhooks.filter((webhook) => delivered.has(webhook.name)).map((webhook) => webhook.name);
+  webhooks = webhooks.filter((webhook) => !delivered.has(webhook.name));
+
   // Format message
-  const message = formatMessage(data);
+  const message = formatMessage(data, process.argv.includes('--continuation'));
 
   // Check Discord's 2000 character limit
   if (message.length > 2000) {
@@ -512,6 +592,7 @@ async function main() {
 
   // Dry-run mode: preview and exit
   if (dryRun) {
+    if (skipped.length > 0) console.log('[discord-send] Already delivered:', { event, webhooks: skipped });
     const webhookCount = webhooks.length || '(none configured)';
     console.log('');
     console.log('============================================================');
@@ -534,13 +615,20 @@ async function main() {
     process.exit(0);
   }
 
+  if (webhooks.length === 0) {
+    console.log('[discord-send] Already delivered', { event, webhooks: skipped });
+    process.exit(0);
+  }
+
   // Send to all webhooks in parallel
   const results = await Promise.allSettled(
     webhooks.map(async (webhook) => {
       try {
         const result = await sendWithRetry(webhook.url, message);
         return { webhook: webhook.name, success: true, statusCode: result.statusCode };
-      } catch (e) {
+      } catch (cause) {
+        if (!(cause instanceof Error)) throw cause;
+        const e: Error = cause;
         return { webhook: webhook.name, success: false, error: e.message };
       }
     })
@@ -548,13 +636,51 @@ async function main() {
 
   // Report results
   let hasFailure = false;
+  const deliveries = [];
   for (const result of results) {
     if (result.status === 'fulfilled' && result.value.success) {
       console.log(`[discord-send] ${result.value.webhook}: Success (status ${result.value.statusCode})`);
+      deliveries.push({ webhook: result.value.webhook, success: true, statusCode: result.value.statusCode });
     } else {
       hasFailure = true;
       const error = result.status === 'fulfilled' ? result.value.error : result.reason;
-      console.error(`[discord-send] ${result.value?.webhook || 'unknown'}: Failed - ${error}`);
+      console.error(
+        `[discord-send] ${result.status === 'fulfilled' ? result.value.webhook : 'unknown'}: Failed - ${error}`
+      );
+      deliveries.push({
+        webhook: result.status === 'fulfilled' ? result.value.webhook : 'unknown',
+        success: false,
+        error: String(error)
+      });
+    }
+  }
+
+  // Durably record any broadcast that reached Discord, so a later session can
+  // verify a send happened instead of re-firing a duplicate.
+  if (deliveries.some((delivery) => delivery.success)) {
+    try {
+      const logPath = recordBroadcastDelivery({
+        cwd: process.cwd(),
+        entry: {
+          protocol: 'broadcast-record/v1',
+          ...(event === undefined ? {} : { event }),
+          recorded_at: new Date().toISOString(),
+          target: nonLifecycle ? 'non-lifecycle' : (target ?? null),
+          summary: data.summary,
+          whats_new: data.whats_new,
+          deliveries
+        }
+      });
+      console.log(`[discord-send] Recorded delivery at ${logPath}`);
+    } catch (cause) {
+      if (!(cause instanceof Error)) throw cause;
+      const e: Error = cause;
+      if (e instanceof BroadcastTargetError) {
+        console.error(`[discord-send] Delivery not recorded: no issues/config.yaml above ${process.cwd()}`);
+      } else {
+        console.error(`[discord-send] Delivered but failed to record at ${BROADCAST_LOG_RELATIVE_PATH}: ${e.message}`);
+        process.exit(1);
+      }
     }
   }
 

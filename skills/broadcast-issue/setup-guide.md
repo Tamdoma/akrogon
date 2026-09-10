@@ -62,7 +62,7 @@ If the block is present but a listed variable is unset, the sender fails and nam
 From the repository root:
 
 ```bash
-echo '{"summary":"Test broadcast","whats_new":["First visible change","Second visible change","Third visible change"]}' | bun <skills-root>/broadcast-issue/scripts/discord-send.js --dry-run
+echo '{"summary":"Test broadcast","whats_new":["First visible change","Second visible change","Third visible change"]}' | bun <skills-root>/broadcast-issue/scripts/discord-send.ts --target issue:<slug> --dry-run
 ```
 
 The preview shows the formatted message, character count, and configured webhook environment names without sending anything.
@@ -72,7 +72,7 @@ The preview shows the formatted message, character count, and configured webhook
 After dry-run succeeds:
 
 ```bash
-echo '{"summary":"Test broadcast","whats_new":["First visible change","Second visible change","Third visible change"]}' | bun <skills-root>/broadcast-issue/scripts/discord-send.js
+echo '{"summary":"Test broadcast","whats_new":["First visible change","Second visible change","Third visible change"]}' | bun <skills-root>/broadcast-issue/scripts/discord-send.ts --target issue:<slug>
 ```
 
 Live mode validates every configured Discord webhook URL before sending and exits with code 1 if any delivery fails.

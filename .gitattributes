@@ -1,3 +1,0 @@
-issues/.scripts/*.ts text eol=lf
-issues/.scripts/package.json text eol=lf
-issues/.scripts/bun.lock text eol=lf

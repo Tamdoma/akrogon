@@ -45,7 +45,7 @@ Domain: the issue lifecycle tooling in this repo, driven through herdr panes. Ev
 
 - Parallel Merge: slot A rebases, rechecks, pushes fast-forward to origin main, no lock or queue; conflict or red checks return through check.fix; merged after push; broadcast never blocks; B repairs itself at the last configured round. [Parallel Merge](decisions/parallel-merge.md)
 
-- Config Shape (corrected by Model Tiering: no `workers` key; 2026-09-10: per-repo `implement: subagents | inline`, default subagents): global akrogon-new/config.yaml (max_active, slots, harness launch lines, toolkits, repos) and per-repo issues/config.yaml (remote, branch, rebuttal, fix_rounds, implement, checks that block, advisory, grounding, broadcast); `akrogon config` prints the merged result; no blocking flag. [Config Shape](decisions/config-shape.md)
+- Config Shape (corrected by Model Tiering: no `workers` key; 2026-09-10: per-repo `implement: subagents | inline`, default subagents; broadcast secret in `~/.config/akrogon/env`, never in a skill folder): global akrogon-new/config.yaml (max_active, slots, harness launch lines, toolkits, repos) and per-repo issues/config.yaml (remote, branch, rebuttal, fix_rounds, implement, checks that block, advisory, grounding, broadcast); `akrogon config` prints the merged result; no blocking flag. [Config Shape](decisions/config-shape.md)
 
 - Distribution: tool repo holds command, skills, plugin; `akrogon install` once per machine (PATH and skill symlinks, herdr integrations, plugin link); `akrogon init` per repo; update is git pull; skills name the command as dependency. [Distribution](decisions/distribution.md)
 
