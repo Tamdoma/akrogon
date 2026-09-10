@@ -1,5 +1,6 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { parse } from 'shell-quote';
 import { readGlobal, readRepo, requireRepo, globalHome, expandPath, base, target, within, type Repo, type GlobalConfig } from './config';
@@ -7,6 +8,12 @@ import { allLeaves, findLeaf, readState, saveState, withLock, withRepoLock, with
 import { requiredSlots, routing, type Slot } from './routing';
 import { herdr, panes, tabs, paneSchema, tabSchema, command, run, CommandError, quote, type Pane, type Tab, type Result } from './shell';
 import { commitMove, completeOwner, recoverMerge } from './phase';
+
+const hookEventSchema = z.discriminatedUnion('event', [
+  z.object({ event: z.literal('pane_agent_status_changed'), data: z.object({ type: z.literal('pane_agent_status_changed'), pane_id: z.string(), agent_status: paneSchema.shape.agent_status }) }),
+  z.object({ event: z.literal('pane_exited'), data: z.object({ type: z.literal('pane_exited'), pane_id: z.string() }) }),
+]);
+type HookEvent = z.infer<typeof hookEventSchema>;
 
 function idle(pane: Pane): boolean { return pane.agent_status === 'idle' || pane.agent_status === 'done'; }
 async function currentPane(id: string): Promise<Pane> {
@@ -96,7 +103,8 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
     saveState(leaf.path, attempt);
     if (pane.agent === null) {
       const harness: { kind: string; args: string[] } = launch(global, seat);
-      const started: Result = await run(['herdr', 'agent', 'start', `${state.slug}-${seat.toLowerCase()}`, '--kind', harness.kind, '--pane', pane.pane_id, '--timeout', '5000', '--', ...harness.args]);
+      const name: string = `akrogon-${createHash('sha256').update(pane.pane_id).digest('hex').slice(0, 24)}`;
+      const started: Result = await run(['herdr', 'agent', 'start', name, '--kind', harness.kind, '--pane', pane.pane_id, '--timeout', '5000', '--', ...harness.args]);
       if (started.code !== 0) {
         if (!retryable(started)) throw new CommandError(['herdr', 'agent', 'start'], repo.root, started);
         console.warn(JSON.stringify({ warning: 'agent start failed', slug: state.slug, slot, ...started }));
@@ -123,6 +131,11 @@ async function dispatchLeaf(global: GlobalConfig, repo: Repo, slug: string, expl
       if (leaf.state.hand_built) {
         if (explicit) throw new Error(`Hand-built leaf cannot be dispatched: ${slug}`);
         return false;
+      }
+      if (leaf.state.phase === 'merge') {
+        const mergeSeat: Slot = leaf.state.attempts.A >= 3 ? 'B' : 'A';
+        const active: boolean = (await panes()).some(pane => pane.pane_id === leaf.state.pane[mergeSeat] && pane.agent !== null && pane.agent_status === 'working');
+        if (active) return false;
       }
       const recovered: boolean = await recoverMerge(repo, leaf);
       const current: Leaf = recovered ? findLeaf(repo, slug) : leaf;
@@ -155,6 +168,9 @@ async function sweep(global: GlobalConfig, repo: Repo, leaves: Leaf[]): Promise<
   for (const leaf of ordered) await dispatchLeaf(global, repo, leaf.state.slug, false);
 }
 export async function nextCommand(input: string | undefined): Promise<void> {
+  const rawEvent: string | undefined = input === undefined ? process.env.HERDR_PLUGIN_EVENT_JSON : undefined;
+  const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
+  if (event?.event === 'pane_agent_status_changed' && event.data.agent_status === 'working') return;
   const global: GlobalConfig = readGlobal();
   await withLock(resolve(globalHome(), '.lock'), async () => {
     if (input === '--all') {

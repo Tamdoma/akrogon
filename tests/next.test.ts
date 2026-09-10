@@ -155,7 +155,7 @@ test('exited hooks resolve persisted pane hints and preserve the surviving slot'
     const b: string = readState(path).pane.B!;
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.filter(pane => pane.pane_id !== a) });
-    const recovered: Result = await next(f, [], { HERDR_PANE_ID: a, HERDR_PLUGIN_EVENT_JSON: JSON.stringify({ type: 'pane.exited', pane_id: a }) });
+    const recovered: Result = await next(f, [], { HERDR_PANE_ID: a, HERDR_PLUGIN_EVENT_JSON: JSON.stringify({ event: 'pane_exited', data: { type: 'pane_exited', pane_id: a, workspace_id: 'w1' } }) });
     expect(recovered.code).toBe(0);
     expect(readState(path).pane.B).toBe(b);
     expect(readState(path).pane.A).not.toBe(a);
@@ -164,4 +164,68 @@ test('exited hooks resolve persisted pane hints and preserve the surviving slot'
     expect(database(f).starts.at(-1)).toContain('strong-a');
     expect(database(f).tabs).toHaveLength(1);
   } finally { f.clean(); }
+}, 15000);
+
+test('delayed working notifications never consume retries and idle notifications still dispatch', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'delayed', 'plan.synthesis');
+    expect((await next(f, ['delayed'])).code).toBe(0);
+    const b: string = readState(path).pane.B!;
+    const db: Database = database(f);
+    saveDatabase(f, { ...db, panes: db.panes.map(p => p.pane_id === b ? { ...p, agent_status: 'idle' } : p) });
+    const event = (status: string): string => JSON.stringify({ event: 'pane_agent_status_changed', data: { type: 'pane_agent_status_changed', pane_id: b, workspace_id: 'w1', agent_status: status } });
+    expect((await next(f, [], { HERDR_PANE_ID: b, HERDR_PLUGIN_EVENT_JSON: event('working') })).code).toBe(0);
+    expect(readState(path).attempts.B).toBe(1);
+    expect(database(f).prompts).toHaveLength(1);
+    expect((await next(f, [], { HERDR_PANE_ID: b, HERDR_PLUGIN_EVENT_JSON: event('idle') })).code).toBe(0);
+    expect(readState(path).attempts.B).toBe(2);
+    expect(database(f).prompts).toHaveLength(2);
+  } finally { f.clean(); }
+}, 15000);
+
+test('a live merge retains its completion call after pushing, including a peer retry', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const remote: string = resolve(f.home, 'remote.git');
+    await command(['git', 'init', '--bare', remote]);
+    await command(['git', 'remote', 'add', 'origin', remote], f.root);
+    const path: string = leaf(f, 'active-merge', 'plan.synthesis');
+    expect((await next(f, ['active-merge'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    writeFileSync(resolve(worktree, 'landed'), 'real change\n');
+    await command(['git', 'add', 'landed'], worktree);
+    await command(['git', 'commit', '-m', 'landed change'], worktree);
+    await command(['git', 'push', 'origin', 'HEAD:main'], worktree);
+    for (const seat of ['A', 'B'] as const) {
+      saveState(path, { ...readState(path), phase: 'merge', attempts: { A: seat === 'A' ? 1 : 3, B: 0 } });
+      const db: Database = database(f);
+      saveDatabase(f, { ...db, panes: db.panes.map(p => ({ ...p, agent: 'fake', agent_status: p.pane_id === readState(path).pane[seat] ? 'working' : 'idle' })) });
+      expect((await next(f, ['--all'])).code).toBe(0);
+      expect(readState(path).phase).toBe('merge');
+    }
+    const completed: Result = await cli(f, ['phase', 'active-merge', 'merged', '--slot', 'A'], worktree, f.env);
+    expect(completed.code).toBe(0);
+    expect(completed.stdout).toContain('issue complete issue');
+    expect(database(f).tabs).toHaveLength(1);
+  } finally { f.clean(); }
+}, 15000);
+
+test('agent names support identical repo-local slugs and long numeric-leading slugs', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const g: Fixture = await fixture();
+  try {
+    const slug: string = '123-this-is-a-valid-leaf-slug-longer-than-thirty-characters';
+    leaf(f, slug, 'plan.synthesis');
+    leaf(g, slug, 'plan.synthesis', { repo: 'other' });
+    const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, other: g.root } });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const db: Database = database(f);
+    expect(db.starts).toHaveLength(2);
+    expect(new Set(db.starts.map(args => args[2])).size).toBe(2);
+    expect(db.starts.every(args => /^[a-z][a-z0-9_-]{0,31}$/.test(args[2]))).toBe(true);
+    expect(db.tabs.map(tab => tab.label)).toEqual([slug, slug]);
+    expect(db.prompts.every(prompt => prompt.text === `plan-issue ${slug} slot=B phase=plan.synthesis`)).toBe(true);
+  } finally { f.clean(); g.clean(); }
 }, 15000);

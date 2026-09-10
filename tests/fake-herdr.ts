@@ -29,6 +29,8 @@ if (args[0] === 'pane' && args[1] === 'split') {
 }
 if (args[0] === 'agent' && args[1] === 'start') {
   const target: Pane = pane(flag('--pane'));
+  if (!/^[a-z][a-z0-9_-]{0,31}$/.test(args[2])) failure('invalid_agent_name');
+  if (db.starts.some(start => start[2] === args[2] && db.panes.some(p => p.pane_id === start[start.indexOf('--pane') + 1] && p.agent !== null))) failure('agent_name_taken');
   target.agent = flag('--kind'); target.agent_status = 'idle'; db.starts.push(args); result({ agent: target });
 }
 if (args[0] === 'agent' && args[1] === 'prompt') {
