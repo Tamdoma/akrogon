@@ -7,7 +7,7 @@ import { command } from './shell';
 export function writeYaml(path: string, content: object): void {
   mkdirSync(dirname(path), { recursive: true });
   const temporary: string = `${path}.${process.pid}.tmp`;
-  writeFileSync(temporary, Bun.YAML.stringify(content));
+  writeFileSync(temporary, Bun.YAML.stringify(content, null, 2));
   renameSync(temporary, path);
 }
 export function writeRepoConfig(root: string, config: RepoConfig): void {

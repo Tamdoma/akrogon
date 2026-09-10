@@ -1,1 +1,17 @@
-{remote: origin,default_branch: main,worktree_root: issues/worktrees,rebuttal: true,fix_rounds: 3,implement: subagents,checks: {test: bun test,typecheck: bun run typecheck},advisory: [],grounding: none,broadcast: {discord: {webhook_env: [DISCORD_WEBHOOK_URL,DISCORD_WEBHOOK_URL_2]}}}
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks: 
+  test: bun test
+  typecheck: bun run typecheck
+advisory: 
+  []
+grounding: none
+broadcast: 
+  discord: 
+    webhook_env: 
+      - DISCORD_WEBHOOK_URL
+      - DISCORD_WEBHOOK_URL_2

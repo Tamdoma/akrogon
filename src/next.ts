@@ -63,7 +63,8 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf): Promise<S
   if (members.length === 0 || members.length > 2) throw new Error(`Expected one or two panes in ${tab.tab_id}`);
   const first: Pane = members.find(pane => pane.pane_id === state.pane.A) ?? members[0];
   const second: Pane = members.length === 2 ? members.find(pane => pane.pane_id !== first.pane_id)! : (await herdr(['pane', 'split', first.pane_id, '--direction', 'right', '--cwd', worktree, '--env', `AKROGON_BASE=${await base(repo, worktree)}`, '--no-focus'], z.object({ pane: paneSchema }))).pane;
-  const allocated: State = { ...tabState, pane: { A: first.pane_id, B: second.pane_id } };
+  const survivingB: boolean = members.length === 1 && first.pane_id === state.pane.B;
+  const allocated: State = { ...tabState, pane: survivingB ? { A: second.pane_id, B: first.pane_id } : { A: first.pane_id, B: second.pane_id } };
   saveState(leaf.path, allocated);
   return allocated;
 }
@@ -161,7 +162,18 @@ export async function nextCommand(input: string | undefined): Promise<void> {
       return;
     }
     const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
-    const cwd: string = input !== undefined || hookPane === undefined ? process.cwd() : z.string().parse((await currentPane(hookPane)).cwd);
+    if (input === undefined && hookPane !== undefined) {
+      const live: Pane | undefined = (await panes()).find(pane => pane.pane_id === hookPane);
+      const repos: Repo[] = Object.entries(global.repos).map(([name, path]) => readRepo(name, path));
+      const owners: { repo: Repo; leaf: Leaf }[] = repos.flatMap(repo => allLeaves(repo).filter(leaf => Object.values(leaf.state.pane).includes(hookPane) || (live !== undefined && live.cwd !== null && leaf.state.worktree !== undefined && within(live.cwd, leaf.state.worktree))).map(leaf => ({ repo, leaf })));
+      if (owners.length > 1) throw new Error(`Multiple leaves own hook pane: ${hookPane}`);
+      if (owners.length === 0) return;
+      const owner: { repo: Repo; leaf: Leaf } = owners[0];
+      const completed: boolean = await dispatchLeaf(global, owner.repo, owner.leaf.state.slug, false);
+      if (completed) await sweepAll(global);
+      return;
+    }
+    const cwd: string = process.cwd();
     const folder: string = input === undefined ? cwd : expandPath(input, cwd);
     const repo: Repo = await requireRepo(global, existsSync(folder) ? folder : cwd);
     const leaves: Leaf[] = allLeaves(repo);

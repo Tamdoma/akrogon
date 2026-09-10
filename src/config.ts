@@ -76,5 +76,5 @@ export async function effectiveConfig(cwd: string): Promise<string> {
   const repo: Repo | null = await currentRepo(global, cwd);
   const top: string | null = repo === null ? null : await command(['git', 'rev-parse', '--show-toplevel'], cwd);
   return Bun.YAML.stringify({ ...global, ... (repo === null ? repoSchema.parse({}) : repo.config), repo: repo === null ? 'none' : repo.name,
-    ...(repo !== null && top !== repo.root ? { AKROGON_BASE: await base(repo, cwd) } : {}) });
+    ...(repo !== null && top !== repo.root ? { AKROGON_BASE: await base(repo, cwd) } : {}) }, null, 2);
 }

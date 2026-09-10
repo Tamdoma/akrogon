@@ -145,3 +145,23 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     expect(database(f).tabs).toHaveLength(0);
   } finally { f.clean(); }
 }, 15000);
+
+test('exited hooks resolve persisted pane hints and preserve the surviving slot', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'exited', 'plan.positions');
+    expect((await next(f, ['exited'])).code).toBe(0);
+    const a: string = readState(path).pane.A!;
+    const b: string = readState(path).pane.B!;
+    const db: Database = database(f);
+    saveDatabase(f, { ...db, panes: db.panes.filter(pane => pane.pane_id !== a) });
+    const recovered: Result = await next(f, [], { HERDR_PANE_ID: a, HERDR_PLUGIN_EVENT_JSON: JSON.stringify({ type: 'pane.exited', pane_id: a }) });
+    expect(recovered.code).toBe(0);
+    expect(readState(path).pane.B).toBe(b);
+    expect(readState(path).pane.A).not.toBe(a);
+    expect(readState(path).attempts).toEqual({ A: 2, B: 1 });
+    expect(database(f).prompts.at(-1)?.text).toBe('plan-issue exited slot=A phase=plan.positions');
+    expect(database(f).starts.at(-1)).toContain('strong-a');
+    expect(database(f).tabs).toHaveLength(1);
+  } finally { f.clean(); }
+}, 15000);
