@@ -1,3 +1,5 @@
 issues/worktrees/
-issues/.scripts/node_modules/
 .evidence/
+node_modules/
+issues/seeds/
+.lock
