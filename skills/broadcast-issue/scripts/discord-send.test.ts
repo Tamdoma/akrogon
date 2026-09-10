@@ -8,6 +8,7 @@ interface Reply {
   readonly status: number;
   readonly body: string;
   readonly networkError?: string;
+  readonly bodyError?: string;
 }
 interface Scenario {
   readonly secrets: string | null;
@@ -49,7 +50,10 @@ async function run(scenario: Scenario): Promise<Result> {
         const reply = replies[index++];
         if (!reply) throw new Error('Unexpected external request');
         if (reply.networkError) throw new TypeError(reply.networkError);
-        return new Response(reply.status === 204 ? null : reply.body, { status: reply.status });
+        const body = reply.bodyError
+          ? new ReadableStream({ start(controller) { controller.error(new TypeError(reply.bodyError)); } })
+          : reply.status === 204 ? null : reply.body;
+        return new Response(body, { status: reply.status });
       };
       const { main } = await import(${JSON.stringify(sender)});
       await main(${JSON.stringify(join(root, '.config/akrogon/env'))});
@@ -145,5 +149,41 @@ test('network failures receive one retry without exposing webhook credentials', 
   });
   expect(result.exitCode, result.output).toBe(0);
   expect(result.requests).toHaveLength(2);
+  expect(result.output).not.toContain('primary-secret');
+});
+
+
+test('retries a failed response body and continues to the next target', async (): Promise<void> => {
+  const result: Result = await run({
+    secrets: `PRIMARY=${primary}\nSECONDARY=${secondary}`, targets: ['PRIMARY', 'SECONDARY'],
+    replies: [
+      { status: 500, body: '', bodyError: `Connection reset reading ${primary}` },
+      { status: 204, body: '' },
+      { status: 204, body: '' },
+    ],
+  });
+  expect(result.exitCode, result.output).toBe(0);
+  expect(result.requests.map((request): string => request.url)).toEqual([primary, primary, secondary]);
+  expect(result.output).toContain('500');
+  expect(result.output).toContain('PRIMARY');
+  expect(result.output).toContain('Project: Search works');
+  expect(result.output).not.toContain('primary-secret');
+});
+
+test('stops after one response-body retry, preserves final context and attempts remaining targets', async (): Promise<void> => {
+  const result: Result = await run({
+    secrets: `PRIMARY=${primary}\nSECONDARY=${secondary}`, targets: ['PRIMARY', 'SECONDARY'],
+    replies: [
+      { status: 500, body: '', bodyError: `Connection reset reading ${primary}` },
+      { status: 502, body: '', bodyError: 'Final reset primary-secret' },
+      { status: 204, body: '' },
+    ],
+  });
+  expect(result.exitCode).not.toBe(0);
+  expect(result.requests.map((request): string => request.url)).toEqual([primary, primary, secondary]);
+  expect(result.output).toContain('502');
+  expect(result.output).toContain('Final reset');
+  expect(result.output).toContain('PRIMARY');
+  expect(result.output).toContain('Project: Search works');
   expect(result.output).not.toContain('primary-secret');
 });

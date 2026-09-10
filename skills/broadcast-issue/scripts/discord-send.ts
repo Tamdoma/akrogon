@@ -66,7 +66,11 @@ async function deliver(webhook: Webhook, content: string): Promise<void> {
     throw new DeliveryError({ target: webhook.name, status: null, body: redact(cause.message, webhook), request });
   });
   if (!response.ok) {
-    throw new DeliveryError({ target: webhook.name, status: response.status, body: redact(await response.text(), webhook), request });
+    const body: string = await response.text().catch((cause: Error): never => {
+      if (!(cause instanceof TypeError)) throw cause;
+      throw new DeliveryError({ target: webhook.name, status: response.status, body: redact(cause.message, webhook), request });
+    });
+    throw new DeliveryError({ target: webhook.name, status: response.status, body: redact(body, webhook), request });
   }
 }
 
