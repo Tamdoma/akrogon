@@ -12,4 +12,5 @@ broadcast:
   discord:
     webhook_env:
       - DISCORD_WEBHOOK_URL
+      - DISCORD_WEBHOOK_URL_2
 grounding: none
