@@ -26,6 +26,8 @@ For a necessary peer question, wait for idle, ask once through herdr in Question
 
 ## Send
 
+Install the skill-local dependencies with `bun install --cwd <skill-folder> --frozen-lockfile` before its first use.
+
 Use [scripts/discord-send.ts](scripts/discord-send.ts) when sending, passing the configured target names as repeated `--target NAME` arguments and one JSON payload on stdin, then report its exit status without writing a delivery record.
 
 ```bash

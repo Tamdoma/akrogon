@@ -1,0 +1,16 @@
+{
+  "name": "@akrogon/broadcast-issue",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "zod": "^4.6.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "test": "bun test scripts/discord-send.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
