@@ -26,9 +26,9 @@ export async function retryCommand(argv: string[], cwd: string): Promise<string>
 }
 export function quote(value: string): string { return "'" + value.replaceAll("'", "'\\''") + "'"; }
 export const paneSchema = z.object({
-  pane_id: z.string(), tab_id: z.string(), cwd: z.string().nullable(),
-  agent: z.string().nullable(), agent_status: z.enum(['idle', 'done', 'working', 'blocked', 'unknown']),
-  agent_session: z.object({ id: z.string() }).nullable().optional(),
+  pane_id: z.string(), tab_id: z.string(), cwd: z.string().nullable().default(null),
+  agent: z.string().nullable().default(null), agent_status: z.enum(['idle', 'done', 'working', 'blocked', 'unknown']),
+  agent_session: z.object({ value: z.string() }).nullable().optional(),
 });
 export type Pane = z.infer<typeof paneSchema>;
 export const tabSchema = z.object({ tab_id: z.string(), label: z.string() });
