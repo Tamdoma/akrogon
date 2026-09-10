@@ -52,3 +52,5 @@ Reshape 2026-09-08 after # Config Shape: the `quality.blocking` flag is gone; ev
 From # Index Levels 2026-09-09: the checker verifies the implementer's docs and index lines against the diff; the reviewer never authors them; drift audit script retired.
 
 From # Command Tests 2026-09-09: in the akrogon repo, check-issue treats a test that asserts prose or output wording as a maintainability defect; exact text is testable only where it runs as written; a new test needs a contract or an observed defect behind it, never coverage.
+
+Operator 2026-09-10 (1-A, nits from A's position): at check.review slot A reads its own positions-A.md and rebuttal-A.md first; they say where to look hardest. A finding grounded in a done criterion, a failing `checks` command or a reproducible defect is a Fix and cites which. A finding grounded only in A's own position is a Nit with its reason, never a Fix, so it cannot open a check.fix round. At merge, a Nit slot A still holds and finds reusable becomes one lesson line plus its history file under the # Lessons rule; B meets it at its next plan. No new turn, no new file, no B reply on the same leaf.

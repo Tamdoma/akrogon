@@ -24,7 +24,7 @@ Domain: the issue lifecycle tooling in this repo, driven through herdr panes. Ev
 
 - One skill serves both the territory and the single issue, [# One Door Skill](decisions/one-door-skill.md)
 
-- No driver loop: skills run `akrogon next`, a herdr event hook recovers, failed after both slots fail, [# Next Command Owner](decisions/next-command-owner.md)
+- No driver loop: skills run `akrogon phase`, the herdr event hook runs `akrogon next` and recovers, failed after both slots fail, [# Next Command Owner](decisions/next-command-owner.md)
 
 - One implementation debate by default, skipped at the door for very small issues, one rebuttal round per repo, fixed roles, any harness in any slot, [# Debate Count](decisions/debate-count.md)
 - One dotted phase name per pass moved only by `akrogon phase`, concurrent slots share a phase with a done list, reviews decide from verdict flags, [# Turn Within Phase](decisions/turn-within-phase.md)
@@ -32,20 +32,20 @@ Domain: the issue lifecycle tooling in this repo, driven through herdr panes. Ev
 
 - Peer questions only in solo passes, wait then prompt, one exchange, owner decides, tie by least change, state untouched, [# Peer Questions](decisions/peer-questions.md)
 
-- Audit and QA pass gone, repo tools measure, reviewers judge with Nits, fix rounds capped, tests from the brief's criteria, ponytail as one file, [# Quality Layers](decisions/quality-layers.md)
+- Audit and QA pass gone, repo tools measure, reviewers judge with Nits, A's position-only findings are Nits and reusable ones become lessons at merge (2026-09-10), fix rounds capped, tests from the brief's criteria, ponytail as one file, [# Quality Layers](decisions/quality-layers.md)
 
-- One eight-section brief under 1,500 words, B never cheap and spawns the worker, sub-briefs in order, mismatches return to B, [# Implementer Brief](decisions/implementer-brief.md)
+- One eight-section brief under 1,500 words, B never cheap and spawns the worker, sub-briefs in order, mismatches return to B; 2026-09-10: section 4 needed interfaces, section 5 mismatch rule, section 6 advisory size, section 8 report skeleton, one launch reminder line, B sends back a return with a missing report at no fix round, `/implement-issue <task>` with no leaf runs standalone, [# Implementer Brief](decisions/implementer-brief.md)
 
 - Workers run only the changed-tests command, the full suite runs once per leaf before handoff, operator-locked
 
-- The consult election stays: one question at the door, one field in state, the whole flow obeys it, intake 151, operator-locked
+- The consult election stays: one question at the door, one field in state, the whole flow obeys it, intake 151, operator-locked 2026-09-10: that one field is `debate`; `consult` dropped, [# Debate Count](decisions/debate-count.md)
 - The grilling format stays as it is: batches, recommended first, N-A replies, no harness-specific asking, intake 143, operator-locked
 
-- Skill Rewrite: seven family skills (chart, plan, implement, check, merge, seed, broadcast), init pending Distribution; cap 300 lines/4k tokens/20 rules with reference triggers; re-read after compaction; peer answers as files; symlink roots; worker model from config. [Skill Rewrite](decisions/skill-rewrite.md)
+- Skill Rewrite: seven family skills (chart, plan, implement, check, merge, seed, broadcast), init per Distribution; cap 300 lines/4k tokens/20 rules with reference triggers; re-read after compaction; peer answers as files; symlink roots; worker model from config. [Skill Rewrite](decisions/skill-rewrite.md)
 
-- Parallel Merge: slot A rebases, rechecks, pushes fast-forward to origin main, no lock or queue; conflict or red checks return through check.fix; merged after push; broadcast never blocks; B repairs itself at round three. [Parallel Merge](decisions/parallel-merge.md)
+- Parallel Merge: slot A rebases, rechecks, pushes fast-forward to origin main, no lock or queue; conflict or red checks return through check.fix; merged after push; broadcast never blocks; B repairs itself at the last configured round. [Parallel Merge](decisions/parallel-merge.md)
 
-- Config Shape (corrected by Model Tiering: no `workers` key): global akrogon-new/config.yaml (max_active, slots, workers, harness launch lines, toolkits, repos) and per-repo issues/config.yaml (remote, branch, rebuttal, fix_rounds, checks that block, advisory, grounding, broadcast); `akrogon config` prints the merged result; no blocking flag. [Config Shape](decisions/config-shape.md)
+- Config Shape (corrected by Model Tiering: no `workers` key; 2026-09-10: per-repo `implement: subagents | inline`, default subagents): global akrogon-new/config.yaml (max_active, slots, harness launch lines, toolkits, repos) and per-repo issues/config.yaml (remote, branch, rebuttal, fix_rounds, implement, checks that block, advisory, grounding, broadcast); `akrogon config` prints the merged result; no blocking flag. [Config Shape](decisions/config-shape.md)
 
 - Distribution: tool repo holds command, skills, plugin; `akrogon install` once per machine (PATH and skill symlinks, herdr integrations, plugin link); `akrogon init` per repo; update is git pull; skills name the command as dependency. [Distribution](decisions/distribution.md)
 

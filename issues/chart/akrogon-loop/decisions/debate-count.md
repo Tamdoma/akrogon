@@ -30,3 +30,5 @@ One debate, on the implementation plan, by default. The door asks one question, 
 From # Door Second Slot 2026-09-09: the door's second slot is separate from the implementation debate field; naming B's pane at chart open does not touch it.
 
 Handoff 2026-09-09 (operator 7-A, 8-A): consult `no` on every leaf; debate `yes` on pull-close and chart-issues only; the two bootstrap leaves are operator-owned with `hand_built: true`; tree accepted: epic akrogon-loop, issues bootstrap, takeover, github, doors, finish, eight leaves.
+
+Operator 2026-09-10 (F1-A): the consult election and the debate question are one question and one field. `consult` leaves state.yaml; `debate: yes|no` is the whole election, asked once at the door with a recommendation from the settled design, default no, read by plan-issue. Intake 151's requirement, one question and one field, is met by `debate` alone; the second field arrived when the planning debate was cut and had no reader.

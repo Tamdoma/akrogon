@@ -22,6 +22,8 @@ Forecloses: a single merged config, harness names in code, a quality blocking fl
 
 Operator note 2026-09-08: the tool repo is akrogon, so the global config is akrogon/config.yaml.
 
+Operator 2026-09-10 (1-A): per-repo key `implement: subagents | inline`, default `subagents`. `inline` means slot B writes the same brief as its own plan and implements it in order itself, `test_changed` as it goes, the full suite once, repairs itself, no sub-briefs, no worker, no mismatch return; chosen for a repo whose work cannot be split into bounded pieces (visual feedback loops such as 3D work) or whose log shows inline cheaper. Read by implement-issue through `akrogon config`; nothing else changes. Evidence: Morph routing benchmark 2026 (small tasks: Opus alone $2.78 vs planner plus Flash $3.18, same pass), Cursor 2026-07-20 (large project: 8x cheaper delegated), theinfinity.dev 2026-08-19 (delegate above about 250k main context), Co-Coder 2026-05-31 (cross-piece dependencies cost context transfer). `remote` and `default_branch` are the merge target: every `origin/main` in # Parallel Merge and # Repeat Safety reads as `<remote>/<default_branch>` from `akrogon config`, origin/main being the defaults.
+
 ### Operator explanations 2026-09-08 (chat, recorded for handoff)
 
 test_changed base. Workers run one after another in the same worktree. "Changed since when" must be the commit where the leaf branched from main, not the previous worker's commit, otherwise tests affected by worker one are skipped by worker two until the full suite. The command passes that commit as `AKROGON_BASE`; when the leaf rebases, the base becomes the new rebase point.
@@ -98,6 +100,8 @@ One debate, on the implementation plan, by default. The door asks one question, 
 
 From # Door Second Slot 2026-09-09: the door's second slot is separate from the implementation debate field; naming B's pane at chart open does not touch it.
 
+Operator 2026-09-10 (F1-A): the consult election and the debate question are one question and one field. `consult` leaves state.yaml; `debate: yes|no` is the whole election, asked once at the door with a recommendation from the settled design, default no, read by plan-issue. Intake 151's requirement, one question and one field, is met by `debate` alone; the second field arrived when the planning debate was cut and had no reader.
+
 ### Decisions not binding this leaf
 
 - none
@@ -114,7 +118,8 @@ From # Door Second Slot 2026-09-09: the door's second slot is separate from the 
 - Chunk ownership defaults to agent-owned. Only a step physically requiring the operator makes its chunk operator-owned, which parks at dispatch before any seat spawns. Credential access alone never qualifies.
 - Every secret including production lives in the consumer repo's gitignored .env. The operator explicitly accepts that agents can read it. No secret vault, broker, or off-machine credential pile exists.
 
-consult-election: no
+Reading note 2026-09-10: the standing lines above are the operator's creation-locked text and stay verbatim. Where they say the gate judges an exit code, this design has the checker's verdict and the blocking `checks` commands; where they say a chunk parks at dispatch, this design has no parking: an operator-owned step is done by the operator in the leaf's tab and the leaf waits in its phase.
+
 
 ## Leaf architecture
 
