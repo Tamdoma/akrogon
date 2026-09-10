@@ -28,6 +28,8 @@ Why: every July 28 skill carries dead or contradicting lines from removed machin
 
 Forecloses: one skill per phase, a shared reference directory, install scripts for copies, pane reads for peer answers, hardcoded model names in skills, serializing on file overlap.
 
+Operator 2026-09-10 (1-A): the routing file is `akrogon.yaml` at the consumer repo root, no harness folder; same key `issues_repo`, same fallback to origin. The framework installer changes its write path outside this epic.
+
 ### Operator explanations 2026-09-08 (chat, recorded for handoff)
 
 Family skills. plan-issue is one file with sections for positions, rebuttal and synthesis; the prompt line `plan-issue <slug> slot=A phase=plan.rebuttal` says which section applies. Positions are blind: neither slot reads the other's before writing. Rebuttal reads the other position by definition. Synthesis reads both. Shared rules are written once at the top, phase sections never restate them.

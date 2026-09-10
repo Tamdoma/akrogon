@@ -1,0 +1,16 @@
+bun test v1.4.0 (34cbb9a40)
+
+skills/broadcast-issue/scripts/discord-send.test.ts:
+(pass) delivers one message to configured targets using only the external file, with no record [27.81ms]
+(pass) refuses missing secrets, invalid routes and empty targets before sending [101.34ms]
+(pass) validates the whole message and all targets before any delivery [99.72ms]
+(pass) retries only the failed target once and does not resend a successful target [22.49ms]
+(pass) surfaces the final response after two failures, redacts secrets and still attempts other targets [30.23ms]
+(pass) network failures receive one retry without exposing webhook credentials [23.06ms]
+(pass) retries a failed response body and continues to the next target [26.56ms]
+(pass) stops after one response-body retry, preserves final context and attempts remaining targets [23.12ms]
+
+ 8 pass
+ 0 fail
+ 48 expect() calls
+Ran 8 tests across 1 file. [382.00ms]

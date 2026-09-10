@@ -1,6 +1,7 @@
 # Chart skill version: 4
 slug: command
-phase: plan.synthesis
+phase: check.review
+fix_rounds: 1
 created: '2026-09-09'
 priority: n
 repo: akrogon
