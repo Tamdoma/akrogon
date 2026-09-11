@@ -272,6 +272,7 @@ test('source retries recheck state, skip CLOSED, and continue after final failur
         view(2),
         close(2, 1),
         view(2),
+        { stdout: JSON.stringify([[{ body: `merged ${head} extra` }]]) },
         close(2),
         view(3),
         close(3, 1),
@@ -279,6 +280,7 @@ test('source retries recheck state, skip CLOSED, and continue after final failur
         view(4),
         close(4, 1),
         view(4),
+        { stdout: '[[]]' },
         close(4, 1),
         view(5, '', 1),
         view(5, '', 1),
@@ -290,10 +292,18 @@ test('source retries recheck state, skip CLOSED, and continue after final failur
     );
     const result: Result = await cli(f, ['phase', 'source', 'merged'], f.root, gh.env);
     expect(result.code).not.toBe(0);
-    const warnings: string[] = result.stderr.split('\n').filter((line) => line.startsWith('{"warning":'));
+    const warnings: { warning?: string; source: string; code?: number }[] = result.stderr
+      .split('\n')
+      .filter((line) => /^\s*\{.*\}\s*$/.test(line))
+      .map((line) =>
+        z
+          .object({ warning: z.string().optional(), source: z.string(), code: z.number().optional() })
+          .parse(JSON.parse(line)),
+      )
+      .filter((item) => item.warning !== undefined);
     expect(warnings).toHaveLength(4);
-    expect(warnings.map((line) => z.object({ source: z.string(), code: z.number() }).parse(JSON.parse(line)))).toEqual(
-      [2, 3, 4, 5].map((n) => ({ source: `team/project#${n}`, code: 1 })),
+    expect(warnings).toEqual(
+      [2, 3, 4, 5].map((n) => ({ warning: expect.any(String), source: `team/project#${n}`, code: 1 })),
     );
     expect(result.stderr).toContain('close failure');
     expect(result.stderr).toContain('view failure');
@@ -322,5 +332,110 @@ test('sourced completion without worktree context fails after rename without a f
     expect(existsSync(gh.db + '.calls')).toBe(false);
   } finally {
     f.clean();
+  }
+});
+
+test('partial commented close success retries without duplicating a merged comment on a later page', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    const worktree: string = await sourceWorktree(f, 'partial');
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    leaf(f, 'partial', 'merge', { worktree, sources: ['team/project#1'] });
+    const comments: string[] = Array.from({ length: 100 }, (_, i) => `earlier ${i}`);
+    writeFileSync(gh.db + '.state', JSON.stringify({ state: 'OPEN', comments, attempts: 0 }));
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        { stdout: '', stateful: true },
+        { stdout: '', stateful: true, code: 1, stderr: 'close failed after comment' },
+        { stdout: '', stateful: true },
+        { stdout: '', stateful: true },
+        { stdout: '', stateful: true },
+      ]),
+    );
+    const result: Result = await cli(f, ['phase', 'partial', 'merged'], f.root, gh.env);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(readFileSync(gh.db + '.state', 'utf8'))).toEqual({
+      state: 'CLOSED',
+      comments: [...comments, `merged ${head}`],
+      attempts: 2,
+    });
+    expect(JSON.parse(result.stderr)).toMatchObject({ warning: expect.any(String), source: 'team/project#1', code: 1 });
+    expect(readState(resolve(f.root, 'issues/closed/issue/partial')).phase).toBe('merged');
+    expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+    const calls: string[][] = readFileSync(gh.db + '.calls', 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => z.object({ args: z.array(z.string()) }).parse(JSON.parse(line)).args);
+    expect(calls).toEqual([
+      ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'],
+      ['issue', 'close', '-R', 'team/project', '1', '--comment', `merged ${head}`],
+      ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'],
+      ['api', '--hostname', 'github.com', 'repos/team/project/issues/1/comments?per_page=100', '--paginate', '--slurp'],
+      ['issue', 'close', '-R', 'team/project', '1'],
+    ]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('failed or malformed retry comment listing prevents another close and continues later sources', async () => {
+  for (const listing of [
+    { stdout: '[[', stderr: 'comment page failed', code: 2 },
+    { stdout: '{malformed-json', code: 0 },
+    { stdout: '[[{"body":"merged PLACEHOLDER"}],[{"body":42}]]', code: 0 },
+  ]) {
+    const f: Fixture = await fixture();
+    try {
+      const gh: GhFixture = fakeGh(f);
+      const worktree: string = await sourceWorktree(f, 'listing');
+      const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+      leaf(f, 'listing', 'merge', { worktree, sources: ['team/project#1', 'team/project#2'] });
+      const args: string[] = [
+        'api',
+        '--hostname',
+        'github.com',
+        'repos/team/project/issues/1/comments?per_page=100',
+        '--paginate',
+        '--slurp',
+      ];
+      const response: string = listing.stdout.replace('PLACEHOLDER', head);
+      writeFileSync(
+        gh.db,
+        JSON.stringify([
+          { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'] },
+          { stdout: '', code: 1, args: ['issue', 'close', '-R', 'team/project', '1', '--comment', `merged ${head}`] },
+          { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'] },
+          { ...listing, stdout: response, args },
+          { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '2', '--json', 'state'] },
+          { stdout: '', args: ['issue', 'close', '-R', 'team/project', '2', '--comment', `merged ${head}`] },
+        ]),
+      );
+      const result: Result = await cli(f, ['phase', 'listing', 'merged'], f.root, gh.env);
+      expect(result.code).not.toBe(0);
+      expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+      const messages: { source: string; warning?: string; error?: string }[] = result.stderr
+        .split('\n')
+        .filter((line) => /^\s*\{.*\}\s*$/.test(line))
+        .map((line) =>
+          z
+            .object({ source: z.string(), warning: z.string().optional(), error: z.string().optional() })
+            .parse(JSON.parse(line)),
+        );
+      expect(messages.filter((item) => item.warning !== undefined)).toHaveLength(1);
+      const failure: { source: string; error: string } = z
+        .object({ source: z.string(), error: z.string() })
+        .parse(messages.find((item) => item.error !== undefined));
+      expect(failure.source).toBe('team/project#1');
+      expect(JSON.parse(failure.error)).toMatchObject({
+        command: ['gh', ...args],
+        cwd: f.root,
+        ...(listing.code === 0 ? { response } : { code: 2, stdout: response, stderr: 'comment page failed' }),
+      });
+      expect(readState(resolve(f.root, 'issues/closed/issue/listing')).phase).toBe('merged');
+    } finally {
+      f.clean();
+    }
   }
 });

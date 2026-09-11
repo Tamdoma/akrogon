@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 const stepSchema = z.object({
   stdout: z.string(),
+  stateful: z.boolean().default(false),
   stderr: z.string().default(''),
   code: z.number().int().default(0),
   delayMs: z.number().nonnegative().default(0),
@@ -32,7 +33,34 @@ if (step.probe !== undefined) {
     throw new Error(JSON.stringify({ probe, lock }));
   appendFileSync(path + '.probes', JSON.stringify({ ...probe, lock, host: process.env.GH_HOST }) + '\n');
 }
-process.stdout.write(step.stdout);
+if (step.stateful) {
+  const statePath: string = path + '.state';
+  const state: { state: 'OPEN' | 'CLOSED'; comments: string[]; attempts: number } = z
+    .object({ state: z.enum(['OPEN', 'CLOSED']), comments: z.array(z.string()), attempts: z.number() })
+    .parse(JSON.parse(readFileSync(statePath, 'utf8')));
+  if (args[0] === 'api') {
+    const pages: { body: string }[][] = [];
+    for (let offset: number = 0; offset < state.comments.length; offset += 100)
+      pages.push(state.comments.slice(offset, offset + 100).map((body) => ({ body })));
+    process.stdout.write(JSON.stringify(pages));
+  } else if (args[1] === 'view') {
+    process.stdout.write(JSON.stringify({ state: state.state }));
+  } else if (args[1] === 'close') {
+    const commentIndex: number = args.indexOf('--comment');
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        state: step.code === 0 ? 'CLOSED' : state.state,
+        comments: commentIndex === -1 ? state.comments : [...state.comments, args[commentIndex + 1]],
+        attempts: state.attempts + 1,
+      }),
+    );
+  } else {
+    throw new Error(JSON.stringify({ args }));
+  }
+} else {
+  process.stdout.write(step.stdout);
+}
 process.stderr.write(step.stderr);
 appendFileSync(path + '.events', 'end\n');
 process.exit(step.code);

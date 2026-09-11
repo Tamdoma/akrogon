@@ -117,18 +117,7 @@ async function closeSource(repo: Repo, source: string, commit: string): Promise<
     '--json',
     'state',
   ];
-  const close: string[] = [
-    'env',
-    'GH_HOST=github.com',
-    'gh',
-    'issue',
-    'close',
-    '-R',
-    repository,
-    number,
-    '--comment',
-    `merged ${commit}`,
-  ];
+  const close: string[] = ['env', 'GH_HOST=github.com', 'gh', 'issue', 'close', '-R', repository, number];
   for (let attempt: number = 0; attempt < 2; attempt++) {
     try {
       const output: string = await command(view, repo.root);
@@ -143,7 +132,36 @@ async function closeSource(repo: Repo, source: string, commit: string): Promise<
           );
         }
       })();
-      if (state === 'OPEN') await command(close, repo.root);
+      if (state === 'CLOSED') return;
+      const comment: string = `merged ${commit}`;
+      const commentExists: boolean =
+        attempt === 1 &&
+        (await (async (): Promise<boolean> => {
+          const args: string[] = [
+            'gh',
+            'api',
+            '--hostname',
+            'github.com',
+            `repos/${repository}/issues/${number}/comments?per_page=100`,
+            '--paginate',
+            '--slurp',
+          ];
+          const response: string = await command(args, repo.root);
+          try {
+            return z
+              .array(z.array(z.object({ body: z.string() })))
+              .parse(JSON.parse(response))
+              .flat()
+              .some((item) => item.body === comment);
+          } catch (error) {
+            if (!(error instanceof SyntaxError) && !(error instanceof z.ZodError)) throw error;
+            throw new SourceError(
+              JSON.stringify({ source, command: args, cwd: repo.root, response, error: error.message }),
+              { cause: error },
+            );
+          }
+        })());
+      await command(commentExists ? close : [...close, '--comment', comment], repo.root);
       return;
     } catch (error) {
       if (!(error instanceof CommandError) || attempt === 1) throw error;

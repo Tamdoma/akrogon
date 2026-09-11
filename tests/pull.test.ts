@@ -173,7 +173,8 @@ test('missing and invalid origins fail visibly, and all continues after invalid 
     await command(['git', 'remote', 'add', 'origin', 'https://gitlab.com/acme/project'], f.root);
     const invalid: Result = await cli(f, ['pull'], f.root, gh.env);
     expect(invalid.code).not.toBe(0);
-    expect(invalid.stderr).toContain('GitHub');
+    const invalidContext: string = /^error: (\{.*\})$/m.exec(invalid.stderr)![1];
+    expect(JSON.parse(invalidContext)).toMatchObject({ repo: 'repo', origin: 'https://gitlab.com/acme/project' });
     await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme'], f.root);
     expect((await cli(f, ['pull'], f.root, gh.env)).code).not.toBe(0);
     await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
