@@ -129,6 +129,6 @@ From # Lessons 2026-09-09: any skill pass that finds a reusable lesson writes `l
 
 From # Command Tests 2026-09-09: implement-issue briefs for the akrogon repo carry the test rule: scenario tests on a temp repo with real files and processes, herdr and gh substituted at one boundary, never real panes, install roots, GitHub or the herdr socket.
 
-Handoff 2026-09-09 (operator 5-A): seed-issue reads `.claude/akrogon.yaml` at the consumer repo root, key `issues_repo: owner/repo`, harness-neutral despite the folder name; the framework installer writes it, the seed-issue skill only reads it.
+Handoff 2026-09-09 (operator 5-A): seed-issue reads `akrogon.yaml` at the consumer repo root, key `issues_repo: owner/repo`, harness-neutral (corrected 2026-09-11 from `.claude/akrogon.yaml` to match the skill as shipped); the framework installer writes it, the seed-issue skill only reads it.
 
 Operator 2026-09-10 (1-A): the routing file is `akrogon.yaml` at the consumer repo root, no harness folder; the `.claude/` path was only where the framework installer already wrote files. Same key `issues_repo`, same fallback to origin. The framework installer changes its write path outside this epic.

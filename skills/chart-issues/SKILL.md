@@ -26,7 +26,7 @@ Run `akrogon pull` at open: report an unregistered or non-GitHub repo and contin
 
 Read the configured `grounding.index` top file, relevant linked areas and `learnings/LESSONS.md` as resources, report absent resources as gaps, and offer a lesson prune at open; reusable findings get one mechanism/date/history-path line in LESSONS.md and a case/evidence/learning file at `learnings/history/<date>-<slug>.md`, with historical lessons treated as observations rather than rules.
 
-Import mirrored `issues/seeds/*.md`, legacy `issues/open/<slug>.md` and operator notes using the provenance in shapes: skip exact GitHub identities already in open/closed leaf `sources` or any chart intake, and legacy source paths already imported, preserving original reports and copying imported text verbatim separately from agent findings and scope.
+Import operator notes, and mirrored `issues/seeds/*.md` and legacy `issues/open/<slug>.md` only when the door opens without an operator note or the note asks for them, using the provenance in shapes: skip exact GitHub identities already in open/closed leaf `sources` or any chart intake, and legacy source paths already imported, preserving original reports and copying imported text verbatim separately from agent findings and scope.
 
 ## Drain
 

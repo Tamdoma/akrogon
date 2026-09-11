@@ -1,0 +1,9 @@
+slug: docs-retire-guide
+phase: plan.synthesis
+created: '2026-09-11'
+priority: l
+repo: akrogon
+debate: 'no'
+blocked-by: [docs-concepts, docs-operate, docs-practice]
+sources:
+  - Tamdoma/akrogon#3

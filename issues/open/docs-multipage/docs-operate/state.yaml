@@ -1,0 +1,9 @@
+slug: docs-operate
+phase: plan.synthesis
+created: '2026-09-11'
+priority: l
+repo: akrogon
+debate: 'no'
+blocked-by: [docs-shell]
+sources:
+  - Tamdoma/akrogon#3

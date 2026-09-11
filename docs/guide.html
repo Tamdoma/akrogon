@@ -546,7 +546,7 @@ broadcast:              <span class="c"># optional: post a summary when an issue
       <tr><th>You have</th><th>Use</th><th>You get</th></tr>
       <tr><td>A goal, but the route is unclear and will take many sessions</td><td><code>/chart-issues</code></td><td>A chart of decisions you settle one by one. It ends by writing a set of leaves with <code>blocked-by</code> wired between them.</td></tr>
       <tr><td>One clear thing to build</td><td><code>/chart-issues</code></td><td>The same door. A small item whose map finds nothing open skips the chart and hands off at once: <code>brief.md</code>, <code>design.md</code>, <code>state.yaml</code>.</td></tr>
-      <tr><td>One observation: "X happened, Y should have"</td><td><code>/seed-issue</code></td><td>A GitHub issue in the right repo. No planning yet.</td></tr>
+      <tr><td>One observation: "X happened, Y should have"</td><td><code>/seed-issue</code></td><td>A GitHub issue in the right repo. No planning, no diagnosis. Give it the exact command, error line, and what you expected, and it keeps all of it.</td></tr>
       <tr><td>Open GitHub issues</td><td><code>akrogon pull</code></td><td>One file per issue in <code>issues/seeds/</code>. Runs at every herdr start. <code>/chart-issues</code> imports the seeds at open. When the leaf merges, the GitHub issue is closed with the commit.</td></tr>
     </table></div>
     <div class="why"><span class="eyebrow">Why decide before agents start</span><p>A decision made during planning gets re-argued in every later phase. A decision written in the brief is settled. Agents build faster when there is nothing left to argue about.</p></div>
@@ -889,7 +889,7 @@ herdr plugin log list --plugin akrogon   <span class="c"># why the hook did or d
     <div class="cards">
       <div class="card"><span class="stepnum">nit</span><h3>A finding that is not a defect</h3><p>Stays in the review file. At merge, A decides: a reusable rule becomes a lesson, real work becomes a seed.</p></div>
       <div class="card"><span class="stepnum">lesson</span><h3>One line plus a history file</h3><p>One line in <code>learnings/LESSONS.md</code> naming mechanism, date, and history path, plus a dated file under <code>learnings/history/</code>. Every plan reads the lines. A lesson is deleted when a leaf applies it, or at the next chart when it has stopped being useful.</p></div>
-      <div class="card"><span class="stepnum">seed</span><h3>A GitHub issue</h3><p>Filed with <code>seed-issue</code>. If it is about a skill, it goes to the akrogon repo, because skills only change through akrogon leaves. Otherwise it goes to the repo the work is in.</p></div>
+      <div class="card"><span class="stepnum">seed</span><h3>A GitHub issue</h3><p>Filed with <code>seed-issue</code>. It posts to the repo named by <code>issues_repo</code> in a root <code>akrogon.yaml</code> when that file exists, otherwise to the repo’s own GitHub origin. A project that uses a framework gets that one-line file so its reports land on the framework. If it is about a skill, it goes to the akrogon repo, because skills only change through akrogon leaves. Otherwise it goes to the repo the work is in.</p></div>
     </div>
     <div class="why"><span class="eyebrow">Why agents do not fix nits as they see them</span><p>Then every review becomes a small implementation with no plan and no second reviewer. Nits become seeds, seeds become leaves, leaves get the full loop.</p></div>
   </div>

@@ -1,0 +1,9 @@
+slug: install-prune-links
+phase: plan.synthesis
+created: '2026-09-11'
+priority: n
+repo: akrogon
+debate: 'no'
+blocked-by: []
+sources:
+  - Tamdoma/akrogon#2
