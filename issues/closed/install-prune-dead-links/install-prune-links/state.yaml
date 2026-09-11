@@ -1,0 +1,26 @@
+slug: install-prune-links
+phase: merged
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#2"
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t4B
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/install-prune-links
+pane: 
+  A: w8:p88
+  B: w8:p89
+slot: A
+prompted: 
+  {}

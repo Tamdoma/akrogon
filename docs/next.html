@@ -61,7 +61,7 @@
           <li>For every registered repo, walk <code>issues/open/</code> in folder order and look at every leaf.</li>
           <li>Skip a leaf if it is <code>merged</code>, <code>failed</code>, or <code>hand_built</code>. Skip it if any slug in <code>blocked-by</code> is not <code>merged</code>.</li>
           <li>If the leaf already has a tab, prompt whoever its phase needs, if they are idle.</li>
-          <li>If it has no tab and fewer than <code>max_active</code> leaves are running anywhere, create the worktree and branch, open a tab with two panes, start the agent, and send one prompt.</li>
+          <li>If it has no tab and fewer than <code>max_active</code> leaves are running anywhere, create the worktree and branch, open a tab with two panes, start the agent, and send one prompt. Merged leaves never count as running, even if their tab is still open.</li>
           <li>Exit.</li>
         </ol>
         <p>The prompt is always four words: skill, slug, slot, phase. For example <code>plan-issue rename-flag slot=B phase=plan.synthesis</code>. The agent reads the skill file and does the rest.</p>
@@ -70,12 +70,12 @@
         <svg class="ill" viewBox="0 0 460 340" role="img" aria-label="Next walks the leaves in folder order, skips blocked and finished ones, and starts ready ones until the active limit is reached.">
           <text x="30" y="30" class="ill-label">folder order</text>
           <g transform="translate(30,46)">
-            <rect x="0" y="0" width="200" height="34" rx="6" class="node sage"/><text x="12" y="22" class="ill-data big">a-api · ready</text><text x="150" y="22" class="ill-data">starts</text>
-            <rect x="0" y="44" width="200" height="34" rx="6" class="node" opacity=".6"/><text x="12" y="66" class="ill-data">b-ui · blocked-by a-api</text>
-            <rect x="0" y="88" width="200" height="34" rx="6" class="node sage"/><text x="12" y="110" class="ill-data big">c-docs · ready</text><text x="150" y="110" class="ill-data">starts</text>
-            <rect x="0" y="132" width="200" height="34" rx="6" class="node" opacity=".6"/><text x="12" y="154" class="ill-data">d-cli · merged</text>
-            <rect x="0" y="176" width="200" height="34" rx="6" class="node sage"/><text x="12" y="198" class="ill-data big">e-auth · ready</text><text x="150" y="198" class="ill-data">starts</text>
-            <rect x="0" y="220" width="200" height="34" rx="6" class="node" opacity=".6"/><text x="12" y="242" class="ill-data">f-search · ready, waits</text>
+            <rect x="0" y="0" width="220" height="34" rx="6" class="node sage"/><text x="12" y="22" class="ill-data big">a-api · ready</text><text x="208" y="22" text-anchor="end" class="ill-data">starts</text>
+            <rect x="0" y="44" width="220" height="34" rx="6" class="node" opacity=".6"/><text x="12" y="66" class="ill-data">b-ui · blocked-by a-api</text>
+            <rect x="0" y="88" width="220" height="34" rx="6" class="node sage"/><text x="12" y="110" class="ill-data big">c-docs · ready</text><text x="208" y="110" text-anchor="end" class="ill-data">starts</text>
+            <rect x="0" y="132" width="220" height="34" rx="6" class="node" opacity=".6"/><text x="12" y="154" class="ill-data">d-cli · merged</text>
+            <rect x="0" y="176" width="220" height="34" rx="6" class="node sage"/><text x="12" y="198" class="ill-data big">e-auth · ready</text><text x="208" y="198" text-anchor="end" class="ill-data">starts</text>
+            <rect x="0" y="220" width="220" height="34" rx="6" class="node" opacity=".6"/><text x="12" y="242" class="ill-data">f-search · ready, waits</text>
           </g>
           <g transform="translate(280,46)">
             <text x="0" y="-6" class="ill-label">max_active: 3</text>
@@ -98,6 +98,13 @@
       <tr><td><code>akrogon next &lt;folder&gt;</code></td><td>Only leaves under that folder. The folder can be an epic, an issue, or one leaf.</td><td>You want only this epic to take the free seats right now.</td></tr>
       <tr><td><code>akrogon next &lt;slug&gt;</code></td><td>Exactly this leaf. Prints the reason if it cannot start: blocked, hand-built, no seat.</td><td>One leaf is stuck and you want to know why.</td></tr>
     </table></div>
+    <h3>Parking work you do not want yet</h3>
+    <p>To keep whole issues or epics out of the loop, park them. A parked folder moves to <code>issues/parked/</code>, where <code>next</code> never looks. Unpark it to bring it back. Names are space separated, and <code>--all</code> takes everything.</p>
+    <pre><code>akrogon park search billing      <span class="c"># these two wait</span>
+akrogon unpark search            <span class="c"># back in the queue</span>
+akrogon park --all               <span class="c"># everything not running</span>
+akrogon unpark --all</code></pre>
+    <p>Park works on whole issues and epics, never on one leaf inside them. It refuses a folder that has a leaf running, and it keeps a folder that another open leaf still depends on. <code>akrogon status</code> lists what is parked.</p>
     <h3>How order is decided</h3>
     <p>There is no priority field the tool reads. The <code>priority</code> line in <code>state.yaml</code> is for you. Order comes from two things only:</p>
     <ul>
@@ -108,8 +115,11 @@
     <p>The prose in <code>EPIC.md</code>, <code>ISSUE.md</code>, or <code>brief.md</code> is for humans and planners. The tool never reads it for ordering.</p>
   </div>
 </section>
+<div class="pager">
+  <a class="prev" href="create.html"><span class="meta">previous</span><span class="t">Create</span></a>
+  <a class="next" href="phases.html"><span class="meta">next</span><span class="t">Phases</span></a>
+</div>
 </main>
-
 <footer class="footer">
   <a class="logo" href="#top" aria-label="Tamdoma">
     <svg viewBox="0 0 1114 390" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tamdoma"><g fill="currentColor" stroke="currentColor" stroke-width="1">

@@ -51,25 +51,27 @@
 <main id="top">
 <section id="limits" class="sec" aria-label="Limits you must know">
   <div class="wrap" data-animate>
-    <div class="head"><span class="eyebrow">13 · Limits you must know</span><h2>Things that will surprise you if you do not know them</h2></div>
+    <div class="head"><span class="eyebrow">12 · Limits you must know</span><h2>Things that will surprise you if you do not know them</h2></div>
     <div class="cards two">
       <div class="card"><span class="tag warn">ordering</span><h4>A running leaf ignores blocked-by edits</h4><p>The list is read once, when <code>next</code> decides whether to start the leaf. After that the tab exists and the list is never read again. Change order before running <code>next</code>, not after.</p></div>
       <div class="card"><span class="tag warn">ordering</span><h4>blocked-by only names leaves</h4><p>Not epics, not issues. To wait for a whole epic, name its last leaf. One line in one file.</p></div>
       <div class="card"><span class="tag warn">capacity</span><h4>max_active is machine-wide, first come first served</h4><p>Counted across every registered repo. Ready leaves start in folder order. One epic can take every seat. Priority in <code>state.yaml</code> is not read.</p></div>
-      <div class="card"><span class="tag warn">capacity</span><h4>Folder targeting does not reserve seats</h4><p><code>next &lt;folder&gt;</code> starts only that folder's leaves now, but the next hook call sweeps everything, and startup runs <code>--all</code>.</p></div>
+      <div class="card"><span class="tag warn">capacity</span><h4>Folder targeting does not reserve seats</h4><p><code>next &lt;folder&gt;</code> starts only that folder's leaves now, but the next hook call sweeps everything, and startup runs <code>--all</code>. To keep work out of the loop for real, use <code>akrogon park</code>.</p></div>
       <div class="card"><span class="tag warn">cleanup</span><h4>Cleanup happens only at startup or with --all</h4><p>Herdr's idle signal flickers between tool calls, so nothing destructive is tied to it. A merge closes its own tab. Worktrees and branches wait for <code>next --all</code> or the next herdr start.</p></div>
       <div class="card"><span class="tag warn">cleanup</span><h4>The last tab may stay open</h4><p>If a merge session dies before its final close, the tab lingers until the next startup sweep. It is harmless. Close it by hand or run <code>akrogon next --all</code>.</p></div>
       <div class="card"><span class="tag warn">files</span><h4>Issue files never go on a leaf branch</h4><p>The handoff to review refuses any file under <code>issues/</code> on the branch, and refuses a dirty worktree. Agents write issue files only in the registered checkout.</p></div>
       <div class="card"><span class="tag warn">files</span><h4>sync commits everything in the checkout</h4><p><code>akrogon sync</code> stages all changes and commits them as <code>sync issues</code>. Do not leave unrelated half-done code in the registered checkout.</p></div>
       <div class="card"><span class="tag warn">agents</span><h4>Blocked is not counted, stuck is</h4><p>A permission dialog waits for you forever with no penalty. A prompt that does not take counts one attempt. Three attempts and the leaf fails.</p></div>
       <div class="card"><span class="tag warn">agents</span><h4>Blind positions cannot ask the peer</h4><p>In <code>plan.positions</code> the two plans must be independent. Peer questions are allowed in every other phase, one per need, through a file under <code>questions/</code>.</p></div>
-      <div class="card"><span class="tag warn">broadcast</span><h4>Only the merge slot broadcasts</h4><p>Never a subagent, never a cheaper model, because the tab closes as soon as the pane goes idle. A failed broadcast does not reopen the issue.</p></div>
-      <div class="card"><span class="tag warn">tests</span><h4>bun test in the akrogon root also scans worktrees</h4><p>Test counts change while leaves are live. Run <code>bun test tests</code> for the root suite only.</p></div>
+      <div class="card"><span class="tag warn">broadcast</span><h4>Only the merge slot broadcasts</h4><p>Never a subagent, never a cheaper model. The merge pane holds the issue context and closes its own tab as its last act, so anything it hands off could be cut short. A failed broadcast does not reopen the issue.</p></div>
     </div>
   </div>
 </section>
+<div class="pager">
+  <a class="prev" href="in-practice.html"><span class="meta">previous</span><span class="t">In practice</span></a>
+  <a class="next" href="problems.html"><span class="meta">next</span><span class="t">Problems</span></a>
+</div>
 </main>
-
 <footer class="footer">
   <a class="logo" href="#top" aria-label="Tamdoma">
     <svg viewBox="0 0 1114 390" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tamdoma"><g fill="currentColor" stroke="currentColor" stroke-width="1">

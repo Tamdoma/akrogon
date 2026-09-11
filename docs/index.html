@@ -53,12 +53,20 @@
   <div class="wrap" data-animate>
     <span class="eyebrow">Akrogon · operator guide</span>
     <h1>Two agents build it. You decide what.</h1>
-    <p class="lede">Akrogon runs software work through two AI agents from different vendors. They plan, build, review, and merge on their own. You write down what you want, answer questions, and read the result. This guide explains every moving part from first principles, then walks through a normal working day.</p>
+    <p class="lede">Akrogon runs software work through two AI agents from different vendors. They plan, build, review, and merge on their own. You write down what you want, answer questions, and read the result. This guide explains every moving part in plain words, then walks through a normal working day. Read the pages in order. Each one ends with a link to the next.</p>
   </div>
   <div class="wrap hero-fig" data-animate>
     <svg class="ill" viewBox="0 0 1000 300" role="img" aria-label="You write a leaf. Akrogon opens a tab with agent A and agent B. They pass the work through phases until it lands on main.">
       <!-- rail -->
       <path id="hero-rail" class="pipe" d="M120 150 H880"/>
+      <!-- walking duo on rail -->
+      <g opacity=".9">
+        <animateMotion dur="14s" repeatCount="indefinite" calcMode="linear"><mpath href="#hero-rail"/></animateMotion>
+        <g transform="translate(0,-22) scale(.7)">
+          <g transform="translate(10,0)"><circle cx="0" cy="0" r="8" fill="var(--ink)"/><path d="M-8 11 Q0 8 8 11 L6 28 L-6 28 Z" fill="var(--ink)"/></g>
+          <g transform="translate(-12,2)"><rect x="-8" y="-8" width="16" height="12" rx="2" fill="var(--sage-500)"/><rect x="-7" y="6" width="14" height="14" fill="var(--sage-500)"/></g>
+        </g>
+      </g>
       <!-- you -->
       <g transform="translate(60,120)">
         <circle cx="0" cy="0" r="10" fill="var(--ink)"/>
@@ -105,7 +113,7 @@
       <g transform="translate(690,120)">
         <g class="node"><rect x="0" y="16" width="26" height="26" rx="4"/><rect x="48" y="16" width="26" height="26" rx="4"/><rect x="96" y="16" width="26" height="26" rx="4"/><rect x="144" y="16" width="26" height="26" rx="4"/></g>
         <g fill="var(--sage-500)"><rect x="7" y="23" width="12" height="12" rx="2"/><rect x="55" y="23" width="12" height="12" rx="2"/><rect x="103" y="23" width="12" height="12" rx="2"/><rect x="151" y="23" width="12" height="12" rx="2"/></g>
-        <text x="13" y="6" text-anchor="middle" class="ill-data">plan</text><text x="61" y="6" text-anchor="middle" class="ill-data">build</text><text x="109" y="6" text-anchor="middle" class="ill-data">check</text><text x="157" y="6" text-anchor="middle" class="ill-data">merge</text>
+        <text x="13" y="60" text-anchor="middle" class="ill-data">plan</text><text x="61" y="60" text-anchor="middle" class="ill-data">build</text><text x="109" y="60" text-anchor="middle" class="ill-data">check</text><text x="157" y="60" text-anchor="middle" class="ill-data">merge</text>
       </g>
       <text x="775" y="240" text-anchor="middle" class="ill-label">phases</text>
       <!-- main -->
@@ -114,40 +122,34 @@
         <path d="M16 28 L26 38 L46 16" fill="none" stroke="var(--on-sage)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
       </g>
       <text x="930" y="205" text-anchor="middle" class="ill-label">main</text>
-      <!-- walking duo on rail -->
-      <g opacity=".9">
-        <animateMotion dur="14s" repeatCount="indefinite" calcMode="linear"><mpath href="#hero-rail"/></animateMotion>
-        <g transform="translate(0,-22) scale(.7)">
-          <g transform="translate(10,0)"><circle cx="0" cy="0" r="8" fill="var(--ink)"/><path d="M-8 11 Q0 8 8 11 L6 28 L-6 28 Z" fill="var(--ink)"/></g>
-          <g transform="translate(-12,2)"><rect x="-8" y="-8" width="16" height="12" rx="2" fill="var(--sage-500)"/><rect x="-7" y="6" width="14" height="14" fill="var(--sage-500)"/></g>
-        </g>
-      </g>
     </svg>
     <p class="cap" style="text-align:center">a file says the phase · a hook fires · the next agent is prompted · repeat until merged</p>
   </div>
   <div class="wrap">
     <ol class="toc" aria-label="Contents">
-      <li><span class="k">01</span><div><a href="index.html">Home</a><p>Start with the overview.</p></div></li>
-      <li><span class="k">02</span><div><a href="idea.html">The idea</a><p>Understand the agent loop.</p></div></li>
-      <li><span class="k">03</span><div><a href="parts.html">Parts</a><p>Meet every moving part.</p></div></li>
-      <li><span class="k">04</span><div><a href="state.html">State</a><p>Read the state file.</p></div></li>
-      <li><span class="k">05</span><div><a href="install.html">Install</a><p>Install the tools once.</p></div></li>
-      <li><span class="k">06</span><div><a href="setup.html">Setup</a><p>Connect a repository.</p></div></li>
-      <li><span class="k">07</span><div><a href="create.html">Create</a><p>Describe a piece of work.</p></div></li>
-      <li><span class="k">08</span><div><a href="next.html">Next</a><p>See how work is picked.</p></div></li>
-      <li><span class="k">09</span><div><a href="phases.html">Phases</a><p>Follow the work stages.</p></div></li>
-      <li><span class="k">10</span><div><a href="files.html">Files</a><p>Find the project files.</p></div></li>
-      <li><span class="k">11</span><div><a href="merge.html">Merge</a><p>Land and announce work.</p></div></li>
-      <li><span class="k">12</span><div><a href="in-practice.html">In practice</a><p>Follow a day and use cases.</p></div></li>
-      <li><span class="k">13</span><div><a href="limits.html">Limits</a><p>Know the system limits.</p></div></li>
-      <li><span class="k">14</span><div><a href="problems.html">Problems</a><p>Diagnose common failures.</p></div></li>
-      <li><span class="k">15</span><div><a href="learn.html">Learn</a><p>Capture nits and lessons.</p></div></li>
-      <li><span class="k">16</span><div><a href="cheat.html">Cheat sheet</a><p>Find everyday commands.</p></div></li>
+      <li><a href="index.html">Home</a><p>Start with the overview.</p></li>
+      <li><a href="idea.html">The idea</a><p>Understand the agent loop.</p></li>
+      <li><a href="parts.html">Parts</a><p>Meet every moving part.</p></li>
+      <li><a href="state.html">State</a><p>Read the state file.</p></li>
+      <li><a href="install.html">Install</a><p>Install the tools once.</p></li>
+      <li><a href="setup.html">Setup</a><p>Connect a repository.</p></li>
+      <li><a href="create.html">Create</a><p>Describe a piece of work.</p></li>
+      <li><a href="next.html">Next</a><p>See how work is picked.</p></li>
+      <li><a href="phases.html">Phases</a><p>Follow the work stages.</p></li>
+      <li><a href="files.html">Files</a><p>Find the project files.</p></li>
+      <li><a href="merge.html">Merge</a><p>Land and announce work.</p></li>
+      <li><a href="in-practice.html">In practice</a><p>Follow a day and use cases.</p></li>
+      <li><a href="limits.html">Limits</a><p>Know the system limits.</p></li>
+      <li><a href="problems.html">Problems</a><p>Diagnose common failures.</p></li>
+      <li><a href="learn.html">Learn</a><p>Capture nits and lessons.</p></li>
+      <li><a href="cheat.html">Cheat sheet</a><p>Find everyday commands.</p></li>
     </ol>
   </div>
 </section>
+<div class="pager">
+  <a class="next" href="idea.html"><span class="meta">next</span><span class="t">The idea</span></a>
+</div>
 </main>
-
 <footer class="footer">
   <a class="logo" href="#top" aria-label="Tamdoma">
     <svg viewBox="0 0 1114 390" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tamdoma"><g fill="currentColor" stroke="currentColor" stroke-width="1">

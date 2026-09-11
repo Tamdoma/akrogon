@@ -51,7 +51,7 @@
 <main id="top">
 <section class="ink-band" id="cheat" aria-label="Cheat sheet">
   <div class="band-in" data-animate>
-    <span class="eyebrow">16 · Cheat sheet</span>
+    <span class="eyebrow">15 · Cheat sheet</span>
     <h2>Everything on one screen</h2>
     <pre><code><span class="c"># once per machine</span>
 bun install &amp;&amp; bun src/akrogon.ts install
@@ -80,6 +80,8 @@ herdr plugin log list --plugin akrogon
 blocked-by: [other-leaf]      <span class="c"># in state.yaml, before the leaf starts</span>
 hand_built: true              <span class="c"># next skips it</span>
 max_active: 0                 <span class="c"># in config.yaml, pause new starts</span>
+akrogon park a b              <span class="c"># set whole issues or epics aside</span>
+akrogon unpark --all          <span class="c"># bring everything back</span>
 
 <span class="c"># files</span>
 ~/Work/infra/akrogon/config.yaml      <span class="c"># slots, harnesses, repos, max_active</span>
@@ -87,8 +89,10 @@ max_active: 0                 <span class="c"># in config.yaml, pause new starts
 ~/.config/akrogon/env                 <span class="c"># secrets, one NAME=value per line</span></code></pre>
   </div>
 </section>
+<div class="pager">
+  <a class="prev" href="learn.html"><span class="meta">previous</span><span class="t">Learn</span></a>
+</div>
 </main>
-
 <footer class="footer">
   <a class="logo" href="#top" aria-label="Tamdoma">
     <svg viewBox="0 0 1114 390" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tamdoma"><g fill="currentColor" stroke="currentColor" stroke-width="1">

@@ -72,6 +72,7 @@
       <div>
         <pre><code>akrogon status                 <span class="c"># every repo, every open leaf, phase, age, blockers</span>
 akrogon status rename-flag     <span class="c"># one leaf's state and last ten log lines</span>
+                               <span class="c"># status also lists parked issues per repo</span>
 herdr plugin log list --plugin akrogon   <span class="c"># why the hook did or did not act</span></code></pre>
         <p>Or read the tab. A on the left, B on the right. Or read the leaf folder: <code>plan.md</code>, <code>review-A.md</code>, <code>review-B.md</code>.</p>
       </div>
@@ -97,14 +98,15 @@ herdr plugin log list --plugin akrogon   <span class="c"># why the hook did or d
 <div class="band">
 <section id="cases" class="sec" aria-label="Use cases">
   <div class="wrap" data-animate>
-    <div class="head"><span class="eyebrow">12 · Use cases</span><h2>The questions that come up, answered</h2></div>
+    <div class="head"><span class="eyebrow">11 · Use cases</span><h2>The questions that come up, answered</h2></div>
 
     <h3>I have one epic and one normal issue. Can they run in parallel?</h3>
     <p>Yes, by default. Every ready leaf in every repo competes for the same seats. If the epic has three unblocked leaves and <code>max_active</code> is 3, the epic can take all three and the issue waits for the first merge. The tool does not balance between folders.</p>
 
     <h3>I only want this epic to use the free seats</h3>
-    <pre><code>akrogon next issues/open/search</code></pre>
-    <p>Only leaves under that folder are considered. The folder can be an epic, an issue, or a single leaf. Two catches: the hook still sweeps everything when a leaf merges, and the startup <code>next --all</code> starts every ready leaf. To keep a leaf from starting at all, give it a blocker or set <code>hand_built: true</code>.</p>
+    <pre><code>akrogon park --all
+akrogon unpark search</code></pre>
+    <p>Park everything, then unpark the one epic. Parked folders sit in <code>issues/parked/</code> and no sweep touches them, not the hook and not the startup <code>next --all</code>. When the epic is done, <code>akrogon unpark --all</code> brings the rest back. Running leaves cannot be parked, so park before you start the day. To keep one leaf inside an epic from starting, give it a blocker or set <code>hand_built: true</code>.</p>
 
     <h3>I want to stop today and do it in a different order tomorrow</h3>
     <p>Nothing is remembered between runs except <code>state.yaml</code>. Edit the <code>blocked-by</code> lists of the leaves that have not started. Add a slug to make one wait, remove a slug to free one. Then run <code>next</code>. Two limits: a leaf that already has a tab keeps running whatever you edit, and you can only name leaves, so to make issue 2 wait for a whole epic, name the epic's last leaf.</p>
@@ -129,8 +131,11 @@ herdr plugin log list --plugin akrogon   <span class="c"># why the hook did or d
   </div>
 </section>
 </div>
+<div class="pager">
+  <a class="prev" href="merge.html"><span class="meta">previous</span><span class="t">Merge</span></a>
+  <a class="next" href="limits.html"><span class="meta">next</span><span class="t">Limits</span></a>
+</div>
 </main>
-
 <footer class="footer">
   <a class="logo" href="#top" aria-label="Tamdoma">
     <svg viewBox="0 0 1114 390" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tamdoma"><g fill="currentColor" stroke="currentColor" stroke-width="1">

@@ -83,9 +83,9 @@
           <path class="pipe sage" d="M340 160 L260 240"/>
           <text x="40" y="210" class="ill-data">akrogon sync</text>
           <text x="330" y="210" class="ill-data sage">merge-issue push</text>
-          <g transform="translate(165,240)">
-            <rect x="0" y="0" width="130" height="50" rx="8" class="node sage"/>
-            <text x="50" y="30" text-anchor="middle" class="ill-data big">origin/main</text>
+          <g transform="translate(140,240)">
+            <rect x="0" y="0" width="180" height="50" rx="8" class="node sage"/>
+            <text x="90" y="30" text-anchor="middle" class="ill-data big">origin/main</text>
           </g>
         </svg>
         <p class="cap">two writers, two folders, one remote · the branch never touches issues/</p>
@@ -103,12 +103,16 @@
       <tr><td>implementation/brief.md</td><td>B</td><td>What was built, check output, the commit.</td></tr>
       <tr><td>review-A.md · review-B.md</td><td>A, B</td><td>Findings, evidence, verdict. A appends re-checks and merge evidence here.</td></tr>
       <tr><td>questions/&lt;id&gt;.md</td><td>either</td><td>One peer question and its answer, when an agent had to ask the other.</td></tr>
+      <tr><td>issues/chart/&lt;issue&gt;/</td><td>you, via chart-issues</td><td>The chart and its decision files. When the issue closes, the whole folder moves to <code>issues/closed/&lt;issue&gt;/chart/</code>.</td></tr>
       <tr><td>issues/log.jsonl</td><td>akrogon</td><td>One line per phase change: time, slot, commit, diff size.</td></tr>
     </table></div>
   </div>
 </section>
+<div class="pager">
+  <a class="prev" href="phases.html"><span class="meta">previous</span><span class="t">Phases</span></a>
+  <a class="next" href="merge.html"><span class="meta">next</span><span class="t">Merge</span></a>
+</div>
 </main>
-
 <footer class="footer">
   <a class="logo" href="#top" aria-label="Tamdoma">
     <svg viewBox="0 0 1114 390" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tamdoma"><g fill="currentColor" stroke="currentColor" stroke-width="1">
