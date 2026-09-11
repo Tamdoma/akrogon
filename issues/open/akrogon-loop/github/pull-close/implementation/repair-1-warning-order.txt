@@ -1,0 +1,45 @@
+Isolated copy mutation: source field before warning, spaces around JSON colons and line edges.
+Command: AKROGON_BASE=ab36dd0e424b5b5041dd251c189639498c72b4a8 bun test tests/pull.test.ts tests/phase.test.ts tests/next.test.ts
+bun test v1.4.0 (34cbb9a40)
+plan-issue build slot=B phase=plan.synthesis
+
+tests/pull.test.ts:
+(pass) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [175.99ms]
+(pass) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [341.88ms]
+(pass) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [250.12ms]
+(pass) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [166.31ms]
+(pass) concurrent pulls serialize listing and reconciliation [292.45ms]
+(pass) startup runs pull all before next all and wrappers forward arguments [9.40ms]
+
+tests/phase.test.ts:
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [201.19ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [299.18ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [202.99ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [189.52ms]
+(pass) source closure waits for epic movement, deduplicates, and uses the triggering worktree commit under relocated locks [268.59ms]
+(pass) source retries recheck state, skip CLOSED, and continue after final failures with move and logging intact [590.14ms]
+(pass) sourced completion without worktree context fails after rename without a fabricated commit [41.63ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [168.73ms]
+(pass) failed or malformed retry comment listing prevents another close and continues later sources [592.57ms]
+
+tests/next.test.ts:
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [513.76ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [658.11ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [132.75ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [620.65ms]
+(pass) merged phase leaves tab intact, next closes it and starts dependent from a closed-folder hook [693.14ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [357.81ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [595.89ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [627.25ms]
+(pass) delayed working notifications never consume retries and idle notifications still dispatch [490.09ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [466.82ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [490.00ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [692.26ms]
+
+ 27 pass
+ 0 fail
+ 266 expect() calls
+Ran 27 tests across 3 files. [10.15s]
+
+Exit: 0
+Temporary copy removed.

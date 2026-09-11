@@ -1,0 +1,37 @@
+Actual CLI exit: 0
+Actual CLI stdout: moved merged
+issue complete issue
+Recorded simulated GitHub state: {"state": "CLOSED", "comments": ["merged b2988879b93c5640a55558266248e0bf9e9f72be", "merged b2988879b93c5640a55558266248e0bf9e9f72be"], "attempts": 2}
+Owner moved: True
+
+Semantically identical warning with source field before warning field:
+bun test v1.4.0 (34cbb9a40)
+
+tests/phase.test.ts:
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [214.35ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [324.83ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [182.39ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [158.86ms]
+(pass) source closure waits for epic movement, deduplicates, and uses the triggering worktree commit under relocated locks [257.12ms]
+269 |       ]),
+270 |     );
+271 |     const result: Result = await cli(f, ['phase', 'source', 'merged'], f.root, gh.env);
+272 |     expect(result.code).not.toBe(0);
+273 |     const warnings: string[] = result.stderr.split('\n').filter((line) => line.startsWith('{"warning":'));
+274 |     expect(warnings).toHaveLength(4);
+                           ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 4
+Received length: 0
+
+      at <anonymous> (/tmp/pull-close-review-xpkmcnht/tests/phase.test.ts:274:22)
+(fail) source retries recheck state, skip CLOSED, and continue after final failures with move and logging intact [504.27ms]
+(pass) sourced completion without worktree context fails after rename without a fabricated commit [47.72ms]
+
+ 6 pass
+ 1 fail
+ 59 expect() calls
+Ran 7 tests across 1 file. [1.71s]
+
+Exit: 1

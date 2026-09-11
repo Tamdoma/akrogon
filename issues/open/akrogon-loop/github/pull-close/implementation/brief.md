@@ -1,6 +1,6 @@
 ## 1. Goal
 
-Implement D1–D7 and A1–A7 from ../plan.md, completing GitHub pull, source closure, and startup integration.
+Repair review-B F1/F2 from reviewed head e58c2445cb38c74a5d5abe253dae555b5754035c, preserving D1–D7 and A1–A7. The concrete repair scope and corrected D6 retry behavior are in repair-1.md.
 
 ## 2. Numbered acceptance criteria
 
@@ -21,7 +21,7 @@ Do not edit seed-issue, chart, broadcast, init, unrelated docs or dispatch logic
 
 ## 6. Ordered steps
 
-Delegate brief-1 then brief-2 sequentially. Inspect each return. Run full format/typecheck/test checks, record results and commit the scoped diff.
+Delegate repair-1.md, inspect its return, run all blocking checks, update evidence and commit the repair. Initial implementation evidence remains below. Repair completion evidence will record before and after heads.
 
 ## 7. Commands
 
@@ -30,6 +30,14 @@ No configured changed-test runner. Use targeted command: `AKROGON_BASE=ab36dd0e4
 ## 8. Done-when, evidence and report
 
 Fill the report with exact command outcomes and evidence paths from real fixture invocations. Report limitations and remaining criteria explicitly. Never substitute prose checks for functional outcomes.
+
+Repair round 1 complete. Before: e58c2445cb38c74a5d5abe253dae555b5754035c. After (code and corrected plan): 2b626628c355937408a799b09d01865692e4bf5a. A following evidence-only commit records this report and review artifacts without changing tested code.
+
+Repair changed files and reasons: src/pull.ts checks complete validated comment history before retrying an OPEN issue and omits an already-posted exact merged comment. tests/fake-gh.ts models comment success before close failure. tests/phase.test.ts proves the partial-success repair, later-page matches, comment-query failures and continued processing, and parses warning fields independently of serialization order. tests/pull.test.ts checks invalid-origin context instead of prose. Plan D6/A5 now account for partial gh side effects. The applied lesson history is dated without changing its original case. Review A's N1–N3 remain accepted limitations, with no adjacent refactor.
+
+Repair tests: fail-first actual CLI regression recorded duplicate comments in repair-1-red.txt. Targeted green and the isolated reordered/whitespace warning variant each passed 27 tests and 266 assertions (repair-1-green.txt and repair-1-warning-order.txt). B's bun run format and bun run typecheck exited 0. Full bun test passed 42 tests, 460 assertions, exit 0. git diff --check passed. Evidence: repair-1-checks.txt. No unverified repair criterion remains. R1–R3 external-race, replay, and lock-duration limitations remain. All fixtures were temporary and no live GitHub/herdr operation was performed for this repair.
+
+Initial implementation evidence:
 
 Changed files and reasons: src/pull.ts implements complete origin-based mirror reconciliation and source close with one rechecking retry. src/akrogon.ts wires pull/--all. src/phase.ts and src/next.ts await source closure after owner rename under existing locks. plugin/pull.sh and plugin/herdr-plugin.toml add pull before next at startup. tests/fake-gh.ts and tests/helpers.ts provide the substituted external boundary. tests/pull.test.ts, tests/phase.test.ts, and tests/next.test.ts verify A1–A7 with real temp-repo CLI processes. No new dependency or adjacent feature.
 Tests run: worker 1 targeted pull check progressed from 6 failing tests to 6 passing tests/61 assertions (pull-red.txt and pull-green.txt). Worker 2 targeted phase/next check progressed from 4 failing tests before implementation to 19 passing tests/181 assertions (close-red.txt and close-green.txt). B ran bun run format (exit 0, scoped formatting only), bun run typecheck (exit 0), bun test (40 pass, 0 fail, 436 assertions, exit 0), and git diff --check (exit 0). Combined command evidence is checks.txt. These tests invoke the actual CLI in temporary repositories and exercise both recovery paths with delayed gh lock/worktree probes. Fixtures clean up their temporary files.

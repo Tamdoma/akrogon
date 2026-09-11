@@ -1,0 +1,132 @@
+bun test v1.4.0 (34cbb9a40)
+
+tests/phase.test.ts:
+322 |       { stdout: '', stateful: true },
+323 |       { stdout: '', stateful: true },
+324 |     ]));
+325 |     const result: Result = await cli(f, ['phase', 'partial', 'merged'], f.root, gh.env);
+326 |     expect(result.code).toBe(0);
+327 |     expect(JSON.parse(readFileSync(gh.db + '.state', 'utf8'))).toEqual({
+                                                                     ^
+error: expect(received).toEqual(expected)
+
+  {
+    "attempts": 2,
+    "comments": [
+      "earlier 0",
+      "earlier 1",
+      "earlier 2",
+      "earlier 3",
+      "earlier 4",
+      "earlier 5",
+      "earlier 6",
+      "earlier 7",
+      "earlier 8",
+      "earlier 9",
+      "earlier 10",
+      "earlier 11",
+      "earlier 12",
+      "earlier 13",
+      "earlier 14",
+      "earlier 15",
+      "earlier 16",
+      "earlier 17",
+      "earlier 18",
+      "earlier 19",
+      "earlier 20",
+      "earlier 21",
+      "earlier 22",
+      "earlier 23",
+      "earlier 24",
+      "earlier 25",
+      "earlier 26",
+      "earlier 27",
+      "earlier 28",
+      "earlier 29",
+      "earlier 30",
+      "earlier 31",
+      "earlier 32",
+      "earlier 33",
+      "earlier 34",
+      "earlier 35",
+      "earlier 36",
+      "earlier 37",
+      "earlier 38",
+      "earlier 39",
+      "earlier 40",
+      "earlier 41",
+      "earlier 42",
+      "earlier 43",
+      "earlier 44",
+      "earlier 45",
+      "earlier 46",
+      "earlier 47",
+      "earlier 48",
+      "earlier 49",
+      "earlier 50",
+      "earlier 51",
+      "earlier 52",
+      "earlier 53",
+      "earlier 54",
+      "earlier 55",
+      "earlier 56",
+      "earlier 57",
+      "earlier 58",
+      "earlier 59",
+      "earlier 60",
+      "earlier 61",
+      "earlier 62",
+      "earlier 63",
+      "earlier 64",
+      "earlier 65",
+      "earlier 66",
+      "earlier 67",
+      "earlier 68",
+      "earlier 69",
+      "earlier 70",
+      "earlier 71",
+      "earlier 72",
+      "earlier 73",
+      "earlier 74",
+      "earlier 75",
+      "earlier 76",
+      "earlier 77",
+      "earlier 78",
+      "earlier 79",
+      "earlier 80",
+      "earlier 81",
+      "earlier 82",
+      "earlier 83",
+      "earlier 84",
+      "earlier 85",
+      "earlier 86",
+      "earlier 87",
+      "earlier 88",
+      "earlier 89",
+      "earlier 90",
+      "earlier 91",
+      "earlier 92",
+      "earlier 93",
+      "earlier 94",
+      "earlier 95",
+      "earlier 96",
+      "earlier 97",
+      "earlier 98",
+      "earlier 99",
+      "merged e487725ef1512809f95a6309c8c645012fffaa16",
++     "merged e487725ef1512809f95a6309c8c645012fffaa16",
+    ],
+    "state": "CLOSED",
+  }
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/phase.test.ts:327:64)
+(fail) partial commented close success retries without duplicating a merged comment on a later page [154.19ms]
+
+ 0 pass
+ 7 filtered out
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [194.00ms]

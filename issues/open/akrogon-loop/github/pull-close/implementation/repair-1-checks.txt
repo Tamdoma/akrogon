@@ -1,0 +1,76 @@
+bun run format
+Exit: 0. All source/test files unchanged by final formatter pass.
+
+bun run typecheck
+Exit: 0
+$ tsc --noEmit
+
+bun test
+bun test v1.4.0 (34cbb9a40)
+
+tests/config.test.ts:
+(pass) config combines defaults and repo values, reports none, and recalculates worktree base [164.11ms]
+
+tests/init.test.ts:
+(pass) init writes proposal, registration and toolkit and preserves repeated user files [114.11ms]
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [552.55ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [668.10ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [132.53ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [620.69ms]
+(pass) merged phase leaves tab intact, next closes it and starts dependent from a closed-folder hook [694.37ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [358.93ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [596.62ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [615.76ms]
+(pass) delayed working notifications never consume retries and idle notifications still dispatch [486.90ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [478.45ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [487.66ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [688.13ms]
+
+tests/phase.test.ts:
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [202.10ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [306.59ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [180.42ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [152.08ms]
+(pass) source closure waits for epic movement, deduplicates, and uses the triggering worktree commit under relocated locks [251.40ms]
+(pass) source retries recheck state, skip CLOSED, and continue after final failures with move and logging intact [570.56ms]
+(pass) sourced completion without worktree context fails after rename without a fabricated commit [46.99ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [178.02ms]
+(pass) failed or malformed retry comment listing prevents another close and continues later sources [591.14ms]
+
+tests/status.test.ts:
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [42.94ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [171.79ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [320.03ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [62.17ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [123.31ms]
+
+tests/pull.test.ts:
+(pass) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [182.67ms]
+(pass) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [335.57ms]
+(pass) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [254.88ms]
+(pass) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [159.62ms]
+(pass) concurrent pulls serialize listing and reconciliation [291.19ms]
+(pass) startup runs pull all before next all and wrappers forward arguments [9.62ms]
+
+skills/broadcast-issue/scripts/discord-send.test.ts:
+(pass) delivers one message to configured targets using only the external file, with no record [23.41ms]
+(pass) refuses missing secrets, invalid routes and empty targets before sending [90.79ms]
+(pass) validates the whole message and all targets before any delivery [92.07ms]
+(pass) retries only the failed target once and does not resend a successful target [24.78ms]
+(pass) surfaces the final response after two failures, redacts secrets and still attempts other targets [24.69ms]
+(pass) network failures receive one retry without exposing webhook credentials [23.80ms]
+(pass) retries a failed response body and continues to the next target [22.25ms]
+(pass) stops after one response-body retry, preserves final context and attempts remaining targets [23.02ms]
+
+ 42 pass
+ 0 fail
+ 460 expect() calls
+Ran 42 tests across 7 files. [11.45s]
+
+Exit: 0
+
+git diff --check
+Exit: 0
