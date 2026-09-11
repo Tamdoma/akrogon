@@ -29,6 +29,7 @@ export const repoSchema = z.strictObject({
   worktree_root: text.default('issues/worktrees'),
   rebuttal: z.boolean().default(true),
   fix_rounds: z.number().int().positive().default(3),
+  max_active: z.number().int().positive().optional(),
   implement: z.enum(['subagents', 'inline']).default('subagents'),
   checks: z.record(text, text).default({}),
   advisory: z.array(text).default([]),
@@ -120,10 +121,13 @@ export async function effectiveConfig(cwd: string): Promise<string> {
   const global: GlobalConfig = readGlobal();
   const repo: Repo | null = await currentRepo(global, cwd);
   const top: string | null = repo === null ? null : await command(['git', 'rev-parse', '--show-toplevel'], cwd);
+  const repoConfig: RepoConfig = repo === null ? repoSchema.parse({}) : repo.config;
+  const { max_active: repoMaxActive, ...repoValues } = repoConfig;
   return Bun.YAML.stringify(
     {
       ...global,
-      ...(repo === null ? repoSchema.parse({}) : repo.config),
+      ...repoValues,
+      ...(repoMaxActive === undefined ? {} : { repo_max_active: repoMaxActive }),
       repo: repo === null ? 'none' : repo.name,
       ...(repo !== null && top !== repo.root ? { AKROGON_BASE: await base(repo, cwd) } : {}),
     },

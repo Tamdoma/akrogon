@@ -458,6 +458,90 @@ test('merged phase leaves tab intact, a hook starts the dependent and only the s
   }
 }, 15000);
 
+test('per-repo capacity leaves uncapped repos to fill the global ceiling', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const g: Fixture = await fixture();
+  try {
+    leaf(f, 'a-one', 'plan.synthesis');
+    leaf(f, 'a-two', 'plan.synthesis');
+    leaf(f, 'a-three', 'plan.synthesis');
+    leaf(g, 'b-one', 'plan.synthesis', { repo: 'other' });
+    leaf(g, 'b-two', 'plan.synthesis', { repo: 'other' });
+    configure(f, { max_active: 3, repos: { repo: f.root, other: g.root } });
+    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 1 });
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(0);
+    const labels: string[] = database(f).tabs.map((tab) => tab.label);
+    expect(labels.filter((label) => label.startsWith('a-'))).toHaveLength(1);
+    expect(labels.filter((label) => label.startsWith('b-'))).toHaveLength(2);
+  } finally {
+    f.clean();
+    g.clean();
+  }
+}, 15000);
+
+test('global capacity still limits a repo with a larger repo cap', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const first: string = leaf(f, 'first', 'plan.synthesis');
+    const second: string = leaf(f, 'second', 'plan.synthesis');
+    configure(f, { max_active: 1 });
+    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 2 });
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(0);
+    expect(database(f).tabs).toHaveLength(1);
+    expect(
+      [readState(first).worktree, readState(second).worktree].filter((worktree) => worktree !== undefined),
+    ).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('repo capacity bypasses existing tabs and refuses a second tab-less leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const first: string = leaf(f, 'first', 'plan.synthesis');
+    configure(f, { max_active: 3 });
+    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 1 });
+    expect((await next(f, ['first'])).code).toBe(0);
+    resetPrompts(f, first);
+    const second: string = leaf(f, 'second', 'plan.synthesis');
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(0);
+    expect(database(f).tabs).toHaveLength(1);
+    expect(database(f).prompts).toHaveLength(1);
+    expect(database(f).prompts[0].text).toContain('first');
+    expect(readState(second).worktree).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('unreadable state reserves its repo capacity and reports its path', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
+    writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
+    const first: string = leaf(f, 'first', 'plan.synthesis');
+    const second: string = leaf(f, 'second', 'plan.synthesis');
+    configure(f, { max_active: 5 });
+    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 3 });
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(1);
+    expect(skips(result)[0]).toMatchObject({ path: malformed });
+    expect(database(f).tabs).toHaveLength(0);
+    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 4 });
+    const retried: Result = await next(f, ['--all']);
+    expect(retried.code).toBe(1);
+    expect(database(f).tabs).toHaveLength(2);
+    expect([first, second].filter((path) => readState(path).worktree !== undefined)).toHaveLength(2);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('machine-wide capacity includes another registered repo and folder selection respects it', async () => {
   const f: DispatchFixture = await dispatchFixture();
   const g: Fixture = await fixture();

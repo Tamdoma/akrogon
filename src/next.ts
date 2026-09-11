@@ -258,22 +258,28 @@ async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
   return state;
 }
 
-async function activeCount(global: GlobalConfig, invocation: Invocation): Promise<number> {
+type ActiveCounts = { total: number; perRepo: Map<string, number> };
+
+async function activeCount(global: GlobalConfig, invocation: Invocation): Promise<ActiveCounts> {
   const live: Pane[] = await panes();
   const registered: ReturnType<typeof registeredRepos> = registeredRepos(global, invocation);
-  let active: number = registered.unknown ? global.max_active : 0;
+  const perRepo: Map<string, number> = new Map();
+  let total: number = registered.unknown ? global.max_active : 0;
   for (const repo of registered.repos) {
     const inventory: Inventory = discover(repo, invocation);
-    if (inventory.unknown) active += global.max_active;
-    else if (inventory.unreadable > 0) active += inventory.leaves.length + inventory.unreadable;
-    else
-      active += inventory.leaves.filter(
-        (leaf) =>
-          leaf.state.phase !== 'merged' &&
-          live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf)),
-      ).length;
+    const contribution: number = inventory.unknown
+      ? global.max_active
+      : inventory.unreadable > 0
+        ? inventory.leaves.length + inventory.unreadable
+        : inventory.leaves.filter(
+            (leaf) =>
+              leaf.state.phase !== 'merged' &&
+              live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf)),
+          ).length;
+    total += contribution;
+    perRepo.set(repo.name, contribution);
   }
-  return active;
+  return { total, perRepo };
 }
 
 async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation: Invocation): Promise<State | null> {
@@ -290,22 +296,24 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
         live.some((pane) => pane.tab_id === tab.tab_id && inWorktree(pane.cwd, expected))),
   );
   if (matches.length > 1) throw new Error(`Multiple tabs for leaf: ${leaf.state.slug}`);
-  if (matches.length === 0 && (await activeCount(global, invocation)) >= global.max_active) return null;
+  if (matches.length === 0) {
+    const counts: ActiveCounts = await activeCount(global, invocation);
+    if (
+      counts.total >= global.max_active ||
+      (repo.config.max_active !== undefined && (counts.perRepo.get(repo.name) ?? 0) >= repo.config.max_active)
+    )
+      return null;
+  }
   const state: State = await ensureWorktree(repo, leaf);
   const worktree: string = z.string().parse(state.worktree);
   const workspace: string | undefined = process.env.HERDR_WORKSPACE_ID || undefined;
-  const placement: string[] = [
-    '--cwd',
-    worktree,
-    '--env',
-    `AKROGON_BASE=${await base(repo, worktree)}`,
-    '--no-focus',
-  ];
+  const placement: string[] = ['--cwd', worktree, '--env', `AKROGON_BASE=${await base(repo, worktree)}`, '--no-focus'];
   const target: string[] = workspace === undefined ? [] : ['--workspace', workspace];
   const tab: Tab =
     matches.length === 1
       ? matches[0]
-      : (await herdr(['tab', 'create', '--label', state.slug, ...placement, ...target], z.object({ tab: tabSchema }))).tab;
+      : (await herdr(['tab', 'create', '--label', state.slug, ...placement, ...target], z.object({ tab: tabSchema })))
+          .tab;
   const tabState: State = { ...state, tab: tab.tab_id };
   saveState(leaf.path, tabState);
   const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === tab.tab_id);

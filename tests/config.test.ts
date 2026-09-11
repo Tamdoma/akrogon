@@ -13,11 +13,23 @@ test('config combines defaults and repo values, reports none, and recalculates w
       remote: 'upstream',
       default_branch: 'trunk',
     });
+    const unset = await cli(f, ['config']);
+    expect(unset.code).toBe(0);
+    expect(Bun.YAML.parse(unset.stdout)).toMatchObject({ max_active: 3 });
+    expect(Bun.YAML.parse(unset.stdout)).not.toHaveProperty('repo_max_active');
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      max_active: 2,
+      fix_rounds: 2,
+      implement: 'inline',
+      remote: 'upstream',
+      default_branch: 'trunk',
+    });
     await command(['git', 'update-ref', 'refs/remotes/upstream/trunk', 'HEAD'], f.root);
     const config = await cli(f, ['config']);
     expect(config.code).toBe(0);
     expect(Bun.YAML.parse(config.stdout)).toMatchObject({
       max_active: 3,
+      repo_max_active: 2,
       fix_rounds: 2,
       implement: 'inline',
       repo: 'repo',
@@ -40,6 +52,10 @@ test('config combines defaults and repo values, reports none, and recalculates w
     expect(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout)).toMatchObject({ AKROGON_BASE: second });
     yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 0 });
     expect((await cli(f, ['config'])).code).not.toBe(0);
+    for (const maxActive of [0, -1, 1.5]) {
+      yaml(resolve(f.root, 'issues/config.yaml'), { max_active: maxActive });
+      expect((await cli(f, ['config'])).code).not.toBe(0);
+    }
   } finally {
     f.clean();
   }
