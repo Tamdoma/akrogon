@@ -1,0 +1,35 @@
+Initial HEAD: 7af5184669bc43d6e9f47f30e0bd8fb24c282a7d
+Initial conflict:
+diff --cc tests/phase.test.ts
+index 22387aa,fa0d0ef..0000000
+--- i/tests/phase.test.ts
++++ w/tests/phase.test.ts
+@@@ -1,9 -1,11 +1,17 @@@
+  import { test, expect } from 'bun:test';
+  import { resolve } from 'node:path';
+  import { readFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+++<<<<<<< HEAD
+ +import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
+ +import { readState } from '../src/state';
+ +import { command, type Result } from '../src/shell';
+++=======
++ import { fixture, cli, leaf, yaml, fakeGh, type GhFixture, type Fixture } from './helpers';
++ import { readState } from '../src/state';
++ import { command, type Result } from '../src/shell';
++ import type { GhStep } from './fake-gh';
++ import { z } from 'zod';
+++>>>>>>> e58c244 (Add GitHub issue pull mirror and completion closure)
+
+  function bytes(path: string): string {
+    return readFileSync(resolve(path, 'state.yaml'), 'utf8');
+Remaining rebase todo:
+pick 2b626628c355937408a799b09d01865692e4bf5a # Avoid duplicate merged comments after partial close failure
+pick 65b67f46d854ea73569fe73d9af149d02b5e7c40 # Record pull-close repair verification
+
+GIT_EDITOR=true git rebase --continue: exit 0. Successfully rebased and updated refs/heads/pull-close. All three commits applied, no further conflicts.
+Final HEAD: f96330c692aa86d1043027fdb73445254bf8a533
+Rebased commits:
+f96330c Record pull-close repair verification
+e1b305b Avoid duplicate merged comments after partial close failure
+fe30c7e Add GitHub issue pull mirror and completion closure
+Final status:

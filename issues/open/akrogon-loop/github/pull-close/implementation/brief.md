@@ -1,6 +1,6 @@
 ## 1. Goal
 
-Repair review-B F1/F2 from reviewed head e58c2445cb38c74a5d5abe253dae555b5754035c, preserving D1–D7 and A1–A7. The concrete repair scope and corrected D6 retry behavior are in repair-1.md.
+Resolve review A's merge-attempt rebase conflict onto 7af5184669bc43d6e9f47f30e0bd8fb24c282a7d, preserving reviewed head 65b67f46d854ea73569fe73d9af149d02b5e7c40 behavior and upstream contracts. Repair round 2 scope is in repair-2.md.
 
 ## 2. Numbered acceptance criteria
 
@@ -21,15 +21,21 @@ Do not edit seed-issue, chart, broadcast, init, unrelated docs or dispatch logic
 
 ## 6. Ordered steps
 
-Delegate repair-1.md, inspect its return, run all blocking checks, update evidence and commit the repair. Initial implementation evidence remains below. Repair completion evidence will record before and after heads.
+Delegate repair-2.md, inspect its rebase resolution, run all blocking checks, update evidence and commit the integration report. Earlier implementation and repair evidence remains below. Record the new before/after heads.
 
 ## 7. Commands
 
-No configured changed-test runner. Use targeted command: `AKROGON_BASE=ab36dd0e424b5b5041dd251c189639498c72b4a8 bun test tests/pull.test.ts tests/phase.test.ts tests/next.test.ts`. Workers run only this targeted check. B owns the full suite and other blocking checks.
+No configured changed-test runner. Use targeted command: `AKROGON_BASE=7af5184669bc43d6e9f47f30e0bd8fb24c282a7d bun test tests/pull.test.ts tests/phase.test.ts tests/next.test.ts`. Workers run only this targeted check. B owns the full suite and other blocking checks.
 
 ## 8. Done-when, evidence and report
 
 Fill the report with exact command outcomes and evidence paths from real fixture invocations. Report limitations and remaining criteria explicitly. Never substitute prose checks for functional outcomes.
+
+Repair round 2 complete. Before: 65b67f46d854ea73569fe73d9af149d02b5e7c40. Rebase target/base: 7af5184669bc43d6e9f47f30e0bd8fb24c282a7d. After: f96330c692aa86d1043027fdb73445254bf8a533. All three leaf commits replayed, becoming fe30c7e, e1b305b and f96330c. The following evidence commit does not change tested code.
+
+Round 2 changed files and reasons: resolved tests/phase.test.ts imports as the union of upstream command and leaf fake-gh types/zod. No further conflict or compatibility repair was needed. Upstream prompted-session handling, dirty-worktree checks, and non-force cleanup survived alongside awaited closure and the partial-comment retry repair. No difference remains in src/pull.ts, tests/fake-gh.ts or tests/pull.test.ts versus the previously reviewed head. Updated this report and review A's recorded merge-conflict context for recheck.
+
+Round 2 tests: targeted pull/phase/next command with the new base passed 31 tests / 293 assertions. B ran bun run format (exit 0, unchanged), bun run typecheck (exit 0), bun test (46 pass, 0 fail, 487 assertions, exit 0), and git diff --check (exit 0). Evidence: repair-2-rebase.txt, repair-2-targeted.txt, repair-2-checks.txt. No unverified integration criteria remain. Existing R1–R3 limitations are unchanged. Rebase is complete, and no push or live external operation was performed by this repair.
 
 Repair round 1 complete. Before: e58c2445cb38c74a5d5abe253dae555b5754035c. After (code and corrected plan): 2b626628c355937408a799b09d01865692e4bf5a. A following evidence-only commit records this report and review artifacts without changing tested code.
 
