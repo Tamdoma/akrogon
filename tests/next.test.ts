@@ -1021,12 +1021,22 @@ for (const seat of ['A', 'B'] as const) {
         { mode: 0o755 },
       );
       const before: State = readState(path);
+      const observedAt: number = Date.now();
       const result: Result = await next(f, ['blocked-merge'], { REAL_GIT: realGit, GIT_CALL_LOG: gitLog });
       const gitCalls: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');
       expect(gitCalls.some((args) => args.startsWith('fetch '))).toBe(false);
       expect(gitCalls).not.toContain('status --porcelain');
       expect(result.code).toBe(0);
-      expect(readState(path)).toEqual(before);
+      const after: State = readState(path);
+      const since: string = z.string().datetime().parse(after.busy_since[seat]);
+      if (seat === 'A') {
+        expect(before.busy_since.A).toBeUndefined();
+        expect(Date.parse(since)).toBeGreaterThanOrEqual(observedAt);
+        expect(Date.parse(since)).toBeLessThanOrEqual(Date.now());
+      } else {
+        expect(before.busy_since.B).toBe(since);
+      }
+      expect(after).toEqual({ ...before, busy_since: { [seat]: since }, busy_notified: {} });
       expect(database(f).prompts).toEqual(db.prompts);
       expect(database(f).starts).toEqual(db.starts);
       expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
