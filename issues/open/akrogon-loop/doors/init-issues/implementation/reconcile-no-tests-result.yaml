@@ -1,0 +1,16 @@
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks:
+  {}
+advisory:
+  []
+grounding:
+  index: REFERENCE.md
+broadcast:
+  discord:
+    webhook_env:
+      - DISCORD_WEBHOOK_URL

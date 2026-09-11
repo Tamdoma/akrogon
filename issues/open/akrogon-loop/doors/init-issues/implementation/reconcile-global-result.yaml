@@ -1,0 +1,17 @@
+max_active: 3
+slots:
+  a:
+    harness: fake
+    model: fixture
+    effort: high
+  b:
+    harness: fake
+    model: fixture
+    effort: high
+harnesses:
+  fake: "false {model} {effort}"
+toolkits:
+  typescript: bun:test
+repos:
+  bun-eslint: /tmp/init-issues-reconcile-hhccxgca/bun-eslint
+  no-tests: /tmp/init-issues-reconcile-hhccxgca/no-tests

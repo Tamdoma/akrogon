@@ -35,13 +35,13 @@ One bounded unit, 12 tracked files before deletion, approximately 15 turns. Retu
 
 ## 7. Commands
 
-No configured test_changed. Targeted check: AKROGON_BASE=ab36dd0e424b5b5041dd251c189639498c72b4a8 bun test tests/init.test.ts. B runs format, typecheck and full suite separately.
+No configured test_changed. Targeted check: AKROGON_BASE=f281241901d0f1c8a2bfd5943be838fb14f5eb9c bun test tests/init.test.ts. B runs format, typecheck and full suite separately.
 
 ## 8. Done-when, evidence and report
 
 C1–C5 observed, with scenario transcript and proposal evidence under implementation/. Return changed files/reasons, test output, limitations and unverified criteria. Keep scope and checks honest.
 
-Changed files and reasons: Rewrote skills/init-issues/SKILL.md for D1–D6 and deleted 11 retired distribution files under payload/ and scripts/. Evidence is in baseline.md, verification.md, scenario-transcript.txt, initial-run-failure.txt and proposal/result YAML files beside this brief.
-Tests run: Real isolated Bun/ESLint setup scenarios passed, including index reuse, configured-missing repair, no-tests toolkit selection, deliberate failing tests and missing-base rejection followed by restored green tests. Targeted tests/init.test.ts passed, 1 test / 12 assertions. See verification.md for exit codes and evidence.
-Known limitations: Plan R1–R3. Other installed runners were not exercised. B reviewed the final skill and evidence. Formatting, all 30 tests (337 assertions), typecheck and diff whitespace checks passed.
-Unverified criteria: None within this bounded unit. C1–C5 observed as recorded in verification.md, pending independent checker review.
+Changed files and reasons: Rewrote skills/init-issues/SKILL.md as the compact command-owned initialization flow and removed all 11 files in its retired payload/scripts trees. Added fresh reconcile-* proposal/result/transcript evidence, updated baseline, and labeled the previous verification report historical because it did not match actual starting HEAD.
+Tests run: AKROGON_BASE=f281241901d0f1c8a2bfd5943be838fb14f5eb9c bun test tests/init.test.ts passed with 1 test, 12 assertions and no failures. Real isolated Bun/ESLint scenarios passed lint/full/changed checks, rejected deliberate failing tests and missing base, preserved manifests and existing indexes, repaired configured missing index through init, and recorded no-tests toolkit selection. See reconcile-verification.md and reconcile-scenario-transcript.txt. Fixtures and helper removed. B completed blocking checks: format and typecheck exited 0, full suite passed 34 tests / 364 assertions, and diff whitespace validation passed.
+Known limitations: Plan R1–R3. Other runners were not exercised. Historical artifacts remain clearly marked as superseded by fresh evidence.
+Unverified criteria: None of C1–C5 for worker verification. Independent checking remains the next lifecycle step.

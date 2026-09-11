@@ -1,3 +1,5 @@
+> Historical report from a previous pass. Its completion claim did not match HEAD f281241 at reconciliation start. See `reconcile-verification.md` and `reconcile-*` artifacts for verification of the actual current implementation.
+
 # Verification
 
 C1: The rewritten skill is 81 lines / 601 whitespace words, comfortably below 4k tokens, with 18 prose sentences including descriptive statements and fewer than 20 operative rule sentences. Functional review covers one config read per pass, complete repo proposal, supported runner selection, no-tests toolkit choice, grounding creation/reuse, command ownership, compaction and terminal footer. No unconditional must/never wording is present.
