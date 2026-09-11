@@ -11,7 +11,7 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
     ? { from: { type: 'string' }, toolkit: { type: 'string' } }
     : verb === 'phase'
       ? { slot: { type: 'string' }, verdict: { type: 'string' } }
-      : verb === 'next' || verb === 'pull'
+      : verb === 'next' || verb === 'pull' || verb === 'park' || verb === 'unpark'
         ? { all: { type: 'boolean' } }
         : {};
 
@@ -53,6 +53,12 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./sync')).syncCommand(process.cwd());
     break;
+  case 'park':
+  case 'unpark':
+    if (values.all === true && positionals.length !== 0) throw new Error('Use issue names or --all, not both');
+    if (values.all !== true && positionals.length === 0) throw new Error('Name at least one issue or pass --all');
+    await (await import('./park')).parkCommand(verb, positionals, values.all === true, process.cwd());
+    break;
   case 'status':
     z.array(z.string()).max(1).parse(positionals);
     await (await import('./status')).statusCommand(positionals[0]);
@@ -62,5 +68,5 @@ switch (verb) {
     await (await import('./install')).install();
     break;
   default:
-    throw new Error('Usage: akrogon <install|init|config|phase|next|pull|sync|status>');
+    throw new Error('Usage: akrogon <install|init|config|phase|next|pull|park|unpark|sync|status>');
 }
