@@ -307,6 +307,10 @@ async function dispatchLeaf(global: GlobalConfig, repo: Repo, slug: string, expl
         const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === current.state.tab);
         if (members.some((pane) => pane.agent !== null && !idle(pane))) return false;
         if (members.length > 0) await command(['herdr', 'tab', 'close', z.string().parse(current.state.tab)]);
+        if (current.state.worktree !== undefined && existsSync(current.state.worktree)) {
+          await command(['git', 'worktree', 'remove', '--force', current.state.worktree], repo.root);
+          await command(['git', 'branch', '-d', current.state.slug], repo.root);
+        }
         return true;
       }
       if (current.state.phase === 'failed') return false;

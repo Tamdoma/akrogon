@@ -1,9 +1,9 @@
 import { test, expect } from 'bun:test';
-import { mkdirSync, writeFileSync, readFileSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, symlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
 import { readState, saveState } from '../src/state';
-import { command, type Result } from '../src/shell';
+import { command, run, type Result } from '../src/shell';
 import type { Database } from './fake-herdr';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
@@ -166,6 +166,8 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     expect(recovered.stdout).toContain('issue complete landing');
     expect(readState(resolve(f.root, 'issues/closed/landing/landed')).phase).toBe('merged');
     expect(database(f).tabs).toHaveLength(0);
+    expect(existsSync(worktree)).toBe(false);
+    expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/landed'], f.root)).code).toBe(1);
   } finally {
     f.clean();
   }
