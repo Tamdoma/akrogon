@@ -41,6 +41,11 @@ This repository's [reference index](REFERENCE.md) links its areas.
 | `akrogon next [<slug>\|<path>\|--all]` | Dispatch eligible work for a leaf, path or all registered repositories. With no argument, use the current directory or Herdr hook context. |
 | `akrogon pull [--all]` | Import open GitHub issues into seeds for the current repository or all registered repositories. |
 | `akrogon status [<slug>]` | Show the registered repository board, or a current-repository leaf's state and recent history. |
+| `akrogon sync` | Commit eligible issue records, rebase and push through the configured remote. |
+| `akrogon park <issue>... \| --all` | Move eligible whole issues to `issues/parked/`. Use top-level issue folder names or `--all`, never both. `--all` skips running issues and prerequisites needed by open work. |
+| `akrogon unpark <issue>... \| --all` | Restore whole issues to `issues/open/`. Use top-level issue folder names or `--all`, never both. Refuse moves that leave open work depending on parked leaves. |
+
+`issues/parked/` is committed issue data. `sync` requires the registered repository's checked-out `default_branch`, refusing detached HEAD, other branches and already-staged paths outside eligible records. Its new commit includes only changes under `issues/`, excluding `issues/seeds/`, files named `.lock` and the configured `worktree_root`. It holds the global then repository lock, fetches, rebases and pushes through `remote`, preserving unrelated local edits on success. Coordination-lock hazards and ignored-path collisions cause refusal, and restoration conflicts stop the push. GitHub intake is separate: `pull` reads this repository's GitHub `origin`, while `remote` selects where code integrates. Consumer projects route reports through `seed-issue` with `issues_repo: owner/repo` in root `akrogon.yaml`. That setting does not redirect `pull`.
 
 ## Skills
 
