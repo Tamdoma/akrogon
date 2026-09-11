@@ -20,7 +20,6 @@ const destinations: string[] = [
   'learn',
   'cheat',
 ].map((name: string): string => `${name}.html`);
-const guide: string = readFileSync(new URL('guide.html', docs), 'utf8');
 
 function extract(source: string, start: string, end: string): string {
   const offset: number = source.indexOf(start);
@@ -50,37 +49,13 @@ async function reveal(page: Page): Promise<void> {
   }
 }
 
-async function styles(locator: Locator): Promise<string[]> {
-  return locator.evaluateAll((elements: Element[]): string[] =>
-    elements.map((element: Element): string => {
-      const css: CSSStyleDeclaration = getComputedStyle(element);
-      return [
-        css.fontFamily,
-        css.fontSize,
-        css.fontWeight,
-        css.lineHeight,
-        css.color,
-        css.backgroundColor,
-        css.display,
-        css.gridTemplateColumns,
-        css.gap,
-        css.padding,
-        css.maxWidth,
-      ].join('|');
-    }),
-  );
-}
-
 const idea: string = readFileSync(new URL('idea.html', docs), 'utf8');
 const concepts: string[] = ['parts', 'state', 'phases', 'files'];
 const titles: string[] = ['Every moving part', 'The state file', 'The phases', 'Where files live'];
 
-test('complete concept copies and navigation', async ({ page, context }, testInfo): Promise<void> => {
+test('concept shells and navigation', async ({ page }, testInfo): Promise<void> => {
   for (const [index, name] of concepts.entries()) {
     const html: string = readFileSync(new URL(`${name}.html`, docs), 'utf8');
-    const section: string = extract(guide, `<section id="${name}"`, '</section>');
-    const body: string = ['parts', 'phases'].includes(name) ? `<div class="band">\n${section}\n</div>` : section;
-    expect(extract(html, '<main id="top">', '</main>')).toBe(`<main id="top">\n${body}\n</main>`);
     expect(
       html
         .replace(`<title>${titles[index]} · Akrogon Guide</title>`, '<title>The idea · Akrogon Guide</title>')
@@ -91,9 +66,6 @@ test('complete concept copies and navigation', async ({ page, context }, testInf
     expect(html).not.toMatch(/<style\b/i);
   }
   await page.goto(new URL('index.html', docs).href);
-  const source: Page = await context.newPage();
-  await source.goto(new URL('guide.html', docs).href);
-  await fonts(source);
   for (const name of [...concepts, 'index']) {
     await page.locator(`nav a[href="${name}.html"]`).click();
     await expect(page).toHaveURL(new URL(`${name}.html`, docs).href);
@@ -112,14 +84,7 @@ test('complete concept copies and navigation', async ({ page, context }, testInf
     await reveal(page);
     await expect(page.locator('main section')).toHaveCount(1);
     await expect(page.locator('link[href="style.css"]')).toHaveCount(1);
-    if (name === 'parts') {
-      const selector: string = '#parts .zig, #parts .copy, #parts pre, #parts .fig';
-      const geometry = (elements: Element[]): number[][] =>
-        elements.map((element: Element): number[] => [element.getBoundingClientRect().width, element.scrollWidth]);
-      expect(await page.locator(selector).evaluateAll(geometry)).toEqual(
-        await source.locator(selector).evaluateAll(geometry),
-      );
-    } else {
+    if (name !== 'parts') {
       expect(await page.evaluate((): boolean => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
     for (const link of await page.locator('a[href^="#"]').all()) {
@@ -129,8 +94,6 @@ test('complete concept copies and navigation', async ({ page, context }, testInf
       await expect(page).toHaveURL(new URL(`${name}.html${href}`, docs).href);
     }
     if (name !== 'index') {
-      const selector: string = `#${name}, #${name} h2, #${name} h3, #${name} p, #${name} .zig, #${name} .state, #${name} .phase, #${name} .eyebrow, #${name} pre, #${name} td`;
-      expect(await styles(page.locator(selector))).toEqual(await styles(source.locator(selector)));
       for (const container of await page.locator('main .tbl, main pre').all()) {
         await expect(container).toHaveCSS('overflow-x', 'auto');
         expect(
@@ -153,5 +116,4 @@ test('complete concept copies and navigation', async ({ page, context }, testInf
       await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true });
     }
   }
-  await source.close();
 });

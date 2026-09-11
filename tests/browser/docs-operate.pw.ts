@@ -20,7 +20,6 @@ const destinations: string[] = [
   'learn',
   'cheat',
 ].map((name: string): string => `${name}.html`);
-const guide: string = readFileSync(new URL('guide.html', docs), 'utf8');
 
 function extract(source: string, start: string, end: string): string {
   const offset: number = source.indexOf(start);
@@ -50,27 +49,6 @@ async function reveal(page: Page): Promise<void> {
   }
 }
 
-async function styles(locator: Locator): Promise<string[]> {
-  return locator.evaluateAll((elements: Element[]): string[] =>
-    elements.map((element: Element): string => {
-      const css: CSSStyleDeclaration = getComputedStyle(element);
-      return [
-        css.fontFamily,
-        css.fontSize,
-        css.fontWeight,
-        css.lineHeight,
-        css.color,
-        css.backgroundColor,
-        css.display,
-        css.gridTemplateColumns,
-        css.gap,
-        css.padding,
-        css.maxWidth,
-      ].join('|');
-    }),
-  );
-}
-
 const idea: string = readFileSync(new URL('idea.html', docs), 'utf8');
 const names: string[] = ['install', 'setup', 'create', 'next', 'merge'];
 
@@ -79,16 +57,11 @@ function section(source: string, name: string): string {
   return extract(document, '<section', '</section>');
 }
 
-test('operating pages preserve source and navigate in a loop', async ({ page, context }, testInfo): Promise<void> => {
+test('operating pages share the shell and navigate in a loop', async ({ page }, testInfo): Promise<void> => {
   test.setTimeout(90_000);
   for (const name of names) {
     const html: string = readFileSync(new URL(`${name}.html`, docs), 'utf8');
-    const content: string = section(guide, name);
-    expect(section(html, name)).toBe(content);
-    const main: string = extract(html, '<main id="top">', '</main>');
-    expect(main).toBe(
-      `<main id="top">\n${['install', 'create'].includes(name) ? `<div class="band">\n${content}\n</div>` : content}\n</main>`,
-    );
+    const content: string = section(html, name);
     expect(html).not.toMatch(/<style\b/i);
     for (const [start, end] of [
       ['<head>', '</head>'],
@@ -103,9 +76,6 @@ test('operating pages preserve source and navigate in a loop', async ({ page, co
       expect(extract(html, start, end)).toBe(expected);
     }
   }
-  const source: Page = await context.newPage();
-  await source.goto(new URL('guide.html', docs).href);
-  await fonts(source);
   await page.goto(new URL('install.html', docs).href);
   for (const name of [...names, 'install']) {
     if (!page.url().endsWith(`${name}.html`)) await page.locator(`nav a[href="${name}.html"]`).click();
@@ -135,25 +105,7 @@ test('operating pages preserve source and navigate in a loop', async ({ page, co
         ),
     ).toEqual([]);
     await reveal(page);
-    if (name === 'next') {
-      const geometry = async (target: Page): Promise<number[][]> =>
-        target.locator('#next, #next .copy, #next svg.ill').evaluateAll((elements: Element[]): number[][] =>
-          elements.map((element: Element): number[] => {
-            const box: DOMRect = element.getBoundingClientRect();
-            return [box.x, box.width, element.scrollWidth];
-          }),
-        );
-      const migrated: number[][] = await geometry(page);
-      const original: number[][] = await geometry(source);
-      expect(migrated).toEqual(original);
-      await testInfo.attach('next-geometry', {
-        body: JSON.stringify({ migrated, original }),
-        contentType: 'application/json',
-      });
-      await source.locator('#next [data-animate]').scrollIntoViewIfNeeded();
-      await expect(source.locator('#next [data-animate]')).toHaveCSS('opacity', '1');
-      await source.locator('#next').screenshot({ path: testInfo.outputPath('source-next.png') });
-    } else {
+    if (name !== 'next') {
       expect(await page.evaluate((): boolean => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
     for (const container of await page.locator('main pre, main .tbl').all()) {
@@ -168,11 +120,6 @@ test('operating pages preserve source and navigate in a loop', async ({ page, co
         element.scrollLeft = 0;
       });
     }
-    const selector: string = `#${name}, #${name} h2, #${name} p, #${name} pre, #${name} .card, #${name} .zig, #${name} svg, #${name} svg *, #${name} .band-in`;
-    expect(await styles(page.locator(selector))).toEqual(await styles(source.locator(selector)));
-    if (['install', 'create'].includes(name)) {
-      expect(await styles(page.locator('main > .band'))).toEqual(await styles(source.locator(`.band:has(> #${name})`)));
-    }
     if (name === 'next') await expect(page.locator('main svg.ill')).toBeVisible();
     await page.evaluate((): void => window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }));
     await expect(page.locator('header')).toHaveCSS('position', 'sticky');
@@ -183,5 +130,4 @@ test('operating pages preserve source and navigate in a loop', async ({ page, co
     await page.evaluate((): void => window.scrollTo({ top: 0, behavior: 'instant' }));
     await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true });
   }
-  await source.close();
 });

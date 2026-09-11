@@ -20,7 +20,6 @@ const destinations: string[] = [
   'learn',
   'cheat',
 ].map((name: string): string => `${name}.html`);
-const guide: string = readFileSync(new URL('guide.html', docs), 'utf8');
 
 function extract(source: string, start: string, end: string): string {
   const offset: number = source.indexOf(start);
@@ -50,27 +49,6 @@ async function reveal(page: Page): Promise<void> {
   }
 }
 
-async function styles(locator: Locator): Promise<string[]> {
-  return locator.evaluateAll((elements: Element[]): string[] =>
-    elements.map((element: Element): string => {
-      const css: CSSStyleDeclaration = getComputedStyle(element);
-      return [
-        css.fontFamily,
-        css.fontSize,
-        css.fontWeight,
-        css.lineHeight,
-        css.color,
-        css.backgroundColor,
-        css.display,
-        css.gridTemplateColumns,
-        css.gap,
-        css.padding,
-        css.maxWidth,
-      ].join('|');
-    }),
-  );
-}
-
 const pages: { name: string; ids: string[] }[] = [
   { name: 'in-practice', ids: ['day', 'cases'] },
   { name: 'limits', ids: ['limits'] },
@@ -81,19 +59,8 @@ const pages: { name: string; ids: string[] }[] = [
 const idea: string = readFileSync(new URL('idea.html', docs), 'utf8');
 
 for (const { name, ids } of pages) {
-  test(`${name} preserves source and renders`, async ({ page, context }, testInfo): Promise<void> => {
+  test(`${name} shares the shell and renders`, async ({ page }, testInfo): Promise<void> => {
     const html: string = readFileSync(new URL(`${name}.html`, docs), 'utf8');
-    const sections: string[] = ids.map((id: string): string =>
-      extract(guide, id === 'cheat' ? '<section class="ink-band" id="cheat"' : `<section id="${id}"`, '</section>'),
-    );
-    const content: string = sections
-      .map((section: string, index: number): string =>
-        ['cases', 'problems'].includes(ids[index]) ? `<div class="band">\n${section}\n</div>` : section,
-      )
-      .join('\n\n');
-    expect(extract(html, '<main id="top">', '</main>')).toBe(
-      `<main id="top">\n${name === 'in-practice' ? '<div class="wrap hero"><h1>In practice</h1></div>\n' : ''}${content}\n</main>`,
-    );
     expect(html).not.toMatch(/<style\b/i);
     for (const [start, end] of [
       ['<footer class="footer"', '</footer>'],
@@ -118,43 +85,10 @@ for (const { name, ids } of pages) {
     await expect(page.locator('main section')).toHaveCount(ids.length);
     if (name === 'in-practice') await expect(page.locator('h1')).toHaveText('In practice');
     await reveal(page);
-    const source: Page = await context.newPage();
-    await source.goto(new URL('guide.html', docs).href);
-    await fonts(source);
     for (const id of ids) {
       await expect(page.locator(`[id="${id}"]`)).toHaveCount(1);
-      const selector: string = `#${id}, #${id} h2, #${id} h3, #${id} h4, #${id} p, #${id} .eyebrow, #${id} .card, #${id} pre, #${id} .tbl`;
-      expect(await styles(page.locator(selector))).toEqual(await styles(source.locator(selector)));
-      expect(
-        await page
-          .locator(`#${id}`)
-          .evaluate((section: HTMLElement): string => getComputedStyle(section.parentElement!).backgroundColor),
-      ).toBe(
-        await source
-          .locator(`#${id}`)
-          .evaluate((section: HTMLElement): string => getComputedStyle(section.parentElement!).backgroundColor),
-      );
     }
     if (name === 'in-practice') {
-      const dayGeometry: string[][] = [];
-      for (const documentPage of [source, page]) {
-        dayGeometry.push(
-          await documentPage.locator('#day, #day pre').evaluateAll((elements: HTMLElement[]): string[] =>
-            elements.map((element: HTMLElement): string => {
-              const rect: DOMRect = element.getBoundingClientRect();
-              return [
-                rect.left,
-                rect.right,
-                rect.width,
-                element.clientWidth,
-                element.scrollWidth,
-                getComputedStyle(element).overflowX,
-              ].join('|');
-            }),
-          ),
-        );
-      }
-      expect(dayGeometry[1]).toEqual(dayGeometry[0]);
       expect(await page.evaluate((): number => document.documentElement.scrollWidth)).toBe(
         await page
           .locator('#day')
@@ -163,7 +97,6 @@ for (const { name, ids } of pages) {
     } else {
       expect(await page.evaluate((): boolean => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
-    await source.close();
     for (const id of ids.filter((id: string): boolean => id !== 'day')) {
       expect(
         await page

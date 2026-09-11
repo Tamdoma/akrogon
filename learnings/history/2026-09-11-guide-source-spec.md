@@ -5,3 +5,5 @@
 Evidence: `tests/browser/docs-operate.pw.ts` and `tests/browser/docs-shell.pw.ts` both `readFileSync` guide.html.
 
 Learning: the leaf that deletes a source file must inventory every spec reading it and retire or re-anchor the comparison in the same diff, listed as a done criterion at chart time.
+
+Applied 2026-09-11 in docs-retire-guide: retired guide-dependent assertions in all four browser specs alongside source deletion, retaining independent navigation and rendering checks.
