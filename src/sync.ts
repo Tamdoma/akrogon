@@ -72,6 +72,30 @@ export async function syncCommand(cwd: string): Promise<void> {
           `Cannot replay commits touching active coordination lock paths:\n${replayedLocks.split('\0').join('\n')}`,
         );
 
+      const ignored: string[] = (
+        await command(['git', 'ls-files', '--others', '--ignored', '--exclude-standard', '-z'], repo.root)
+      )
+        .split('\0')
+        .filter((path: string) => path !== '');
+      if (ignored.length > 0) {
+        const incomingPaths: string = await command(['git', 'ls-tree', '-r', '--name-only', '-z', incoming], repo.root);
+        const replayedPaths: string = await command(
+          ['git', 'log', '--format=', '--name-only', '--no-renames', '-z', `${incoming}..HEAD`],
+          repo.root,
+        );
+        const integrated: string[] = (incomingPaths + replayedPaths)
+          .split('\0')
+          .filter((path: string) => path !== '')
+          .map((path: string) => resolve(repo.root, path));
+        const collisions: string[] = ignored.filter((path: string) =>
+          integrated.some(
+            (tracked: string) => within(resolve(repo.root, path), tracked) || within(tracked, resolve(repo.root, path)),
+          ),
+        );
+        if (collisions.length > 0)
+          throw new Error(`Cannot sync over ignored operator paths:\n${collisions.join('\n')}`);
+      }
+
       if (worktree !== repo.root) {
         const paths: string[] = [
           ':(top,literal)issues',

@@ -351,3 +351,76 @@ for (const location of ['issues/.lock', 'settings [1]*/.lock']) {
     });
   }
 }
+
+for (const source of ['incoming', 'replay']) {
+  for (const [ignoredPath, trackedPath] of [
+    ['collision [1]* \n', 'collision [1]* \n'],
+    ['collision/file', 'collision'],
+    ['collision', 'collision/file'],
+    ['collision/operator', 'collision'],
+  ]) {
+    test(`sync preserves ignored ${JSON.stringify(ignoredPath)} against ${source} ${JSON.stringify(trackedPath)}`, async () => {
+      const f: Fixture = await remoteFixture();
+      try {
+        put(f, '.gitignore', 'collision*\n');
+        await command(['git', 'add', '.gitignore'], f.root);
+        await command(['git', 'commit', '-m', 'ignore operator files'], f.root);
+        await command(['git', 'push'], f.root);
+        if (source === 'incoming') {
+          const other: string = resolve(f.home, 'other');
+          await command(['git', 'clone', resolve(f.home, 'remote.git'), other]);
+          await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
+          await command(['git', 'config', 'user.name', 'Test'], other);
+          put({ ...f, root: other }, trackedPath, 'remote bytes\n');
+          await command(['git', '--literal-pathspecs', 'add', '-f', '--', trackedPath], other);
+          await command(['git', 'commit', '-m', 'track collision'], other);
+          await command(['git', 'push'], other);
+        } else {
+          put(f, trackedPath, 'replayed bytes\n');
+          await command(['git', '--literal-pathspecs', 'add', '-f', '--', trackedPath], f.root);
+          await command(['git', 'commit', '-m', 'track collision'], f.root);
+          await command(['git', '--literal-pathspecs', 'rm', '--', trackedPath], f.root);
+          await command(['git', 'commit', '-m', 'remove collision'], f.root);
+          await advance(f, 'landed');
+        }
+        if (ignoredPath === 'collision/operator')
+          await command(['git', 'init', '-b', 'main', resolve(f.root, 'collision')]);
+        put(f, ignoredPath, 'operator ignored bytes\n');
+        put(f, 'issues/record', 'eligible issue\n');
+        const before: string[] = await snapshot(f);
+        const result: Result = await cli(f, ['sync']);
+        expect(result.code).not.toBe(0);
+        expect(result.stderr).toContain(ignoredPath === 'collision/operator' ? 'collision/' : ignoredPath);
+        expect(readFileSync(resolve(f.root, ignoredPath), 'utf8')).toBe('operator ignored bytes\n');
+        expect(await snapshot(f)).toEqual(before);
+        expect(readFileSync(resolve(f.root, 'issues/record'), 'utf8')).toBe('eligible issue\n');
+        await locksFree(f);
+      } finally {
+        f.clean();
+      }
+    });
+  }
+}
+
+test('sync permits harmless ignored paths while preserving tracked autostash edits', async () => {
+  const f: Fixture = await remoteFixture();
+  try {
+    put(f, '.gitignore', 'collision*\n');
+    put(f, 'collision-other', 'tracked sibling\n');
+    await command(['git', 'add', '-f', '.gitignore', 'collision-other'], f.root);
+    await command(['git', 'commit', '-m', 'ignore operator files'], f.root);
+    await command(['git', 'push'], f.root);
+    await advance(f, 'landed');
+    put(f, 'collision', 'ignored bytes\n');
+    put(f, 'file', 'operator tracked bytes\n');
+    put(f, 'issues/record');
+    const result: Result = await cli(f, ['sync']);
+    expect(result.code, result.stderr).toBe(0);
+    expect(readFileSync(resolve(f.root, 'collision'), 'utf8')).toBe('ignored bytes\n');
+    expect(readFileSync(resolve(f.root, 'file'), 'utf8')).toBe('operator tracked bytes\n');
+    expect(await command(['git', 'diff', '--cached', '--name-only'], f.root)).toBe('');
+    await locksFree(f);
+  } finally {
+    f.clean();
+  }
+});
