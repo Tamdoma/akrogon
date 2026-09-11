@@ -313,7 +313,10 @@ async function dispatchLeaf(global: GlobalConfig, repo: Repo, slug: string, expl
         }
         return true;
       }
-      if (current.state.phase === 'failed') return false;
+      if (current.state.phase === 'failed') {
+        await command(['herdr', 'notification', 'show', `Failed leaf: ${repo.name}/${slug}`]);
+        return false;
+      }
       if (!dependenciesReady(repo, current.state)) {
         if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
         return false;

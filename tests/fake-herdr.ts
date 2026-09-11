@@ -9,6 +9,7 @@ const databaseSchema = z.object({
   serial: z.number(),
   failPrompts: z.boolean().default(false),
   failSplitOnce: z.boolean().default(false),
+  failNotification: z.boolean().default(false),
   prompts: z.array(z.object({ pane: z.string(), text: z.string() })).default([]),
   starts: z.array(z.array(z.string())).default([]),
 });
@@ -39,6 +40,11 @@ function pane(id: string): Pane {
   const found: Pane | undefined = db.panes.find((p) => p.pane_id === id);
   if (found === undefined) throw new Error(`Missing pane ${id}`);
   return found;
+}
+if (args[0] === 'notification' && args[1] === 'show') {
+  z.tuple([z.literal('notification'), z.literal('show'), z.string().min(1)]).parse(args);
+  if (db.failNotification) failure('fixture_notification_failed');
+  result({});
 }
 if (args[0] === 'pane' && args[1] === 'list') result({ panes: db.panes });
 if (args[0] === 'pane' && args[1] === 'get') result({ pane: pane(args[2]) });

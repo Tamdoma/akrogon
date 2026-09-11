@@ -45,10 +45,14 @@ switch (verb) {
     z.array(z.string()).max(1).parse(positionals);
     await (await import('./next')).nextCommand(values.all === true ? '--all' : positionals[0]);
     break;
+  case 'status':
+    z.array(z.string()).max(1).parse(positionals);
+    await (await import('./status')).statusCommand(positionals[0]);
+    break;
   case 'install':
     z.tuple([]).parse(positionals);
     await (await import('./install')).install();
     break;
   default:
-    throw new Error('Usage: akrogon <install|init|config|phase|next>');
+    throw new Error('Usage: akrogon <install|init|config|phase|next|status>');
 }

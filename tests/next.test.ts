@@ -5,6 +5,7 @@ import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
 import { readState, saveState } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { Database } from './fake-herdr';
+import { z } from 'zod';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 async function dispatchFixture(): Promise<DispatchFixture> {
@@ -21,6 +22,15 @@ function database(f: DispatchFixture): Database {
 }
 function saveDatabase(f: DispatchFixture, db: Database): void {
   writeFileSync(f.db, JSON.stringify(db));
+}
+function calls(f: DispatchFixture): string[][] {
+  const path: string = f.db + '.calls';
+  return existsSync(path)
+    ? readFileSync(path, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
+    : [];
 }
 async function next(f: DispatchFixture, args: string[], env: NodeJS.ProcessEnv = {}): Promise<Result> {
   return cli(f, ['next', ...args], f.root, { ...f.env, ...env });
@@ -39,6 +49,7 @@ test('next creates one worktree/tab under concurrent hooks, prompts configured B
     expect(db.prompts[0].text).toBe('plan-issue build slot=B phase=plan.synthesis');
     console.log(db.prompts[0].text);
     expect(db.starts[0]).toContain('strong-b');
+    expect(calls(f).some((args) => args[0] === 'notification')).toBe(false);
     expect(readState(path).attempts.B).toBe(1);
     const b: string = readState(path).pane.B!;
     expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
@@ -67,10 +78,50 @@ test('next resumes interrupted tab creation, retries same slot twice then peer o
     expect(db.prompts[2].pane).not.toBe(db.prompts[0].pane);
     expect(db.prompts.every((p) => p.text.includes('slot=B'))).toBe(true);
     expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8')).toContain('"to":"failed"');
+    const state: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
+    const before: number = calls(f).length;
+    expect((await next(f, ['retry'])).code).toBe(0);
+    const notified: string[][] = calls(f).slice(before);
+    expect(notified).toHaveLength(1);
+    expect(notified[0].slice(0, 2)).toEqual(['notification', 'show']);
+    expect(notified[0][2]).toContain('repo');
+    expect(notified[0][2]).toContain('retry');
+    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(state);
   } finally {
     f.clean();
   }
 }, 15000);
+
+test('next notifies failed leaves without dispatch or state changes and exposes notification failures', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'broken', 'failed');
+    const state: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
+    const notified: Result = await next(f, ['broken']);
+    expect(notified.code).toBe(0);
+    expect(calls(f)).toHaveLength(1);
+    expect(calls(f)[0].slice(0, 2)).toEqual(['notification', 'show']);
+    expect(calls(f)[0][2]).toContain('repo');
+    expect(calls(f)[0][2]).toContain('broken');
+    expect(database(f).prompts).toHaveLength(0);
+    expect(database(f).starts).toHaveLength(0);
+    expect(database(f).tabs).toHaveLength(0);
+    expect(database(f).panes).toHaveLength(0);
+    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(state);
+    expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
+    saveDatabase(f, { ...database(f), failNotification: true });
+    const failed: Result = await next(f, ['broken']);
+    expect(failed.code).not.toBe(0);
+    expect(failed.stderr).toContain('fixture_notification_failed');
+    expect(failed.stderr).toContain('notification');
+    expect(failed.stderr).toContain('broken');
+    expect(calls(f)).toEqual([calls(f)[0], calls(f)[0]]);
+    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(state);
+    expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
 
 test('next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers', async () => {
   const f: DispatchFixture = await dispatchFixture();

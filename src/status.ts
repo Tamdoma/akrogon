@@ -1,0 +1,128 @@
+import { readdirSync, readFileSync, type Dirent } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
+import { z } from 'zod';
+import { expandPath, globalHome, readGlobal, readRepo, requireRepo, type GlobalConfig, type Repo } from './config';
+import { findLeaf, leavesUnder, stateSchema, type Leaf, type State } from './state';
+import { phaseSchema, slotSchema, verdictSchema } from './routing';
+
+const logSchema = z.object({
+  ts: z.iso.datetime(),
+  repo: z.string(),
+  slug: z.string(),
+  from: phaseSchema,
+  to: phaseSchema,
+  slot: slotSchema.nullable(),
+  attempts: z.object({ A: z.number().int().nonnegative(), B: z.number().int().nonnegative() }),
+  fix_rounds: z.number().int().nonnegative(),
+  verdict: z.object({ A: verdictSchema.optional(), B: verdictSchema.optional() }),
+  head: z.string(),
+  diff: z.string(),
+  session: z.string().nullable(),
+});
+type LogRecord = { record: z.infer<typeof logSchema>; text: string };
+type Scan =
+  { ok: true; repo: Repo; leaves: Leaf[]; log: LogRecord[] } | { ok: false; repo: string; path: string; error: string };
+
+function readLog(root: string): LogRecord[] {
+  const issues: string = resolve(root, 'issues');
+  if (!readdirSync(issues).includes('log.jsonl')) return [];
+  const content: string = readFileSync(resolve(issues, 'log.jsonl'), 'utf8').replace(/(?:\r?\n)+$/, '');
+  return content === '' ? [] : content.split('\n').map((text) => ({ record: logSchema.parse(JSON.parse(text)), text }));
+}
+
+function scanRepo(name: string, registeredPath: string): Scan {
+  let path: string = expandPath(registeredPath, globalHome());
+  try {
+    readdirSync(path);
+    path = resolve(path, 'issues/config.yaml');
+    const repo: Repo = readRepo(name, registeredPath);
+    const slugs: Set<string> = new Set();
+    function walk(folder: string): Leaf[] {
+      path = folder;
+      const entries: Dirent[] = readdirSync(folder, { withFileTypes: true });
+      if (entries.some((entry) => entry.name === 'state.yaml')) {
+        path = resolve(folder, 'state.yaml');
+        const leaves: Leaf[] = leavesUnder(folder);
+        for (const leaf of leaves) {
+          z.literal(repo.name).parse(leaf.state.repo);
+          stateSchema.shape.slug.refine((slug) => !slugs.has(slug), 'Duplicate leaf slug').parse(leaf.state.slug);
+          slugs.add(leaf.state.slug);
+        }
+        return leaves;
+      }
+      return entries
+        .filter((entry) => entry.isDirectory())
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .flatMap((entry) => walk(resolve(folder, entry.name)));
+    }
+    const leaves: Leaf[] = walk(resolve(repo.root, 'issues/open'));
+    path = resolve(repo.root, 'issues/log.jsonl');
+    return { ok: true, repo, leaves, log: readLog(repo.root) };
+  } catch (error) {
+    if (
+      error instanceof z.ZodError ||
+      error instanceof SyntaxError ||
+      (error instanceof Error && 'code' in error && typeof error.code === 'string' && /^E[A-Z]+$/.test(error.code))
+    ) {
+      return { ok: false, repo: name, path, error: error.message };
+    }
+    throw error;
+  }
+}
+
+function row(leaf: Leaf, log: LogRecord[], now: number): string {
+  const state: State = leaf.state;
+  const last: LogRecord | undefined = log.findLast(
+    ({ record }) => record.slug === state.slug && record.to === state.phase,
+  );
+  const elapsed: number | undefined = last === undefined ? undefined : now - Date.parse(last.record.ts);
+  const age: string = elapsed === undefined || elapsed < 0 ? 'unavailable' : `${Math.floor(elapsed / 60000)}m`;
+  const verdict: string = Object.entries(state.verdict)
+    .map(([slot, value]) => `${slot}:${value}`)
+    .join(',');
+  return `${state.slug} phase=${state.phase} done=[${state.done.join(',')}] attempts=A:${state.attempts.A},B:${state.attempts.B} fix_rounds=${state.fix_rounds} verdict=${verdict || '[]'} tab=${state.tab === undefined ? 'unavailable' : JSON.stringify(state.tab)} blocked-by=[${state['blocked-by'].join(',')}] age=${age}`;
+}
+
+export async function statusCommand(slug: string | undefined): Promise<void> {
+  const global: GlobalConfig = readGlobal();
+  if (slug !== undefined) {
+    const repo: Repo = await requireRepo(global, process.cwd());
+    const leaf: Leaf = findLeaf(repo, slug);
+    const log: LogRecord[] = readLog(repo.root)
+      .filter(({ record }) => record.slug === slug)
+      .slice(-10);
+    console.log(Bun.YAML.stringify(leaf.state, null, 2).trimEnd());
+    console.log('History:');
+    console.log(log.length === 0 ? 'unavailable' : log.map((entry) => entry.text).join('\n'));
+    console.log(resolve(leaf.path, 'plan.md'));
+    return;
+  }
+  const now: number = Date.now();
+  const scans: Scan[] = Object.entries(global.repos)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, path]) => scanRepo(name, path));
+  for (const scan of scans) {
+    if (!scan.ok) console.log(JSON.stringify({ unreadable: scan.repo, path: scan.path, error: scan.error }));
+  }
+  for (const scan of scans) {
+    if (scan.ok) {
+      for (const leaf of scan.leaves.filter((leaf) => leaf.state.phase === 'failed'))
+        console.log(`Failed: ${scan.repo.name}/${leaf.state.slug}`);
+    }
+  }
+  for (const scan of scans) {
+    if (!scan.ok) continue;
+    console.log(scan.repo.name);
+    let previous: string[] = [];
+    for (const leaf of scan.leaves) {
+      const groups: string[] = relative(resolve(scan.repo.root, 'issues/open'), leaf.path).split(sep).slice(0, -1);
+      let shared: number = 0;
+      while (shared < groups.length && shared < previous.length && groups[shared] === previous[shared]) shared++;
+      for (let index: number = shared; index < groups.length; index++)
+        console.log(`${'  '.repeat(index + 1)}${groups[index]}`);
+      console.log(`${'  '.repeat(groups.length + 1)}${row(leaf, scan.log, now)}`);
+      previous = groups;
+    }
+  }
+  if (scans.some((scan) => !scan.ok)) process.exitCode = 1;
+}
