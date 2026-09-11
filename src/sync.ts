@@ -1,4 +1,4 @@
-import { basename, relative, resolve } from 'node:path';
+import { basename, dirname, relative, resolve } from 'node:path';
 import { expandPath, globalHome, readGlobal, requireRepo, within, type GlobalConfig, type Repo } from './config';
 import { CommandError, command, run, type Result } from './shell';
 import { withLock, withRepoLock } from './state';
@@ -83,15 +83,23 @@ export async function syncCommand(cwd: string): Promise<void> {
           ['git', 'log', '--format=', '--name-only', '--no-renames', '-z', `${incoming}..HEAD`],
           repo.root,
         );
-        const integrated: string[] = (incomingPaths + replayedPaths)
-          .split('\0')
-          .filter((path: string) => path !== '')
-          .map((path: string) => resolve(repo.root, path));
-        const collisions: string[] = ignored.filter((path: string) =>
-          integrated.some(
-            (tracked: string) => within(resolve(repo.root, path), tracked) || within(tracked, resolve(repo.root, path)),
-          ),
+        const integrated: Set<string> = new Set(
+          (incomingPaths + replayedPaths)
+            .split('\0')
+            .filter((path: string) => path !== '')
+            .map((path: string) => resolve(repo.root, path)),
         );
+        const directories: Set<string> = new Set();
+        for (const path of integrated)
+          for (let parent: string = dirname(path); parent !== repo.root; parent = dirname(parent))
+            directories.add(parent);
+        const collisions: string[] = ignored.filter((path: string) => {
+          const absolute: string = resolve(repo.root, path);
+          if (directories.has(absolute)) return true;
+          for (let ancestor: string = absolute; ancestor !== repo.root; ancestor = dirname(ancestor))
+            if (integrated.has(ancestor)) return true;
+          return false;
+        });
         if (collisions.length > 0)
           throw new Error(`Cannot sync over ignored operator paths:\n${collisions.join('\n')}`);
       }
