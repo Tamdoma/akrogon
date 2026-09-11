@@ -1,9 +1,9 @@
 import { test, expect } from 'bun:test';
 import { resolve } from 'node:path';
-import { readFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
 import { readState } from '../src/state';
-import { type Result } from '../src/shell';
+import { command, type Result } from '../src/shell';
 
 function bytes(path: string): string {
   return readFileSync(resolve(path, 'state.yaml'), 'utf8');
@@ -85,6 +85,26 @@ test('review aggregates verdicts, rechecks only A, caps repairs and permits oper
         'session',
       ].sort(),
     );
+  } finally {
+    f.clean();
+  }
+});
+
+test('handoff to review refuses a dirty worktree and passes once committed', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = resolve(f.home, 'wt');
+    await command(['git', 'worktree', 'add', '-b', 'dirty', worktree], f.root);
+    const path: string = leaf(f, 'dirty', 'implement', { worktree });
+    writeFileSync(resolve(worktree, 'work'), 'done\n');
+    const refused: Result = await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'B']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('Uncommitted work');
+    expect(readState(path).phase).toBe('implement');
+    await command(['git', 'add', 'work'], worktree);
+    await command(['git', 'commit', '-m', 'work'], worktree);
+    expect((await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'B'])).code).toBe(0);
+    expect(readState(path).phase).toBe('check.review');
   } finally {
     f.clean();
   }

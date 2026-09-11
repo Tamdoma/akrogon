@@ -69,6 +69,9 @@ function ownsPane(leaf: Leaf, pane: Pane | undefined, paneId: string): boolean {
   return Object.values(leaf.state.pane).includes(paneId) || (pane !== undefined && inWorktree(pane.cwd, leaf));
 }
 
+function busy(pane: Pane): boolean {
+  return pane.agent_status === 'working' || pane.agent_status === 'blocked';
+}
 function idle(pane: Pane): boolean {
   return pane.agent_status === 'idle' || pane.agent_status === 'done';
 }
@@ -219,7 +222,7 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
     const peer: Slot = peerOf(slot);
     const seat: Slot = seatFor(state, slot);
     const pane: Pane = await currentPane(z.string().parse(state.pane[seat]));
-    if (pane.agent !== null && pane.agent_status === 'working') return;
+    if (pane.agent !== null && busy(pane)) return;
     if (pane.agent !== null && !idle(pane)) {
       if (seat === peer) {
         await commitMove(repo, leaf, state, 'failed', slot);
@@ -228,6 +231,7 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
       saveState(leaf.path, { ...state, attempts: { ...state.attempts, [slot]: 2 } });
       continue;
     }
+    if (pane.agent !== null && pane.agent_session?.value === state.prompted[slot]) return;
     if (state.attempts[slot] >= 3) {
       await commitMove(repo, leaf, state, 'failed', slot);
       return;
@@ -259,7 +263,7 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
     }
     const ready: Pane = await currentPane(pane.pane_id);
     if (!idle(ready)) {
-      if (ready.agent_status === 'working') return;
+      if (busy(ready)) return;
       continue;
     }
     const prompt: string = `${routing[state.phase].skill} ${state.slug} slot=${slot} phase=${state.phase}`;
@@ -276,7 +280,11 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
       '5000',
     ];
     const result: Result = await run(args);
-    if (result.code === 0) return;
+    if (result.code === 0) {
+      const session: string | undefined = (await currentPane(ready.pane_id)).agent_session?.value;
+      saveState(leaf.path, { ...readState(leaf.path), prompted: { ...attempt.prompted, [slot]: session } });
+      return;
+    }
     if (!retryable(result)) throw new CommandError(args, repo.root, result);
     console.warn(
       JSON.stringify({ warning: 'prompt failed', slug: state.slug, slot, attempt: attempt.attempts[slot], ...result }),
@@ -308,7 +316,7 @@ async function dispatchLeaf(global: GlobalConfig, repo: Repo, slug: string, expl
         if (members.some((pane) => pane.agent !== null && !idle(pane))) return false;
         if (members.length > 0) await command(['herdr', 'tab', 'close', z.string().parse(current.state.tab)]);
         if (current.state.worktree !== undefined && existsSync(current.state.worktree)) {
-          await command(['git', 'worktree', 'remove', '--force', current.state.worktree], repo.root);
+          await command(['git', 'worktree', 'remove', current.state.worktree], repo.root);
           await command(['git', 'branch', '-d', current.state.slug], repo.root);
         }
         return true;

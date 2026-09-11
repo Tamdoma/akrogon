@@ -8,6 +8,7 @@ const databaseSchema = z.object({
   tabs: z.array(tabSchema),
   serial: z.number(),
   failPrompts: z.boolean().default(false),
+  blockOnStart: z.boolean().default(false),
   failSplitOnce: z.boolean().default(false),
   failNotification: z.boolean().default(false),
   prompts: z.array(z.object({ pane: z.string(), text: z.string() })).default([]),
@@ -89,7 +90,8 @@ if (args[0] === 'agent' && args[1] === 'start') {
   )
     failure('agent_name_taken');
   target.agent = flag('--kind');
-  target.agent_status = 'idle';
+  target.agent_status = db.blockOnStart ? 'blocked' : 'idle';
+  target.agent_session = { value: `session-${++db.serial}` };
   db.starts.push(args);
   result({ agent: target });
 }

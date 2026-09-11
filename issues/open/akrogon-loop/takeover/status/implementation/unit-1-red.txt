@@ -1,0 +1,79 @@
+bun test v1.4.0 (34cbb9a40)
+
+tests/status.test.ts:
+49 |     log(f, [event('broken', 'failed', 40), event('broken', 'implement', 1), event('broken', 'failed', 7), event('ordinary', 'failed', 0)]);
+50 |     const env: NodeJS.ProcessEnv = fakeHerdr(f);
+51 |     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
+52 |     const otherBefore: Record<string, string> = snapshot(resolve(g.root, 'issues'));
+53 |     const result: Result = await cli(f, ['status'], f.home, env);
+54 |     expect(result.code).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/status/tests/status.test.ts:54:25)
+(fail) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [37.21ms]
+85 | 
+86 | test('age is unavailable for missing, empty, unrelated and future history and uses file order', async () => {
+87 |   const f: Fixture = await fixture();
+88 |   try {
+89 |     leaf(f, 'timed', 'implement');
+90 |     expect((await cli(f, ['status'])).stdout).toContain('age=unavailable');
+                                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "age=unavailable"
+Received: ""
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/status/tests/status.test.ts:90:47)
+(fail) age is unavailable for missing, empty, unrelated and future history and uses file order [28.39ms]
+109 |     const state: string = resolve(path, 'state.yaml');
+110 |     const original: string = readFileSync(state, 'utf8');
+111 |     const verify = async (failingPath: string): Promise<void> => {
+112 |       const result: Result = await cli(f, ['status'], f.home);
+113 |       expect(result.code).not.toBe(0);
+114 |       expect(result.stdout.split('\n')[0]).toContain('bad');
+                                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "bad"
+Received: ""
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/status/tests/status.test.ts:114:44)
+      at async <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/status/tests/status.test.ts:121:13)
+(fail) incomplete repositories report exact paths before readable trees and exit nonzero [35.93ms]
+151 |     expect((await cli(f, ['status'])).code).not.toBe(0);
+152 |     saveState(path, { ...readState(path), repo: 'repo' });
+153 |     leaf(f, 'same', 'implement', {}, 'another');
+154 |     const result: Result = await cli(f, ['status']);
+155 |     expect(result.code).not.toBe(0);
+156 |     expect(result.stdout).toContain('same');
+                                ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "same"
+Received: ""
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/status/tests/status.test.ts:156:27)
+(fail) overview rejects repo mismatches and duplicate slugs within an open repo [50.97ms]
+171 |     log(f, Array.from({ length: 13 }, (_, index) => event('selected', index % 2 === 0 ? 'implement' : 'merged', 20 - index, `record-${index}`)).flatMap((line) => [line, event('other', 'merged', 0)]));
+172 |     const env: NodeJS.ProcessEnv = fakeHerdr(f);
+173 |     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
+174 |     const inertBefore: Record<string, string> = snapshot(resolve(worktree, 'issues'));
+175 |     const result: Result = await cli(f, ['status', 'selected'], worktree, env);
+176 |     expect(result.code).toBe(0);
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/status/tests/status.test.ts:176:25)
+(fail) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [30.12ms]
+
+ 0 pass
+ 5 fail
+ 8 expect() calls
+Ran 5 tests across 1 file. [215.00ms]

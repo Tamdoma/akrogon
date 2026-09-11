@@ -1,0 +1,13 @@
+bun test v1.4.0 (34cbb9a40)
+
+tests/status.test.ts:
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [43.62ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [175.21ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [317.91ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [62.07ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [128.48ms]
+
+ 5 pass
+ 0 fail
+ 127 expect() calls
+Ran 5 tests across 1 file. [770.00ms]

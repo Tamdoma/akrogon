@@ -60,6 +60,58 @@ test('next creates one worktree/tab under concurrent hooks, prompts configured B
   }
 }, 15000);
 
+test('next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'flicker', 'plan.synthesis');
+    expect((await next(f, ['flicker'])).code).toBe(0);
+    const b: string = readState(path).pane.B!;
+    expect(readState(path).prompted.B).toBeDefined();
+    const flicker: Database = database(f);
+    saveDatabase(f, {
+      ...flicker,
+      panes: flicker.panes.map((p) => (p.pane_id === b ? { ...p, agent_status: 'idle' } : p)),
+    });
+    expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(1);
+    expect(readState(path).attempts.B).toBe(1);
+    const replaced: Database = database(f);
+    saveDatabase(f, {
+      ...replaced,
+      panes: replaced.panes.map((p) =>
+        p.pane_id === b ? { ...p, agent_status: 'idle', agent_session: { value: 'other' } } : p,
+      ),
+    });
+    expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(2);
+    expect(readState(path).attempts.B).toBe(2);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next waits on a blocked agent instead of counting attempts or flipping seats', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'dialog', 'plan.synthesis');
+    saveDatabase(f, { ...database(f), blockOnStart: true });
+    expect((await next(f, ['dialog'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(0);
+    expect(database(f).starts).toHaveLength(1);
+    expect(readState(path).attempts.B).toBe(1);
+    const b: string = readState(path).pane.B!;
+    const db: Database = database(f);
+    saveDatabase(f, { ...db, panes: db.panes.map((p) => (p.pane_id === b ? { ...p, agent_status: 'idle' } : p)) });
+    expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(1);
+    expect(database(f).prompts[0].pane).toBe(b);
+    expect(readState(path).attempts.B).toBe(2);
+    expect(readState(path).phase).toBe('plan.synthesis');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('next resumes interrupted tab creation, retries same slot twice then peer once and fails', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -252,7 +304,7 @@ test('exited hooks resolve persisted pane hints and preserve the surviving slot'
   }
 }, 15000);
 
-test('delayed working notifications never consume retries and idle notifications still dispatch', async () => {
+test('delayed working and idle notifications from the prompted session never consume retries', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'delayed', 'plan.synthesis');
@@ -269,8 +321,32 @@ test('delayed working notifications never consume retries and idle notifications
     expect(readState(path).attempts.B).toBe(1);
     expect(database(f).prompts).toHaveLength(1);
     expect((await next(f, [], { HERDR_PANE_ID: b, HERDR_PLUGIN_EVENT_JSON: event('idle') })).code).toBe(0);
-    expect(readState(path).attempts.B).toBe(2);
-    expect(database(f).prompts).toHaveLength(2);
+    expect(readState(path).attempts.B).toBe(1);
+    expect(database(f).prompts).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('uncommitted work in a merge worktree is never recovered as merged', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const remote: string = resolve(f.home, 'remote.git');
+    await command(['git', 'init', '--bare', remote]);
+    await command(['git', 'remote', 'add', 'origin', remote], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const path: string = leaf(f, 'dirty', 'plan.synthesis');
+    expect((await next(f, ['dirty'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    writeFileSync(resolve(worktree, 'forgotten'), 'never committed\n');
+    saveState(path, { ...readState(path), phase: 'merge', prompted: {} });
+    const db: Database = database(f);
+    saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
+    const result: Result = await next(f, ['dirty']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('Uncommitted work');
+    expect(readState(path).phase).toBe('merge');
+    expect(existsSync(resolve(worktree, 'forgotten'))).toBe(true);
   } finally {
     f.clean();
   }

@@ -1,0 +1,27 @@
+[
+  {
+    "argv": [
+      "/usr/bin/bun",
+      "/home/ivan/Work/infra/akrogon/issues/worktrees/status/src/akrogon.ts",
+      "status"
+    ],
+    "cwd": "/tmp/akrogon-QT7a9x",
+    "AKROGON_HOME": "/tmp/akrogon-QT7a9x",
+    "code": 0,
+    "stdout": "Failed: repo/fixture-failure\nrepo\n  epic\n    issue\n      fixture-failure phase=failed done=[] attempts=A:2,B:3 fix_rounds=0 verdict=A:fix tab=\"w1:t2\" blocked-by=[] age=unavailable\n  issue\n    fixture-active phase=implement done=[] attempts=A:0,B:0 fix_rounds=0 verdict=[] tab=unavailable blocked-by=[] age=unavailable",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "/usr/bin/bun",
+      "/home/ivan/Work/infra/akrogon/issues/worktrees/status/src/akrogon.ts",
+      "status",
+      "fixture-failure"
+    ],
+    "cwd": "/tmp/akrogon-QT7a9x/repo",
+    "AKROGON_HOME": "/tmp/akrogon-QT7a9x",
+    "code": 0,
+    "stdout": "slug: fixture-failure\nphase: failed\ncreated: 2026-09-10\npriority: \"n\"\nrepo: repo\ndebate: \"no\"\nblocked-by: \n  []\nattempts: \n  A: 2\n  B: 3\ndone: \n  []\nfix_rounds: 0\nverdict: \n  A: fix\ntab: w1:t2\npane: \n  {}\nHistory:\nunavailable\n/tmp/akrogon-QT7a9x/repo/issues/open/epic/issue/fixture-failure/plan.md",
+    "stderr": ""
+  }
+]

@@ -1,0 +1,20 @@
+bun test v1.4.0 (34cbb9a40)
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [518.37ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [661.86ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [132.00ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [612.27ms]
+(pass) merged phase leaves tab intact, next closes it and starts dependent from a closed-folder hook [694.17ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [358.06ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [453.88ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [625.76ms]
+(pass) delayed working notifications never consume retries and idle notifications still dispatch [495.33ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [464.66ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [493.73ms]
+
+ 11 pass
+ 0 fail
+ 101 expect() calls
+Ran 11 tests across 1 file. [5.55s]

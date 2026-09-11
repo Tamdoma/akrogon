@@ -1,8 +1,8 @@
-# Chart skill version: 4
 slug: init-issues
-phase: plan.synthesis
-created: '2026-09-09'
-priority: n
+phase: implement
+created: 2026-09-09
+priority: "n"
 repo: akrogon
-debate: no
-blocked-by: [status]
+debate: "no"
+blocked-by: 
+  - status

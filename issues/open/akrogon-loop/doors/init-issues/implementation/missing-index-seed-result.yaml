@@ -1,0 +1,18 @@
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks: 
+  lint: bun run lint
+  test: bun test
+  test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\""
+advisory: 
+  []
+grounding: 
+  index: missing.md
+broadcast: 
+  discord: 
+    webhook_env: 
+      - DISCORD_WEBHOOK_URL

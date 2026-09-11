@@ -37,6 +37,7 @@ export async function commitMove(
     phase: to,
     done: [],
     verdict: {},
+    prompted: {},
     attempts: { A: 0, B: 0 },
     fix_rounds:
       to === 'check.fix'
@@ -88,6 +89,7 @@ export async function transition(
   if (state.phase !== 'failed' && (slot === undefined || !required.includes(slot)))
     throw new Error('A required --slot is missing or invalid');
   if (slot !== undefined && state.done.includes(slot)) throw new Error(`Slot already recorded: ${slot}`);
+  if (requested === 'check.review' && state.worktree !== undefined) await requireClean(state.worktree);
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
   const recorded: State = {
@@ -111,10 +113,16 @@ export async function transition(
   await commitMove(repo, leaf, recorded, capped, slot ?? null);
 }
 
+export async function requireClean(worktree: string): Promise<void> {
+  const dirty: string = await command(['git', 'status', '--porcelain'], worktree);
+  if (dirty !== '') throw new Error(`Uncommitted work in ${worktree}:\n${dirty}`);
+}
+
 export async function recoverMerge(repo: Repo, leaf: Leaf): Promise<boolean> {
   if (leaf.state.phase !== 'merge') return false;
   if (leaf.state.worktree === undefined) throw new Error(`Merge leaf has no worktree: ${leaf.state.slug}`);
   await retryCommand(['git', 'fetch', repo.config.remote, repo.config.default_branch], repo.root);
+  await requireClean(leaf.state.worktree);
   const head: string = await command(['git', 'rev-parse', 'HEAD'], leaf.state.worktree);
   const result: Result = await run(['git', 'merge-base', '--is-ancestor', head, target(repo)], repo.root);
   if (result.code === 1) return false;

@@ -1,0 +1,49 @@
+bun test v1.4.0 (34cbb9a40)
+
+tests/config.test.ts:
+(pass) config combines defaults and repo values, reports none, and recalculates worktree base [155.81ms]
+
+tests/init.test.ts:
+(pass) init writes proposal, registration and toolkit and preserves repeated user files [116.47ms]
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [531.09ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [668.85ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [137.01ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [609.79ms]
+(pass) merged phase leaves tab intact, next closes it and starts dependent from a closed-folder hook [697.09ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [347.68ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [445.68ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [611.97ms]
+(pass) delayed working notifications never consume retries and idle notifications still dispatch [490.07ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [479.17ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [496.05ms]
+
+tests/phase.test.ts:
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [208.50ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [310.37ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [181.58ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [160.00ms]
+
+tests/status.test.ts:
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [39.83ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [171.31ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [293.10ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [62.42ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [125.63ms]
+
+skills/broadcast-issue/scripts/discord-send.test.ts:
+(pass) delivers one message to configured targets using only the external file, with no record [23.91ms]
+(pass) refuses missing secrets, invalid routes and empty targets before sending [93.97ms]
+(pass) validates the whole message and all targets before any delivery [92.68ms]
+(pass) retries only the failed target once and does not resend a successful target [22.32ms]
+(pass) surfaces the final response after two failures, redacts secrets and still attempts other targets [21.92ms]
+(pass) network failures receive one retry without exposing webhook credentials [22.14ms]
+(pass) retries a failed response body and continues to the next target [23.30ms]
+(pass) stops after one response-body retry, preserves final context and attempts remaining targets [23.84ms]
+
+ 30 pass
+ 0 fail
+ 314 expect() calls
+Ran 30 tests across 6 files. [7.70s]

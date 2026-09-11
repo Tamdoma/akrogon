@@ -1,0 +1,21 @@
+{
+  "command": [
+    "/usr/bin/bun",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/status/src/akrogon.ts",
+    "next",
+    "broken"
+  ],
+  "cwd": "/tmp/akrogon-z41DrO/repo",
+  "success": {
+    "code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "failure": {
+    "code": 1,
+    "stdout": "",
+    "stderr": "29 |   return { code, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };\n30 | }\n31 | \n32 | export async function command(argv: string[], cwd: string = process.cwd()): Promise<string> {\n33 |   const result: Result = await run(argv, cwd);\n34 |   if (result.code !== 0) throw new CommandError(argv, cwd, result);\n                                    ^\nerror: {\"command\":[\"herdr\",\"notification\",\"show\",\"Failed leaf: repo/broken\"],\"cwd\":\"/tmp/akrogon-z41DrO/repo\",\"code\":1,\"stdout\":\"\",\"stderr\":\"{\\\"error\\\":{\\\"code\\\":\\\"fixture_notification_failed\\\",\\\"message\\\":\\\"fixture failure\\\"}}\"}\n   argv: [ \"herdr\", \"notification\", \"show\", \"Failed leaf: repo/broken\" ],\n    cwd: \"/tmp/akrogon-z41DrO/repo\",\n result: {\n  code: 1,\n  stdout: \"\",\n  stderr: \"{\\\"error\\\":{\\\"code\\\":\\\"fixture_notification_failed\\\",\\\"message\\\":\\\"fixture failure\\\"}}\",\n},\n\n      at command (/home/ivan/Work/infra/akrogon/issues/worktrees/status/src/shell.ts:34:32)\n      at async <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/status/src/next.ts:317:15)\n\nBun v1.4.0 (Linux x64)"
+  },
+  "calls": "[\"notification\",\"show\",\"Failed leaf: repo/broken\"]\n[\"notification\",\"show\",\"Failed leaf: repo/broken\"]\n",
+  "stateUnchanged": true
+}

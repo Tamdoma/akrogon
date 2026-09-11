@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Akrogon Guide</title>
+<style>
+  :root { --ink: #1c1c1c; --muted: #5a5a5a; --line: #ddd; --bg: #fbfaf7; --code: #f0eee8; --accent: #2c5f8a; }
+  body { margin: 0; padding: 2rem 1rem 4rem; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, sans-serif; }
+  main { max-width: 46rem; margin: 0 auto; }
+  h1 { font-size: 2rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--line); padding-bottom: .25rem; }
+  h3 { font-size: 1.1rem; margin: 1.5rem 0 .5rem; }
+  p, li { max-width: 42rem; }
+  code { background: var(--code); padding: .1em .35em; border-radius: 3px; font-size: .92em; }
+  pre { background: var(--code); padding: .75rem 1rem; overflow-x: auto; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .95em; }
+  th, td { text-align: left; border-bottom: 1px solid var(--line); padding: .4rem .5rem; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .why { border-left: 3px solid var(--accent); padding: .5rem 1rem; margin: 1rem 0; background: #f3f6f9; }
+  .why b { color: var(--accent); }
+  .lede { color: var(--muted); font-size: 1.05em; }
+  nav ol { columns: 2; padding-left: 1.25rem; }
+  nav a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Akrogon Guide</h1>
+<p class="lede">How to run software work through two AI agents that plan, build, review, and merge on their own, while you make the decisions.</p>
+
+<nav>
+<ol>
+  <li><a href="#idea">The idea in one minute</a></li>
+  <li><a href="#pieces">The pieces</a></li>
+  <li><a href="#install">Install</a></li>
+  <li><a href="#setup">Set up a repo</a></li>
+  <li><a href="#create">Create work</a></li>
+  <li><a href="#run">Run the loop</a></li>
+  <li><a href="#phases">What happens in each phase</a></li>
+  <li><a href="#watch">Watching and intervening</a></li>
+  <li><a href="#problems">When things go wrong</a></li>
+  <li><a href="#learn">Nits, lessons, seeds</a></li>
+  <li><a href="#cheat">Cheat sheet</a></li>
+</ol>
+</nav>
+
+<h2 id="idea">1. The idea in one minute</h2>
+<p>You write down a piece of work. Akrogon gives it to two agents from different vendors, one called <b>A</b> (Claude) and one called <b>B</b> (Codex). B does most of the building. A reviews and merges. They pass the work back and forth through a small set of phases until it lands on <code>main</code>.</p>
+<p>You are the operator. You decide what gets built and answer questions during planning. You do not babysit the agents. When they are done, the branch is on <code>main</code> and the terminal tab is gone.</p>
+
+<div class="why"><b>Why two vendors?</b> One model reviewing its own work misses the same things twice. In the first real run, A found only style nits by reading the code while B found four real bugs by running it. Two different minds catch more.</div>
+
+<h2 id="pieces">2. The pieces</h2>
+
+<table>
+<tr><th>Word</th><th>What it is</th></tr>
+<tr><td>Repo</td><td>A git checkout you registered with akrogon. It has an <code>issues/</code> folder.</td></tr>
+<tr><td>Issue</td><td>A folder under <code>issues/open/</code>. One unit of intent, like "add a status command".</td></tr>
+<tr><td>Leaf</td><td>Any folder that has a <code>state.yaml</code>. This is the thing agents actually work on. An issue is usually one leaf. A big issue can be a folder of several leaves.</td></tr>
+<tr><td>Phase</td><td>One word in <code>state.yaml</code> that says where the leaf is: planning, implementing, reviewing, merging. This is the <b>only</b> signal. There is no database.</td></tr>
+<tr><td>Slot</td><td>A or B. Which agent a phase needs.</td></tr>
+<tr><td>Tab</td><td>A terminal tab in herdr, one per active leaf, with two panes: A on the left, B on the right.</td></tr>
+<tr><td>Worktree</td><td>A separate checkout of the repo on a branch named after the leaf, under <code>issues/worktrees/&lt;slug&gt;</code>. Agents work there so they never touch your main checkout.</td></tr>
+<tr><td>Skill</td><td>The instructions an agent follows in a phase, like <code>plan-issue</code> or <code>check-issue</code>. Installed into each agent's skill folder.</td></tr>
+</table>
+
+<div class="why"><b>Why is the phase in a file?</b> Because a file can be read by you, by git, and by both agents with no server running. If akrogon crashes, nothing is lost. If you want to change what happens next, you edit one line.</div>
+
+<h3>A leaf's state.yaml, explained</h3>
+<pre><code>slug: status              # the leaf's name, also its branch name
+phase: plan.synthesis     # where it is right now
+created: 2026-09-09
+priority: "n"
+repo: akrogon             # which registered repo it belongs to
+debate: "no"              # yes = A and B both plan first, then argue
+blocked-by:               # leaves that must be merged before this starts
+  - command
+  - core-skills
+attempts: { A: 0, B: 1 }  # how many times each slot was prompted this phase
+done: []                  # slots that finished this phase
+fix_rounds: 0             # how many review/fix loops so far
+verdict: {}               # review results, filled by check.review
+tab: w8:tE                # filled in by akrogon when it starts the leaf
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/status
+pane: { A: w8:pN, B: w8:pP }
+slot: B                   # who was prompted last</code></pre>
+<p>You write the first six fields when you create the leaf. Akrogon manages the rest.</p>
+
+<h2 id="install">3. Install</h2>
+<p>Once per machine. Needs <a href="https://bun.sh">bun</a>, git, and herdr.</p>
+<pre><code>cd ~/Work/infra/akrogon
+bun install
+bun run src/akrogon.ts install</code></pre>
+<p>This creates:</p>
+<ul>
+  <li><code>~/.local/bin/akrogon</code>, a link to the source. Edits to <code>src/</code> are live immediately.</li>
+  <li>Links from every folder in <code>skills/</code> into <code>~/.claude/skills</code> and <code>~/.agents/skills</code>, so both agents read the same skill text.</li>
+  <li>The herdr plugin, which calls <code>akrogon next</code> whenever an agent goes idle or a pane exits.</li>
+</ul>
+<p>If a destination already exists and is not the right link, install prints <code>rm</code> commands and stops. Run them and install again.</p>
+
+<div class="why"><b>Why symlinks?</b> One copy of the truth. When a leaf merges a skill change, every agent on the machine sees it on its next prompt with no reinstall.</div>
+
+<h3>Global config</h3>
+<p>Lives at the akrogon repo root, <code>config.yaml</code>. It says which agents run and which repos exist.</p>
+<pre><code>max_active: 3                 # at most 3 leaves running at once
+slots:
+  a: { harness: claude, model: claude-fable-5-1, effort: medium }
+  b: { harness: codex,  model: gpt-6-astra,      effort: medium }
+harnesses:                    # how to launch each agent; {model} and {effort} are filled in
+  claude: claude --model {model} --effort {effort} --dangerously-skip-permissions
+  codex: codex -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access
+repos:
+  akrogon: /home/ivan/Work/infra/akrogon</code></pre>
+
+<div class="why"><b>Why max_active?</b> Each active leaf is two agents burning tokens and a git worktree on disk. Three at once is a lot. Raise it when you have the budget.</div>
+
+<h2 id="setup">4. Set up a repo</h2>
+<p>Once per repo you want agents to work in.</p>
+<pre><code>cd ~/Work/my-app
+akrogon init --toolkit typescript="bun test"</code></pre>
+<p>This writes <code>issues/config.yaml</code>, creates <code>issues/open/</code> and <code>learnings/LESSONS.md</code>, adds the ignore lines for worktrees and lock files, and registers the repo in the global config under its folder name.</p>
+
+<h3>Repo config</h3>
+<pre><code>remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true          # in debate mode, do A and B get one reply to each other's plan
+fix_rounds: 3           # how many review/fix loops before the leaf is marked failed
+implement: subagents    # B may delegate to workers, or "inline" to do it alone
+checks:                 # every one of these must pass before review and before merge
+  format: bun run format
+  test: bun test
+  typecheck: bun run typecheck
+advisory: []            # commands whose failure is reported but does not block
+grounding: none         # or { index: docs/INDEX.md }, a two-level map of the repo that planners read first
+broadcast:              # optional: post a summary on merge
+  discord:
+    webhook_env: [DISCORD_WEBHOOK_URL]</code></pre>
+<p>Secrets like the webhook URL go in <code>~/.config/akrogon/env</code>, one <code>NAME=value</code> per line, never in the repo.</p>
+<p>Check what an agent will see with:</p>
+<pre><code>akrogon config</code></pre>
+
+<h2 id="create">5. Create work</h2>
+<p>Three ways in, from most to least planning.</p>
+
+<table>
+<tr><th>You have</th><th>Use</th><th>What you get</th></tr>
+<tr><td>A goal, but the route is unclear and spans many sessions</td><td><code>/chart-issues</code></td><td>A chart of decisions you settle one by one with an agent, ending in a set of leaves with blocked-by wiring</td></tr>
+<tr><td>One clear thing to build</td><td><code>/create-issue</code></td><td>A short interview, then one leaf: <code>brief.md</code>, <code>design.md</code>, <code>state.yaml</code></td></tr>
+<tr><td>One observation, "X happened, Y should have"</td><td><code>/seed-issue</code></td><td>A seed report to import later through create-issue, or a GitHub issue</td></tr>
+</table>
+
+<p>All three are things you run in your own agent session, by hand, with you present. The loop never plans intent for you.</p>
+
+<div class="why"><b>Why decide before agents start?</b> A decision made during planning gets re-argued in every later phase. A decision written in the brief is settled. Agents build faster when there is nothing to argue about.</div>
+
+<h3>Example: a small leaf by hand</h3>
+<p>You can also just write the files. The minimum is <code>brief.md</code> saying what and why, and a <code>state.yaml</code>:</p>
+<pre><code>mkdir -p issues/open/rename-flag
+cat &gt; issues/open/rename-flag/brief.md &lt;&lt;'EOF'
+# Rename --verbose to --debug
+
+The flag does debug logging, not verbose output. Rename it, keep --verbose as an alias for one release.
+
+Done when: `mytool --debug` works, `mytool --verbose` prints a deprecation line, tests cover both.
+EOF
+cat &gt; issues/open/rename-flag/state.yaml &lt;&lt;'EOF'
+slug: rename-flag
+phase: plan.synthesis
+created: 2026-09-11
+priority: "n"
+repo: my-app
+debate: "no"
+blocked-by: []
+EOF
+git add issues && git commit -m "issue: rename-flag"</code></pre>
+<p>Start phase is <code>plan.synthesis</code> when <code>debate: "no"</code>, and <code>plan.positions</code> when <code>debate: "yes"</code>.</p>
+
+<h3>Ordering with blocked-by</h3>
+<p>If leaf <code>api</code> must land before leaf <code>ui</code>, put <code>blocked-by: [api]</code> in the ui state. That is the only ordering mechanism. Leaves with no blockers start whenever there is capacity, in parallel.</p>
+
+<h2 id="run">6. Run the loop</h2>
+<pre><code>akrogon next --all</code></pre>
+<p>That is the whole start button. What it does, in order:</p>
+<ol>
+  <li>Reads every leaf in every registered repo.</li>
+  <li>For each leaf that is not merged, not failed, not hand-built, and whose blockers are all merged: if fewer than <code>max_active</code> leaves are running, create the worktree and branch, open a tab with two panes, and start the agent the current phase needs.</li>
+  <li>Sends one prompt: the skill name, the slug, the slot, the phase. For example <code>plan-issue status slot=B phase=plan.synthesis</code>.</li>
+  <li>Exits.</li>
+</ol>
+<p>Nothing keeps running. The herdr plugin calls <code>akrogon next</code> again every time an agent goes idle. That call sees the new phase in <code>state.yaml</code> and prompts whoever is next. That is the entire loop: file says phase, hook fires, next reads file, next prompts.</p>
+
+<div class="why"><b>Why no daemon?</b> A daemon can be in a wrong state. A file plus a hook cannot. If you close herdr and open it again, the plugin's startup hook runs <code>next --all</code> and everything resumes from the files.</div>
+
+<h3>Other forms</h3>
+<pre><code>akrogon next              # leaves under the current folder
+akrogon next status       # exactly this leaf; errors if it cannot start
+akrogon next issues/open/akrogon-loop   # every leaf under a folder</code></pre>
+
+<h2 id="phases">7. What happens in each phase</h2>
+
+<table>
+<tr><th>Phase</th><th>Who</th><th>Skill</th><th>What they do</th><th>Then</th></tr>
+<tr><td>plan.positions</td><td>A and B</td><td>plan-issue</td><td>Each writes a plan alone, not reading the other's</td><td>plan.rebuttal</td></tr>
+<tr><td>plan.rebuttal</td><td>A and B</td><td>plan-issue</td><td>Each reads the other's plan and replies once</td><td>plan.synthesis</td></tr>
+<tr><td>plan.synthesis</td><td>B</td><td>plan-issue</td><td>Writes the final <code>plan.md</code>, or the only plan if debate is off</td><td>implement</td></tr>
+<tr><td>implement</td><td>B</td><td>implement-issue</td><td>Builds it on the leaf branch, runs checks, writes <code>implementation/brief.md</code></td><td>check.review</td></tr>
+<tr><td>check.review</td><td>A and B</td><td>check-issue</td><td>Each reviews the diff and writes <code>review-A.md</code> or <code>review-B.md</code> with a verdict: ready, nits, or fix</td><td>merge if nobody said fix, else check.fix</td></tr>
+<tr><td>check.fix</td><td>B</td><td>implement-issue</td><td>Fixes the listed defects</td><td>check.review, A only this time</td></tr>
+<tr><td>merge</td><td>A</td><td>merge-issue</td><td>Rebases the branch on <code>origin/main</code>, runs checks, pushes, records lessons</td><td>merged</td></tr>
+<tr><td>merged</td><td>nobody</td><td></td><td>Tab closed, worktree and branch removed, issue folder moved to <code>issues/closed</code> when all its leaves are merged</td><td></td></tr>
+<tr><td>failed</td><td>nobody</td><td></td><td>Waits for you</td><td>implement, when you say so</td></tr>
+</table>
+
+<p>An agent ends its phase by running one command, which is the only way the phase changes:</p>
+<pre><code>akrogon phase status implement --slot B
+akrogon phase status check.review --slot A --verdict nits</code></pre>
+<p>The command refuses illegal moves, refuses a slot that already reported, and moves the phase only when every required slot has reported. That is why you sometimes see "transition refused" in a pane: the agent tried twice, the second was rejected, and that is correct.</p>
+
+<div class="why"><b>Why does check.review after a fix use only A?</b> B just wrote the fix. Having B review its own fix adds cost and little signal. A re-checks, and if A says fix again, B goes another round, up to <code>fix_rounds</code>.</div>
+
+<h3>Merging without a local main</h3>
+<p>A does not merge into your checkout. It rebases the leaf branch on <code>origin/main</code>, runs the checks, and pushes the branch as the new <code>main</code>. If two leaves finish at once, the second push is rejected by git, A rebases again and retries. If the rebase has a conflict, the leaf goes to check.fix and B resolves it, then A re-checks.</p>
+<p>Your local <code>main</code> is therefore behind after every merge. Pull when you want it:</p>
+<pre><code>git pull --rebase</code></pre>
+
+<h3>A full example, start to finish</h3>
+<ol>
+  <li>You commit the <code>rename-flag</code> leaf and push.</li>
+  <li><code>akrogon next --all</code>. A tab named <code>rename-flag</code> appears. Codex starts in the right pane and gets <code>plan-issue rename-flag slot=B phase=plan.synthesis</code>.</li>
+  <li>Codex writes <code>plan.md</code> and runs <code>akrogon phase rename-flag implement --slot B</code>. It goes idle. The hook fires.</li>
+  <li><code>next</code> reads phase implement, prompts Codex again with implement-issue. Codex builds, runs the three checks, commits on the branch, moves the phase to check.review.</li>
+  <li><code>next</code> prompts both panes with check-issue. Claude starts in the left pane. Each reviews and reports a verdict. Say Claude says nits and Codex says fix.</li>
+  <li>Phase goes to check.fix. Codex fixes, moves to check.review. Only Claude is prompted this time and says ready.</li>
+  <li>Phase goes to merge. Claude rebases, runs checks, pushes main, moves to merged.</li>
+  <li><code>next</code> sees merged: closes the tab, removes the worktree and branch, moves the issue folder to <code>issues/closed</code>.</li>
+  <li>You <code>git pull --rebase</code>.</li>
+</ol>
+
+<h2 id="watch">8. Watching and intervening</h2>
+<p>Everything is visible in three places:</p>
+<ul>
+  <li>The tab. Left pane A, right pane B. Read it like any terminal.</li>
+  <li>The leaf folder. <code>state.yaml</code> for where it is, <code>plan.md</code>, <code>implementation/brief.md</code>, <code>review-A.md</code>, <code>review-B.md</code> for what was done.</li>
+  <li><code>issues/log.jsonl</code>. One line per phase change with time, slot, commit, and diff size.</li>
+</ul>
+<p>To see why the hook did or did not act:</p>
+<pre><code>herdr plugin log list --plugin akrogon</code></pre>
+
+<h3>Changing course</h3>
+<p>Edit <code>state.yaml</code>. It is the only truth. To send a leaf back to implementation, set <code>phase: implement</code> and run <code>akrogon next &lt;slug&gt;</code>. To stop a leaf, close its tab; nothing will restart it until the next <code>next</code>. To pause everything, set <code>max_active: 0</code>.</p>
+
+<h3>Hand-built leaves</h3>
+<p>Set <code>hand_built: true</code> in a leaf you are driving yourself. <code>next</code> skips it entirely. You move its phase with <code>akrogon phase</code> the same way agents do. Useful for the first leaves of a new repo, before you trust the loop.</p>
+
+<h2 id="problems">9. When things go wrong</h2>
+
+<table>
+<tr><th>You see</th><th>What it means</th><th>Do</th></tr>
+<tr><td>An agent showing a startup dialog</td><td>The agent is blocked on a prompt only a human can answer</td><td>Answer it. The hook sees the status change and continues. No attempt is counted.</td></tr>
+<tr><td><code>attempts</code> climbing to 2</td><td>The prompt did not take, twice</td><td>Look at the pane. The third try goes to the other agent's pane as a stand-in. After that the leaf is failed.</td></tr>
+<tr><td><code>phase: failed</code></td><td>Three fix rounds or three prompt failures</td><td>Read the reviews, decide, then <code>akrogon phase &lt;slug&gt; implement</code> to send it back.</td></tr>
+<tr><td>Leaf never starts</td><td>A blocker is not merged, or <code>max_active</code> is reached</td><td><code>akrogon next &lt;slug&gt;</code> prints the reason.</td></tr>
+<tr><td>Push rejected at merge</td><td>Another leaf landed first</td><td>Nothing. A rebases and retries.</td></tr>
+<tr><td>Merge conflict</td><td>Two leaves touched the same lines</td><td>Nothing. It goes to check.fix, B resolves, A re-checks.</td></tr>
+<tr><td>"Transition refused"</td><td>The agent called <code>phase</code> twice</td><td>Nothing. The first call worked.</td></tr>
+<tr><td>Tests count changes between runs</td><td><code>bun test</code> in the akrogon root also scans live worktrees</td><td>Cosmetic. Scope the test runner if it bothers you.</td></tr>
+</table>
+
+<div class="why"><b>Why does the loop hand a slot to the other agent's pane?</b> A stuck agent is usually a stuck harness, not a stuck task. The other pane is a fresh process with the same skill files. It is cheaper than failing the leaf.</div>
+
+<h2 id="learn">10. Nits, lessons, seeds</h2>
+<p>Reviews produce three kinds of leftovers, and each has one exit so nothing piles up.</p>
+<ul>
+  <li><b>Nit.</b> A reviewer finding that is not a defect. Stays in the review file. At merge, A decides: if it is a reusable rule, it becomes a lesson; if it is real work, it becomes a seed.</li>
+  <li><b>Lesson.</b> One line in <code>learnings/LESSONS.md</code> plus a dated file under <code>learnings/history/</code>. Every plan-issue run reads the lines. A lesson is deleted when a leaf applies it, or at the next chart when it has stopped being useful.</li>
+  <li><b>Seed.</b> A GitHub issue filed with <code>seed-issue</code>. If a lesson is about a skill, the seed goes to the akrogon repo, because skills only change through akrogon leaves. Otherwise it goes to the repo the work is in.</li>
+</ul>
+
+<div class="why"><b>Why not just let agents fix nits as they see them?</b> Then every review becomes a small implementation with no plan and no second reviewer. Nits become seeds, seeds become leaves, leaves get the full loop.</div>
+
+<h2 id="cheat">11. Cheat sheet</h2>
+<pre><code># one time
+bun install &amp;&amp; bun run src/akrogon.ts install
+
+# per repo
+akrogon init --toolkit typescript="bun test"
+akrogon config                      # what agents will see
+
+# work
+/create-issue   /chart-issues   /seed-issue    # in your own agent session
+akrogon next --all                  # start everything that can start
+akrogon next &lt;slug&gt;                 # start or nudge one leaf, with reasons
+akrogon phase &lt;slug&gt; &lt;phase&gt; --slot A|B [--verdict ready|nits|fix]
+
+# look
+cat issues/open/**/state.yaml
+tail issues/log.jsonl
+herdr plugin log list --plugin akrogon
+
+# after merges
+git pull --rebase</code></pre>
+
+</main>
+</body>
+</html>

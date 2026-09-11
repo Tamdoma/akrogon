@@ -1,0 +1,17 @@
+max_active: 3
+slots: 
+  a: 
+    harness: fake
+    model: fixture-a
+    effort: high
+  b: 
+    harness: fake
+    model: fixture-b
+    effort: medium
+harnesses: 
+  fake: "false {model} {effort}"
+toolkits: 
+  typescript: bun:test
+repos: 
+  bun-eslint: /tmp/init-issues-scenario-tf_t1wow/bun-eslint
+  no-tests: /tmp/init-issues-scenario-tf_t1wow/no-tests

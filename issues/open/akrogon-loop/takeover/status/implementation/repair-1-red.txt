@@ -1,0 +1,26 @@
+bun test v1.4.0 (34cbb9a40)
+
+tests/status.test.ts:
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [45.46ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [185.27ms]
+164 |     const path: string = leaf(f, 'bad-leaf', 'implement', { repo: 'bad' });
+165 |     const state: string = resolve(path, 'state.yaml');
+166 |     const original: string = readFileSync(state, 'utf8');
+167 |     const verify = async (failingPath: string): Promise<void> => {
+168 |       const result: Result = await cli(f, ['status'], f.home);
+169 |       expect(result.code).not.toBe(0);
+                                    ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/status/tests/status.test.ts:169:31)
+      at async <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/status/tests/status.test.ts:177:11)
+(fail) incomplete repositories report exact paths before readable trees and exit nonzero [40.00ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [65.42ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [117.49ms]
+
+ 4 pass
+ 1 fail
+ 59 expect() calls
+Ran 5 tests across 1 file. [497.00ms]

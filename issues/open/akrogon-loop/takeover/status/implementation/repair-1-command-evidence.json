@@ -1,0 +1,13 @@
+{
+  "scenario": "unreadable failed state beside readable repo",
+  "command": [
+    "bun",
+    "src/akrogon.ts",
+    "status"
+  ],
+  "cwd": "/tmp/akrogon-SYbjw6",
+  "state": "/tmp/akrogon-SYbjw6/repo/issues/open/issue/unreadable-state/state.yaml",
+  "code": 1,
+  "stdout": "{\"unreadable\":\"bad\",\"path\":\"/tmp/akrogon-SYbjw6/repo/issues/open/issue/unreadable-state/state.yaml\",\"error\":\"ENOENT: no such file or directory, open '/tmp/akrogon-SYbjw6/repo/issues/open/issue/unreadable-state/state.yaml'\"}\ngood\n  issue\n    visible phase=implement done=[] attempts=A:0,B:0 fix_rounds=0 verdict=[] tab=unavailable blocked-by=[] age=unavailable",
+  "stderr": ""
+}

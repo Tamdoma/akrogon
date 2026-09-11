@@ -1,0 +1,9 @@
+bun test v1.4.0 (34cbb9a40)
+
+tests/status-cosmetic.test.ts:
+(pass) cosmetic variants pass real row assertions and wrong values fail [0.86ms]
+
+ 1 pass
+ 0 fail
+ 91 expect() calls
+Ran 1 test across 1 file. [9.00ms]
