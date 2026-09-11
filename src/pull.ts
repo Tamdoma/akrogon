@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { readGlobal, readRepo, requireRepo, type GlobalConfig, type Repo } from './config';
 import { command, retryCommand, CommandError } from './shell';
-import { withRepoLock, leavesUnder, type Leaf } from './state';
+import { withRepoLock, type Leaf } from './state';
 
 const issueSchema = z.object({
   number: z.number().int().positive(),
@@ -179,12 +179,11 @@ async function closeSource(repo: Repo, source: string, commit: string): Promise<
   }
 }
 
-export async function closeSources(repo: Repo, leaf: Leaf, destination: string): Promise<void> {
-  const sources: Set<string> = new Set(leavesUnder(destination).flatMap((item) => item.state.sources ?? []));
+export async function closeSources(repo: Repo, sources: ReadonlySet<string>, leaf: Leaf): Promise<void> {
   if (sources.size === 0) return;
   if (leaf.state.worktree === undefined)
     throw new Error(
-      JSON.stringify({ error: 'Sourced completion requires a worktree', slug: leaf.state.slug, destination }),
+      JSON.stringify({ error: 'Sourced completion requires a worktree', slug: leaf.state.slug, sources: [...sources] }),
     );
   const commit: string = await command(['git', 'rev-parse', 'HEAD'], leaf.state.worktree);
   const failures: { source: string; error: Error }[] = [];

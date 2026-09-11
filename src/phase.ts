@@ -60,21 +60,42 @@ export async function commitMove(
 }
 
 export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): Promise<void> {
-  const issue: string = dirname(leaf.path);
-  if (!leavesUnder(issue).every((item) => item.state.phase === 'merged')) return;
-  if (justMerged) console.log(`issue complete ${basename(issue)}`);
   if (within(leaf.path, resolve(repo.root, 'issues/closed'))) return;
+  const issue: string = dirname(leaf.path);
+  const issueLeaves: Leaf[] = leavesUnder(issue);
+  if (!issueLeaves.every((item) => item.state.phase === 'merged')) return;
   const parent: string = dirname(issue);
   const owner: string = basename(parent) === 'open' ? issue : parent;
-  if (!leavesUnder(owner).every((item) => item.state.phase === 'merged')) return;
-  const closed: string = resolve(repo.root, 'issues/closed');
-  mkdirSync(closed, { recursive: true });
-  const destination: string = resolve(closed, basename(owner));
-  if (existsSync(destination)) throw new Error(`Completion destination exists: ${destination}`);
+  const ownerLeaves: Leaf[] = owner === issue ? issueLeaves : leavesUnder(owner);
+  const complete: boolean = ownerLeaves.every((item) => item.state.phase === 'merged');
+  const destination: string = resolve(repo.root, 'issues/closed', basename(owner));
+  if (complete && existsSync(destination)) throw new Error(`Completion destination exists: ${destination}`);
+  const issueSources: Set<string> = new Set(issueLeaves.flatMap((item) => item.state.sources ?? []));
+  const siblingSources: Set<string> = new Set(
+    ownerLeaves.filter((item) => dirname(item.path) !== issue).flatMap((item) => item.state.sources ?? []),
+  );
+  const privateSources: Set<string> =
+    owner === issue
+      ? issueSources
+      : new Set(
+          [...issueSources].filter(
+            (source) =>
+              issueLeaves.every((item) => (item.state.sources ?? []).includes(source)) && !siblingSources.has(source),
+          ),
+        );
+  await closeSources(repo, privateSources, leaf);
+  if (complete && owner !== issue) {
+    const remaining: Set<string> = new Set(
+      ownerLeaves.flatMap((item) => item.state.sources ?? []).filter((source) => !privateSources.has(source)),
+    );
+    await closeSources(repo, remaining, leaf);
+  }
+  if (justMerged) console.log(`issue complete ${basename(issue)}`);
+  if (!complete) return;
+  mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
   renameSync(owner, destination);
   const chart: string = resolve(repo.root, 'issues/chart', basename(owner));
   if (existsSync(chart)) renameSync(chart, resolve(destination, 'chart'));
-  await closeSources(repo, leaf, destination);
 }
 
 export async function transition(

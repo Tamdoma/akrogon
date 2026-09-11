@@ -431,8 +431,9 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     const gh: GhFixture = fakeGh(f);
     const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     const probe: NonNullable<GhStep['probe']> = {
+      open: resolve(f.root, 'issues/open/landing'),
       closed: resolve(f.root, 'issues/closed/landing'),
-      lock: resolve(f.root, 'issues/closed/landing/.lock'),
+      lock: resolve(f.root, 'issues/open/landing/.lock'),
       worktree,
     };
     writeFileSync(
@@ -662,7 +663,12 @@ test('next awaits sourced completion after a failed rename before removing the w
     expect(existsSync(gh.db + '.calls')).toBe(false);
     rmSync(closed, { recursive: true });
     const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
-    const probe: NonNullable<GhStep['probe']> = { closed, lock: resolve(closed, '.lock'), worktree };
+    const probe: NonNullable<GhStep['probe']> = {
+      open: resolve(f.root, 'issues/open/issue'),
+      closed,
+      lock: resolve(f.root, 'issues/open/issue/.lock'),
+      worktree,
+    };
     writeFileSync(
       gh.db,
       JSON.stringify([
@@ -1142,3 +1148,71 @@ test('agent start allows 30 seconds while prompt wait remains 5 seconds', async 
     f.clean();
   }
 });
+
+test('startup retries closure before cleanup and retains failed owners with their worktree branch and tab', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'retry', 'plan.synthesis');
+    expect((await next(f, ['retry'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#1'] });
+    const gh: GhFixture = fakeGh(f);
+    f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
+    const probe: NonNullable<GhStep['probe']> = {
+      open: resolve(f.root, 'issues/open/issue'),
+      closed: resolve(f.root, 'issues/closed/issue'),
+      lock: resolve(f.root, 'issues/open/issue/.lock'),
+      worktree,
+    };
+    const failure: GhStep[] = [
+      { stdout: '', code: 1, stderr: 'offline', probe },
+      { stdout: '', code: 1, stderr: 'offline', probe },
+    ];
+    writeFileSync(gh.db, JSON.stringify(failure));
+    expect((await cli(f, ['phase', 'retry', 'merged'], f.root, f.env)).code).not.toBe(0);
+    writeFileSync(gh.db, JSON.stringify(failure));
+    const failed: Result = await next(f, ['--all']);
+    expect(failed.code).not.toBe(0);
+    expect(failed.stderr).toContain('offline');
+    expect(existsSync(worktree)).toBe(true);
+    expect(await command(['git', 'branch', '--show-current'], worktree)).toBe('retry');
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['retry']);
+    expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        { stdout: '{"state":"OPEN"}', probe },
+        { stdout: '', probe },
+      ]),
+    );
+    const retried: Result = await next(f, ['--all']);
+    expect(retried.code).toBe(0);
+    expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+    expect(existsSync(probe.closed)).toBe(true);
+    expect(existsSync(worktree)).toBe(false);
+    expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/retry'], f.root)).code).toBe(1);
+    expect(database(f).tabs).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('startup retains completed issue resources while an epic sibling remains unfinished', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'done', 'plan.synthesis', {}, 'epic/first');
+    leaf(f, 'waiting', 'plan.synthesis', { hand_built: true }, 'epic/second');
+    expect((await next(f, ['done'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    saveState(path, { ...readState(path), phase: 'merge' });
+    expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(readState(path).phase).toBe('merged');
+    expect(existsSync(worktree)).toBe(true);
+    expect(await command(['git', 'branch', '--show-current'], worktree)).toBe('done');
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['done']);
+    expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 15000);

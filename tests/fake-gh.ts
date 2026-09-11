@@ -10,7 +10,7 @@ const stepSchema = z.object({
   code: z.number().int().default(0),
   delayMs: z.number().nonnegative().default(0),
   args: z.array(z.string()).optional(),
-  probe: z.object({ closed: z.string(), lock: z.string(), worktree: z.string() }).optional(),
+  probe: z.object({ open: z.string(), closed: z.string(), lock: z.string(), worktree: z.string() }).optional(),
 });
 export type GhStep = z.input<typeof stepSchema>;
 const path: string = z.string().parse(process.env.FAKE_GH);
@@ -29,7 +29,7 @@ await Bun.sleep(step.delayMs);
 if (step.probe !== undefined) {
   const probe: NonNullable<GhStep['probe']> = step.probe;
   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;
-  if (!existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)
+  if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)
     throw new Error(JSON.stringify({ probe, lock }));
   appendFileSync(path + '.probes', JSON.stringify({ ...probe, lock, host: process.env.GH_HOST }) + '\n');
 }

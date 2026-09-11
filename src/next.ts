@@ -498,6 +498,7 @@ async function dispatchLeaf(
 }
 
 async function cleanupMerged(repo: Repo, leaf: Leaf): Promise<void> {
+  if (within(leaf.path, resolve(repo.root, 'issues/open'))) return;
   const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === leaf.state.tab);
   if (members.length > 0) await command(['herdr', 'tab', 'close', z.string().parse(leaf.state.tab)]);
   if (leaf.state.worktree !== undefined && existsSync(leaf.state.worktree)) {
@@ -533,6 +534,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
   const invocation: Invocation = { skipped: new Set() };
   await withLock(resolve(globalHome(), '.lock'), async () => {
     if (input === '--all') {
+      await sweepAll(global, invocation);
       for (const repo of registeredRepos(global, invocation).repos)
         for (const leaf of discover(repo, invocation).leaves.filter((leaf) => leaf.state.phase === 'merged')) {
           try {
@@ -542,7 +544,6 @@ export async function nextCommand(input: string | undefined): Promise<void> {
             report(invocation, repo.name, leaf.path, error, leaf.state.slug);
           }
         }
-      await sweepAll(global, invocation);
       return;
     }
     if (event?.event === 'tab_closed') {
