@@ -1,4 +1,4 @@
-max_active: 3
+max_active: 6
 slots: 
   a: 
     harness: claude
