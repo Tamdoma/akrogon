@@ -1,5 +1,5 @@
 slug: docs-retire-guide
-phase: implement
+phase: merged
 created: 2026-09-11
 priority: l
 repo: akrogon
@@ -12,7 +12,7 @@ sources:
   - "Tamdoma/akrogon#3"
 attempts: 
   A: 0
-  B: 1
+  B: 0
 done: 
   []
 fix_rounds: 0
@@ -23,6 +23,6 @@ worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/docs-retire-guide
 pane: 
   A: w8:p7Y
   B: w8:p7Z
-slot: B
+slot: A
 prompted: 
-  B: 01a09079-3eee-7902-924a-4f1396802557
+  {}
