@@ -159,6 +159,7 @@ export async function statusCommand(slug: string | undefined): Promise<void> {
     if (!scan.ok) continue;
     console.log(scan.repo.name);
     if (scan.leaves.length > 0) console.log(render([['  LEAF', ...header.slice(1)], ...rows(scan, now)]).join('\n'));
+    else console.log('  no open leaves');
     if (scan.parked.length > 0) console.log(`  parked  ${scan.parked.join(', ')}`);
   }
   if (scans.some((scan) => !scan.ok)) process.exitCode = 1;

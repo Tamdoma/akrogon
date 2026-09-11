@@ -135,6 +135,7 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     expect(result.stdout).toContain('remote-leaf');
     expect(result.stdout).not.toContain('closed-leaf');
     expect(result.stdout).not.toContain('hand_built');
+    expect(result.stdout).not.toContain('no open leaves');
     expect(rows.filter((line) => /^\s*\S+\s+failed\b/.test(line))).toHaveLength(1);
     const ordinary: string = leafRow(result.stdout, 'ordinary');
     expect(cell(result.stdout, ordinary, 'PHASE')).toBe('implement');
@@ -175,6 +176,27 @@ test('age is unavailable for missing, empty, unrelated and future history and us
   }
 });
 
+for (const directory of ['missing', 'empty']) {
+  test(`overview reports no open leaves for a ${directory} open directory without writes`, async () => {
+    const f: Fixture = await fixture();
+    try {
+      register(f, { repo: f.root });
+      const open: string = resolve(f.root, 'issues/open');
+      if (directory === 'missing') rmSync(open, { recursive: true });
+      const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
+      const result: Result = await cli(f, ['status'], f.home);
+      expect(result.code).toBe(0);
+      expect(result.stdout).toBe('repo\n  no open leaves');
+      expect(result.stderr).toBe('');
+      expect(result.stdout.split('\n').filter((line) => /^\s*\S+\s+failed\b/.test(line))).toHaveLength(0);
+      expect(existsSync(open)).toBe(directory === 'empty');
+      expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
 test('incomplete repositories report exact paths before readable trees and exit nonzero', async () => {
   const f: Fixture = await fixture();
   const g: Fixture = await fixture();
@@ -186,7 +208,7 @@ test('incomplete repositories report exact paths before readable trees and exit 
     const original: string = readFileSync(state, 'utf8');
     const verify = async (failingPath: string): Promise<void> => {
       const result: Result = await cli(f, ['status'], f.home);
-      expect(result.code).not.toBe(0);
+      expect(result.code).toBe(1);
       const diagnostic: { unreadable: string; path: string } = z
         .object({ unreadable: z.string(), path: z.string() })
         .parse(JSON.parse(result.stdout.split('\n')[0]));
@@ -194,6 +216,7 @@ test('incomplete repositories report exact paths before readable trees and exit 
       expect(diagnostic.path).toBe(failingPath);
       expect(result.stdout.indexOf('bad')).toBeLessThan(result.stdout.indexOf('visible'));
       expect(result.stdout).toContain('visible');
+      expect(result.stdout).not.toContain('no open leaves');
     };
     rmSync(state);
     symlinkSync(resolve(f.home, 'missing-state.yaml'), state);
@@ -221,13 +244,19 @@ test('incomplete repositories report exact paths before readable trees and exit 
       const empty: Result = await cli(f, ['status'], f.home);
       expect(empty.code).toBe(0);
       expect(empty.stdout).not.toContain('unreadable');
-      expect(empty.stdout.split('\n').slice(0, 3)).toEqual(['bad', '  parked  resting', 'good']);
+      expect(empty.stdout.split('\n').slice(0, 4)).toEqual(['bad', '  no open leaves', '  parked  resting', 'good']);
+      expect(cell(empty.stdout, leafRow(empty.stdout, 'visible'), 'PHASE')).toBe('implement');
     }
     rmSync(open, { recursive: true });
     writeFileSync(open, 'file');
     await verify(open);
     rmSync(open);
     mkdirSync(open);
+    const config: string = resolve(f.root, 'issues/config.yaml');
+    for (const malformed of ['checks: [', 'checks: invalid']) {
+      writeFileSync(config, malformed);
+      await verify(config);
+    }
     const missing: string = resolve(f.home, 'missing');
     register(f, { bad: missing, good: g.root });
     await verify(missing);
