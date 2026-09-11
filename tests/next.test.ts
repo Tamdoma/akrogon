@@ -829,3 +829,15 @@ test('a selected leaf removed before its repo lock is reported as skipped', asyn
     f.clean();
   }
 });
+
+test('recovery fetch deadline releases dispatch locks without transitioning', async () => {
+  const result: Result = await run([
+    'timeout',
+    '5',
+    process.execPath,
+    resolve(import.meta.dir, 'fetch-deadline-harness.ts'),
+  ]);
+  expect(result.code).toBe(0);
+  expect(result.stderr).toBe('');
+  expect(result.stdout).toContain('"stateUnchanged":true');
+}, 10000);

@@ -14,19 +14,35 @@ export class CommandError extends Error {
   }
 }
 
-export async function run(argv: string[], cwd: string = process.cwd()): Promise<Result> {
+export async function run(argv: string[], cwd: string = process.cwd(), deadlineMs?: number): Promise<Result> {
   const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(argv, {
     cwd,
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
   });
-  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
+  const collected: Promise<[string, string, number]> = Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ]);
-  return { code, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const [stdout, stderr, code]: [string, string, number] = await (deadlineMs === undefined
+      ? collected
+      : Promise.race([
+          collected,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              child.kill();
+              reject(new CommandError(argv, cwd, { code: 1, stdout: '', stderr: `deadline ${deadlineMs}ms exceeded` }));
+            }, deadlineMs);
+          }),
+        ]));
+    return { code, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function command(argv: string[], cwd: string = process.cwd()): Promise<string> {
@@ -35,11 +51,13 @@ export async function command(argv: string[], cwd: string = process.cwd()): Prom
   return result.stdout;
 }
 
-export async function retryCommand(argv: string[], cwd: string): Promise<string> {
-  const result: Result = await run(argv, cwd);
+export async function retryCommand(argv: string[], cwd: string, deadlineMs?: number): Promise<string> {
+  const result: Result = await run(argv, cwd, deadlineMs);
   if (result.code === 0) return result.stdout;
   console.warn(JSON.stringify({ warning: 'retrying command', command: argv, cwd, ...result }));
-  return command(argv, cwd);
+  const retried: Result = await run(argv, cwd, deadlineMs);
+  if (retried.code !== 0) throw new CommandError(argv, cwd, retried);
+  return retried.stdout;
 }
 
 export function quote(value: string): string {

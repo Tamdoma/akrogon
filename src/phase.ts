@@ -136,7 +136,7 @@ export async function requireCodeOnly(repo: Repo, worktree: string): Promise<voi
 export async function recoverMerge(repo: Repo, leaf: Leaf): Promise<boolean> {
   if (leaf.state.phase !== 'merge') return false;
   if (leaf.state.worktree === undefined) throw new Error(`Merge leaf has no worktree: ${leaf.state.slug}`);
-  await retryCommand(['git', 'fetch', repo.config.remote, repo.config.default_branch], repo.root);
+  await retryCommand(['git', 'fetch', repo.config.remote, repo.config.default_branch], repo.root, 60000);
   await requireClean(leaf.state.worktree);
   const head: string = await command(['git', 'rev-parse', 'HEAD'], leaf.state.worktree);
   const result: Result = await run(['git', 'merge-base', '--is-ancestor', head, target(repo)], repo.root);
