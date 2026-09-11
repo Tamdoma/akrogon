@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, realpathSync, readdirSync, statSync, type Dirent } from 'node:fs';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -6,7 +6,7 @@ import { parse } from 'shell-quote';
 import {
   readGlobal,
   readRepo,
-  requireRepo,
+  commonDirectory,
   globalHome,
   expandPath,
   base,
@@ -15,18 +15,7 @@ import {
   type Repo,
   type GlobalConfig,
 } from './config';
-import {
-  allLeaves,
-  findLeaf,
-  readState,
-  saveState,
-  withLock,
-  withRepoLock,
-  withLeafLocks,
-  dependenciesReady,
-  type Leaf,
-  type State,
-} from './state';
+import { readState, saveState, withLock, withRepoLock, withLeafLocks, type Leaf, type State } from './state';
 import { requiredSlots, routing, type Slot } from './routing';
 import {
   herdr,
@@ -64,6 +53,89 @@ const hookEventSchema = z.discriminatedUnion('event', [
 ]);
 
 type HookEvent = z.infer<typeof hookEventSchema>;
+
+type Invocation = { skipped: Set<string> };
+type Inventory = { leaves: Leaf[]; unreadable: number; unknown: boolean };
+type DispatchOutcome = 'completed' | 'waiting' | 'skipped';
+
+function report(invocation: Invocation, repo: string, path: string, error: Error, slug?: string): void {
+  const key: string = `${repo}/${path}`;
+  const identity: string = `${repo}/slug:${slug}`;
+  if (invocation.skipped.has(key) || (slug !== undefined && invocation.skipped.has(identity))) return;
+  invocation.skipped.add(key);
+  if (slug !== undefined) invocation.skipped.add(identity);
+  console.error(JSON.stringify({ repo, path, ...(slug === undefined ? {} : { slug }), error: error.message }));
+}
+
+function discover(repo: Repo, invocation: Invocation): Inventory {
+  const result: Inventory = { leaves: [], unreadable: 0, unknown: false };
+  function visit(path: string): void {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(path, { withFileTypes: true });
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, repo.name, path, error);
+      result.unknown = true;
+      return;
+    }
+    if (entries.some((entry) => entry.name === 'state.yaml')) {
+      try {
+        const state: State = readState(path);
+        if (state.repo !== repo.name) throw new Error(`Leaf repo mismatch: ${path}`);
+        result.leaves.push({ path, state });
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        report(invocation, repo.name, path, error);
+        result.unreadable += 1;
+      }
+      return;
+    }
+    for (const entry of entries.filter((entry) => entry.isDirectory())) visit(resolve(path, entry.name));
+  }
+  for (const area of ['open', 'closed']) {
+    const path: string = resolve(repo.root, 'issues', area);
+    try {
+      if (statSync(path, { throwIfNoEntry: false }) !== undefined) visit(path);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, repo.name, path, error);
+      result.unknown = true;
+    }
+  }
+  const slugs: Set<string> = new Set();
+  const duplicates: Set<string> = new Set();
+  for (const leaf of result.leaves) {
+    if (slugs.has(leaf.state.slug)) duplicates.add(leaf.state.slug);
+    slugs.add(leaf.state.slug);
+  }
+  for (const leaf of result.leaves.filter((leaf) => duplicates.has(leaf.state.slug))) {
+    report(invocation, repo.name, leaf.path, new Error(`Duplicate leaf slug: ${leaf.state.slug}`));
+    result.unreadable += 1;
+  }
+  return { ...result, leaves: result.leaves.filter((leaf) => !duplicates.has(leaf.state.slug)) };
+}
+
+function registeredRepos(global: GlobalConfig, invocation: Invocation): { repos: Repo[]; unknown: boolean } {
+  const repos: Repo[] = [];
+  let unknown: boolean = false;
+  for (const [name, path] of Object.entries(global.repos)) {
+    try {
+      repos.push(readRepo(name, path));
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, name, expandPath(path, globalHome()), error);
+      unknown = true;
+    }
+  }
+  return { repos, unknown };
+}
+
+function lookup(inventory: Inventory, slug: string): Leaf {
+  const leaf: Leaf | undefined = inventory.leaves.find((leaf) => leaf.state.slug === slug);
+  if (leaf === undefined) throw new Error(`Missing or unreadable leaf: ${slug}`);
+  return leaf;
+}
 
 function inWorktree(cwd: string | null, leaf: Leaf): boolean {
   return cwd !== null && leaf.state.worktree !== undefined && within(cwd, leaf.state.worktree);
@@ -134,20 +206,25 @@ async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
   return state;
 }
 
-async function activeCount(global: GlobalConfig): Promise<number> {
+async function activeCount(global: GlobalConfig, invocation: Invocation): Promise<number> {
   const live: Pane[] = await panes();
-  const active: Set<string> = new Set();
-  for (const [name, path] of Object.entries(global.repos)) {
-    const repo: Repo = readRepo(name, path);
-    for (const leaf of allLeaves(repo).filter((leaf) => leaf.state.phase !== 'merged')) {
-      if (live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf)))
-        active.add(`${name}/${leaf.state.slug}`);
-    }
+  const registered: ReturnType<typeof registeredRepos> = registeredRepos(global, invocation);
+  let active: number = registered.unknown ? global.max_active : 0;
+  for (const repo of registered.repos) {
+    const inventory: Inventory = discover(repo, invocation);
+    if (inventory.unknown) active += global.max_active;
+    else if (inventory.unreadable > 0) active += inventory.leaves.length + inventory.unreadable;
+    else
+      active += inventory.leaves.filter(
+        (leaf) =>
+          leaf.state.phase !== 'merged' &&
+          live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf)),
+      ).length;
   }
-  return active.size;
+  return active;
 }
 
-async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf): Promise<State | null> {
+async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation: Invocation): Promise<State | null> {
   const live: Pane[] = await panes();
   const liveTabs: Tab[] = await tabs();
   const expected: Leaf = {
@@ -161,7 +238,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf): Promise<S
         live.some((pane) => pane.tab_id === tab.tab_id && inWorktree(pane.cwd, expected))),
   );
   if (matches.length > 1) throw new Error(`Multiple tabs for leaf: ${leaf.state.slug}`);
-  if (matches.length === 0 && (await activeCount(global)) >= global.max_active) return null;
+  if (matches.length === 0 && (await activeCount(global, invocation)) >= global.max_active) return null;
   const state: State = await ensureWorktree(repo, leaf);
   const worktree: string = z.string().parse(state.worktree);
   const placement: string[] = ['--cwd', worktree, '--env', `AKROGON_BASE=${await base(repo, worktree)}`, '--no-focus'];
@@ -292,41 +369,62 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
   }
 }
 
-async function dispatchLeaf(global: GlobalConfig, repo: Repo, slug: string, explicit: boolean): Promise<boolean> {
+async function dispatchLeaf(
+  global: GlobalConfig,
+  repo: Repo,
+  identity: Leaf,
+  explicit: boolean,
+  invocation: Invocation,
+): Promise<DispatchOutcome> {
+  const slug: string = identity.state.slug;
   return withRepoLock(repo, async () => {
-    const leaf: Leaf = findLeaf(repo, slug);
+    const inventory: Inventory = discover(repo, invocation);
+    const leaf: Leaf | undefined = inventory.leaves.find((leaf) => leaf.state.slug === slug);
+    if (leaf === undefined) {
+      report(invocation, repo.name, identity.path, new Error(`Missing or unreadable leaf: ${slug}`), slug);
+      return 'skipped';
+    }
     return withLeafLocks(leaf, async () => {
-      if (leaf.state.hand_built) {
-        if (explicit) throw new Error(`Hand-built leaf cannot be dispatched: ${slug}`);
-        return false;
+      try {
+        const state: State = readState(leaf.path);
+        if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
+        const refreshed: Leaf = { path: leaf.path, state };
+        if (state.hand_built) {
+          if (explicit) throw new Error(`Hand-built leaf cannot be dispatched: ${slug}`);
+          return 'waiting';
+        }
+        if (state.phase === 'merge') {
+          const mergeSeat: Slot = seatFor(state, 'A');
+          const active: boolean = (await panes()).some(
+            (pane) => pane.pane_id === state.pane[mergeSeat] && pane.agent !== null && pane.agent_status === 'working',
+          );
+          if (active) return 'waiting';
+        }
+        const recovered: boolean = await recoverMerge(repo, refreshed);
+        const current: Leaf = recovered ? lookup(discover(repo, invocation), slug) : refreshed;
+        if (current.state.phase === 'merged') {
+          await completeOwner(repo, current, false);
+          return 'completed';
+        }
+        if (current.state.phase === 'failed') {
+          await command(['herdr', 'notification', 'show', `Failed leaf: ${repo.name}/${slug}`]);
+          return 'waiting';
+        }
+        const dependencies: Leaf[] = current.state['blocked-by'].map((dependency) => lookup(inventory, dependency));
+        if (!dependencies.every((dependency) => dependency.state.phase === 'merged')) {
+          if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
+          return 'waiting';
+        }
+        const allocated: State | null = await allocate(global, repo, current, invocation);
+        if (allocated === null) return 'waiting';
+        for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds))
+          await dispatchSlot(global, repo, { path: current.path, state: allocated }, slot);
+        return 'waiting';
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        report(invocation, repo.name, leaf.path, error, slug);
+        return 'skipped';
       }
-      if (leaf.state.phase === 'merge') {
-        const mergeSeat: Slot = seatFor(leaf.state, 'A');
-        const active: boolean = (await panes()).some(
-          (pane) =>
-            pane.pane_id === leaf.state.pane[mergeSeat] && pane.agent !== null && pane.agent_status === 'working',
-        );
-        if (active) return false;
-      }
-      const recovered: boolean = await recoverMerge(repo, leaf);
-      const current: Leaf = recovered ? findLeaf(repo, slug) : leaf;
-      if (current.state.phase === 'merged') {
-        await completeOwner(repo, current, false);
-        return true;
-      }
-      if (current.state.phase === 'failed') {
-        await command(['herdr', 'notification', 'show', `Failed leaf: ${repo.name}/${slug}`]);
-        return false;
-      }
-      if (!dependenciesReady(repo, current.state)) {
-        if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
-        return false;
-      }
-      const state: State | null = await allocate(global, repo, current);
-      if (state === null) return false;
-      for (const slot of requiredSlots(state.phase, state.fix_rounds))
-        await dispatchSlot(global, repo, { path: current.path, state }, slot);
-      return false;
     });
   });
 }
@@ -340,27 +438,23 @@ async function cleanupMerged(repo: Repo, leaf: Leaf): Promise<void> {
   }
 }
 
-async function sweepAll(global: GlobalConfig): Promise<void> {
-  const repos: Repo[] = Object.entries(global.repos).map(([name, path]) => readRepo(name, path));
-  for (const repo of repos)
-    await sweep(
-      global,
-      repo,
-      allLeaves(repo).filter((leaf) => leaf.state.phase === 'merged'),
-    );
-  for (const repo of repos)
-    await sweep(
-      global,
-      repo,
-      allLeaves(repo).filter((leaf) => leaf.state.phase !== 'merged'),
-    );
+async function sweepAll(global: GlobalConfig, invocation: Invocation): Promise<void> {
+  const { repos } = registeredRepos(global, invocation);
+  for (const merged of [true, false])
+    for (const repo of repos)
+      await sweep(
+        global,
+        repo,
+        discover(repo, invocation).leaves.filter((leaf) => (leaf.state.phase === 'merged') === merged),
+        invocation,
+      );
 }
 
-async function sweep(global: GlobalConfig, repo: Repo, leaves: Leaf[]): Promise<void> {
+async function sweep(global: GlobalConfig, repo: Repo, leaves: Leaf[], invocation: Invocation): Promise<void> {
   const ordered: Leaf[] = [...leaves].sort(
     (a, b) => Number(b.state.phase === 'merged') - Number(a.state.phase === 'merged'),
   );
-  for (const leaf of ordered) await dispatchLeaf(global, repo, leaf.state.slug, false);
+  for (const leaf of ordered) await dispatchLeaf(global, repo, leaf, false, invocation);
 }
 
 export async function nextCommand(input: string | undefined): Promise<void> {
@@ -368,42 +462,68 @@ export async function nextCommand(input: string | undefined): Promise<void> {
   const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
   if (event?.event === 'pane_agent_status_changed' && event.data.agent_status === 'working') return;
   const global: GlobalConfig = readGlobal();
+  const invocation: Invocation = { skipped: new Set() };
   await withLock(resolve(globalHome(), '.lock'), async () => {
     if (input === '--all') {
-      for (const repo of Object.entries(global.repos).map(([name, path]) => readRepo(name, path)))
-        for (const leaf of allLeaves(repo).filter((leaf) => leaf.state.phase === 'merged'))
-          await cleanupMerged(repo, leaf);
-      await sweepAll(global);
+      for (const repo of registeredRepos(global, invocation).repos)
+        for (const leaf of discover(repo, invocation).leaves.filter((leaf) => leaf.state.phase === 'merged')) {
+          try {
+            await cleanupMerged(repo, leaf);
+          } catch (error) {
+            if (!(error instanceof Error)) throw error;
+            report(invocation, repo.name, leaf.path, error, leaf.state.slug);
+          }
+        }
+      await sweepAll(global, invocation);
       return;
     }
     const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
     if (input === undefined && hookPane !== undefined) {
       const live: Pane | undefined = (await panes()).find((pane) => pane.pane_id === hookPane);
-      const repos: Repo[] = Object.entries(global.repos).map(([name, path]) => readRepo(name, path));
-      const owners: { repo: Repo; leaf: Leaf }[] = repos.flatMap((repo) =>
-        allLeaves(repo)
-          .filter((leaf) => ownsPane(leaf, live, hookPane))
+      const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
+        discover(repo, invocation)
+          .leaves.filter((leaf) => ownsPane(leaf, live, hookPane))
           .map((leaf) => ({ repo, leaf })),
       );
       if (owners.length > 1) throw new Error(`Multiple leaves own hook pane: ${hookPane}`);
       if (owners.length === 0) return;
       const owner: { repo: Repo; leaf: Leaf } = owners[0];
-      const completed: boolean = await dispatchLeaf(global, owner.repo, owner.leaf.state.slug, false);
-      if (completed) await sweepAll(global);
+      const outcome: DispatchOutcome = await dispatchLeaf(global, owner.repo, owner.leaf, false, invocation);
+      if (outcome === 'completed') await sweepAll(global, invocation);
       return;
     }
     const cwd: string = process.cwd();
     const folder: string = input === undefined ? cwd : expandPath(input, cwd);
-    const repo: Repo = await requireRepo(global, existsSync(folder) ? folder : cwd);
-    const leaves: Leaf[] = allLeaves(repo);
+    const selection: string = existsSync(folder) ? folder : cwd;
+    const common: string | null = await commonDirectory(selection);
+    const matches: Repo[] = [];
+    for (const repo of registeredRepos(global, invocation).repos) {
+      try {
+        if (common !== null && (await commonDirectory(repo.root)) === common) matches.push(repo);
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        report(invocation, repo.name, repo.root, error);
+      }
+    }
+    if (matches.length > 1) throw new Error(`Multiple registered checkouts for ${selection}`);
+    if (matches.length === 0) throw new Error(`No initialized registered checkout for ${selection}`);
+    const repo: Repo = matches[0];
+    const inventory: Inventory = discover(repo, invocation);
     const selected: Leaf[] =
       input !== undefined && !existsSync(folder)
-        ? [findLeaf(repo, input)]
-        : leaves.filter((leaf) => within(leaf.path, folder) || within(folder, leaf.path) || inWorktree(folder, leaf));
-    if (selected.length === 0) throw new Error(`No leaves match: ${input ?? cwd}`);
+        ? inventory.leaves.filter((leaf) => leaf.state.slug === input)
+        : inventory.leaves.filter(
+            (leaf) => within(leaf.path, folder) || within(folder, leaf.path) || inWorktree(folder, leaf),
+          );
+    if (selected.length === 0) {
+      if (inventory.unreadable > 0 || inventory.unknown) return;
+      if (input !== undefined && !existsSync(folder)) throw new Error(`Missing leaf: ${input}`);
+      throw new Error(`No leaves match: ${input ?? cwd}`);
+    }
     if (selected.length === 1) {
-      const completed: boolean = await dispatchLeaf(global, repo, selected[0].state.slug, true);
-      if (completed) await sweepAll(global);
-    } else await sweep(global, repo, selected);
+      const outcome: DispatchOutcome = await dispatchLeaf(global, repo, selected[0], true, invocation);
+      if (outcome === 'completed') await sweepAll(global, invocation);
+    } else await sweep(global, repo, selected, invocation);
   });
+  if (invocation.skipped.size > 0) process.exitCode = 1;
 }

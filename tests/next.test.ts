@@ -567,3 +567,265 @@ test('next awaits sourced completion after a failed rename before removing the w
     f.clean();
   }
 }, 15000);
+
+const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+function skips(result: Result): z.infer<typeof skipSchema>[] {
+  return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+}
+function configure(f: DispatchFixture, extra: object): void {
+  const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+  yaml(resolve(f.home, 'config.yaml'), { ...global, ...extra });
+}
+function resetPrompts(f: DispatchFixture, path: string): void {
+  saveState(path, { ...readState(path), prompted: {} });
+  const db: Database = database(f);
+  saveDatabase(f, { ...db, prompts: [], panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) });
+}
+
+for (const mode of ['startup', 'hook', 'cwd'] as const) {
+  test(`missing registration is isolated during ${mode}`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+      expect((await next(f, ['healthy'])).code).toBe(0);
+      resetPrompts(f, healthy);
+      const missing: string = resolve(f.home, 'deleted');
+      configure(f, { repos: { missing, repo: f.root } });
+      const result: Result = await next(
+        f,
+        mode === 'startup' ? ['--all'] : [],
+        mode === 'hook' ? { HERDR_PANE_ID: readState(healthy).pane.B } : {},
+      );
+      expect(result.code).toBe(1);
+      expect(skips(result)).toHaveLength(1);
+      expect(skips(result)[0]).toMatchObject({ repo: 'missing', path: missing });
+      expect(skips(result)[0].error).toContain('ENOENT');
+      expect(database(f).prompts).toHaveLength(1);
+    } finally {
+      f.clean();
+    }
+  }, 15000);
+}
+
+test('missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'broken', 'plan.synthesis', { 'blocked-by': ['nonexistent'] });
+    leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['healthy'] });
+    leaf(f, 'healthy', 'plan.synthesis');
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(1);
+    expect(skips(result)[0].slug).toBe('broken');
+    expect(skips(result)[0].error).toContain('nonexistent');
+    expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
+      'plan-issue healthy slot=B phase=plan.synthesis',
+    ]);
+  } finally {
+    f.clean();
+  }
+});
+
+for (const capacity of [3, 4]) {
+  test(`bad YAML and invalid states reserve occupancy at capacity ${capacity}`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+      expect((await next(f, ['healthy'])).code).toBe(0);
+      resetPrompts(f, healthy);
+      const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
+      writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
+      const invalid: string = leaf(f, 'invalid', 'not-a-phase');
+      leaf(f, 'new', 'plan.synthesis');
+      configure(f, { max_active: capacity });
+      const result: Result = await next(f, ['--all']);
+      expect(result.code).toBe(1);
+      expect(
+        skips(result)
+          .map((skip) => skip.path)
+          .sort(),
+      ).toEqual([invalid, malformed].sort());
+      expect(database(f).tabs).toHaveLength(1);
+      expect(database(f).prompts).toHaveLength(1);
+      configure(f, { max_active: 5 });
+      expect((await next(f, ['new'])).code).toBe(1);
+      expect(database(f).tabs).toHaveLength(2);
+    } finally {
+      f.clean();
+    }
+  }, 15000);
+}
+
+test('dirty merged worktree cleanup reports the original git error and still sweeps', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const dirty: string = leaf(f, 'dirty', 'plan.synthesis', {}, 'dirty-issue');
+    expect((await next(f, ['dirty'])).code).toBe(0);
+    const worktree: string = readState(dirty).worktree!;
+    writeFileSync(resolve(worktree, 'untracked'), 'dirty');
+    saveState(dirty, { ...readState(dirty), phase: 'merged' });
+    leaf(f, 'healthy', 'plan.synthesis', {}, 'healthy-issue');
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(1);
+    expect(skips(result)[0]).toMatchObject({ slug: 'dirty' });
+    expect(skips(result)[0].error).toContain('worktree');
+    expect(skips(result)[0].error).toContain('untracked');
+    expect(existsSync(worktree)).toBe(true);
+    expect(database(f).prompts.at(-1)?.text).toContain('healthy');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+for (const scope of ['global', 'repo', 'leaf'] as const) {
+  test(`${scope} lock acquisition failure is fatal`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const path: string = leaf(f, 'locked', 'plan.synthesis');
+      leaf(f, 'zhealthy', 'plan.synthesis');
+      symlinkSync(
+        resolve(f.home, 'missing/lock'),
+        resolve(scope === 'global' ? f.home : scope === 'repo' ? resolve(f.root, 'issues') : path, '.lock'),
+      );
+      const result: Result = await next(f, ['locked']);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('lock');
+      expect(result.stderr).not.toContain('"repo":"repo"');
+      expect(database(f).prompts).toHaveLength(0);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+test('lock finalization failures and invalid hook events remain fatal', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'healthy', 'plan.synthesis');
+    const invalid: Result = await next(f, [], { HERDR_PLUGIN_EVENT_JSON: '{"event":"invalid"}' });
+    expect(invalid.code).not.toBe(0);
+    expect(database(f).prompts).toHaveLength(0);
+    const flock: string = resolve(f.home, 'bin/flock');
+    writeFileSync(flock, '#!/bin/sh\nprintf locked\ncat >/dev/null\nprintf "finalization failure" >&2\nexit 7\n', {
+      mode: 0o755,
+    });
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('finalization failure');
+    expect(result.stderr).not.toContain('"repo":"repo"');
+    expect(database(f).prompts).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+});
+
+for (const invalid of ['duplicate', 'mismatch']) {
+  test(`${invalid} leaf identity never dispatches an arbitrary leaf`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const path: string = leaf(f, 'ambiguous', 'plan.synthesis', invalid === 'mismatch' ? { repo: 'wrong' } : {});
+      if (invalid === 'duplicate') leaf(f, 'ambiguous', 'plan.synthesis', {}, 'second');
+      configure(f, { max_active: 4 });
+      leaf(f, 'healthy', 'plan.synthesis');
+      const result: Result = await next(f, ['--all']);
+      expect(result.code).toBe(1);
+      expect(skips(result).some((skip) => skip.path === path)).toBe(true);
+      expect(database(f).prompts.every((prompt) => prompt.text.includes('healthy'))).toBe(true);
+      expect(database(f).prompts).toHaveLength(1);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+test('unknown directory population reserves all new capacity but allows existing tabs', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+    expect((await next(f, ['healthy'])).code).toBe(0);
+    resetPrompts(f, healthy);
+    leaf(f, 'new', 'plan.synthesis');
+    const closed: string = resolve(f.root, 'issues/closed');
+    writeFileSync(closed, 'not a directory');
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(1);
+    expect(skips(result)[0].path).toBe(closed);
+    expect(skips(result)[0].error).toContain('ENOTDIR');
+    expect(database(f).tabs).toHaveLength(1);
+    expect(database(f).prompts).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+});
+
+test('non-Error throws cross the scoped discovery boundary unchanged', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const script: string = resolve(f.home, 'non-error.ts');
+    writeFileSync(
+      script,
+      `import { mock } from 'bun:test';
+import * as config from ${JSON.stringify(resolve(import.meta.dir, '../src/config.ts'))};
+mock.module(${JSON.stringify(resolve(import.meta.dir, '../src/config.ts'))}, () => ({ ...config, readRepo: () => { throw 'non-error-sentinel'; } }));
+const { nextCommand } = await import(${JSON.stringify(resolve(import.meta.dir, '../src/next.ts'))});
+try { await nextCommand('--all'); process.exit(2); } catch (error) { if (error !== 'non-error-sentinel') throw error; console.error(error); process.exit(9); }
+`,
+    );
+    const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, script], {
+      env: { ...process.env, ...f.env, AKROGON_HOME: f.home },
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const stderr: string = await new Response(child.stderr).text();
+    expect(await child.exited).toBe(9);
+    expect(stderr.trim()).toBe('non-error-sentinel');
+  } finally {
+    f.clean();
+  }
+});
+
+test('explicit unreadable targets retain the original error without a missing-target stack', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
+    writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
+    for (const input of ['malformed', malformed]) {
+      const result: Result = await next(f, [input]);
+      expect(result.code).toBe(1);
+      expect(skips(result)).toHaveLength(1);
+      expect(skips(result)[0].path).toBe(malformed);
+      expect(skips(result)[0].error).not.toContain('Missing');
+    }
+    rmSync(malformed, { recursive: true });
+    const missing: Result = await next(f, ['nonexistent']);
+    expect(missing.code).not.toBe(0);
+    expect(missing.stderr).toContain('Missing leaf');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a selected leaf removed before its repo lock is reported as skipped', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const gone: string = leaf(f, 'gone', 'plan.synthesis');
+    writeFileSync(
+      resolve(f.home, 'bin/flock'),
+      '#!/bin/sh\nif [ "$2" = "$REMOVE_BEFORE_LOCK" ]; then rm -r "$REMOVE_LEAF"; fi\nexec /usr/bin/flock "$@"\n',
+      { mode: 0o755 },
+    );
+    const result: Result = await next(f, ['gone'], {
+      REMOVE_BEFORE_LOCK: resolve(f.root, 'issues/.lock'),
+      REMOVE_LEAF: gone,
+    });
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(1);
+    expect(skips(result)[0]).toMatchObject({ slug: 'gone', path: gone });
+    expect(database(f).prompts).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+});
