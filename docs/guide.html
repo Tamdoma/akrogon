@@ -545,9 +545,9 @@ broadcast:              <span class="c"># optional: post a summary when an issue
     <div class="tbl"><table>
       <tr><th>You have</th><th>Use</th><th>You get</th></tr>
       <tr><td>A goal, but the route is unclear and will take many sessions</td><td><code>/chart-issues</code></td><td>A chart of decisions you settle one by one. It ends by writing a set of leaves with <code>blocked-by</code> wired between them.</td></tr>
-      <tr><td>One clear thing to build</td><td><code>/create-issue</code></td><td>A short interview, then one leaf: <code>brief.md</code>, <code>design.md</code>, <code>state.yaml</code>.</td></tr>
+      <tr><td>One clear thing to build</td><td><code>/chart-issues</code></td><td>The same door. A small item whose map finds nothing open skips the chart and hands off at once: <code>brief.md</code>, <code>design.md</code>, <code>state.yaml</code>.</td></tr>
       <tr><td>One observation: "X happened, Y should have"</td><td><code>/seed-issue</code></td><td>A GitHub issue in the right repo. No planning yet.</td></tr>
-      <tr><td>Open GitHub issues</td><td><code>akrogon pull</code></td><td>One file per issue in <code>issues/seeds/</code>. Runs at every herdr start. Import a seed through <code>/create-issue</code>. When the leaf merges, the GitHub issue is closed with the commit.</td></tr>
+      <tr><td>Open GitHub issues</td><td><code>akrogon pull</code></td><td>One file per issue in <code>issues/seeds/</code>. Runs at every herdr start. <code>/chart-issues</code> imports the seeds at open. When the leaf merges, the GitHub issue is closed with the commit.</td></tr>
     </table></div>
     <div class="why"><span class="eyebrow">Why decide before agents start</span><p>A decision made during planning gets re-argued in every later phase. A decision written in the brief is settled. Agents build faster when there is nothing left to argue about.</p></div>
     <h3>Or just write the files</h3>
@@ -713,7 +713,7 @@ akrogon phase rename-flag merge --slot A --verdict nits</code></pre>
     <div class="tbl"><table>
       <tr><th>File</th><th>Written by</th><th>What it holds</th></tr>
       <tr><td>brief.md</td><td>you</td><td>What and why. The done criteria.</td></tr>
-      <tr><td>design.md</td><td>you, via create-issue</td><td>Locked decisions. Agents do not reopen them.</td></tr>
+      <tr><td>design.md</td><td>you, via chart-issues</td><td>Locked decisions. Agents do not reopen them.</td></tr>
       <tr><td>positions-A.md · positions-B.md</td><td>A, B</td><td>Independent plans, debate mode only.</td></tr>
       <tr><td>rebuttal-A.md · rebuttal-B.md</td><td>A, B</td><td>One reply each, debate mode only.</td></tr>
       <tr><td>plan.md</td><td>B</td><td>The final plan. Decisions, read-first paths, ordered checklist, acceptance criteria.</td></tr>
@@ -769,7 +769,7 @@ akrogon phase rename-flag merge --slot A --verdict nits</code></pre>
     <div class="day">
       <div><h3>Adding work</h3><span class="meta">any time</span></div>
       <div>
-        <p>In your own agent session, run <code>/create-issue</code> for one clear thing, or <code>/chart-issues</code> for a route you cannot see yet. Or write the two files by hand. Then <code>akrogon sync</code>. The next hook call, or <code>akrogon next</code>, picks it up.</p>
+        <p>In your own agent session, run <code>/chart-issues</code>. It imports pulled seeds, asks what it must, and writes the leaf. A small clear item goes straight to handoff. Or write the two files by hand. Then <code>akrogon sync</code>. The next hook call, or <code>akrogon next</code>, picks it up.</p>
       </div>
     </div>
     <div class="day">
@@ -908,7 +908,7 @@ akrogon init --toolkit typescript="bun test"     <span class="c"># or the init-i
 akrogon config                                    <span class="c"># what agents will see</span>
 
 <span class="c"># create work, in your own agent session</span>
-/chart-issues     /create-issue     /seed-issue
+/seed-issue       /chart-issues
 akrogon pull                                      <span class="c"># GitHub issues → issues/seeds/</span>
 akrogon sync                                      <span class="c"># commit + rebase + push the checkout</span>
 
