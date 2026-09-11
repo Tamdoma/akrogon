@@ -1,42 +1,39 @@
 # 1. Goal
 
-Implement fetch-deadline plan D1–D5 in the leaf worktree. A hung recovery fetch must reject at 60 seconds and release dispatch locks. One bounded implementation unit covers the shell helper, its caller and verification.
+Resolve merge-attempt-1 conflict from review-A.md while preserving plan D1–D5 and all existing acceptance criteria. Reviewed head is 400dc3eef8a7fcde5a2204a228f039c0df20cdd3. Rebase target is f9e7ddd8c47297114490269ecc1fb7f16e775fd1. Repair round 1 of 3.
 
 # 2. Numbered acceptance criteria
 
-1. A1: A real PID-recording sleeping fetch exceeds a short parameter-injected deadline, throws CommandError with command/cwd/nonzero result/deadline stderr within scheduling tolerance, terminates the direct child, and is not retried.
-2. A2: Real nextCommand recovery releases global/repo/leaf locks on timeout, independently verified with nonblocking flock; merge state stays unchanged.
-3. A3: Fast success, ordinary failure then success with one structured warning, two failures returning the second error, and a hung second attempt all preserve planned semantics. Omitted deadlines retain behavior.
-4. A4: Standalone fast successful and failed commands with a long deadline exit promptly, proving timer cleanup.
-5. A5: Changed tests pass, red then green evidence exists, and a real harness invocation records timeout, dead PID, reacquired locks and unchanged state in the authoritative leaf verification.txt.
+1. R1: tests/next.test.ts preserves upstream dispatch-isolation helpers/tests followed by the leaf recovery-deadline test, with no conflict markers.
+2. R2: Existing deadline tests still prove CommandError context, 60000 production argument, bounded short timeout, child termination, one attempt, timer cleanup, retry semantics, real lock reacquisition and unchanged merge state.
+3. R3: Integration honors upstream nextCommand error reporting without weakening the underlying CommandError assertion or modifying production dispatch behavior. If upstream changed propagation, observe the real error at the wrapper boundary and rethrow it, then verify the new outer failure contract and structured deadline diagnostic.
+4. R4: Configured changed tests pass and real harness evidence is refreshed. Capture a failing run if integration changes are required, before fixing that test.
 
 # 3. Read-first list
 
-Read this leaf's ../plan.md and ../design.md, docs/merge.html, docs/next.html, docs/limits.html, src/shell.ts, recoverMerge in src/phase.ts, nextCommand/dispatchLeaf in src/next.ts, lock helpers in src/state.ts, tests/helpers.ts and tests/next.test.ts (copy isolated fixture and fake Herdr patterns), tests/phase.test.ts, package.json, and /home/ivan/.codex/skills/implement-issue/ponytail.md.
+Read ../plan.md, ../review-A.md, ../review-B.md, docs/next.html and docs/merge.html, src/next.ts error boundaries/reporting, src/shell.ts and src/phase.ts recovery, tests/next.test.ts conflict, tests/fetch-deadline-harness.ts, tests/shell.test.ts, tests/helpers.ts. Copy existing upstream test patterns for structured dispatch errors. Read /home/ivan/.codex/skills/implement-issue/ponytail.md.
 
 # 4. Change list and needed interfaces
 
-src/shell.ts: optional third deadlineMs?: number on run and retryCommand. Preserve Result and return types. Timer races collection, kills direct child and rejects CommandError, always cleared. Retry ordinary failures once with the same deadline, never retry a thrown timeout. command unchanged.
-src/phase.ts: recovery fetch passes 60000.
-tests/phase.test.ts or tests/next.test.ts plus narrow shell tests/isolated harness as needed. Test-only wrapper asserts 60000 then passes a short number into the real retryCommand; isolated module mock must not pollute the suite. Use real subprocesses and locks.
+Resolve tests/next.test.ts by preserving both appended blocks. The pending rebase already contains the original leaf production and shell-test changes. Only adjust tests/fetch-deadline-harness.ts or its invocation as necessary for the integrated error contract. Existing production optional deadline interfaces and 60000 remain unchanged.
 
 # 5. Do-not, reasons and exceptions
 
-Do not change other production callers, locks, dispatch, configuration, or add dependencies: these are outside locked scope. Do not mock timeout implementation, spawn, locks, or authentication: evidence must prove real behavior. Do not run full suite or commit: B owns final gates and commit. Return a mismatch with concrete evidence instead of changing scope or interfaces; only a revised brief from B permits that change. These exclusions keep scope narrow and evidence meaningful; a revised brief is the only scope/interface exception.
+Do not remove or weaken upstream or leaf tests, change production behavior, modify docs unrelated to this conflict, or add dependencies. Preserve both siblings' contracts. Do not complete rebase, commit or run full suite: B owns those steps. Return a mismatch with evidence for scope/interface expansion, except an updated brief from B may authorize it. These exclusions preserve reviewed behavior and integration evidence; the only scope/interface exception is a revised brief.
 
 # 6. Ordered steps
 
-Derive tests for criteria 1–4 before production code and capture a fail-first result. Implement shell helper and recovery caller. Run changed tests red then green as applicable. Run real isolated harness and save authoritative verification.txt. Inspect scope and fill report below. Expected about five files, under 20 turns; materially larger work returns evidence and proposed brief correction rather than silently expanding.
+Resolve the single textual conflict, run changed tests and capture failures, repair only any resulting test integration mismatch, rerun changed tests and real harness. Leave conflict file resolved in working tree for B to inspect/stage. Fill section 8. Expected 1–2 edited test files and under 12 turns, with evidence-based mismatch if materially larger.
 
 # 7. Commands
 
-AKROGON_BASE=67c82bad809cb2144405ed2ff3ba49d3af1686a6 bun test --changed=67c82bad809cb2144405ed2ff3ba49d3af1686a6
+AKROGON_BASE=f9e7ddd8c47297114490269ecc1fb7f16e775fd1 bun test --changed=f9e7ddd8c47297114490269ecc1fb7f16e775fd1
 
 # 8. Done-when, evidence and report
 
-Report changed files/reasons, changed-test results including fail-first evidence, end-to-end artifact, known limitations and unverified criteria. The locked child.kill() design does not promise descendant termination or signal escalation. Preserve that limitation. Issue artifacts belong only in /home/ivan/Work/infra/akrogon/issues/open/loop-hardening/dispatch-progress/fetch-deadline, never the worktree issues directory. Clean temporary fixtures/helpers. Do not use real Herdr panes, socket, GitHub or installation state in tests.
+Save repair-red.txt (if applicable), repair-green.txt and repair-verification.txt in this authoritative implementation directory. Use real temporary files/processes and fake external executable boundaries only. Do not touch real Herdr or GitHub. All prior acceptance criteria remain required. Report files/reasons, commands/results, limitations and unverified criteria. B completes rebase, runs final gates, records before/after heads and hands off.
 
-Changed files and reasons: pending
-Tests run: pending
-Known limitations: direct-child kill only, no signal escalation or deadlines for other git commands.
-Unverified criteria: pending implementation
+Changed files and reasons: tests/next.test.ts resolves the append conflict by retaining the exact upstream file followed by the original leaf deadline test. tests/fetch-deadline-harness.ts checks the real CommandError at the retry wrapper boundary, rethrows it, then verifies nextCommand sets exitCode 1 and emits the structured repo/path/slug/deadline diagnostic. Production files remain unchanged from the reviewed implementation.
+Tests run: AKROGON_BASE=f9e7ddd8c47297114490269ecc1fb7f16e775fd1 bun test --changed=f9e7ddd8c47297114490269ecc1fb7f16e775fd1 initially exited 1 (91 pass, 1 integration mismatch) in repair-red.txt, then exited 0 (92 pass, 0 fail, 966 assertions) in repair-green.txt. timeout 5 bun tests/fetch-deadline-harness.ts exited 0 in repair-verification.txt: 135.0ms total, 100ms injected deadline, one attempt, dead child PID, four locks reacquired, unchanged merge state and no transition. Exact block-preservation assertion passed.
+Known limitations: direct-child signaling only, no escalation or descendant cleanup, partial child output omitted on timeout.
+Unverified criteria: R1–R4 verified. Final format, typecheck, full-suite gates and rebase completion belong to B and were not run here. Files remain unstaged as instructed.

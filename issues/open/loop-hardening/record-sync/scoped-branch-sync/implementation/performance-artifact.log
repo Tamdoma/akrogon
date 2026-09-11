@@ -1,0 +1,2 @@
+Read-only registered checkout path data. New scan executed directly from current src/sync.ts. Both scans returned identical collision results. Milliseconds are one local run, not a timing threshold.
+{"ignored":4114,"integrated":564,"old_ms":1873.516923,"new_ms":3.9015249999999924,"same_results":true,"collision_count":0}

@@ -59,7 +59,8 @@ if (args[0] === 'pane' && args[1] === 'list') result({ panes: db.panes });
 if (args[0] === 'pane' && args[1] === 'get') result({ pane: pane(args[2]) });
 if (args[0] === 'tab' && args[1] === 'list') result({ tabs: db.tabs });
 if (args[0] === 'tab' && args[1] === 'create') {
-  const tab: Tab = { tab_id: `w1:t${++db.serial}`, label: flag('--label') };
+  const workspace: string = args.includes('--workspace') ? flag('--workspace') : 'w1';
+  const tab: Tab = { tab_id: `${workspace}:t${++db.serial}`, label: flag('--label') };
   const root: Pane = {
     pane_id: `w1:p${++db.serial}`,
     tab_id: tab.tab_id,

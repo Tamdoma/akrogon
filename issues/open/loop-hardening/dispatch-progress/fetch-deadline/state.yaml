@@ -1,5 +1,5 @@
 slug: fetch-deadline
-phase: implement
+phase: merged
 created: 2026-09-11
 priority: "n"
 repo: akrogon
@@ -14,10 +14,10 @@ sources:
   - "Tamdoma/akrogon#14"
 attempts: 
   A: 0
-  B: 1
+  B: 0
 done: 
   []
-fix_rounds: 0
+fix_rounds: 1
 verdict: 
   {}
 tab: w8:t4K
@@ -25,6 +25,6 @@ worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/fetch-deadline
 pane: 
   A: w8:p8N
   B: w8:p8P
-slot: B
+slot: A
 prompted: 
-  B: 01a090e8-b117-7dd1-9396-fc09838e703f
+  {}

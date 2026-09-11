@@ -1,13 +1,30 @@
 slug: failure-signals
-phase: plan.synthesis
-created: '2026-09-11'
-priority: n
+phase: implement
+created: 2026-09-11
+priority: "n"
 repo: akrogon
-debate: 'no'
-blocked-by: []
-sources:
+debate: "no"
+blocked-by: 
+  []
+sources: 
   - "Tamdoma/akrogon#6"
   - "Tamdoma/akrogon#9"
   - "Tamdoma/akrogon#11"
   - "Tamdoma/akrogon#10"
   - "Tamdoma/akrogon#14"
+attempts: 
+  A: 0
+  B: 1
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w7:tA
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/failure-signals
+pane: 
+  A: w7:pC
+  B: w7:pD
+slot: B
+prompted: 
+  B: 01a090f7-c631-7bb0-a18a-e8ad46469cb1

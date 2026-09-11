@@ -1,0 +1,10 @@
+Command: bun tests/fetch-deadline-harness.ts
+Working directory: /home/ivan/Work/infra/akrogon/issues/worktrees/fetch-deadline
+Exit code: 0
+{"timeout":"{\"command\":[\"git\",\"fetch\",\"origin\",\"main\"],\"cwd\":\"/tmp/akrogon-KTwmly/repo\",\"code\":1,\"stdout\":\"\",\"stderr\":\"deadline 100ms exceeded\"}"}
+{"elapsedMs":138.595665,"deadPid":1063691,"attempts":1}
+{"reacquiredLock":"/tmp/akrogon-KTwmly/.lock"}
+{"reacquiredLock":"/tmp/akrogon-KTwmly/repo/issues/.lock"}
+{"reacquiredLock":"/tmp/akrogon-KTwmly/repo/issues/open/issue/.lock"}
+{"reacquiredLock":"/tmp/akrogon-KTwmly/repo/issues/open/issue/recover/.lock"}
+{"phase":"merge","stateUnchanged":true,"transitionRecorded":false}

@@ -1,0 +1,8 @@
+{"dispatchExitCode":1,"diagnostic":{"repo":"repo","path":"/tmp/akrogon-PbzeK9/repo/issues/open/issue/recover","slug":"recover","error":"{\"command\":[\"git\",\"fetch\",\"origin\",\"main\"],\"cwd\":\"/tmp/akrogon-PbzeK9/repo\",\"code\":1,\"stdout\":\"\",\"stderr\":\"deadline 100ms exceeded\"}"}}
+{"timeout":"{\"command\":[\"git\",\"fetch\",\"origin\",\"main\"],\"cwd\":\"/tmp/akrogon-PbzeK9/repo\",\"code\":1,\"stdout\":\"\",\"stderr\":\"deadline 100ms exceeded\"}"}
+{"elapsedMs":135.007316,"deadPid":1228734,"attempts":1}
+{"reacquiredLock":"/tmp/akrogon-PbzeK9/.lock"}
+{"reacquiredLock":"/tmp/akrogon-PbzeK9/repo/issues/.lock"}
+{"reacquiredLock":"/tmp/akrogon-PbzeK9/repo/issues/open/issue/.lock"}
+{"reacquiredLock":"/tmp/akrogon-PbzeK9/repo/issues/open/issue/recover/.lock"}
+{"phase":"merge","stateUnchanged":true,"transitionRecorded":false}

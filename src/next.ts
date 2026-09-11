@@ -50,6 +50,10 @@ const hookEventSchema = z.discriminatedUnion('event', [
     event: z.literal('pane_closed'),
     data: z.object({ type: z.literal('pane_closed'), pane_id: z.string() }),
   }),
+  z.object({
+    event: z.literal('tab_closed'),
+    data: z.object({ type: z.literal('tab_closed'), tab_id: z.string() }),
+  }),
 ]);
 
 type HookEvent = z.infer<typeof hookEventSchema>;
@@ -241,7 +245,15 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   if (matches.length === 0 && (await activeCount(global, invocation)) >= global.max_active) return null;
   const state: State = await ensureWorktree(repo, leaf);
   const worktree: string = z.string().parse(state.worktree);
-  const placement: string[] = ['--cwd', worktree, '--env', `AKROGON_BASE=${await base(repo, worktree)}`, '--no-focus'];
+  const workspace: string | undefined = process.env.HERDR_WORKSPACE_ID || undefined;
+  const placement: string[] = [
+    '--cwd',
+    worktree,
+    '--env',
+    `AKROGON_BASE=${await base(repo, worktree)}`,
+    '--no-focus',
+    ...(workspace === undefined ? [] : ['--workspace', workspace]),
+  ];
   const tab: Tab =
     matches.length === 1
       ? matches[0]
@@ -483,6 +495,20 @@ export async function nextCommand(input: string | undefined): Promise<void> {
           }
         }
       await sweepAll(global, invocation);
+      return;
+    }
+    if (event?.event === 'tab_closed') {
+      const owners: { repo: Repo; leaf: Leaf }[] = Object.entries(global.repos)
+        .map(([name, path]) => readRepo(name, path))
+        .flatMap((repo) =>
+          allLeaves(repo)
+            .filter((leaf) => leaf.state.tab === event.data.tab_id)
+            .map((leaf) => ({ repo, leaf })),
+        );
+      if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
+      if (owners.length === 0) return;
+      const completed: boolean = await dispatchLeaf(global, owners[0].repo, owners[0].leaf.state.slug, false);
+      if (completed) await sweepAll(global);
       return;
     }
     const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;

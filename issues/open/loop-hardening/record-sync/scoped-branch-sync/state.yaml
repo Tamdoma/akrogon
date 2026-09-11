@@ -1,5 +1,5 @@
 slug: scoped-branch-sync
-phase: implement
+phase: merged
 created: 2026-09-11
 priority: "n"
 repo: akrogon
@@ -12,10 +12,10 @@ sources:
   - "Tamdoma/akrogon#14"
 attempts: 
   A: 0
-  B: 1
+  B: 0
 done: 
   []
-fix_rounds: 0
+fix_rounds: 2
 verdict: 
   {}
 tab: w8:t4G
@@ -23,6 +23,6 @@ worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/scoped-branch-sync
 pane: 
   A: w8:p8F
   B: w8:p8G
-slot: B
+slot: A
 prompted: 
-  B: 01a090e0-0ce0-7ad2-9dbd-cb22e065119c
+  {}
