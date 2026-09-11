@@ -57,7 +57,6 @@ export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}
     slug,
     phase,
     created: '2026-09-10',
-    priority: 'n',
     repo: 'repo',
     debate: 'no',
     'blocked-by': [],

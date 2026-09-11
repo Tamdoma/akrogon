@@ -379,7 +379,7 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
       await commitMove(repo, leaf, state, 'failed', slot);
       return;
     }
-    const attempt: State = { ...state, attempts: { ...state.attempts, [slot]: state.attempts[slot] + 1 }, slot };
+    const attempt: State = { ...state, attempts: { ...state.attempts, [slot]: state.attempts[slot] + 1 } };
     saveState(leaf.path, attempt);
     if (pane.agent === null) {
       const harness: { kind: string; args: string[] } = launch(global, seat);

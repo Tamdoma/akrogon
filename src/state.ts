@@ -12,7 +12,6 @@ export const stateSchema = z
     slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     phase: phaseSchema,
     created: z.string(),
-    priority: z.string(),
     repo: z.string(),
     debate: z.enum(['yes', 'no']),
     'blocked-by': z.array(z.string()),
@@ -28,7 +27,6 @@ export const stateSchema = z
     tab: z.string().optional(),
     worktree: z.string().optional(),
     pane: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
-    slot: slotSchema.optional(),
     prompted: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
@@ -44,7 +42,12 @@ export class RepoMismatchError extends Error {
 }
 
 export function readState(path: string): State {
-  return stateSchema.parse(Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8')));
+  const parsed: ReturnType<typeof Bun.YAML.parse> = Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8'));
+  return stateSchema.parse(
+    parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? Object.fromEntries(Object.entries(parsed).filter(([key]) => key !== 'priority' && key !== 'slot'))
+      : parsed,
+  );
 }
 
 export function saveState(path: string, state: State): void {

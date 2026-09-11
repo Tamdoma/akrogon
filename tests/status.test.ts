@@ -80,6 +80,8 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
       'broken',
       'failed',
       {
+        priority: 'n',
+        slot: 'B',
         done: ['A'],
         attempts: { A: 2, B: 3 },
         fix_rounds: 2,
@@ -282,7 +284,7 @@ test('overview rejects repo mismatches and duplicate slugs within an open repo',
 test('detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes', async () => {
   const f: Fixture = await fixture();
   try {
-    const path: string = leaf(f, 'selected', 'merged');
+    const path: string = leaf(f, 'selected', 'merged', { priority: 'n', slot: 'B' });
     mkdirSync(resolve(f.root, 'issues/closed'));
     renameSync(resolve(path, '..'), resolve(f.root, 'issues/closed/issue'));
     const authoritative: string = resolve(f.root, 'issues/closed/issue/selected');
@@ -301,19 +303,21 @@ test('detail resolves authoritative closed state from a worktree, limits history
     const inertBefore: Record<string, string> = snapshot(resolve(worktree, 'issues'));
     const result: Result = await cli(f, ['status', 'selected'], worktree, env);
     expect(result.code).toBe(0);
-    const state: State = stateSchema.parse(Bun.YAML.parse(result.stdout.split(/^History\s*:\s*$/m)[0]));
+    const stateText: string = result.stdout.split(/^History\s*:\s*$/m)[0];
+    expect(stateText).not.toMatch(/^(priority|slot):/m);
+    const state: State = stateSchema.parse(Bun.YAML.parse(stateText));
     expect(state).toEqual(readState(authoritative));
     expect(result.stdout).toContain(resolve(authoritative, 'plan.md'));
-    const records: { slug: string; head: string }[] = result.stdout
+    const records: { slug: string; head: string; slot: string }[] = result.stdout
       .split(/^History\s*:\s*$/m)[1]
       .split('\n')
       .filter((line) => line.trimStart().startsWith('{'))
-      .map((line) => z.object({ slug: z.string(), head: z.string() }).parse(JSON.parse(line)));
+      .map((line) => z.object({ slug: z.string(), head: z.string(), slot: z.string() }).parse(JSON.parse(line)));
     expect(records).toHaveLength(10);
     expect(records.map((record) => record.head)).toEqual(
       Array.from({ length: 10 }, (_, index) => `record-${index + 3}`),
     );
-    expect(records.every((record) => record.slug === 'selected')).toBe(true);
+    expect(records.every((record) => record.slug === 'selected' && record.slot === 'B')).toBe(true);
     expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
     expect(snapshot(resolve(worktree, 'issues'))).toEqual(inertBefore);
     expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);

@@ -43,6 +43,7 @@ test('next creates one worktree/tab under concurrent hooks, prompts configured B
     const path: string = leaf(f, 'build', 'plan.synthesis');
     const results: Result[] = await Promise.all([next(f, ['build']), next(f, ['build'])]);
     expect(results.map((r) => r.code)).toEqual([0, 0]);
+    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).not.toMatch(/^(priority|slot):/m);
     const db: Database = database(f);
     expect(db.tabs).toHaveLength(1);
     expect(db.panes).toHaveLength(2);
