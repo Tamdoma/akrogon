@@ -498,17 +498,15 @@ export async function nextCommand(input: string | undefined): Promise<void> {
       return;
     }
     if (event?.event === 'tab_closed') {
-      const owners: { repo: Repo; leaf: Leaf }[] = Object.entries(global.repos)
-        .map(([name, path]) => readRepo(name, path))
-        .flatMap((repo) =>
-          allLeaves(repo)
-            .filter((leaf) => leaf.state.tab === event.data.tab_id)
-            .map((leaf) => ({ repo, leaf })),
-        );
+      const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
+        discover(repo, invocation)
+          .leaves.filter((leaf) => leaf.state.tab === event.data.tab_id)
+          .map((leaf) => ({ repo, leaf })),
+      );
       if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
       if (owners.length === 0) return;
-      const completed: boolean = await dispatchLeaf(global, owners[0].repo, owners[0].leaf.state.slug, false);
-      if (completed) await sweepAll(global);
+      const outcome: DispatchOutcome = await dispatchLeaf(global, owners[0].repo, owners[0].leaf, false, invocation);
+      if (outcome === 'completed') await sweepAll(global, invocation);
       return;
     }
     const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
