@@ -29,7 +29,7 @@ implement: subagents
 checks: {}
 advisory: []
 grounding:
-  index: REFERENCE.md
+  index: docs/reference-index.md
 broadcast:
   discord:
     webhook_env: [DISCORD_WEBHOOK_URL]
@@ -53,9 +53,11 @@ With no tests, propose a language/runner toolkit from effective global `toolkits
 
 Toolkit selection records a choice without installing a framework, changing the consumer manifest or migrating an existing suite.
 
-Reuse a valid configured or discovered top index, or, when no suitable index exists even if the configured path names a missing file, create a small top Markdown index at a suitable repo path with one line per area linking to a real existing entry point or document and set `grounding.index` to that path.
+Reuse a valid configured or discovered top index, or, when no suitable index exists even if the configured path names a missing file, create a small top Markdown index at `docs/reference-index.md` with one line per area linking to a real existing entry point or document and set `grounding.index` to that path.
 
-That top index is the only direct skill-authored repo write outside `issues/`, with no area documents or exhaustive inventory.
+For an area that cannot be explained in one index line, create an adjacent `AREA.md` and link it from the top index. Use `# <folder> area` and exactly four second-level sections: Commands, Key files, Non-obvious patterns and See also. Keep it at most 40 lines, with repository-relative paths to real files and no overview or exhaustive inventory.
+
+The top index and these needed area documents are the only direct skill-authored repo writes outside `issues/`.
 
 ## Initialize and verify
 

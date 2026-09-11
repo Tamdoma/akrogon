@@ -28,7 +28,7 @@ Initialization writes `issues/config.yaml`, creates `issues/open` and the lesson
 
 The registration key in the machine configuration is persistent repository identity and must match each leaf’s `repo` value. Its registered directory path may change independently while keeping the same key. Changing the repository root or `worktree_root` requires manual reconciliation of existing worktree locations, Git metadata and recorded `state.worktree` paths before dispatch can resume.
 
-This repository's [reference index](REFERENCE.md) links its areas.
+This repository's [reference index](docs/reference-index.md) links its areas.
 
 ## Command
 

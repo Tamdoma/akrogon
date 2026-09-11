@@ -24,7 +24,7 @@ Effective settings supply `implement`, `checks`, optional `advisory`, `AKROGON_B
 
 For a necessary peer question, wait for idle, ask once through herdr in Question/Option form requesting `<leaf>/questions/<id>.md`, run `herdr agent wait` without a timeout, read the file and decide by simplicity, clarity, elegance, cost, speed and quality.
 
-The plan's read-first list supplies worker context; the index is opened only on a gap, and implement updates affected docs and area index entries before review.
+The plan's read-first list supplies worker context; the index is opened only on a gap, and implement updates affected docs and area index entries before review, keeping affected `AREA.md` files at most 40 lines with exactly Commands, Key files, Non-obvious patterns and See also as second-level sections.
 
 A reusable lesson found during leaf work gets an active line naming mechanism/date/history path and a history file with case, evidence and learning; `learnings/LESSONS.md` is not pass input, and applying a lesson removes its active line and dates its history file without rewriting the historical case.
 

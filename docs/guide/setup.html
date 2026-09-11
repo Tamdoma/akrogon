@@ -71,7 +71,7 @@ checks:                 <span class="c"># every one must pass before review and 
   test_changed: ': "${AKROGON_BASE:?AKROGON_BASE is required}" &amp;&amp; bun test --changed="$AKROGON_BASE"'
 advisory: []            <span class="c"># commands whose failure is reported but does not block</span>
 grounding:
-  index: REFERENCE.md   <span class="c"># a short map of the repo that planners read first</span>
+  index: docs/reference-index.md   <span class="c"># a short map of the repo that planners read first</span>
 broadcast:              <span class="c"># optional: post a summary when an issue completes</span>
   discord:
     webhook_env: [DISCORD_WEBHOOK_URL, DISCORD_WEBHOOK_URL_2]</code></pre>

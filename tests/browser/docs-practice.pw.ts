@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page, type Locator } from '@playwright/test';
 
-const docs: URL = new URL('../../docs/', import.meta.url);
+const docs: URL = new URL('../../docs/guide/', import.meta.url);
 const destinations: string[] = [
   'index',
   'idea',
