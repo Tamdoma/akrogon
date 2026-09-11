@@ -71,3 +71,16 @@ One Nit noticed while verifying B-F2, pre-existing and not blocking. Herdr sets 
 ## Verdict
 
 nits
+
+## Hand verification after merge (operator with charting Claude, 2026-09-11)
+
+Criterion 7. `bun run src/akrogon.ts install` from the merged checkout: no output, exit 0 (existing links matched). Verified: `~/.local/bin/akrogon -> /home/ivan/Work/infra/akrogon/src/akrogon.ts`; 11 skill symlinks in `~/.claude/skills` and `~/.agents/skills` into `skills/`; `herdr plugin list` shows `akrogon (akrogon) enabled [local:/home/ivan/Work/infra/akrogon/plugin]`; `akrogon config` prints global plus repo with `repo: akrogon`.
+
+Criterion 8. Fixture pane `w8:pF` split from the charting pane, shell exited. `herdr plugin log list --plugin akrogon`:
+
+```text
+plugin-log-3 pane.agent_status_changed succeeded 0 stdout='' stderr=''
+plugin-log-4 pane.exited succeeded 0 stdout='' stderr=''
+```
+
+Both events ran `sh next.sh`, which exec'd `akrogon next` with the pane context, exit 0, no dispatch (no leaf resolves from that pane's cwd, hand-built leaves are skipped). Startup entry `next.sh --all` is the only startup command in `plugin/herdr-plugin.toml`; no pull hook present.

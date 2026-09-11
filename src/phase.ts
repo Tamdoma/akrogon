@@ -1,14 +1,50 @@
 import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { readGlobal, requireRepo, target, globalHome, type Repo, within } from './config';
-import { readState, saveState, findLeaf, leavesUnder, withRepoLock, withLeafLocks, withLock, type State, type Leaf } from './state';
-import { phaseSchema, slotSchema, verdictSchema, routing, requiredSlots, type Phase, type Slot, type Verdict } from './routing';
+import {
+  readState,
+  saveState,
+  findLeaf,
+  leavesUnder,
+  withRepoLock,
+  withLeafLocks,
+  withLock,
+  type State,
+  type Leaf,
+} from './state';
+import {
+  phaseSchema,
+  slotSchema,
+  verdictSchema,
+  routing,
+  requiredSlots,
+  type Phase,
+  type Slot,
+  type Verdict,
+} from './routing';
 import { command, run, retryCommand, type Result } from './shell';
 import { logMove } from './log';
 
-export async function commitMove(repo: Repo, leaf: Leaf, recorded: State, to: Phase, slot: Slot | null): Promise<State> {
-  const after: State = { ...recorded, phase: to, done: [], verdict: {}, attempts: { A: 0, B: 0 },
-    fix_rounds: to === 'check.fix' ? recorded.fix_rounds + 1 : recorded.phase === 'failed' && to === 'implement' ? 0 : recorded.fix_rounds };
+export async function commitMove(
+  repo: Repo,
+  leaf: Leaf,
+  recorded: State,
+  to: Phase,
+  slot: Slot | null,
+): Promise<State> {
+  const after: State = {
+    ...recorded,
+    phase: to,
+    done: [],
+    verdict: {},
+    attempts: { A: 0, B: 0 },
+    fix_rounds:
+      to === 'check.fix'
+        ? recorded.fix_rounds + 1
+        : recorded.phase === 'failed' && to === 'implement'
+          ? 0
+          : recorded.fix_rounds,
+  };
   saveState(leaf.path, after);
   console.log(`moved ${to}`);
   // The transition is committed even if diagnostic collection or append fails.
@@ -19,40 +55,62 @@ export async function commitMove(repo: Repo, leaf: Leaf, recorded: State, to: Ph
   }
   return after;
 }
+
 export function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): void {
   const issue: string = dirname(leaf.path);
-  if (!leavesUnder(issue).every(item => item.state.phase === 'merged')) return;
+  if (!leavesUnder(issue).every((item) => item.state.phase === 'merged')) return;
   if (justMerged) console.log(`issue complete ${basename(issue)}`);
   if (within(leaf.path, resolve(repo.root, 'issues/closed'))) return;
   const parent: string = dirname(issue);
   const owner: string = basename(parent) === 'open' ? issue : parent;
-  if (!leavesUnder(owner).every(item => item.state.phase === 'merged')) return;
+  if (!leavesUnder(owner).every((item) => item.state.phase === 'merged')) return;
   const closed: string = resolve(repo.root, 'issues/closed');
   mkdirSync(closed, { recursive: true });
   const destination: string = resolve(closed, basename(owner));
   if (existsSync(destination)) throw new Error(`Completion destination exists: ${destination}`);
   renameSync(owner, destination);
 }
-export async function transition(repo: Repo, leaf: Leaf, requested: Phase, explicitSlot: Slot | undefined, verdict: Verdict | undefined): Promise<void> {
+
+export async function transition(
+  repo: Repo,
+  leaf: Leaf,
+  requested: Phase,
+  explicitSlot: Slot | undefined,
+  verdict: Verdict | undefined,
+): Promise<void> {
   const state: State = readState(leaf.path);
   if (state.phase === 'merged') throw new Error(`Merged is terminal: ${state.slug}`);
   if (!routing[state.phase].next.includes(requested)) throw new Error(`Illegal move ${state.phase} -> ${requested}`);
-  if (state.phase === 'plan.positions' && requested !== (repo.config.rebuttal ? 'plan.rebuttal' : 'plan.synthesis')) throw new Error('Destination contradicts rebuttal config');
+  if (state.phase === 'plan.positions' && requested !== (repo.config.rebuttal ? 'plan.rebuttal' : 'plan.synthesis'))
+    throw new Error('Destination contradicts rebuttal config');
   const required: readonly Slot[] = requiredSlots(state.phase, state.fix_rounds);
   const slot: Slot | undefined = explicitSlot ?? (required.length === 1 ? required[0] : undefined);
-  if (state.phase !== 'failed' && (slot === undefined || !required.includes(slot))) throw new Error('A required --slot is missing or invalid');
+  if (state.phase !== 'failed' && (slot === undefined || !required.includes(slot)))
+    throw new Error('A required --slot is missing or invalid');
   if (slot !== undefined && state.done.includes(slot)) throw new Error(`Slot already recorded: ${slot}`);
-  if ((state.phase === 'check.review') !== (verdict !== undefined)) throw new Error('Review requires --verdict; other phases forbid it');
-  const recorded: State = { ...state, done: slot === undefined ? state.done : [...state.done, slot], verdict: verdict === undefined || slot === undefined ? state.verdict : { ...state.verdict, [slot]: verdict } };
-  if (!required.every(requiredSlot => recorded.done.includes(requiredSlot))) {
+  if ((state.phase === 'check.review') !== (verdict !== undefined))
+    throw new Error('Review requires --verdict; other phases forbid it');
+  const recorded: State = {
+    ...state,
+    done: slot === undefined ? state.done : [...state.done, slot],
+    verdict: verdict === undefined || slot === undefined ? state.verdict : { ...state.verdict, [slot]: verdict },
+  };
+  if (!required.every((requiredSlot) => recorded.done.includes(requiredSlot))) {
     saveState(leaf.path, recorded);
     console.log('recorded');
     return;
   }
-  const destination: Phase = state.phase === 'check.review' ? Object.values(recorded.verdict).includes('fix') ? 'check.fix' : 'merge' : requested;
-  const capped: Phase = destination === 'check.fix' && state.fix_rounds >= repo.config.fix_rounds ? 'failed' : destination;
+  const destination: Phase =
+    state.phase === 'check.review'
+      ? Object.values(recorded.verdict).includes('fix')
+        ? 'check.fix'
+        : 'merge'
+      : requested;
+  const capped: Phase =
+    destination === 'check.fix' && state.fix_rounds >= repo.config.fix_rounds ? 'failed' : destination;
   await commitMove(repo, leaf, recorded, capped, slot ?? null);
 }
+
 export async function recoverMerge(repo: Repo, leaf: Leaf): Promise<boolean> {
   if (leaf.state.phase !== 'merge') return false;
   if (leaf.state.worktree === undefined) throw new Error(`Merge leaf has no worktree: ${leaf.state.slug}`);
@@ -64,16 +122,24 @@ export async function recoverMerge(repo: Repo, leaf: Leaf): Promise<boolean> {
   await transition(repo, leaf, 'merged', 'A', undefined);
   return true;
 }
-export async function phaseCommand(slug: string, rawPhase: string, rawSlot: string | boolean | undefined, rawVerdict: string | boolean | undefined): Promise<void> {
+
+export async function phaseCommand(
+  slug: string,
+  rawPhase: string,
+  rawSlot: string | boolean | undefined,
+  rawVerdict: string | boolean | undefined,
+): Promise<void> {
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
   const verdict: Verdict | undefined = verdictSchema.optional().parse(rawVerdict);
   const repo: Repo = await requireRepo(readGlobal(), process.cwd());
-  await withLock(resolve(globalHome(), '.lock'), () => withRepoLock(repo, async () => {
-    const leaf: Leaf = findLeaf(repo, slug);
-    await withLeafLocks(leaf, async () => {
-      if (leaf.state.phase === 'merged') completeOwner(repo, leaf, false);
-      await transition(repo, leaf, requested, slot, verdict);
-    });
-  }));
+  await withLock(resolve(globalHome(), '.lock'), () =>
+    withRepoLock(repo, async () => {
+      const leaf: Leaf = findLeaf(repo, slug);
+      await withLeafLocks(leaf, async () => {
+        if (leaf.state.phase === 'merged') completeOwner(repo, leaf, false);
+        await transition(repo, leaf, requested, slot, verdict);
+      });
+    }),
+  );
 }

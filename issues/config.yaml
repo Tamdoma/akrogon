@@ -4,7 +4,8 @@ worktree_root: issues/worktrees
 rebuttal: true
 fix_rounds: 3
 implement: subagents
-checks: 
+checks:
+  format: bun run format
   test: bun test
   typecheck: bun run typecheck
 advisory: 

@@ -1,11 +1,28 @@
 import { z } from 'zod';
-export const phaseSchema = z.enum(['plan.positions', 'plan.rebuttal', 'plan.synthesis', 'implement', 'check.review', 'check.fix', 'merge', 'merged', 'failed']);
+export const phaseSchema = z.enum([
+  'plan.positions',
+  'plan.rebuttal',
+  'plan.synthesis',
+  'implement',
+  'check.review',
+  'check.fix',
+  'merge',
+  'merged',
+  'failed',
+]);
+
 export const slotSchema = z.enum(['A', 'B']);
+
 export const verdictSchema = z.enum(['ready', 'nits', 'fix']);
+
 export type Phase = z.infer<typeof phaseSchema>;
+
 export type Slot = z.infer<typeof slotSchema>;
+
 export type Verdict = z.infer<typeof verdictSchema>;
+
 type Route = { skill: string | null; slots: readonly Slot[]; next: readonly Phase[] };
+
 export const routing: Record<Phase, Route> = {
   'plan.positions': { skill: 'plan-issue', slots: ['A', 'B'], next: ['plan.rebuttal', 'plan.synthesis'] },
   'plan.rebuttal': { skill: 'plan-issue', slots: ['A', 'B'], next: ['plan.synthesis'] },
@@ -17,6 +34,7 @@ export const routing: Record<Phase, Route> = {
   merged: { skill: null, slots: [], next: [] },
   failed: { skill: null, slots: [], next: ['implement'] },
 };
+
 export function requiredSlots(phase: Phase, rounds: number): readonly Slot[] {
   return phase === 'check.review' && rounds > 0 ? ['A'] : routing[phase].slots;
 }

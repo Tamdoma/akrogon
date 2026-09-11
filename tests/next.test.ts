@@ -16,18 +16,26 @@ async function dispatchFixture(): Promise<DispatchFixture> {
   writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, prompts: [], starts: [] }));
   return { ...f, db, env: { PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db } };
 }
-function database(f: DispatchFixture): Database { return JSON.parse(readFileSync(f.db, 'utf8')) as Database; }
-function saveDatabase(f: DispatchFixture, db: Database): void { writeFileSync(f.db, JSON.stringify(db)); }
-async function next(f: DispatchFixture, args: string[], env: NodeJS.ProcessEnv = {}): Promise<Result> { return cli(f, ['next', ...args], f.root, { ...f.env, ...env }); }
+function database(f: DispatchFixture): Database {
+  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
+}
+function saveDatabase(f: DispatchFixture, db: Database): void {
+  writeFileSync(f.db, JSON.stringify(db));
+}
+async function next(f: DispatchFixture, args: string[], env: NodeJS.ProcessEnv = {}): Promise<Result> {
+  return cli(f, ['next', ...args], f.root, { ...f.env, ...env });
+}
 
 test('next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'build', 'plan.synthesis');
     const results: Result[] = await Promise.all([next(f, ['build']), next(f, ['build'])]);
-    expect(results.map(r => r.code)).toEqual([0, 0]);
+    expect(results.map((r) => r.code)).toEqual([0, 0]);
     const db: Database = database(f);
-    expect(db.tabs).toHaveLength(1); expect(db.panes).toHaveLength(2); expect(db.prompts).toHaveLength(1);
+    expect(db.tabs).toHaveLength(1);
+    expect(db.panes).toHaveLength(2);
+    expect(db.prompts).toHaveLength(1);
     expect(db.prompts[0].text).toBe('plan-issue build slot=B phase=plan.synthesis');
     console.log(db.prompts[0].text);
     expect(db.starts[0]).toContain('strong-b');
@@ -36,7 +44,9 @@ test('next creates one worktree/tab under concurrent hooks, prompts configured B
     expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
     expect(readState(path).attempts.B).toBe(1);
     expect(await command(['git', 'branch', '--show-current'], readState(path).worktree)).toBe('build');
-  } finally { f.clean(); }
+  } finally {
+    f.clean();
+  }
 }, 15000);
 
 test('next resumes interrupted tab creation, retries same slot twice then peer once and fails', async () => {
@@ -51,12 +61,15 @@ test('next resumes interrupted tab creation, retries same slot twice then peer o
     expect(retried.code).toBe(0);
     expect(readState(path).phase).toBe('failed');
     const db: Database = database(f);
-    expect(db.tabs).toHaveLength(1); expect(db.prompts).toHaveLength(3);
+    expect(db.tabs).toHaveLength(1);
+    expect(db.prompts).toHaveLength(3);
     expect(db.prompts[0].pane).toBe(db.prompts[1].pane);
     expect(db.prompts[2].pane).not.toBe(db.prompts[0].pane);
-    expect(db.prompts.every(p => p.text.includes('slot=B'))).toBe(true);
+    expect(db.prompts.every((p) => p.text.includes('slot=B'))).toBe(true);
     expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8')).toContain('"to":"failed"');
-  } finally { f.clean(); }
+  } finally {
+    f.clean();
+  }
 }, 15000);
 
 test('next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers', async () => {
@@ -76,11 +89,16 @@ test('next refuses hand-built and dependencies, respects capacity, and sends unk
     expect(database(f).tabs).toHaveLength(1);
     expect(readState(dependent).worktree).toBeUndefined();
     const db: Database = database(f);
-    saveDatabase(f, { ...db, panes: db.panes.map(p => p.pane_id === readState(first).pane.B ? { ...p, agent_status: 'unknown' } : p) });
+    saveDatabase(f, {
+      ...db,
+      panes: db.panes.map((p) => (p.pane_id === readState(first).pane.B ? { ...p, agent_status: 'unknown' } : p)),
+    });
     expect((await next(f, ['first'])).code).toBe(0);
     expect(database(f).prompts.at(-1)?.pane).toBe(readState(first).pane.A);
     expect(database(f).prompts.at(-1)?.text).toContain('slot=B');
-  } finally { f.clean(); }
+  } finally {
+    f.clean();
+  }
 }, 15000);
 
 test('merged phase leaves tab intact, next closes it and starts dependent from a closed-folder hook', async () => {
@@ -95,12 +113,14 @@ test('merged phase leaves tab intact, next closes it and starts dependent from a
     expect(merged.code).toBe(0);
     expect(database(f).tabs).toHaveLength(1);
     const db: Database = database(f);
-    saveDatabase(f, { ...db, panes: db.panes.map(p => ({ ...p, agent_status: 'idle' })) });
+    saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
     expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
     expect(database(f).tabs).toHaveLength(1);
     expect(database(f).tabs[0].label).toBe('second');
     expect(readState(dependent).attempts.B).toBe(1);
-  } finally { f.clean(); }
+  } finally {
+    f.clean();
+  }
 }, 15000);
 
 test('machine-wide capacity includes another registered repo and folder selection respects it', async () => {
@@ -112,11 +132,14 @@ test('machine-wide capacity includes another registered repo and folder selectio
     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
     yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 1, repos: { repo: f.root, other: g.root } });
     const results: Result[] = await Promise.all([next(f, ['first']), next(f, [resolve(g.root, 'issues/open/issue')])]);
-    expect(results.every(result => result.code === 0)).toBe(true);
+    expect(results.every((result) => result.code === 0)).toBe(true);
     expect(database(f).tabs).toHaveLength(1);
     const states = [readState(resolve(f.root, 'issues/open/issue/first')), readState(second)];
-    expect(states.filter(state => state.worktree !== undefined)).toHaveLength(1);
-  } finally { f.clean(); g.clean(); }
+    expect(states.filter((state) => state.worktree !== undefined)).toHaveLength(1);
+  } finally {
+    f.clean();
+    g.clean();
+  }
 }, 15000);
 
 test('next recovers only merge-phase work by ancestry against a non-default remote target', async () => {
@@ -137,13 +160,15 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     await command(['git', 'push', 'upstream', 'HEAD:trunk'], worktree);
     saveState(path, { ...readState(path), phase: 'merge' });
     const db: Database = database(f);
-    saveDatabase(f, { ...db, panes: db.panes.map(p => ({ ...p, agent_status: 'idle' })) });
+    saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
     const recovered: Result = await next(f, ['landed']);
     expect(recovered.code).toBe(0);
     expect(recovered.stdout).toContain('issue complete landing');
     expect(readState(resolve(f.root, 'issues/closed/landing/landed')).phase).toBe('merged');
     expect(database(f).tabs).toHaveLength(0);
-  } finally { f.clean(); }
+  } finally {
+    f.clean();
+  }
 }, 15000);
 
 test('exited hooks resolve persisted pane hints and preserve the surviving slot', async () => {
@@ -154,8 +179,14 @@ test('exited hooks resolve persisted pane hints and preserve the surviving slot'
     const a: string = readState(path).pane.A!;
     const b: string = readState(path).pane.B!;
     const db: Database = database(f);
-    saveDatabase(f, { ...db, panes: db.panes.filter(pane => pane.pane_id !== a) });
-    const recovered: Result = await next(f, [], { HERDR_PANE_ID: a, HERDR_PLUGIN_EVENT_JSON: JSON.stringify({ event: 'pane_exited', data: { type: 'pane_exited', pane_id: a, workspace_id: 'w1' } }) });
+    saveDatabase(f, { ...db, panes: db.panes.filter((pane) => pane.pane_id !== a) });
+    const recovered: Result = await next(f, [], {
+      HERDR_PANE_ID: a,
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'pane_exited',
+        data: { type: 'pane_exited', pane_id: a, workspace_id: 'w1' },
+      }),
+    });
     expect(recovered.code).toBe(0);
     expect(readState(path).pane.B).toBe(b);
     expect(readState(path).pane.A).not.toBe(a);
@@ -163,7 +194,9 @@ test('exited hooks resolve persisted pane hints and preserve the surviving slot'
     expect(database(f).prompts.at(-1)?.text).toBe('plan-issue exited slot=A phase=plan.positions');
     expect(database(f).starts.at(-1)).toContain('strong-a');
     expect(database(f).tabs).toHaveLength(1);
-  } finally { f.clean(); }
+  } finally {
+    f.clean();
+  }
 }, 15000);
 
 test('delayed working notifications never consume retries and idle notifications still dispatch', async () => {
@@ -173,15 +206,21 @@ test('delayed working notifications never consume retries and idle notifications
     expect((await next(f, ['delayed'])).code).toBe(0);
     const b: string = readState(path).pane.B!;
     const db: Database = database(f);
-    saveDatabase(f, { ...db, panes: db.panes.map(p => p.pane_id === b ? { ...p, agent_status: 'idle' } : p) });
-    const event = (status: string): string => JSON.stringify({ event: 'pane_agent_status_changed', data: { type: 'pane_agent_status_changed', pane_id: b, workspace_id: 'w1', agent_status: status } });
+    saveDatabase(f, { ...db, panes: db.panes.map((p) => (p.pane_id === b ? { ...p, agent_status: 'idle' } : p)) });
+    const event = (status: string): string =>
+      JSON.stringify({
+        event: 'pane_agent_status_changed',
+        data: { type: 'pane_agent_status_changed', pane_id: b, workspace_id: 'w1', agent_status: status },
+      });
     expect((await next(f, [], { HERDR_PANE_ID: b, HERDR_PLUGIN_EVENT_JSON: event('working') })).code).toBe(0);
     expect(readState(path).attempts.B).toBe(1);
     expect(database(f).prompts).toHaveLength(1);
     expect((await next(f, [], { HERDR_PANE_ID: b, HERDR_PLUGIN_EVENT_JSON: event('idle') })).code).toBe(0);
     expect(readState(path).attempts.B).toBe(2);
     expect(database(f).prompts).toHaveLength(2);
-  } finally { f.clean(); }
+  } finally {
+    f.clean();
+  }
 }, 15000);
 
 test('a live merge retains its completion call after pushing, including a peer retry', async () => {
@@ -200,7 +239,14 @@ test('a live merge retains its completion call after pushing, including a peer r
     for (const seat of ['A', 'B'] as const) {
       saveState(path, { ...readState(path), phase: 'merge', attempts: { A: seat === 'A' ? 1 : 3, B: 0 } });
       const db: Database = database(f);
-      saveDatabase(f, { ...db, panes: db.panes.map(p => ({ ...p, agent: 'fake', agent_status: p.pane_id === readState(path).pane[seat] ? 'working' : 'idle' })) });
+      saveDatabase(f, {
+        ...db,
+        panes: db.panes.map((p) => ({
+          ...p,
+          agent: 'fake',
+          agent_status: p.pane_id === readState(path).pane[seat] ? 'working' : 'idle',
+        })),
+      });
       expect((await next(f, ['--all'])).code).toBe(0);
       expect(readState(path).phase).toBe('merge');
     }
@@ -208,7 +254,9 @@ test('a live merge retains its completion call after pushing, including a peer r
     expect(completed.code).toBe(0);
     expect(completed.stdout).toContain('issue complete issue');
     expect(database(f).tabs).toHaveLength(1);
-  } finally { f.clean(); }
+  } finally {
+    f.clean();
+  }
 }, 15000);
 
 test('agent names support identical repo-local slugs and long numeric-leading slugs', async () => {
@@ -223,9 +271,12 @@ test('agent names support identical repo-local slugs and long numeric-leading sl
     expect((await next(f, ['--all'])).code).toBe(0);
     const db: Database = database(f);
     expect(db.starts).toHaveLength(2);
-    expect(new Set(db.starts.map(args => args[2])).size).toBe(2);
-    expect(db.starts.every(args => /^[a-z][a-z0-9_-]{0,31}$/.test(args[2]))).toBe(true);
-    expect(db.tabs.map(tab => tab.label)).toEqual([slug, slug]);
-    expect(db.prompts.every(prompt => prompt.text === `plan-issue ${slug} slot=B phase=plan.synthesis`)).toBe(true);
-  } finally { f.clean(); g.clean(); }
+    expect(new Set(db.starts.map((args) => args[2])).size).toBe(2);
+    expect(db.starts.every((args) => /^[a-z][a-z0-9_-]{0,31}$/.test(args[2]))).toBe(true);
+    expect(db.tabs.map((tab) => tab.label)).toEqual([slug, slug]);
+    expect(db.prompts.every((prompt) => prompt.text === `plan-issue ${slug} slot=B phase=plan.synthesis`)).toBe(true);
+  } finally {
+    f.clean();
+    g.clean();
+  }
 }, 15000);

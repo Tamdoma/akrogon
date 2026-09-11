@@ -5,10 +5,23 @@ import { effectiveConfig } from './config';
 import { initialize } from './init';
 
 const verb: string | undefined = process.argv[2];
-const options: Record<string, { type: 'string' | 'boolean' }> = verb === 'init' ? { from: { type: 'string' }, toolkit: { type: 'string' } }
-  : verb === 'phase' ? { slot: { type: 'string' }, verdict: { type: 'string' } }
-  : verb === 'next' ? { all: { type: 'boolean' } } : {};
-const { values, positionals } = parseArgs({ args: process.argv.slice(3), options, allowPositionals: true, strict: true });
+
+const options: Record<string, { type: 'string' | 'boolean' }> =
+  verb === 'init'
+    ? { from: { type: 'string' }, toolkit: { type: 'string' } }
+    : verb === 'phase'
+      ? { slot: { type: 'string' }, verdict: { type: 'string' } }
+      : verb === 'next'
+        ? { all: { type: 'boolean' } }
+        : {};
+
+const { values, positionals } = parseArgs({
+  args: process.argv.slice(3),
+  options,
+  allowPositionals: true,
+  strict: true,
+});
+
 switch (verb) {
   case 'config':
     z.tuple([]).parse(positionals);
@@ -16,7 +29,11 @@ switch (verb) {
     break;
   case 'init':
     z.tuple([]).parse(positionals);
-    await initialize(process.cwd(), z.string().optional().parse(values.from), z.string().optional().parse(values.toolkit));
+    await initialize(
+      process.cwd(),
+      z.string().optional().parse(values.from),
+      z.string().optional().parse(values.toolkit),
+    );
     break;
   case 'phase': {
     const [slug, phase]: [string, string] = z.tuple([z.string(), z.string()]).parse(positionals);
@@ -32,5 +49,6 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./install')).install();
     break;
-  default: throw new Error('Usage: akrogon <install|init|config|phase|next>');
+  default:
+    throw new Error('Usage: akrogon <install|init|config|phase|next>');
 }
