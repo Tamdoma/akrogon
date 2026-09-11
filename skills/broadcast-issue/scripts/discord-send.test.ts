@@ -22,17 +22,41 @@ interface RequestTrace {
 }
 const traceSchema: z.ZodType<RequestTrace> = z.strictObject({ url: z.string(), body: z.string() });
 
+interface FailureTrace {
+  readonly target: string;
+  readonly status: number | null;
+  readonly body: string;
+  readonly request: { readonly content: string };
+  readonly delivered: number;
+  readonly failed: number;
+  readonly unattempted: number;
+}
+const failureSchema: z.ZodType<FailureTrace> = z.strictObject({
+  target: z.string(), status: z.number().nullable(), body: z.string(),
+  request: z.strictObject({ content: z.string() }),
+  delivered: z.number(), failed: z.number(), unattempted: z.number(),
+});
+
 interface Result {
   readonly exitCode: number;
   readonly output: string;
   readonly requests: readonly RequestTrace[];
   readonly files: readonly string[];
+  readonly failures: readonly FailureTrace[];
 }
 
 const sender: string = join(import.meta.dir, 'discord-send.ts');
 const primary: string = 'https://discord.com/api/webhooks/123456/primary-secret';
 const secondary: string = 'https://discord.com/api/webhooks/654321/secondary-secret';
 const today: string = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+const threeChunks: string[] = [
+  `## 🧪 Title (${today})\n\n**Before**\n- ${'a'.repeat(1500)}`,
+  `**Now**\n- ${'b'.repeat(1500)}`,
+  `**Next**\n- ${'c'.repeat(1500)}`,
+];
+const threeChunkPayload: string = JSON.stringify({ summary: 'Title', before: ['a'.repeat(1500)], now: ['b'.repeat(1500)], next: ['c'.repeat(1500)] });
+const success: Reply = { status: 204, body: '' };
+const rejected: Reply = { status: 500, body: 'busy' };
 const payload: string = JSON.stringify({ summary: 'Project: Search works', before: ['Saved items were lost.'], now: ['Search finds saved items.'], next: ['Nothing needs re-saving.'] });
 
 async function run(scenario: Scenario): Promise<Result> {
@@ -57,7 +81,13 @@ async function run(scenario: Scenario): Promise<Result> {
         return new Response(body, { status: reply.status });
       };
       const { main } = await import(${JSON.stringify(sender)});
-      await main(${JSON.stringify(join(root, '.config/akrogon/env'))});
+      try {
+        await main(${JSON.stringify(join(root, '.config/akrogon/env'))});
+      } catch (cause) {
+        if (!(cause instanceof AggregateError)) throw cause;
+        console.log('FAILURES:' + JSON.stringify(cause.errors.map((error) => error.message)));
+        throw cause;
+      }
     `);
     const child: Bun.Subprocess<'pipe', 'pipe', 'pipe'> = Bun.spawn({
       cmd: [process.execPath, boundary, ...scenario.targets.flatMap((target: string): string[] => ['--target', target])],
@@ -73,6 +103,9 @@ async function run(scenario: Scenario): Promise<Result> {
     return {
       exitCode,
       output: stdout + stderr,
+      failures: stdout.split('\n').filter((line: string): boolean => line.startsWith('FAILURES:'))
+        .flatMap((line: string): string[] => z.array(z.string()).parse(JSON.parse(line.slice('FAILURES:'.length))))
+        .map((failure: string): FailureTrace => failureSchema.parse(JSON.parse(failure))),
       requests: readFileSync(join(root, 'requests.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map((line: string): RequestTrace => traceSchema.parse(JSON.parse(line))),
       files: readdirSync(root, { recursive: true, encoding: 'utf8' }).sort(),
     };
@@ -155,6 +188,10 @@ test('surfaces the final response after two failures, redacts secrets and still 
   });
   expect(result.exitCode).not.toBe(0);
   expect(result.requests.map((request): string => request.url)).toEqual([primary, primary, secondary]);
+  expect(result.failures).toEqual([{
+    target: 'PRIMARY', status: 429, body: '[redacted token] rejected',
+    request: JSON.parse(result.requests[1]!.body), delivered: 0, failed: 1, unattempted: 0,
+  }]);
   expect(result.output).toContain('429');
   expect(result.output).toContain('rejected');
   expect(result.output).not.toContain('primary-secret');
@@ -199,9 +236,85 @@ test('stops after one response-body retry, preserves final context and attempts 
   });
   expect(result.exitCode).not.toBe(0);
   expect(result.requests.map((request): string => request.url)).toEqual([primary, primary, secondary]);
+  expect(result.failures).toEqual([{
+    target: 'PRIMARY', status: 502, body: 'Final reset [redacted token]',
+    request: JSON.parse(result.requests[1]!.body), delivered: 0, failed: 1, unattempted: 0,
+  }]);
   expect(result.output).toContain('502');
   expect(result.output).toContain('Final reset');
   expect(result.output).toContain('PRIMARY');
   expect(result.output).toContain('Project: Search works');
+  expect(result.output).not.toContain('primary-secret');
+});
+
+
+test('reports partial delivery and sends every chunk to the remaining target', async (): Promise<void> => {
+  const result: Result = await run({
+    secrets: `PRIMARY=${primary}\nSECONDARY=${secondary}`, targets: ['PRIMARY', 'SECONDARY'], payload: threeChunkPayload,
+    replies: [success, { status: 500, body: primary }, { status: 429, body: 'primary-secret rejected' }, success, success, success],
+  });
+  expect(result.exitCode).not.toBe(0);
+  expect(result.requests).toEqual([
+    ...[threeChunks[0], threeChunks[1], threeChunks[1]].map((content: string): RequestTrace => ({ url: primary, body: JSON.stringify({ content }) })),
+    ...threeChunks.map((content: string): RequestTrace => ({ url: secondary, body: JSON.stringify({ content }) })),
+  ]);
+  expect(result.failures).toEqual([{
+    target: 'PRIMARY', status: 429, body: '[redacted token] rejected', request: { content: threeChunks[1] },
+    delivered: 1, failed: 1, unattempted: 1,
+  }]);
+  expect(result.output).toContain('broadcast retry');
+  expect(result.output).toContain('broadcast delivered');
+  expect(result.output).not.toContain('primary-secret');
+  expect(result.files).toEqual(['.config', '.config/akrogon', '.config/akrogon/env', 'boundary.ts', 'requests.jsonl']);
+});
+
+for (const delivered of [0, 2]) {
+  test(`reports exhaustion after ${delivered} completed chunks`, async (): Promise<void> => {
+    const result: Result = await run({
+      secrets: `PRIMARY=${primary}`, targets: ['PRIMARY'], payload: threeChunkPayload,
+      replies: [...Array<Reply>(delivered).fill(success), rejected, rejected],
+    });
+    expect(result.exitCode).not.toBe(0);
+    expect(result.requests).toEqual([...threeChunks.slice(0, delivered), threeChunks[delivered], threeChunks[delivered]]
+      .map((content: string): RequestTrace => ({ url: primary, body: JSON.stringify({ content }) })));
+    expect(result.failures).toEqual([{
+      target: 'PRIMARY', status: 500, body: 'busy', request: { content: threeChunks[delivered] },
+      delivered, failed: 1, unattempted: 2 - delivered,
+    }]);
+  });
+}
+
+test('counts recovered retries once and keeps failing targets independent', async (): Promise<void> => {
+  const result: Result = await run({
+    secrets: `PRIMARY=${primary}\nSECONDARY=${secondary}`, targets: ['PRIMARY', 'SECONDARY'], payload: threeChunkPayload,
+    replies: [rejected, success, rejected, rejected, success, success, rejected, rejected],
+  });
+  expect(result.exitCode).not.toBe(0);
+  expect(result.requests).toEqual([
+    ...[threeChunks[0], threeChunks[0], threeChunks[1], threeChunks[1]].map((content: string): RequestTrace => ({ url: primary, body: JSON.stringify({ content }) })),
+    ...[...threeChunks, threeChunks[2]].map((content: string): RequestTrace => ({ url: secondary, body: JSON.stringify({ content }) })),
+  ]);
+  expect(result.failures).toEqual([
+    { target: 'PRIMARY', status: 500, body: 'busy', request: { content: threeChunks[1] }, delivered: 1, failed: 1, unattempted: 1 },
+    { target: 'SECONDARY', status: 500, body: 'busy', request: { content: threeChunks[2] }, delivered: 2, failed: 1, unattempted: 0 },
+  ]);
+});
+
+test('reports exhausted network retries with redacted final context', async (): Promise<void> => {
+  const result: Result = await run({
+    secrets: `PRIMARY=${primary}\nSECONDARY=${secondary}`, targets: ['PRIMARY', 'SECONDARY'],
+    replies: [
+      { status: 0, body: '', networkError: `Failed to fetch ${primary}` },
+      { status: 0, body: '', networkError: 'Final failure primary-secret' },
+      success,
+    ],
+  });
+  expect(result.exitCode).not.toBe(0);
+  expect(result.requests.map((request): string => request.url)).toEqual([primary, primary, secondary]);
+  expect(result.failures).toEqual([{
+    target: 'PRIMARY', status: null, body: 'Final failure [redacted token]',
+    request: JSON.parse(result.requests[1]!.body), delivered: 0, failed: 1, unattempted: 0,
+  }]);
+  expect(result.output).toContain('broadcast retry');
   expect(result.output).not.toContain('primary-secret');
 });

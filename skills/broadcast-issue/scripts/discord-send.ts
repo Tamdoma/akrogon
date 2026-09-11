@@ -16,11 +16,17 @@ interface Webhook {
   readonly url: string;
   readonly token: string;
 }
-interface Failure {
+interface ChunkFailure {
   readonly target: string;
   readonly status: number | null;
   readonly body: string;
   readonly request: { readonly content: string };
+}
+
+interface Failure extends ChunkFailure {
+  readonly delivered: number;
+  readonly failed: number;
+  readonly unattempted: number;
 }
 
 const bullets: z.ZodType<readonly string[]> = z.array(z.string().trim().min(1)).min(1);
@@ -64,7 +70,7 @@ const webhookSchema: z.ZodType<string> = z.url().refine((value: string): boolean
 });
 
 class DeliveryError extends Error {
-  constructor(readonly failure: Failure) {
+  constructor(readonly failure: ChunkFailure) {
     super(JSON.stringify(failure));
     this.name = 'DeliveryError';
   }
@@ -104,14 +110,22 @@ async function deliver(webhook: Webhook, content: string): Promise<void> {
 }
 
 async function sendWithRetry(webhook: Webhook, contents: readonly string[]): Promise<void> {
-  for (const content of contents) {
-    try {
-      await deliver(webhook, content);
-    } catch (cause) {
-      if (!(cause instanceof DeliveryError)) throw cause;
-      console.warn({ event: 'broadcast retry', attempt: 1, ...cause.failure });
-      await deliver(webhook, content);
+  let delivered: number = 0;
+  try {
+    for (const content of contents) {
+      try {
+        await deliver(webhook, content);
+      } catch (cause) {
+        if (!(cause instanceof DeliveryError)) throw cause;
+        console.warn({ event: 'broadcast retry', attempt: 1, ...cause.failure });
+        await deliver(webhook, content);
+      }
+      delivered += 1;
     }
+  } catch (cause) {
+    if (!(cause instanceof DeliveryError)) throw cause;
+    const failure: Failure = { ...cause.failure, delivered, failed: 1, unattempted: contents.length - delivered - 1 };
+    throw new DeliveryError(failure);
   }
 }
 
