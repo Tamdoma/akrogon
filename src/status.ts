@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, type Dirent } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { expandPath, globalHome, readGlobal, readRepo, requireRepo, type GlobalConfig, type Repo } from './config';
-import { findLeaf, leavesUnder, stateSchema, type Leaf, type State } from './state';
+import { findLeaf, readState, stateSchema, type Leaf, type State } from './state';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
 
 const logSchema = z.object({
@@ -42,13 +42,11 @@ function scanRepo(name: string, registeredPath: string): Scan {
       const entries: Dirent[] = readdirSync(folder, { withFileTypes: true });
       if (entries.some((entry) => entry.name === 'state.yaml')) {
         path = resolve(folder, 'state.yaml');
-        const leaves: Leaf[] = leavesUnder(folder);
-        for (const leaf of leaves) {
-          z.literal(repo.name).parse(leaf.state.repo);
-          stateSchema.shape.slug.refine((slug) => !slugs.has(slug), 'Duplicate leaf slug').parse(leaf.state.slug);
-          slugs.add(leaf.state.slug);
-        }
-        return leaves;
+        const state: State = readState(folder);
+        z.literal(repo.name).parse(state.repo);
+        stateSchema.shape.slug.refine((slug) => !slugs.has(slug), 'Duplicate leaf slug').parse(state.slug);
+        slugs.add(state.slug);
+        return [{ path: folder, state }];
       }
       return entries
         .filter((entry) => entry.isDirectory())

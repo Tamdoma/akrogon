@@ -12,7 +12,20 @@ import {
 import { resolve, relative } from 'node:path';
 import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
-import { readState, saveState } from '../src/state';
+import { z } from 'zod';
+import { readState, saveState, stateSchema, type State } from '../src/state';
+
+function field(row: string, name: string): string {
+  const match: RegExpMatchArray | null = row.match(new RegExp(`(?:^|\\s)${name}\\s*=\\s*(.*?)(?=\\s+[\\w-]+\\s*=|$)`));
+  expect(match).not.toBeNull();
+  return match![1].trim();
+}
+function slots(value: string): string[] {
+  return value
+    .split(',')
+    .map((entry) => entry.replace(/\s/g, ''))
+    .sort();
+}
 
 function register(f: Fixture, repos: Record<string, string>): void {
   const global: object = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
@@ -93,16 +106,16 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     const result: Result = await cli(f, ['status'], f.home, env);
     expect(result.code).toBe(0);
     const rows: string[] = result.stdout.split('\n');
-    const row: string = rows.find((line) => line.includes('phase=failed'))!;
+    const row: string = rows.find((line) => /\bphase\s*=\s*failed\b/.test(line))!;
     expect(rows[0]).toContain('repo');
     expect(rows[0]).toContain('broken');
-    expect(row).toContain('done=[A]');
-    expect(row).toContain('attempts=A:2,B:3');
-    expect(row).toContain('fix_rounds=2');
-    expect(row).toContain('verdict=A:fix,B:nits');
-    expect(row).toContain('tab="w1:t9"');
-    expect(row).toContain('blocked-by=[missing]');
-    expect(row).toContain('age=7m');
+    expect(Bun.YAML.parse(field(row, 'done'))).toEqual(['A']);
+    expect(slots(field(row, 'attempts'))).toEqual(['A:2', 'B:3']);
+    expect(field(row, 'fix_rounds')).toBe('2');
+    expect(slots(field(row, 'verdict'))).toEqual(['A:fix', 'B:nits']);
+    expect(Bun.YAML.parse(field(row, 'tab'))).toBe('w1:t9');
+    expect(Bun.YAML.parse(field(row, 'blocked-by'))).toEqual(['missing']);
+    expect(field(row, 'age')).toBe('7m');
     const epic: number = rows.findIndex((line) => line.trim() === 'epic');
     const job: number = rows.findIndex((line) => line.trim() === 'job');
     const broken: number = rows.indexOf(row);
@@ -114,15 +127,15 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     expect(result.stdout).toContain('remote-leaf');
     expect(result.stdout).not.toContain('closed-leaf');
     expect(result.stdout).not.toContain('hand_built');
-    expect(rows.filter((line) => line.includes('phase=failed'))).toHaveLength(1);
-    const ordinary: string = rows.find((line) => line.includes('phase=implement'))!;
-    expect(ordinary).toContain('done=[]');
-    expect(ordinary).toContain('attempts=A:0,B:0');
-    expect(ordinary).toContain('fix_rounds=0');
-    expect(ordinary).toContain('verdict=[]');
-    expect(ordinary).toContain('tab=unavailable');
-    expect(ordinary).toContain('blocked-by=[]');
-    expect(ordinary).toContain('age=unavailable');
+    expect(rows.filter((line) => /\bphase\s*=\s*failed\b/.test(line))).toHaveLength(1);
+    const ordinary: string = rows.find((line) => /\bphase\s*=\s*implement\b/.test(line))!;
+    expect(Bun.YAML.parse(field(ordinary, 'done'))).toEqual([]);
+    expect(slots(field(ordinary, 'attempts'))).toEqual(['A:0', 'B:0']);
+    expect(field(ordinary, 'fix_rounds')).toBe('0');
+    expect(Bun.YAML.parse(field(ordinary, 'verdict'))).toEqual([]);
+    expect(field(ordinary, 'tab')).toBe('unavailable');
+    expect(Bun.YAML.parse(field(ordinary, 'blocked-by'))).toEqual([]);
+    expect(field(ordinary, 'age')).toBe('unavailable');
     expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
     expect(snapshot(resolve(g.root, 'issues'))).toEqual(otherBefore);
     expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
@@ -136,7 +149,12 @@ test('age is unavailable for missing, empty, unrelated and future history and us
   const f: Fixture = await fixture();
   try {
     leaf(f, 'timed', 'implement');
-    expect((await cli(f, ['status'])).stdout).toContain('age=unavailable');
+    expect(
+      field(
+        (await cli(f, ['status'])).stdout.split('\n').find((line) => /^\s*timed\b/.test(line))!,
+        'age',
+      ),
+    ).toBe('unavailable');
     for (const lines of [
       [],
       [event('other', 'implement', 1)],
@@ -146,10 +164,20 @@ test('age is unavailable for missing, empty, unrelated and future history and us
       log(f, lines);
       const result: Result = await cli(f, ['status']);
       expect(result.code).toBe(0);
-      expect(result.stdout).toContain('age=unavailable');
+      expect(
+        field(
+          result.stdout.split('\n').find((line) => /^\s*timed\b/.test(line))!,
+          'age',
+        ),
+      ).toBe('unavailable');
     }
     log(f, [event('timed', 'implement', 1), event('timed', 'implement', 12)]);
-    expect((await cli(f, ['status'])).stdout).toContain('age=12m');
+    expect(
+      field(
+        (await cli(f, ['status'])).stdout.split('\n').find((line) => /^\s*timed\b/.test(line))!,
+        'age',
+      ),
+    ).toBe('12m');
   } finally {
     f.clean();
   }
@@ -167,11 +195,18 @@ test('incomplete repositories report exact paths before readable trees and exit 
     const verify = async (failingPath: string): Promise<void> => {
       const result: Result = await cli(f, ['status'], f.home);
       expect(result.code).not.toBe(0);
-      expect(result.stdout.split('\n')[0]).toContain('bad');
-      expect(result.stdout.split('\n')[0]).toContain(failingPath);
+      const diagnostic: { unreadable: string; path: string } = z
+        .object({ unreadable: z.string(), path: z.string() })
+        .parse(JSON.parse(result.stdout.split('\n')[0]));
+      expect(diagnostic.unreadable).toBe('bad');
+      expect(diagnostic.path).toBe(failingPath);
       expect(result.stdout.indexOf('bad')).toBeLessThan(result.stdout.indexOf('visible'));
       expect(result.stdout).toContain('visible');
     };
+    rmSync(state);
+    symlinkSync(resolve(f.home, 'missing-state.yaml'), state);
+    await verify(state);
+    rmSync(state);
     for (const malformed of ['slug: [', 'slug: bad-leaf\nphase: invalid']) {
       writeFileSync(state, malformed);
       await verify(state);
@@ -240,14 +275,19 @@ test('detail resolves authoritative closed state from a worktree, limits history
     const inertBefore: Record<string, string> = snapshot(resolve(worktree, 'issues'));
     const result: Result = await cli(f, ['status', 'selected'], worktree, env);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain('phase: merged');
-    expect(result.stdout).not.toContain('phase: failed');
+    const state: State = stateSchema.parse(Bun.YAML.parse(result.stdout.split(/^History\s*:\s*$/m)[0]));
+    expect(state).toEqual(readState(authoritative));
     expect(result.stdout).toContain(resolve(authoritative, 'plan.md'));
-    const records: string[] = result.stdout.split('\n').filter((line) => line.startsWith('{'));
+    const records: { slug: string; head: string }[] = result.stdout
+      .split(/^History\s*:\s*$/m)[1]
+      .split('\n')
+      .filter((line) => line.trimStart().startsWith('{'))
+      .map((line) => z.object({ slug: z.string(), head: z.string() }).parse(JSON.parse(line)));
     expect(records).toHaveLength(10);
-    expect(records[0]).toContain('record-3');
-    expect(records[9]).toContain('record-12');
-    expect(records.every((line) => line.includes('"slug":"selected"'))).toBe(true);
+    expect(records.map((record) => record.head)).toEqual(
+      Array.from({ length: 10 }, (_, index) => `record-${index + 3}`),
+    );
+    expect(records.every((record) => record.slug === 'selected')).toBe(true);
     expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
     expect(snapshot(resolve(worktree, 'issues'))).toEqual(inertBefore);
     expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
