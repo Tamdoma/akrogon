@@ -87,8 +87,15 @@ export const tabSchema = z.object({ tab_id: z.string(), label: z.string() });
 export type Tab = z.infer<typeof tabSchema>;
 
 export async function herdr<T>(args: string[], schema: z.ZodType<T>): Promise<T> {
-  const output: string = await command(['herdr', ...args]);
-  return z.object({ result: schema }).parse(JSON.parse(output)).result;
+  const argv: string[] = ['herdr', ...args];
+  const cwd: string = process.cwd();
+  const stdout: string = await command(argv, cwd);
+  try {
+    return z.object({ result: schema }).parse(JSON.parse(stdout)).result;
+  } catch (error) {
+    if (!(error instanceof SyntaxError) && !(error instanceof z.ZodError)) throw error;
+    throw new Error(JSON.stringify({ command: argv, cwd, stdout, error: error.message }), { cause: error });
+  }
 }
 
 export async function panes(): Promise<Pane[]> {

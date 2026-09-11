@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { test, expect, spyOn } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { fixture, type Fixture } from './helpers';
 import { CommandError, retryCommand, run, type Result } from '../src/shell';
 
 for (const firstFailure of [false, true]) {
@@ -75,5 +76,47 @@ for (const code of [0, 7]) {
     ]);
     expect(result).toEqual({ code: 0, stdout: '', stderr: '' });
     expect(performance.now() - start).toBeLessThan(2000);
+  });
+}
+
+for (const stdout of ['not-json-response', '{"result":{"panes":"invalid-panes"}}']) {
+  test(`Herdr response retains native cause for ${stdout}`, async () => {
+    const f: Fixture = await fixture();
+    try {
+      const bin: string = resolve(f.home, 'bin');
+      mkdirSync(bin);
+      symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
+      const db: string = resolve(f.home, 'herdr.json');
+      writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, paneListStdout: stdout }));
+      const script: string = `import assert from 'node:assert/strict';
+import {z} from ${JSON.stringify(import.meta.resolve('zod'))};
+import {panes, herdr, CommandError} from ${JSON.stringify(resolve(import.meta.dir, '../src/shell.ts'))};
+await assert.rejects(panes(), (error) => {
+  assert(error.cause instanceof ${stdout.startsWith('{') ? 'z.ZodError' : 'SyntaxError'});
+  const context = JSON.parse(error.message);
+  assert.deepEqual(context.command, ['herdr', 'pane', 'list']);
+  assert.equal(context.cwd, process.cwd());
+  assert.equal(context.stdout, ${JSON.stringify(stdout)});
+  assert.equal(context.error, error.cause.message);
+  return true;
+});
+await assert.rejects(herdr(['invalid-command'], z.object({})), (error) => {
+  assert(error instanceof CommandError);
+  assert.equal(error.result.code, 1);
+  assert.equal(error.cause, undefined);
+  return true;
+});`;
+      const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, '-e', script], {
+        cwd: f.root,
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db },
+        stdin: 'ignore',
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      const stderr: string = await new Response(child.stderr).text();
+      expect({ code: await child.exited, stderr }).toEqual({ code: 0, stderr: '' });
+    } finally {
+      f.clean();
+    }
   });
 }

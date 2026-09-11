@@ -7,6 +7,7 @@ const databaseSchema = z.object({
   panes: z.array(paneSchema),
   tabs: z.array(tabSchema),
   serial: z.number(),
+  paneListStdout: z.string().optional(),
   failPrompts: z.boolean().default(false),
   blockOnStart: z.boolean().default(false),
   failSplitOnce: z.boolean().default(false),
@@ -55,7 +56,13 @@ if (args[0] === 'plugin' && args[1] === 'link') {
   z.tuple([z.literal('plugin'), z.literal('link'), z.string().min(1)]).parse(args);
   result({});
 }
-if (args[0] === 'pane' && args[1] === 'list') result({ panes: db.panes });
+if (args[0] === 'pane' && args[1] === 'list') {
+  if (db.paneListStdout !== undefined) {
+    console.log(db.paneListStdout);
+    process.exit(0);
+  }
+  result({ panes: db.panes });
+}
 if (args[0] === 'pane' && args[1] === 'get') result({ pane: pane(args[2]) });
 if (args[0] === 'tab' && args[1] === 'list') result({ tabs: db.tabs });
 if (args[0] === 'tab' && args[1] === 'create') {

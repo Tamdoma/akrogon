@@ -586,6 +586,8 @@ export async function nextCommand(input: string | undefined): Promise<void> {
     }
     const cwd: string = process.cwd();
     const folder: string = input === undefined ? cwd : expandPath(input, cwd);
+    if (existsSync(folder) && !statSync(folder).isDirectory())
+      throw new Error(`Invalid target "${input}": expected a leaf folder, slug or worktree path`);
     const selection: string = existsSync(folder) ? folder : cwd;
     const common: string | null = await commonDirectory(selection);
     const matches: Repo[] = [];

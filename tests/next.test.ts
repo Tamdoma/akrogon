@@ -37,6 +37,70 @@ async function next(f: DispatchFixture, args: string[], env: NodeJS.ProcessEnv =
   return cli(f, ['next', ...args], f.root, { ...f.env, ...env });
 }
 
+for (const kind of ['relative file', 'absolute file', 'file symlink']) {
+  test(`next rejects ${kind} before dispatch or leaf mutation`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const path: string = leaf(f, 'build', 'plan.synthesis');
+      const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
+      symlinkSync(resolve(f.root, 'file'), resolve(f.root, 'file-link'));
+      const target: string =
+        kind === 'absolute file' ? resolve(f.root, 'file') : kind === 'file symlink' ? 'file-link' : 'file';
+      const result: Result = await next(f, [target]);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain(target);
+      expect(result.stderr).toContain('leaf folder');
+      expect(result.stderr).toContain('slug');
+      expect(result.stderr).toContain('worktree path');
+      expect(result.stderr).not.toContain('ENOTDIR');
+      expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
+      expect(calls(f)).toEqual([]);
+      expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+for (const kind of ['leaf folder', 'worktree path']) {
+  test(`next dispatches an explicit ${kind}`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const worktree: string = resolve(f.root, 'issues/worktrees/build');
+      if (kind === 'worktree path') await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
+      const path: string = leaf(f, 'build', 'plan.synthesis', kind === 'worktree path' ? { worktree } : {});
+      expect((await next(f, [kind === 'worktree path' ? worktree : path])).code).toBe(0);
+      expect(database(f).prompts).toHaveLength(1);
+      expect(readState(path).attempts.B).toBe(1);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+for (const stdout of ['not-json-response', '{"result":{"panes":"invalid-panes"}}']) {
+  test(`next reports Herdr response context for ${stdout}`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      leaf(f, 'build', 'plan.synthesis');
+      saveDatabase(f, { ...database(f), paneListStdout: stdout });
+      const result: Result = await next(f, ['build']);
+      expect(result.code).not.toBe(0);
+      const diagnostic: string = skips(result)[0].error;
+      const response: { command: string[]; cwd: string; stdout: string; error: string } = z
+        .object({ command: z.array(z.string()), cwd: z.string(), stdout: z.string(), error: z.string() })
+        .parse(JSON.parse(diagnostic));
+      expect(response.command).toEqual(['herdr', 'pane', 'list']);
+      expect(response.cwd).toBe(f.root);
+      expect(response.stdout).toBe(stdout);
+      expect(response.error).toMatch(stdout.startsWith('{') ? /array/ : /JSON/);
+      expect(database(f).prompts).toHaveLength(0);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
 test('next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {

@@ -183,7 +183,12 @@ test('failed log preserves committed state and failed container rename retries w
   try {
     const path: string = leaf(f, 'log-error', 'plan.synthesis');
     mkdirSync(resolve(f.root, 'issues/log.jsonl'));
-    expect((await cli(f, ['phase', 'log-error', 'implement'])).code).not.toBe(0);
+    const failed: Result = await cli(f, ['phase', 'log-error', 'implement']);
+    expect(failed.code).not.toBe(0);
+    expect(failed.stderr).toContain('implement');
+    expect(failed.stderr).toContain('committed');
+    expect(failed.stderr).toContain('log append failed');
+    expect(failed.stderr).toContain('EISDIR');
     expect(readState(path).phase).toBe('implement');
     const before: string = bytes(path);
     expect((await cli(f, ['phase', 'log-error', 'implement'])).code).not.toBe(0);
@@ -197,6 +202,32 @@ test('failed log preserves committed state and failed container rename retries w
     expect(retried.stdout).not.toContain('issue complete');
     expect(existsSync(resolve(f.root, 'issues/closed/closing/close-error/state.yaml'))).toBe(true);
     expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+});
+
+test('failed log diagnostics report committed state without replay', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'diagnostic-error', 'plan.synthesis');
+    yaml(resolve(f.root, 'issues/config.yaml'), { default_branch: 'missing-base' });
+    const failed: Result = await cli(f, ['phase', 'diagnostic-error', 'implement']);
+    expect(failed.code).not.toBe(0);
+    expect(failed.stderr).toContain('implement');
+    expect(failed.stderr).toContain('committed');
+    expect(failed.stderr).toContain('log append failed');
+    expect(failed.stderr).toContain('merge-base');
+    expect(failed.stderr).toContain('origin/missing-base');
+    expect(failed.stderr).toContain('Not a valid object name');
+    expect(readState(path).phase).toBe('implement');
+    const before: string = bytes(path);
+    yaml(resolve(f.root, 'issues/config.yaml'), {});
+    const retried: Result = await cli(f, ['phase', 'diagnostic-error', 'implement']);
+    expect(retried.code).not.toBe(0);
+    expect(retried.stderr).toContain('Illegal move');
+    expect(bytes(path)).toBe(before);
+    expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
   } finally {
     f.clean();
   }
