@@ -18,11 +18,11 @@ Challenge fuzzy terms.
 Verify with a concrete scenario.
 Check the live surface.
 
-For a necessary peer question, wait for idle, ask once through herdr in Question/Option form requesting `<leaf>/questions/<id>.md`, run `herdr agent wait` without a timeout, read the file and decide by simplicity, clarity, elegance, cost, speed and quality.
-
 The command owns state, verdict aggregation, repair counts and dispatch; an existing review and unchanged diff are evidence to resume from, not a reason to repeat completed work.
 
 ## check.review
+
+During initial review, both A and B work blind: do not contact or wait for the peer, or read the peer's current review. Record unresolved questions as findings in your own `review-<slot>.md` and account for them in your verdict under the Fix/Nit rules below. Uncertainty alone is not a Fix.
 
 As A, read your own `positions-A.md` and `rebuttal-A.md` first when debate produced them, then judge the whole initial diff against the plan, brief criteria/change list/exclusions/done/report and live contracts, following affected docs and index pointers and checking any lesson claim against its evidence.
 
@@ -39,6 +39,8 @@ All `checks` commands block, optional `advisory` failures are Nits, and a report
 Rerun checks only for a code change, missing evidence or a specific concern, leaving doc/index authorship with B and recording any reusable lesson found here as one active mechanism/date/history line plus a history file with case, evidence and learning.
 
 On re-check after `check.fix`, inspect only the repair diff from the prior reviewed head (or recorded rebase/conflict baseline), append A's results to `review-A.md`, confirm earlier findings and add a blocking finding only for a defect introduced by the repair.
+
+Only during A's re-check after `check.fix`, still dispatched as `check.review`, may A ask a necessary peer question: wait for idle, ask once through herdr in Question/Option form requesting `<leaf>/questions/<id>.md`, run `herdr agent wait` without a timeout, read the file and decide by simplicity, clarity, elegance, cost, speed and quality.
 
 Finish with `akrogon phase <slug> <next> --slot <A|B> --verdict <ready|nits|fix>`, requesting `check.fix` for fix or `merge` for ready/nits, and if it prints `moved failed` append A's diagnosis paragraph to `plan.md` explaining what kept failing and why before printing the footer and stopping.
 
