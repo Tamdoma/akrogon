@@ -1,9 +1,10 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, writeFileSync, readFileSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
+import { fixture, cli, leaf, yaml, fakeGh, type GhFixture, type Fixture } from './helpers';
 import { readState, saveState } from '../src/state';
 import { command, run, type Result } from '../src/shell';
+import type { GhStep } from './fake-gh';
 import type { Database } from './fake-herdr';
 import { z } from 'zod';
 
@@ -261,11 +262,37 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     await command(['git', 'add', 'landed'], worktree);
     await command(['git', 'commit', '-m', 'landed change'], worktree);
     await command(['git', 'push', 'upstream', 'HEAD:trunk'], worktree);
-    saveState(path, { ...readState(path), phase: 'merge' });
+    const gh: GhFixture = fakeGh(f);
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    const probe: NonNullable<GhStep['probe']> = {
+      closed: resolve(f.root, 'issues/closed/landing'),
+      lock: resolve(f.root, 'issues/closed/landing/.lock'),
+      worktree,
+    };
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        { stdout: '{"state":"OPEN"}', probe },
+        {
+          stdout: '',
+          delayMs: 100,
+          args: ['issue', 'close', '-R', 'team/project', '8', '--comment', `merged ${head}`],
+          probe,
+        },
+      ]),
+    );
+    f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
+    saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#8'] });
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
     const recovered: Result = await next(f, ['landed']);
     expect(recovered.code).toBe(0);
+    expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+    expect(
+      readFileSync(gh.db + '.probes', 'utf8')
+        .trim()
+        .split('\n'),
+    ).toHaveLength(2);
     expect(recovered.stdout).toContain('issue complete landing');
     expect(readState(resolve(f.root, 'issues/closed/landing/landed')).phase).toBe('merged');
     expect(database(f).tabs).toHaveLength(0);
@@ -407,5 +434,51 @@ test('agent names support identical repo-local slugs and long numeric-leading sl
   } finally {
     f.clean();
     g.clean();
+  }
+}, 15000);
+
+test('next awaits sourced completion after a failed rename before removing the worktree', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'rename', 'plan.synthesis');
+    expect((await next(f, ['rename'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#9'] });
+    const closed: string = resolve(f.root, 'issues/closed/issue');
+    mkdirSync(closed, { recursive: true });
+    const gh: GhFixture = fakeGh(f);
+    f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
+    expect((await cli(f, ['phase', 'rename', 'merged'], f.root, f.env)).code).not.toBe(0);
+    expect(readState(path).phase).toBe('merged');
+    expect(existsSync(gh.db + '.calls')).toBe(false);
+    rmSync(closed, { recursive: true });
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    const probe: NonNullable<GhStep['probe']> = { closed, lock: resolve(closed, '.lock'), worktree };
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        { stdout: '{"state":"OPEN"}', delayMs: 100, probe },
+        {
+          stdout: '',
+          delayMs: 100,
+          args: ['issue', 'close', '-R', 'team/project', '9', '--comment', `merged ${head}`],
+          probe,
+        },
+      ]),
+    );
+    const db: Database = database(f);
+    saveDatabase(f, { ...db, panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) });
+    const recovered: Result = await next(f, ['rename']);
+    expect(recovered).toMatchObject({ code: 0 });
+    expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+    expect(
+      readFileSync(gh.db + '.probes', 'utf8')
+        .trim()
+        .split('\n'),
+    ).toHaveLength(2);
+    expect(existsSync(worktree)).toBe(false);
+    expect(database(f).tabs).toHaveLength(0);
+  } finally {
+    f.clean();
   }
 }, 15000);

@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { command, type Result } from '../src/shell';
@@ -64,4 +64,14 @@ export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}
     ...extra,
   });
   return path;
+}
+
+export type GhFixture = { db: string; env: NodeJS.ProcessEnv };
+export function fakeGh(f: Fixture): GhFixture {
+  const bin: string = resolve(f.home, 'gh-bin');
+  mkdirSync(bin);
+  symlinkSync(resolve(import.meta.dir, 'fake-gh.ts'), resolve(bin, 'gh'));
+  const db: string = resolve(f.home, 'gh.json');
+  writeFileSync(db, '[]');
+  return { db, env: { PATH: `${bin}:${process.env.PATH}`, FAKE_GH: db } };
 }

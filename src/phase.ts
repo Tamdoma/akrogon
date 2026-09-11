@@ -24,6 +24,7 @@ import {
 } from './routing';
 import { command, run, retryCommand, type Result } from './shell';
 import { logMove } from './log';
+import { closeSources } from './pull';
 
 export async function commitMove(
   repo: Repo,
@@ -50,14 +51,14 @@ export async function commitMove(
   console.log(`moved ${to}`);
   // The transition is committed even if diagnostic collection or append fails.
   try {
-    if (to === 'merged') completeOwner(repo, leaf, true);
+    if (to === 'merged') await completeOwner(repo, leaf, true);
   } finally {
     await logMove(repo, recorded, after, slot);
   }
   return after;
 }
 
-export function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): void {
+export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): Promise<void> {
   const issue: string = dirname(leaf.path);
   if (!leavesUnder(issue).every((item) => item.state.phase === 'merged')) return;
   if (justMerged) console.log(`issue complete ${basename(issue)}`);
@@ -70,6 +71,7 @@ export function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): void
   const destination: string = resolve(closed, basename(owner));
   if (existsSync(destination)) throw new Error(`Completion destination exists: ${destination}`);
   renameSync(owner, destination);
+  await closeSources(repo, leaf, destination);
 }
 
 export async function transition(
@@ -145,7 +147,7 @@ export async function phaseCommand(
     withRepoLock(repo, async () => {
       const leaf: Leaf = findLeaf(repo, slug);
       await withLeafLocks(leaf, async () => {
-        if (leaf.state.phase === 'merged') completeOwner(repo, leaf, false);
+        if (leaf.state.phase === 'merged') await completeOwner(repo, leaf, false);
         await transition(repo, leaf, requested, slot, verdict);
       });
     }),

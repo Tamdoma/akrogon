@@ -1,0 +1,215 @@
+bun test v1.4.0 (34cbb9a40)
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [539.13ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [656.45ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [129.00ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [625.28ms]
+(pass) merged phase leaves tab intact, next closes it and starts dependent from a closed-folder hook [701.80ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [362.16ms]
+220 |     saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#8'] });
+221 |     const db: Database = database(f);
+222 |     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
+223 |     const recovered: Result = await next(f, ['landed']);
+224 |     expect(recovered.code).toBe(0);
+225 |     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+                                                          ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "probe": {
++       "closed": "/tmp/akrogon-LYp2gx/repo/issues/closed/landing",
++       "lock": "/tmp/akrogon-LYp2gx/repo/issues/closed/landing/.lock",
++       "worktree": "/tmp/akrogon-LYp2gx/repo/issues/worktrees/landed",
++     },
++     "stdout": "{"state":"OPEN"}",
++   },
++   {
++     "args": [
++       "issue",
++       "close",
++       "-R",
++       "team/project",
++       "8",
++       "--comment",
++       "merged 616f407e2cca96b03ba1df2051a259c5acfebbd8",
++     ],
++     "delayMs": 100,
++     "probe": {
++       "closed": "/tmp/akrogon-LYp2gx/repo/issues/closed/landing",
++       "lock": "/tmp/akrogon-LYp2gx/repo/issues/closed/landing/.lock",
++       "worktree": "/tmp/akrogon-LYp2gx/repo/issues/worktrees/landed",
++     },
++     "stdout": "",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 28
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/next.test.ts:225:53)
+(fail) next recovers only merge-phase work by ancestry against a non-default remote target [461.25ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [632.69ms]
+(pass) delayed working notifications never consume retries and idle notifications still dispatch [487.32ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [477.63ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [509.52ms]
+
+tests/phase.test.ts:
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [210.39ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [310.17ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [194.89ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [169.24ms]
+164 |       { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', String(n), '--json', 'state'], probe },
+165 |       { stdout: '', args: ['issue', 'close', '-R', 'team/project', String(n), '--comment', `merged ${head}`], probe },
+166 |     ])));
+167 |     const result: Result = await cli(f, ['phase', 'two', 'merged'], f.root, { ...gh.env, GH_HOST: 'elsewhere.invalid', GH_REPO: 'elsewhere/other' });
+168 |     expect(result.code).toBe(0);
+169 |     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+                                                          ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "args": [
++       "issue",
++       "view",
++       "-R",
++       "team/project",
++       "1",
++       "--json",
++       "state",
++     ],
++     "probe": {
++       "closed": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic",
++       "lock": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic/second/.lock",
++       "worktree": "/tmp/akrogon-S5jiaa/trigger",
++     },
++     "stdout": "{"state":"OPEN"}",
++   },
++   {
++     "args": [
++       "issue",
++       "close",
++       "-R",
++       "team/project",
++       "1",
++       "--comment",
++       "merged 7fc2b3b83228ebda48363d0f58f91a361164f5c9",
++     ],
++     "probe": {
++       "closed": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic",
++       "lock": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic/second/.lock",
++       "worktree": "/tmp/akrogon-S5jiaa/trigger",
++     },
++     "stdout": "",
++   },
++   {
++     "args": [
++       "issue",
++       "view",
++       "-R",
++       "team/project",
++       "2",
++       "--json",
++       "state",
++     ],
++     "probe": {
++       "closed": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic",
++       "lock": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic/second/.lock",
++       "worktree": "/tmp/akrogon-S5jiaa/trigger",
++     },
++     "stdout": "{"state":"OPEN"}",
++   },
++   {
++     "args": [
++       "issue",
++       "close",
++       "-R",
++       "team/project",
++       "2",
++       "--comment",
++       "merged 7fc2b3b83228ebda48363d0f58f91a361164f5c9",
++     ],
++     "probe": {
++       "closed": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic",
++       "lock": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic/second/.lock",
++       "worktree": "/tmp/akrogon-S5jiaa/trigger",
++     },
++     "stdout": "",
++   },
++   {
++     "args": [
++       "issue",
++       "view",
++       "-R",
++       "team/project",
++       "3",
++       "--json",
++       "state",
++     ],
++     "probe": {
++       "closed": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic",
++       "lock": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic/second/.lock",
++       "worktree": "/tmp/akrogon-S5jiaa/trigger",
++     },
++     "stdout": "{"state":"OPEN"}",
++   },
++   {
++     "args": [
++       "issue",
++       "close",
++       "-R",
++       "team/project",
++       "3",
++       "--comment",
++       "merged 7fc2b3b83228ebda48363d0f58f91a361164f5c9",
++     ],
++     "probe": {
++       "closed": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic",
++       "lock": "/tmp/akrogon-S5jiaa/repo/issues/closed/epic/second/.lock",
++       "worktree": "/tmp/akrogon-S5jiaa/trigger",
++     },
++     "stdout": "",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 104
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/phase.test.ts:169:53)
+(fail) source closure waits for epic movement, deduplicates, and uses the triggering worktree commit under relocated locks [107.89ms]
+190 |       view(5, '', 1), view(5, '', 1),
+191 |       view(6, '{"state":"INVALID"}'),
+192 |       view(7), close(7),
+193 |     ]));
+194 |     const result: Result = await cli(f, ['phase', 'source', 'merged'], f.root, gh.env);
+195 |     expect(result.code).not.toBe(0);
+                                  ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/phase.test.ts:195:29)
+(fail) source retries recheck state, skip CLOSED, and continue after final failures with move and logging intact [52.17ms]
+211 |   const f: Fixture = await fixture();
+212 |   try {
+213 |     const gh: GhFixture = fakeGh(f);
+214 |     leaf(f, 'missing', 'merge', { sources: ['team/project#1'] });
+215 |     const result: Result = await cli(f, ['phase', 'missing', 'merged'], f.root, gh.env);
+216 |     expect(result.code).not.toBe(0);
+                                  ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/phase.test.ts:216:29)
+(fail) sourced completion without worktree context fails after rename without a fabricated commit [47.62ms]
+
+ 14 pass
+ 4 fail
+ 147 expect() calls
+Ran 18 tests across 2 files. [6.72s]

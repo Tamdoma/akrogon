@@ -1,0 +1,105 @@
+bun test v1.4.0 (34cbb9a40)
+
+tests/pull.test.ts:
+39 |       { ...issue(103, 'a pull request'), pull_request: {} },
+40 |     ]];
+41 |     pages[0][0] = issue(1, 'Renamed ../ title', body);
+42 |     script(gh, [{ stdout: JSON.stringify(pages), args: listingArgs }]);
+43 |     const pulled: Result = await cli(f, ['pull'], f.root, gh.env);
+44 |     expect(pulled.code).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/pull.test.ts:44:25)
+(fail) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [30.46ms]
+70 |     writeFileSync(resolve(f.root, 'issues/seeds/1-existing.md'), 'do not touch\n');
+71 |     const before: Record<string, string> = snapshot(f);
+72 |     script(gh, [{ stdout: '[[', code: 1, stderr: 'page two failed' }, { stdout: '[[', code: 2, stderr: 'page two failed again' }]);
+73 |     const failed: Result = await cli(f, ['pull'], f.root, gh.env);
+74 |     expect(failed.code).not.toBe(0);
+75 |     expect(failed.stderr).toContain('retrying command');
+                               ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "retrying command"
+Received: "52 |   case 'install':\n53 |     z.tuple([]).parse(positionals);\n54 |     await (await import('./install')).install();\n55 |     break;\n56 |   default:\n57 |     throw new Error('Usage: akrogon <install|init|config|phase|next|status>');\n                   ^\nerror: Usage: akrogon <install|init|config|phase|next|status>\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/src/akrogon.ts:57:15\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/pull.test.ts:75:27)
+(fail) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [30.52ms]
+101 |     const worktree: string = resolve(f.home, 'worktree');
+102 |     await command(['git', 'worktree', 'add', '-b', 'work', worktree], f.root);
+103 |     for (const origin of ['https://github.com/acme/project', 'git@github.com:acme/project.git', 'ssh://git@github.com/acme/project.git']) {
+104 |       await command(['git', 'remote', 'set-url', 'origin', origin], f.root);
+105 |       script(gh, [{ stdout: JSON.stringify([[issue(4, 'Target')]]), args: listingArgs }]);
+106 |       expect((await cli(f, ['pull'], worktree, { ...gh.env, GH_REPO: 'other/wrong', GH_HOST: 'elsewhere.invalid' })).code).toBe(0);
+                                                                                                                                 ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/pull.test.ts:106:124)
+(fail) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [31.27ms]
+118 |   const bad: Fixture = await fixture();
+119 |   try {
+120 |     const gh: GhFixture = fakeGh(f);
+121 |     const missing: Result = await cli(f, ['pull'], f.root, gh.env);
+122 |     expect(missing.code).not.toBe(0);
+123 |     expect(missing.stderr).toContain('origin');
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "origin"
+Received: "52 |   case 'install':\n53 |     z.tuple([]).parse(positionals);\n54 |     await (await import('./install')).install();\n55 |     break;\n56 |   default:\n57 |     throw new Error('Usage: akrogon <install|init|config|phase|next|status>');\n                   ^\nerror: Usage: akrogon <install|init|config|phase|next|status>\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/src/akrogon.ts:57:15\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/pull.test.ts:123:28)
+(fail) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [31.20ms]
+147 |     const gh: GhFixture = fakeGh(f);
+148 |     await command(['git', 'remote', 'add', 'origin', 'https://github.com/acme/project'], f.root);
+149 |     script(gh, [{ stdout: JSON.stringify([[issue(1, 'Old')]]), delayMs: 200 }, { stdout: JSON.stringify([[issue(1, 'New')]]) }]);
+150 |     const first: Promise<Result> = cli(f, ['pull'], f.root, gh.env);
+151 |     for (let attempt: number = 0; attempt < 100 && !existsSync(gh.db + '.calls'); attempt++) await Bun.sleep(10);
+152 |     expect(existsSync(gh.db + '.calls')).toBe(true);
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/pull.test.ts:152:42)
+(fail) concurrent pulls serialize listing and reconciliation [1014.47ms]
+158 | });
+159 |
+160 | test('startup runs pull all before next all and wrappers forward arguments', async () => {
+161 |   const plugin: string = resolve(import.meta.dir, '../plugin');
+162 |   const manifest = z.object({ startup: z.array(z.object({ command: z.array(z.string()) })) }).parse(Bun.TOML.parse(readFileSync(resolve(plugin, 'herdr-plugin.toml'), 'utf8')));
+163 |   expect(manifest.startup.map((item) => item.command)).toEqual([['sh', 'pull.sh', '--all'], ['sh', 'next.sh', '--all']]);
+                                                             ^
+error: expect(received).toEqual(expected)
+
+  [
+    [
+      "sh",
+-     "pull.sh",
+-     "--all",
+-   ],
+-   [
+-     "sh",
+      "next.sh",
+      "--all",
+    ],
+  ]
+
+- Expected  - 5
++ Received  + 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/pull-close/tests/pull.test.ts:163:56)
+(fail) startup runs pull all before next all and wrappers forward arguments [2.18ms]
+
+ 0 pass
+ 6 fail
+ 8 expect() calls
+Ran 6 tests across 1 file. [1180.00ms]

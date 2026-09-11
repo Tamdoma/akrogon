@@ -1,9 +1,11 @@
 import { test, expect } from 'bun:test';
 import { resolve } from 'node:path';
 import { readFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
+import { fixture, cli, leaf, yaml, fakeGh, type GhFixture, type Fixture } from './helpers';
 import { readState } from '../src/state';
 import { command, type Result } from '../src/shell';
+import type { GhStep } from './fake-gh';
+import { z } from 'zod';
 
 function bytes(path: string): string {
   return readFileSync(resolve(path, 'state.yaml'), 'utf8');
@@ -151,6 +153,173 @@ test('failed log preserves committed state and failed container rename retries w
     expect(retried.stdout).not.toContain('issue complete');
     expect(existsSync(resolve(f.root, 'issues/closed/closing/close-error/state.yaml'))).toBe(true);
     expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+});
+
+async function sourceWorktree(f: Fixture, name: string): Promise<string> {
+  const worktree: string = resolve(f.home, name);
+  await command(['git', 'worktree', 'add', '-b', name, worktree], f.root);
+  writeFileSync(resolve(worktree, name), name);
+  await command(['git', 'add', name], worktree);
+  await command(['git', 'commit', '-m', name], worktree);
+  return worktree;
+}
+
+test('source closure waits for epic movement, deduplicates, and uses the triggering worktree commit under relocated locks', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    const first: string = await sourceWorktree(f, 'earlier');
+    const last: string = await sourceWorktree(f, 'trigger');
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], last);
+    expect(head).not.toBe(await command(['git', 'rev-parse', 'HEAD'], f.root));
+    expect(head).not.toBe(await command(['git', 'rev-parse', 'HEAD'], first));
+    leaf(f, 'one', 'merge', { worktree: first, sources: ['team/project#1', 'team/project#2'] }, 'epic/first');
+    leaf(f, 'empty', 'merged', {}, 'epic/first');
+    leaf(f, 'two', 'merge', { worktree: last, sources: ['team/project#2', 'team/project#3'] }, 'epic/second');
+    expect((await cli(f, ['phase', 'one', 'merged'], f.root, gh.env)).code).toBe(0);
+    expect(existsSync(gh.db + '.calls')).toBe(false);
+    const probe: NonNullable<GhStep['probe']> = {
+      closed: resolve(f.root, 'issues/closed/epic'),
+      lock: resolve(f.root, 'issues/closed/epic/second/.lock'),
+      worktree: last,
+    };
+    writeFileSync(
+      gh.db,
+      JSON.stringify(
+        [1, 2, 3].flatMap((): GhStep[] => [
+          { stdout: '{"state":"OPEN"}', probe },
+          { stdout: '', probe },
+        ]),
+      ),
+    );
+    const result: Result = await cli(f, ['phase', 'two', 'merged'], f.root, {
+      ...gh.env,
+      GH_HOST: 'elsewhere.invalid',
+      GH_REPO: 'elsewhere/other',
+    });
+    expect(result).toMatchObject({ code: 0 });
+    expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+    expect(
+      readFileSync(gh.db + '.probes', 'utf8')
+        .trim()
+        .split('\n'),
+    ).toHaveLength(6);
+    const calls: { args: string[]; cwd: string }[] = readFileSync(gh.db + '.calls', 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => z.object({ args: z.array(z.string()), cwd: z.string() }).parse(JSON.parse(line)));
+    expect(
+      calls
+        .filter((call) => call.args[1] === 'close')
+        .map((call) => call.args)
+        .sort(),
+    ).toEqual([1, 2, 3].map((n) => ['issue', 'close', '-R', 'team/project', String(n), '--comment', `merged ${head}`]));
+    expect(
+      calls
+        .filter((call) => call.args[1] === 'view')
+        .map((call) => call.args)
+        .sort(),
+    ).toEqual([1, 2, 3].map((n) => ['issue', 'view', '-R', 'team/project', String(n), '--json', 'state']));
+    expect(calls.every((call) => call.cwd === f.root)).toBe(true);
+    expect(
+      readFileSync(gh.db + '.probes', 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => z.object({ host: z.string() }).parse(JSON.parse(line)).host),
+    ).toEqual(Array(6).fill('github.com'));
+  } finally {
+    f.clean();
+  }
+});
+
+test('source retries recheck state, skip CLOSED, and continue after final failures with move and logging intact', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    const worktree: string = await sourceWorktree(f, 'source');
+    const sources: string[] = [
+      'team/project#1',
+      'team/project#2',
+      'team/project#3',
+      'team/project#4',
+      'malformed',
+      'team/project#5',
+      'team/project#6',
+      'team/project#8',
+      'team/project#7',
+    ];
+    leaf(f, 'source', 'merge', { worktree, sources });
+    const view = (n: number, stdout: string = '{"state":"OPEN"}', code: number = 0): GhStep => ({
+      args: ['issue', 'view', '-R', 'team/project', String(n), '--json', 'state'],
+      stdout,
+      code,
+      stderr: code ? 'view failure' : '',
+    });
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    const close = (n: number, code: number = 0): GhStep => ({
+      args: ['issue', 'close', '-R', 'team/project', String(n), '--comment', `merged ${head}`],
+      stdout: '',
+      code,
+      stderr: code ? 'close failure' : '',
+    });
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        view(1, '{"state":"CLOSED"}'),
+        view(2),
+        close(2, 1),
+        view(2),
+        close(2),
+        view(3),
+        close(3, 1),
+        view(3, '{"state":"CLOSED"}'),
+        view(4),
+        close(4, 1),
+        view(4),
+        close(4, 1),
+        view(5, '', 1),
+        view(5, '', 1),
+        view(6, '{"state":"INVALID"}'),
+        view(8, '{malformed-json'),
+        view(7),
+        close(7),
+      ]),
+    );
+    const result: Result = await cli(f, ['phase', 'source', 'merged'], f.root, gh.env);
+    expect(result.code).not.toBe(0);
+    const warnings: string[] = result.stderr.split('\n').filter((line) => line.startsWith('{"warning":'));
+    expect(warnings).toHaveLength(4);
+    expect(warnings.map((line) => z.object({ source: z.string(), code: z.number() }).parse(JSON.parse(line)))).toEqual(
+      [2, 3, 4, 5].map((n) => ({ source: `team/project#${n}`, code: 1 })),
+    );
+    expect(result.stderr).toContain('close failure');
+    expect(result.stderr).toContain('view failure');
+    expect(result.stderr).toContain('malformed');
+    expect(result.stderr).toContain('INVALID');
+    expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+    expect(readState(resolve(f.root, 'issues/closed/issue/source')).phase).toBe('merged');
+    expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8')).toContain('"to":"merged"');
+    const before: string = readFileSync(gh.db + '.calls', 'utf8');
+    expect((await cli(f, ['phase', 'source', 'merged'], f.root, gh.env)).code).not.toBe(0);
+    expect(readFileSync(gh.db + '.calls', 'utf8')).toBe(before);
+  } finally {
+    f.clean();
+  }
+});
+
+test('sourced completion without worktree context fails after rename without a fabricated commit', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    leaf(f, 'missing', 'merge', { sources: ['team/project#1'] });
+    const result: Result = await cli(f, ['phase', 'missing', 'merged'], f.root, gh.env);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('worktree');
+    expect(readState(resolve(f.root, 'issues/closed/issue/missing')).phase).toBe('merged');
+    expect(existsSync(gh.db + '.calls')).toBe(false);
   } finally {
     f.clean();
   }

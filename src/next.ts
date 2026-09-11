@@ -311,7 +311,7 @@ async function dispatchLeaf(global: GlobalConfig, repo: Repo, slug: string, expl
       const recovered: boolean = await recoverMerge(repo, leaf);
       const current: Leaf = recovered ? findLeaf(repo, slug) : leaf;
       if (current.state.phase === 'merged') {
-        completeOwner(repo, current, false);
+        await completeOwner(repo, current, false);
         const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === current.state.tab);
         if (members.some((pane) => pane.agent !== null && !idle(pane))) return false;
         if (members.length > 0) await command(['herdr', 'tab', 'close', z.string().parse(current.state.tab)]);
