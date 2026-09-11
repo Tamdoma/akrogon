@@ -19,6 +19,8 @@ import {
   readState,
   saveState,
   RepoMismatchError,
+  validateLeafDepth,
+  missingLeafMessage,
   withLock,
   withRepoLock,
   withLeafLocks,
@@ -82,7 +84,7 @@ function report(invocation: Invocation, repo: string, path: string, error: Error
 
 function discover(repo: Repo, invocation: Invocation): Inventory {
   const result: Inventory = { leaves: [], unreadable: 0, unknown: false };
-  function visit(path: string): void {
+  function visit(path: string, areaRoot: string): void {
     let entries: Dirent[];
     try {
       entries = readdirSync(path, { withFileTypes: true });
@@ -94,6 +96,7 @@ function discover(repo: Repo, invocation: Invocation): Inventory {
     }
     if (entries.some((entry) => entry.name === 'state.yaml')) {
       try {
+        validateLeafDepth(areaRoot, path);
         const state: State = readState(path);
         if (state.repo !== repo.name) throw new RepoMismatchError(path, state.repo, repo.name);
         result.leaves.push({ path, state });
@@ -104,12 +107,12 @@ function discover(repo: Repo, invocation: Invocation): Inventory {
       }
       return;
     }
-    for (const entry of entries.filter((entry) => entry.isDirectory())) visit(resolve(path, entry.name));
+    for (const entry of entries.filter((entry) => entry.isDirectory())) visit(resolve(path, entry.name), areaRoot);
   }
   for (const area of ['open', 'closed']) {
     const path: string = resolve(repo.root, 'issues', area);
     try {
-      if (statSync(path, { throwIfNoEntry: false }) !== undefined) visit(path);
+      if (statSync(path, { throwIfNoEntry: false }) !== undefined) visit(path, path);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       report(invocation, repo.name, path, error);
@@ -537,87 +540,111 @@ async function sweep(global: GlobalConfig, repo: Repo, leaves: Leaf[], invocatio
   for (const leaf of ordered) await dispatchLeaf(global, repo, leaf, false, invocation);
 }
 
+type Selection = { repo: Repo; leaves: Leaf[] };
+
+async function selectLeaves(
+  global: GlobalConfig,
+  invocation: Invocation,
+  input: string | undefined,
+): Promise<Selection> {
+  const cwd: string = process.cwd();
+  const folder: string = input === undefined ? cwd : expandPath(input, cwd);
+  if (existsSync(folder) && !statSync(folder).isDirectory())
+    throw new Error(`Invalid target "${input}": expected a leaf folder, slug or worktree path`);
+  const selection: string = existsSync(folder) ? folder : cwd;
+  const common: string | null = await commonDirectory(selection);
+  const matches: Repo[] = [];
+  for (const repo of registeredRepos(global, invocation).repos) {
+    try {
+      if (common !== null && (await commonDirectory(repo.root)) === common) matches.push(repo);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, repo.name, repo.root, error);
+    }
+  }
+  if (matches.length > 1) throw new Error(`Multiple registered checkouts for ${selection}`);
+  if (matches.length === 0) throw new Error(`No initialized registered checkout for ${selection}`);
+  const repo: Repo = matches[0];
+  const inventory: Inventory = discover(repo, invocation);
+  const selected: Leaf[] =
+    input !== undefined && !existsSync(folder)
+      ? inventory.leaves.filter((leaf) => leaf.state.slug === input)
+      : inventory.leaves.filter(
+          (leaf) => within(leaf.path, folder) || within(folder, leaf.path) || inWorktree(folder, leaf),
+        );
+  if (selected.length === 0) {
+    if (inventory.unreadable > 0 || inventory.unknown) return { repo, leaves: selected };
+    if (input !== undefined && !existsSync(folder)) throw new Error(missingLeafMessage(repo, input));
+    throw new Error(`No leaves match: ${input ?? cwd}`);
+  }
+  return { repo, leaves: selected };
+}
+
 export async function nextCommand(input: string | undefined): Promise<void> {
   const rawEvent: string | undefined = input === undefined ? process.env.HERDR_PLUGIN_EVENT_JSON : undefined;
   const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
   if (event?.event === 'pane_agent_status_changed' && event.data.agent_status === 'working') return;
   const global: GlobalConfig = readGlobal();
   const invocation: Invocation = { skipped: new Set() };
-  await withLock(resolve(globalHome(), '.lock'), async () => {
-    if (input === '--all') {
-      await sweepAll(global, invocation);
-      for (const repo of registeredRepos(global, invocation).repos)
-        for (const leaf of discover(repo, invocation).leaves.filter((leaf) => leaf.state.phase === 'merged')) {
-          try {
-            await cleanupMerged(repo, leaf);
-          } catch (error) {
-            if (!(error instanceof Error)) throw error;
-            report(invocation, repo.name, leaf.path, error, leaf.state.slug);
-          }
-        }
-      return;
-    }
-    if (event?.event === 'tab_closed') {
-      const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
-        discover(repo, invocation)
-          .leaves.filter((leaf) => leaf.state.tab === event.data.tab_id)
-          .map((leaf) => ({ repo, leaf })),
-      );
-      if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
-      if (owners.length === 0) return;
-      const outcome: DispatchOutcome = await dispatchLeaf(global, owners[0].repo, owners[0].leaf, false, invocation);
-      if (outcome === 'completed') await sweepAll(global, invocation);
-      return;
-    }
-    const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
-    if (input === undefined && hookPane !== undefined) {
-      const live: Pane | undefined = (await panes()).find((pane) => pane.pane_id === hookPane);
-      const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
-        discover(repo, invocation)
-          .leaves.filter((leaf) => ownsPane(leaf, live, hookPane))
-          .map((leaf) => ({ repo, leaf })),
-      );
-      if (owners.length > 1) throw new Error(`Multiple leaves own hook pane: ${hookPane}`);
-      if (owners.length === 0) return;
-      const owner: { repo: Repo; leaf: Leaf } = owners[0];
-      const outcome: DispatchOutcome = await dispatchLeaf(global, owner.repo, owner.leaf, false, invocation);
-      if (outcome === 'completed') await sweepAll(global, invocation);
-      return;
-    }
-    const cwd: string = process.cwd();
-    const folder: string = input === undefined ? cwd : expandPath(input, cwd);
-    if (existsSync(folder) && !statSync(folder).isDirectory())
-      throw new Error(`Invalid target "${input}": expected a leaf folder, slug or worktree path`);
-    const selection: string = existsSync(folder) ? folder : cwd;
-    const common: string | null = await commonDirectory(selection);
-    const matches: Repo[] = [];
-    for (const repo of registeredRepos(global, invocation).repos) {
-      try {
-        if (common !== null && (await commonDirectory(repo.root)) === common) matches.push(repo);
-      } catch (error) {
-        if (!(error instanceof Error)) throw error;
-        report(invocation, repo.name, repo.root, error);
-      }
-    }
-    if (matches.length > 1) throw new Error(`Multiple registered checkouts for ${selection}`);
-    if (matches.length === 0) throw new Error(`No initialized registered checkout for ${selection}`);
-    const repo: Repo = matches[0];
-    const inventory: Inventory = discover(repo, invocation);
-    const selected: Leaf[] =
-      input !== undefined && !existsSync(folder)
-        ? inventory.leaves.filter((leaf) => leaf.state.slug === input)
-        : inventory.leaves.filter(
-            (leaf) => within(leaf.path, folder) || within(folder, leaf.path) || inWorktree(folder, leaf),
+  const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
+  const selection: Selection | undefined =
+    input !== '--all' && event?.event !== 'tab_closed' && (input !== undefined || hookPane === undefined)
+      ? await selectLeaves(global, invocation, input)
+      : undefined;
+  if (selection === undefined || selection.leaves.length > 0)
+    await withLock(resolve(globalHome(), '.lock'), async () => {
+      if (selection !== undefined) {
+        if (selection.leaves.length === 1) {
+          const outcome: DispatchOutcome = await dispatchLeaf(
+            global,
+            selection.repo,
+            selection.leaves[0],
+            true,
+            invocation,
           );
-    if (selected.length === 0) {
-      if (inventory.unreadable > 0 || inventory.unknown) return;
-      if (input !== undefined && !existsSync(folder)) throw new Error(`Missing leaf: ${input}`);
-      throw new Error(`No leaves match: ${input ?? cwd}`);
-    }
-    if (selected.length === 1) {
-      const outcome: DispatchOutcome = await dispatchLeaf(global, repo, selected[0], true, invocation);
-      if (outcome === 'completed') await sweepAll(global, invocation);
-    } else await sweep(global, repo, selected, invocation);
-  });
+          if (outcome === 'completed') await sweepAll(global, invocation);
+        } else await sweep(global, selection.repo, selection.leaves, invocation);
+        return;
+      }
+      if (input === '--all') {
+        await sweepAll(global, invocation);
+        for (const repo of registeredRepos(global, invocation).repos)
+          for (const leaf of discover(repo, invocation).leaves.filter((leaf) => leaf.state.phase === 'merged')) {
+            try {
+              await cleanupMerged(repo, leaf);
+            } catch (error) {
+              if (!(error instanceof Error)) throw error;
+              report(invocation, repo.name, leaf.path, error, leaf.state.slug);
+            }
+          }
+        return;
+      }
+      if (event?.event === 'tab_closed') {
+        const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
+          discover(repo, invocation)
+            .leaves.filter((leaf) => leaf.state.tab === event.data.tab_id)
+            .map((leaf) => ({ repo, leaf })),
+        );
+        if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
+        if (owners.length === 0) return;
+        const outcome: DispatchOutcome = await dispatchLeaf(global, owners[0].repo, owners[0].leaf, false, invocation);
+        if (outcome === 'completed') await sweepAll(global, invocation);
+        return;
+      }
+      if (input === undefined && hookPane !== undefined) {
+        const live: Pane | undefined = (await panes()).find((pane) => pane.pane_id === hookPane);
+        const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
+          discover(repo, invocation)
+            .leaves.filter((leaf) => ownsPane(leaf, live, hookPane))
+            .map((leaf) => ({ repo, leaf })),
+        );
+        if (owners.length > 1) throw new Error(`Multiple leaves own hook pane: ${hookPane}`);
+        if (owners.length === 0) return;
+        const owner: { repo: Repo; leaf: Leaf } = owners[0];
+        const outcome: DispatchOutcome = await dispatchLeaf(global, owner.repo, owner.leaf, false, invocation);
+        if (outcome === 'completed') await sweepAll(global, invocation);
+        return;
+      }
+    });
   if (invocation.skipped.size > 0) process.exitCode = 1;
 }

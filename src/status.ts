@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { expandPath, globalHome, readGlobal, readRepo, requireRepo, type GlobalConfig, type Repo } from './config';
-import { findLeaf, readState, stateSchema, RepoMismatchError, type Leaf, type State } from './state';
+import { findLeaf, readState, stateSchema, RepoMismatchError, validateLeafDepth, type Leaf, type State } from './state';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
 import { issueFolders } from './park';
 
@@ -44,6 +44,7 @@ function scanRepo(name: string, registeredPath: string): Scan {
       const entries: Dirent[] = readdirSync(folder, { withFileTypes: true });
       if (entries.some((entry) => entry.name === 'state.yaml')) {
         path = resolve(folder, 'state.yaml');
+        validateLeafDepth(open, folder);
         const state: State = readState(folder);
         if (state.repo !== repo.name) throw new RepoMismatchError(folder, state.repo, repo.name);
         stateSchema.shape.slug.refine((slug) => !slugs.has(slug), 'Duplicate leaf slug').parse(state.slug);

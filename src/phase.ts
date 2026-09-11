@@ -67,11 +67,11 @@ export async function commitMove(
 export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): Promise<void> {
   if (within(leaf.path, resolve(repo.root, 'issues/closed'))) return;
   const issue: string = dirname(leaf.path);
-  const issueLeaves: Leaf[] = leavesUnder(issue);
+  const issueLeaves: Leaf[] = leavesUnder(issue, resolve(repo.root, 'issues/open'));
   if (!issueLeaves.every((item) => item.state.phase === 'merged')) return;
   const parent: string = dirname(issue);
   const owner: string = basename(parent) === 'open' ? issue : parent;
-  const ownerLeaves: Leaf[] = owner === issue ? issueLeaves : leavesUnder(owner);
+  const ownerLeaves: Leaf[] = owner === issue ? issueLeaves : leavesUnder(owner, resolve(repo.root, 'issues/open'));
   const complete: boolean = ownerLeaves.every((item) => item.state.phase === 'merged');
   const destination: string = resolve(repo.root, 'issues/closed', basename(owner));
   if (complete && existsSync(destination)) throw new Error(`Completion destination exists: ${destination}`);

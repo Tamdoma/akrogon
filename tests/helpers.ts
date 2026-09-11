@@ -35,10 +35,13 @@ export async function cli(
   args: string[],
   cwd: string = f.root,
   env: NodeJS.ProcessEnv = {},
+  timeout?: number,
 ): Promise<Result> {
   const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, entry, ...args], {
     cwd,
     env: { ...process.env, AKROGON_HOME: f.home, HERDR_PANE_ID: '', ...env },
+    timeout,
+    killSignal: 'SIGKILL',
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
@@ -48,6 +51,8 @@ export async function cli(
     new Response(child.stderr).text(),
     child.exited,
   ]);
+  if (child.signalCode !== null)
+    throw new Error(JSON.stringify({ args, timeout, signal: child.signalCode, code, stdout, stderr }));
   return { code, stdout: stdout.trim(), stderr: stderr.trim() };
 }
 export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}, container: string = 'issue'): string {

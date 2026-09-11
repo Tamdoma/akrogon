@@ -360,3 +360,70 @@ test('busy durations appear in NOTE for every recorded seat without writes or he
     f.clean();
   }
 });
+
+for (const nesting of ['', 'invalid', 'epic/issue/extra/invalid']) {
+  test(`status reports invalid open/${nesting} while showing another repo without writes`, async () => {
+    const f: Fixture = await fixture();
+    const g: Fixture = await fixture();
+    try {
+      register(f, { repo: f.root, good: g.root });
+      leaf(g, 'visible', 'implement', { repo: 'good' });
+      const source: string = leaf(f, 'invalid', 'implement');
+      const path: string = resolve(f.root, 'issues/open', nesting);
+      mkdirSync(path, { recursive: true });
+      renameSync(resolve(source, 'state.yaml'), resolve(path, 'state.yaml'));
+      rmSync(source, { recursive: true });
+      const before: Record<string, string> = snapshot(f.root);
+      const overview: Result = await cli(f, ['status']);
+      expect(overview.code).toBe(1);
+      expect(overview.stdout).toContain('"unreadable":"repo"');
+      expect(overview.stdout).toContain(resolve(path, 'state.yaml'));
+      expect(overview.stdout).toContain('visible');
+      expect(snapshot(f.root)).toEqual(before);
+      for (const area of ['open', 'closed']) {
+        const detailed: Result = await cli(f, ['status', 'invalid']);
+        expect(detailed.code).toBe(1);
+        expect(detailed.stderr).toContain(resolve(f.root, 'issues', area, nesting, 'state.yaml'));
+        if (area === 'open') renameSync(resolve(f.root, 'issues/open'), resolve(f.root, 'issues/closed'));
+      }
+      renameSync(resolve(f.root, 'issues/closed'), resolve(f.root, 'issues/open'));
+      expect(snapshot(f.root)).toEqual(before);
+    } finally {
+      f.clean();
+      g.clean();
+    }
+  });
+}
+
+for (const owner of ['issue', 'epic/issue']) {
+  test(`status identifies dormant ${owner}/resting and prefers open or closed leaves`, async () => {
+    const f: Fixture = await fixture();
+    try {
+      const parked: string = resolve(f.root, 'issues/parked', owner, 'resting');
+      mkdirSync(parked, { recursive: true });
+      writeFileSync(resolve(parked, 'state.yaml'), 'slug: [');
+      const before: Record<string, string> = snapshot(f.root);
+      const result: Result = await cli(f, ['status', 'resting']);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('Missing leaf: resting (parked)');
+      for (const slug of ['absent', 'issue', 'epic']) {
+        const missing: Result = await cli(f, ['status', slug]);
+        expect(missing.code).toBe(1);
+        expect(missing.stderr).toContain(`Missing leaf: ${slug}`);
+        expect(missing.stderr.split('\n').find((line) => line.startsWith('error: '))).toBe(
+          `error: Missing leaf: ${slug}`,
+        );
+      }
+      expect(snapshot(f.root)).toEqual(before);
+      leaf(f, 'resting', 'implement');
+      for (const area of ['open', 'closed']) {
+        const active: Result = await cli(f, ['status', 'resting']);
+        expect(active.code).toBe(0);
+        expect(active.stdout).toContain('phase: implement');
+        if (area === 'open') renameSync(resolve(f.root, 'issues/open'), resolve(f.root, 'issues/closed'));
+      }
+    } finally {
+      f.clean();
+    }
+  });
+}

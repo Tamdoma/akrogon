@@ -1,8 +1,9 @@
 import { test, expect } from 'bun:test';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { readState, saveState, stateSchema, type State } from '../src/state';
+import { repoSchema, type Repo } from '../src/config';
+import { allLeaves, findLeaf, leavesUnder, readState, saveState, stateSchema, type State } from '../src/state';
 import { fixture, leaf, yaml, type Fixture } from './helpers';
 
 const canonical: z.input<typeof stateSchema> = {
@@ -98,6 +99,71 @@ test('migration retains strict validation of unknown keys, required fields, know
     for (const invalid of ['null', 'false', '42', 'text', '[]', '- priority: n\n  slot: B', '']) {
       writeFileSync(file, invalid);
       expect(() => readState(path)).toThrow(z.ZodError);
+    }
+  } finally {
+    f.clean();
+  }
+});
+
+for (const area of ['open', 'closed']) {
+  for (const depth of [0, 1, 2, 3, 4]) {
+    test(`allLeaves validates ${area} depth ${depth} before reading state`, async () => {
+      const f: Fixture = await fixture();
+      try {
+        const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({}) };
+        const original: string = leaf(f, 'target', 'plan.synthesis');
+        const path: string = resolve(f.root, 'issues', area, ...['owner', 'issue', 'nested', 'target'].slice(0, depth));
+        mkdirSync(path, { recursive: true });
+        renameSync(resolve(original, 'state.yaml'), resolve(path, 'state.yaml'));
+        if (depth === 2 || depth === 3) {
+          expect(allLeaves(repo).map((item) => item.path)).toEqual([path]);
+          expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area)).map((item) => item.path)).toEqual([path]);
+        } else {
+          writeFileSync(resolve(path, 'state.yaml'), 'invalid: [');
+          expect(() => allLeaves(repo)).toThrow(z.ZodError);
+          expect(() => allLeaves(repo)).toThrow(resolve(path, 'state.yaml'));
+        }
+      } finally {
+        f.clean();
+      }
+    });
+  }
+}
+
+for (const owner of ['issue', 'epic/issue']) {
+  test(`findLeaf identifies parked ${owner}/leaf without parsing its state`, async () => {
+    const f: Fixture = await fixture();
+    try {
+      const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({}) };
+      const parked: string = resolve(f.root, 'issues/parked', owner, 'target');
+      mkdirSync(parked, { recursive: true });
+      writeFileSync(resolve(parked, 'state.yaml'), 'invalid: [');
+      expect(() => findLeaf(repo, 'target')).toThrow('Missing leaf: target (parked)');
+      for (const slug of ['absent', 'issue', 'epic']) {
+        expect(() => findLeaf(repo, slug)).toThrow(new Error(`Missing leaf: ${slug}`));
+      }
+      const active: string = leaf(f, 'target', 'plan.synthesis');
+      expect(findLeaf(repo, 'target').path).toBe(active);
+      const closed: string = resolve(f.root, 'issues/closed/issue/target');
+      mkdirSync(dirname(closed), { recursive: true });
+      renameSync(active, closed);
+      expect(findLeaf(repo, 'target').path).toBe(closed);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+test('findLeaf ignores parked folders without state and unsupported nesting', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({}) };
+    mkdirSync(resolve(f.root, 'issues/parked/issue/empty'), { recursive: true });
+    const nested: string = resolve(f.root, 'issues/parked/epic/issue/extra/deep');
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(resolve(nested, 'state.yaml'), 'invalid: [');
+    for (const slug of ['empty', 'deep']) {
+      expect(() => findLeaf(repo, slug)).toThrow(new Error(`Missing leaf: ${slug}`));
     }
   } finally {
     f.clean();

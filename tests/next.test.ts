@@ -1374,3 +1374,113 @@ test('startup retains completed issue resources while an epic sibling remains un
     f.clean();
   }
 }, 15000);
+
+for (const area of ['open', 'closed']) {
+  for (const nesting of ['', 'invalid', 'epic/issue/extra/invalid']) {
+    test(`explicit next rejects ${area}/${nesting} before any flock`, async () => {
+      const f: DispatchFixture = await dispatchFixture();
+      try {
+        const source: string = leaf(f, 'invalid', area === 'closed' ? 'merged' : 'plan.synthesis');
+        const path: string = resolve(f.root, 'issues', area, nesting);
+        mkdirSync(path, { recursive: true });
+        renameSync(resolve(source, 'state.yaml'), resolve(path, 'state.yaml'));
+        rmSync(source, { recursive: true });
+        const state: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
+        const db: string = readFileSync(f.db, 'utf8');
+        writeFileSync(resolve(f.home, 'bin/flock'), '#!/bin/sh\nprintf invoked > "$FLOCK_CALLS"\nexit 91\n', {
+          mode: 0o755,
+        });
+        for (const input of ['invalid', path]) {
+          const result: Result = await cli(
+            f,
+            ['next', input],
+            f.root,
+            { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') },
+            3000,
+          );
+          expect(result.code).toBe(1);
+          expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+          expect(result.stderr).toContain('Invalid leaf depth');
+          expect(existsSync(resolve(f.home, 'flock-calls'))).toBe(false);
+          expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(state);
+          expect(readFileSync(f.db, 'utf8')).toBe(db);
+          expect(calls(f)).toEqual([]);
+          expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
+          expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+          expect(existsSync(resolve(f.home, '.lock'))).toBe(false);
+          console.log(result.stderr);
+        }
+      } finally {
+        f.clean();
+      }
+    }, 10000);
+  }
+}
+
+for (const route of ['--all', '.', 'hook']) {
+  test(`invalid merged depth stays excluded during ${route} with healthy work`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      configure(f, { max_active: 4 });
+      const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+      if (route === 'hook') {
+        expect((await next(f, ['healthy'])).code).toBe(0);
+        resetPrompts(f, healthy);
+      }
+      const bad: string = leaf(
+        f,
+        'invalid',
+        'merged',
+        { tab: 'invalid-tab', worktree: resolve(f.home, 'invalid-worktree') },
+        'epic/issue/extra',
+      );
+      mkdirSync(resolve(f.home, 'invalid-worktree'));
+      const before: string = readFileSync(resolve(bad, 'state.yaml'), 'utf8');
+      const result: Result = await next(
+        f,
+        route === 'hook' ? [] : [route],
+        route === 'hook' ? { HERDR_PANE_ID: readState(healthy).pane.B } : {},
+      );
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain(resolve(bad, 'state.yaml'));
+      expect(database(f).prompts).toHaveLength(1);
+      expect(database(f).prompts[0].text).toContain('healthy');
+      expect(readFileSync(resolve(bad, 'state.yaml'), 'utf8')).toBe(before);
+      expect(existsSync(resolve(f.home, 'invalid-worktree'))).toBe(true);
+      expect(calls(f).some((args) => args.includes('invalid-tab'))).toBe(false);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+for (const owner of ['issue', 'epic/issue']) {
+  test(`next identifies dormant ${owner}/resting without parsing and prefers active leaves`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const parked: string = resolve(f.root, 'issues/parked', owner, 'resting');
+      mkdirSync(parked, { recursive: true });
+      writeFileSync(resolve(parked, 'state.yaml'), 'slug: [');
+      const result: Result = await next(f, ['resting']);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('Missing leaf: resting (parked)');
+      console.log(result.stderr.split('\n').find((line) => line.includes('error: Missing leaf:')));
+      for (const slug of ['absent', 'issue', 'epic']) {
+        const missing: Result = await next(f, [slug]);
+        expect(missing.code).toBe(1);
+        expect(missing.stderr).toContain(`Missing leaf: ${slug}`);
+        expect(missing.stderr.split('\n').find((line) => line.startsWith('error: '))).toBe(
+          `error: Missing leaf: ${slug}`,
+        );
+      }
+      expect(calls(f)).toEqual([]);
+      leaf(f, 'resting', 'plan.synthesis');
+      expect((await next(f, ['resting'])).code).toBe(0);
+      expect(database(f).prompts).toHaveLength(1);
+      renameSync(resolve(f.root, 'issues/open'), resolve(f.root, 'issues/closed'));
+      expect((await next(f, ['resting'])).code).toBe(0);
+    } finally {
+      f.clean();
+    }
+  });
+}

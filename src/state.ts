@@ -1,9 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
 import { type Repo } from './config';
 import { writeYaml } from './shell';
+import { issueFolders } from './park';
 
 const counts = z.object({ A: z.number().int().nonnegative().default(0), B: z.number().int().nonnegative().default(0) });
 
@@ -54,16 +55,29 @@ export function saveState(path: string, state: State): void {
   writeYaml(resolve(path, 'state.yaml'), state);
 }
 
-export function leavesUnder(path: string): Leaf[] {
+export function validateLeafDepth(areaRoot: string, leafPath: string): void {
+  const depth: number = relative(areaRoot, leafPath).split(sep).filter(Boolean).length;
+  z.number()
+    .refine((value) => value === 2 || value === 3, `Invalid leaf depth: ${resolve(leafPath, 'state.yaml')}`)
+    .parse(depth);
+}
+
+export function leavesUnder(path: string, areaRoot: string): Leaf[] {
   if (!existsSync(path)) return [];
-  if (existsSync(resolve(path, 'state.yaml'))) return [{ path, state: readState(path) }];
+  if (existsSync(resolve(path, 'state.yaml'))) {
+    validateLeafDepth(areaRoot, path);
+    return [{ path, state: readState(path) }];
+  }
   return readdirSync(path, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .flatMap((entry) => leavesUnder(resolve(path, entry.name)));
+    .flatMap((entry) => leavesUnder(resolve(path, entry.name), areaRoot));
 }
 
 export function allLeaves(repo: Repo): Leaf[] {
-  const leaves: Leaf[] = ['open', 'closed'].flatMap((area) => leavesUnder(resolve(repo.root, 'issues', area)));
+  const leaves: Leaf[] = ['open', 'closed'].flatMap((area) => {
+    const areaRoot: string = resolve(repo.root, 'issues', area);
+    return leavesUnder(areaRoot, areaRoot);
+  });
   const slugs: Set<string> = new Set();
   for (const leaf of leaves) {
     if (slugs.has(leaf.state.slug)) throw new Error(`Duplicate leaf slug: ${leaf.state.slug}`);
@@ -73,9 +87,24 @@ export function allLeaves(repo: Repo): Leaf[] {
   return leaves;
 }
 
+export function missingLeafMessage(repo: Repo, slug: string): string {
+  const parkedRoot: string = resolve(repo.root, 'issues/parked');
+  const parked: boolean = issueFolders(repo.root, 'issues/parked').some((owner) => {
+    const ownerPath: string = resolve(parkedRoot, owner);
+    return issueFolders(ownerPath, '.').some((child) => {
+      const childPath: string = resolve(ownerPath, child);
+      return (
+        (child === slug && existsSync(resolve(childPath, 'state.yaml'))) ||
+        issueFolders(childPath, '.').some((leaf) => leaf === slug && existsSync(resolve(childPath, leaf, 'state.yaml')))
+      );
+    });
+  });
+  return `Missing leaf: ${slug}${parked ? ' (parked)' : ''}`;
+}
+
 export function findLeaf(repo: Repo, slug: string): Leaf {
   const leaf: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === slug);
-  if (leaf === undefined) throw new Error(`Missing leaf: ${slug}`);
+  if (leaf === undefined) throw new Error(missingLeafMessage(repo, slug));
   return leaf;
 }
 

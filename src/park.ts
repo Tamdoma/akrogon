@@ -20,7 +20,7 @@ export function issueFolders(root: string, area: string): string[] {
 }
 
 function running(root: string, issue: string): boolean {
-  return leavesUnder(resolve(root, 'issues/open', issue)).some(
+  return leavesUnder(resolve(root, 'issues/open', issue), resolve(root, 'issues/open')).some(
     (leaf: Leaf) => leaf.state.tab !== undefined || leaf.state.worktree !== undefined,
   );
 }
@@ -31,11 +31,15 @@ function stranded(root: string, verb: ParkVerb, moving: string[]): string[] {
   const open: Leaf[] = [
     ...issueFolders(root, 'issues/open')
       .filter((issue) => verb === 'unpark' || !moving.includes(issue))
-      .flatMap((issue) => leavesUnder(resolve(root, 'issues/open', issue))),
-    ...(verb === 'unpark' ? moving.flatMap((issue) => leavesUnder(resolve(root, from, issue))) : []),
+      .flatMap((issue) => leavesUnder(resolve(root, 'issues/open', issue), resolve(root, 'issues/open'))),
+    ...(verb === 'unpark'
+      ? moving.flatMap((issue) => leavesUnder(resolve(root, from, issue), resolve(root, from)))
+      : []),
   ];
   const known: Set<string> = new Set(
-    [...open, ...leavesUnder(resolve(root, 'issues/closed'))].map((leaf) => leaf.state.slug),
+    [...open, ...leavesUnder(resolve(root, 'issues/closed'), resolve(root, 'issues/closed'))].map(
+      (leaf) => leaf.state.slug,
+    ),
   );
   return open.flatMap((leaf) => leaf.state['blocked-by'].filter((dependency) => !known.has(dependency)));
 }
@@ -73,7 +77,9 @@ function settle(root: string, candidates: string[]): string[] {
     const dangling: string[] = stranded(root, 'park', moving);
     if (dangling.length === 0) return moving;
     const owners: string[] = moving.filter((issue) =>
-      leavesUnder(resolve(root, 'issues/open', issue)).some((leaf) => dangling.includes(leaf.state.slug)),
+      leavesUnder(resolve(root, 'issues/open', issue), resolve(root, 'issues/open')).some((leaf) =>
+        dangling.includes(leaf.state.slug),
+      ),
     );
     if (owners.length === 0) return moving;
     moving = moving.filter((issue) => !owners.includes(issue));
