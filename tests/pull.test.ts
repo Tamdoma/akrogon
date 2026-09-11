@@ -67,7 +67,7 @@ test('pull reconciles every page by number, preserves bodies, excludes PRs, and 
     expect(files['1-renamed-title.md']).toContain('https://github.com/acme/project/issues/1');
     expect(files['1-renamed-title.md']).toContain(body);
     expect(files['101-issue.md']).not.toContain('null');
-    expect(files[`102-${'x'.repeat(100)}.md`]).toBeDefined();
+    expect(files[`102-${'x'.repeat(40)}.md`]).toBeDefined();
     expect(files['notes.md']).toBe('keep');
     expect(
       Object.keys(files)
@@ -80,6 +80,42 @@ test('pull reconciles every page by number, preserves bodies, excludes PRs, and 
     script(gh, [{ stdout: '[[]]' }]);
     expect((await cli(f, ['pull'], f.root, gh.env)).code).toBe(0);
     expect(snapshot(f)).toEqual({ 'notes.md': 'keep' });
+  } finally {
+    f.clean();
+  }
+});
+
+test('pull caps slugs at word boundaries and hard cuts oversized first words', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    await command(['git', 'remote', 'add', 'origin', 'https://github.com/acme/project.git'], f.root);
+    const issues: Issue[] = [
+      issue(104, 'alpha bravo charlie delta echo foxtrot golf hotel'),
+      issue(105, 'X'.repeat(41)),
+      issue(106, `${'X'.repeat(41)} tail`),
+      issue(107, 'X'.repeat(40)),
+      issue(108, `alpha ${'X'.repeat(34)}`),
+      issue(109, `alpha ${'X'.repeat(34)} tail`),
+      issue(110, `${'X'.repeat(39)} tail`),
+    ];
+    script(gh, [{ stdout: JSON.stringify([issues]), args: listingArgs }]);
+    expect((await cli(f, ['pull'], f.root, gh.env)).code).toBe(0);
+    const names: string[] = Object.keys(snapshot(f));
+    expect(names).toEqual([
+      '104-alpha-bravo-charlie-delta-echo-foxtrot.md',
+      `105-${'x'.repeat(40)}.md`,
+      `106-${'x'.repeat(40)}.md`,
+      `107-${'x'.repeat(40)}.md`,
+      `108-alpha-${'x'.repeat(34)}.md`,
+      `109-alpha-${'x'.repeat(34)}.md`,
+      `110-${'x'.repeat(39)}.md`,
+    ]);
+    for (const name of names) {
+      const slug: string = name.slice(name.indexOf('-') + 1, -3);
+      expect(slug.length).toBeLessThanOrEqual(40);
+      expect(slug.endsWith('-')).toBe(false);
+    }
   } finally {
     f.clean();
   }

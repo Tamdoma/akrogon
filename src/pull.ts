@@ -28,14 +28,15 @@ function parseListing(output: string): GitHubIssue[] {
 }
 
 function slug(title: string): string {
-  return (
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 100)
-      .replace(/-$/, '') || 'issue'
-  );
+  const normalized: string = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (normalized.length <= 40) return normalized || 'issue';
+  const prefix: string = normalized.slice(0, 40);
+  const boundary: number = prefix.lastIndexOf('-');
+  const shortened: string = normalized[40] !== '-' && boundary !== -1 ? prefix.slice(0, boundary) : prefix;
+  return shortened.replace(/-$/, '') || 'issue';
 }
 
 export async function pullRepo(repo: Repo): Promise<void> {
