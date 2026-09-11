@@ -36,7 +36,7 @@ Inline has no worker, sub-briefs or mismatch returns; both modes run the resolve
 
 Derive meaningful tests from acceptance criteria before code, demonstrate red then green and a fail-first test for a bug, with no test needed for a trivial one-liner.
 
-After the last implementation unit, run the full suite once as B and every other blocking check, repair any failure by the protocol (yourself in inline mode), then fill the report with command evidence and commit everything on the leaf branch before handoff; `akrogon phase` refuses a dirty worktree.
+After the last implementation unit, run the full suite once as B and every other blocking check, repair any failure by the protocol (yourself in inline mode), then fill the report with command evidence and commit the code on the leaf branch before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
 
 Every command under `checks` blocks; `advisory` failures are reported as Nits, and a full-suite rerun follows a repair rather than an unchanged successful run.
 

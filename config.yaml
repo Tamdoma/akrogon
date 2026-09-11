@@ -1,18 +1,18 @@
 max_active: 3
-slots:
-  a:
+slots: 
+  a: 
     harness: claude
     model: claude-fable-5-1
     effort: medium
-  b:
+  b: 
     harness: codex
     model: gpt-6-astra
     effort: medium
-harnesses:
-  claude: claude --model {model} --effort {effort} --dangerously-skip-permissions
-  codex: codex -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access
-  pi: pi --model {model} --thinking {effort} -a
-toolkits:
+harnesses: 
+  claude: "claude --model {model} --effort {effort} --dangerously-skip-permissions"
+  codex: "codex -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access"
+  pi: "pi --model {model} --thinking {effort} -a"
+toolkits: 
   typescript: bun:test
-repos:
+repos: 
   akrogon: /home/ivan/Work/infra/akrogon

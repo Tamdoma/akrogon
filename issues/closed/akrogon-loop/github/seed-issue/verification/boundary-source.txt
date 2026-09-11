@@ -1,0 +1,9 @@
+#!/usr/bin/python3
+import os,sys,json
+from pathlib import Path
+p=Path(os.environ['CAPTURE_DIR'])
+with (p/'calls.jsonl').open('a') as f: f.write(json.dumps({'argv':sys.argv[1:],'stdin':sys.stdin.read()})+'\n')
+if os.environ['CASE_ID']=='V8':
+ print('HTTP 401: controlled authentication error for consumer/app',file=sys.stderr)
+ sys.exit(1)
+print('https://github.com/'+sys.argv[sys.argv.index('-R')+1]+'/issues/42')

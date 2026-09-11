@@ -1,0 +1,6 @@
+exit: 1
+stdout: 
+stderr: HTTP 401: controlled authentication error for consumer/app
+
+Last operation: gh issue create failed (exit 1): HTTP 401: controlled authentication error for consumer/app
+Next: none submission failed

@@ -1,0 +1,2 @@
+Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-list/akrogon.yaml: issues_repo is a list, not a string
+Next: none routing failed

@@ -1,8 +1,0 @@
-# Chart skill version: 4
-slug: chart-issues
-phase: plan.positions
-created: '2026-09-09'
-priority: n
-repo: akrogon
-debate: yes
-blocked-by: [status, pull-close]

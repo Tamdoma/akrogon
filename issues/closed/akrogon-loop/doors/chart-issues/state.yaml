@@ -1,0 +1,25 @@
+slug: chart-issues
+phase: merged
+created: 2026-09-09
+priority: "n"
+repo: akrogon
+debate: "yes"
+blocked-by: 
+  - status
+  - pull-close
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tN
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/chart-issues
+pane: 
+  A: w8:p13
+  B: w8:p14
+slot: A
+prompted: 
+  {}

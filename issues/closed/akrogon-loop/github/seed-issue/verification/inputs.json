@@ -1,0 +1,163 @@
+[
+  {
+    "case": "V1",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V1/nested/deeper",
+    "root": "/tmp/seed-issue-ho8tsjat/V1",
+    "akrogon.yaml": "issues_repo: upstream/intake\n",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V2",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V2",
+    "root": "/tmp/seed-issue-ho8tsjat/V2",
+    "akrogon.yaml": "issues_repo: \"upstream/intake\" # shared queue\nother: unchanged\n",
+    "remotes": ""
+  },
+  {
+    "case": "V3-https",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V3-https",
+    "root": "/tmp/seed-issue-ho8tsjat/V3-https",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V3-scp",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V3-scp",
+    "root": "/tmp/seed-issue-ho8tsjat/V3-scp",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\tgit@github.com:consumer/app.git (fetch)\norigin\tgit@github.com:consumer/app.git (push)\n"
+  },
+  {
+    "case": "V3-ssh",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V3-ssh",
+    "root": "/tmp/seed-issue-ho8tsjat/V3-ssh",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\tssh://git@github.com/consumer/app.git (fetch)\norigin\tssh://git@github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V4-missing",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V4-missing",
+    "root": "/tmp/seed-issue-ho8tsjat/V4-missing",
+    "akrogon.yaml": "other: upstream/intake\n",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V4-blank",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V4-blank",
+    "root": "/tmp/seed-issue-ho8tsjat/V4-blank",
+    "akrogon.yaml": "issues_repo:\n",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V4-null",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V4-null",
+    "root": "/tmp/seed-issue-ho8tsjat/V4-null",
+    "akrogon.yaml": "issues_repo: null\n",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V4-list",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V4-list",
+    "root": "/tmp/seed-issue-ho8tsjat/V4-list",
+    "akrogon.yaml": "issues_repo: [upstream/intake]\n",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V4-yaml",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V4-yaml",
+    "root": "/tmp/seed-issue-ho8tsjat/V4-yaml",
+    "akrogon.yaml": "issues_repo: [upstream/intake\n",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V4-duplicate",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V4-duplicate",
+    "root": "/tmp/seed-issue-ho8tsjat/V4-duplicate",
+    "akrogon.yaml": "issues_repo: upstream/intake\nissues_repo: other/queue\n",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V4-url",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V4-url",
+    "root": "/tmp/seed-issue-ho8tsjat/V4-url",
+    "akrogon.yaml": "issues_repo: https://github.com/upstream/intake\n",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V4-extra",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V4-extra",
+    "root": "/tmp/seed-issue-ho8tsjat/V4-extra",
+    "akrogon.yaml": "issues_repo: upstream/intake/extra\n",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V4-path",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V4-path",
+    "root": "/tmp/seed-issue-ho8tsjat/V4-path",
+    "akrogon.yaml": "issues_repo: /intake\n",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V5-missing",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V5-missing",
+    "root": "/tmp/seed-issue-ho8tsjat/V5-missing",
+    "akrogon.yaml": "ABSENT",
+    "remotes": ""
+  },
+  {
+    "case": "V5-host",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V5-host",
+    "root": "/tmp/seed-issue-ho8tsjat/V5-host",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\thttps://gitlab.com/consumer/app.git (fetch)\norigin\thttps://gitlab.com/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V5-lookalike",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V5-lookalike",
+    "root": "/tmp/seed-issue-ho8tsjat/V5-lookalike",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\thttps://github.com.evil.test/consumer/app.git (fetch)\norigin\thttps://github.com.evil.test/consumer/app.git (push)\n"
+  },
+  {
+    "case": "V5-path",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V5-path",
+    "root": "/tmp/seed-issue-ho8tsjat/V5-path",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\thttps://github.com/consumer/app/extra.git (fetch)\norigin\thttps://github.com/consumer/app/extra.git (push)\n"
+  },
+  {
+    "case": "V5-local",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V5-local",
+    "root": "/tmp/seed-issue-ho8tsjat/V5-local",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\t/tmp/consumer/app (fetch)\norigin\t/tmp/consumer/app (push)\n"
+  },
+  {
+    "case": "V5-query",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V5-query",
+    "root": "/tmp/seed-issue-ho8tsjat/V5-query",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\thttps://github.com/consumer/app?x=1 (fetch)\norigin\thttps://github.com/consumer/app?x=1 (push)\n"
+  },
+  {
+    "case": "V6",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V6",
+    "root": "/tmp/seed-issue-ho8tsjat/V6",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\tgit@github.com:consumer/app.git (fetch)\norigin\tgit@github.com:consumer/app.git (push)\nupstream\thttps://github.com/other/queue.git (fetch)\nupstream\thttps://github.com/other/queue.git (push)\n"
+  },
+  {
+    "case": "V7",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V7",
+    "root": "/tmp/seed-issue-ho8tsjat/V7",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\thttps://github.com/consumer/app (fetch)\norigin\thttps://github.com/consumer/app (push)\n"
+  },
+  {
+    "case": "V8",
+    "cwd": "/tmp/seed-issue-ho8tsjat/V8",
+    "root": "/tmp/seed-issue-ho8tsjat/V8",
+    "akrogon.yaml": "ABSENT",
+    "remotes": "origin\thttps://github.com/consumer/app.git (fetch)\norigin\thttps://github.com/consumer/app.git (push)\n"
+  }
+]

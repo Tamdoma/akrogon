@@ -40,11 +40,11 @@ After green checks, push `HEAD:<default_branch>` to the configured remote fast-f
 
 Other push errors are reported with their cause rather than retried as competing merges, and an unchanged successful check run is reused only when neither code nor integration changed.
 
-Gather the completed issue's briefs before its folder may move, then after confirmed push success run `akrogon phase <slug> merged --slot A`, delegating one broadcast-issue writer with that issue context and repo worktree only when this invocation prints `issue complete`.
+Gather the completed issue's briefs before its folder may move, then after confirmed push success run `akrogon phase <slug> merged --slot A`, and only when this invocation prints `issue complete`, run the broadcast-issue skill yourself in this session with that issue context and repo worktree; the broadcast is always sent by the merge slot, never by a subagent or another agent, because the tab closes as soon as this pane goes idle after `merged`.
 
-The writer's harness chooses its model; a failed broadcast is visible but leaves the merge complete, while GitHub closure and completed-folder moves belong to the command.
+A failed broadcast is visible but leaves the merge complete, while GitHub closure and completed-folder moves belong to the command.
 
-Finish by printing the footer and stopping.
+Finish by printing the footer, then close this tab with `herdr tab close "$HERDR_TAB_ID"` as the very last act; the startup sweep removes the worktree and branch, and closes any tab a merge left open.
 
 ## Printed footer
 

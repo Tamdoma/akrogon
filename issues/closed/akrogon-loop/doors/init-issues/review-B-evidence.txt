@@ -1,0 +1,392 @@
+$ git init -b main
+Initialized empty Git repository in /tmp/init-review-b-pwe0cx4i/consumer/.git/
+
+exit=0
+
+$ git config user.name Review Fixture
+
+exit=0
+
+$ git config user.email review@example.invalid
+
+exit=0
+
+$ bun install
+bun install v1.4.0 (34cbb9a40)
+
++ eslint@9.39.1
+
+86 packages installed [10.00ms]
+Resolving dependencies
+Resolved, downloaded and extracted [0]
+Saved lockfile
+
+exit=0
+
+$ git add .
+
+exit=0
+
+$ git commit -m Fixture baseline
+[main (root-commit) ae3df2a] Fixture baseline
+ 6 files changed, 191 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 bun.lock
+ create mode 100644 eslint.config.js
+ create mode 100644 package.json
+ create mode 100644 sum.js
+ create mode 100644 sum.test.js
+
+exit=0
+
+$ git rev-parse HEAD
+ae3df2af60bb992534aee62152fad36d8dedc629
+
+exit=0
+
+$ bun /home/ivan/Work/infra/akrogon/issues/worktrees/init-issues/src/akrogon.ts config
+max_active: 3
+slots:
+  a:
+    harness: fake
+    model: fixture
+    effort: medium
+  b:
+    harness: fake
+    model: fixture
+    effort: medium
+harnesses:
+  fake: "false {model} {effort}"
+toolkits:
+  typescript: bun:test
+repos:
+  {}
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks:
+  {}
+advisory:
+  []
+grounding: none
+repo: none
+
+exit=0
+
+$ bun test --help
+Usage: bun test [flags] [<patterns>]
+  Run all matching test files and print the results to stdout
+
+Flags:
+      --no-orphans                    Exit when the parent process dies, and on exit kill every descendant.
+      --timeout=<val>                 Set the per-test timeout in milliseconds, default is 5000.
+  -u, --update-snapshots              Update snapshot files
+      --rerun-each=<val>              Re-run each test file <NUMBER> times, helps catch certain bugs
+      --retry=<val>                   Default retry count for all tests, overridden by per-test { retry: N }
+      --todo                          Include tests that are marked with "test.todo()"
+      --only                          Run only tests that are marked with "test.only()" or "describe.only()"
+      --pass-with-no-tests            Exit with code 0 when no tests are found
+      --concurrent                    Treat all tests as `test.concurrent()` tests
+      --randomize                     Run tests in random order
+      --seed=<val>                    Set the random seed for test randomization
+      --coverage                      Generate a coverage profile
+      --coverage-reporter=<val>       Report coverage in 'text' and/or 'lcov'. Defaults to 'text'.
+      --coverage-dir=<val>            Directory for coverage files. Defaults to 'coverage'.
+      --bail=<val>                    Exit the test suite after <NUMBER> failures. If you do not specify a number, it defaults to 1.
+  -t, --test-name-pattern=<val>       Run only tests with a name that matches the given regex.
+      --reporter=<val>                Test output reporter format. Available: 'junit' (requires --reporter-outfile), 'dots'. Default: console output.
+      --reporter-outfile=<val>        Output file path for the reporter format (required with --reporter).
+      --dots                          Enable dots reporter. Shorthand for --reporter=dots.
+      --only-failures                 Only display test failures, hiding passing tests.
+      --max-concurrency=<val>         Maximum number of concurrent tests to execute at once. Default is 20.
+      --path-ignore-patterns=<val>    Glob patterns for test file paths to ignore.
+      --changed=<val>                 Only run test files affected by changed files according to git. Optionally pass a commit or branch to compare against.
+      --isolate                       Run each test file in a fresh global object. Leaked handles from one file cannot affect another.
+      --no-isolate                    With --parallel: let each worker keep one global and module registry across the files it runs (faster; files can see each other's leftovers).
+      --parallel=<val>                Run test files in parallel using N worker processes. Implies --isolate. Defaults to CPU core count.
+      --parallel-delay=<val>          Milliseconds the first --parallel worker must be busy before spawning the rest. 0 spawns all immediately. Default 5.
+      --test-worker                   (internal) Run as a --parallel worker, receiving files over IPC.
+      --shard=<val>                   Run a subset of test files, e.g. '--shard=1/3' runs the first of three shards. Useful for splitting tests across multiple CI jobs.
+      --timings=<val>                 JSON file(s) of per-file durations (ms); several are merged, e.g. one per CI shard. Balances --shard by total time and makes --parallel start the slowest files first.
+      --update-timings                After the run, write measured per-file durations to the first --timings file (only this shard's files under --shard; merged with what was read otherwise).
+
+Examples:
+  Run all test files
+  bun test
+
+  Run all test files with "foo" or "bar" in the file name
+  bun test foo bar
+
+  Run all test files, only including tests whose names includes "baz"
+  bun test --test-name-pattern baz
+
+Full documentation is available at https://bun.com/docs/cli/test
+
+exit=0
+
+Proposal:
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks:
+  lint: bun run lint
+  test: bun test
+  test_changed: ': "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE"'
+advisory: []
+grounding:
+  index: REFERENCE.md
+broadcast:
+  discord:
+    webhook_env: [DISCORD_WEBHOOK_URL]
+
+$ bun /home/ivan/Work/infra/akrogon/issues/worktrees/init-issues/src/akrogon.ts init --from /tmp/init-review-b-pwe0cx4i/proposal.yaml
+
+exit=0
+
+Result:
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks:
+  lint: bun run lint
+  test: bun test
+  test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\""
+advisory:
+  []
+grounding:
+  index: REFERENCE.md
+broadcast:
+  discord:
+    webhook_env:
+      - DISCORD_WEBHOOK_URL
+$ bun run lint
+$ eslint .
+
+exit=0
+
+$ bun test
+bun test v1.4.0 (34cbb9a40)
+
+sum.test.js:
+(pass) sum [0.05ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [3.00ms]
+
+exit=0
+
+$ bash -c : "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE"
+bun test v1.4.0 (34cbb9a40)
+--changed: 5 changed files, running 1/1 test file
+
+sum.test.js:
+(pass) sum [0.03ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [5.00ms]
+
+exit=0
+
+$ bash -c : "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE"
+bash: line 1: AKROGON_BASE: AKROGON_BASE is required
+
+exit=127
+
+$ bash -c : "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE"
+bun test v1.4.0 (34cbb9a40)
+--changed: 5 changed files, running 1/1 test file
+
+sum.test.js:
+error: expect(received).toBe(expected)
+
+Expected: 6
+Received: 5
+
+(fail) sum [0.09ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [7.00ms]
+
+exit=1
+
+$ bash -c : "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE"
+bun test v1.4.0 (34cbb9a40)
+--changed: 5 changed files, running 1/1 test file
+
+sum.test.js:
+(pass) sum [0.04ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [6.00ms]
+
+exit=0
+
+$ bun /home/ivan/Work/infra/akrogon/issues/worktrees/init-issues/src/akrogon.ts config
+max_active: 3
+slots:
+  a:
+    harness: fake
+    model: fixture
+    effort: medium
+  b:
+    harness: fake
+    model: fixture
+    effort: medium
+harnesses:
+  fake: "false {model} {effort}"
+toolkits:
+  typescript: bun:test
+repos:
+  consumer: /tmp/init-review-b-pwe0cx4i/consumer
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks:
+  lint: bun run lint
+  test: bun test
+  test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\""
+advisory:
+  []
+grounding:
+  index: REFERENCE.md
+broadcast:
+  discord:
+    webhook_env:
+      - DISCORD_WEBHOOK_URL
+repo: consumer
+
+exit=0
+
+$ bun /home/ivan/Work/infra/akrogon/issues/worktrees/init-issues/src/akrogon.ts init --from /tmp/init-review-b-pwe0cx4i/proposal.yaml
+
+exit=0
+
+Verified repeat setup preserves every consumer file byte, including manifest and index.
+
+$ bun /home/ivan/Work/infra/akrogon/issues/worktrees/init-issues/src/akrogon.ts init --from /tmp/init-review-b-pwe0cx4i/proposal.yaml
+
+exit=0
+
+$ bun /home/ivan/Work/infra/akrogon/issues/worktrees/init-issues/src/akrogon.ts config
+max_active: 3
+slots:
+  a:
+    harness: fake
+    model: fixture
+    effort: medium
+  b:
+    harness: fake
+    model: fixture
+    effort: medium
+harnesses:
+  fake: "false {model} {effort}"
+toolkits:
+  typescript: bun:test
+repos:
+  consumer: /tmp/init-review-b-pwe0cx4i/consumer
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks:
+  lint: bun run lint
+  test: bun test
+  test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\""
+advisory:
+  []
+grounding:
+  index: missing.md
+broadcast:
+  discord:
+    webhook_env:
+      - DISCORD_WEBHOOK_URL
+repo: consumer
+
+exit=0
+
+$ bun /home/ivan/Work/infra/akrogon/issues/worktrees/init-issues/src/akrogon.ts init --from /tmp/init-review-b-pwe0cx4i/proposal.yaml
+
+exit=0
+
+$ git init -b main
+Initialized empty Git repository in /tmp/init-review-b-pwe0cx4i/no-tests/.git/
+
+exit=0
+
+$ bun /home/ivan/Work/infra/akrogon/issues/worktrees/init-issues/src/akrogon.ts config
+max_active: 3
+slots:
+  a:
+    harness: fake
+    model: fixture
+    effort: medium
+  b:
+    harness: fake
+    model: fixture
+    effort: medium
+harnesses:
+  fake: "false {model} {effort}"
+toolkits:
+  typescript: bun:test
+repos:
+  consumer: /tmp/init-review-b-pwe0cx4i/consumer
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks:
+  {}
+advisory:
+  []
+grounding: none
+repo: none
+
+exit=0
+
+$ bun /home/ivan/Work/infra/akrogon/issues/worktrees/init-issues/src/akrogon.ts init --from /tmp/init-review-b-pwe0cx4i/proposal.yaml --toolkit typescript=bun:test
+
+exit=0
+
+Global result:
+max_active: 3
+slots:
+  a:
+    harness: fake
+    model: fixture
+    effort: medium
+  b:
+    harness: fake
+    model: fixture
+    effort: medium
+harnesses:
+  fake: "false {model} {effort}"
+toolkits:
+  typescript: bun:test
+repos:
+  consumer: /tmp/init-review-b-pwe0cx4i/consumer
+  no-tests: /tmp/init-review-b-pwe0cx4i/no-tests
+Verified no-tests toolkit choice without framework installation. All fixture files and temporary proposal removed.

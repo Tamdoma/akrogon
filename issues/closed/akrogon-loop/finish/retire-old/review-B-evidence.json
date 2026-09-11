@@ -1,0 +1,89 @@
+{
+  "base": "a40ff4dbcf1811cb44ceeb35945bdecee17bcc95",
+  "head": "795ed526f8747416d31ee0daa0a964d83561c951",
+  "clean": true,
+  "archives_equal": 19,
+  "existing_history_equal": 6,
+  "active_lines_preserved": true,
+  "retired_trees_absent": true,
+  "eight_skills": true,
+  "links": [
+    {
+      "file": "README.md",
+      "target": "config.yaml"
+    },
+    {
+      "file": "README.md",
+      "target": "plugin/"
+    },
+    {
+      "file": "README.md",
+      "target": "skills/init-issues/SKILL.md"
+    },
+    {
+      "file": "README.md",
+      "target": "REFERENCE.md"
+    },
+    {
+      "file": "README.md",
+      "target": "skills/chart-issues/SKILL.md"
+    },
+    {
+      "file": "README.md",
+      "target": "skills/plan-issue/SKILL.md"
+    },
+    {
+      "file": "README.md",
+      "target": "skills/implement-issue/SKILL.md"
+    },
+    {
+      "file": "README.md",
+      "target": "skills/check-issue/SKILL.md"
+    },
+    {
+      "file": "README.md",
+      "target": "skills/merge-issue/SKILL.md"
+    },
+    {
+      "file": "README.md",
+      "target": "skills/seed-issue/SKILL.md"
+    },
+    {
+      "file": "README.md",
+      "target": "skills/broadcast-issue/SKILL.md"
+    },
+    {
+      "file": "README.md",
+      "target": "skills/init-issues/SKILL.md"
+    },
+    {
+      "file": "REFERENCE.md",
+      "target": "src/"
+    },
+    {
+      "file": "REFERENCE.md",
+      "target": "tests/"
+    },
+    {
+      "file": "REFERENCE.md",
+      "target": "skills/"
+    },
+    {
+      "file": "REFERENCE.md",
+      "target": "plugin/"
+    },
+    {
+      "file": "REFERENCE.md",
+      "target": "docs/"
+    },
+    {
+      "file": "REFERENCE.md",
+      "target": "issues/"
+    },
+    {
+      "file": "REFERENCE.md",
+      "target": "learnings/"
+    }
+  ],
+  "excluded_surfaces_unchanged": true
+}

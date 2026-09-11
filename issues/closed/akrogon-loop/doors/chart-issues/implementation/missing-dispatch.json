@@ -1,0 +1,9 @@
+{
+  "args": [
+    "next",
+    "broken-dependency"
+  ],
+  "code": 1,
+  "stdout": "",
+  "stderr": "61 |   return leaves;\n62 | }\n63 | \n64 | export function findLeaf(repo: Repo, slug: string): Leaf {\n65 |   const leaf: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === slug);\n66 |   if (leaf === undefined) throw new Error(`Missing leaf: ${slug}`);\n                                         ^\nerror: Missing leaf: missing\n      at findLeaf (/home/ivan/Work/infra/akrogon/issues/worktrees/chart-issues/src/state.ts:66:37)\n      at map (1:11)\n      at dependenciesReady (/home/ivan/Work/infra/akrogon/issues/worktrees/chart-issues/src/state.ts:107:30)\n      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/chart-issues/src/next.ts:328:12)\n\nBun v1.4.0 (Linux x64)\n"
+}

@@ -1,0 +1,8 @@
+{
+  "args": [
+    "status"
+  ],
+  "code": 0,
+  "stdout": "repo\n  utility-suite\n    identity\n      emit-identity phase=plan.synthesis done=[] attempts=A:0,B:0 fix_rounds=0 verdict=[] tab=unavailable blocked-by=[] age=unavailable\n    numbers\n      parse-integer phase=plan.positions done=[] attempts=A:0,B:0 fix_rounds=0 verdict=[] tab=unavailable blocked-by=[] age=unavailable\n",
+  "stderr": ""
+}

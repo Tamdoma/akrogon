@@ -1,0 +1,27 @@
+{
+  "results": [
+    {
+      "args": [
+        "next",
+        "emit-identity"
+      ],
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "next",
+        "parse-integer"
+      ],
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "prompts": [
+    "plan-issue emit-identity slot=B phase=plan.synthesis",
+    "plan-issue parse-integer slot=A phase=plan.positions",
+    "plan-issue parse-integer slot=B phase=plan.positions"
+  ]
+}

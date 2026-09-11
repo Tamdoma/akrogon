@@ -1,0 +1,12 @@
+[
+  {
+    "case": "missing blocked-by absent",
+    "result": "refused before writes",
+    "unchanged": true
+  },
+  {
+    "case": "occupied partial leaf",
+    "result": "refused before writes",
+    "unchanged": true
+  }
+]

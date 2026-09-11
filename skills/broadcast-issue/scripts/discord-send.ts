@@ -7,7 +7,9 @@ import { z } from 'zod';
 
 interface Message {
   readonly summary: string;
-  readonly whats_new: readonly string[];
+  readonly before: readonly string[];
+  readonly now: readonly string[];
+  readonly next: readonly string[];
 }
 interface Webhook {
   readonly name: string;
@@ -21,10 +23,37 @@ interface Failure {
   readonly request: { readonly content: string };
 }
 
+const bullets: z.ZodType<readonly string[]> = z.array(z.string().trim().min(1)).min(1);
 const messageSchema: z.ZodType<Message> = z.strictObject({
   summary: z.string().trim().min(1).max(200),
-  whats_new: z.array(z.string().trim().min(1)).min(1),
+  before: bullets,
+  now: bullets,
+  next: bullets,
 });
+const chunkSchema: z.ZodType<string> = z.string().max(2000);
+
+function section(title: string, items: readonly string[]): string {
+  return `**${title}**\n${items.map((item: string): string => `- ${item}`).join('\n')}`;
+}
+
+function stamp(date: Date): string {
+  const two = (n: number): string => String(n).padStart(2, '0');
+  return `${two(date.getMonth() + 1)}/${two(date.getDate())}/${two(date.getFullYear() % 100)}`;
+}
+
+function chunks(message: Message): string[] {
+  const parts: string[] = [
+    `## 🧪 ${message.summary} (${stamp(new Date())})`,
+    section('Before', message.before),
+    section('Now', message.now),
+    section('Next', message.next),
+  ];
+  return parts.reduce((acc: string[], part: string): string[] => {
+    const last: string | undefined = acc.at(-1);
+    const joined: string = last === undefined ? part : `${last}\n\n${part}`;
+    return last !== undefined && joined.length <= 2000 ? [...acc.slice(0, -1), joined] : [...acc, chunkSchema.parse(part)];
+  }, []);
+}
 const targetsSchema: z.ZodType<string[]> = z.array(z.string().regex(/^[A-Z_][A-Z0-9_]*$/)).min(1)
   .refine((names: string[]): boolean => new Set(names).size === names.length, 'Duplicate broadcast target');
 const webhookSchema: z.ZodType<string> = z.url().refine((value: string): boolean => {
@@ -74,13 +103,15 @@ async function deliver(webhook: Webhook, content: string): Promise<void> {
   }
 }
 
-async function sendWithRetry(webhook: Webhook, content: string): Promise<void> {
-  try {
-    await deliver(webhook, content);
-  } catch (cause) {
-    if (!(cause instanceof DeliveryError)) throw cause;
-    console.warn({ event: 'broadcast retry', attempt: 1, ...cause.failure });
-    await deliver(webhook, content);
+async function sendWithRetry(webhook: Webhook, contents: readonly string[]): Promise<void> {
+  for (const content of contents) {
+    try {
+      await deliver(webhook, content);
+    } catch (cause) {
+      if (!(cause instanceof DeliveryError)) throw cause;
+      console.warn({ event: 'broadcast retry', attempt: 1, ...cause.failure });
+      await deliver(webhook, content);
+    }
   }
 }
 
@@ -93,12 +124,12 @@ export async function main(envFile: string): Promise<void> {
   });
   const targets: string[] = targetsSchema.parse(args.values.target);
   const message: Message = messageSchema.parse(JSON.parse(await Bun.stdin.text()));
-  const content: string = z.string().max(2000).parse(`${message.summary}\n\n${message.whats_new.map((item: string): string => `- ${item}`).join('\n')}`);
+  const contents: string[] = chunks(message);
   const webhooks: Webhook[] = readWebhooks(targets, envFile);
   const failures: DeliveryError[] = [];
   for (const webhook of webhooks) {
     try {
-      await sendWithRetry(webhook, content);
+      await sendWithRetry(webhook, contents);
       console.log({ event: 'broadcast delivered', target: webhook.name });
     } catch (cause) {
       if (!(cause instanceof DeliveryError)) throw cause;

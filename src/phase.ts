@@ -91,7 +91,10 @@ export async function transition(
   if (state.phase !== 'failed' && (slot === undefined || !required.includes(slot)))
     throw new Error('A required --slot is missing or invalid');
   if (slot !== undefined && state.done.includes(slot)) throw new Error(`Slot already recorded: ${slot}`);
-  if (requested === 'check.review' && state.worktree !== undefined) await requireClean(state.worktree);
+  if (requested === 'check.review' && state.worktree !== undefined) {
+    await requireClean(state.worktree);
+    await requireCodeOnly(repo, state.worktree);
+  }
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
   const recorded: State = {
@@ -118,6 +121,14 @@ export async function transition(
 export async function requireClean(worktree: string): Promise<void> {
   const dirty: string = await command(['git', 'status', '--porcelain'], worktree);
   if (dirty !== '') throw new Error(`Uncommitted work in ${worktree}:\n${dirty}`);
+}
+
+export async function requireCodeOnly(repo: Repo, worktree: string): Promise<void> {
+  const files: string = await command(
+    ['git', 'diff', '--name-only', `${target(repo)}...HEAD`, '--', 'issues'],
+    worktree,
+  );
+  if (files !== '') throw new Error(`Issue files on leaf branch belong to ${resolve(repo.root, 'issues')}:\n${files}`);
 }
 
 export async function recoverMerge(repo: Repo, leaf: Leaf): Promise<boolean> {

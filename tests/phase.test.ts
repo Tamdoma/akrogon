@@ -92,7 +92,7 @@ test('review aggregates verdicts, rechecks only A, caps repairs and permits oper
   }
 });
 
-test('handoff to review refuses a dirty worktree and passes once committed', async () => {
+test('handoff to review refuses a dirty worktree and issue files on the branch, then passes', async () => {
   const f: Fixture = await fixture();
   try {
     const worktree: string = resolve(f.home, 'wt');
@@ -105,6 +105,15 @@ test('handoff to review refuses a dirty worktree and passes once committed', asy
     expect(readState(path).phase).toBe('implement');
     await command(['git', 'add', 'work'], worktree);
     await command(['git', 'commit', '-m', 'work'], worktree);
+    mkdirSync(resolve(worktree, 'issues/open/issue/dirty'), { recursive: true });
+    writeFileSync(resolve(worktree, 'issues/open/issue/dirty/review-B.md'), 'stray artifact\n');
+    await command(['git', 'add', 'issues'], worktree);
+    await command(['git', 'commit', '-m', 'artifact on branch'], worktree);
+    const artifacts: Result = await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'B']);
+    expect(artifacts.code).not.toBe(0);
+    expect(artifacts.stderr).toContain('Issue files on leaf branch');
+    expect(readState(path).phase).toBe('implement');
+    await command(['git', 'reset', '--hard', 'HEAD~1'], worktree);
     expect((await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'B'])).code).toBe(0);
     expect(readState(path).phase).toBe('check.review');
   } finally {

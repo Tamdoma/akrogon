@@ -49,6 +49,10 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./pull')).pullCommand(values.all === true);
     break;
+  case 'sync':
+    z.tuple([]).parse(positionals);
+    await (await import('./sync')).syncCommand(process.cwd());
+    break;
   case 'status':
     z.array(z.string()).max(1).parse(positionals);
     await (await import('./status')).statusCommand(positionals[0]);
@@ -58,5 +62,5 @@ switch (verb) {
     await (await import('./install')).install();
     break;
   default:
-    throw new Error('Usage: akrogon <install|init|config|phase|next|pull|status>');
+    throw new Error('Usage: akrogon <install|init|config|phase|next|pull|sync|status>');
 }

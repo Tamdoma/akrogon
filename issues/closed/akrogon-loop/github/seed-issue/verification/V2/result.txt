@@ -1,0 +1,6 @@
+exit: 0
+stdout: https://github.com/upstream/intake/issues/42
+
+stderr: 
+Last operation: created https://github.com/upstream/intake/issues/42
+Next: none intake submitted

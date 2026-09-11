@@ -1,0 +1,24 @@
+slug: pull-close
+phase: merged
+created: 2026-09-09
+priority: "n"
+repo: akrogon
+debate: "yes"
+blocked-by: 
+  - status
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 2
+verdict: 
+  {}
+tab: w8:tG
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/pull-close
+pane: 
+  A: w8:pS
+  B: w8:pT
+slot: A
+prompted: 
+  {}

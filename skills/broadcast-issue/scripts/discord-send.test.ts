@@ -32,7 +32,8 @@ interface Result {
 const sender: string = join(import.meta.dir, 'discord-send.ts');
 const primary: string = 'https://discord.com/api/webhooks/123456/primary-secret';
 const secondary: string = 'https://discord.com/api/webhooks/654321/secondary-secret';
-const payload: string = JSON.stringify({ summary: 'Project: Search works', whats_new: ['Search finds saved items.'] });
+const today: string = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+const payload: string = JSON.stringify({ summary: 'Project: Search works', before: ['Saved items were lost.'], now: ['Search finds saved items.'], next: ['Nothing needs re-saving.'] });
 
 async function run(scenario: Scenario): Promise<Result> {
   const root: string = mkdtempSync(join(tmpdir(), 'akrogon-broadcast-'));
@@ -87,8 +88,24 @@ test('delivers one message to configured targets using only the external file, w
   });
   expect(result.exitCode, result.output).toBe(0);
   expect(result.requests.map((request): string => request.url)).toEqual([primary, secondary]);
-  expect(JSON.parse(result.requests[0]!.body)).toEqual({ content: 'Project: Search works\n\n- Search finds saved items.' });
+  expect(JSON.parse(result.requests[0]!.body)).toEqual({
+    content: `## 🧪 Project: Search works (${today})\n\n**Before**\n- Saved items were lost.\n\n**Now**\n- Search finds saved items.\n\n**Next**\n- Nothing needs re-saving.`,
+  });
   expect(result.files).toEqual(['.config', '.config/akrogon', '.config/akrogon/env', 'boundary.ts', 'requests.jsonl']);
+});
+
+test('splits a long message into several deliveries at section boundaries', async (): Promise<void> => {
+  const long: string = JSON.stringify({ summary: 'Title', before: ['a'.repeat(1500)], now: ['b'.repeat(1500)], next: ['c'] });
+  const result: Result = await run({
+    secrets: `PRIMARY=${primary}`, targets: ['PRIMARY'], payload: long,
+    replies: [{ status: 204, body: '' }, { status: 204, body: '' }],
+  });
+  expect(result.exitCode, result.output).toBe(0);
+  const bodies: string[] = result.requests.map((request): string => JSON.parse(request.body).content);
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0]).toStartWith(`## 🧪 Title (${today})\n\n**Before**`);
+  expect(bodies[1]).toStartWith('**Now**');
+  expect(bodies[1]).toContain('**Next**');
 });
 
 test('refuses missing secrets, invalid routes and empty targets before sending', async (): Promise<void> => {
@@ -107,9 +124,10 @@ test('refuses missing secrets, invalid routes and empty targets before sending',
 
 test('validates the whole message and all targets before any delivery', async (): Promise<void> => {
   for (const invalid of [
-    JSON.stringify({ summary: '', whats_new: ['item'] }),
-    JSON.stringify({ summary: 'Title', whats_new: [] }),
-    JSON.stringify({ summary: 'Title', whats_new: ['a'.repeat(2000)] }),
+    JSON.stringify({ summary: '', before: ['a'], now: ['b'], next: ['c'] }),
+    JSON.stringify({ summary: 'Title', before: [], now: ['b'], next: ['c'] }),
+    JSON.stringify({ summary: 'Title', before: ['a'], now: ['b'] }),
+    JSON.stringify({ summary: 'Title', before: ['a'.repeat(2000)], now: ['b'], next: ['c'] }),
   ]) {
     const result: Result = await run({ secrets: `PRIMARY=${primary}`, targets: ['PRIMARY'], replies: [], payload: invalid });
     expect(result.exitCode).not.toBe(0);

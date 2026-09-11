@@ -1,0 +1,2 @@
+Last operation: stopped at /tmp/seed-issue-ho8tsjat/V5-query origin: origin repository path has a query suffix
+Next: none routing failed

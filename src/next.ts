@@ -110,11 +110,7 @@ async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
       await command(['git', 'rev-parse', '--git-common-dir'], repo.root),
     );
     const actualCommon: string = resolve(path, await command(['git', 'rev-parse', '--git-common-dir'], path));
-    if (
-      realpathSync(expectedCommon) !== realpathSync(actualCommon) ||
-      (await command(['git', 'branch', '--show-current'], path)) !== leaf.state.slug
-    )
-      throw new Error(`Unrelated worktree: ${path}`);
+    if (realpathSync(expectedCommon) !== realpathSync(actualCommon)) throw new Error(`Unrelated worktree: ${path}`);
   } else {
     const branch: Result = await run(
       ['git', 'show-ref', '--verify', '--quiet', `refs/heads/${leaf.state.slug}`],
@@ -312,13 +308,6 @@ async function dispatchLeaf(global: GlobalConfig, repo: Repo, slug: string, expl
       const current: Leaf = recovered ? findLeaf(repo, slug) : leaf;
       if (current.state.phase === 'merged') {
         await completeOwner(repo, current, false);
-        const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === current.state.tab);
-        if (members.some((pane) => pane.agent !== null && !idle(pane))) return false;
-        if (members.length > 0) await command(['herdr', 'tab', 'close', z.string().parse(current.state.tab)]);
-        if (current.state.worktree !== undefined && existsSync(current.state.worktree)) {
-          await command(['git', 'worktree', 'remove', current.state.worktree], repo.root);
-          await command(['git', 'branch', '-d', current.state.slug], repo.root);
-        }
         return true;
       }
       if (current.state.phase === 'failed') {
@@ -336,6 +325,15 @@ async function dispatchLeaf(global: GlobalConfig, repo: Repo, slug: string, expl
       return false;
     });
   });
+}
+
+async function cleanupMerged(repo: Repo, leaf: Leaf): Promise<void> {
+  const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === leaf.state.tab);
+  if (members.length > 0) await command(['herdr', 'tab', 'close', z.string().parse(leaf.state.tab)]);
+  if (leaf.state.worktree !== undefined && existsSync(leaf.state.worktree)) {
+    await command(['git', 'worktree', 'remove', leaf.state.worktree], repo.root);
+    await command(['git', 'branch', '-d', leaf.state.slug], repo.root);
+  }
 }
 
 async function sweepAll(global: GlobalConfig): Promise<void> {
@@ -368,6 +366,9 @@ export async function nextCommand(input: string | undefined): Promise<void> {
   const global: GlobalConfig = readGlobal();
   await withLock(resolve(globalHome(), '.lock'), async () => {
     if (input === '--all') {
+      for (const repo of Object.entries(global.repos).map(([name, path]) => readRepo(name, path)))
+        for (const leaf of allLeaves(repo).filter((leaf) => leaf.state.phase === 'merged'))
+          await cleanupMerged(repo, leaf);
       await sweepAll(global);
       return;
     }

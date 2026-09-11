@@ -205,7 +205,7 @@ test('next refuses hand-built and dependencies, respects capacity, and sends unk
   }
 }, 15000);
 
-test('merged phase leaves tab intact, next closes it and starts dependent from a closed-folder hook', async () => {
+test('merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
@@ -219,9 +219,10 @@ test('merged phase leaves tab intact, next closes it and starts dependent from a
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
     expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
-    expect(database(f).tabs).toHaveLength(1);
-    expect(database(f).tabs[0].label).toBe('second');
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['first', 'second']);
     expect(readState(dependent).attempts.B).toBe(1);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['second']);
   } finally {
     f.clean();
   }
@@ -295,6 +296,9 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     ).toHaveLength(2);
     expect(recovered.stdout).toContain('issue complete landing');
     expect(readState(resolve(f.root, 'issues/closed/landing/landed')).phase).toBe('merged');
+    expect(database(f).tabs).toHaveLength(1);
+    expect(existsSync(worktree)).toBe(true);
+    expect((await next(f, ['--all'])).code).toBe(0);
     expect(database(f).tabs).toHaveLength(0);
     expect(existsSync(worktree)).toBe(false);
     expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/landed'], f.root)).code).toBe(1);
@@ -374,6 +378,33 @@ test('uncommitted work in a merge worktree is never recovered as merged', async 
     expect(result.stderr).toContain('Uncommitted work');
     expect(readState(path).phase).toBe('merge');
     expect(existsSync(resolve(worktree, 'forgotten'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a worktree parked mid-rebase is still dispatched', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'conflict', 'plan.synthesis');
+    expect((await next(f, ['conflict'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    writeFileSync(resolve(worktree, 'clash'), 'leaf side\n');
+    await command(['git', 'add', 'clash'], worktree);
+    await command(['git', 'commit', '-m', 'leaf side'], worktree);
+    writeFileSync(resolve(f.root, 'clash'), 'main side\n');
+    await command(['git', 'add', 'clash'], f.root);
+    await command(['git', 'commit', '-m', 'main side'], f.root);
+    expect((await run(['git', 'rebase', 'HEAD~1'], worktree)).code).toBe(0);
+    expect((await run(['git', 'rebase', await command(['git', 'rev-parse', 'HEAD'], f.root)], worktree)).code).not.toBe(
+      0,
+    );
+    expect(await command(['git', 'branch', '--show-current'], worktree)).toBe('');
+    saveState(path, { ...readState(path), phase: 'check.fix', prompted: {} });
+    const db: Database = database(f);
+    saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
+    expect((await next(f, ['conflict'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(2);
   } finally {
     f.clean();
   }
@@ -476,6 +507,8 @@ test('next awaits sourced completion after a failed rename before removing the w
         .trim()
         .split('\n'),
     ).toHaveLength(2);
+    expect(existsSync(worktree)).toBe(true);
+    expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worktree)).toBe(false);
     expect(database(f).tabs).toHaveLength(0);
   } finally {

@@ -1,0 +1,2 @@
+Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-url/akrogon.yaml: issues_repo is a full URL, not owner/repo
+Next: none routing failed

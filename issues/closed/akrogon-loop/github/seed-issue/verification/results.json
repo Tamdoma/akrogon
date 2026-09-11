@@ -1,0 +1,125 @@
+[
+  {
+    "case": "V1",
+    "calls": 1,
+    "exit": 0,
+    "result": "Last operation: created https://github.com/upstream/intake/issues/42\nNext: none intake submitted\n"
+  },
+  {
+    "case": "V2",
+    "calls": 1,
+    "exit": 0,
+    "result": "Last operation: created https://github.com/upstream/intake/issues/42\nNext: none intake submitted\n"
+  },
+  {
+    "case": "V3-https",
+    "calls": 1,
+    "exit": 0,
+    "result": "Last operation: created https://github.com/consumer/app/issues/42\nNext: none intake submitted\n"
+  },
+  {
+    "case": "V3-scp",
+    "calls": 1,
+    "exit": 0,
+    "result": "Last operation: created https://github.com/consumer/app/issues/42\nNext: none intake submitted\n"
+  },
+  {
+    "case": "V3-ssh",
+    "calls": 1,
+    "exit": 0,
+    "result": "Last operation: created https://github.com/consumer/app/issues/42\nNext: none intake submitted\n"
+  },
+  {
+    "case": "V4-missing",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-missing/akrogon.yaml: missing top-level issues_repo\nNext: none routing failed\n"
+  },
+  {
+    "case": "V4-blank",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-blank/akrogon.yaml: blank issues_repo\nNext: none routing failed\n"
+  },
+  {
+    "case": "V4-null",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-null/akrogon.yaml: null issues_repo\nNext: none routing failed\n"
+  },
+  {
+    "case": "V4-list",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-list/akrogon.yaml: issues_repo is a list, not a string\nNext: none routing failed\n"
+  },
+  {
+    "case": "V4-yaml",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-yaml/akrogon.yaml: invalid YAML: unclosed flow sequence\nNext: none routing failed\n"
+  },
+  {
+    "case": "V4-duplicate",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-duplicate/akrogon.yaml: duplicate issues_repo keys are ambiguous\nNext: none routing failed\n"
+  },
+  {
+    "case": "V4-url",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-url/akrogon.yaml: issues_repo is a full URL, not owner/repo\nNext: none routing failed\n"
+  },
+  {
+    "case": "V4-extra",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-extra/akrogon.yaml: issues_repo has an extra path component\nNext: none routing failed\n"
+  },
+  {
+    "case": "V4-path",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-path/akrogon.yaml: issues_repo has no owner\nNext: none routing failed\n"
+  },
+  {
+    "case": "V5-missing",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V5-missing origin: origin is missing\nNext: none routing failed\n"
+  },
+  {
+    "case": "V5-host",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V5-host origin: origin host gitlab.com is not GitHub.com\nNext: none routing failed\n"
+  },
+  {
+    "case": "V5-lookalike",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V5-lookalike origin: origin host github.com.evil.test is not GitHub.com\nNext: none routing failed\n"
+  },
+  {
+    "case": "V5-path",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V5-path origin: origin repository path has an extra component\nNext: none routing failed\n"
+  },
+  {
+    "case": "V5-local",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V5-local origin: origin is a local path\nNext: none routing failed\n"
+  },
+  {
+    "case": "V5-query",
+    "calls": 0,
+    "result": "Last operation: stopped at /tmp/seed-issue-ho8tsjat/V5-query origin: origin repository path has a query suffix\nNext: none routing failed\n"
+  },
+  {
+    "case": "V6",
+    "calls": 1,
+    "exit": 0,
+    "result": "Last operation: created https://github.com/consumer/app/issues/42\nNext: none intake submitted\n"
+  },
+  {
+    "case": "V7",
+    "calls": 1,
+    "exit": 0,
+    "result": "Last operation: created https://github.com/consumer/app/issues/42\nNext: none intake submitted\n"
+  },
+  {
+    "case": "V8",
+    "calls": 1,
+    "exit": 1,
+    "result": "Last operation: gh issue create failed (exit 1): HTTP 401: controlled authentication error for consumer/app\nNext: none submission failed\n"
+  }
+]

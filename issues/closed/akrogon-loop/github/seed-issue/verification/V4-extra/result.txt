@@ -1,0 +1,2 @@
+Last operation: stopped at /tmp/seed-issue-ho8tsjat/V4-extra/akrogon.yaml: issues_repo has an extra path component
+Next: none routing failed
