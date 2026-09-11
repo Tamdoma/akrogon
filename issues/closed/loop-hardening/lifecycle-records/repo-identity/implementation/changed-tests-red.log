@@ -1,0 +1,158 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 3 changed files, running 3/10 test files
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [612.47ms]
+(pass) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [712.12ms]
+(pass) next waits on a blocked agent instead of counting attempts or flipping seats [478.53ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [703.12ms]
+(pass) failed delivery retries, deduplicates sweeps and resets after a phase transition [324.66ms]
+(pass) busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes [2408.97ms]
+(pass) logical B fallback warns for physical A and unknown agents retain busy observations [865.93ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [686.12ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [661.28ms]
+(pass) a closed tab hook from a merged leaf sweeps and starts the next leaf [646.48ms]
+(pass) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [892.83ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [377.47ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [676.73ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [713.94ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [493.95ms]
+(pass) uncommitted work in a merge worktree is never recovered as merged [390.17ms]
+(pass) a worktree parked mid-rebase is still dispatched [526.30ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [587.76ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [544.63ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [742.35ms]
+(pass) missing registration is isolated during startup [511.63ms]
+(pass) missing registration is isolated during hook [529.86ms]
+(pass) missing registration is isolated during cwd [507.08ms]
+(pass) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [295.93ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 3 [896.09ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 4 [912.02ms]
+(pass) dirty merged worktree cleanup reports the original git error and still sweeps [634.31ms]
+(pass) global lock acquisition failure is fatal [34.57ms]
+(pass) repo lock acquisition failure is fatal [43.03ms]
+(pass) leaf lock acquisition failure is fatal [46.59ms]
+(pass) lock finalization failures and invalid hook events remain fatal [328.25ms]
+(pass) duplicate leaf identity never dispatches an arbitrary leaf [297.25ms]
+(pass) mismatch leaf identity never dispatches an arbitrary leaf [303.22ms]
+878 |     expect(sweep.code).not.toBe(0);
+879 |     for (const result of [selected, sweep]) {
+880 |       const diagnostic: z.infer<typeof skipSchema> = skips(result).find((skip) => skip.path === path)!;
+881 |       expect(diagnostic.repo).toBe('repo');
+882 |       expect(diagnostic.error).toContain(path);
+883 |       expect(diagnostic.error).toMatch(/stored[^\n]*other/i);
+                                     ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /stored[^\n]*other/i
+Received: "Leaf repo mismatch: /tmp/akrogon-Iz6kMj/repo/issues/open/issue/wrong-key"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/repo-identity/tests/next.test.ts:883:32)
+(fail) next selection and sweep report both repo keys without dispatching or changing the mismatched leaf [341.97ms]
+915 |       const result: Result = await next(relocated, ['relocated']);
+916 |       expect(result.code).not.toBe(0);
+917 |       expect(skips(result)).toHaveLength(1);
+918 |       const error: string = skips(result)[0].error;
+919 |       expect(error).toContain(recorded);
+920 |       expect(error).toContain(expected);
+                          ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-QmA1Iq/repo/issues/new-worktrees/relocated"
+Received: "Worktree path mismatch: /tmp/akrogon-QmA1Iq/repo/issues/worktrees/relocated"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/repo-identity/tests/next.test.ts:920:21)
+(fail) changed worktree root reports recorded and expected worktrees without creating or prompting [119.43ms]
+915 |       const result: Result = await next(relocated, ['relocated']);
+916 |       expect(result.code).not.toBe(0);
+917 |       expect(skips(result)).toHaveLength(1);
+918 |       const error: string = skips(result)[0].error;
+919 |       expect(error).toContain(recorded);
+920 |       expect(error).toContain(expected);
+                          ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-RzZanb/moved-repo/issues/worktrees/relocated"
+Received: "Worktree path mismatch: /tmp/akrogon-RzZanb/repo/issues/worktrees/relocated"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/repo-identity/tests/next.test.ts:920:21)
+(fail) changed repo root reports recorded and expected worktrees without creating or prompting [126.91ms]
+(pass) moving a repo with the same registered key supports status, phase and dispatch without a recorded worktree [381.58ms]
+(pass) unknown directory population reserves all new capacity but allows existing tabs [604.27ms]
+(pass) non-Error throws cross the scoped discovery boundary unchanged [33.81ms]
+(pass) explicit unreadable targets retain the original error without a missing-target stack [114.02ms]
+(pass) a selected leaf removed before its repo lock is reported as skipped [49.70ms]
+(pass) recovery fetch deadline releases dispatch locks without transitioning [208.27ms]
+(pass) next prompts an idle agent with null session data [545.20ms]
+(pass) next prompts an idle agent with omitted session data [542.36ms]
+(pass) blocked merge seat A prevents fetch and clean checks in a dirty worktree [409.22ms]
+(pass) blocked merge seat B prevents fetch and clean checks in a dirty worktree [399.61ms]
+(pass) recorded seats stay authoritative with an extra pane first and neither missing [540.11ms]
+(pass) recorded seats stay authoritative with an extra pane first and A missing [541.58ms]
+(pass) recorded seats stay authoritative with an extra pane first and B missing [574.72ms]
+(pass) recorded seats stay authoritative with an extra pane first and both missing [596.59ms]
+(pass) allocation handles an interrupted tab [440.11ms]
+(pass) allocation handles an empty tab [446.97ms]
+(pass) allocation handles an recreated tab [623.75ms]
+(pass) agent start allows 30 seconds while prompt wait remains 5 seconds [311.63ms]
+
+tests/phase.test.ts:
+18 |     const history: string = resolve(f.root, 'issues/log.jsonl');
+19 |     writeFileSync(history, '');
+20 |     const result: Result = await cli(f, ['phase', 'wrong-key', 'implement', '--slot', 'B']);
+21 |     expect(result.code).not.toBe(0);
+22 |     expect(result.stderr).toContain(path);
+23 |     expect(result.stderr).toMatch(/stored[^\n]*other/i);
+                               ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /stored[^\n]*other/i
+Received: "56 | export function allLeaves(repo: Repo): Leaf[] {\n57 |   const leaves: Leaf[] = ['open', 'closed'].flatMap((area) => leavesUnder(resolve(repo.root, 'issues', area)));\n58 |   const slugs: Set<string> = new Set();\n59 |   for (const leaf of leaves) {\n60 |     if (slugs.has(leaf.state.slug)) throw new Error(`Duplicate leaf slug: ${leaf.state.slug}`);\n61 |     if (leaf.state.repo !== repo.name) throw new Error(`Leaf repo mismatch: ${leaf.path}`);\n                                                      ^\nerror: Leaf repo mismatch: /tmp/akrogon-1eD5Hx/repo/issues/open/issue/wrong-key\n      at allLeaves (/home/ivan/Work/infra/akrogon/issues/worktrees/repo-identity/src/state.ts:61:50)\n      at findLeaf (/home/ivan/Work/infra/akrogon/issues/worktrees/repo-identity/src/state.ts:68:34)\n      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/repo-identity/src/phase.ts:162:26)\n      at withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/repo-identity/src/state.ts:85:18)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/repo-identity/tests/phase.test.ts:23:27)
+(fail) valid phase transition rejects a mismatched repo key without changing state or history [41.80ms]
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [221.59ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [325.07ms]
+(pass) handoff to review refuses a dirty worktree and issue files on the branch, then passes [134.67ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [186.13ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [157.83ms]
+(pass) source closure waits for epic movement, deduplicates, and uses the triggering worktree commit under relocated locks [264.44ms]
+(pass) source retries recheck state, skip CLOSED, and continue after final failures with move and logging intact [610.10ms]
+(pass) sourced completion without worktree context fails after rename without a fabricated commit [51.52ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [186.22ms]
+(pass) failed or malformed retry comment listing prevents another close and continues later sources [630.71ms]
+
+tests/status.test.ts:
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [41.82ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [187.37ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [339.35ms]
+251 |     expect(diagnostic).toMatchObject({ unreadable: 'repo', path: resolve(path, 'state.yaml') });
+252 |     expect(overview.stdout).toContain('visible');
+253 |     const detail: Result = await cli(f, ['status', 'wrong-key']);
+254 |     expect(detail.code).not.toBe(0);
+255 |     for (const error of [diagnostic.error, detail.stderr]) {
+256 |       expect(error).toContain(path);
+                          ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-l58CWw/repo/issues/open/issue/wrong-key"
+Received: "[\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      \"repo\"\n    ],\n    \"path\": [],\n    \"message\": \"Invalid input: expected \\\"repo\\\"\"\n  }\n]"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/repo-identity/tests/status.test.ts:256:21)
+(fail) repo mismatch identifies both keys in overview and detail while healthy repos remain visible [77.02ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [63.23ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [128.45ms]
+(pass) busy durations appear in NOTE for every recorded seat without writes or herdr calls [38.41ms]
+
+5 tests failed:
+(fail) next selection and sweep report both repo keys without dispatching or changing the mismatched leaf [341.97ms]
+(fail) changed worktree root reports recorded and expected worktrees without creating or prompting [119.43ms]
+(fail) changed repo root reports recorded and expected worktrees without creating or prompting [126.91ms]
+(fail) valid phase transition rejects a mismatched repo key without changing state or history [41.80ms]
+(fail) repo mismatch identifies both keys in overview and detail while healthy repos remain visible [77.02ms]
+
+ 67 pass
+ 5 fail
+ 645 expect() calls
+Ran 72 tests across 3 files. [31.05s]

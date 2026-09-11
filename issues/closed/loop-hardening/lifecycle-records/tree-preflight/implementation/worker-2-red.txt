@@ -1,0 +1,404 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 8 changed files, running 10/11 test files
+
+tests/config.test.ts:
+(pass) config combines defaults and repo values, reports none, and recalculates worktree base [159.96ms]
+
+tests/init.test.ts:
+(pass) init writes proposal, registration and toolkit and preserves repeated user files [108.88ms]
+(pass) init ignores the custom worktree root and preserves user rules on repeated init [64.15ms]
+(pass) init resolves relative external worktree root from nested cwd [34.32ms]
+(pass) init resolves absolute external worktree root from nested cwd [34.01ms]
+(pass) init resolves repo-prefix sibling worktree root from nested cwd [34.62ms]
+(pass) init resolves normalized relative internal worktree root from nested cwd [32.71ms]
+(pass) init resolves absolute internal worktree root from nested cwd [32.27ms]
+(pass) init resolves relative repo-equal worktree root from nested cwd [31.79ms]
+(pass) init resolves absolute repo-equal worktree root from nested cwd [31.63ms]
+
+tests/install.test.ts:
+(pass) install creates all four absent harness roots and repeats without changing links or herdr arguments [233.00ms]
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/.evidence/install-prune-links/home-listing.json
+(pass) install prunes only dangling owned links and preserves real entries and foreign links in every root [122.66ms]
+(pass) install prunes before refusing directory at .claude/skills without installing links or calling herdr [34.11ms]
+(pass) install prunes before refusing foreign-link at .claude/skills without installing links or calling herdr [33.99ms]
+(pass) install prunes before refusing wrong-owned-link at .claude/skills without installing links or calling herdr [31.80ms]
+(pass) install prunes before refusing directory at .agents/skills without installing links or calling herdr [29.87ms]
+(pass) install prunes before refusing foreign-link at .agents/skills without installing links or calling herdr [29.92ms]
+(pass) install prunes before refusing wrong-owned-link at .agents/skills without installing links or calling herdr [31.77ms]
+(pass) install prunes before refusing directory at .codex/skills without installing links or calling herdr [35.29ms]
+(pass) install prunes before refusing foreign-link at .codex/skills without installing links or calling herdr [32.85ms]
+(pass) install prunes before refusing wrong-owned-link at .codex/skills without installing links or calling herdr [31.85ms]
+(pass) install prunes before refusing directory at .pi/agent/skills without installing links or calling herdr [32.38ms]
+(pass) install prunes before refusing foreign-link at .pi/agent/skills without installing links or calling herdr [32.41ms]
+(pass) install prunes before refusing wrong-owned-link at .pi/agent/skills without installing links or calling herdr [30.18ms]
+(pass) install still refuses an executable destination conflict before linking or herdr calls [32.16ms]
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [572.28ms]
+(pass) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [679.02ms]
+(pass) next waits on a blocked agent instead of counting attempts or flipping seats [486.77ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [711.63ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [142.07ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [703.84ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [691.07ms]
+(pass) a closed tab hook from a merged leaf sweeps and starts the next leaf [677.57ms]
+(pass) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [879.93ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [387.64ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [681.87ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [697.94ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [502.46ms]
+(pass) uncommitted work in a merge worktree is never recovered as merged [382.48ms]
+(pass) a worktree parked mid-rebase is still dispatched [523.20ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [515.66ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [573.18ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [774.96ms]
+(pass) missing registration is isolated during startup [503.63ms]
+(pass) missing registration is isolated during hook [522.49ms]
+(pass) missing registration is isolated during cwd [516.35ms]
+(pass) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [306.41ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 3 [855.03ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 4 [844.50ms]
+(pass) dirty merged worktree cleanup reports the original git error and still sweeps [619.17ms]
+(pass) global lock acquisition failure is fatal [36.25ms]
+(pass) repo lock acquisition failure is fatal [38.91ms]
+(pass) leaf lock acquisition failure is fatal [47.06ms]
+(pass) lock finalization failures and invalid hook events remain fatal [315.32ms]
+(pass) duplicate leaf identity never dispatches an arbitrary leaf [286.32ms]
+(pass) mismatch leaf identity never dispatches an arbitrary leaf [280.53ms]
+(pass) unknown directory population reserves all new capacity but allows existing tabs [566.70ms]
+(pass) non-Error throws cross the scoped discovery boundary unchanged [35.50ms]
+(pass) explicit unreadable targets retain the original error without a missing-target stack [105.16ms]
+(pass) a selected leaf removed before its repo lock is reported as skipped [41.71ms]
+(pass) recovery fetch deadline releases dispatch locks without transitioning [196.95ms]
+(pass) next prompts an idle agent with null session data [487.96ms]
+(pass) next prompts an idle agent with omitted session data [492.00ms]
+(pass) blocked merge seat A prevents fetch and clean checks in a dirty worktree [380.64ms]
+(pass) blocked merge seat B prevents fetch and clean checks in a dirty worktree [369.33ms]
+(pass) recorded seats stay authoritative with an extra pane first and neither missing [495.20ms]
+(pass) recorded seats stay authoritative with an extra pane first and A missing [511.01ms]
+(pass) recorded seats stay authoritative with an extra pane first and B missing [528.72ms]
+(pass) recorded seats stay authoritative with an extra pane first and both missing [550.07ms]
+(pass) allocation handles an interrupted tab [420.70ms]
+(pass) allocation handles an empty tab [401.35ms]
+(pass) allocation handles an recreated tab [582.95ms]
+(pass) agent start allows 30 seconds while prompt wait remains 5 seconds [290.39ms]
+1021 |         const db: string = readFileSync(f.db, 'utf8');
+1022 |         writeFileSync(resolve(f.home, 'bin/flock'), '#!/bin/sh\nprintf invoked > "$FLOCK_CALLS"\nexit 91\n', { mode: 0o755 });
+1023 |         for (const input of ['invalid', path]) {
+1024 |           const result: Result = await cli(f, ['next', input], f.root, { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') }, 3000);
+1025 |           expect(result.code).toBe(1);
+1026 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-i35liQ/repo/issues/open/state.yaml"
+Received: "99 |   );\n100 |   const reader: ReadableStreamDefaultReader<Uint8Array> = child.stdout.getReader();\n101 |   const acquired: Awaited<ReturnType<typeof reader.read>> = await reader.read();\n102 |   if (acquired.done) {\n103 |     const stderr: string = await new Response(child.stderr).text();\n104 |     throw new Error(JSON.stringify({ lock: path, code: await child.exited, stderr }));\n                    ^\nerror: {\"lock\":\"/tmp/akrogon-i35liQ/.lock\",\"code\":91,\"stderr\":\"\"}\n      at withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/state.ts:104:15)\n      at async nextCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:486:9)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1026:33)
+(fail) explicit next rejects open/ before any flock [37.04ms]
+1021 |         const db: string = readFileSync(f.db, 'utf8');
+1022 |         writeFileSync(resolve(f.home, 'bin/flock'), '#!/bin/sh\nprintf invoked > "$FLOCK_CALLS"\nexit 91\n', { mode: 0o755 });
+1023 |         for (const input of ['invalid', path]) {
+1024 |           const result: Result = await cli(f, ['next', input], f.root, { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') }, 3000);
+1025 |           expect(result.code).toBe(1);
+1026 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-JPzvFs/repo/issues/open/invalid/state.yaml"
+Received: "99 |   );\n100 |   const reader: ReadableStreamDefaultReader<Uint8Array> = child.stdout.getReader();\n101 |   const acquired: Awaited<ReturnType<typeof reader.read>> = await reader.read();\n102 |   if (acquired.done) {\n103 |     const stderr: string = await new Response(child.stderr).text();\n104 |     throw new Error(JSON.stringify({ lock: path, code: await child.exited, stderr }));\n                    ^\nerror: {\"lock\":\"/tmp/akrogon-JPzvFs/.lock\",\"code\":91,\"stderr\":\"\"}\n      at withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/state.ts:104:15)\n      at async nextCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:486:9)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1026:33)
+(fail) explicit next rejects open/invalid before any flock [34.84ms]
+1021 |         const db: string = readFileSync(f.db, 'utf8');
+1022 |         writeFileSync(resolve(f.home, 'bin/flock'), '#!/bin/sh\nprintf invoked > "$FLOCK_CALLS"\nexit 91\n', { mode: 0o755 });
+1023 |         for (const input of ['invalid', path]) {
+1024 |           const result: Result = await cli(f, ['next', input], f.root, { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') }, 3000);
+1025 |           expect(result.code).toBe(1);
+1026 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-8mFAQz/repo/issues/open/epic/issue/extra/invalid/state.yaml"
+Received: "99 |   );\n100 |   const reader: ReadableStreamDefaultReader<Uint8Array> = child.stdout.getReader();\n101 |   const acquired: Awaited<ReturnType<typeof reader.read>> = await reader.read();\n102 |   if (acquired.done) {\n103 |     const stderr: string = await new Response(child.stderr).text();\n104 |     throw new Error(JSON.stringify({ lock: path, code: await child.exited, stderr }));\n                    ^\nerror: {\"lock\":\"/tmp/akrogon-8mFAQz/.lock\",\"code\":91,\"stderr\":\"\"}\n      at withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/state.ts:104:15)\n      at async nextCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:486:9)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1026:33)
+(fail) explicit next rejects open/epic/issue/extra/invalid before any flock [35.28ms]
+1021 |         const db: string = readFileSync(f.db, 'utf8');
+1022 |         writeFileSync(resolve(f.home, 'bin/flock'), '#!/bin/sh\nprintf invoked > "$FLOCK_CALLS"\nexit 91\n', { mode: 0o755 });
+1023 |         for (const input of ['invalid', path]) {
+1024 |           const result: Result = await cli(f, ['next', input], f.root, { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') }, 3000);
+1025 |           expect(result.code).toBe(1);
+1026 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-Ru0W5q/repo/issues/closed/state.yaml"
+Received: "99 |   );\n100 |   const reader: ReadableStreamDefaultReader<Uint8Array> = child.stdout.getReader();\n101 |   const acquired: Awaited<ReturnType<typeof reader.read>> = await reader.read();\n102 |   if (acquired.done) {\n103 |     const stderr: string = await new Response(child.stderr).text();\n104 |     throw new Error(JSON.stringify({ lock: path, code: await child.exited, stderr }));\n                    ^\nerror: {\"lock\":\"/tmp/akrogon-Ru0W5q/.lock\",\"code\":91,\"stderr\":\"\"}\n      at withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/state.ts:104:15)\n      at async nextCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:486:9)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1026:33)
+(fail) explicit next rejects closed/ before any flock [35.99ms]
+1021 |         const db: string = readFileSync(f.db, 'utf8');
+1022 |         writeFileSync(resolve(f.home, 'bin/flock'), '#!/bin/sh\nprintf invoked > "$FLOCK_CALLS"\nexit 91\n', { mode: 0o755 });
+1023 |         for (const input of ['invalid', path]) {
+1024 |           const result: Result = await cli(f, ['next', input], f.root, { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') }, 3000);
+1025 |           expect(result.code).toBe(1);
+1026 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-gR7H6f/repo/issues/closed/invalid/state.yaml"
+Received: "99 |   );\n100 |   const reader: ReadableStreamDefaultReader<Uint8Array> = child.stdout.getReader();\n101 |   const acquired: Awaited<ReturnType<typeof reader.read>> = await reader.read();\n102 |   if (acquired.done) {\n103 |     const stderr: string = await new Response(child.stderr).text();\n104 |     throw new Error(JSON.stringify({ lock: path, code: await child.exited, stderr }));\n                    ^\nerror: {\"lock\":\"/tmp/akrogon-gR7H6f/.lock\",\"code\":91,\"stderr\":\"\"}\n      at withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/state.ts:104:15)\n      at async nextCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:486:9)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1026:33)
+(fail) explicit next rejects closed/invalid before any flock [33.15ms]
+1021 |         const db: string = readFileSync(f.db, 'utf8');
+1022 |         writeFileSync(resolve(f.home, 'bin/flock'), '#!/bin/sh\nprintf invoked > "$FLOCK_CALLS"\nexit 91\n', { mode: 0o755 });
+1023 |         for (const input of ['invalid', path]) {
+1024 |           const result: Result = await cli(f, ['next', input], f.root, { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') }, 3000);
+1025 |           expect(result.code).toBe(1);
+1026 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-RGlIBT/repo/issues/closed/epic/issue/extra/invalid/state.yaml"
+Received: "99 |   );\n100 |   const reader: ReadableStreamDefaultReader<Uint8Array> = child.stdout.getReader();\n101 |   const acquired: Awaited<ReturnType<typeof reader.read>> = await reader.read();\n102 |   if (acquired.done) {\n103 |     const stderr: string = await new Response(child.stderr).text();\n104 |     throw new Error(JSON.stringify({ lock: path, code: await child.exited, stderr }));\n                    ^\nerror: {\"lock\":\"/tmp/akrogon-RGlIBT/.lock\",\"code\":91,\"stderr\":\"\"}\n      at withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/state.ts:104:15)\n      at async nextCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:486:9)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1026:33)
+(fail) explicit next rejects closed/epic/issue/extra/invalid before any flock [34.72ms]
+1054 |       const bad: string = leaf(f, 'invalid', 'merged', { tab: 'invalid-tab', worktree: resolve(f.home, 'invalid-worktree') }, 'epic/issue/extra');
+1055 |       mkdirSync(resolve(f.home, 'invalid-worktree'));
+1056 |       const before: string = readFileSync(resolve(bad, 'state.yaml'), 'utf8');
+1057 |       const result: Result = await next(f, route === 'hook' ? [] : [route], route === 'hook' ? { HERDR_PANE_ID: readState(healthy).pane.B } : {});
+1058 |       expect(result.code).toBe(1);
+1059 |       expect(result.stderr).toContain(resolve(bad, 'state.yaml'));
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-8px8le/repo/issues/open/epic/issue/extra/invalid/state.yaml"
+Received: "{\"repo\":\"repo\",\"path\":\"/tmp/akrogon-8px8le/repo/issues/open/epic/issue/extra/invalid\",\"slug\":\"invalid\",\"error\":\"{\\\"command\\\":[\\\"git\\\",\\\"worktree\\\",\\\"remove\\\",\\\"/tmp/akrogon-8px8le/invalid-worktree\\\"],\\\"cwd\\\":\\\"/tmp/akrogon-8px8le/repo\\\",\\\"code\\\":128,\\\"stdout\\\":\\\"\\\",\\\"stderr\\\":\\\"fatal: '/tmp/akrogon-8px8le/invalid-worktree' is not a working tree\\\"}\"}"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1059:29)
+(fail) invalid merged depth stays excluded during --all with healthy work [312.30ms]
+(pass) invalid merged depth stays excluded during . with healthy work [301.62ms]
+1053 |       }
+1054 |       const bad: string = leaf(f, 'invalid', 'merged', { tab: 'invalid-tab', worktree: resolve(f.home, 'invalid-worktree') }, 'epic/issue/extra');
+1055 |       mkdirSync(resolve(f.home, 'invalid-worktree'));
+1056 |       const before: string = readFileSync(resolve(bad, 'state.yaml'), 'utf8');
+1057 |       const result: Result = await next(f, route === 'hook' ? [] : [route], route === 'hook' ? { HERDR_PANE_ID: readState(healthy).pane.B } : {});
+1058 |       expect(result.code).toBe(1);
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1058:27)
+(fail) invalid merged depth stays excluded during hook with healthy work [499.33ms]
+1075 |       const parked: string = resolve(f.root, 'issues/parked', owner, 'resting');
+1076 |       mkdirSync(parked, { recursive: true });
+1077 |       writeFileSync(resolve(parked, 'state.yaml'), 'slug: [');
+1078 |       const result: Result = await next(f, ['resting']);
+1079 |       expect(result.code).toBe(1);
+1080 |       expect(result.stderr).toContain('Missing leaf: resting (parked)');
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Missing leaf: resting (parked)"
+Received: "547 |         : inventory.leaves.filter(\n548 |             (leaf) => within(leaf.path, folder) || within(folder, leaf.path) || inWorktree(folder, leaf),\n549 |           );\n550 |     if (selected.length === 0) {\n551 |       if (inventory.unreadable > 0 || inventory.unknown) return;\n552 |       if (input !== undefined && !existsSync(folder)) throw new Error(`Missing leaf: ${input}`);\n                                                                      ^\nerror: Missing leaf: resting\n      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:552:65)\n      at async withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/state.ts:107:18)\n      at async nextCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:486:9)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1080:29)
+(fail) next identifies dormant issue/resting without parsing and prefers active leaves [37.63ms]
+1075 |       const parked: string = resolve(f.root, 'issues/parked', owner, 'resting');
+1076 |       mkdirSync(parked, { recursive: true });
+1077 |       writeFileSync(resolve(parked, 'state.yaml'), 'slug: [');
+1078 |       const result: Result = await next(f, ['resting']);
+1079 |       expect(result.code).toBe(1);
+1080 |       expect(result.stderr).toContain('Missing leaf: resting (parked)');
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Missing leaf: resting (parked)"
+Received: "547 |         : inventory.leaves.filter(\n548 |             (leaf) => within(leaf.path, folder) || within(folder, leaf.path) || inWorktree(folder, leaf),\n549 |           );\n550 |     if (selected.length === 0) {\n551 |       if (inventory.unreadable > 0 || inventory.unknown) return;\n552 |       if (input !== undefined && !existsSync(folder)) throw new Error(`Missing leaf: ${input}`);\n                                                                      ^\nerror: Missing leaf: resting\n      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:552:65)\n      at async withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/state.ts:107:18)\n      at async nextCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:486:9)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1080:29)
+(fail) next identifies dormant epic/issue/resting without parsing and prefers active leaves [37.76ms]
+
+tests/park.test.ts:
+(pass) park and unpark move whole issues by name, refuse running ones, and keep the loop blind to parked work [515.07ms]
+(pass) park --all skips running issues and unpark --all restores everything [101.15ms]
+(pass) park keeps prerequisites that open leaves still depend on, and unpark refuses dependents of parked work [502.67ms]
+
+tests/phase.test.ts:
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [211.13ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [315.58ms]
+(pass) handoff to review refuses a dirty worktree and issue files on the branch, then passes [135.94ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [181.87ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [153.55ms]
+(pass) source closure waits for epic movement, deduplicates, and uses the triggering worktree commit under relocated locks [251.47ms]
+(pass) source retries recheck state, skip CLOSED, and continue after final failures with move and logging intact [584.35ms]
+(pass) sourced completion without worktree context fails after rename without a fabricated commit [44.73ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [176.77ms]
+(pass) failed or malformed retry comment listing prevents another close and continues later sources [636.93ms]
+
+tests/pull.test.ts:
+(pass) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [187.92ms]
+(pass) pull caps slugs at word boundaries and hard cuts oversized first words [68.32ms]
+(pass) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [347.04ms]
+(pass) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [252.18ms]
+(pass) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [162.19ms]
+(pass) concurrent pulls serialize listing and reconciliation [292.87ms]
+(pass) startup runs pull all before next all and wrappers forward arguments [9.86ms]
+
+tests/status.test.ts:
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [43.21ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [185.82ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [328.00ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [62.34ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [116.89ms]
+313 |       mkdirSync(path, { recursive: true });
+314 |       renameSync(resolve(source, 'state.yaml'), resolve(path, 'state.yaml'));
+315 |       rmSync(source, { recursive: true });
+316 |       const before: Record<string, string> = snapshot(f.root);
+317 |       const overview: Result = await cli(f, ['status']);
+318 |       expect(overview.code).toBe(1);
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/status.test.ts:318:29)
+(fail) status reports invalid open/ while showing another repo without writes [37.77ms]
+313 |       mkdirSync(path, { recursive: true });
+314 |       renameSync(resolve(source, 'state.yaml'), resolve(path, 'state.yaml'));
+315 |       rmSync(source, { recursive: true });
+316 |       const before: Record<string, string> = snapshot(f.root);
+317 |       const overview: Result = await cli(f, ['status']);
+318 |       expect(overview.code).toBe(1);
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/status.test.ts:318:29)
+(fail) status reports invalid open/invalid while showing another repo without writes [41.13ms]
+313 |       mkdirSync(path, { recursive: true });
+314 |       renameSync(resolve(source, 'state.yaml'), resolve(path, 'state.yaml'));
+315 |       rmSync(source, { recursive: true });
+316 |       const before: Record<string, string> = snapshot(f.root);
+317 |       const overview: Result = await cli(f, ['status']);
+318 |       expect(overview.code).toBe(1);
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/status.test.ts:318:29)
+(fail) status reports invalid open/epic/issue/extra/invalid while showing another repo without writes [37.17ms]
+348 |       expect(result.stderr).toContain('Missing leaf: resting (parked)');
+349 |       for (const slug of ['absent', 'issue', 'epic']) {
+350 |         const missing: Result = await cli(f, ['status', slug]);
+351 |         expect(missing.code).toBe(1);
+352 |         expect(missing.stderr).toContain(`Missing leaf: ${slug}`);
+353 |         expect(missing.stderr).not.toContain('(parked)');
+                                         ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "(parked)"
+Received: "86 |   return `Missing leaf: ${slug}${parked ? ' (parked)' : ''}`;\n87 | }\n88 | \n89 | export function findLeaf(repo: Repo, slug: string): Leaf {\n90 |   const leaf: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === slug);\n91 |   if (leaf === undefined) throw new Error(missingLeafMessage(repo, slug));\n                                         ^\nerror: Missing leaf: absent\n      at findLeaf (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/state.ts:91:37)\n      at statusCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/status.ts:127:24)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/status.test.ts:353:36)
+(fail) status identifies dormant issue/resting and prefers open or closed leaves [67.88ms]
+348 |       expect(result.stderr).toContain('Missing leaf: resting (parked)');
+349 |       for (const slug of ['absent', 'issue', 'epic']) {
+350 |         const missing: Result = await cli(f, ['status', slug]);
+351 |         expect(missing.code).toBe(1);
+352 |         expect(missing.stderr).toContain(`Missing leaf: ${slug}`);
+353 |         expect(missing.stderr).not.toContain('(parked)');
+                                         ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "(parked)"
+Received: "86 |   return `Missing leaf: ${slug}${parked ? ' (parked)' : ''}`;\n87 | }\n88 | \n89 | export function findLeaf(repo: Repo, slug: string): Leaf {\n90 |   const leaf: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === slug);\n91 |   if (leaf === undefined) throw new Error(missingLeafMessage(repo, slug));\n                                         ^\nerror: Missing leaf: absent\n      at findLeaf (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/state.ts:91:37)\n      at statusCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/status.ts:127:24)\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/status.test.ts:353:36)
+(fail) status identifies dormant epic/issue/resting and prefers open or closed leaves [61.70ms]
+
+tests/sync.test.ts:
+(pass) sync commits local changes, rebases on the remote and pushes [131.71ms]
+(pass) sync preserves unrelated edits with advancing remote=false [72.34ms]
+(pass) sync preserves unrelated edits with advancing remote=true [89.01ms]
+(pass) autostash restoration conflict refuses push and preserves recovery stash [87.61ms]
+(pass) sync refuses side without touching HEAD or index [54.21ms]
+(pass) sync refuses detached HEAD without touching HEAD or index [55.34ms]
+(pass) sync refuses staged exclusion "outside file \n" [53.79ms]
+(pass) sync refuses staged exclusion "issues/seeds/note" [54.44ms]
+(pass) sync refuses staged exclusion "issues/.lock" [52.68ms]
+(pass) sync refuses staged exclusion "issues/nested/.lock" [52.25ms]
+(pass) sync refuses staged exclusion "issues/worktrees/branch/file" [50.29ms]
+(pass) sync refuses staged exclusion "rename" [51.63ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/worktrees [85.75ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/custom trees [81.33ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/tree[1]* [79.32ms]
+(pass) sync scopes tracked changes and new files with worktree root ../external [81.00ms]
+(pass) sync scopes tracked changes and new files with worktree root . [75.35ms]
+(pass) sync holds global then repo locks through push while real park waits [112.84ms]
+(pass) sync owns global lock while waiting for repo lock [72.00ms]
+(pass) sync refuses active coordination lock issues/.lock from local [56.27ms]
+(pass) sync refuses active coordination lock issues/.lock from incoming [74.84ms]
+(pass) sync refuses active coordination lock issues/.lock from replay [78.17ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from local [54.60ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from incoming [72.85ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from replay [77.40ms]
+(pass) sync preserves ignored "collision [1]* \n" against incoming "collision [1]* \n" [83.30ms]
+(pass) sync preserves ignored "collision/file" against incoming "collision" [82.74ms]
+(pass) sync preserves ignored "collision" against incoming "collision/file" [84.04ms]
+(pass) sync preserves ignored "collision/operator" against incoming "collision" [84.13ms]
+(pass) sync preserves ignored "collision [1]* \n" against replay "collision [1]* \n" [87.48ms]
+(pass) sync preserves ignored "collision/file" against replay "collision" [87.86ms]
+(pass) sync preserves ignored "collision" against replay "collision/file" [89.13ms]
+(pass) sync preserves ignored "collision/operator" against replay "collision" [93.80ms]
+(pass) sync permits harmless ignored paths while preserving tracked autostash edits [98.85ms]
+
+tests/state.test.ts:
+(pass) allLeaves validates open depth 0 before reading state [5.79ms]
+(pass) allLeaves validates open depth 1 before reading state [5.27ms]
+(pass) allLeaves validates open depth 2 before reading state [5.74ms]
+(pass) allLeaves validates open depth 3 before reading state [6.12ms]
+(pass) allLeaves validates open depth 4 before reading state [5.39ms]
+(pass) allLeaves validates closed depth 0 before reading state [5.18ms]
+(pass) allLeaves validates closed depth 1 before reading state [5.18ms]
+(pass) allLeaves validates closed depth 2 before reading state [5.06ms]
+(pass) allLeaves validates closed depth 3 before reading state [5.20ms]
+(pass) allLeaves validates closed depth 4 before reading state [4.98ms]
+(pass) findLeaf identifies parked issue/leaf without parsing its state [5.15ms]
+(pass) findLeaf identifies parked epic/issue/leaf without parsing its state [5.15ms]
+(pass) findLeaf ignores parked folders without state and unsupported nesting [5.23ms]
+
+15 tests failed:
+(fail) explicit next rejects open/ before any flock [37.04ms]
+(fail) explicit next rejects open/invalid before any flock [34.84ms]
+(fail) explicit next rejects open/epic/issue/extra/invalid before any flock [35.28ms]
+(fail) explicit next rejects closed/ before any flock [35.99ms]
+(fail) explicit next rejects closed/invalid before any flock [33.15ms]
+(fail) explicit next rejects closed/epic/issue/extra/invalid before any flock [34.72ms]
+(fail) invalid merged depth stays excluded during --all with healthy work [312.30ms]
+(fail) invalid merged depth stays excluded during hook with healthy work [499.33ms]
+(fail) next identifies dormant issue/resting without parsing and prefers active leaves [37.63ms]
+(fail) next identifies dormant epic/issue/resting without parsing and prefers active leaves [37.76ms]
+(fail) status reports invalid open/ while showing another repo without writes [37.77ms]
+(fail) status reports invalid open/invalid while showing another repo without writes [41.13ms]
+(fail) status reports invalid open/epic/issue/extra/invalid while showing another repo without writes [37.17ms]
+(fail) status identifies dormant issue/resting and prefers open or closed leaves [67.88ms]
+(fail) status identifies dormant epic/issue/resting and prefers open or closed leaves [61.70ms]
+
+ 146 pass
+ 15 fail
+ 1352 expect() calls
+Ran 161 tests across 10 files. [33.77s]
+
+Exit code: 1

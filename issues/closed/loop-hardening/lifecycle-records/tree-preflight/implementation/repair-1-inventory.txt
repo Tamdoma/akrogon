@@ -1,0 +1,4 @@
+Command: bun -e import { readRepo } from "./src/config.ts"; import { allLeaves } from "./src/state.ts"; const repo = readRepo("akrogon", "/home/ivan/Work/infra/akrogon"); console.log(JSON.stringify({repo: repo.name, count: allLeaves(repo).length}));
+{"repo":"akrogon","count":29}
+
+Exit code: 0

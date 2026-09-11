@@ -80,6 +80,7 @@ if (args[0] === 'tab' && args[1] === 'create') {
   result({ tab, root_pane: root });
 }
 if (args[0] === 'pane' && args[1] === 'split') {
+  if (args.includes('--workspace')) failure('unknown option: --workspace');
   if (db.failSplitOnce) {
     db.failSplitOnce = false;
     failure('fixture_split_failed');

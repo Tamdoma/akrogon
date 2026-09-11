@@ -1,0 +1,228 @@
+Command: bun test
+bun test v1.4.0 (34cbb9a40)
+
+tests/config.test.ts:
+(pass) config combines defaults and repo values, reports none, and recalculates worktree base [160.60ms]
+
+tests/init.test.ts:
+(pass) init writes proposal, registration and toolkit and preserves repeated user files [111.73ms]
+(pass) init ignores the custom worktree root and preserves user rules on repeated init [59.79ms]
+(pass) init resolves relative external worktree root from nested cwd [29.25ms]
+(pass) init resolves absolute external worktree root from nested cwd [33.25ms]
+(pass) init resolves repo-prefix sibling worktree root from nested cwd [35.97ms]
+(pass) init resolves normalized relative internal worktree root from nested cwd [33.42ms]
+(pass) init resolves absolute internal worktree root from nested cwd [30.74ms]
+(pass) init resolves relative repo-equal worktree root from nested cwd [30.76ms]
+(pass) init resolves absolute repo-equal worktree root from nested cwd [33.14ms]
+
+tests/install.test.ts:
+(pass) install creates all four absent harness roots and repeats without changing links or herdr arguments [241.38ms]
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/.evidence/install-prune-links/home-listing.json
+(pass) install prunes only dangling owned links and preserves real entries and foreign links in every root [122.88ms]
+(pass) install prunes before refusing directory at .claude/skills without installing links or calling herdr [28.46ms]
+(pass) install prunes before refusing foreign-link at .claude/skills without installing links or calling herdr [36.02ms]
+(pass) install prunes before refusing wrong-owned-link at .claude/skills without installing links or calling herdr [36.12ms]
+(pass) install prunes before refusing directory at .agents/skills without installing links or calling herdr [28.53ms]
+(pass) install prunes before refusing foreign-link at .agents/skills without installing links or calling herdr [34.35ms]
+(pass) install prunes before refusing wrong-owned-link at .agents/skills without installing links or calling herdr [29.25ms]
+(pass) install prunes before refusing directory at .codex/skills without installing links or calling herdr [34.29ms]
+(pass) install prunes before refusing foreign-link at .codex/skills without installing links or calling herdr [31.25ms]
+(pass) install prunes before refusing wrong-owned-link at .codex/skills without installing links or calling herdr [31.23ms]
+(pass) install prunes before refusing directory at .pi/agent/skills without installing links or calling herdr [30.25ms]
+(pass) install prunes before refusing foreign-link at .pi/agent/skills without installing links or calling herdr [29.68ms]
+(pass) install prunes before refusing wrong-owned-link at .pi/agent/skills without installing links or calling herdr [32.77ms]
+(pass) install still refuses an executable destination conflict before linking or herdr calls [32.64ms]
+
+tests/park.test.ts:
+(pass) park and unpark move whole issues by name, refuse running ones, and keep the loop blind to parked work [531.71ms]
+(pass) park --all skips running issues and unpark --all restores everything [97.33ms]
+(pass) park keeps prerequisites that open leaves still depend on, and unpark refuses dependents of parked work [483.53ms]
+
+tests/pull.test.ts:
+(pass) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [182.19ms]
+(pass) pull caps slugs at word boundaries and hard cuts oversized first words [61.58ms]
+(pass) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [336.01ms]
+(pass) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [247.47ms]
+(pass) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [160.14ms]
+(pass) concurrent pulls serialize listing and reconciliation [287.27ms]
+(pass) startup runs pull all before next all and wrappers forward arguments [9.19ms]
+
+tests/shell.test.ts:
+(pass) deadline kills sleeping attempt after no failures [110.83ms]
+(pass) deadline kills sleeping attempt after one failure [110.96ms]
+(pass) ordinary retry preserves warning and second result with optional deadlines [4.78ms]
+(pass) standalone command clears long deadline on exit 0 [19.29ms]
+(pass) standalone command clears long deadline on exit 7 [20.75ms]
+
+tests/sync.test.ts:
+(pass) sync commits local changes, rebases on the remote and pushes [130.16ms]
+(pass) sync preserves unrelated edits with advancing remote=false [77.51ms]
+(pass) sync preserves unrelated edits with advancing remote=true [91.66ms]
+(pass) autostash restoration conflict refuses push and preserves recovery stash [85.41ms]
+(pass) sync refuses side without touching HEAD or index [56.68ms]
+(pass) sync refuses detached HEAD without touching HEAD or index [51.93ms]
+(pass) sync refuses staged exclusion "outside file \n" [50.94ms]
+(pass) sync refuses staged exclusion "issues/seeds/note" [51.78ms]
+(pass) sync refuses staged exclusion "issues/.lock" [54.96ms]
+(pass) sync refuses staged exclusion "issues/nested/.lock" [52.06ms]
+(pass) sync refuses staged exclusion "issues/worktrees/branch/file" [51.33ms]
+(pass) sync refuses staged exclusion "rename" [52.18ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/worktrees [83.78ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/custom trees [85.77ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/tree[1]* [78.30ms]
+(pass) sync scopes tracked changes and new files with worktree root ../external [83.98ms]
+(pass) sync scopes tracked changes and new files with worktree root . [75.26ms]
+(pass) sync holds global then repo locks through push while real park waits [116.26ms]
+(pass) sync owns global lock while waiting for repo lock [71.66ms]
+(pass) sync refuses active coordination lock issues/.lock from local [56.97ms]
+(pass) sync refuses active coordination lock issues/.lock from incoming [76.04ms]
+(pass) sync refuses active coordination lock issues/.lock from replay [76.15ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from local [56.07ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from incoming [71.59ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from replay [75.04ms]
+(pass) sync preserves ignored "collision [1]* \n" against incoming "collision [1]* \n" [80.75ms]
+(pass) sync preserves ignored "collision/file" against incoming "collision" [85.29ms]
+(pass) sync preserves ignored "collision" against incoming "collision/file" [78.15ms]
+(pass) sync preserves ignored "collision/operator" against incoming "collision" [85.42ms]
+(pass) sync preserves ignored "collision [1]* \n" against replay "collision [1]* \n" [90.65ms]
+(pass) sync preserves ignored "collision/file" against replay "collision" [89.32ms]
+(pass) sync preserves ignored "collision" against replay "collision/file" [88.19ms]
+(pass) sync preserves ignored "collision/operator" against replay "collision" [87.20ms]
+(pass) sync permits harmless ignored paths while preserving tracked autostash edits [94.30ms]
+
+tests/phase.test.ts:
+(pass) valid phase transition rejects a mismatched repo key without changing state or history [40.13ms]
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [215.25ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [327.32ms]
+(pass) handoff to review refuses a dirty worktree and issue files on the branch, then passes [135.86ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [178.06ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [169.58ms]
+(pass) asymmetric and empty leaf sources defer until epic completion under open locks [255.96ms]
+(pass) source retries recheck state, skip CLOSED, and continue after final failures without moving [547.12ms]
+(pass) sourced completion without worktree context fails before rename without a fabricated commit [51.30ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [184.47ms]
+(pass) failed or malformed retry comment listing prevents another close and continues later sources [601.01ms]
+(pass) each completed issue closes only its all-leaf private sources before the final epic closure [294.95ms]
+(pass) standalone closure failure retries outstanding sources on next without replaying completion [333.21ms]
+(pass) epic closure failure retries outstanding sources on next without replaying completion [335.94ms]
+(pass) standalone completion closes the union of asymmetric leaf sources [159.28ms]
+
+tests/state.test.ts:
+(pass) allLeaves validates open depth 0 before reading state [8.26ms]
+(pass) allLeaves validates open depth 1 before reading state [6.41ms]
+(pass) allLeaves validates open depth 2 before reading state [5.51ms]
+(pass) allLeaves validates open depth 3 before reading state [5.72ms]
+(pass) allLeaves validates open depth 4 before reading state [5.36ms]
+(pass) allLeaves validates closed depth 0 before reading state [4.82ms]
+(pass) allLeaves validates closed depth 1 before reading state [4.98ms]
+(pass) allLeaves validates closed depth 2 before reading state [5.91ms]
+(pass) allLeaves validates closed depth 3 before reading state [5.35ms]
+(pass) allLeaves validates closed depth 4 before reading state [5.13ms]
+(pass) findLeaf identifies parked issue/leaf without parsing its state [5.11ms]
+(pass) findLeaf identifies parked epic/issue/leaf without parsing its state [5.61ms]
+(pass) findLeaf ignores parked folders without state and unsupported nesting [5.32ms]
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [587.57ms]
+(pass) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [706.70ms]
+(pass) next waits on a blocked agent instead of counting attempts or flipping seats [495.38ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [732.26ms]
+(pass) failed delivery retries, deduplicates sweeps and resets after a phase transition [334.29ms]
+(pass) busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes [2565.59ms]
+(pass) logical B fallback warns for physical A and unknown agents retain busy observations [916.34ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [743.19ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [705.92ms]
+(pass) a closed tab hook from a merged leaf sweeps and starts the next leaf [688.44ms]
+(pass) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [908.88ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [384.82ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [698.28ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [740.99ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [529.87ms]
+(pass) uncommitted work in a merge worktree is never recovered as merged [408.76ms]
+(pass) a worktree parked mid-rebase is still dispatched [535.90ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [599.33ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [577.34ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [763.97ms]
+(pass) missing registration is isolated during startup [538.13ms]
+(pass) missing registration is isolated during hook [558.07ms]
+(pass) missing registration is isolated during cwd [539.31ms]
+(pass) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [316.37ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 3 [913.43ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 4 [927.24ms]
+(pass) dirty merged worktree cleanup reports the original git error and still sweeps [660.18ms]
+(pass) global lock acquisition failure is fatal [41.90ms]
+(pass) repo lock acquisition failure is fatal [43.32ms]
+(pass) leaf lock acquisition failure is fatal [48.48ms]
+(pass) lock finalization failures and invalid hook events remain fatal [336.81ms]
+(pass) duplicate leaf identity never dispatches an arbitrary leaf [300.68ms]
+(pass) mismatch leaf identity never dispatches an arbitrary leaf [298.48ms]
+(pass) next selection and sweep report both repo keys without dispatching or changing the mismatched leaf [349.04ms]
+(pass) changed worktree root reports recorded and expected worktrees without creating or prompting [132.77ms]
+(pass) changed repo root reports recorded and expected worktrees without creating or prompting [123.94ms]
+(pass) moving a repo with the same registered key supports status, phase and dispatch without a recorded worktree [368.18ms]
+(pass) unknown directory population reserves all new capacity but allows existing tabs [617.31ms]
+(pass) non-Error throws cross the scoped discovery boundary unchanged [35.90ms]
+(pass) explicit unreadable targets retain the original error without a missing-target stack [111.68ms]
+(pass) a selected leaf removed before its repo lock is reported as skipped [48.92ms]
+(pass) recovery fetch deadline releases dispatch locks without transitioning [209.17ms]
+(pass) next prompts an idle agent with null session data [536.68ms]
+(pass) next prompts an idle agent with omitted session data [535.15ms]
+(pass) blocked merge seat A prevents fetch and clean checks in a dirty worktree [413.44ms]
+(pass) blocked merge seat B prevents fetch and clean checks in a dirty worktree [407.93ms]
+(pass) recorded seats stay authoritative with an extra pane first and neither missing [541.74ms]
+(pass) recorded seats stay authoritative with an extra pane first and A missing [561.69ms]
+(pass) recorded seats stay authoritative with an extra pane first and B missing [584.40ms]
+(pass) recorded seats stay authoritative with an extra pane first and both missing [621.42ms]
+(pass) allocation handles an interrupted tab [445.54ms]
+(pass) allocation handles an empty tab [442.56ms]
+(pass) allocation handles an recreated tab [630.43ms]
+(pass) agent start allows 30 seconds while prompt wait remains 5 seconds [298.16ms]
+(pass) startup retries closure before cleanup and retains failed owners with their worktree branch and tab [658.03ms]
+(pass) startup retains completed issue resources while an epic sibling remains unfinished [432.77ms]
+{"repo":"repo","path":"/tmp/akrogon-eRvT4S/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-eRvT4S/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-eRvT4S/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-eRvT4S/repo/issues/open/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects open/ before any flock [71.73ms]
+{"repo":"repo","path":"/tmp/akrogon-F8aLaS/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-F8aLaS/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-F8aLaS/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-F8aLaS/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects open/invalid before any flock [77.21ms]
+{"repo":"repo","path":"/tmp/akrogon-wNKV6a/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-wNKV6a/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-wNKV6a/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-wNKV6a/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects open/epic/issue/extra/invalid before any flock [70.38ms]
+{"repo":"repo","path":"/tmp/akrogon-Z7BO6z/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-Z7BO6z/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-Z7BO6z/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-Z7BO6z/repo/issues/closed/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects closed/ before any flock [77.00ms]
+{"repo":"repo","path":"/tmp/akrogon-B7NY1t/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-B7NY1t/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-B7NY1t/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-B7NY1t/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects closed/invalid before any flock [78.36ms]
+{"repo":"repo","path":"/tmp/akrogon-lARvJd/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-lARvJd/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-lARvJd/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-lARvJd/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects closed/epic/issue/extra/invalid before any flock [78.00ms]
+(pass) invalid merged depth stays excluded during --all with healthy work [300.17ms]
+(pass) invalid merged depth stays excluded during . with healthy work [306.05ms]
+(pass) invalid merged depth stays excluded during hook with healthy work [552.96ms]
+error: Missing leaf: resting (parked)
+(pass) next identifies dormant issue/resting without parsing and prefers active leaves [609.96ms]
+error: Missing leaf: resting (parked)
+(pass) next identifies dormant epic/issue/resting without parsing and prefers active leaves [602.65ms]
+
+tests/status.test.ts:
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [43.34ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [184.99ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [345.90ms]
+(pass) repo mismatch identifies both keys in overview and detail while healthy repos remain visible [72.27ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [61.24ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [130.47ms]
+(pass) busy durations appear in NOTE for every recorded seat without writes or herdr calls [36.57ms]
+(pass) status reports invalid open/ while showing another repo without writes [109.73ms]
+(pass) status reports invalid open/invalid while showing another repo without writes [105.95ms]
+(pass) status reports invalid open/epic/issue/extra/invalid while showing another repo without writes [101.14ms]
+(pass) status identifies dormant issue/resting and prefers open or closed leaves [193.37ms]
+(pass) status identifies dormant epic/issue/resting and prefers open or closed leaves [196.79ms]
+
+ 181 pass
+ 0 fail
+ 1773 expect() calls
+Ran 181 tests across 11 files. [44.19s]
+
+Exit code: 0

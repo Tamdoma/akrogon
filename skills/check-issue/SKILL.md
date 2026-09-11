@@ -3,7 +3,7 @@ name: check-issue
 description: Review a leaf implementation with concrete-defect verdicts, or re-check only its repair diff as slot A after check.fix.
 ---
 
-After compaction, re-read this file, the slug's brief or plan, and this phase's references.
+Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
 
 # Check issue
 

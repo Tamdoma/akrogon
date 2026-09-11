@@ -3,7 +3,7 @@ name: chart-issues
 description: Turn operator notes or imported reports into charts of open decisions, then hand settled work directly to leaf contracts in a registered repository. Operator-invoked only.
 ---
 
-After compaction, re-read this file, the slug's brief or plan when present, and this pass's references; for an unfinished chart, resume from CHART.md and the selected decision's linked context.
+Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt. After compaction on an unfinished chart, resume from CHART.md and the selected decision's linked context.
 
 # Chart issues
 

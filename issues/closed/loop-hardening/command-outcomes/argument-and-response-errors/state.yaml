@@ -1,0 +1,27 @@
+slug: argument-and-response-errors
+phase: merged
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w7:tE
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/argument-and-response-errors
+pane: 
+  A: w7:pM
+  B: w7:pN
+slot: A
+prompted: 
+  {}

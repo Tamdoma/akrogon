@@ -1,0 +1,12 @@
+{"result":{"code":0,"stdout":"","stderr":""},"state":{"slug":"dependent","phase":"plan.synthesis","created":"2026-09-10","priority":"n","repo":"repo","debate":"no","blocked-by":["completed"],"failed_notified":false,"busy_since":{"B":"2026-09-11T15:21:41.794Z"},"busy_notified":{},"attempts":{"A":0,"B":1},"done":[],"fix_rounds":0,"verdict":{},"tab":"w2:t1","worktree":"/tmp/akrogon-Lpintt/repo/issues/worktrees/dependent","pane":{"A":"w1:p2","B":"w1:p3"},"slot":"B","prompted":{"B":"session-4"}}}
+["pane","list"]
+["tab","list"]
+["pane","list"]
+["tab","create","--label","dependent","--cwd","/tmp/akrogon-Lpintt/repo/issues/worktrees/dependent","--env","AKROGON_BASE=411e0a267e24b4c6c9c482e2d7484c4a57fa9152","--no-focus","--workspace","w2"]
+["pane","list"]
+["pane","split","w1:p2","--direction","right","--cwd","/tmp/akrogon-Lpintt/repo/issues/worktrees/dependent","--env","AKROGON_BASE=411e0a267e24b4c6c9c482e2d7484c4a57fa9152","--no-focus","--workspace","w2"]
+["pane","get","w1:p3"]
+["agent","start","akrogon-322c84c51539aa7a2310a7a7","--kind","fake","--pane","w1:p3","--timeout","30000","--","--model","strong-b","--effort","medium"]
+["pane","get","w1:p3"]
+["agent","prompt","w1:p3","plan-issue dependent slot=B phase=plan.synthesis","--wait","--until","working","--timeout","5000"]
+["pane","get","w1:p3"]

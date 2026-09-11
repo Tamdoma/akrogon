@@ -1,0 +1,29 @@
+slug: discord-chunk-report
+phase: merged
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#5"
+  - "Tamdoma/akrogon#13"
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 1
+verdict: 
+  {}
+tab: w7:tB
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/discord-chunk-report
+pane: 
+  A: w7:pE
+  B: w7:pF
+slot: A
+prompted: 
+  {}

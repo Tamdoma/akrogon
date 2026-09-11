@@ -3,7 +3,7 @@ name: init-issues
 description: Inspect a repository, propose its issue lifecycle configuration and optional test toolkit, then initialize it through the installed akrogon command.
 ---
 
-After compaction, reread this file and any applicable brief, plan and phase references before continuing.
+Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
 
 # Init Issues
 

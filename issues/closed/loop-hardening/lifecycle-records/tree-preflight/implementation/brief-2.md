@@ -1,0 +1,33 @@
+## 1. Goal
+Integrate shared depth and parked diagnostics into next/status, plan D3/D4/D5, proving malformed explicit next targets fail before any lock while valid dispatch and isolation continue working.
+
+## 2. Numbered acceptance criteria
+1. C1: real bounded next invocations at depths 0/1/4 in open/closed, slug and path selection, report absolute offending state path and exit nonzero before any flock invocation, without state/log/worktree/Herdr mutation. Include merged invalid state. A fixture flock executable records and fails immediately if invoked, so even red tests cannot deadlock.
+2. C2: invalid leaves stay out of next inventory in all routes, including merged cleanup. A mixed malformed/healthy sweep reports the malformed path and still dispatches healthy work at sufficient capacity. Existing malformed YAML/capacity/identity/unreadable-target/concurrency and hook behavior pass.
+3. C3: status <slug> and next <slug> emit Missing leaf: <slug> (parked) for issue/leaf and epic/issue/leaf dormant state (without parsing it). Absent and owner-only names stay ordinary misses. Active/closed lookup wins. Preserve original next unreadable diagnostics.
+4. C4: status overview reports invalid open depth as unreadable with state path and nonzero code while showing a separate valid repo. Detailed status rejects invalid open/closed states without mutation. Existing status read-only behavior remains.
+
+## 3. Read-first list
+Read ../plan.md D3–D5/C1–C4, src/state.ts (preceding worker interfaces), src/next.ts discover/dispatchLeaf/nextCommand, src/status.ts scanRepo/statusCommand, tests/helpers.ts, tests/next.test.ts especially existing lock-failure, removed-before-lock and scoped-error tests, tests/status.test.ts snapshot/register helpers, and /home/ivan/.codex/skills/implement-issue/ponytail.md. Copy existing real CLI temporary-repo patterns.
+
+## 4. Change list and needed interfaces
+Own src/next.ts, src/status.ts, tests/next.test.ts, tests/status.test.ts and a narrowly needed tests/helpers.ts change only if it prevents duplicate subprocess logic. The preceding worker exports validateLeafDepth(areaRoot: string, leafPath: string): void and missingLeafMessage(repo: Repo, slug: string): string in src/state.ts. Existing leavesUnder now has explicit areaRoot. In discover pass area root explicitly through visit, validate before readState and retain existing per-leaf reporting. In status set diagnostic path to state.yaml before validation so Zod errors use existing unreadable handling. Move ordinary selection/resolution/discovery out of global lock, retaining locked dispatch rediscovery. Prefer extraction of existing selection code over duplicate scans or alternate fast path. Hooks/all retain their semantics. Missing parked text belongs only in ordinary missing-slug flow, not unreadable lookup failures.
+
+## 5. Do-not, reasons and exceptions
+Do not replace isolated discovery with fail-fast allLeaves, alter capacity accounting, change completion or repo mismatch behavior, or add catch-all fallbacks. Those guarantees belong to existing flows and sibling leaves. Do not commit or run full-suite/format/typecheck commands. Return a mismatch with evidence before altering scope/interfaces, except with B's revised brief. Preserve existing guarantees for these reasons; a revised brief is the only exception.
+
+## 6. Ordered steps
+Derive CLI tests before integration code and record red changed-test evidence. Add shared validator/message calls and move selection before lock. Run changed tests green, repair in-scope failures, and fill report. Record at least representative real invalid-depth and parked diagnostic output in evidence (test console output is acceptable). Timeout handling must kill/reap its child, preserve output/exit code and report timeout as failure. Prefer Bun's native subprocess timeout when supported by installed Bun types to a custom race helper. Advisory scope: 4–5 files, about 18 turns. Keep code focused despite nextCommand control-flow movement.
+
+## 7. Commands
+Run only this test command, red then green:
+AKROGON_BASE=a6b53fdceca8e54b7618f59cffd0beb53c2d882b bash -c ': "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE"'
+Save command output and exit codes beside this brief in worker-2-red.txt and worker-2-green.txt. B owns full suite and other checks.
+
+## 8. Done-when, evidence and report
+Fill all four report contents, provide changed-test results/evidence paths, and identify any criterion not verified. Temporary repo CLI tests replace Herdr/gh at existing process boundaries only and never call production panes or GitHub. Existing repo files outside your unit are owned by completed worker 1 and B.
+
+Changed files and reasons: src/next.ts validates each discovered state against its area root and extracts ordinary selection before the global lock, preserving locked rediscovery, skipped exit status, and hook/all flows. Missing ordinary slugs use the shared parked diagnostic. src/status.ts validates open state depth after setting its diagnostic state path. tests/next.test.ts and tests/status.test.ts cover invalid depths 0/1/4, open/closed, slug/path preflight, malformed merged isolation, healthy dispatch, parked lookup and active/closed precedence, and read-only overview/detail behavior. tests/helpers.ts adds an optional native CLI subprocess timeout, SIGKILL, and signal failure reporting after output and exit have been awaited.
+Tests run: the section 7 changed-test command ran red (146 pass, 15 fail, exit 1), then after integration (159 pass, 2 fail, exit 1), then after assertion repair and closed-next coverage (161 pass, 0 fail, 1546 expectations, exit 0). Evidence: worker-2-red.txt and worker-2-green.txt beside this brief. Green evidence retains both integration runs. Two red/status failures and the two intermediate failures were assertions matching the literal parked suffix in Bun source excerpts, repaired by checking the actual error line. The other 13 initial failures demonstrated missing behavior. Real invalid-depth JSON diagnostics and parked error lines are captured in the evidence.
+Known limitations: no-lock rejection applies to a tree already invalid at invocation start. Existing repo-locked rediscovery still handles filesystem changes after preflight. Traversal still stops at state-bearing directories as planned. Native timeout bounds only tests that request it. No production Herdr panes or GitHub were called, and no commits were made.
+Unverified criteria: none within C1–C4 of this brief. Full suite, formatting, typecheck, authoritative record loading, chart preflight instructions, and final commit belong to B and were not run or changed by this worker.

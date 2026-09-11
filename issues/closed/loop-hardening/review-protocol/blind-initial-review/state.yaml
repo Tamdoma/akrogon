@@ -1,0 +1,28 @@
+slug: blind-initial-review
+phase: merged
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#12"
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w7:tF
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/blind-initial-review
+pane: 
+  A: w7:pP
+  B: w7:pQ
+slot: A
+prompted: 
+  {}

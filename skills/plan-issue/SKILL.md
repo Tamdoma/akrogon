@@ -3,7 +3,7 @@ name: plan-issue
 description: Write a leaf's execution plan through blind positions, one rebuttal round, or slot B synthesis, including direct synthesis when debate is off.
 ---
 
-After compaction, re-read this file, the slug's brief or plan, and this phase's references.
+Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
 
 # Plan issue
 

@@ -1,0 +1,28 @@
+slug: repo-identity
+phase: merged
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#8"
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w7:tD
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/repo-identity
+pane: 
+  A: w7:pJ
+  B: w7:pK
+slot: A
+prompted: 
+  {}

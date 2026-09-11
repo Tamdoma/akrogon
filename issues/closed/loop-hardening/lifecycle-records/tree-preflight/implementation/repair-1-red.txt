@@ -1,0 +1,535 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 12 changed files, running 10/11 test files
+
+tests/config.test.ts:
+(pass) config combines defaults and repo values, reports none, and recalculates worktree base [150.08ms]
+
+tests/init.test.ts:
+(pass) init writes proposal, registration and toolkit and preserves repeated user files [114.07ms]
+(pass) init ignores the custom worktree root and preserves user rules on repeated init [56.41ms]
+(pass) init resolves relative external worktree root from nested cwd [32.02ms]
+(pass) init resolves absolute external worktree root from nested cwd [33.62ms]
+(pass) init resolves repo-prefix sibling worktree root from nested cwd [31.54ms]
+(pass) init resolves normalized relative internal worktree root from nested cwd [29.38ms]
+(pass) init resolves absolute internal worktree root from nested cwd [33.92ms]
+(pass) init resolves relative repo-equal worktree root from nested cwd [34.27ms]
+(pass) init resolves absolute repo-equal worktree root from nested cwd [33.16ms]
+
+tests/install.test.ts:
+(pass) install creates all four absent harness roots and repeats without changing links or herdr arguments [228.32ms]
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/.evidence/install-prune-links/home-listing.json
+(pass) install prunes only dangling owned links and preserves real entries and foreign links in every root [124.89ms]
+(pass) install prunes before refusing directory at .claude/skills without installing links or calling herdr [32.41ms]
+(pass) install prunes before refusing foreign-link at .claude/skills without installing links or calling herdr [31.41ms]
+(pass) install prunes before refusing wrong-owned-link at .claude/skills without installing links or calling herdr [30.95ms]
+(pass) install prunes before refusing directory at .agents/skills without installing links or calling herdr [32.40ms]
+(pass) install prunes before refusing foreign-link at .agents/skills without installing links or calling herdr [31.88ms]
+(pass) install prunes before refusing wrong-owned-link at .agents/skills without installing links or calling herdr [30.02ms]
+(pass) install prunes before refusing directory at .codex/skills without installing links or calling herdr [28.66ms]
+(pass) install prunes before refusing foreign-link at .codex/skills without installing links or calling herdr [28.75ms]
+(pass) install prunes before refusing wrong-owned-link at .codex/skills without installing links or calling herdr [30.64ms]
+(pass) install prunes before refusing directory at .pi/agent/skills without installing links or calling herdr [28.46ms]
+(pass) install prunes before refusing foreign-link at .pi/agent/skills without installing links or calling herdr [29.04ms]
+(pass) install prunes before refusing wrong-owned-link at .pi/agent/skills without installing links or calling herdr [33.18ms]
+(pass) install still refuses an executable destination conflict before linking or herdr calls [29.31ms]
+
+tests/park.test.ts:
+25 |     expect(parked.stdout).toContain('parked');
+26 |     expect(existsSync(resolve(f.root, 'issues/parked/docs/docs-b/state.yaml'))).toBe(true);
+27 |     expect(existsSync(resolve(f.root, 'issues/open/docs'))).toBe(false);
+28 |     expect(readdirSync(resolve(f.root, 'issues/open'))).toEqual(['busy-issue']);
+29 |     const status: Result = await cli(f, ['status']);
+30 |     expect(status.code).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/park.test.ts:30:25)
+(fail) park and unpark move whole issues by name, refuse running ones, and keep the loop blind to parked work [57.89ms]
+(pass) park --all skips running issues and unpark --all restores everything [91.31ms]
+(pass) park keeps prerequisites that open leaves still depend on, and unpark refuses dependents of parked work [234.04ms]
+
+tests/pull.test.ts:
+57 |       ],
+58 |     ];
+59 |     pages[0][0] = issue(1, 'Renamed ../ title', body);
+60 |     script(gh, [{ stdout: JSON.stringify(pages), args: listingArgs }]);
+61 |     const pulled: Result = await cli(f, ['pull'], f.root, gh.env);
+62 |     expect(pulled.code).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/pull.test.ts:62:25)
+(fail) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [32.33ms]
+ 98 |       issue(108, `alpha ${'X'.repeat(34)}`),
+ 99 |       issue(109, `alpha ${'X'.repeat(34)} tail`),
+100 |       issue(110, `${'X'.repeat(39)} tail`),
+101 |     ];
+102 |     script(gh, [{ stdout: JSON.stringify([issues]), args: listingArgs }]);
+103 |     expect((await cli(f, ['pull'], f.root, gh.env)).code).toBe(0);
+                                                                ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/pull.test.ts:103:59)
+(fail) pull caps slugs at word boundaries and hard cuts oversized first words [30.33ms]
+133 |       { stdout: '[[', code: 1, stderr: 'page two failed' },
+134 |       { stdout: '[[', code: 2, stderr: 'page two failed again' },
+135 |     ]);
+136 |     const failed: Result = await cli(f, ['pull'], f.root, gh.env);
+137 |     expect(failed.code).not.toBe(0);
+138 |     expect(JSON.parse(failed.stderr.split('\n')[0])).toMatchObject({
+                      ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/pull.test.ts:138:17)
+(fail) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [28.07ms]
+180 |     ]) {
+181 |       await command(['git', 'remote', 'set-url', 'origin', origin], f.root);
+182 |       script(gh, [{ stdout: JSON.stringify([[issue(4, 'Target')]]), args: listingArgs }]);
+183 |       expect(
+184 |         (await cli(f, ['pull'], worktree, { ...gh.env, GH_REPO: 'other/wrong', GH_HOST: 'elsewhere.invalid' })).code,
+185 |       ).toBe(0);
+              ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/pull.test.ts:185:9)
+(fail) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [31.60ms]
+203 |   const bad: Fixture = await fixture();
+204 |   try {
+205 |     const gh: GhFixture = fakeGh(f);
+206 |     const missing: Result = await cli(f, ['pull'], f.root, gh.env);
+207 |     expect(missing.code).not.toBe(0);
+208 |     expect(missing.stderr).toContain('origin');
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "origin"
+Received: "182 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/pull.ts:182:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/pull.test.ts:208:28)
+(fail) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [34.76ms]
+244 |       { stdout: JSON.stringify([[issue(1, 'Old')]]), delayMs: 200 },
+245 |       { stdout: JSON.stringify([[issue(1, 'New')]]) },
+246 |     ]);
+247 |     const first: Promise<Result> = cli(f, ['pull'], f.root, gh.env);
+248 |     for (let attempt: number = 0; attempt < 100 && !existsSync(gh.db + '.calls'); attempt++) await Bun.sleep(10);
+249 |     expect(existsSync(gh.db + '.calls')).toBe(true);
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/pull.test.ts:249:42)
+(fail) concurrent pulls serialize listing and reconciliation [1012.56ms]
+(pass) startup runs pull all before next all and wrappers forward arguments [10.08ms]
+
+tests/sync.test.ts:
+(pass) sync commits local changes, rebases on the remote and pushes [132.69ms]
+(pass) sync preserves unrelated edits with advancing remote=false [73.10ms]
+(pass) sync preserves unrelated edits with advancing remote=true [87.92ms]
+(pass) autostash restoration conflict refuses push and preserves recovery stash [86.25ms]
+(pass) sync refuses side without touching HEAD or index [53.79ms]
+(pass) sync refuses detached HEAD without touching HEAD or index [55.02ms]
+(pass) sync refuses staged exclusion "outside file \n" [53.65ms]
+(pass) sync refuses staged exclusion "issues/seeds/note" [54.31ms]
+(pass) sync refuses staged exclusion "issues/.lock" [53.45ms]
+(pass) sync refuses staged exclusion "issues/nested/.lock" [54.66ms]
+(pass) sync refuses staged exclusion "issues/worktrees/branch/file" [54.69ms]
+(pass) sync refuses staged exclusion "rename" [51.56ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/worktrees [83.51ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/custom trees [83.75ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/tree[1]* [78.73ms]
+(pass) sync scopes tracked changes and new files with worktree root ../external [83.34ms]
+(pass) sync scopes tracked changes and new files with worktree root . [75.06ms]
+(pass) sync holds global then repo locks through push while real park waits [116.38ms]
+(pass) sync owns global lock while waiting for repo lock [72.02ms]
+(pass) sync refuses active coordination lock issues/.lock from local [56.85ms]
+(pass) sync refuses active coordination lock issues/.lock from incoming [71.37ms]
+(pass) sync refuses active coordination lock issues/.lock from replay [80.55ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from local [57.97ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from incoming [73.14ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from replay [80.67ms]
+(pass) sync preserves ignored "collision [1]* \n" against incoming "collision [1]* \n" [80.69ms]
+(pass) sync preserves ignored "collision/file" against incoming "collision" [84.60ms]
+(pass) sync preserves ignored "collision" against incoming "collision/file" [81.73ms]
+(pass) sync preserves ignored "collision/operator" against incoming "collision" [86.75ms]
+(pass) sync preserves ignored "collision [1]* \n" against replay "collision [1]* \n" [86.51ms]
+(pass) sync preserves ignored "collision/file" against replay "collision" [88.91ms]
+(pass) sync preserves ignored "collision" against replay "collision/file" [88.85ms]
+(pass) sync preserves ignored "collision/operator" against replay "collision" [89.76ms]
+(pass) sync permits harmless ignored paths while preserving tracked autostash edits [99.91ms]
+
+tests/phase.test.ts:
+17 |     const before: string = bytes(path);
+18 |     const history: string = resolve(f.root, 'issues/log.jsonl');
+19 |     writeFileSync(history, '');
+20 |     const result: Result = await cli(f, ['phase', 'wrong-key', 'implement', '--slot', 'B']);
+21 |     expect(result.code).not.toBe(0);
+22 |     expect(result.stderr).toContain(path);
+                               ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-WD6HRC/repo/issues/open/issue/wrong-key"
+Received: "63 | <<<<<<< HEAD\n     ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/phase.ts:63:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:22:27)
+(fail) valid phase transition rejects a mismatched repo key without changing state or history [30.14ms]
+40 |     });
+41 |     const same: Result[] = await Promise.all([
+42 |       cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'A']),
+43 |       cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'A']),
+44 |     ]);
+45 |     expect(same.map((r) => r.code).sort()).toEqual([0, 1]);
+                                                ^
+error: expect(received).toEqual(expected)
+
+  [
+-   0,
++   1,
+    1,
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:45:44)
+(fail) real same-slot and different-slot races record once and refuse stale moves unchanged [31.21ms]
+74 |   const f: Fixture = await fixture();
+75 |   try {
+76 |     yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1 });
+77 |     const path: string = leaf(f, 'repair', 'check.review');
+78 |     expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'A'])).code).not.toBe(0);
+79 |     expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'A', '--verdict', 'nits'])).stdout).toBe('recorded');
+                                                                                                         ^
+error: expect(received).toBe(expected)
+
+Expected: "recorded"
+Received: ""
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:79:101)
+(fail) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [53.46ms]
+128 |     await command(['git', 'worktree', 'add', '-b', 'dirty', worktree], f.root);
+129 |     const path: string = leaf(f, 'dirty', 'implement', { worktree });
+130 |     writeFileSync(resolve(worktree, 'work'), 'done\n');
+131 |     const refused: Result = await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'B']);
+132 |     expect(refused.code).not.toBe(0);
+133 |     expect(refused.stderr).toContain('Uncommitted work');
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Uncommitted work"
+Received: "63 | <<<<<<< HEAD\n     ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/phase.ts:63:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:133:28)
+(fail) handoff to review refuses a dirty worktree and issue files on the branch, then passes [33.33ms]
+157 |     leaf(f, 'two', 'merge', {}, 'epic/first');
+158 |     leaf(f, 'three', 'merge', {}, 'epic/second');
+159 |     mkdirSync(resolve(f.root, 'issues/chart/epic'), { recursive: true });
+160 |     writeFileSync(resolve(f.root, 'issues/chart/epic/CHART.md'), '# Chart: epic\n');
+161 |     const race: Result[] = await Promise.all(['one', 'two'].map((slug) => cli(f, ['phase', slug, 'merged'])));
+162 |     expect(race.every((r) => r.code === 0)).toBe(true);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:162:45)
+(fail) completion reports each issue once, moves only finished containers, and refuses repeated merged [30.18ms]
+182 |   const f: Fixture = await fixture();
+183 |   try {
+184 |     const path: string = leaf(f, 'log-error', 'plan.synthesis');
+185 |     mkdirSync(resolve(f.root, 'issues/log.jsonl'));
+186 |     expect((await cli(f, ['phase', 'log-error', 'implement'])).code).not.toBe(0);
+187 |     expect(readState(path).phase).toBe('implement');
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: "implement"
+Received: "plan.synthesis"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:187:35)
+(fail) failed log preserves committed state and failed container rename retries without replay [33.44ms]
+221 |     expect(head).not.toBe(await command(['git', 'rev-parse', 'HEAD'], f.root));
+222 |     expect(head).not.toBe(await command(['git', 'rev-parse', 'HEAD'], first));
+223 |     leaf(f, 'one', 'merge', { worktree: first, sources: ['team/project#1', 'team/project#2'] }, 'epic/first');
+224 |     leaf(f, 'empty', 'merged', {}, 'epic/first');
+225 |     leaf(f, 'two', 'merge', { worktree: last, sources: ['team/project#2', 'team/project#3'] }, 'epic/second');
+226 |     expect((await cli(f, ['phase', 'one', 'merged'], f.root, gh.env)).code).toBe(0);
+                                                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:226:77)
+(fail) asymmetric and empty leaf sources defer until epic completion under open locks [42.00ms]
+344 |         z
+345 |           .object({ warning: z.string().optional(), source: z.string(), code: z.number().optional() })
+346 |           .parse(JSON.parse(line)),
+347 |       )
+348 |       .filter((item) => item.warning !== undefined);
+349 |     expect(warnings).toHaveLength(4);
+                           ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 4
+Received length: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:349:22)
+(fail) source retries recheck state, skip CLOSED, and continue after final failures without moving [34.37ms]
+370 |     const gh: GhFixture = fakeGh(f);
+371 |     leaf(f, 'missing', 'merge', { sources: ['team/project#1'] });
+372 |     const result: Result = await cli(f, ['phase', 'missing', 'merged'], f.root, gh.env);
+373 |     expect(result.code).not.toBe(0);
+374 |     expect(result.stderr).toContain('worktree');
+375 |     expect(readState(resolve(f.root, 'issues/open/issue/missing')).phase).toBe('merged');
+                                                                                ^
+error: expect(received).toBe(expected)
+
+Expected: "merged"
+Received: "merge"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:375:75)
+(fail) sourced completion without worktree context fails before rename without a fabricated commit [31.21ms]
+397 |         { stdout: '', stateful: true },
+398 |         { stdout: '', stateful: true },
+399 |       ]),
+400 |     );
+401 |     const result: Result = await cli(f, ['phase', 'partial', 'merged'], f.root, gh.env);
+402 |     expect(result.code).toBe(0);
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:402:25)
+(fail) partial commented close success retries without duplicating a merged comment on a later page [33.69ms]
+456 |           { stdout: '', args: ['issue', 'close', '-R', 'team/project', '2', '--comment', `merged ${head}`] },
+457 |         ]),
+458 |       );
+459 |       const result: Result = await cli(f, ['phase', 'listing', 'merged'], f.root, gh.env);
+460 |       expect(result.code).not.toBe(0);
+461 |       expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+                                                            ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "args": [
++       "issue",
++       "view",
++       "-R",
++       "team/project",
++       "1",
++       "--json",
++       "state",
++     ],
++     "stdout": "{"state":"OPEN"}",
++   },
++   {
++     "args": [
++       "issue",
++       "close",
++       "-R",
++       "team/project",
++       "1",
++       "--comment",
++       "merged 8c9e56f83269b314ae9f526808e72c01a0cdfbd3",
++     ],
++     "code": 1,
++     "stdout": "",
++   },
++   {
++     "args": [
++       "issue",
++       "view",
++       "-R",
++       "team/project",
++       "1",
++       "--json",
++       "state",
++     ],
++     "stdout": "{"state":"OPEN"}",
++   },
++   {
++     "args": [
++       "api",
++       "--hostname",
++       "github.com",
++       "repos/team/project/issues/1/comments?per_page=100",
++       "--paginate",
++       "--slurp",
++     ],
++     "code": 2,
++     "stderr": "comment page failed",
++     "stdout": "[[",
++   },
++   {
++     "args": [
++       "issue",
++       "view",
++       "-R",
++       "team/project",
++       "2",
++       "--json",
++       "state",
++     ],
++     "stdout": "{"state":"OPEN"}",
++   },
++   {
++     "args": [
++       "issue",
++       "close",
++       "-R",
++       "team/project",
++       "2",
++       "--comment",
++       "merged 8c9e56f83269b314ae9f526808e72c01a0cdfbd3",
++     ],
++     "stdout": "",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 76
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:461:55)
+(fail) failed or malformed retry comment listing prevents another close and continues later sources [33.02ms]
+525 |           probe: firstProbe,
+526 |         },
+527 |       ]),
+528 |     );
+529 |     const earlier: Result = await cli(f, ['phase', 'first', 'merged'], f.root, gh.env);
+530 |     expect(earlier.code).toBe(0);
+                               ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:530:26)
+(fail) each completed issue closes only its all-leaf private sources before the final epic closure [38.84ms]
+609 |         ]),
+610 |       );
+611 |       const failed: Result = await cli(f, ['phase', 'retry', 'merged'], f.root, gh.env);
+612 |       expect(failed.code).not.toBe(0);
+613 |       expect(failed.stdout).not.toContain('issue complete');
+614 |       expect(failed.stderr).toContain('offline');
+                                  ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "offline"
+Received: "63 | <<<<<<< HEAD\n     ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/phase.ts:63:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:614:29)
+(fail) standalone closure failure retries outstanding sources on next without replaying completion [33.51ms]
+609 |         ]),
+610 |       );
+611 |       const failed: Result = await cli(f, ['phase', 'retry', 'merged'], f.root, gh.env);
+612 |       expect(failed.code).not.toBe(0);
+613 |       expect(failed.stdout).not.toContain('issue complete');
+614 |       expect(failed.stderr).toContain('offline');
+                                  ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "offline"
+Received: "63 | <<<<<<< HEAD\n     ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/phase.ts:63:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:614:29)
+(fail) epic closure failure retries outstanding sources on next without replaying completion [32.51ms]
+652 |     leaf(f, 'union', 'merge', { worktree, sources: ['team/project#2'] });
+653 |     writeFileSync(
+654 |       gh.db,
+655 |       JSON.stringify([{ stdout: '{"state":"OPEN"}' }, { stdout: '' }, { stdout: '{"state":"OPEN"}' }, { stdout: '' }]),
+656 |     );
+657 |     expect((await cli(f, ['phase', 'union', 'merged'], f.root, gh.env)).code).toBe(0);
+                                                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:657:79)
+(fail) standalone completion closes the union of asymmetric leaf sources [36.06ms]
+
+tests/next.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+1245 | <<<<<<< HEAD
+       ^
+error: Unexpected <<
+    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1245:1
+-------------------------------
+
+
+tests/state.test.ts:
+(pass) allLeaves validates open depth 0 before reading state [6.05ms]
+(pass) allLeaves validates open depth 1 before reading state [5.73ms]
+(pass) allLeaves validates open depth 2 before reading state [4.86ms]
+(pass) allLeaves validates open depth 3 before reading state [5.04ms]
+(pass) allLeaves validates open depth 4 before reading state [4.49ms]
+(pass) allLeaves validates closed depth 0 before reading state [4.54ms]
+(pass) allLeaves validates closed depth 1 before reading state [4.76ms]
+(pass) allLeaves validates closed depth 2 before reading state [4.53ms]
+(pass) allLeaves validates closed depth 3 before reading state [5.75ms]
+(pass) allLeaves validates closed depth 4 before reading state [5.25ms]
+(pass) findLeaf identifies parked issue/leaf without parsing its state [6.86ms]
+(pass) findLeaf identifies parked epic/issue/leaf without parsing its state [4.97ms]
+(pass) findLeaf ignores parked folders without state and unsupported nesting [5.87ms]
+
+tests/status.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+333 | <<<<<<< HEAD
+      ^
+error: Unexpected <<
+    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/status.test.ts:333:1
+-------------------------------
+
+
+24 tests failed:
+(fail) park and unpark move whole issues by name, refuse running ones, and keep the loop blind to parked work [57.89ms]
+(fail) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [32.33ms]
+(fail) pull caps slugs at word boundaries and hard cuts oversized first words [30.33ms]
+(fail) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [28.07ms]
+(fail) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [31.60ms]
+(fail) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [34.76ms]
+(fail) concurrent pulls serialize listing and reconciliation [1012.56ms]
+(fail) valid phase transition rejects a mismatched repo key without changing state or history [30.14ms]
+(fail) real same-slot and different-slot races record once and refuse stale moves unchanged [31.21ms]
+(fail) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [53.46ms]
+(fail) handoff to review refuses a dirty worktree and issue files on the branch, then passes [33.33ms]
+(fail) completion reports each issue once, moves only finished containers, and refuses repeated merged [30.18ms]
+(fail) failed log preserves committed state and failed container rename retries without replay [33.44ms]
+(fail) asymmetric and empty leaf sources defer until epic completion under open locks [42.00ms]
+(fail) source retries recheck state, skip CLOSED, and continue after final failures without moving [34.37ms]
+(fail) sourced completion without worktree context fails before rename without a fabricated commit [31.21ms]
+(fail) partial commented close success retries without duplicating a merged comment on a later page [33.69ms]
+(fail) failed or malformed retry comment listing prevents another close and continues later sources [33.02ms]
+(fail) each completed issue closes only its all-leaf private sources before the final epic closure [38.84ms]
+(fail) standalone closure failure retries outstanding sources on next without replaying completion [33.51ms]
+(fail) epic closure failure retries outstanding sources on next without replaying completion [32.51ms]
+(fail) standalone completion closes the union of asymmetric leaf sources [36.06ms]
+
+ 75 pass
+ 24 fail
+ 2 errors
+ 711 expect() calls
+Ran 99 tests across 10 files. [6.10s]
+exit_code=1

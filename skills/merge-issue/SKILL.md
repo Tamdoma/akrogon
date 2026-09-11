@@ -3,7 +3,7 @@ name: merge-issue
 description: Rebase a reviewed leaf onto its configured remote branch, run checks, push fast-forward, and request one broadcast only when the issue completes.
 ---
 
-After compaction, re-read this file, the slug's brief or plan, and this phase's references.
+Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
 
 # Merge issue
 

@@ -3,7 +3,7 @@ name: seed-issue
 description: File one observation as unverified GitHub intake, using the repository's root akrogon.yaml issues_repo or its GitHub origin.
 ---
 
-After compaction, re-read this file and the reporter's supplied context before continuing.
+Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt. After compaction, also re-read the reporter's supplied context.
 
 # Seed issue
 

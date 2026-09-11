@@ -1,0 +1,41 @@
+Command: bun run format
+$ prettier --write src tests
+src/akrogon.ts 31ms (unchanged)
+src/config.ts 18ms (unchanged)
+src/init.ts 8ms (unchanged)
+src/install.ts 5ms (unchanged)
+src/log.ts 2ms (unchanged)
+src/next.ts 33ms
+src/park.ts 8ms
+src/phase.ts 11ms
+src/pull.ts 10ms
+src/routing.ts 3ms (unchanged)
+src/shell.ts 6ms (unchanged)
+src/state.ts 7ms
+src/status.ts 13ms (unchanged)
+src/sync.ts 7ms (unchanged)
+tests/browser/docs-concepts.config.ts 1ms (unchanged)
+tests/browser/docs-concepts.pw.ts 7ms (unchanged)
+tests/browser/docs-operate.config.ts 1ms (unchanged)
+tests/browser/docs-operate.pw.ts 8ms (unchanged)
+tests/browser/docs-practice.config.ts 1ms (unchanged)
+tests/browser/docs-practice.pw.ts 8ms (unchanged)
+tests/browser/docs-shell.pw.ts 5ms (unchanged)
+tests/browser/playwright.config.ts 1ms (unchanged)
+tests/config.test.ts 2ms (unchanged)
+tests/fake-gh.ts 5ms (unchanged)
+tests/fake-herdr.ts 8ms (unchanged)
+tests/fetch-deadline-harness.ts 7ms (unchanged)
+tests/helpers.ts 4ms (unchanged)
+tests/init.test.ts 4ms (unchanged)
+tests/install.test.ts 10ms (unchanged)
+tests/next.test.ts 62ms
+tests/park.test.ts 7ms (unchanged)
+tests/phase.test.ts 23ms (unchanged)
+tests/pull.test.ts 17ms (unchanged)
+tests/shell.test.ts 4ms (unchanged)
+tests/state.test.ts 3ms (unchanged)
+tests/status.test.ts 18ms
+tests/sync.test.ts 17ms (unchanged)
+
+Exit code: 0

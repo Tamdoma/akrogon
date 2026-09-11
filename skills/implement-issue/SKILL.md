@@ -3,7 +3,7 @@ name: implement-issue
 description: Implement a leaf plan or repair its review findings, using an eight-section brief and sequential workers or configured inline execution; without a leaf, implement the prompt task standalone.
 ---
 
-After compaction, re-read this file, the slug's brief or plan, and this phase's references; standalone re-reads its task brief instead of a leaf.
+Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt. After compaction, standalone re-reads its task brief instead of a leaf.
 
 # Implement issue
 

@@ -1,0 +1,14 @@
+timestamp: 2026-09-11T16:50:52.945Z
+setup: tests/helpers.ts fixture() created an isolated Git repository, valid repository config and global registration repo -> root
+root: /tmp/akrogon-kF0pkX/repo
+AKROGON_HOME: /tmp/akrogon-kF0pkX
+cwd: /tmp/akrogon-kF0pkX
+removed open directory: /tmp/akrogon-kF0pkX/repo/issues/open
+entrypoint: /usr/bin/bun /home/ivan/Work/infra/akrogon/issues/worktrees/status-empty-open-fix/src/akrogon.ts status
+stdout (trimmed by existing CLI helper):
+repo
+  no open leaves
+stderr (trimmed by existing CLI helper):
+
+exit code: 0
+open directory exists after invocation: false

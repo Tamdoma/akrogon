@@ -3,7 +3,7 @@ name: broadcast-issue
 description: Compose and send one factual update for a completed issue to its configured Discord targets, run by the merge slot itself after issue completion.
 ---
 
-After compaction, re-read this file, the slug's brief or plan, and this phase's references, using the completed issue context supplied by the merger if its folder moved.
+Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt. After compaction, use the completed issue context supplied by the merger if its folder moved.
 
 # Broadcast issue
 

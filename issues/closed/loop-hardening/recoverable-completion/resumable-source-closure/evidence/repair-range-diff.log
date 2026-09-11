@@ -1,0 +1,45 @@
+1:  611d52b ! 1:  3902efb Retry source closure before completion moves and cleanup
+    @@ src/next.ts: export async function nextCommand(input: string | undefined): Promi
+     -      await sweepAll(global, invocation);
+            return;
+          }
+    +     if (event?.event === 'tab_closed') {
+    +-      const owners: { repo: Repo; leaf: Leaf }[] = Object.entries(global.repos)
+    +-        .map(([name, path]) => readRepo(name, path))
+    +-        .flatMap((repo) =>
+    +-          allLeaves(repo)
+    +-            .filter((leaf) => leaf.state.tab === event.data.tab_id)
+    +-            .map((leaf) => ({ repo, leaf })),
+    +-        );
+    ++      const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
+    ++        discover(repo, invocation)
+    ++          .leaves.filter((leaf) => leaf.state.tab === event.data.tab_id)
+    ++          .map((leaf) => ({ repo, leaf })),
+    ++      );
+    +       if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
+    +       if (owners.length === 0) return;
+    +-      const completed: boolean = await dispatchLeaf(global, owners[0].repo, owners[0].leaf.state.slug, false);
+    +-      if (completed) await sweepAll(global);
+    ++      const owner: { repo: Repo; leaf: Leaf } = owners[0];
+    ++      const outcome: DispatchOutcome = await dispatchLeaf(global, owner.repo, owner.leaf, false, invocation);
+    ++      if (outcome === 'completed') await sweepAll(global, invocation);
+    +       return;
+    +     }
+          const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
+     
+      ## src/phase.ts ##
+    @@ tests/next.test.ts: test('next awaits sourced completion after a failed rename b
+          writeFileSync(
+            gh.db,
+            JSON.stringify([
+    -@@ tests/next.test.ts: test('recovery fetch deadline releases dispatch locks without transitioning', as
+    -   expect(result.stderr).toBe('');
+    -   expect(result.stdout).toContain('"stateUnchanged":true');
+    - }, 10000);
+    +@@ tests/next.test.ts: test('agent start allows 30 seconds while prompt wait remains 5 seconds', async
+    +     f.clean();
+    +   }
+    + });
+     +
+     +test('startup retries closure before cleanup and retains failed owners with their worktree branch and tab', async () => {
+     +  const f: DispatchFixture = await dispatchFixture();

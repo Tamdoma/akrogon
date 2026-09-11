@@ -1,0 +1,26 @@
+slug: status-empty-open-fix
+phase: merged
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#1"
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t4S
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/status-empty-open-fix
+pane: 
+  A: w8:p8Z
+  B: w8:p80
+slot: A
+prompted: 
+  {}

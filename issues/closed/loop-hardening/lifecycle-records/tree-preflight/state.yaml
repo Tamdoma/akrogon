@@ -1,0 +1,28 @@
+slug: tree-preflight
+phase: merged
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#8"
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 3
+verdict: 
+  {}
+tab: w7:tC
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight
+pane: 
+  A: w7:pG
+  B: w7:pH
+slot: A
+prompted: 
+  {}

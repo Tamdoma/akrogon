@@ -1,0 +1,8 @@
+$ tsc --noEmit
+src/next.ts(552,11): error TS2304: Cannot find name 'allLeaves'.
+src/next.ts(553,22): error TS7006: Parameter 'leaf' implicitly has an 'any' type.
+src/next.ts(554,19): error TS7006: Parameter 'leaf' implicitly has an 'any' type.
+src/next.ts(558,13): error TS2322: Type 'string' is not assignable to type 'boolean'.
+  Type 'string' is not assignable to type 'boolean'.
+src/next.ts(558,40): error TS2554: Expected 5 arguments, but got 4.
+src/next.ts(559,28): error TS2554: Expected 2 arguments, but got 1.

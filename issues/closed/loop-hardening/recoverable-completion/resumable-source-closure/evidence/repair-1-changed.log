@@ -1,0 +1,92 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 6 changed files, running 2/10 test files
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [580.29ms]
+(pass) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [685.68ms]
+(pass) next waits on a blocked agent instead of counting attempts or flipping seats [488.82ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [693.78ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [135.52ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [694.57ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [686.86ms]
+246 |       HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+247 |         event: 'tab_closed',
+248 |         data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w2' },
+249 |       }),
+250 |     });
+251 |     expect(closed.code).toBe(0);
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/next.test.ts:251:25)
+(fail) a closed tab hook from a merged leaf sweeps and starts the next leaf [394.73ms]
+(pass) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [874.09ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [394.15ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [665.91ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [724.04ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [500.26ms]
+(pass) uncommitted work in a merge worktree is never recovered as merged [374.81ms]
+(pass) a worktree parked mid-rebase is still dispatched [506.74ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [500.55ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [556.94ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [785.39ms]
+(pass) missing registration is isolated during startup [497.55ms]
+(pass) missing registration is isolated during hook [536.29ms]
+(pass) missing registration is isolated during cwd [495.29ms]
+(pass) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [301.48ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 3 [875.49ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 4 [869.03ms]
+(pass) dirty merged worktree cleanup reports the original git error and still sweeps [656.98ms]
+(pass) global lock acquisition failure is fatal [35.95ms]
+(pass) repo lock acquisition failure is fatal [44.74ms]
+(pass) leaf lock acquisition failure is fatal [44.91ms]
+(pass) lock finalization failures and invalid hook events remain fatal [319.31ms]
+(pass) duplicate leaf identity never dispatches an arbitrary leaf [316.41ms]
+(pass) mismatch leaf identity never dispatches an arbitrary leaf [322.14ms]
+(pass) unknown directory population reserves all new capacity but allows existing tabs [637.51ms]
+(pass) non-Error throws cross the scoped discovery boundary unchanged [37.60ms]
+(pass) explicit unreadable targets retain the original error without a missing-target stack [125.43ms]
+(pass) a selected leaf removed before its repo lock is reported as skipped [50.28ms]
+(pass) recovery fetch deadline releases dispatch locks without transitioning [208.29ms]
+(pass) next prompts an idle agent with null session data [524.81ms]
+(pass) next prompts an idle agent with omitted session data [515.10ms]
+(pass) blocked merge seat A prevents fetch and clean checks in a dirty worktree [386.95ms]
+(pass) blocked merge seat B prevents fetch and clean checks in a dirty worktree [390.58ms]
+(pass) recorded seats stay authoritative with an extra pane first and neither missing [536.48ms]
+(pass) recorded seats stay authoritative with an extra pane first and A missing [538.97ms]
+(pass) recorded seats stay authoritative with an extra pane first and B missing [580.03ms]
+(pass) recorded seats stay authoritative with an extra pane first and both missing [603.56ms]
+(pass) allocation handles an interrupted tab [457.25ms]
+(pass) allocation handles an empty tab [429.34ms]
+(pass) allocation handles an recreated tab [602.93ms]
+(pass) agent start allows 30 seconds while prompt wait remains 5 seconds [305.73ms]
+(pass) startup retries closure before cleanup and retains failed owners with their worktree branch and tab [677.71ms]
+(pass) startup retains completed issue resources while an epic sibling remains unfinished [432.67ms]
+
+tests/phase.test.ts:
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [234.58ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [337.57ms]
+(pass) handoff to review refuses a dirty worktree and issue files on the branch, then passes [140.09ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [190.62ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [169.22ms]
+(pass) asymmetric and empty leaf sources defer until epic completion under open locks [275.52ms]
+(pass) source retries recheck state, skip CLOSED, and continue after final failures without moving [588.54ms]
+(pass) sourced completion without worktree context fails before rename without a fabricated commit [51.28ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [195.14ms]
+(pass) failed or malformed retry comment listing prevents another close and continues later sources [643.88ms]
+(pass) each completed issue closes only its all-leaf private sources before the final epic closure [297.66ms]
+(pass) standalone closure failure retries outstanding sources on next without replaying completion [344.78ms]
+(pass) epic closure failure retries outstanding sources on next without replaying completion [340.08ms]
+(pass) standalone completion closes the union of asymmetric leaf sources [158.89ms]
+
+1 tests failed:
+(fail) a closed tab hook from a merged leaf sweeps and starts the next leaf [394.73ms]
+
+ 63 pass
+ 1 fail
+ 506 expect() calls
+Ran 64 tests across 2 files. [27.59s]

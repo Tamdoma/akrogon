@@ -1,0 +1,138 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 1 changed file, running 1/11 test files
+
+tests/state.test.ts:
+19 |         if (depth === 2 || depth === 3) {
+20 |           expect(allLeaves(repo).map((item) => item.path)).toEqual([path]);
+21 |           expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area)).map((item) => item.path)).toEqual([path]);
+22 |         } else {
+23 |           writeFileSync(resolve(path, 'state.yaml'), 'invalid: [');
+24 |           expect(() => allLeaves(repo)).toThrow(z.ZodError);
+                                             ^
+error: expect(received).toThrow(expected)
+
+Expected constructor: _
+Received constructor: SyntaxError
+
+Received message: "YAML Parse error: Unexpected token"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/state.test.ts:24:41)
+(fail) allLeaves validates open depth 0 before reading state [8.30ms]
+19 |         if (depth === 2 || depth === 3) {
+20 |           expect(allLeaves(repo).map((item) => item.path)).toEqual([path]);
+21 |           expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area)).map((item) => item.path)).toEqual([path]);
+22 |         } else {
+23 |           writeFileSync(resolve(path, 'state.yaml'), 'invalid: [');
+24 |           expect(() => allLeaves(repo)).toThrow(z.ZodError);
+                                             ^
+error: expect(received).toThrow(expected)
+
+Expected constructor: _
+Received constructor: SyntaxError
+
+Received message: "YAML Parse error: Unexpected token"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/state.test.ts:24:41)
+(fail) allLeaves validates open depth 1 before reading state [5.40ms]
+(pass) allLeaves validates open depth 2 before reading state [6.58ms]
+(pass) allLeaves validates open depth 3 before reading state [4.99ms]
+19 |         if (depth === 2 || depth === 3) {
+20 |           expect(allLeaves(repo).map((item) => item.path)).toEqual([path]);
+21 |           expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area)).map((item) => item.path)).toEqual([path]);
+22 |         } else {
+23 |           writeFileSync(resolve(path, 'state.yaml'), 'invalid: [');
+24 |           expect(() => allLeaves(repo)).toThrow(z.ZodError);
+                                             ^
+error: expect(received).toThrow(expected)
+
+Expected constructor: _
+Received constructor: SyntaxError
+
+Received message: "YAML Parse error: Unexpected token"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/state.test.ts:24:41)
+(fail) allLeaves validates open depth 4 before reading state [5.49ms]
+19 |         if (depth === 2 || depth === 3) {
+20 |           expect(allLeaves(repo).map((item) => item.path)).toEqual([path]);
+21 |           expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area)).map((item) => item.path)).toEqual([path]);
+22 |         } else {
+23 |           writeFileSync(resolve(path, 'state.yaml'), 'invalid: [');
+24 |           expect(() => allLeaves(repo)).toThrow(z.ZodError);
+                                             ^
+error: expect(received).toThrow(expected)
+
+Expected constructor: _
+Received constructor: SyntaxError
+
+Received message: "YAML Parse error: Unexpected token"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/state.test.ts:24:41)
+(fail) allLeaves validates closed depth 0 before reading state [5.34ms]
+19 |         if (depth === 2 || depth === 3) {
+20 |           expect(allLeaves(repo).map((item) => item.path)).toEqual([path]);
+21 |           expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area)).map((item) => item.path)).toEqual([path]);
+22 |         } else {
+23 |           writeFileSync(resolve(path, 'state.yaml'), 'invalid: [');
+24 |           expect(() => allLeaves(repo)).toThrow(z.ZodError);
+                                             ^
+error: expect(received).toThrow(expected)
+
+Expected constructor: _
+Received constructor: SyntaxError
+
+Received message: "YAML Parse error: Unexpected token"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/state.test.ts:24:41)
+(fail) allLeaves validates closed depth 1 before reading state [5.32ms]
+(pass) allLeaves validates closed depth 2 before reading state [4.96ms]
+(pass) allLeaves validates closed depth 3 before reading state [5.83ms]
+19 |         if (depth === 2 || depth === 3) {
+20 |           expect(allLeaves(repo).map((item) => item.path)).toEqual([path]);
+21 |           expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area)).map((item) => item.path)).toEqual([path]);
+22 |         } else {
+23 |           writeFileSync(resolve(path, 'state.yaml'), 'invalid: [');
+24 |           expect(() => allLeaves(repo)).toThrow(z.ZodError);
+                                             ^
+error: expect(received).toThrow(expected)
+
+Expected constructor: _
+Received constructor: SyntaxError
+
+Received message: "YAML Parse error: Unexpected token"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/state.test.ts:24:41)
+(fail) allLeaves validates closed depth 4 before reading state [6.11ms]
+37 |     try {
+38 |       const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({}) };
+39 |       const parked: string = resolve(f.root, 'issues/parked', owner, 'target');
+40 |       mkdirSync(parked, { recursive: true });
+41 |       writeFileSync(resolve(parked, 'state.yaml'), 'invalid: [');
+42 |       expect(() => findLeaf(repo, 'target')).toThrow('Missing leaf: target (parked)');
+                                                  ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "Missing leaf: target (parked)"
+Received message: "Missing leaf: target"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/state.test.ts:42:46)
+(fail) findLeaf identifies parked issue/leaf without parsing its state [5.76ms]
+37 |     try {
+38 |       const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({}) };
+39 |       const parked: string = resolve(f.root, 'issues/parked', owner, 'target');
+40 |       mkdirSync(parked, { recursive: true });
+41 |       writeFileSync(resolve(parked, 'state.yaml'), 'invalid: [');
+42 |       expect(() => findLeaf(repo, 'target')).toThrow('Missing leaf: target (parked)');
+                                                  ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "Missing leaf: target (parked)"
+Received message: "Missing leaf: target"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/state.test.ts:42:46)
+(fail) findLeaf identifies parked epic/issue/leaf without parsing its state [4.87ms]
+(pass) findLeaf ignores parked folders without state and unsupported nesting [5.22ms]
+
+ 5 pass
+ 8 fail
+ 18 expect() calls
+Ran 13 tests across 1 file. [97.00ms]

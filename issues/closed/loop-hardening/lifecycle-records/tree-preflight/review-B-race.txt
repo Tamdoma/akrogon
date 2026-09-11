@@ -1,0 +1,37 @@
+Command: bun -e <inline reproduction below>
+
+import assert from 'node:assert/strict';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fixture, leaf, cli } from './tests/helpers.ts';
+const f = await fixture();
+try {
+  const original = leaf(f, 'moving', 'plan.synthesis');
+  const moved = resolve(f.root, 'issues/open/epic/issue/extra/moving');
+  const repoLock = resolve(f.root, 'issues/.lock');
+  const locks = resolve(f.home, 'lock-calls');
+  const bin = resolve(f.home, 'bin');
+  mkdirSync(bin);
+  writeFileSync(resolve(bin, 'flock'), '#!/bin/sh\nprintf "%s\\n" "$2" >> "$LOCK_CALLS"\nif [ "$2" = "$REPO_LOCK" ]; then mkdir -p "$MOVED_PARENT"; mv "$ORIGINAL" "$MOVED"; fi\nexec /usr/bin/flock "$@"\n', { mode: 0o755 });
+  writeFileSync(resolve(bin, 'herdr'), '#!/bin/sh\nprintf unexpected > "$HERDR_CALLS"\nexit 92\n', { mode: 0o755 });
+  const result = await cli(f, ['next', 'moving'], f.root, {
+    PATH: `${bin}:${process.env.PATH}`,
+    LOCK_CALLS: locks,
+    REPO_LOCK: repoLock,
+    MOVED_PARENT: resolve(moved, '..'),
+    ORIGINAL: original,
+    MOVED: moved,
+    HERDR_CALLS: resolve(f.home, 'herdr-calls'),
+  }, 3000);
+  assert.equal(result.code, 1);
+  assert.ok(result.stderr.includes(resolve(moved, 'state.yaml')));
+  assert.deepEqual(readFileSync(locks, 'utf8').trim().split('\n'), [resolve(f.home, '.lock'), repoLock]);
+  assert.equal(existsSync(resolve(f.home, 'herdr-calls')), false);
+  assert.equal(existsSync(resolve(f.root, 'issues/log.jsonl')), false);
+  console.log(JSON.stringify({scenario: 'leaf moved to depth four at repo-lock acquisition', ...result, locks: readFileSync(locks, 'utf8').trim().split('\n'), leafLockAcquired: false, dispatched: false}));
+} finally { f.clean(); }
+
+Output:
+{"scenario":"leaf moved to depth four at repo-lock acquisition","code":1,"stdout":"","stderr":"{\"repo\":\"repo\",\"path\":\"/tmp/akrogon-Kmfksh/repo/issues/open/epic/issue/extra/moving\",\"error\":\"[\\n  {\\n    \\\"code\\\": \\\"custom\\\",\\n    \\\"path\\\": [],\\n    \\\"message\\\": \\\"Invalid leaf depth: /tmp/akrogon-Kmfksh/repo/issues/open/epic/issue/extra/moving/state.yaml\\\"\\n  }\\n]\"}\n{\"repo\":\"repo\",\"path\":\"/tmp/akrogon-Kmfksh/repo/issues/open/issue/moving\",\"slug\":\"moving\",\"error\":\"Missing or unreadable leaf: moving\"}","locks":["/tmp/akrogon-Kmfksh/.lock","/tmp/akrogon-Kmfksh/repo/issues/.lock"],"leafLockAcquired":false,"dispatched":false}
+
+Exit code: 0

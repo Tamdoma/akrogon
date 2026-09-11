@@ -1,0 +1,1291 @@
+Command: AKROGON_BASE=7be71885565323b89f666098748dcb127fdd84bf : "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE"
+bun test v1.4.0 (34cbb9a40)
+--changed: 11 changed files, running 11/11 test files
+
+tests/config.test.ts:
+(pass) config combines defaults and repo values, reports none, and recalculates worktree base [155.81ms]
+
+tests/init.test.ts:
+(pass) init writes proposal, registration and toolkit and preserves repeated user files [105.61ms]
+(pass) init ignores the custom worktree root and preserves user rules on repeated init [59.12ms]
+(pass) init resolves relative external worktree root from nested cwd [29.33ms]
+(pass) init resolves absolute external worktree root from nested cwd [30.29ms]
+(pass) init resolves repo-prefix sibling worktree root from nested cwd [29.99ms]
+(pass) init resolves normalized relative internal worktree root from nested cwd [30.13ms]
+(pass) init resolves absolute internal worktree root from nested cwd [29.69ms]
+(pass) init resolves relative repo-equal worktree root from nested cwd [33.25ms]
+(pass) init resolves absolute repo-equal worktree root from nested cwd [30.42ms]
+
+tests/install.test.ts:
+(pass) install creates all four absent harness roots and repeats without changing links or herdr arguments [225.29ms]
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/.evidence/install-prune-links/home-listing.json
+(pass) install prunes only dangling owned links and preserves real entries and foreign links in every root [119.75ms]
+(pass) install prunes before refusing directory at .claude/skills without installing links or calling herdr [29.95ms]
+(pass) install prunes before refusing foreign-link at .claude/skills without installing links or calling herdr [28.14ms]
+(pass) install prunes before refusing wrong-owned-link at .claude/skills without installing links or calling herdr [32.15ms]
+(pass) install prunes before refusing directory at .agents/skills without installing links or calling herdr [28.64ms]
+(pass) install prunes before refusing foreign-link at .agents/skills without installing links or calling herdr [28.70ms]
+(pass) install prunes before refusing wrong-owned-link at .agents/skills without installing links or calling herdr [33.40ms]
+(pass) install prunes before refusing directory at .codex/skills without installing links or calling herdr [28.82ms]
+(pass) install prunes before refusing foreign-link at .codex/skills without installing links or calling herdr [32.49ms]
+(pass) install prunes before refusing wrong-owned-link at .codex/skills without installing links or calling herdr [30.47ms]
+(pass) install prunes before refusing directory at .pi/agent/skills without installing links or calling herdr [30.68ms]
+(pass) install prunes before refusing foreign-link at .pi/agent/skills without installing links or calling herdr [32.40ms]
+(pass) install prunes before refusing wrong-owned-link at .pi/agent/skills without installing links or calling herdr [31.55ms]
+(pass) install still refuses an executable destination conflict before linking or herdr calls [32.97ms]
+
+tests/park.test.ts:
+(pass) park and unpark move whole issues by name, refuse running ones, and keep the loop blind to parked work [263.56ms]
+(pass) park --all skips running issues and unpark --all restores everything [102.14ms]
+(pass) park keeps prerequisites that open leaves still depend on, and unpark refuses dependents of parked work [218.72ms]
+
+tests/pull.test.ts:
+(pass) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [179.21ms]
+(pass) pull caps slugs at word boundaries and hard cuts oversized first words [64.46ms]
+(pass) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [353.22ms]
+(pass) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [246.89ms]
+(pass) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [167.61ms]
+(pass) concurrent pulls serialize listing and reconciliation [292.79ms]
+(pass) startup runs pull all before next all and wrappers forward arguments [9.29ms]
+
+tests/sync.test.ts:
+(pass) sync commits local changes, rebases on the remote and pushes [130.17ms]
+(pass) sync preserves unrelated edits with advancing remote=false [68.28ms]
+(pass) sync preserves unrelated edits with advancing remote=true [86.78ms]
+(pass) autostash restoration conflict refuses push and preserves recovery stash [79.37ms]
+(pass) sync refuses side without touching HEAD or index [51.92ms]
+(pass) sync refuses detached HEAD without touching HEAD or index [51.84ms]
+(pass) sync refuses staged exclusion "outside file \n" [50.02ms]
+(pass) sync refuses staged exclusion "issues/seeds/note" [50.10ms]
+(pass) sync refuses staged exclusion "issues/.lock" [49.90ms]
+(pass) sync refuses staged exclusion "issues/nested/.lock" [50.06ms]
+(pass) sync refuses staged exclusion "issues/worktrees/branch/file" [54.51ms]
+(pass) sync refuses staged exclusion "rename" [52.01ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/worktrees [82.74ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/custom trees [82.35ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/tree[1]* [85.46ms]
+(pass) sync scopes tracked changes and new files with worktree root ../external [84.87ms]
+(pass) sync scopes tracked changes and new files with worktree root . [79.79ms]
+(pass) sync holds global then repo locks through push while real park waits [119.77ms]
+(pass) sync owns global lock while waiting for repo lock [76.26ms]
+(pass) sync refuses active coordination lock issues/.lock from local [60.19ms]
+(pass) sync refuses active coordination lock issues/.lock from incoming [79.90ms]
+(pass) sync refuses active coordination lock issues/.lock from replay [76.40ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from local [58.48ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from incoming [78.54ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from replay [87.12ms]
+(pass) sync preserves ignored "collision [1]* \n" against incoming "collision [1]* \n" [92.93ms]
+(pass) sync preserves ignored "collision/file" against incoming "collision" [86.13ms]
+(pass) sync preserves ignored "collision" against incoming "collision/file" [85.24ms]
+(pass) sync preserves ignored "collision/operator" against incoming "collision" [93.73ms]
+(pass) sync preserves ignored "collision [1]* \n" against replay "collision [1]* \n" [94.87ms]
+(pass) sync preserves ignored "collision/file" against replay "collision" [97.48ms]
+(pass) sync preserves ignored "collision" against replay "collision/file" [89.55ms]
+(pass) sync preserves ignored "collision/operator" against replay "collision" [95.61ms]
+(pass) sync permits harmless ignored paths while preserving tracked autostash edits [101.87ms]
+
+tests/phase.test.ts:
+(pass) valid phase transition rejects a mismatched repo key without changing state or history [41.64ms]
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [222.36ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [315.95ms]
+(pass) handoff to review refuses a dirty worktree and issue files on the branch, then passes [127.56ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [178.05ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [156.47ms]
+(pass) failed log diagnostics report committed state without replay [96.63ms]
+(pass) asymmetric and empty leaf sources defer until epic completion under open locks [258.63ms]
+(pass) source retries recheck state, skip CLOSED, and continue after final failures without moving [560.91ms]
+(pass) sourced completion without worktree context fails before rename without a fabricated commit [42.59ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [174.03ms]
+(pass) failed or malformed retry comment listing prevents another close and continues later sources [631.92ms]
+(pass) each completed issue closes only its all-leaf private sources before the final epic closure [297.29ms]
+658 |           { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'], probe },
+659 |           { stdout: '', args: ['issue', 'close', '-R', 'team/project', '1', '--comment', `merged ${head}`], probe },
+660 |         ]),
+661 |       );
+662 |       const retried: Result = await cli(f, ['next', 'retry'], f.root, gh.env);
+663 |       expect(retried.code).toBe(0);
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:663:28)
+(fail) standalone closure failure retries outstanding sources on next without replaying completion [193.55ms]
+658 |           { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'], probe },
+659 |           { stdout: '', args: ['issue', 'close', '-R', 'team/project', '1', '--comment', `merged ${head}`], probe },
+660 |         ]),
+661 |       );
+662 |       const retried: Result = await cli(f, ['next', 'retry'], f.root, gh.env);
+663 |       expect(retried.code).toBe(0);
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/phase.test.ts:663:28)
+(fail) epic closure failure retries outstanding sources on next without replaying completion [181.01ms]
+(pass) standalone completion closes the union of asymmetric leaf sources [156.29ms]
+
+tests/shell.test.ts:
+(pass) deadline kills sleeping attempt after no failures [111.40ms]
+(pass) deadline kills sleeping attempt after one failure [111.27ms]
+(pass) ordinary retry preserves warning and second result with optional deadlines [6.92ms]
+(pass) standalone command clears long deadline on exit 0 [21.00ms]
+(pass) standalone command clears long deadline on exit 7 [18.42ms]
+(pass) Herdr response retains native cause for not-json-response [71.72ms]
+(pass) Herdr response retains native cause for {"result":{"panes":"invalid-panes"}} [71.19ms]
+
+tests/next.test.ts:
+46 |       symlinkSync(resolve(f.root, 'file'), resolve(f.root, 'file-link'));
+47 |       const target: string =
+48 |         kind === 'absolute file' ? resolve(f.root, 'file') : kind === 'file symlink' ? 'file-link' : 'file';
+49 |       const result: Result = await next(f, [target]);
+50 |       expect(result.code).not.toBe(0);
+51 |       expect(result.stderr).toContain(target);
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "file"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:51:29)
+(fail) next rejects relative file before dispatch or leaf mutation [28.63ms]
+46 |       symlinkSync(resolve(f.root, 'file'), resolve(f.root, 'file-link'));
+47 |       const target: string =
+48 |         kind === 'absolute file' ? resolve(f.root, 'file') : kind === 'file symlink' ? 'file-link' : 'file';
+49 |       const result: Result = await next(f, [target]);
+50 |       expect(result.code).not.toBe(0);
+51 |       expect(result.stderr).toContain(target);
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-tMuql8/repo/file"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:51:29)
+(fail) next rejects absolute file before dispatch or leaf mutation [28.45ms]
+46 |       symlinkSync(resolve(f.root, 'file'), resolve(f.root, 'file-link'));
+47 |       const target: string =
+48 |         kind === 'absolute file' ? resolve(f.root, 'file') : kind === 'file symlink' ? 'file-link' : 'file';
+49 |       const result: Result = await next(f, [target]);
+50 |       expect(result.code).not.toBe(0);
+51 |       expect(result.stderr).toContain(target);
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "file-link"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:51:29)
+(fail) next rejects file symlink before dispatch or leaf mutation [27.94ms]
+67 |     const f: DispatchFixture = await dispatchFixture();
+68 |     try {
+69 |       const worktree: string = resolve(f.root, 'issues/worktrees/build');
+70 |       if (kind === 'worktree path') await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
+71 |       const path: string = leaf(f, 'build', 'plan.synthesis', kind === 'worktree path' ? { worktree } : {});
+72 |       expect((await next(f, [kind === 'worktree path' ? worktree : path])).code).toBe(0);
+                                                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:72:82)
+(fail) next dispatches an explicit leaf folder [27.12ms]
+67 |     const f: DispatchFixture = await dispatchFixture();
+68 |     try {
+69 |       const worktree: string = resolve(f.root, 'issues/worktrees/build');
+70 |       if (kind === 'worktree path') await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
+71 |       const path: string = leaf(f, 'build', 'plan.synthesis', kind === 'worktree path' ? { worktree } : {});
+72 |       expect((await next(f, [kind === 'worktree path' ? worktree : path])).code).toBe(0);
+                                                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:72:82)
+(fail) next dispatches an explicit worktree path [33.06ms]
+765 |   }
+766 | }, 15000);
+767 | 
+768 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+769 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+770 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:770:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:89:34)
+(fail) next reports Herdr response context for not-json-response [29.80ms]
+765 |   }
+766 | }, 15000);
+767 | 
+768 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+769 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+770 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:770:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:89:34)
+(fail) next reports Herdr response context for {"result":{"panes":"invalid-panes"}} [27.66ms]
+104 | test('next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd', async () => {
+105 |   const f: DispatchFixture = await dispatchFixture();
+106 |   try {
+107 |     const path: string = leaf(f, 'build', 'plan.synthesis');
+108 |     const results: Result[] = await Promise.all([next(f, ['build']), next(f, ['build'])]);
+109 |     expect(results.map((r) => r.code)).toEqual([0, 0]);
+                                             ^
+error: expect(received).toEqual(expected)
+
+  [
+-   0,
+-   0,
++   1,
++   1,
+  ]
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:109:40)
+(fail) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [29.71ms]
+128 | 
+129 | test('next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session', async () => {
+130 |   const f: DispatchFixture = await dispatchFixture();
+131 |   try {
+132 |     const path: string = leaf(f, 'flicker', 'plan.synthesis');
+133 |     expect((await next(f, ['flicker'])).code).toBe(0);
+                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:133:47)
+(fail) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [28.08ms]
+161 | test('next waits on a blocked agent instead of counting attempts or flipping seats', async () => {
+162 |   const f: DispatchFixture = await dispatchFixture();
+163 |   try {
+164 |     const path: string = leaf(f, 'dialog', 'plan.synthesis');
+165 |     saveDatabase(f, { ...database(f), blockOnStart: true });
+166 |     expect((await next(f, ['dialog'])).code).toBe(0);
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:166:46)
+(fail) next waits on a blocked agent instead of counting attempts or flipping seats [27.85ms]
+185 |   const f: DispatchFixture = await dispatchFixture();
+186 |   try {
+187 |     const path: string = leaf(f, 'retry', 'plan.synthesis');
+188 |     saveDatabase(f, { ...database(f), failSplitOnce: true });
+189 |     expect((await next(f, ['retry'])).code).not.toBe(0);
+190 |     expect(database(f).tabs).toHaveLength(1);
+                                   ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:190:30)
+(fail) next resumes interrupted tab creation, retries same slot twice then peer once and fails [28.18ms]
+220 |     const path: string = leaf(f, 'broken', 'failed');
+221 |     expect(readState(path)).toMatchObject({ failed_notified: false, busy_since: {}, busy_notified: {} });
+222 |     saveDatabase(f, { ...database(f), failNotification: true });
+223 |     const failed: Result = await next(f, ['broken']);
+224 |     expect(failed.code).not.toBe(0);
+225 |     expect(failed.stderr).toContain('fixture_notification_failed');
+                                ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "fixture_notification_failed"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:225:27)
+(fail) failed delivery retries, deduplicates sweeps and resets after a phase transition [28.06ms]
+268 | test('busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes', async () => {
+269 |   const f: DispatchFixture = await dispatchFixture();
+270 |   try {
+271 |     const path: string = leaf(f, 'busy', 'plan.positions');
+272 |     const now: number = Date.parse('2026-09-11T12:00:00Z');
+273 |     expect((await nextAt(f, 'busy', now)).code).toBe(0);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:273:49)
+(fail) busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes [29.22ms]
+325 | test('logical B fallback warns for physical A and unknown agents retain busy observations', async () => {
+326 |   const f: DispatchFixture = await dispatchFixture();
+327 |   try {
+328 |     const path: string = leaf(f, 'fallback', 'plan.synthesis');
+329 |     const now: number = Date.parse('2026-09-11T12:00:00Z');
+330 |     expect((await nextAt(f, 'fallback', now)).code).toBe(0);
+                                                          ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:330:53)
+(fail) logical B fallback warns for physical A and unknown agents retain busy observations [28.78ms]
+365 |     expect((await next(f, ['dependent'])).code).not.toBe(0);
+366 |     expect((await next(f, ['missing'])).code).not.toBe(0);
+367 |     saveState(missing, { ...readState(missing), 'blocked-by': ['first'] });
+368 |     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+369 |     yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 1 });
+370 |     expect((await next(f, ['--all'])).code).toBe(0);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:370:45)
+(fail) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [96.95ms]
+388 |   try {
+389 |     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
+390 |     const dependent: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
+391 |     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+392 |     yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 1 });
+393 |     expect((await next(f, ['first'])).code).toBe(0);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:393:45)
+(fail) a merged leaf with its tab still open does not count toward max_active [30.45ms]
+407 | test('a closed tab hook from a merged leaf sweeps and starts the next leaf', async () => {
+408 |   const f: DispatchFixture = await dispatchFixture();
+409 |   try {
+410 |     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
+411 |     const dependent: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
+412 |     expect((await next(f, ['first'])).code).toBe(0);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:412:45)
+(fail) a closed tab hook from a merged leaf sweeps and starts the next leaf [27.75ms]
+438 | test('merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it', async () => {
+439 |   const f: DispatchFixture = await dispatchFixture();
+440 |   try {
+441 |     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
+442 |     const dependent: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
+443 |     expect((await next(f, ['first'])).code).toBe(0);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:443:45)
+(fail) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [28.67ms]
+465 |     leaf(f, 'first', 'plan.synthesis');
+466 |     const second: string = leaf(g, 'second', 'plan.synthesis', { repo: 'other' });
+467 |     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+468 |     yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 1, repos: { repo: f.root, other: g.root } });
+469 |     const results: Result[] = await Promise.all([next(f, ['first']), next(f, [resolve(g.root, 'issues/open/issue')])]);
+470 |     expect(results.every((result) => result.code === 0)).toBe(true);
+                                                               ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:470:58)
+(fail) machine-wide capacity includes another registered repo and folder selection respects it [35.81ms]
+484 |     await command(['git', 'init', '--bare', remote]);
+485 |     await command(['git', 'remote', 'add', 'upstream', remote], f.root);
+486 |     await command(['git', 'push', 'upstream', 'HEAD:trunk'], f.root);
+487 |     yaml(resolve(f.root, 'issues/config.yaml'), { remote: 'upstream', default_branch: 'trunk' });
+488 |     const path: string = leaf(f, 'landed', 'plan.synthesis', {}, 'landing');
+489 |     expect((await next(f, ['landed'])).code).toBe(0);
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:489:46)
+(fail) next recovers only merge-phase work by ancestry against a non-default remote target [39.42ms]
+540 | 
+541 | test('exited hooks resolve persisted pane hints and preserve the surviving slot', async () => {
+542 |   const f: DispatchFixture = await dispatchFixture();
+543 |   try {
+544 |     const path: string = leaf(f, 'exited', 'plan.positions');
+545 |     expect((await next(f, ['exited'])).code).toBe(0);
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:545:46)
+(fail) exited hooks resolve persisted pane hints and preserve the surviving slot [27.48ms]
+568 | 
+569 | test('delayed working and idle notifications from the prompted session never consume retries', async () => {
+570 |   const f: DispatchFixture = await dispatchFixture();
+571 |   try {
+572 |     const path: string = leaf(f, 'delayed', 'plan.synthesis');
+573 |     expect((await next(f, ['delayed'])).code).toBe(0);
+                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:573:47)
+(fail) delayed working and idle notifications from the prompted session never consume retries [28.04ms]
+596 |     const remote: string = resolve(f.home, 'remote.git');
+597 |     await command(['git', 'init', '--bare', remote]);
+598 |     await command(['git', 'remote', 'add', 'origin', remote], f.root);
+599 |     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+600 |     const path: string = leaf(f, 'dirty', 'plan.synthesis');
+601 |     expect((await next(f, ['dirty'])).code).toBe(0);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:601:45)
+(fail) uncommitted work in a merge worktree is never recovered as merged [34.50ms]
+616 | 
+617 | test('a worktree parked mid-rebase is still dispatched', async () => {
+618 |   const f: DispatchFixture = await dispatchFixture();
+619 |   try {
+620 |     const path: string = leaf(f, 'conflict', 'plan.synthesis');
+621 |     expect((await next(f, ['conflict'])).code).toBe(0);
+                                                     ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:621:48)
+(fail) a worktree parked mid-rebase is still dispatched [29.03ms]
+646 |   try {
+647 |     const remote: string = resolve(f.home, 'remote.git');
+648 |     await command(['git', 'init', '--bare', remote]);
+649 |     await command(['git', 'remote', 'add', 'origin', remote], f.root);
+650 |     const path: string = leaf(f, 'active-merge', 'plan.synthesis');
+651 |     expect((await next(f, ['active-merge'])).code).toBe(0);
+                                                         ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:651:52)
+(fail) a live merge retains its completion call after pushing, including a peer retry [28.02ms]
+697 |     const slug: string = '123-this-is-a-valid-leaf-slug-longer-than-thirty-characters';
+698 |     leaf(f, slug, 'plan.synthesis');
+699 |     leaf(g, slug, 'plan.synthesis', { repo: 'other' });
+700 |     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+701 |     yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, other: g.root } });
+702 |     expect((await next(f, ['--all'])).code).toBe(0);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:702:45)
+(fail) agent names support identical repo-local slugs and long numeric-leading slugs [33.34ms]
+714 | 
+715 | test('next awaits sourced completion after a failed rename before removing the worktree', async () => {
+716 |   const f: DispatchFixture = await dispatchFixture();
+717 |   try {
+718 |     const path: string = leaf(f, 'rename', 'plan.synthesis');
+719 |     expect((await next(f, ['rename'])).code).toBe(0);
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:719:46)
+(fail) next awaits sourced completion after a failed rename before removing the worktree [28.90ms]
+782 | for (const mode of ['startup', 'hook', 'cwd'] as const) {
+783 |   test(`missing registration is isolated during ${mode}`, async () => {
+784 |     const f: DispatchFixture = await dispatchFixture();
+785 |     try {
+786 |       const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+787 |       expect((await next(f, ['healthy'])).code).toBe(0);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:787:49)
+(fail) missing registration is isolated during startup [28.23ms]
+782 | for (const mode of ['startup', 'hook', 'cwd'] as const) {
+783 |   test(`missing registration is isolated during ${mode}`, async () => {
+784 |     const f: DispatchFixture = await dispatchFixture();
+785 |     try {
+786 |       const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+787 |       expect((await next(f, ['healthy'])).code).toBe(0);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:787:49)
+(fail) missing registration is isolated during hook [30.52ms]
+782 | for (const mode of ['startup', 'hook', 'cwd'] as const) {
+783 |   test(`missing registration is isolated during ${mode}`, async () => {
+784 |     const f: DispatchFixture = await dispatchFixture();
+785 |     try {
+786 |       const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+787 |       expect((await next(f, ['healthy'])).code).toBe(0);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:787:49)
+(fail) missing registration is isolated during cwd [27.24ms]
+765 |   }
+766 | }, 15000);
+767 | 
+768 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+769 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+770 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:770:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:815:12)
+(fail) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [29.37ms]
+826 | for (const capacity of [3, 4]) {
+827 |   test(`bad YAML and invalid states reserve occupancy at capacity ${capacity}`, async () => {
+828 |     const f: DispatchFixture = await dispatchFixture();
+829 |     try {
+830 |       const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+831 |       expect((await next(f, ['healthy'])).code).toBe(0);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:831:49)
+(fail) bad YAML and invalid states reserve occupancy at capacity 3 [27.06ms]
+826 | for (const capacity of [3, 4]) {
+827 |   test(`bad YAML and invalid states reserve occupancy at capacity ${capacity}`, async () => {
+828 |     const f: DispatchFixture = await dispatchFixture();
+829 |     try {
+830 |       const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+831 |       expect((await next(f, ['healthy'])).code).toBe(0);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:831:49)
+(fail) bad YAML and invalid states reserve occupancy at capacity 4 [27.01ms]
+855 | 
+856 | test('dirty merged worktree cleanup reports the original git error and still sweeps', async () => {
+857 |   const f: DispatchFixture = await dispatchFixture();
+858 |   try {
+859 |     const dirty: string = leaf(f, 'dirty', 'plan.synthesis', {}, 'dirty-issue');
+860 |     expect((await next(f, ['dirty'])).code).toBe(0);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:860:45)
+(fail) dirty merged worktree cleanup reports the original git error and still sweeps [27.26ms]
+885 |         resolve(f.home, 'missing/lock'),
+886 |         resolve(scope === 'global' ? f.home : scope === 'repo' ? resolve(f.root, 'issues') : path, '.lock'),
+887 |       );
+888 |       const result: Result = await next(f, ['locked']);
+889 |       expect(result.code).not.toBe(0);
+890 |       expect(result.stderr).toContain('lock');
+                                  ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "lock"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:890:29)
+(fail) global lock acquisition failure is fatal [31.55ms]
+885 |         resolve(f.home, 'missing/lock'),
+886 |         resolve(scope === 'global' ? f.home : scope === 'repo' ? resolve(f.root, 'issues') : path, '.lock'),
+887 |       );
+888 |       const result: Result = await next(f, ['locked']);
+889 |       expect(result.code).not.toBe(0);
+890 |       expect(result.stderr).toContain('lock');
+                                  ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "lock"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:890:29)
+(fail) repo lock acquisition failure is fatal [31.06ms]
+885 |         resolve(f.home, 'missing/lock'),
+886 |         resolve(scope === 'global' ? f.home : scope === 'repo' ? resolve(f.root, 'issues') : path, '.lock'),
+887 |       );
+888 |       const result: Result = await next(f, ['locked']);
+889 |       expect(result.code).not.toBe(0);
+890 |       expect(result.stderr).toContain('lock');
+                                  ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "lock"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:890:29)
+(fail) leaf lock acquisition failure is fatal [29.01ms]
+907 |     writeFileSync(flock, '#!/bin/sh\nprintf locked\ncat >/dev/null\nprintf "finalization failure" >&2\nexit 7\n', {
+908 |       mode: 0o755,
+909 |     });
+910 |     const result: Result = await next(f, ['--all']);
+911 |     expect(result.code).not.toBe(0);
+912 |     expect(result.stderr).toContain('finalization failure');
+                                ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "finalization failure"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:912:27)
+(fail) lock finalization failures and invalid hook events remain fatal [48.67ms]
+765 |   }
+766 | }, 15000);
+767 | 
+768 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+769 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+770 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:770:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:930:14)
+(fail) duplicate leaf identity never dispatches an arbitrary leaf [30.80ms]
+765 |   }
+766 | }, 15000);
+767 | 
+768 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+769 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+770 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:770:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:930:14)
+(fail) mismatch leaf identity never dispatches an arbitrary leaf [29.88ms]
+765 |   }
+766 | }, 15000);
+767 | 
+768 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+769 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+770 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:770:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:951:54)
+(fail) next selection and sweep report both repo keys without dispatching or changing the mismatched leaf [50.95ms]
+765 |   }
+766 | }, 15000);
+767 | 
+768 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+769 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+770 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:770:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:987:14)
+(fail) changed worktree root reports recorded and expected worktrees without creating or prompting [34.07ms]
+765 |   }
+766 | }, 15000);
+767 | 
+768 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+769 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+770 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:770:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:987:14)
+(fail) changed repo root reports recorded and expected worktrees without creating or prompting [31.19ms]
+1013 |     const moved: DispatchFixture = { ...f, root };
+1014 |     const status: Result = await cli(moved, ['status', 'movable']);
+1015 |     expect(status.code).toBe(0);
+1016 |     expect(status.stdout).toContain('repo: repo');
+1017 |     expect((await cli(moved, ['phase', 'movable', 'implement', '--slot', 'B'])).code).toBe(0);
+1018 |     expect((await next(moved, ['movable'])).code).toBe(0);
+                                                         ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1018:51)
+(fail) moving a repo with the same registered key supports status, phase and dispatch without a recorded worktree [93.99ms]
+1031 | 
+1032 | test('unknown directory population reserves all new capacity but allows existing tabs', async () => {
+1033 |   const f: DispatchFixture = await dispatchFixture();
+1034 |   try {
+1035 |     const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+1036 |     expect((await next(f, ['healthy'])).code).toBe(0);
+                                                     ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1036:47)
+(fail) unknown directory population reserves all new capacity but allows existing tabs [29.37ms]
+1068 |       stdin: 'ignore',
+1069 |       stdout: 'pipe',
+1070 |       stderr: 'pipe',
+1071 |     });
+1072 |     const stderr: string = await new Response(child.stderr).text();
+1073 |     expect(await child.exited).toBe(9);
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 9
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1073:32)
+(fail) non-Error throws cross the scoped discovery boundary unchanged [25.39ms]
+765 |   }
+766 | }, 15000);
+767 | 
+768 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+769 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+770 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:770:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1088:14)
+(fail) explicit unreadable targets retain the original error without a missing-target stack [28.87ms]
+765 |   }
+766 | }, 15000);
+767 | 
+768 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+769 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+770 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:770:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1115:12)
+(fail) a selected leaf removed before its repo lock is reported as skipped [28.95ms]
+1125 |     'timeout',
+1126 |     '5',
+1127 |     process.execPath,
+1128 |     resolve(import.meta.dir, 'fetch-deadline-harness.ts'),
+1129 |   ]);
+1130 |   expect(result.code).toBe(0);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1130:23)
+(fail) recovery fetch deadline releases dispatch locks without transitioning [56.07ms]
+1135 | for (const session of [null, undefined]) {
+1136 |   test(`next prompts an idle agent with ${session === null ? 'null' : 'omitted'} session data`, async () => {
+1137 |     const f: DispatchFixture = await dispatchFixture();
+1138 |     try {
+1139 |       const path: string = leaf(f, 'sessionless', 'plan.synthesis');
+1140 |       expect((await next(f, ['sessionless'])).code).toBe(0);
+                                                           ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1140:53)
+(fail) next prompts an idle agent with null session data [27.34ms]
+1135 | for (const session of [null, undefined]) {
+1136 |   test(`next prompts an idle agent with ${session === null ? 'null' : 'omitted'} session data`, async () => {
+1137 |     const f: DispatchFixture = await dispatchFixture();
+1138 |     try {
+1139 |       const path: string = leaf(f, 'sessionless', 'plan.synthesis');
+1140 |       expect((await next(f, ['sessionless'])).code).toBe(0);
+                                                           ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1140:53)
+(fail) next prompts an idle agent with omitted session data [27.10ms]
+1162 |       const remote: string = resolve(f.home, 'remote.git');
+1163 |       await command(['git', 'init', '--bare', remote]);
+1164 |       await command(['git', 'remote', 'add', 'origin', remote], f.root);
+1165 |       await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+1166 |       const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
+1167 |       expect((await next(f, ['blocked-merge'])).code).toBe(0);
+                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1167:55)
+(fail) blocked merge seat A prevents fetch and clean checks in a dirty worktree [37.97ms]
+1162 |       const remote: string = resolve(f.home, 'remote.git');
+1163 |       await command(['git', 'init', '--bare', remote]);
+1164 |       await command(['git', 'remote', 'add', 'origin', remote], f.root);
+1165 |       await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+1166 |       const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
+1167 |       expect((await next(f, ['blocked-merge'])).code).toBe(0);
+                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1167:55)
+(fail) blocked merge seat B prevents fetch and clean checks in a dirty worktree [33.31ms]
+1213 | for (const missing of ['neither', 'A', 'B', 'both'] as const) {
+1214 |   test(`recorded seats stay authoritative with an extra pane first and ${missing} missing`, async () => {
+1215 |     const f: DispatchFixture = await dispatchFixture();
+1216 |     try {
+1217 |       const path: string = leaf(f, 'seats', 'plan.synthesis');
+1218 |       expect((await next(f, ['seats'])).code).toBe(0);
+                                                     ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1218:47)
+(fail) recorded seats stay authoritative with an extra pane first and neither missing [29.02ms]
+1213 | for (const missing of ['neither', 'A', 'B', 'both'] as const) {
+1214 |   test(`recorded seats stay authoritative with an extra pane first and ${missing} missing`, async () => {
+1215 |     const f: DispatchFixture = await dispatchFixture();
+1216 |     try {
+1217 |       const path: string = leaf(f, 'seats', 'plan.synthesis');
+1218 |       expect((await next(f, ['seats'])).code).toBe(0);
+                                                     ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1218:47)
+(fail) recorded seats stay authoritative with an extra pane first and A missing [30.79ms]
+1213 | for (const missing of ['neither', 'A', 'B', 'both'] as const) {
+1214 |   test(`recorded seats stay authoritative with an extra pane first and ${missing} missing`, async () => {
+1215 |     const f: DispatchFixture = await dispatchFixture();
+1216 |     try {
+1217 |       const path: string = leaf(f, 'seats', 'plan.synthesis');
+1218 |       expect((await next(f, ['seats'])).code).toBe(0);
+                                                     ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1218:47)
+(fail) recorded seats stay authoritative with an extra pane first and B missing [27.61ms]
+1213 | for (const missing of ['neither', 'A', 'B', 'both'] as const) {
+1214 |   test(`recorded seats stay authoritative with an extra pane first and ${missing} missing`, async () => {
+1215 |     const f: DispatchFixture = await dispatchFixture();
+1216 |     try {
+1217 |       const path: string = leaf(f, 'seats', 'plan.synthesis');
+1218 |       expect((await next(f, ['seats'])).code).toBe(0);
+                                                     ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1218:47)
+(fail) recorded seats stay authoritative with an extra pane first and both missing [26.69ms]
+1268 |       if (edge === 'empty') {
+1269 |         expect(result.code).toBe(1);
+1270 |         expect(result.stderr).toContain(state.tab!);
+1271 |         expect(database(f).panes).toHaveLength(0);
+1272 |       } else {
+1273 |         expect(result.code).toBe(0);
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1273:29)
+(fail) allocation handles an interrupted tab [51.70ms]
+1253 |   test(`allocation handles an ${edge} tab`, async () => {
+1254 |     const f: DispatchFixture = await dispatchFixture();
+1255 |     try {
+1256 |       const path: string = leaf(f, 'allocation', 'plan.synthesis');
+1257 |       saveDatabase(f, { ...database(f), failSplitOnce: edge === 'interrupted' });
+1258 |       expect((await next(f, ['allocation'])).code).toBe(edge === 'interrupted' ? 1 : 0);
+                                                          ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1258:52)
+(fail) allocation handles an empty tab [28.15ms]
+1253 |   test(`allocation handles an ${edge} tab`, async () => {
+1254 |     const f: DispatchFixture = await dispatchFixture();
+1255 |     try {
+1256 |       const path: string = leaf(f, 'allocation', 'plan.synthesis');
+1257 |       saveDatabase(f, { ...database(f), failSplitOnce: edge === 'interrupted' });
+1258 |       expect((await next(f, ['allocation'])).code).toBe(edge === 'interrupted' ? 1 : 0);
+                                                          ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1258:52)
+(fail) allocation handles an recreated tab [28.53ms]
+1295 | 
+1296 | test('agent start allows 30 seconds while prompt wait remains 5 seconds', async () => {
+1297 |   const f: DispatchFixture = await dispatchFixture();
+1298 |   try {
+1299 |     leaf(f, 'timeouts', 'plan.synthesis');
+1300 |     expect((await next(f, ['timeouts'])).code).toBe(0);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1300:48)
+(fail) agent start allows 30 seconds while prompt wait remains 5 seconds [27.56ms]
+1309 | 
+1310 | test('startup retries closure before cleanup and retains failed owners with their worktree branch and tab', async () => {
+1311 |   const f: DispatchFixture = await dispatchFixture();
+1312 |   try {
+1313 |     const path: string = leaf(f, 'retry', 'plan.synthesis');
+1314 |     expect((await next(f, ['retry'])).code).toBe(0);
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1314:45)
+(fail) startup retries closure before cleanup and retains failed owners with their worktree branch and tab [28.72ms]
+1358 | test('startup retains completed issue resources while an epic sibling remains unfinished', async () => {
+1359 |   const f: DispatchFixture = await dispatchFixture();
+1360 |   try {
+1361 |     const path: string = leaf(f, 'done', 'plan.synthesis', {}, 'epic/first');
+1362 |     leaf(f, 'waiting', 'plan.synthesis', { hand_built: true }, 'epic/second');
+1363 |     expect((await next(f, ['done'])).code).toBe(0);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1363:44)
+(fail) startup retains completed issue resources while an epic sibling remains unfinished [32.60ms]
+1397 |             f.root,
+1398 |             { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') },
+1399 |             3000,
+1400 |           );
+1401 |           expect(result.code).toBe(1);
+1402 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-EoifvY/repo/issues/open/state.yaml"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1402:33)
+(fail) explicit next rejects open/ before any flock [30.82ms]
+1397 |             f.root,
+1398 |             { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') },
+1399 |             3000,
+1400 |           );
+1401 |           expect(result.code).toBe(1);
+1402 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-j3oO20/repo/issues/open/invalid/state.yaml"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1402:33)
+(fail) explicit next rejects open/invalid before any flock [30.12ms]
+1397 |             f.root,
+1398 |             { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') },
+1399 |             3000,
+1400 |           );
+1401 |           expect(result.code).toBe(1);
+1402 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-HyQyDC/repo/issues/open/epic/issue/extra/invalid/state.yaml"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1402:33)
+(fail) explicit next rejects open/epic/issue/extra/invalid before any flock [27.13ms]
+1397 |             f.root,
+1398 |             { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') },
+1399 |             3000,
+1400 |           );
+1401 |           expect(result.code).toBe(1);
+1402 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-S59AE8/repo/issues/closed/state.yaml"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1402:33)
+(fail) explicit next rejects closed/ before any flock [29.19ms]
+1397 |             f.root,
+1398 |             { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') },
+1399 |             3000,
+1400 |           );
+1401 |           expect(result.code).toBe(1);
+1402 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-FepOCn/repo/issues/closed/invalid/state.yaml"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1402:33)
+(fail) explicit next rejects closed/invalid before any flock [28.63ms]
+1397 |             f.root,
+1398 |             { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') },
+1399 |             3000,
+1400 |           );
+1401 |           expect(result.code).toBe(1);
+1402 |           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-vKVU4n/repo/issues/closed/epic/issue/extra/invalid/state.yaml"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1402:33)
+(fail) explicit next rejects closed/epic/issue/extra/invalid before any flock [30.02ms]
+1440 |         f,
+1441 |         route === 'hook' ? [] : [route],
+1442 |         route === 'hook' ? { HERDR_PANE_ID: readState(healthy).pane.B } : {},
+1443 |       );
+1444 |       expect(result.code).toBe(1);
+1445 |       expect(result.stderr).toContain(resolve(bad, 'state.yaml'));
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-6UfTCE/repo/issues/open/epic/issue/extra/invalid/state.yaml"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1445:29)
+(fail) invalid merged depth stays excluded during --all with healthy work [28.40ms]
+1440 |         f,
+1441 |         route === 'hook' ? [] : [route],
+1442 |         route === 'hook' ? { HERDR_PANE_ID: readState(healthy).pane.B } : {},
+1443 |       );
+1444 |       expect(result.code).toBe(1);
+1445 |       expect(result.stderr).toContain(resolve(bad, 'state.yaml'));
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "/tmp/akrogon-QE7Oik/repo/issues/open/epic/issue/extra/invalid/state.yaml"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1445:29)
+(fail) invalid merged depth stays excluded during . with healthy work [30.04ms]
+1422 |     const f: DispatchFixture = await dispatchFixture();
+1423 |     try {
+1424 |       configure(f, { max_active: 4 });
+1425 |       const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
+1426 |       if (route === 'hook') {
+1427 |         expect((await next(f, ['healthy'])).code).toBe(0);
+                                                         ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1427:51)
+(fail) invalid merged depth stays excluded during hook with healthy work [28.53ms]
+1461 |       const parked: string = resolve(f.root, 'issues/parked', owner, 'resting');
+1462 |       mkdirSync(parked, { recursive: true });
+1463 |       writeFileSync(resolve(parked, 'state.yaml'), 'slug: [');
+1464 |       const result: Result = await next(f, ['resting']);
+1465 |       expect(result.code).toBe(1);
+1466 |       expect(result.stderr).toContain('Missing leaf: resting (parked)');
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Missing leaf: resting (parked)"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1466:29)
+(fail) next identifies dormant issue/resting without parsing and prefers active leaves [28.13ms]
+1461 |       const parked: string = resolve(f.root, 'issues/parked', owner, 'resting');
+1462 |       mkdirSync(parked, { recursive: true });
+1463 |       writeFileSync(resolve(parked, 'state.yaml'), 'slug: [');
+1464 |       const result: Result = await next(f, ['resting']);
+1465 |       expect(result.code).toBe(1);
+1466 |       expect(result.stderr).toContain('Missing leaf: resting (parked)');
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Missing leaf: resting (parked)"
+Received: "587 | <<<<<<< HEAD\n      ^\nerror: Unexpected <<\n    at /home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/src/next.ts:587:1\n\nBun v1.4.0 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/tree-preflight/tests/next.test.ts:1466:29)
+(fail) next identifies dormant epic/issue/resting without parsing and prefers active leaves [27.01ms]
+
+tests/state.test.ts:
+(pass) canonical states parse and save without retired fields and retain defaults [5.47ms]
+(pass) strict schema rejects legacy keys priority [0.44ms]
+(pass) strict schema rejects legacy keys slot [0.06ms]
+(pass) strict schema rejects legacy keys priority, slot [0.02ms]
+(pass) open lazily migrates priority regardless of legacy value type [5.04ms]
+(pass) open lazily migrates slot regardless of legacy value type [4.66ms]
+(pass) open lazily migrates priority, slot regardless of legacy value type [5.13ms]
+(pass) closed lazily migrates priority regardless of legacy value type [5.07ms]
+(pass) closed lazily migrates slot regardless of legacy value type [5.19ms]
+(pass) closed lazily migrates priority, slot regardless of legacy value type [5.20ms]
+(pass) parked lazily migrates priority regardless of legacy value type [4.86ms]
+(pass) parked lazily migrates slot regardless of legacy value type [4.77ms]
+(pass) parked lazily migrates priority, slot regardless of legacy value type [5.39ms]
+(pass) migration retains strict validation of unknown keys, required fields, known values and YAML shapes [5.75ms]
+(pass) allLeaves validates open depth 0 before reading state [5.44ms]
+(pass) allLeaves validates open depth 1 before reading state [4.41ms]
+(pass) allLeaves validates open depth 2 before reading state [4.73ms]
+(pass) allLeaves validates open depth 3 before reading state [5.17ms]
+(pass) allLeaves validates open depth 4 before reading state [4.92ms]
+(pass) allLeaves validates closed depth 0 before reading state [5.06ms]
+(pass) allLeaves validates closed depth 1 before reading state [5.39ms]
+(pass) allLeaves validates closed depth 2 before reading state [5.51ms]
+(pass) allLeaves validates closed depth 3 before reading state [4.70ms]
+(pass) allLeaves validates closed depth 4 before reading state [4.54ms]
+(pass) findLeaf identifies parked issue/leaf without parsing its state [5.36ms]
+(pass) findLeaf identifies parked epic/issue/leaf without parsing its state [5.47ms]
+(pass) findLeaf ignores parked folders without state and unsupported nesting [4.73ms]
+
+tests/status.test.ts:
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [43.89ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [183.61ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [322.60ms]
+(pass) repo mismatch identifies both keys in overview and detail while healthy repos remain visible [69.91ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [58.03ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [124.53ms]
+(pass) busy durations appear in NOTE for every recorded seat without writes or herdr calls [36.26ms]
+(pass) status reports invalid open/ while showing another repo without writes [94.54ms]
+(pass) status reports invalid open/invalid while showing another repo without writes [96.46ms]
+(pass) status reports invalid open/epic/issue/extra/invalid while showing another repo without writes [100.05ms]
+(pass) status identifies dormant issue/resting and prefers open or closed leaves [173.53ms]
+(pass) status identifies dormant epic/issue/resting and prefers open or closed leaves [180.10ms]
+
+76 tests failed:
+(fail) standalone closure failure retries outstanding sources on next without replaying completion [193.55ms]
+(fail) epic closure failure retries outstanding sources on next without replaying completion [181.01ms]
+(fail) next rejects relative file before dispatch or leaf mutation [28.63ms]
+(fail) next rejects absolute file before dispatch or leaf mutation [28.45ms]
+(fail) next rejects file symlink before dispatch or leaf mutation [27.94ms]
+(fail) next dispatches an explicit leaf folder [27.12ms]
+(fail) next dispatches an explicit worktree path [33.06ms]
+(fail) next reports Herdr response context for not-json-response [29.80ms]
+(fail) next reports Herdr response context for {"result":{"panes":"invalid-panes"}} [27.66ms]
+(fail) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [29.71ms]
+(fail) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [28.08ms]
+(fail) next waits on a blocked agent instead of counting attempts or flipping seats [27.85ms]
+(fail) next resumes interrupted tab creation, retries same slot twice then peer once and fails [28.18ms]
+(fail) failed delivery retries, deduplicates sweeps and resets after a phase transition [28.06ms]
+(fail) busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes [29.22ms]
+(fail) logical B fallback warns for physical A and unknown agents retain busy observations [28.78ms]
+(fail) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [96.95ms]
+(fail) a merged leaf with its tab still open does not count toward max_active [30.45ms]
+(fail) a closed tab hook from a merged leaf sweeps and starts the next leaf [27.75ms]
+(fail) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [28.67ms]
+(fail) machine-wide capacity includes another registered repo and folder selection respects it [35.81ms]
+(fail) next recovers only merge-phase work by ancestry against a non-default remote target [39.42ms]
+(fail) exited hooks resolve persisted pane hints and preserve the surviving slot [27.48ms]
+(fail) delayed working and idle notifications from the prompted session never consume retries [28.04ms]
+(fail) uncommitted work in a merge worktree is never recovered as merged [34.50ms]
+(fail) a worktree parked mid-rebase is still dispatched [29.03ms]
+(fail) a live merge retains its completion call after pushing, including a peer retry [28.02ms]
+(fail) agent names support identical repo-local slugs and long numeric-leading slugs [33.34ms]
+(fail) next awaits sourced completion after a failed rename before removing the worktree [28.90ms]
+(fail) missing registration is isolated during startup [28.23ms]
+(fail) missing registration is isolated during hook [30.52ms]
+(fail) missing registration is isolated during cwd [27.24ms]
+(fail) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [29.37ms]
+(fail) bad YAML and invalid states reserve occupancy at capacity 3 [27.06ms]
+(fail) bad YAML and invalid states reserve occupancy at capacity 4 [27.01ms]
+(fail) dirty merged worktree cleanup reports the original git error and still sweeps [27.26ms]
+(fail) global lock acquisition failure is fatal [31.55ms]
+(fail) repo lock acquisition failure is fatal [31.06ms]
+(fail) leaf lock acquisition failure is fatal [29.01ms]
+(fail) lock finalization failures and invalid hook events remain fatal [48.67ms]
+(fail) duplicate leaf identity never dispatches an arbitrary leaf [30.80ms]
+(fail) mismatch leaf identity never dispatches an arbitrary leaf [29.88ms]
+(fail) next selection and sweep report both repo keys without dispatching or changing the mismatched leaf [50.95ms]
+(fail) changed worktree root reports recorded and expected worktrees without creating or prompting [34.07ms]
+(fail) changed repo root reports recorded and expected worktrees without creating or prompting [31.19ms]
+(fail) moving a repo with the same registered key supports status, phase and dispatch without a recorded worktree [93.99ms]
+(fail) unknown directory population reserves all new capacity but allows existing tabs [29.37ms]
+(fail) non-Error throws cross the scoped discovery boundary unchanged [25.39ms]
+(fail) explicit unreadable targets retain the original error without a missing-target stack [28.87ms]
+(fail) a selected leaf removed before its repo lock is reported as skipped [28.95ms]
+(fail) recovery fetch deadline releases dispatch locks without transitioning [56.07ms]
+(fail) next prompts an idle agent with null session data [27.34ms]
+(fail) next prompts an idle agent with omitted session data [27.10ms]
+(fail) blocked merge seat A prevents fetch and clean checks in a dirty worktree [37.97ms]
+(fail) blocked merge seat B prevents fetch and clean checks in a dirty worktree [33.31ms]
+(fail) recorded seats stay authoritative with an extra pane first and neither missing [29.02ms]
+(fail) recorded seats stay authoritative with an extra pane first and A missing [30.79ms]
+(fail) recorded seats stay authoritative with an extra pane first and B missing [27.61ms]
+(fail) recorded seats stay authoritative with an extra pane first and both missing [26.69ms]
+(fail) allocation handles an interrupted tab [51.70ms]
+(fail) allocation handles an empty tab [28.15ms]
+(fail) allocation handles an recreated tab [28.53ms]
+(fail) agent start allows 30 seconds while prompt wait remains 5 seconds [27.56ms]
+(fail) startup retries closure before cleanup and retains failed owners with their worktree branch and tab [28.72ms]
+(fail) startup retains completed issue resources while an epic sibling remains unfinished [32.60ms]
+(fail) explicit next rejects open/ before any flock [30.82ms]
+(fail) explicit next rejects open/invalid before any flock [30.12ms]
+(fail) explicit next rejects open/epic/issue/extra/invalid before any flock [27.13ms]
+(fail) explicit next rejects closed/ before any flock [29.19ms]
+(fail) explicit next rejects closed/invalid before any flock [28.63ms]
+(fail) explicit next rejects closed/epic/issue/extra/invalid before any flock [30.02ms]
+(fail) invalid merged depth stays excluded during --all with healthy work [28.40ms]
+(fail) invalid merged depth stays excluded during . with healthy work [30.04ms]
+(fail) invalid merged depth stays excluded during hook with healthy work [28.53ms]
+(fail) next identifies dormant issue/resting without parsing and prefers active leaves [28.13ms]
+(fail) next identifies dormant epic/issue/resting without parsing and prefers active leaves [27.01ms]
+
+ 129 pass
+ 76 fail
+ 1308 expect() calls
+Ran 205 tests across 11 files. [13.94s]
+
+Exit code: 1

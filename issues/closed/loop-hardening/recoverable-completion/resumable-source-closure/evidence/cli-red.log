@@ -1,0 +1,367 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 3 changed files, running 2/10 test files
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [583.60ms]
+(pass) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [734.16ms]
+(pass) next waits on a blocked agent instead of counting attempts or flipping seats [502.01ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [722.54ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [143.04ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [721.11ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [740.86ms]
+(pass) a closed pane hook from a merged leaf whose tab is gone sweeps and starts the next leaf [709.01ms]
+(pass) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [914.09ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [407.00ms]
+338 |     f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
+339 |     saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#8'] });
+340 |     const db: Database = database(f);
+341 |     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
+342 |     const recovered: Result = await next(f, ['landed']);
+343 |     expect(recovered.code).toBe(0);
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/next.test.ts:343:28)
+(fail) next recovers only merge-phase work by ancestry against a non-default remote target [496.90ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [741.65ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [502.17ms]
+(pass) uncommitted work in a merge worktree is never recovered as merged [397.20ms]
+(pass) a worktree parked mid-rebase is still dispatched [528.58ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [514.26ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [590.87ms]
+551 |       ]),
+552 |     );
+553 |     const db: Database = database(f);
+554 |     saveDatabase(f, { ...db, panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) });
+555 |     const recovered: Result = await next(f, ['rename']);
+556 |     expect(recovered).toMatchObject({ code: 0 });
+                            ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "code": 0,
++   "code": 1,
++   "stderr": 
++ "{"warning":"retrying source closure","source":"team/project#9","command":["env","GH_HOST=github.com","gh","issue","view","-R","team/project","9","--json","state"],"cwd":"/tmp/akrogon-jciY9B/repo","code":1,"stdout":"","stderr":"flock: cannot open lock file /tmp/akrogon-jciY9B/repo/issues/open/issue/.lock: No such file or directory\n28 | await Bun.sleep(step.delayMs);\n29 | if (step.probe !== undefined) {\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\n33 |     throw new Error(JSON.stringify({ probe, lock }));\n                   ^\nerror: {\"probe\":{\"open\":\"/tmp/akrogon-jciY9B/repo/issues/open/issue\",\"closed\":\"/tmp/akrogon-jciY9B/repo/issues/closed/issue\",\"lock\":\"/tmp/akrogon-jciY9B/repo/issues/open/issue/.lock\",\"worktree\":\"/tmp/akrogon-jciY9B/repo/issues/worktrees/rename\"},\"lock\":66}\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\n\nBun v1.4.0 (Linux x64)"}
++ {"source":"team/project#9","error":"{\"command\":[\"env\",\"GH_HOST=github.com\",\"gh\",\"issue\",\"view\",\"-R\",\"team/project\",\"9\",\"--json\",\"state\"],\"cwd\":\"/tmp/akrogon-jciY9B/repo\",\"code\":1,\"stdout\":\"\",\"stderr\":\"19 |   .min(1)\\n20 |   .parse(JSON.parse(readFileSync(path, 'utf8')));\\n21 | const [step, ...remaining]: z.output<typeof stepSchema>[] = steps;\\n22 | const args: string[] = process.argv.slice(2);\\n23 | if (step.args !== undefined && JSON.stringify(args) !== JSON.stringify(step.args))\\n24 |   throw new Error(JSON.stringify({ expected: step.args, actual: args }));\\n                 ^\\nerror: {\\\"expected\\\":[\\\"issue\\\",\\\"close\\\",\\\"-R\\\",\\\"team/project\\\",\\\"9\\\",\\\"--comment\\\",\\\"merged 72f5be3cbb08502a56afe7ea0c2cef4627673085\\\"],\\\"actual\\\":[\\\"issue\\\",\\\"view\\\",\\\"-R\\\",\\\"team/project\\\",\\\"9\\\",\\\"--json\\\",\\\"state\\\"]}\\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:24:13\\n\\nBun v1.4.0 (Linux x64)\"}"}
++ {"repo":"repo","path":"/tmp/akrogon-jciY9B/repo/issues/open/issue/rename","slug":"rename","error":"Source closure failed: team/project#9"}"
++ ,
++   "stdout": "",
+  }
+
+- Expected  - 1
++ Received  + 7
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/next.test.ts:556:23)
+(fail) next awaits sourced completion after a failed rename before removing the worktree [567.65ms]
+(pass) missing registration is isolated during startup [530.23ms]
+(pass) missing registration is isolated during hook [539.55ms]
+(pass) missing registration is isolated during cwd [524.80ms]
+(pass) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [313.63ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 3 [893.90ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 4 [896.69ms]
+(pass) dirty merged worktree cleanup reports the original git error and still sweeps [667.99ms]
+(pass) global lock acquisition failure is fatal [37.55ms]
+(pass) repo lock acquisition failure is fatal [46.15ms]
+(pass) leaf lock acquisition failure is fatal [47.05ms]
+(pass) lock finalization failures and invalid hook events remain fatal [332.28ms]
+(pass) duplicate leaf identity never dispatches an arbitrary leaf [302.19ms]
+(pass) mismatch leaf identity never dispatches an arbitrary leaf [308.43ms]
+(pass) unknown directory population reserves all new capacity but allows existing tabs [604.28ms]
+(pass) non-Error throws cross the scoped discovery boundary unchanged [36.57ms]
+(pass) explicit unreadable targets retain the original error without a missing-target stack [118.23ms]
+(pass) a selected leaf removed before its repo lock is reported as skipped [50.34ms]
+(pass) recovery fetch deadline releases dispatch locks without transitioning [205.41ms]
+870 |         { stdout: '', code: 1, stderr: 'offline', probe },
+871 |         { stdout: '', code: 1, stderr: 'offline', probe },
+872 |       ]));
+873 |       const failed: Result = await cli(f, ['phase', 'retry', 'merged'], f.root, f.env);
+874 |       expect(failed.code).not.toBe(0);
+875 |       expect(failed.stdout).not.toContain('issue complete');
+                                      ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "issue complete"
+Received: "moved merged\nissue complete standalone"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/next.test.ts:875:33)
+(fail) standalone closure failure retries outstanding sources on next without replaying completion [477.81ms]
+870 |         { stdout: '', code: 1, stderr: 'offline', probe },
+871 |         { stdout: '', code: 1, stderr: 'offline', probe },
+872 |       ]));
+873 |       const failed: Result = await cli(f, ['phase', 'retry', 'merged'], f.root, f.env);
+874 |       expect(failed.code).not.toBe(0);
+875 |       expect(failed.stdout).not.toContain('issue complete');
+                                      ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "issue complete"
+Received: "moved merged\nissue complete final"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/next.test.ts:875:33)
+(fail) epic closure failure retries outstanding sources on next without replaying completion [481.06ms]
+917 |     ];
+918 |     writeFileSync(gh.db, JSON.stringify(failure));
+919 |     expect((await cli(f, ['phase', 'retry', 'merged'], f.root, f.env)).code).not.toBe(0);
+920 |     writeFileSync(gh.db, JSON.stringify(failure));
+921 |     const failed: Result = await next(f, ['--all']);
+922 |     expect(failed.code).not.toBe(0);
+                                  ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/next.test.ts:922:29)
+(fail) startup retries closure before cleanup and retains failed owners with their worktree branch and tab [515.28ms]
+949 |     const worktree: string = readState(path).worktree!;
+950 |     saveState(path, { ...readState(path), phase: 'merge' });
+951 |     expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
+952 |     expect((await next(f, ['--all'])).code).toBe(0);
+953 |     expect(readState(path).phase).toBe('merged');
+954 |     expect(existsSync(worktree)).toBe(true);
+                                       ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/next.test.ts:954:34)
+(fail) startup retains completed issue resources while an epic sibling remains unfinished [476.08ms]
+
+tests/phase.test.ts:
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [227.17ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [341.69ms]
+(pass) handoff to review refuses a dirty worktree and issue files on the branch, then passes [137.83ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [194.30ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [167.78ms]
+212 |     const result: Result = await cli(f, ['phase', 'two', 'merged'], f.root, {
+213 |       ...gh.env,
+214 |       GH_HOST: 'elsewhere.invalid',
+215 |       GH_REPO: 'elsewhere/other',
+216 |     });
+217 |     expect(result).toMatchObject({ code: 0 });
+                         ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "code": 0,
++   "code": 1,
++   "stderr": 
++ "{"warning":"retrying source closure","source":"team/project#2","command":["env","GH_HOST=github.com","gh","issue","view","-R","team/project","2","--json","state"],"cwd":"/tmp/akrogon-OAqumQ/repo","code":1,"stdout":"","stderr":"flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\n28 | await Bun.sleep(step.delayMs);\n29 | if (step.probe !== undefined) {\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\n33 |     throw new Error(JSON.stringify({ probe, lock }));\n                   ^\nerror: {\"probe\":{\"open\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\",\"closed\":\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\",\"lock\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\",\"worktree\":\"/tmp/akrogon-OAqumQ/trigger\"},\"lock\":66}\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\n\nBun v1.4.0 (Linux x64)"}
++ {"source":"team/project#2","error":"{\"command\":[\"env\",\"GH_HOST=github.com\",\"gh\",\"issue\",\"view\",\"-R\",\"team/project\",\"2\",\"--json\",\"state\"],\"cwd\":\"/tmp/akrogon-OAqumQ/repo\",\"code\":1,\"stdout\":\"\",\"stderr\":\"flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\\n28 | await Bun.sleep(step.delayMs);\\n29 | if (step.probe !== undefined) {\\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\\n33 |     throw new Error(JSON.stringify({ probe, lock }));\\n                   ^\\nerror: {\\\"probe\\\":{\\\"open\\\":\\\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\\\",\\\"closed\\\":\\\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\\\",\\\"lock\\\":\\\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\\\",\\\"worktree\\\":\\\"/tmp/akrogon-OAqumQ/trigger\\\"},\\\"lock\\\":66}\\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\\n\\nBun v1.4.0 (Linux x64)\"}"}
++ {"warning":"retrying source closure","source":"team/project#3","command":["env","GH_HOST=github.com","gh","issue","view","-R","team/project","3","--json","state"],"cwd":"/tmp/akrogon-OAqumQ/repo","code":1,"stdout":"","stderr":"flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\n28 | await Bun.sleep(step.delayMs);\n29 | if (step.probe !== undefined) {\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\n33 |     throw new Error(JSON.stringify({ probe, lock }));\n                   ^\nerror: {\"probe\":{\"open\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\",\"closed\":\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\",\"lock\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\",\"worktree\":\"/tmp/akrogon-OAqumQ/trigger\"},\"lock\":66}\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\n\nBun v1.4.0 (Linux x64)"}
++ {"source":"team/project#3","error":"{\"command\":[\"env\",\"GH_HOST=github.com\",\"gh\",\"issue\",\"view\",\"-R\",\"team/project\",\"3\",\"--json\",\"state\"],\"cwd\":\"/tmp/akrogon-OAqumQ/repo\",\"code\":1,\"stdout\":\"\",\"stderr\":\"flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\\n28 | await Bun.sleep(step.delayMs);\\n29 | if (step.probe !== undefined) {\\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\\n33 |     throw new Error(JSON.stringify({ probe, lock }));\\n                   ^\\nerror: {\\\"probe\\\":{\\\"open\\\":\\\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\\\",\\\"closed\\\":\\\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\\\",\\\"lock\\\":\\\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\\\",\\\"worktree\\\":\\\"/tmp/akrogon-OAqumQ/trigger\\\"},\\\"lock\\\":66}\\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\\n\\nBun v1.4.0 (Linux x64)\"}"}
++ {"warning":"retrying source closure","source":"team/project#1","command":["env","GH_HOST=github.com","gh","issue","view","-R","team/project","1","--json","state"],"cwd":"/tmp/akrogon-OAqumQ/repo","code":1,"stdout":"","stderr":"flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\n28 | await Bun.sleep(step.delayMs);\n29 | if (step.probe !== undefined) {\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\n33 |     throw new Error(JSON.stringify({ probe, lock }));\n                   ^\nerror: {\"probe\":{\"open\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\",\"closed\":\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\",\"lock\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\",\"worktree\":\"/tmp/akrogon-OAqumQ/trigger\"},\"lock\":66}\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\n\nBun v1.4.0 (Linux x64)"}
++ {"source":"team/project#1","error":"{\"command\":[\"env\",\"GH_HOST=github.com\",\"gh\",\"issue\",\"view\",\"-R\",\"team/project\",\"1\",\"--json\",\"state\"],\"cwd\":\"/tmp/akrogon-OAqumQ/repo\",\"code\":1,\"stdout\":\"\",\"stderr\":\"flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\\n28 | await Bun.sleep(step.delayMs);\\n29 | if (step.probe !== undefined) {\\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\\n33 |     throw new Error(JSON.stringify({ probe, lock }));\\n                   ^\\nerror: {\\\"probe\\\":{\\\"open\\\":\\\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\\\",\\\"closed\\\":\\\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\\\",\\\"lock\\\":\\\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\\\",\\\"worktree\\\":\\\"/tmp/akrogon-OAqumQ/trigger\\\"},\\\"lock\\\":66}\\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\\n\\nBun v1.4.0 (Linux x64)\"}"}
++ 45 |   }
++ 46 | }
++ 47 | 
++ 48 | export async function command(argv: string[], cwd: string = process.cwd()): Promise<string> {
++ 49 |   const result: Result = await run(argv, cwd);
++ 50 |   if (result.code !== 0) throw new CommandError(argv, cwd, result);
++                                     ^
++ error: {"command":["env","GH_HOST=github.com","gh","issue","view","-R","team/project","2","--json","state"],"cwd":"/tmp/akrogon-OAqumQ/repo","code":1,"stdout":"","stderr":"flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\n28 | await Bun.sleep(step.delayMs);\n29 | if (step.probe !== undefined) {\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\n33 |     throw new Error(JSON.stringify({ probe, lock }));\n                   ^\nerror: {\"probe\":{\"open\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\",\"closed\":\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\",\"lock\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\",\"worktree\":\"/tmp/akrogon-OAqumQ/trigger\"},\"lock\":66}\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\n\nBun v1.4.0 (Linux x64)"}
++    argv: [ "env", "GH_HOST=github.com", "gh", "issue", "view", "-R", "team/project", "2", "--json", "state" ],
++     cwd: "/tmp/akrogon-OAqumQ/repo",
++  result: {
++   code: 1,
++   stdout: "",
++   stderr: "flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\n28 | await Bun.sleep(step.delayMs);\n29 | if (step.probe !== undefined) {\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\n33 |     throw new Error(JSON.stringify({ probe, lock }));\n                   ^\nerror: {\"probe\":{\"open\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\",\"closed\":\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\",\"lock\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\",\"worktree\":\"/tmp/akrogon-OAqumQ/trigger\"},\"lock\":66}\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\n\nBun v1.4.0 (Linux x64)",
++ },
++ 
++       at command (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/shell.ts:50:32)
++       at async closeSource (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/pull.ts:124:36)
++       at async closeSources (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/pull.ts:193:13)
++       at async completeOwner (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:76:9)
++       at async commitMove (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:54:32)
++       at async transition (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:120:9)
++       at async <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:164:15)
++ 45 |   }
++ 46 | }
++ 47 | 
++ 48 | export async function command(argv: string[], cwd: string = process.cwd()): Promise<string> {
++ 49 |   const result: Result = await run(argv, cwd);
++ 50 |   if (result.code !== 0) throw new CommandError(argv, cwd, result);
++                                     ^
++ error: {"command":["env","GH_HOST=github.com","gh","issue","view","-R","team/project","3","--json","state"],"cwd":"/tmp/akrogon-OAqumQ/repo","code":1,"stdout":"","stderr":"flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\n28 | await Bun.sleep(step.delayMs);\n29 | if (step.probe !== undefined) {\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\n33 |     throw new Error(JSON.stringify({ probe, lock }));\n                   ^\nerror: {\"probe\":{\"open\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\",\"closed\":\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\",\"lock\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\",\"worktree\":\"/tmp/akrogon-OAqumQ/trigger\"},\"lock\":66}\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\n\nBun v1.4.0 (Linux x64)"}
++    argv: [
++   "env", "GH_HOST=github.com", "gh", "issue", "view", "-R", "team/project", "3", "--json", "state"
++ ],
++     cwd: "/tmp/akrogon-OAqumQ/repo",
++  result: {
++   code: 1,
++   stdout: "",
++   stderr: "flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\n28 | await Bun.sleep(step.delayMs);\n29 | if (step.probe !== undefined) {\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\n33 |     throw new Error(JSON.stringify({ probe, lock }));\n                   ^\nerror: {\"probe\":{\"open\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\",\"closed\":\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\",\"lock\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\",\"worktree\":\"/tmp/akrogon-OAqumQ/trigger\"},\"lock\":66}\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\n\nBun v1.4.0 (Linux x64)",
++ },
++ 
++       at command (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/shell.ts:50:32)
++       at async closeSource (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/pull.ts:124:36)
++       at async closeSources (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/pull.ts:193:13)
++       at async completeOwner (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:76:9)
++       at async commitMove (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:54:32)
++       at async transition (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:120:9)
++       at async <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:164:15)
++ 45 |   }
++ 46 | }
++ 47 | 
++ 48 | export async function command(argv: string[], cwd: string = process.cwd()): Promise<string> {
++ 49 |   const result: Result = await run(argv, cwd);
++ 50 |   if (result.code !== 0) throw new CommandError(argv, cwd, result);
++                                     ^
++ error: {"command":["env","GH_HOST=github.com","gh","issue","view","-R","team/project","1","--json","state"],"cwd":"/tmp/akrogon-OAqumQ/repo","code":1,"stdout":"","stderr":"flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\n28 | await Bun.sleep(step.delayMs);\n29 | if (step.probe !== undefined) {\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\n33 |     throw new Error(JSON.stringify({ probe, lock }));\n                   ^\nerror: {\"probe\":{\"open\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\",\"closed\":\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\",\"lock\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\",\"worktree\":\"/tmp/akrogon-OAqumQ/trigger\"},\"lock\":66}\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\n\nBun v1.4.0 (Linux x64)"}
++    argv: [
++   "env", "GH_HOST=github.com", "gh", "issue", "view", "-R", "team/project", "1", "--json", "state"
++ ],
++     cwd: "/tmp/akrogon-OAqumQ/repo",
++  result: {
++   code: 1,
++   stdout: "",
++   stderr: "flock: cannot open lock file /tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock: No such file or directory\n28 | await Bun.sleep(step.delayMs);\n29 | if (step.probe !== undefined) {\n30 |   const probe: NonNullable<GhStep['probe']> = step.probe;\n31 |   const lock: number = await Bun.spawn(['flock', '-n', probe.lock, 'true']).exited;\n32 |   if (!existsSync(probe.open) || existsSync(probe.closed) || !existsSync(resolve(probe.worktree, '.git')) || lock !== 1)\n33 |     throw new Error(JSON.stringify({ probe, lock }));\n                   ^\nerror: {\"probe\":{\"open\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic\",\"closed\":\"/tmp/akrogon-OAqumQ/repo/issues/closed/epic\",\"lock\":\"/tmp/akrogon-OAqumQ/repo/issues/open/epic/second/.lock\",\"worktree\":\"/tmp/akrogon-OAqumQ/trigger\"},\"lock\":66}\n      at /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/fake-gh.ts:33:15\n\nBun v1.4.0 (Linux x64)",
++ },
++ 
++       at command (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/shell.ts:50:32)
++       at async closeSource (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/pull.ts:124:36)
++       at async closeSources (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/pull.ts:193:13)
++       at async completeOwner (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:76:9)
++       at async commitMove (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:54:32)
++       at async transition (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:120:9)
++       at async <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/phase.ts:164:15)
++ 
++ Bun v1.4.0 (Linux x64)"
++ ,
++   "stdout": 
++ "moved merged
++ issue complete second"
++ ,
+  }
+
+- Expected  - 1
++ Received  + 88
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/phase.test.ts:217:20)
+(fail) asymmetric and empty leaf sources defer until epic completion under open locks [259.08ms]
+33 | export type State = z.infer<typeof stateSchema>;
+34 | 
+35 | export type Leaf = { path: string; state: State };
+36 | 
+37 | export function readState(path: string): State {
+38 |   return stateSchema.parse(Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8')));
+                                               ^
+ENOENT: no such file or directory, open '/tmp/akrogon-fziIzm/repo/issues/open/issue/source/state.yaml'
+    path: "/tmp/akrogon-fziIzm/repo/issues/open/issue/source/state.yaml",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at readState (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/state.ts:38:43)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/phase.test.ts:327:12)
+(fail) source retries recheck state, skip CLOSED, and continue after final failures without moving [584.38ms]
+33 | export type State = z.infer<typeof stateSchema>;
+34 | 
+35 | export type Leaf = { path: string; state: State };
+36 | 
+37 | export function readState(path: string): State {
+38 |   return stateSchema.parse(Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8')));
+                                               ^
+ENOENT: no such file or directory, open '/tmp/akrogon-olYAPe/repo/issues/open/issue/missing/state.yaml'
+    path: "/tmp/akrogon-olYAPe/repo/issues/open/issue/missing/state.yaml",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at readState (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/state.ts:38:43)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/phase.test.ts:344:12)
+(fail) sourced completion without worktree context fails before rename without a fabricated commit [50.64ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [198.53ms]
+33 | export type State = z.infer<typeof stateSchema>;
+34 | 
+35 | export type Leaf = { path: string; state: State };
+36 | 
+37 | export function readState(path: string): State {
+38 |   return stateSchema.parse(Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8')));
+                                               ^
+ENOENT: no such file or directory, open '/tmp/akrogon-jF6MHr/repo/issues/open/issue/listing/state.yaml'
+    path: "/tmp/akrogon-jF6MHr/repo/issues/open/issue/listing/state.yaml",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at readState (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/src/state.ts:38:43)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/phase.test.ts:449:14)
+(fail) failed or malformed retry comment listing prevents another close and continues later sources [213.14ms]
+478 |       { stdout: '', args: ['issue', 'close', '-R', 'team/project', '2', '--comment', `merged ${firstHead}`], probe: firstProbe },
+479 |     ]));
+480 |     const earlier: Result = await cli(f, ['phase', 'first', 'merged'], f.root, gh.env);
+481 |     expect(earlier.code).toBe(0);
+482 |     expect(earlier.stdout).toContain('issue complete first');
+483 |     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+                                                          ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "args": [
++       "issue",
++       "view",
++       "-R",
++       "team/project",
++       "2",
++       "--json",
++       "state",
++     ],
++     "probe": {
++       "closed": "/tmp/akrogon-xatQnL/repo/issues/closed/epic",
++       "lock": "/tmp/akrogon-xatQnL/repo/issues/open/epic/first/.lock",
++       "open": "/tmp/akrogon-xatQnL/repo/issues/open/epic",
++       "worktree": "/tmp/akrogon-xatQnL/first",
++     },
++     "stdout": "{"state":"OPEN"}",
++   },
++   {
++     "args": [
++       "issue",
++       "close",
++       "-R",
++       "team/project",
++       "2",
++       "--comment",
++       "merged de7cbbb2ce4cbea13c3e3ccb4b3095cb0e056c25",
++     ],
++     "probe": {
++       "closed": "/tmp/akrogon-xatQnL/repo/issues/closed/epic",
++       "lock": "/tmp/akrogon-xatQnL/repo/issues/open/epic/first/.lock",
++       "open": "/tmp/akrogon-xatQnL/repo/issues/open/epic",
++       "worktree": "/tmp/akrogon-xatQnL/first",
++     },
++     "stdout": "",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 38
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure/tests/phase.test.ts:483:53)
+(fail) each completed issue closes only its all-leaf private sources before the final epic closure [62.85ms]
+
+11 tests failed:
+(fail) next recovers only merge-phase work by ancestry against a non-default remote target [496.90ms]
+(fail) next awaits sourced completion after a failed rename before removing the worktree [567.65ms]
+(fail) standalone closure failure retries outstanding sources on next without replaying completion [477.81ms]
+(fail) epic closure failure retries outstanding sources on next without replaying completion [481.06ms]
+(fail) startup retries closure before cleanup and retains failed owners with their worktree branch and tab [515.28ms]
+(fail) startup retains completed issue resources while an epic sibling remains unfinished [476.08ms]
+(fail) asymmetric and empty leaf sources defer until epic completion under open locks [259.08ms]
+(fail) source retries recheck state, skip CLOSED, and continue after final failures without moving [584.38ms]
+(fail) sourced completion without worktree context fails before rename without a fabricated commit [50.64ms]
+(fail) failed or malformed retry comment listing prevents another close and continues later sources [213.14ms]
+(fail) each completed issue closes only its all-leaf private sources before the final epic closure [62.85ms]
+
+ 40 pass
+ 11 fail
+ 332 expect() calls
+Ran 51 tests across 2 files. [21.39s]

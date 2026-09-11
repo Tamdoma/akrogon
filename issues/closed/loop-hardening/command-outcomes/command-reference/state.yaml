@@ -1,0 +1,27 @@
+slug: command-reference
+phase: merged
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - scoped-branch-sync
+sources: 
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t4R
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/command-reference
+pane: 
+  A: w8:p8X
+  B: w8:p8Y
+slot: A
+prompted: 
+  {}
