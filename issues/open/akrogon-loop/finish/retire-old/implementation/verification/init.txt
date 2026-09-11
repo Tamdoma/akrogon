@@ -1,0 +1,24 @@
+cwd: /home/ivan/Work/infra/akrogon
+command: akrogon init --from <temporary proposal>
+exit: 0
+
+Proposal:
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks:
+  format: bun run format
+  test: bun test
+  typecheck: bun run typecheck
+  test_changed: ': "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE"'
+advisory: []
+grounding:
+  index: REFERENCE.md
+broadcast:
+  discord:
+    webhook_env:
+      - DISCORD_WEBHOOK_URL
+      - DISCORD_WEBHOOK_URL_2

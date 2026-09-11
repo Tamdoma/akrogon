@@ -1,0 +1,2 @@
+All 19 destination files compared byte-for-byte with git HEAD source blobs: PASS.
+No changes in src/, tests/, skills/, package.json, bun.lock or issues/chart/: verified by git diff.

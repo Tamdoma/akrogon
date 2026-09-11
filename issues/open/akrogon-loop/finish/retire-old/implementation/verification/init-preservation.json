@@ -1,0 +1,20 @@
+{
+  "before": {
+    "/home/ivan/Work/infra/akrogon/config.yaml": "2576855680917e2b39c178ebb28c2b601ef9b2a059160b92602b80d831481279",
+    "/home/ivan/Work/infra/akrogon/package.json": "9e305159500dc652f002856e85dbf50219711c7932036ff1a5833b6c12d1dd37",
+    "/home/ivan/Work/infra/akrogon/bun.lock": "11df15a4558363d38d82fa2a474eba7061846f34009a19bf4398517182c3516e",
+    "/home/ivan/Work/infra/akrogon/.gitignore": "281b428cb4631783bbb37fc7cc1df7786cb3b6a79b033f1f570676e6b4f81c7b",
+    "/home/ivan/Work/infra/akrogon/learnings/LESSONS.md": "cf22260670854fc5e765b958b8225f28d4e45aead3ede6510ed10d314bbc95ea",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/package.json": "9e305159500dc652f002856e85dbf50219711c7932036ff1a5833b6c12d1dd37",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/bun.lock": "11df15a4558363d38d82fa2a474eba7061846f34009a19bf4398517182c3516e"
+  },
+  "after": {
+    "/home/ivan/Work/infra/akrogon/config.yaml": "511f208abc6147e58b5763df16f9d8809a20e233b5582465837ae7157abcfeeb",
+    "/home/ivan/Work/infra/akrogon/package.json": "9e305159500dc652f002856e85dbf50219711c7932036ff1a5833b6c12d1dd37",
+    "/home/ivan/Work/infra/akrogon/bun.lock": "11df15a4558363d38d82fa2a474eba7061846f34009a19bf4398517182c3516e",
+    "/home/ivan/Work/infra/akrogon/.gitignore": "281b428cb4631783bbb37fc7cc1df7786cb3b6a79b033f1f570676e6b4f81c7b",
+    "/home/ivan/Work/infra/akrogon/learnings/LESSONS.md": "cf22260670854fc5e765b958b8225f28d4e45aead3ede6510ed10d314bbc95ea",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/package.json": "9e305159500dc652f002856e85dbf50219711c7932036ff1a5833b6c12d1dd37",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/bun.lock": "11df15a4558363d38d82fa2a474eba7061846f34009a19bf4398517182c3516e"
+  }
+}

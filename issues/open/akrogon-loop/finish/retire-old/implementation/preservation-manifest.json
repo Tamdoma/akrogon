@@ -1,0 +1,126 @@
+{
+  "archives": [
+    {
+      "source": "reference/lessons/2026-09-05-ambient-skills-overrode-dispatch.md",
+      "destination": "learnings/history/2026-09-05-ambient-skills-overrode-dispatch.md",
+      "sha256": "db62263cc97c4d0b3f1a0c6c692dcd4bc10b97514a06a8f6aac0d0ba13b73361"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-api-fixture-divergence.md",
+      "destination": "learnings/history/2026-09-05-api-fixture-divergence.md",
+      "sha256": "8fe10a3ff2c238454378226d44a3b1fab818c9ac6e9614ff89d51878ca1d3918"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-composer-footer-misread.md",
+      "destination": "learnings/history/2026-09-05-composer-footer-misread.md",
+      "sha256": "a151bfd3a86bd55177d61cc0fe4e78a762ec57c91460bb0f31e8287bb5a3071c"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-empty-proof-dir.md",
+      "destination": "learnings/history/2026-09-05-empty-proof-dir.md",
+      "sha256": "0072f5dc391598abaae0ecba7095438640c8d7baa90c2d0beaddeaca4fcda97e"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-listagents-name-vs-kind.md",
+      "destination": "learnings/history/2026-09-05-listagents-name-vs-kind.md",
+      "sha256": "f437bfdb59e13c1f38c4f57a5017b44b62c96b3a31503f4bcdb2118dd033ebbf"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-print-flag-interactive-contract.md",
+      "destination": "learnings/history/2026-09-05-print-flag-interactive-contract.md",
+      "sha256": "c2ba61a5bed29aeb171cf75d35bbddce23e212967a2d541e8191756c228880ef"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-producer-consumer-evidence-contract.md",
+      "destination": "learnings/history/2026-09-05-producer-consumer-evidence-contract.md",
+      "sha256": "a385614580cff662acfddc1b9c119f9ddbc1121d90f9e76fcebb28d9960475b4"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-pushed-failing-test.md",
+      "destination": "learnings/history/2026-09-05-pushed-failing-test.md",
+      "sha256": "35edc574da1ead30d820e477ab09795f6631176c0c83e7e138e4ecef1e8aead1"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-queue-order-preempted-active-work.md",
+      "destination": "learnings/history/2026-09-05-queue-order-preempted-active-work.md",
+      "sha256": "e9552cf43d31be2bf135716388e159e0d96800e4db47c2bc310f06a3ac8c8a5b"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-rendered-identity-indentation.md",
+      "destination": "learnings/history/2026-09-05-rendered-identity-indentation.md",
+      "sha256": "7fd15ed3bb50d86e83b5879aa82af8400cdf5fe40eb3ce15dfaa574f58e1f51b"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-screen-scraped-delivery.md",
+      "destination": "learnings/history/2026-09-05-screen-scraped-delivery.md",
+      "sha256": "f04c70e322616c93ffae481b6de6e35952d67d0185f434379eb3b10b4d51aeae"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-self-reported-runtime-identity.md",
+      "destination": "learnings/history/2026-09-05-self-reported-runtime-identity.md",
+      "sha256": "88ed73e6aa85ec1a9674f4b21d41c5a9ab029cfdfe2f50192023ee3f8366814d"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-up-duplicate-panes.md",
+      "destination": "learnings/history/2026-09-05-up-duplicate-panes.md",
+      "sha256": "26b4129f865647857dc85c09ea0060f5d3b1a1ddd1cf4cdb2b197b52230975a3"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-verification-scope.md",
+      "destination": "learnings/history/2026-09-05-verification-scope.md",
+      "sha256": "66abe6c897e1f9e767200872d7fb879565ebd3da437b2c2c0afd3612792db96b"
+    },
+    {
+      "source": "reference/lessons/2026-09-05-watchdog-cleanup-evidence.md",
+      "destination": "learnings/history/2026-09-05-watchdog-cleanup-evidence.md",
+      "sha256": "934057160bceecf1543b66143b4d35fcd4baac213b9d2721678ec31eb9eaef76"
+    },
+    {
+      "source": "reference/lessons/2026-09-06-factory-reliability.md",
+      "destination": "learnings/history/2026-09-06-factory-reliability.md",
+      "sha256": "5c5615a6730af9564fbb8d465bfa2eed12b42d194d25793127e56fb4e808f706"
+    },
+    {
+      "source": "reference/lessons/2026-09-07-framework-quality-coverage.json",
+      "destination": "learnings/history/2026-09-07-framework-quality-coverage.json",
+      "sha256": "0cc1cf8dc39e2da74ce131a7f4719fadb484e9e3c83274bf271a56bfecd0e765"
+    },
+    {
+      "source": "reference/lessons/2026-09-07-role-effort-screening.json",
+      "destination": "learnings/history/2026-09-07-role-effort-screening.json",
+      "sha256": "946c389cf55c1339be5e6865ecfdc39a877ad4f3440736e080162477b86be7bd"
+    },
+    {
+      "source": "reference/lessons/README.md",
+      "destination": "learnings/history/README.md",
+      "sha256": "f334efab037824ac35c8d737a902055653bade9704a9b8c37c7cc29fbab59cf5"
+    }
+  ],
+  "prior_history": {
+    "learnings/history/2026-09-10-core-skills.md": "529338a579d2b8dfa782f74f83aa83a4e487170e9a8ed7247f3de84bfe4a46ac",
+    "learnings/history/2026-09-10-review-by-reading.md": "5dca06772b3a0b531495549bce1489469e1dd969027e5f7f37bdceaca701b930",
+    "learnings/history/2026-09-10-stderr-json-parse.md": "8ca7506147c8e9186ced58475f77917d104da20b4070d315a570cac7d21566d5",
+    "learnings/history/2026-09-11-lock-vs-criterion.md": "7cdfcebc860ff005fc6f451da6526a045673a4fa81ab89ce57ad348efcb44b82",
+    "learnings/history/2026-09-11-pull-close-partial-side-effect.md": "752f287d4c0435b873a66abcd9aab8aa1d1ad05f1d923d511eac119a04c34d8b",
+    "learnings/history/2026-09-11-uncommitted-handoff.md": "f873f048c0c683be2218b67041382d21181ad25af256a1176f51ea3f07d35799"
+  },
+  "lessons_before": "# Lessons\n\nOne line per lesson: mechanism, date, history file. A line leaves when applied or pruned at chart open.\n\n- check-issue review: slot A missed three reproducible defects on the command leaf by reading only, slot B found them by running the code in a temp repo. 2026-09-10. history/2026-09-10-review-by-reading.md\n- implement-issue report: core-skills deleted consult-issue and explain-issue and left dangling links in seed-issue and init-issues unreported; grep for the old path and name out-of-scope hits under known limitations. 2026-09-10. history/2026-09-10-core-skills.md\n- process boundary: `retryable` in `src/next.ts` parses herdr stderr as JSON unguarded, so a non-JSON stderr surfaces as SyntaxError and the real body is lost; parse external stderr behind a guard and propagate the raw text. 2026-09-10. history/2026-09-10-stderr-json-parse.md\n- check-issue review: confirm the reviewed commit is ahead of the base and `git status --porcelain` is empty before any verdict; two leaves passed review with all work uncommitted. 2026-09-11. history/2026-09-11-uncommitted-handoff.md\n- chart-issues handoff audit: a grep-shaped done-criterion collided with a verbatim standing block the same design required; check forbidden-term criteria against copied verbatim text before the leaf opens. 2026-09-11. history/2026-09-11-lock-vs-criterion.md\n",
+  "locked_designs": {
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/issues/open/akrogon-loop/takeover/status/design.md": "50dc58136d5133758613d2f3515b8daf5c7be71bf26ec814cd2f4965c245b7a7",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/issues/open/akrogon-loop/github/pull-close/design.md": "a6626f185e1bd4b2f6cc2fd2e037a76fd03cb2d7210d25561fbd2589851cae5a",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/issues/open/akrogon-loop/github/seed-issue/design.md": "f08de143c35daf9c08e3330d9ab4fe24368e7cfda00c37a028eebdea3aadc08b",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/issues/open/akrogon-loop/finish/retire-old/design.md": "322aedd562c5ea67e27b70a746fca0917791d7a7d12785d58e308abcf7d9f395",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/issues/open/akrogon-loop/doors/chart-issues/design.md": "cb61886b177cc1d60f6de62d6ec2ec4e637b151ee398f30f7134b4acfb0297a9",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/issues/open/akrogon-loop/doors/init-issues/design.md": "84412f8ed2c142a00a8eb808e39301f33f02c2fd519885ef606784a7c05eaa3d",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/issues/open/akrogon-loop/bootstrap/command/design.md": "c5cf57b941cdcd49bfc052d288b056f587db7422d215d7829823ced8272fc670",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/retire-old/issues/open/akrogon-loop/bootstrap/core-skills/design.md": "fe92dc1e2c2f28a117f68ce780f00d9f0acebee7991524fee9e889248a7a81e7",
+    "/home/ivan/Work/infra/akrogon/issues/open/akrogon-loop/finish/retire-old/design.md": "322aedd562c5ea67e27b70a746fca0917791d7a7d12785d58e308abcf7d9f395",
+    "/home/ivan/Work/infra/akrogon/issues/open/akrogon-loop/doors/chart-issues/design.md": "cb61886b177cc1d60f6de62d6ec2ec4e637b151ee398f30f7134b4acfb0297a9",
+    "/home/ivan/Work/infra/akrogon/issues/open/akrogon-loop/doors/init-issues/design.md": "84412f8ed2c142a00a8eb808e39301f33f02c2fd519885ef606784a7c05eaa3d",
+    "/home/ivan/Work/infra/akrogon/issues/open/akrogon-loop/github/pull-close/design.md": "a6626f185e1bd4b2f6cc2fd2e037a76fd03cb2d7210d25561fbd2589851cae5a",
+    "/home/ivan/Work/infra/akrogon/issues/open/akrogon-loop/github/seed-issue/design.md": "f08de143c35daf9c08e3330d9ab4fe24368e7cfda00c37a028eebdea3aadc08b",
+    "/home/ivan/Work/infra/akrogon/issues/open/akrogon-loop/takeover/status/design.md": "50dc58136d5133758613d2f3515b8daf5c7be71bf26ec814cd2f4965c245b7a7",
+    "/home/ivan/Work/infra/akrogon/issues/open/akrogon-loop/bootstrap/command/design.md": "c5cf57b941cdcd49bfc052d288b056f587db7422d215d7829823ced8272fc670",
+    "/home/ivan/Work/infra/akrogon/issues/open/akrogon-loop/bootstrap/core-skills/design.md": "fe92dc1e2c2f28a117f68ce780f00d9f0acebee7991524fee9e889248a7a81e7"
+  }
+}

@@ -1,0 +1,335 @@
+[
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 7,
+    "target": "config.yaml",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 14,
+    "target": "plugin/",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 20,
+    "target": "skills/init-issues/SKILL.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 29,
+    "target": "REFERENCE.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 47,
+    "target": "skills/chart-issues/SKILL.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 48,
+    "target": "skills/plan-issue/SKILL.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 49,
+    "target": "skills/implement-issue/SKILL.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 50,
+    "target": "skills/check-issue/SKILL.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 51,
+    "target": "skills/merge-issue/SKILL.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 52,
+    "target": "skills/seed-issue/SKILL.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 53,
+    "target": "skills/broadcast-issue/SKILL.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "README.md",
+    "line": 54,
+    "target": "skills/init-issues/SKILL.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "REFERENCE.md",
+    "line": 3,
+    "target": "src/",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "REFERENCE.md",
+    "line": 4,
+    "target": "tests/",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "REFERENCE.md",
+    "line": 5,
+    "target": "skills/",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "REFERENCE.md",
+    "line": 6,
+    "target": "plugin/",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "REFERENCE.md",
+    "line": 7,
+    "target": "docs/",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "REFERENCE.md",
+    "line": 8,
+    "target": "issues/",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "REFERENCE.md",
+    "line": 9,
+    "target": "learnings/",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "skills/broadcast-issue/SKILL.md",
+    "line": 31,
+    "target": "scripts/discord-send.ts",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "skills/chart-issues/SKILL.md",
+    "line": 19,
+    "target": "assets/questions.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "skills/chart-issues/SKILL.md",
+    "line": 19,
+    "target": "assets/shapes.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "skills/chart-issues/SKILL.md",
+    "line": 19,
+    "target": "assets/standing-design.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "skills/check-issue/SKILL.md",
+    "line": 14,
+    "target": "ponytail.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "skills/implement-issue/SKILL.md",
+    "line": 14,
+    "target": "ponytail.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "skills/implement-issue/SKILL.md",
+    "line": 14,
+    "target": "brief-template.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "skills/implement-issue/SKILL.md",
+    "line": 14,
+    "target": "worker-protocol.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "learnings/charting/README.md",
+    "line": 35,
+    "target": "intake-line-beats-both-slots.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "learnings/charting/README.md",
+    "line": 36,
+    "target": "name-the-reader-first.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "learnings/charting/README.md",
+    "line": 37,
+    "target": "carries-go-stale.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "learnings/charting/README.md",
+    "line": 38,
+    "target": "ask-who-files.md",
+    "exists": true,
+    "record_exemption": false,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "learnings/history/2026-09-06-factory-reliability.md",
+    "line": 6,
+    "target": "2026-09-05-producer-consumer-evidence-contract.md",
+    "exists": true,
+    "record_exemption": true,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "learnings/history/2026-09-06-factory-reliability.md",
+    "line": 7,
+    "target": "2026-09-05-queue-order-preempted-active-work.md",
+    "exists": true,
+    "record_exemption": true,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "learnings/history/2026-09-06-factory-reliability.md",
+    "line": 8,
+    "target": "2026-09-05-watchdog-cleanup-evidence.md",
+    "exists": true,
+    "record_exemption": true,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "learnings/history/2026-09-06-factory-reliability.md",
+    "line": 9,
+    "target": "2026-09-05-verification-scope.md",
+    "exists": true,
+    "record_exemption": true,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "learnings/history/2026-09-06-factory-reliability.md",
+    "line": 730,
+    "target": "2026-09-05-queue-order-preempted-active-work.md",
+    "exists": true,
+    "record_exemption": true,
+    "retired": false
+  },
+  {
+    "checkout": "worktree",
+    "file": "learnings/history/README.md",
+    "line": 32,
+    "target": "2026-09-06-factory-reliability.md",
+    "exists": true,
+    "record_exemption": true,
+    "retired": false
+  }
+]

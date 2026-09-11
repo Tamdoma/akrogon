@@ -4,13 +4,15 @@ worktree_root: issues/worktrees
 rebuttal: true
 fix_rounds: 3
 implement: subagents
-checks:
+checks: 
   format: bun run format
   test: bun test
   typecheck: bun run typecheck
+  test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\""
 advisory: 
   []
-grounding: none
+grounding: 
+  index: REFERENCE.md
 broadcast: 
   discord: 
     webhook_env: 

@@ -1,0 +1,4 @@
+command: ['bun', 'run', 'typecheck']
+AKROGON_BASE=a40ff4dbcf1811cb44ceeb35945bdecee17bcc95
+exit: 0
+$ tsc --noEmit

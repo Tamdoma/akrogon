@@ -1,0 +1,47 @@
+[
+  {
+    "merge": {
+      "ts": "2026-09-11T08:01:07.269Z",
+      "repo": "akrogon",
+      "slug": "seed-issue",
+      "from": "merge",
+      "to": "merged",
+      "slot": "A",
+      "attempts": {
+        "A": 1,
+        "B": 0
+      },
+      "fix_rounds": 0,
+      "verdict": {},
+      "head": "507aff5d2e9c1b14631a641854308590b557d745",
+      "diff": "",
+      "session": "05e70a49-414c-491c-9655-a0bb0c5ca9fc"
+    },
+    "other_latest_phases": {
+      "init-issues": "merge",
+      "pull-close": "implement"
+    }
+  },
+  {
+    "merge": {
+      "ts": "2026-09-11T08:01:48.959Z",
+      "repo": "akrogon",
+      "slug": "init-issues",
+      "from": "merge",
+      "to": "merged",
+      "slot": "A",
+      "attempts": {
+        "A": 1,
+        "B": 0
+      },
+      "fix_rounds": 0,
+      "verdict": {},
+      "head": "7af5184669bc43d6e9f47f30e0bd8fb24c282a7d",
+      "diff": "",
+      "session": "151fa56d-3736-48e8-b6f4-4fda6859f70b"
+    },
+    "other_latest_phases": {
+      "pull-close": "implement"
+    }
+  }
+]

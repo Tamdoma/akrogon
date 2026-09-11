@@ -1,0 +1,3 @@
+Negative check: configured test_changed command with AKROGON_BASE unset
+exit: 127 (expected nonzero)
+bash: line 1: AKROGON_BASE: AKROGON_BASE is required

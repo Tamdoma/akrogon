@@ -1,0 +1,25 @@
+command: ['bun', 'run', 'format']
+AKROGON_BASE=a40ff4dbcf1811cb44ceeb35945bdecee17bcc95
+exit: 0
+src/akrogon.ts 29ms (unchanged)
+src/config.ts 16ms (unchanged)
+src/init.ts 8ms (unchanged)
+src/install.ts 4ms (unchanged)
+src/log.ts 3ms (unchanged)
+src/next.ts 24ms (unchanged)
+src/phase.ts 7ms (unchanged)
+src/pull.ts 12ms (unchanged)
+src/routing.ts 2ms (unchanged)
+src/shell.ts 6ms (unchanged)
+src/state.ts 8ms (unchanged)
+src/status.ts 7ms (unchanged)
+tests/config.test.ts 2ms (unchanged)
+tests/fake-gh.ts 4ms (unchanged)
+tests/fake-herdr.ts 6ms (unchanged)
+tests/helpers.ts 3ms (unchanged)
+tests/init.test.ts 2ms (unchanged)
+tests/next.test.ts 27ms (unchanged)
+tests/phase.test.ts 20ms (unchanged)
+tests/pull.test.ts 15ms (unchanged)
+tests/status.test.ts 12ms (unchanged)
+$ prettier --write src tests

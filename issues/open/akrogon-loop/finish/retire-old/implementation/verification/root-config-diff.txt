@@ -1,0 +1,56 @@
+diff --git i/config.yaml w/config.yaml
+index e3b3c1f..e42206a 100644
+--- i/config.yaml
++++ w/config.yaml
+@@ -1,18 +1,18 @@
+ max_active: 3
+-slots:
+-  a:
++slots: 
++  a: 
+     harness: claude
+     model: claude-fable-5-1
+     effort: medium
+-  b:
++  b: 
+     harness: codex
+     model: gpt-6-astra
+     effort: medium
+-harnesses:
+-  claude: claude --model {model} --effort {effort} --dangerously-skip-permissions
+-  codex: codex -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access
+-  pi: pi --model {model} --thinking {effort} -a
+-toolkits:
++harnesses: 
++  claude: "claude --model {model} --effort {effort} --dangerously-skip-permissions"
++  codex: "codex -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access"
++  pi: "pi --model {model} --thinking {effort} -a"
++toolkits: 
+   typescript: bun:test
+-repos:
+-  akrogon: /home/ivan/Work/infra/akrogon
++repos: 
++  akrogon: /home/ivan/Work/infra/akrogon
+\ No newline at end of file
+diff --git i/issues/config.yaml w/issues/config.yaml
+index b31b7a6..2773aa2 100644
+--- i/issues/config.yaml
++++ w/issues/config.yaml
+@@ -4,13 +4,15 @@ worktree_root: issues/worktrees
+ rebuttal: true
+ fix_rounds: 3
+ implement: subagents
+-checks:
++checks: 
+   format: bun run format
+   test: bun test
+   typecheck: bun run typecheck
++  test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\""
+ advisory: 
+   []
+-grounding: none
++grounding: 
++  index: REFERENCE.md
+ broadcast: 
+   discord: 
+     webhook_env: 

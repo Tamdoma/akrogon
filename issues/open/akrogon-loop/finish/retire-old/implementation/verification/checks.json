@@ -1,0 +1,18 @@
+[
+  {
+    "check": "format",
+    "exit": 0
+  },
+  {
+    "check": "typecheck",
+    "exit": 0
+  },
+  {
+    "check": "test",
+    "exit": 0
+  },
+  {
+    "check": "test_changed",
+    "exit": 0
+  }
+]

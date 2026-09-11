@@ -1,0 +1,505 @@
+{
+  "scope": "README, skills, learnings and both worktree/authoritative open leaves. Markdown inline links, reference definitions and old-tree plain paths inspected. Implementation evidence records excluded from recursive audit.",
+  "before": [
+    {
+      "checkout": "worktree",
+      "file": "README.md",
+      "line": 9,
+      "classification": "replace obsolete navigation",
+      "text": "- `reference/` holds the four things from the current akrogon repo (`~/Work/infra/akrogon`) that the intake na"
+    },
+    {
+      "checkout": "worktree",
+      "file": "README.md",
+      "line": 10,
+      "classification": "replace obsolete navigation",
+      "text": "- `new-beginning/`: the session notes that produced the intake, the July 20 and July 28 skill snapshots, and t"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/bootstrap/command/design.md",
+      "line": 9,
+      "classification": "preserve locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/bootstrap/command/design.md",
+      "line": 11,
+      "classification": "preserve locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/bootstrap/command/plan.md",
+      "line": 19,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "No `status`, failed notification, `pull`, GitHub close call or startup pull hook, including stubs. Do not rewr"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/bootstrap/core-skills/design.md",
+      "line": 9,
+      "classification": "preserve locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/bootstrap/core-skills/design.md",
+      "line": 11,
+      "classification": "preserve locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/doors/init-issues/plan.md",
+      "line": 47,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "- **R3. Legacy references remain elsewhere.** Live search finds retired paths in `skills/seed-issue/SKILL.md`,"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/ISSUE.md",
+      "line": 9,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "- `retire-old`: Delete new-beginning/ and reference/, move reference/lessons to learnings/history/, remaining "
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 7,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "Move every file under `reference/lessons/` (README.md and the two .json files included) into `learnings/histor"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 15,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "1. `reference/`, `new-beginning/` and every skill folder not among the eight are gone; no Markdown link or pat"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 16,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "2. `learnings/history/` holds every former reference/lessons file byte-identical, and `learnings/LESSONS.md` e"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 9,
+      "classification": "preserve locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 11,
+      "classification": "preserve locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 118,
+      "classification": "preserve locked design",
+      "text": "Mechanical moves and deletions plus three short files. Ownership: `reference/`, `new-beginning/`, `learnings/`"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/takeover/status/design.md",
+      "line": 17,
+      "classification": "preserve locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/takeover/status/design.md",
+      "line": 19,
+      "classification": "preserve locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/bootstrap/command/design.md",
+      "line": 9,
+      "classification": "preserve locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/bootstrap/command/design.md",
+      "line": 11,
+      "classification": "preserve locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/bootstrap/command/plan.md",
+      "line": 19,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "No `status`, failed notification, `pull`, GitHub close call or startup pull hook, including stubs. Do not rewr"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/bootstrap/core-skills/design.md",
+      "line": 9,
+      "classification": "preserve locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/bootstrap/core-skills/design.md",
+      "line": 11,
+      "classification": "preserve locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/doors/chart-issues/implementation/brief.md",
+      "line": 49,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "Outside ownership: references remain in README.md, docs/guide.html, new-beginning/SESSION-SUMMARY.md, new-begi"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/doors/chart-issues/implementation/verification.md",
+      "line": 28,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "Only skills/chart-issues and deletion of skills/create-issue, skills/braindump-issues and skills/consolidate-i"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/doors/chart-issues/positions-A.md",
+      "line": 36,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "- After the rewrite, `grep -rn \"create-issue\\|braindump-issues\\|consolidate-issues\\|consult-position\\|SERIES-\\"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/doors/chart-issues/rebuttal-A.md",
+      "line": 7,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "Single SKILL.md with Open, Drain, Decide, Handoff and the footer; four Pocock lines; `akrogon` named as the de"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/doors/init-issues/plan.md",
+      "line": 47,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "- **R3. Legacy references remain elsewhere.** Live search finds retired paths in `skills/seed-issue/SKILL.md`,"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/ISSUE.md",
+      "line": 9,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "- `retire-old`: Delete new-beginning/ and reference/, move reference/lessons to learnings/history/, remaining "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 7,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "Move every file under `reference/lessons/` (README.md and the two .json files included) into `learnings/histor"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 15,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "1. `reference/`, `new-beginning/` and every skill folder not among the eight are gone; no Markdown link or pat"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 16,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "2. `learnings/history/` holds every former reference/lessons file byte-identical, and `learnings/LESSONS.md` e"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 9,
+      "classification": "preserve locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 11,
+      "classification": "preserve locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 118,
+      "classification": "preserve locked design",
+      "text": "Mechanical moves and deletions plus three short files. Ownership: `reference/`, `new-beginning/`, `learnings/`"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/plan.md",
+      "line": 18,
+      "classification": "preserve retirement contract or prior pass record",
+      "text": "- **D1. Preserve archives mechanically.** Move every file below reference/lessons into learnings/history with "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/takeover/status/design.md",
+      "line": 17,
+      "classification": "preserve locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/takeover/status/design.md",
+      "line": 19,
+      "classification": "preserve locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    }
+  ],
+  "after": [
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/bootstrap/command/design.md",
+      "line": 9,
+      "classification": "locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/bootstrap/command/design.md",
+      "line": 11,
+      "classification": "locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/bootstrap/command/plan.md",
+      "line": 19,
+      "classification": "retirement contract or prior pass record",
+      "text": "No `status`, failed notification, `pull`, GitHub close call or startup pull hook, including stubs. Do not rewr"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/bootstrap/core-skills/design.md",
+      "line": 9,
+      "classification": "locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/bootstrap/core-skills/design.md",
+      "line": 11,
+      "classification": "locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/doors/init-issues/plan.md",
+      "line": 47,
+      "classification": "retirement contract or prior pass record",
+      "text": "- **R3. Legacy references remain elsewhere.** Live search finds retired paths in `skills/seed-issue/SKILL.md`,"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/ISSUE.md",
+      "line": 9,
+      "classification": "retirement contract or prior pass record",
+      "text": "- `retire-old`: Delete new-beginning/ and reference/, move reference/lessons to learnings/history/, remaining "
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 7,
+      "classification": "retirement contract or prior pass record",
+      "text": "Move every file under `reference/lessons/` (README.md and the two .json files included) into `learnings/histor"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 15,
+      "classification": "retirement contract or prior pass record",
+      "text": "1. `reference/`, `new-beginning/` and every skill folder not among the eight are gone; no Markdown link or pat"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 16,
+      "classification": "retirement contract or prior pass record",
+      "text": "2. `learnings/history/` holds every former reference/lessons file byte-identical, and `learnings/LESSONS.md` e"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 9,
+      "classification": "locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 11,
+      "classification": "locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 118,
+      "classification": "locked design",
+      "text": "Mechanical moves and deletions plus three short files. Ownership: `reference/`, `new-beginning/`, `learnings/`"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/finish/retire-old/plan.md",
+      "line": 18,
+      "classification": "retirement contract or prior pass record",
+      "text": "- **D1. Preserve archives mechanically.** Move every file below reference/lessons into learnings/history with "
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/takeover/status/design.md",
+      "line": 17,
+      "classification": "locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "worktree",
+      "file": "issues/open/akrogon-loop/takeover/status/design.md",
+      "line": 19,
+      "classification": "locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/bootstrap/command/design.md",
+      "line": 9,
+      "classification": "locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/bootstrap/command/design.md",
+      "line": 11,
+      "classification": "locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/bootstrap/command/plan.md",
+      "line": 19,
+      "classification": "retirement contract or prior pass record",
+      "text": "No `status`, failed notification, `pull`, GitHub close call or startup pull hook, including stubs. Do not rewr"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/bootstrap/core-skills/design.md",
+      "line": 9,
+      "classification": "locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/bootstrap/core-skills/design.md",
+      "line": 11,
+      "classification": "locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/doors/chart-issues/positions-A.md",
+      "line": 36,
+      "classification": "retirement contract or prior pass record",
+      "text": "- After the rewrite, `grep -rn \"create-issue\\|braindump-issues\\|consolidate-issues\\|consult-position\\|SERIES-\\"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/doors/chart-issues/rebuttal-A.md",
+      "line": 7,
+      "classification": "retirement contract or prior pass record",
+      "text": "Single SKILL.md with Open, Drain, Decide, Handoff and the footer; four Pocock lines; `akrogon` named as the de"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/doors/init-issues/plan.md",
+      "line": 47,
+      "classification": "retirement contract or prior pass record",
+      "text": "- **R3. Legacy references remain elsewhere.** Live search finds retired paths in `skills/seed-issue/SKILL.md`,"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/ISSUE.md",
+      "line": 9,
+      "classification": "retirement contract or prior pass record",
+      "text": "- `retire-old`: Delete new-beginning/ and reference/, move reference/lessons to learnings/history/, remaining "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 7,
+      "classification": "retirement contract or prior pass record",
+      "text": "Move every file under `reference/lessons/` (README.md and the two .json files included) into `learnings/histor"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 15,
+      "classification": "retirement contract or prior pass record",
+      "text": "1. `reference/`, `new-beginning/` and every skill folder not among the eight are gone; no Markdown link or pat"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/brief.md",
+      "line": 16,
+      "classification": "retirement contract or prior pass record",
+      "text": "2. `learnings/history/` holds every former reference/lessons file byte-identical, and `learnings/LESSONS.md` e"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 9,
+      "classification": "locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 11,
+      "classification": "locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/design.md",
+      "line": 118,
+      "classification": "locked design",
+      "text": "Mechanical moves and deletions plus three short files. Ownership: `reference/`, `new-beginning/`, `learnings/`"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/finish/retire-old/plan.md",
+      "line": 18,
+      "classification": "retirement contract or prior pass record",
+      "text": "- **D1. Preserve archives mechanically.** Move every file below reference/lessons into learnings/history with "
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/takeover/status/design.md",
+      "line": 17,
+      "classification": "locked design",
+      "text": "The hand-built path: the `akrogon` command (install, init, config, phase, next, status), the herdr plugin, and"
+    },
+    {
+      "checkout": "authoritative",
+      "file": "issues/open/akrogon-loop/takeover/status/design.md",
+      "line": 19,
+      "classification": "locked design",
+      "text": "From # Lessons 2026-09-09: the last bootstrap leaf moves reference/lessons into learnings/history/ unchanged, "
+    }
+  ],
+  "conclusion": "README replaced obsolete navigation. Other matches describe retirement or prior results and are preserved. No surviving actionable link or plain path targets a retired tree. No skills or authoritative handoff repairs needed."
+}

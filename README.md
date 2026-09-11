@@ -1,14 +1,54 @@
-# akrogon-new
+# Akrogon
 
-Rebuild of the issue lifecycle from the July 28 skills plus the current intake skills, with a thin herdr driver on top. Nothing is decided yet. The chart decides: run `/chart-issues` in this checkout; its input is `issues/chart/INTAKE.md`.
+Akrogon runs an issue lifecycle through paired coding agents in Herdr. Skills shape work, plan it, implement it, review it and merge it. The command tracks phases and dispatches the next pass.
 
-## Layout
+## Install
 
-- `skills/` is the working skill set. Lifecycle skills are the July 28 snapshot of `tamdoma/issue-lifecycle` at commit `2f1fdbc3` (consult, check, implement, merge, explain, broadcast, init). Intake skills are the current akrogon versions (chart-issues, create-issue, consolidate-issues, seed-issue). `braindump-issues` is new, the intake-folding skill. Nothing here is installed into any harness yet.
-- `issues/` is the scaffold from the July 28 init-issues: `config.yaml`, `open/`, `worktrees/` (ignored), `.scripts/` (the 3,970-line July 28 payload, self-test passing), and `chart/INTAKE.md`.
-- `reference/` holds the four things from the current akrogon repo (`~/Work/infra/akrogon`) that the intake names as worth keeping, to build on or rewrite, never to run as is: `akrogon-scripts/branch-watcher.ts` (38 lines), `akrogon-scripts/alert-webhook.ts` (the Moshi push, 220 lines, no imports), `akrogon-config.yaml` (the repos block and model per seat), and `lessons/` (history to keep).
-- `new-beginning/`: the session notes that produced the intake, the July 20 and July 28 skill snapshots, and the July 28 keep/cut list. Delete once the chart no longer needs them.
+Install Bun, Git, Herdr and the harness CLIs configured in [config.yaml](config.yaml). Make `flock` available for locking and install authenticated GitHub CLI (`gh`) for GitHub intake and issue closure. Keep dependencies in this checkout:
 
-## Not copied
+```sh
+bun install
+bun src/akrogon.ts install
+```
 
-Nothing else from the current akrogon repo is here: not the reconciler, judge, verification, merge-finalize, board, the current lifecycle skills, issue-master, or its docs. The intake treats them as the example not to follow. They stay at `~/Work/infra/akrogon` for reading.
+Before installation, set the machine's slots, harness commands and registered repositories in `config.yaml` at the tool root, or in the directory selected by `AKROGON_HOME`. Installation reads that configuration, links `akrogon` into `~/.local/bin`, links each skill into `~/.claude/skills` and `~/.agents/skills`, installs each configured Herdr harness integration and links the [plugin](plugin/). Put `~/.local/bin` on `PATH`. Conflicting destinations stop installation and print removal commands for review.
+
+Update with `git pull` in the tool checkout. The installed command and skills use that checkout through symlinks.
+
+## Initialize a repository
+
+Run [init-issues](skills/init-issues/SKILL.md) from the repository root. It inspects the repository and proposes its branch, checks, grounding index and other lifecycle choices. The skill writes a complete proposal to a temporary YAML file, then invokes:
+
+```sh
+akrogon init --from /path/to/proposal.yaml
+akrogon config
+```
+
+Initialization writes `issues/config.yaml`, creates `issues/open` and the lessons scaffold, adds generated-path ignore entries and registers the repository in the machine configuration. Repeat setup preserves existing choices. For repositories without tests, `--toolkit <lang>=<runner>` records a toolkit choice without installing dependencies. `akrogon config` shows the effective machine and repository settings.
+
+This repository's [reference index](REFERENCE.md) links its areas.
+
+## Command
+
+| Invocation | Effect |
+| --- | --- |
+| `akrogon install` | Link this checkout's command, skills and Herdr integration. |
+| `akrogon init --from <proposal.yaml> [--toolkit <lang>=<runner>]` | Initialize or update repository configuration and registration. |
+| `akrogon config` | Print effective configuration for the current repository. |
+| `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>]` | Record a lifecycle pass through validated phase transitions. |
+| `akrogon next [<slug>\|<path>\|--all]` | Dispatch eligible work for a leaf, path or all registered repositories. With no argument, use the current directory or Herdr hook context. |
+| `akrogon pull [--all]` | Import open GitHub issues into seeds for the current repository or all registered repositories. |
+| `akrogon status [<slug>]` | Show the registered repository board, or a current-repository leaf's state and recent history. |
+
+## Skills
+
+| Skill | Purpose |
+| --- | --- |
+| [chart-issues](skills/chart-issues/SKILL.md) | Turn operator notes and imported reports into decisions and leaf contracts. |
+| [plan-issue](skills/plan-issue/SKILL.md) | Write an execution plan, with paired discussion when enabled. |
+| [implement-issue](skills/implement-issue/SKILL.md) | Implement a plan or repair review findings using the configured worker mode. |
+| [check-issue](skills/check-issue/SKILL.md) | Review concrete defects and verify repairs. |
+| [merge-issue](skills/merge-issue/SKILL.md) | Rebase reviewed work, run checks and push a fast-forward merge. |
+| [seed-issue](skills/seed-issue/SKILL.md) | File one observation as unverified GitHub intake. |
+| [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a factual completed-issue update to configured Discord targets. |
+| [init-issues](skills/init-issues/SKILL.md) | Inspect a repository and initialize its lifecycle configuration. |

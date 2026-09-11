@@ -1,0 +1,9 @@
+command: ['bash', '-c', ': "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE"']
+AKROGON_BASE=a40ff4dbcf1811cb44ceeb35945bdecee17bcc95
+exit: 0
+bun test v1.4.0 (34cbb9a40)
+--changed: 39 changed files, but no test files are affected
+
+ 0 pass
+ 0 fail
+Ran 0 tests across 0 files. [17.00ms]

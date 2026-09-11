@@ -1,0 +1,40 @@
+max_active: 3
+slots: 
+  a: 
+    harness: claude
+    model: claude-fable-5-1
+    effort: medium
+  b: 
+    harness: codex
+    model: gpt-6-astra
+    effort: medium
+harnesses: 
+  claude: "claude --model {model} --effort {effort} --dangerously-skip-permissions"
+  codex: "codex -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access"
+  pi: "pi --model {model} --thinking {effort} -a"
+toolkits: 
+  typescript: bun:test
+repos: 
+  akrogon: /home/ivan/Work/infra/akrogon
+remote: origin
+default_branch: main
+worktree_root: issues/worktrees
+rebuttal: true
+fix_rounds: 3
+implement: subagents
+checks: 
+  format: bun run format
+  test: bun test
+  typecheck: bun run typecheck
+  test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\""
+advisory: 
+  []
+grounding: 
+  index: REFERENCE.md
+broadcast: 
+  discord: 
+    webhook_env: 
+      - DISCORD_WEBHOOK_URL
+      - DISCORD_WEBHOOK_URL_2
+repo: akrogon
+AKROGON_BASE: a40ff4dbcf1811cb44ceeb35945bdecee17bcc95
