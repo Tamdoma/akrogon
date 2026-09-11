@@ -1,0 +1,83 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 3 changed files, running 2/10 test files
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [546.20ms]
+(pass) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [674.21ms]
+(pass) next waits on a blocked agent instead of counting attempts or flipping seats [495.90ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [665.91ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [133.53ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [693.17ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [661.68ms]
+(pass) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [906.57ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [392.58ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [666.28ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [721.75ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [508.41ms]
+(pass) uncommitted work in a merge worktree is never recovered as merged [391.72ms]
+(pass) a worktree parked mid-rebase is still dispatched [533.51ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [521.45ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [576.88ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [770.73ms]
+537 |   }
+538 | }, 15000);
+539 | 
+540 | test('recovery fetch deadline releases dispatch locks without transitioning', async () => {
+541 |   const result: Result = await run(['timeout', '5', process.execPath, resolve(import.meta.dir, 'fetch-deadline-harness.ts')]);
+542 |   expect(result.code).toBe(0);
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/fetch-deadline/tests/next.test.ts:542:23)
+(fail) recovery fetch deadline releases dispatch locks without transitioning [53.94ms]
+
+tests/shell.test.ts:
+ 9 |     const cwd: string = mkdtempSync(resolve(tmpdir(), 'deadline-'));
+10 |     const argv: string[] = ['sh', '-c', `${firstFailure ? 'if [ ! -f attempts ]; then echo first >> attempts; echo first >&2; exit 7; fi; ' : ''}echo $$ >> attempts; exec sleep 3`];
+11 |     const warning = spyOn(console, 'warn').mockImplementation(() => {});
+12 |     try {
+13 |       const start: number = performance.now();
+14 |       await expect(retryCommand(argv, cwd, 100)).rejects.toMatchObject({
+                                                              ^
+error: expect(received).rejects.toMatchObject(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/fetch-deadline/tests/shell.test.ts:14:58)
+(fail) deadline kills sleeping attempt after no failures [3001.78ms]
+ 9 |     const cwd: string = mkdtempSync(resolve(tmpdir(), 'deadline-'));
+10 |     const argv: string[] = ['sh', '-c', `${firstFailure ? 'if [ ! -f attempts ]; then echo first >> attempts; echo first >&2; exit 7; fi; ' : ''}echo $$ >> attempts; exec sleep 3`];
+11 |     const warning = spyOn(console, 'warn').mockImplementation(() => {});
+12 |     try {
+13 |       const start: number = performance.now();
+14 |       await expect(retryCommand(argv, cwd, 100)).rejects.toMatchObject({
+                                                              ^
+error: expect(received).rejects.toMatchObject(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/fetch-deadline/tests/shell.test.ts:14:58)
+(fail) deadline kills sleeping attempt after one failure [3002.60ms]
+35 |     expect(await run(['sh', '-c', 'echo output'])).toEqual({ code: 0, stdout: 'output', stderr: '' });
+36 |     expect(await run(['sh', '-c', 'echo error >&2; exit 4'])).toEqual({ code: 4, stdout: '', stderr: 'error' });
+37 |     expect(await retryCommand(['sh', '-c', 'echo fast'], cwd, 1000)).toBe('fast');
+38 |     const argv: string[] = ['sh', '-c', 'if [ ! -f first ]; then touch first; echo first >&2; exit 7; fi; echo second'];
+39 |     expect(await retryCommand(argv, cwd, 1000)).toBe('second');
+40 |     expect(warning).toHaveBeenCalledExactlyOnceWith(JSON.stringify({ warning: 'retrying command', command: argv, cwd, code: 7, stdout: '', stderr: 'first' }));
+                         ^
+TypeError: expect(warning).toHaveBeenCalledExactlyOnceWith is not a function. (In 'expect(warning).toHaveBeenCalledExactlyOnceWith(JSON.stringify({ warning: "retrying command", command: argv, cwd, code: 7, stdout: "", stderr: "first" }))', 'expect(warning).toHaveBeenCalledExactlyOnceWith' is undefined)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/fetch-deadline/tests/shell.test.ts:40:21)
+(fail) ordinary retry preserves warning and second result with optional deadlines [4.79ms]
+(pass) standalone command clears long deadline on exit 0 [19.56ms]
+(pass) standalone command clears long deadline on exit 7 [19.41ms]
+
+ 19 pass
+ 4 fail
+ 160 expect() calls
+Ran 23 tests across 2 files. [15.99s]

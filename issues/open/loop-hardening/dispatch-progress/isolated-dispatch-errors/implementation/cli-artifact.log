@@ -1,0 +1,13 @@
+{
+  "invocation": "bun src/akrogon.ts next --all",
+  "fixture": "/tmp/akrogon-2dPi2J/repo",
+  "code": 1,
+  "stdout": "",
+  "stderr": "{\"repo\":\"repo\",\"path\":\"/tmp/akrogon-2dPi2J/repo/issues/open/issue/broken\",\"slug\":\"broken\",\"error\":\"Missing or unreadable leaf: nonexistent\"}",
+  "prompts": [
+    {
+      "pane": "w1:p3",
+      "text": "plan-issue healthy slot=B phase=plan.synthesis"
+    }
+  ]
+}

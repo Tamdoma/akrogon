@@ -1,0 +1,30 @@
+slug: fetch-deadline
+phase: implement
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#6"
+  - "Tamdoma/akrogon#9"
+  - "Tamdoma/akrogon#11"
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"
+attempts: 
+  A: 0
+  B: 1
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t4K
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/fetch-deadline
+pane: 
+  A: w8:p8N
+  B: w8:p8P
+slot: B
+prompted: 
+  B: 01a090e8-b117-7dd1-9396-fc09838e703f

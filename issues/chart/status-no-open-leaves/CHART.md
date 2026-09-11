@@ -17,3 +17,5 @@ None.
 
 ## Out Of Scope
 - Other unreadable-repo paths keep the `unreadable` JSON line and exit 1.
+
+Handed off 2026-09-11 into `../../open/status-no-open-leaves/`.

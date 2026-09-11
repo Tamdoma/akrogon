@@ -43,3 +43,5 @@ None.
 - Switching intake to the configured remote.
 - A rename or relocation command for repos and worktrees.
 - Durable Discord delivery ledger.
+
+Handed off 2026-09-11 into `../../open/loop-hardening/`.

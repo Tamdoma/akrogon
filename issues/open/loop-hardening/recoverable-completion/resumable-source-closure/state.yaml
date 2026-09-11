@@ -1,0 +1,12 @@
+slug: resumable-source-closure
+phase: plan.synthesis
+created: '2026-09-11'
+priority: n
+repo: akrogon
+debate: 'no'
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#5"
+  - "Tamdoma/akrogon#13"
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"

@@ -57,6 +57,10 @@ const hookEventSchema = z.discriminatedUnion('event', [
     event: z.literal('pane_exited'),
     data: z.object({ type: z.literal('pane_exited'), pane_id: z.string() }),
   }),
+  z.object({
+    event: z.literal('pane_closed'),
+    data: z.object({ type: z.literal('pane_closed'), pane_id: z.string() }),
+  }),
 ]);
 
 type HookEvent = z.infer<typeof hookEventSchema>;

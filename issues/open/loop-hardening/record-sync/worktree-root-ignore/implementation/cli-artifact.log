@@ -1,0 +1,29 @@
+{
+  "cwd": "/tmp/akrogon-z6fs2b/repo",
+  "command": [
+    "/usr/bin/bun",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/worktree-root-ignore/src/akrogon.ts",
+    "init",
+    "--from",
+    "/tmp/akrogon-z6fs2b/proposal.yaml"
+  ],
+  "first": {
+    "code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "repeatCommand": [
+    "/usr/bin/bun",
+    "/home/ivan/Work/infra/akrogon/issues/worktrees/worktree-root-ignore/src/akrogon.ts",
+    "init"
+  ],
+  "repeated": {
+    "code": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+}
+.gitignore:
+work/trees/
+issues/seeds/
+.lock

@@ -1,0 +1,28 @@
+slug: scoped-branch-sync
+phase: implement
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#7"
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"
+attempts: 
+  A: 0
+  B: 1
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t4G
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/scoped-branch-sync
+pane: 
+  A: w8:p8F
+  B: w8:p8G
+slot: B
+prompted: 
+  B: 01a090e0-0ce0-7ad2-9dbd-cb22e065119c

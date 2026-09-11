@@ -226,6 +226,37 @@ test('a merged leaf with its tab still open does not count toward max_active', a
   }
 }, 15000);
 
+test('a closed pane hook from a merged leaf whose tab is gone sweeps and starts the next leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
+    const dependent: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
+    expect((await next(f, ['first'])).code).toBe(0);
+    const a: string = readState(first).pane.A!;
+    const tab: string = readState(first).tab!;
+    saveState(first, { ...readState(first), phase: 'merge' });
+    expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      tabs: db.tabs.filter((item) => item.tab_id !== tab),
+      panes: db.panes.filter((pane) => pane.tab_id !== tab),
+    });
+    const closed: Result = await next(f, [], {
+      HERDR_PANE_ID: a,
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'pane_closed',
+        data: { type: 'pane_closed', pane_id: a, workspace_id: 'w1' },
+      }),
+    });
+    expect(closed.code).toBe(0);
+    expect(database(f).tabs.map((item) => item.label)).toEqual(['second']);
+    expect(readState(dependent).attempts.B).toBe(1);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {

@@ -17,3 +17,7 @@ command = ["sh", "next.sh"]
 [[events]]
 on = "pane.exited"
 command = ["sh", "next.sh"]
+
+[[events]]
+on = "pane.closed"
+command = ["sh", "next.sh"]

@@ -1,0 +1,175 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 1 changed file, running 1/9 test files
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [565.03ms]
+(pass) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [677.02ms]
+(pass) next waits on a blocked agent instead of counting attempts or flipping seats [487.97ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [668.01ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [129.99ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [672.90ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [678.77ms]
+(pass) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [842.23ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [375.99ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [637.27ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [676.13ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [465.71ms]
+(pass) uncommitted work in a merge worktree is never recovered as merged [369.68ms]
+(pass) a worktree parked mid-rebase is still dispatched [493.75ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [477.32ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [535.78ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [732.25ms]
+537 |   }
+538 | }, 15000);
+539 | 
+540 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+541 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+542 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:542:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:565:14)
+(fail) missing registration is isolated during startup [311.97ms]
+537 |   }
+538 | }, 15000);
+539 | 
+540 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+541 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+542 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:542:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:565:14)
+(fail) missing registration is isolated during hook [344.09ms]
+537 |   }
+538 | }, 15000);
+539 | 
+540 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+541 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+542 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:542:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:565:14)
+(fail) missing registration is isolated during cwd [322.92ms]
+537 |   }
+538 | }, 15000);
+539 | 
+540 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+541 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+542 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:542:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:581:12)
+(fail) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [297.39ms]
+537 |   }
+538 | }, 15000);
+539 | 
+540 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+541 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+542 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unexpected identifier "ZodError"
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:542:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:602:14)
+(fail) bad YAML and invalid states reserve occupancy at capacity 3 [325.94ms]
+537 |   }
+538 | }, 15000);
+539 | 
+540 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+541 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+542 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unexpected identifier "ZodError"
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:542:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:602:14)
+(fail) bad YAML and invalid states reserve occupancy at capacity 4 [319.04ms]
+537 |   }
+538 | }, 15000);
+539 | 
+540 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+541 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+542 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:542:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:623:12)
+(fail) dirty merged worktree cleanup reports the original git error and still sweeps [367.96ms]
+635 |     try {
+636 |       const path: string = leaf(f, 'locked', 'plan.synthesis');
+637 |       leaf(f, 'zhealthy', 'plan.synthesis');
+638 |       mkdirSync(resolve(scope === 'global' ? f.home : scope === 'repo' ? resolve(f.root, 'issues') : path, '.lock'));
+639 |       const result: Result = await next(f, ['--all']);
+640 |       expect(result.code).not.toBe(0);
+                                    ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:640:31)
+(fail) global lock acquisition failure is fatal [534.74ms]
+635 |     try {
+636 |       const path: string = leaf(f, 'locked', 'plan.synthesis');
+637 |       leaf(f, 'zhealthy', 'plan.synthesis');
+638 |       mkdirSync(resolve(scope === 'global' ? f.home : scope === 'repo' ? resolve(f.root, 'issues') : path, '.lock'));
+639 |       const result: Result = await next(f, ['--all']);
+640 |       expect(result.code).not.toBe(0);
+                                    ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:640:31)
+(fail) repo lock acquisition failure is fatal [528.99ms]
+635 |     try {
+636 |       const path: string = leaf(f, 'locked', 'plan.synthesis');
+637 |       leaf(f, 'zhealthy', 'plan.synthesis');
+638 |       mkdirSync(resolve(scope === 'global' ? f.home : scope === 'repo' ? resolve(f.root, 'issues') : path, '.lock'));
+639 |       const result: Result = await next(f, ['--all']);
+640 |       expect(result.code).not.toBe(0);
+                                    ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:640:31)
+(fail) leaf lock acquisition failure is fatal [541.55ms]
+(pass) lock finalization failures and invalid hook events remain fatal [306.01ms]
+537 |   }
+538 | }, 15000);
+539 | 
+540 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+541 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+542 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:542:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:674:14)
+(fail) duplicate leaf identity never dispatches an arbitrary leaf [36.95ms]
+537 |   }
+538 | }, 15000);
+539 | 
+540 | const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+541 | function skips(result: Result): z.infer<typeof skipSchema>[] {
+542 |   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
+                                                                             ^
+SyntaxError: JSON Parse error: Unrecognized token '|'
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:542:72)
+      at map (1:11)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/tests/next.test.ts:674:14)
+(fail) mismatch leaf identity never dispatches an arbitrary leaf [35.67ms]
+
+ 18 pass
+ 12 fail
+ 175 expect() calls
+Ran 30 tests across 1 file. [13.78s]

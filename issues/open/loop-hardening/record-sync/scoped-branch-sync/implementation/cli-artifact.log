@@ -1,0 +1,81 @@
+$ git init -b main
+exit: 0
+Initialized empty Git repository in /tmp/scoped-sync-cli-_djr46te/repo/.git/
+
+
+$ git config user.name Sync CLI Test
+exit: 0
+
+
+$ git config user.email test@example.invalid
+exit: 0
+
+
+$ git add .
+exit: 0
+
+
+$ git commit -m fixture baseline
+exit: 0
+[main (root-commit) 1400664] fixture baseline
+ 2 files changed, 2 insertions(+)
+ create mode 100644 file
+ create mode 100644 issues/config.yaml
+
+
+$ git init --bare -b main /tmp/scoped-sync-cli-_djr46te/remote.git
+exit: 0
+Initialized empty Git repository in /tmp/scoped-sync-cli-_djr46te/remote.git/
+
+
+$ git remote add origin /tmp/scoped-sync-cli-_djr46te/remote.git
+exit: 0
+
+
+$ git push origin HEAD:main
+exit: 0
+
+To /tmp/scoped-sync-cli-_djr46te/remote.git
+ * [new branch]      HEAD -> main
+
+$ bun /home/ivan/Work/infra/akrogon/issues/worktrees/scoped-branch-sync/src/akrogon.ts sync
+exit: 0
+
+
+$ git --git-dir=/tmp/scoped-sync-cli-_djr46te/remote.git branch -v
+exit: 0
+* main fbdcfe1 sync issues
+
+
+$ git --git-dir=/tmp/scoped-sync-cli-_djr46te/remote.git show --format=fuller --name-status refs/heads/main
+exit: 0
+commit fbdcfe18cfd5f1aea8a952eeca65e532ea3b11a2
+Author:     Sync CLI Test <test@example.invalid>
+AuthorDate: Fri Sep 11 16:41:09 2026 +0200
+Commit:     Sync CLI Test <test@example.invalid>
+CommitDate: Fri Sep 11 16:41:09 2026 +0200
+
+    sync issues
+
+A	issues/open/demo/record.md
+
+
+$ git --git-dir=/tmp/scoped-sync-cli-_djr46te/remote.git show --format= --name-only refs/heads/main
+exit: 0
+issues/open/demo/record.md
+
+
+$ git diff --cached --name-only
+exit: 0
+
+
+$ git status --porcelain
+exit: 0
+ M file
+?? issues/.lock
+?? issues/custom-worktrees/
+?? issues/seeds/
+?? unrelated.txt
+
+
+PASS: remote sync commit contains only issues/open/demo/record.md; unrelated tracked/untracked contents preserved; index empty; seeds and custom worktree files excluded.

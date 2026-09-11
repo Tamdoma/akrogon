@@ -1,0 +1,13 @@
+slug: failure-signals
+phase: plan.synthesis
+created: '2026-09-11'
+priority: n
+repo: akrogon
+debate: 'no'
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#6"
+  - "Tamdoma/akrogon#9"
+  - "Tamdoma/akrogon#11"
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"

@@ -1,0 +1,28 @@
+slug: worktree-root-ignore
+phase: merged
+created: 2026-09-11
+priority: "n"
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#7"
+  - "Tamdoma/akrogon#10"
+  - "Tamdoma/akrogon#14"
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t4H
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/worktree-root-ignore
+pane: 
+  A: w8:p8H
+  B: w8:p8J
+slot: A
+prompted: 
+  {}

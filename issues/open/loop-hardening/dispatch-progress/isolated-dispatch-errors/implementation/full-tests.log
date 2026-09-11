@@ -1,0 +1,103 @@
+bun test v1.4.0 (34cbb9a40)
+
+tests/config.test.ts:
+(pass) config combines defaults and repo values, reports none, and recalculates worktree base [168.73ms]
+
+tests/init.test.ts:
+(pass) init writes proposal, registration and toolkit and preserves repeated user files [108.18ms]
+
+tests/install.test.ts:
+(pass) install creates all four absent harness roots and repeats without changing links or herdr arguments [254.47ms]
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/issues/worktrees/isolated-dispatch-errors/.evidence/install-prune-links/home-listing.json
+(pass) install prunes only dangling owned links and preserves real entries and foreign links in every root [122.82ms]
+(pass) install prunes before refusing directory at .claude/skills without installing links or calling herdr [36.59ms]
+(pass) install prunes before refusing foreign-link at .claude/skills without installing links or calling herdr [35.77ms]
+(pass) install prunes before refusing wrong-owned-link at .claude/skills without installing links or calling herdr [29.87ms]
+(pass) install prunes before refusing directory at .agents/skills without installing links or calling herdr [28.71ms]
+(pass) install prunes before refusing foreign-link at .agents/skills without installing links or calling herdr [28.86ms]
+(pass) install prunes before refusing wrong-owned-link at .agents/skills without installing links or calling herdr [38.04ms]
+(pass) install prunes before refusing directory at .codex/skills without installing links or calling herdr [32.98ms]
+(pass) install prunes before refusing foreign-link at .codex/skills without installing links or calling herdr [29.42ms]
+(pass) install prunes before refusing wrong-owned-link at .codex/skills without installing links or calling herdr [29.74ms]
+(pass) install prunes before refusing directory at .pi/agent/skills without installing links or calling herdr [27.83ms]
+(pass) install prunes before refusing foreign-link at .pi/agent/skills without installing links or calling herdr [31.89ms]
+(pass) install prunes before refusing wrong-owned-link at .pi/agent/skills without installing links or calling herdr [30.35ms]
+(pass) install still refuses an executable destination conflict before linking or herdr calls [33.81ms]
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [577.62ms]
+(pass) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [669.37ms]
+(pass) next waits on a blocked agent instead of counting attempts or flipping seats [462.82ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [666.59ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [129.89ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [665.95ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [686.19ms]
+(pass) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [880.77ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [382.68ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [659.45ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [690.42ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [476.00ms]
+(pass) uncommitted work in a merge worktree is never recovered as merged [364.89ms]
+(pass) a worktree parked mid-rebase is still dispatched [486.84ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [492.82ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [550.73ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [762.12ms]
+(pass) missing registration is isolated during startup [503.52ms]
+(pass) missing registration is isolated during hook [545.20ms]
+(pass) missing registration is isolated during cwd [508.10ms]
+(pass) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [307.39ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 3 [864.62ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 4 [842.68ms]
+(pass) dirty merged worktree cleanup reports the original git error and still sweeps [631.92ms]
+(pass) global lock acquisition failure is fatal [37.51ms]
+(pass) repo lock acquisition failure is fatal [41.23ms]
+(pass) leaf lock acquisition failure is fatal [45.84ms]
+(pass) lock finalization failures and invalid hook events remain fatal [322.52ms]
+(pass) duplicate leaf identity never dispatches an arbitrary leaf [288.19ms]
+(pass) mismatch leaf identity never dispatches an arbitrary leaf [278.54ms]
+(pass) unknown directory population reserves all new capacity but allows existing tabs [568.97ms]
+(pass) non-Error throws cross the scoped discovery boundary unchanged [35.18ms]
+(pass) explicit unreadable targets retain the original error without a missing-target stack [101.84ms]
+(pass) a selected leaf removed before its repo lock is reported as skipped [43.84ms]
+
+tests/park.test.ts:
+(pass) park and unpark move whole issues by name, refuse running ones, and keep the loop blind to parked work [540.56ms]
+(pass) park --all skips running issues and unpark --all restores everything [104.43ms]
+(pass) park keeps prerequisites that open leaves still depend on, and unpark refuses dependents of parked work [497.58ms]
+
+tests/phase.test.ts:
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [205.67ms]
+(pass) review aggregates verdicts, rechecks only A, caps repairs and permits operator restart [319.00ms]
+(pass) handoff to review refuses a dirty worktree and issue files on the branch, then passes [124.26ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [182.51ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [162.12ms]
+(pass) source closure waits for epic movement, deduplicates, and uses the triggering worktree commit under relocated locks [255.28ms]
+(pass) source retries recheck state, skip CLOSED, and continue after final failures with move and logging intact [595.84ms]
+(pass) sourced completion without worktree context fails after rename without a fabricated commit [46.29ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [181.15ms]
+(pass) failed or malformed retry comment listing prevents another close and continues later sources [614.30ms]
+
+tests/pull.test.ts:
+(pass) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [180.40ms]
+(pass) pull caps slugs at word boundaries and hard cuts oversized first words [61.68ms]
+(pass) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [337.69ms]
+(pass) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [262.38ms]
+(pass) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [162.49ms]
+(pass) concurrent pulls serialize listing and reconciliation [293.73ms]
+(pass) startup runs pull all before next all and wrappers forward arguments [9.21ms]
+
+tests/status.test.ts:
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [44.62ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [183.36ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [327.66ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [58.66ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [119.25ms]
+
+tests/sync.test.ts:
+(pass) sync commits local changes, rebases on the remote and pushes [112.46ms]
+
+ 77 pass
+ 0 fail
+ 909 expect() calls
+Ran 77 tests across 9 files. [22.65s]

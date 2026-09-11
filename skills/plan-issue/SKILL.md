@@ -26,6 +26,8 @@ A missing resource is reported as a gap, not invented content; lessons describe 
 
 For a necessary peer question outside blind positions, wait for the peer to be idle, ask once through herdr in Question/Option form with instructions to write `<leaf>/questions/<id>.md`, run `herdr agent wait` without a timeout, read that file and decide by simplicity, clarity, elegance, cost, speed and quality.
 
+When the brief and the locked design disagree, never ask the operator: the design wins, the conflict is written into the plan as a note for review, and planning continues.
+
 A reusable lesson found here is one line in `learnings/LESSONS.md` naming mechanism, date and history path, plus `learnings/history/<date>-<slug>.md` with the case, evidence and abstract learning.
 
 ## plan.positions

@@ -1,0 +1,44 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 2 changed files, running 1/9 test files
+
+tests/next.test.ts:
+plan-issue build slot=B phase=plan.synthesis
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured B, ignores working events and resolves hook cwd [540.58ms]
+(pass) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [673.25ms]
+(pass) next waits on a blocked agent instead of counting attempts or flipping seats [471.92ms]
+(pass) next resumes interrupted tab creation, retries same slot twice then peer once and fails [668.17ms]
+(pass) next notifies failed leaves without dispatch or state changes and exposes notification failures [134.05ms]
+(pass) next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers [668.27ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [658.71ms]
+(pass) merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it [845.25ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [379.74ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [671.89ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [681.91ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [485.78ms]
+(pass) uncommitted work in a merge worktree is never recovered as merged [372.70ms]
+(pass) a worktree parked mid-rebase is still dispatched [509.74ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [502.08ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [542.11ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [736.16ms]
+(pass) missing registration is isolated during startup [499.38ms]
+(pass) missing registration is isolated during hook [534.95ms]
+(pass) missing registration is isolated during cwd [527.49ms]
+(pass) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [303.50ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 3 [870.63ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 4 [850.09ms]
+(pass) dirty merged worktree cleanup reports the original git error and still sweeps [643.90ms]
+(pass) global lock acquisition failure is fatal [36.06ms]
+(pass) repo lock acquisition failure is fatal [42.68ms]
+(pass) leaf lock acquisition failure is fatal [42.36ms]
+(pass) lock finalization failures and invalid hook events remain fatal [316.24ms]
+(pass) duplicate leaf identity never dispatches an arbitrary leaf [280.12ms]
+(pass) mismatch leaf identity never dispatches an arbitrary leaf [283.55ms]
+(pass) unknown directory population reserves all new capacity but allows existing tabs [558.65ms]
+(pass) non-Error throws cross the scoped discovery boundary unchanged [35.99ms]
+(pass) explicit unreadable targets retain the original error without a missing-target stack [101.82ms]
+(pass) a selected leaf removed before its repo lock is reported as skipped [42.95ms]
+
+ 34 pass
+ 0 fail
+ 245 expect() calls
+Ran 34 tests across 1 file. [15.54s]
