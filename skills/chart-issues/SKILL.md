@@ -34,7 +34,7 @@ Show a proportional territory map before grilling, including material forks, pra
 
 Propose the split by destination and speed of resolution before writing: independently checkable outcomes sharing a destination can be parallel leaves of one issue, independent issues run side by side, and only an actual dependency orders work, never file overlap or presentation preference.
 
-Write one chart folder per destination and stop a seed drain for the operator to select one, even if it yielded only one unresolved destination; a direct single item whose map finds nothing unspecified writes the same chart structure and proceeds to handoff immediately.
+Write one chart folder per destination. When every chart still holds an unresolved decision, stop the seed drain for the operator to select one; when every decision in every chart is resolved, hand off each chart in order without asking for a selection, asking the debate question once for the whole batch. A direct single item whose map finds nothing unspecified writes the same chart structure and proceeds to handoff immediately.
 
 ## Decide
 
