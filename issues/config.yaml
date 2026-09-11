@@ -12,7 +12,7 @@ checks:
 advisory: 
   []
 grounding: 
-  index: REFERENCE.md
+  index: docs/reference-index.md
 broadcast: 
   discord: 
     webhook_env: 
