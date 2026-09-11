@@ -205,6 +205,27 @@ test('next refuses hand-built and dependencies, respects capacity, and sends unk
   }
 }, 15000);
 
+test('a merged leaf with its tab still open does not count toward max_active', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
+    const dependent: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
+    const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+    yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 1 });
+    expect((await next(f, ['first'])).code).toBe(0);
+    const b: string = readState(first).pane.B!;
+    saveState(first, { ...readState(first), phase: 'merge' });
+    expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
+    const db: Database = database(f);
+    saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
+    expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['first', 'second']);
+    expect(readState(dependent).attempts.B).toBe(1);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {

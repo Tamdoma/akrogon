@@ -135,7 +135,7 @@ async function activeCount(global: GlobalConfig): Promise<number> {
   const active: Set<string> = new Set();
   for (const [name, path] of Object.entries(global.repos)) {
     const repo: Repo = readRepo(name, path);
-    for (const leaf of allLeaves(repo)) {
+    for (const leaf of allLeaves(repo).filter((leaf) => leaf.state.phase !== 'merged')) {
       if (live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf)))
         active.add(`${name}/${leaf.state.slug}`);
     }
