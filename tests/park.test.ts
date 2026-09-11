@@ -1,8 +1,17 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, leaf, type Fixture } from './helpers';
 import { type Result } from '../src/shell';
+
+function fakeHerdr(f: Fixture): NodeJS.ProcessEnv {
+  const bin: string = resolve(f.home, 'bin');
+  mkdirSync(bin);
+  symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
+  const db: string = resolve(f.home, 'herdr.json');
+  writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, prompts: [], starts: [] }));
+  return { PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db };
+}
 
 test('park and unpark move whole issues by name, refuse running ones, and keep the loop blind to parked work', async () => {
   const f: Fixture = await fixture();
@@ -21,7 +30,7 @@ test('park and unpark move whole issues by name, refuse running ones, and keep t
     expect(status.code).toBe(0);
     expect(status.stdout).not.toContain('docs-a');
     expect(status.stdout).toContain('parked  docs, small-issue');
-    expect((await cli(f, ['next', '--all'])).stdout).not.toContain('docs-a');
+    expect((await cli(f, ['next', '--all'], f.root, fakeHerdr(f))).stdout).not.toContain('docs-a');
     expect(existsSync(resolve(f.root, 'issues/parked/docs/docs-a/state.yaml'))).toBe(true);
     const refused: Result = await cli(f, ['park', 'busy-issue']);
     expect(refused.code).not.toBe(0);
@@ -91,7 +100,7 @@ test('park keeps prerequisites that open leaves still depend on, and unpark refu
     expect(all.stdout).toContain('needed   third');
     expect(readdirSync(resolve(f.root, 'issues/open')).sort()).toEqual(['busy-issue', 'third']);
     expect(readdirSync(resolve(f.root, 'issues/parked')).sort()).toEqual(['first', 'second']);
-    expect((await cli(f, ['next', '--all'])).stderr).not.toContain('Missing leaf');
+    expect((await cli(f, ['next', '--all'], f.root, fakeHerdr(f))).stderr).not.toContain('Missing leaf');
   } finally {
     f.clean();
   }

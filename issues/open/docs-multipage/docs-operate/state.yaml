@@ -1,9 +1,26 @@
 slug: docs-operate
-phase: plan.synthesis
-created: '2026-09-11'
+phase: merged
+created: 2026-09-11
 priority: l
 repo: akrogon
-debate: 'no'
-blocked-by: [docs-shell]
-sources:
-  - Tamdoma/akrogon#3
+debate: "no"
+blocked-by: 
+  - docs-shell
+sources: 
+  - "Tamdoma/akrogon#3"
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t21
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/docs-operate
+pane: 
+  A: w8:p3P
+  B: w8:p3Q
+slot: A
+prompted: 
+  {}

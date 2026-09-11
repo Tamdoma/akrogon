@@ -71,6 +71,8 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   const destination: string = resolve(closed, basename(owner));
   if (existsSync(destination)) throw new Error(`Completion destination exists: ${destination}`);
   renameSync(owner, destination);
+  const chart: string = resolve(repo.root, 'issues/chart', basename(owner));
+  if (existsSync(chart)) renameSync(chart, resolve(destination, 'chart'));
   await closeSources(repo, leaf, destination);
 }
 

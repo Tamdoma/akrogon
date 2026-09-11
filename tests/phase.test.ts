@@ -127,6 +127,8 @@ test('completion reports each issue once, moves only finished containers, and re
     leaf(f, 'one', 'merge', {}, 'epic/first');
     leaf(f, 'two', 'merge', {}, 'epic/first');
     leaf(f, 'three', 'merge', {}, 'epic/second');
+    mkdirSync(resolve(f.root, 'issues/chart/epic'), { recursive: true });
+    writeFileSync(resolve(f.root, 'issues/chart/epic/CHART.md'), '# Chart: epic\n');
     const race: Result[] = await Promise.all(['one', 'two'].map((slug) => cli(f, ['phase', slug, 'merged'])));
     expect(race.every((r) => r.code === 0)).toBe(true);
     expect(race.filter((r) => r.stdout.includes('issue complete first'))).toHaveLength(1);
@@ -134,6 +136,8 @@ test('completion reports each issue once, moves only finished containers, and re
     expect((await cli(f, ['phase', 'three', 'merged'])).stdout).toContain('issue complete second');
     expect(existsSync(resolve(f.root, 'issues/closed/epic/first/one/state.yaml'))).toBe(true);
     expect(existsSync(resolve(f.root, 'issues/open/epic'))).toBe(false);
+    expect(existsSync(resolve(f.root, 'issues/closed/epic/chart/CHART.md'))).toBe(true);
+    expect(existsSync(resolve(f.root, 'issues/chart/epic'))).toBe(false);
     expect((await cli(f, ['phase', 'three', 'merged'])).code).not.toBe(0);
     leaf(f, 'single', 'merge', {}, 'standalone');
     expect((await cli(f, ['phase', 'single', 'merged'])).stdout).toContain('issue complete standalone');

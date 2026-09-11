@@ -3,3 +3,4 @@ issues/worktrees/
 node_modules/
 issues/seeds/
 .lock
+.pi-command-logs/
