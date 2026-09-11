@@ -13,7 +13,12 @@ function bytes(path: string): string {
 test('real same-slot and different-slot races record once and refuse stale moves unchanged', async () => {
   const f: Fixture = await fixture();
   try {
-    const path: string = leaf(f, 'race', 'plan.positions');
+    const stamp: string = '2026-09-11T12:00:00.000Z';
+    const path: string = leaf(f, 'race', 'plan.positions', {
+      failed_notified: true,
+      busy_since: { A: stamp },
+      busy_notified: { A: stamp },
+    });
     const same: Result[] = await Promise.all([
       cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'A']),
       cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'A']),
@@ -24,7 +29,12 @@ test('real same-slot and different-slot races record once and refuse stale moves
     expect((await cli(f, ['phase', 'race', 'merge', '--slot', 'B'])).code).not.toBe(0);
     expect(bytes(path)).toBe(before);
     expect((await cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'B'])).code).toBe(0);
-    expect(readState(path).phase).toBe('plan.rebuttal');
+    expect(readState(path)).toMatchObject({
+      phase: 'plan.rebuttal',
+      failed_notified: false,
+      busy_since: { A: stamp },
+      busy_notified: { A: stamp },
+    });
     const moved: string = bytes(path);
     expect((await cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'B'])).code).not.toBe(0);
     expect(bytes(path)).toBe(moved);

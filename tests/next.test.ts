@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, leaf, yaml, fakeGh, type GhFixture, type Fixture } from './helpers';
+import { fixture, cli, entry, leaf, yaml, fakeGh, type GhFixture, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
@@ -75,6 +75,8 @@ test('next does not re-prompt a slot whose prompted session is still alive, and 
     });
     expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
     expect(database(f).prompts).toHaveLength(1);
+    expect(readState(path).busy_since.B).toBeUndefined();
+    expect(readState(path).busy_notified.B).toBeUndefined();
     expect(readState(path).attempts.B).toBe(1);
     const replaced: Database = database(f);
     saveDatabase(f, {
@@ -98,6 +100,7 @@ test('next waits on a blocked agent instead of counting attempts or flipping sea
     saveDatabase(f, { ...database(f), blockOnStart: true });
     expect((await next(f, ['dialog'])).code).toBe(0);
     expect(database(f).prompts).toHaveLength(0);
+    expect(readState(path).busy_since.B).toBeDefined();
     expect(database(f).starts).toHaveLength(1);
     expect(readState(path).attempts.B).toBe(1);
     const b: string = readState(path).pane.B!;
@@ -131,50 +134,160 @@ test('next resumes interrupted tab creation, retries same slot twice then peer o
     expect(db.prompts[2].pane).not.toBe(db.prompts[0].pane);
     expect(db.prompts.every((p) => p.text.includes('slot=B'))).toBe(true);
     expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8')).toContain('"to":"failed"');
-    const state: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
     const before: number = calls(f).length;
     expect((await next(f, ['retry'])).code).toBe(0);
-    const notified: string[][] = calls(f).slice(before);
+    const notified: string[][] = calls(f)
+      .slice(before)
+      .filter((args) => args[0] === 'notification');
     expect(notified).toHaveLength(1);
     expect(notified[0].slice(0, 2)).toEqual(['notification', 'show']);
     expect(notified[0][2]).toContain('repo');
     expect(notified[0][2]).toContain('retry');
-    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(state);
+    expect(readState(path).failed_notified).toBe(true);
   } finally {
     f.clean();
   }
 }, 15000);
 
-test('next notifies failed leaves without dispatch or state changes and exposes notification failures', async () => {
+test('failed delivery retries, deduplicates sweeps and resets after a phase transition', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'broken', 'failed');
-    const state: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
-    const notified: Result = await next(f, ['broken']);
-    expect(notified.code).toBe(0);
-    expect(calls(f)).toHaveLength(1);
-    expect(calls(f)[0].slice(0, 2)).toEqual(['notification', 'show']);
-    expect(calls(f)[0][2]).toContain('repo');
-    expect(calls(f)[0][2]).toContain('broken');
-    expect(database(f).prompts).toHaveLength(0);
-    expect(database(f).starts).toHaveLength(0);
-    expect(database(f).tabs).toHaveLength(0);
-    expect(database(f).panes).toHaveLength(0);
-    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(state);
-    expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
+    expect(readState(path)).toMatchObject({ failed_notified: false, busy_since: {}, busy_notified: {} });
     saveDatabase(f, { ...database(f), failNotification: true });
     const failed: Result = await next(f, ['broken']);
     expect(failed.code).not.toBe(0);
     expect(failed.stderr).toContain('fixture_notification_failed');
     expect(failed.stderr).toContain('notification');
     expect(failed.stderr).toContain('broken');
-    expect(calls(f)).toEqual([calls(f)[0], calls(f)[0]]);
-    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(state);
+    expect(readState(path).failed_notified).toBe(false);
+    saveDatabase(f, { ...database(f), failNotification: false });
+    for (let sweep: number = 0; sweep < 3; sweep++) expect((await next(f, ['broken'])).code).toBe(0);
+    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(2);
+    expect(readState(path).failed_notified).toBe(true);
+    expect(database(f)).toMatchObject({ prompts: [], starts: [], tabs: [], panes: [] });
     expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
+    expect((await cli(f, ['phase', 'broken', 'implement', '--slot', 'B'], f.root, f.env)).code).toBe(0);
+    expect(readState(path).failed_notified).toBe(false);
+    saveState(path, { ...readState(path), phase: 'failed' });
+    expect((await next(f, ['broken'])).code).toBe(0);
+    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(3);
   } finally {
     f.clean();
   }
 });
+
+async function nextAt(f: DispatchFixture, slug: string, now: number): Promise<Result> {
+  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(
+    [
+      process.execPath,
+      '--eval',
+      `Date.now = () => ${now}; process.argv = ['bun', ${JSON.stringify(entry)}, 'next', ${JSON.stringify(slug)}]; await import(${JSON.stringify(entry)});`,
+    ],
+    {
+      cwd: f.root,
+      env: { ...process.env, AKROGON_HOME: f.home, HERDR_PANE_ID: '', ...f.env },
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  );
+  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  return { stdout, stderr, code };
+}
+
+test('busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'busy', 'plan.positions');
+    const now: number = Date.parse('2026-09-11T12:00:00Z');
+    expect((await nextAt(f, 'busy', now)).code).toBe(0);
+    const started: State = readState(path);
+    expect(started.busy_since).toEqual({ A: new Date(now).toISOString(), B: new Date(now).toISOString() });
+    saveDatabase(f, { ...database(f), panes: database(f).panes.map((p) => ({ ...p, agent_status: 'blocked' })) });
+    for (const minutes of [59, 60]) expect((await nextAt(f, 'busy', now + minutes * 60000)).code).toBe(0);
+    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(0);
+    saveDatabase(f, { ...database(f), failNotification: true });
+    const failed: Result = await nextAt(f, 'busy', now + 61 * 60000);
+    expect(failed.code).not.toBe(0);
+    expect(failed.stderr).toContain('fixture_notification_failed');
+    expect(readState(path).busy_since).toEqual(started.busy_since);
+    expect(readState(path).busy_notified).toEqual({});
+    saveDatabase(f, { ...database(f), failNotification: false });
+    for (const minutes of [61, 62]) expect((await nextAt(f, 'busy', now + minutes * 60000)).code).toBe(0);
+    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(3);
+    expect(readState(path)).toMatchObject({
+      phase: started.phase,
+      pane: started.pane,
+      attempts: started.attempts,
+      busy_since: started.busy_since,
+    });
+    expect(Object.keys(readState(path).busy_notified)).toEqual(['A', 'B']);
+    saveState(path, { ...readState(path), phase: 'plan.synthesis' });
+    for (const status of ['idle', 'done', 'unknown'] as const) {
+      saveDatabase(f, {
+        ...database(f),
+        panes: database(f).panes.map((p) =>
+          p.pane_id === started.pane.A
+            ? { ...p, agent_status: status, agent: status === 'unknown' ? null : 'fake' }
+            : p,
+        ),
+      });
+      expect((await nextAt(f, 'busy', now + 63 * 60000)).code).toBe(0);
+      expect(readState(path).busy_since.A).toBeUndefined();
+      expect(readState(path).busy_notified.A).toBeUndefined();
+      expect(readState(path).busy_notified.B).toBeDefined();
+      saveDatabase(f, {
+        ...database(f),
+        panes: database(f).panes.map((p) =>
+          p.pane_id === started.pane.A ? { ...p, agent: 'fake', agent_status: 'working' } : p,
+        ),
+      });
+      expect((await nextAt(f, 'busy', now + 64 * 60000)).code).toBe(0);
+      expect(readState(path).busy_since.A).toBe(new Date(now + 64 * 60000).toISOString());
+    }
+    expect((await nextAt(f, 'busy', now + 125 * 60000)).code).toBe(0);
+    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(4);
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
+test('logical B fallback warns for physical A and unknown agents retain busy observations', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'fallback', 'plan.synthesis');
+    const now: number = Date.parse('2026-09-11T12:00:00Z');
+    expect((await nextAt(f, 'fallback', now)).code).toBe(0);
+    const initial: State = readState(path);
+    saveState(path, { ...initial, attempts: { A: 0, B: 2 }, busy_since: {}, prompted: {} });
+    saveDatabase(f, {
+      ...database(f),
+      panes: database(f).panes.map((p) => (p.pane_id === initial.pane.B ? { ...p, agent_status: 'unknown' } : p)),
+    });
+    expect((await nextAt(f, 'fallback', now)).code).toBe(0);
+    expect(database(f).prompts.at(-1)).toMatchObject({ pane: initial.pane.A, text: expect.stringContaining('slot=B') });
+    expect(readState(path)).toMatchObject({ attempts: { A: 0, B: 3 }, busy_since: { A: new Date(now).toISOString() } });
+    expect(readState(path).busy_since.B).toBeUndefined();
+    expect((await nextAt(f, 'fallback', now + 61 * 60000)).code).toBe(0);
+    const notifications: string[][] = calls(f).filter((args) => args[0] === 'notification');
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0][2]).toContain('seat A');
+    expect(readState(path).busy_notified.B).toBeUndefined();
+    const before: State = readState(path);
+    saveState(path, { ...before, done: ['B'] });
+    saveDatabase(f, { ...database(f), panes: database(f).panes.map((p) => ({ ...p, agent_status: 'unknown' })) });
+    expect((await nextAt(f, 'fallback', now + 62 * 60000)).code).toBe(0);
+    expect(readState(path).busy_since).toEqual(before.busy_since);
+    expect(readState(path).busy_notified).toEqual(before.busy_notified);
+  } finally {
+    f.clean();
+  }
+}, 15000);
 
 test('next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -476,7 +589,13 @@ test('a live merge retains its completion call after pushing, including a peer r
     await command(['git', 'commit', '-m', 'landed change'], worktree);
     await command(['git', 'push', 'origin', 'HEAD:main'], worktree);
     for (const seat of ['A', 'B'] as const) {
-      saveState(path, { ...readState(path), phase: 'merge', attempts: { A: seat === 'A' ? 1 : 3, B: 0 } });
+      saveState(path, {
+        ...readState(path),
+        phase: 'merge',
+        attempts: { A: seat === 'A' ? 1 : 3, B: 0 },
+        busy_since: { [seat]: new Date(Date.now() - 61 * 60000).toISOString() },
+        busy_notified: {},
+      });
       const db: Database = database(f);
       saveDatabase(f, {
         ...db,
@@ -488,6 +607,13 @@ test('a live merge retains its completion call after pushing, including a peer r
       });
       expect((await next(f, ['--all'])).code).toBe(0);
       expect(readState(path).phase).toBe('merge');
+      expect(readState(path).busy_since[seat]).toBeDefined();
+      expect(readState(path).busy_notified[seat]).toBeDefined();
+      expect(
+        calls(f)
+          .filter((args) => args[0] === 'notification')
+          .at(-1)![2],
+      ).toContain(`seat ${seat}`);
     }
     const completed: Result = await cli(f, ['phase', 'active-merge', 'merged', '--slot', 'A'], worktree, f.env);
     expect(completed.code).toBe(0);

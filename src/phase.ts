@@ -36,6 +36,7 @@ export async function commitMove(
   const after: State = {
     ...recorded,
     phase: to,
+    failed_notified: false,
     done: [],
     verdict: {},
     prompted: {},

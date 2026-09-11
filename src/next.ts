@@ -156,6 +156,40 @@ function idle(pane: Pane): boolean {
   return pane.agent_status === 'idle' || pane.agent_status === 'done';
 }
 
+const STALL_MS: number = 60 * 60 * 1000;
+
+async function observeBusy(path: string, state: State, seat: Slot, pane: Pane, now: number): Promise<State> {
+  if (pane.agent === null || idle(pane)) {
+    if (state.busy_since[seat] === undefined && state.busy_notified[seat] === undefined) return state;
+    const cleared: State = {
+      ...state,
+      busy_since: { ...state.busy_since, [seat]: undefined },
+      busy_notified: { ...state.busy_notified, [seat]: undefined },
+    };
+    saveState(path, cleared);
+    return cleared;
+  }
+  if (!busy(pane)) return state;
+  const since: string = state.busy_since[seat] ?? new Date(now).toISOString();
+  const observed: State = { ...state, busy_since: { ...state.busy_since, [seat]: since } };
+  if (state.busy_since[seat] === undefined) saveState(path, observed);
+  const elapsed: number = now - Date.parse(since);
+  if (elapsed <= STALL_MS || observed.busy_notified[seat] !== undefined) return observed;
+  const minutes: number = Math.floor(elapsed / 60000);
+  await command([
+    'herdr',
+    'notification',
+    'show',
+    `Busy leaf: ${state.repo}/${state.slug} seat ${seat} ${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`,
+  ]);
+  const notified: State = {
+    ...observed,
+    busy_notified: { ...observed.busy_notified, [seat]: new Date(now).toISOString() },
+  };
+  saveState(path, notified);
+  return notified;
+}
+
 function peerOf(slot: Slot): Slot {
   return slot === 'A' ? 'B' : 'A';
 }
@@ -313,11 +347,12 @@ function retryable(result: Result): boolean {
 
 async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: Slot): Promise<void> {
   while (true) {
-    const state: State = readState(leaf.path);
-    if (state.phase !== leaf.state.phase || state.done.includes(slot)) return;
+    const recorded: State = readState(leaf.path);
+    if (recorded.phase !== leaf.state.phase || recorded.done.includes(slot)) return;
     const peer: Slot = peerOf(slot);
-    const seat: Slot = seatFor(state, slot);
-    const pane: Pane = await currentPane(z.string().parse(state.pane[seat]));
+    const seat: Slot = seatFor(recorded, slot);
+    const pane: Pane = await currentPane(z.string().parse(recorded.pane[seat]));
+    const state: State = await observeBusy(leaf.path, recorded, seat, pane, Date.now());
     if (pane.agent !== null && busy(pane)) return;
     if (pane.agent !== null && !idle(pane)) {
       if (seat === peer) {
@@ -359,6 +394,7 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
       }
     }
     const ready: Pane = await currentPane(pane.pane_id);
+    await observeBusy(leaf.path, readState(leaf.path), seat, ready, Date.now());
     if (!idle(ready)) {
       if (busy(ready)) return;
       continue;
@@ -378,8 +414,10 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
     ];
     const result: Result = await run(args);
     if (result.code === 0) {
-      const session: string | undefined = (await currentPane(ready.pane_id)).agent_session?.value;
-      saveState(leaf.path, { ...readState(leaf.path), prompted: { ...attempt.prompted, [slot]: session } });
+      const prompted: Pane = await currentPane(ready.pane_id);
+      const observed: State = await observeBusy(leaf.path, readState(leaf.path), seat, prompted, Date.now());
+      const session: string | undefined = prompted.agent_session?.value;
+      saveState(leaf.path, { ...observed, prompted: { ...observed.prompted, [slot]: session } });
       return;
     }
     if (!retryable(result)) throw new CommandError(args, repo.root, result);
@@ -406,13 +444,20 @@ async function dispatchLeaf(
     }
     return withLeafLocks(leaf, async () => {
       try {
-        const state: State = readState(leaf.path);
+        let state: State = readState(leaf.path);
         if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
-        const refreshed: Leaf = { path: leaf.path, state };
         if (state.hand_built) {
           if (explicit) throw new Error(`Hand-built leaf cannot be dispatched: ${slug}`);
           return 'waiting';
         }
+        if (state.phase !== 'merged' && Object.values(state.pane).length > 0) {
+          const live: Pane[] = await panes();
+          for (const seat of ['A', 'B'] as const) {
+            const pane: Pane | undefined = live.find((pane) => pane.pane_id === state.pane[seat]);
+            if (pane !== undefined) state = await observeBusy(leaf.path, state, seat, pane, Date.now());
+          }
+        }
+        const refreshed: Leaf = { path: leaf.path, state };
         if (state.phase === 'merge') {
           const mergeSeat: Slot = seatFor(state, 'A');
           const active: boolean = (await panes()).some(
@@ -427,7 +472,10 @@ async function dispatchLeaf(
           return 'completed';
         }
         if (current.state.phase === 'failed') {
-          await command(['herdr', 'notification', 'show', `Failed leaf: ${repo.name}/${slug}`]);
+          if (!current.state.failed_notified) {
+            await command(['herdr', 'notification', 'show', `Failed leaf: ${repo.name}/${slug}`]);
+            saveState(current.path, { ...current.state, failed_notified: true });
+          }
           return 'waiting';
         }
         const dependencies: Leaf[] = current.state['blocked-by'].map((dependency) => lookup(inventory, dependency));

@@ -73,7 +73,13 @@ function scanRepo(name: string, registeredPath: string): Scan {
 
 const header: string[] = ['LEAF', 'PHASE', 'AGE', 'BLOCKED BY', 'NOTE'];
 
-function note(state: State): string {
+function note(state: State, now: number): string {
+  const busy: string[] = (['A', 'B'] as const).flatMap((seat) => {
+    const since: string | undefined = state.busy_since[seat];
+    if (since === undefined) return [];
+    const minutes: number = Math.max(0, Math.floor((now - Date.parse(since)) / 60000));
+    return [`busy ${seat} ${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`];
+  });
   const attempts: string[] =
     state.attempts.A + state.attempts.B > 0 ? [`attempts A:${state.attempts.A} B:${state.attempts.B}`] : [];
   const fixes: string[] = state.fix_rounds > 0 ? [`fix rounds ${state.fix_rounds}`] : [];
@@ -81,7 +87,7 @@ function note(state: State): string {
   const verdict: string[] = verdicts.length > 0 ? [`verdict ${verdicts.join(' ')}`] : [];
   const done: string[] = state.done.length > 0 ? [`done ${state.done.join(' ')}`] : [];
   const tab: string[] = state.tab === undefined ? [] : [`tab ${state.tab}`];
-  return [...done, ...attempts, ...fixes, ...verdict, ...tab].join(' · ');
+  return [...done, ...attempts, ...fixes, ...verdict, ...tab, ...busy].join(' · ');
 }
 
 function cells(leaf: Leaf, log: LogRecord[], now: number, indent: string): string[] {
@@ -91,7 +97,7 @@ function cells(leaf: Leaf, log: LogRecord[], now: number, indent: string): strin
   );
   const elapsed: number | undefined = last === undefined ? undefined : now - Date.parse(last.record.ts);
   const age: string = elapsed === undefined || elapsed < 0 ? '-' : `${Math.floor(elapsed / 60000)}m`;
-  return [`${indent}${state.slug}`, state.phase, age, state['blocked-by'].join(' '), note(state)];
+  return [`${indent}${state.slug}`, state.phase, age, state['blocked-by'].join(' '), note(state, now)];
 }
 
 function rows(scan: Scan & { ok: true }, now: number): string[][] {

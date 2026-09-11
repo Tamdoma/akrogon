@@ -300,3 +300,30 @@ test('detail resolves authoritative closed state from a worktree, limits history
     f.clean();
   }
 });
+
+test('busy durations appear in NOTE for every recorded seat without writes or herdr calls', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const now: number = Date.now();
+    leaf(f, 'long', 'implement', {
+      busy_since: { A: new Date(now - 62 * 60000).toISOString(), B: new Date(now - 1503 * 60000).toISOString() },
+    });
+    leaf(f, 'short', 'implement', {
+      busy_since: { A: new Date(now - 2 * 60000).toISOString(), B: new Date(now + 60000).toISOString() },
+    });
+    leaf(f, 'empty', 'implement');
+    const env: NodeJS.ProcessEnv = fakeHerdr(f);
+    const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
+    const result: Result = await cli(f, ['status'], f.home, env);
+    expect(result.code).toBe(0);
+    expect(cell(result.stdout, leafRow(result.stdout, 'long'), 'NOTE')).toContain('busy A 1h02m');
+    expect(cell(result.stdout, leafRow(result.stdout, 'long'), 'NOTE')).toContain('busy B 25h03m');
+    expect(cell(result.stdout, leafRow(result.stdout, 'short'), 'NOTE')).toContain('busy A 0h02m');
+    expect(cell(result.stdout, leafRow(result.stdout, 'short'), 'NOTE')).toContain('busy B 0h00m');
+    expect(cell(result.stdout, leafRow(result.stdout, 'empty'), 'NOTE')).not.toContain('busy');
+    expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
+    expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
