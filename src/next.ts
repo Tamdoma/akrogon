@@ -249,22 +249,29 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   const tabState: State = { ...state, tab: tab.tab_id };
   saveState(leaf.path, tabState);
   const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === tab.tab_id);
-  if (members.length === 0 || members.length > 2) throw new Error(`Expected one or two panes in ${tab.tab_id}`);
-  const first: Pane = members.find((pane) => pane.pane_id === state.pane.A) ?? members[0];
-  const second: Pane =
-    members.length === 2
-      ? members.find((pane) => pane.pane_id !== first.pane_id)!
+  if (members.length === 0) throw new Error(`Expected at least one pane in ${tab.tab_id}`);
+  const recordedA: Pane | undefined = members.find((pane) => pane.pane_id === state.pane.A);
+  const recordedB: Pane | undefined = members.find((pane) => pane.pane_id === state.pane.B);
+  const bootstrap: boolean = matches.length === 0 || (state.pane.A === undefined && state.pane.B === undefined);
+  const first: Pane =
+    recordedA ??
+    (bootstrap
+      ? members[0]
       : (
           await herdr(
-            ['pane', 'split', first.pane_id, '--direction', 'right', ...placement],
+            ['pane', 'split', (recordedB ?? members[0]).pane_id, '--direction', 'right', ...placement],
             z.object({ pane: paneSchema }),
           )
-        ).pane;
-  const survivingB: boolean = members.length === 1 && first.pane_id === state.pane.B;
-  const allocated: State = {
-    ...tabState,
-    pane: survivingB ? { A: second.pane_id, B: first.pane_id } : { A: first.pane_id, B: second.pane_id },
-  };
+        ).pane);
+  const second: Pane =
+    recordedB ??
+    (
+      await herdr(
+        ['pane', 'split', first.pane_id, '--direction', 'right', ...placement],
+        z.object({ pane: paneSchema }),
+      )
+    ).pane;
+  const allocated: State = { ...tabState, pane: { A: first.pane_id, B: second.pane_id } };
   saveState(leaf.path, allocated);
   return allocated;
 }
@@ -308,7 +315,8 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
       saveState(leaf.path, { ...state, attempts: { ...state.attempts, [slot]: 2 } });
       continue;
     }
-    if (pane.agent !== null && pane.agent_session?.value === state.prompted[slot]) return;
+    if (pane.agent !== null && state.prompted[slot] !== undefined && pane.agent_session?.value === state.prompted[slot])
+      return;
     if (state.attempts[slot] >= 3) {
       await commitMove(repo, leaf, state, 'failed', slot);
       return;
@@ -328,7 +336,7 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
         '--pane',
         pane.pane_id,
         '--timeout',
-        '5000',
+        '30000',
         '--',
         ...harness.args,
       ]);
@@ -396,7 +404,7 @@ async function dispatchLeaf(
         if (state.phase === 'merge') {
           const mergeSeat: Slot = seatFor(state, 'A');
           const active: boolean = (await panes()).some(
-            (pane) => pane.pane_id === state.pane[mergeSeat] && pane.agent !== null && pane.agent_status === 'working',
+            (pane) => pane.pane_id === state.pane[mergeSeat] && pane.agent !== null && busy(pane),
           );
           if (active) return 'waiting';
         }

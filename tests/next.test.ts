@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, leaf, yaml, fakeGh, type GhFixture, type Fixture } from './helpers';
-import { readState, saveState } from '../src/state';
+import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import type { Database } from './fake-herdr';
@@ -841,3 +841,168 @@ test('recovery fetch deadline releases dispatch locks without transitioning', as
   expect(result.stderr).toBe('');
   expect(result.stdout).toContain('"stateUnchanged":true');
 }, 10000);
+
+for (const session of [null, undefined]) {
+  test(`next prompts an idle agent with ${session === null ? 'null' : 'omitted'} session data`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const path: string = leaf(f, 'sessionless', 'plan.synthesis');
+      expect((await next(f, ['sessionless'])).code).toBe(0);
+      resetPrompts(f, path);
+      const db: Database = database(f);
+      saveDatabase(f, {
+        ...db,
+        panes: db.panes.map((pane) => ({ ...pane, agent_session: session })),
+      });
+      expect((await next(f, ['sessionless'])).code).toBe(0);
+      expect(database(f).prompts).toEqual([
+        { pane: readState(path).pane.B!, text: 'plan-issue sessionless slot=B phase=plan.synthesis' },
+      ]);
+      expect(database(f).starts).toHaveLength(1);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+for (const seat of ['A', 'B'] as const) {
+  test(`blocked merge seat ${seat} prevents fetch and clean checks in a dirty worktree`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const remote: string = resolve(f.home, 'remote.git');
+      await command(['git', 'init', '--bare', remote]);
+      await command(['git', 'remote', 'add', 'origin', remote], f.root);
+      await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+      const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
+      expect((await next(f, ['blocked-merge'])).code).toBe(0);
+      const state: State = readState(path);
+      writeFileSync(resolve(state.worktree!, 'unfinished'), 'dirty merge work\n');
+      saveState(path, { ...state, phase: 'merge', attempts: { A: seat === 'A' ? 1 : 2, B: 0 } });
+      const db: Database = database(f);
+      saveDatabase(f, {
+        ...db,
+        panes: db.panes.map((pane) => ({
+          ...pane,
+          agent: 'fake',
+          agent_status: pane.pane_id === state.pane[seat] ? 'blocked' : 'idle',
+        })),
+      });
+      const realGit: string = await command(['sh', '-c', 'command -v git']);
+      const gitLog: string = resolve(f.home, 'git.calls');
+      writeFileSync(
+        resolve(f.home, 'bin/git'),
+        '#!/bin/sh\nprintf "%s\\n" "$*" >> "$GIT_CALL_LOG"\nexec "$REAL_GIT" "$@"\n',
+        { mode: 0o755 },
+      );
+      const before: State = readState(path);
+      const result: Result = await next(f, ['blocked-merge'], { REAL_GIT: realGit, GIT_CALL_LOG: gitLog });
+      const gitCalls: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');
+      expect(gitCalls.some((args) => args.startsWith('fetch '))).toBe(false);
+      expect(gitCalls).not.toContain('status --porcelain');
+      expect(result.code).toBe(0);
+      expect(readState(path)).toEqual(before);
+      expect(database(f).prompts).toEqual(db.prompts);
+      expect(database(f).starts).toEqual(db.starts);
+      expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+for (const missing of ['neither', 'A', 'B', 'both'] as const) {
+  test(`recorded seats stay authoritative with an extra pane first and ${missing} missing`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const path: string = leaf(f, 'seats', 'plan.synthesis');
+      expect((await next(f, ['seats'])).code).toBe(0);
+      resetPrompts(f, path);
+      const state: State = readState(path);
+      const db: Database = database(f);
+      saveDatabase(f, {
+        ...db,
+        panes: [
+          { ...db.panes[0], pane_id: 'operator' },
+          ...db.panes.filter(
+            (pane) => missing === 'neither' || (missing !== 'both' && pane.pane_id !== state.pane[missing]),
+          ),
+        ],
+      });
+      const before: number = calls(f).length;
+      expect((await next(f, ['seats'])).code).toBe(0);
+      const allocated: State = readState(path);
+      const invoked: string[][] = calls(f).slice(before);
+      const splits: string[][] = invoked.filter((args) => args[0] === 'pane' && args[1] === 'split');
+      expect(splits).toHaveLength(missing === 'neither' ? 0 : missing === 'both' ? 2 : 1);
+      for (const slot of ['A', 'B'] as const) {
+        expect(allocated.pane[slot]).not.toBe('operator');
+        if (missing !== slot && missing !== 'both') expect(allocated.pane[slot]).toBe(state.pane[slot]);
+        else expect(allocated.pane[slot]).not.toBe(state.pane[slot]);
+      }
+      if (missing === 'A' || missing === 'B') expect(splits[0][2]).toBe(state.pane[missing === 'A' ? 'B' : 'A']!);
+      if (missing === 'both') expect(splits.map((args) => args[2])).toEqual(['operator', allocated.pane.A!]);
+      expect(database(f).prompts.at(-1)?.pane).toBe(allocated.pane.B);
+      expect(invoked.filter((args) => args[0] === 'agent').every((args) => !args.includes('operator'))).toBe(true);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+for (const edge of ['interrupted', 'empty', 'recreated'] as const) {
+  test(`allocation handles an ${edge} tab`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const path: string = leaf(f, 'allocation', 'plan.synthesis');
+      saveDatabase(f, { ...database(f), failSplitOnce: edge === 'interrupted' });
+      expect((await next(f, ['allocation'])).code).toBe(edge === 'interrupted' ? 1 : 0);
+      const state: State = readState(path);
+      const db: Database = database(f);
+      saveDatabase(f, {
+        ...db,
+        tabs: edge === 'recreated' ? [] : db.tabs,
+        panes: edge === 'interrupted' ? [...db.panes, { ...db.panes[0], pane_id: 'operator' }] : [],
+      });
+      const before: number = calls(f).length;
+      const result: Result = await next(f, ['allocation']);
+      if (edge === 'empty') {
+        expect(result.code).toBe(1);
+        expect(result.stderr).toContain(state.tab!);
+        expect(database(f).panes).toHaveLength(0);
+      } else {
+        expect(result.code).toBe(0);
+        const allocated: State = readState(path);
+        const updated: Database = database(f);
+        expect(allocated.pane.A).toBe(updated.panes[0].pane_id);
+        expect(allocated.pane.B).not.toBe('operator');
+        expect(
+          calls(f)
+            .slice(before)
+            .filter((args) => args[0] === 'pane' && args[1] === 'split'),
+        ).toHaveLength(1);
+        expect(updated.prompts.at(-1)?.pane).toBe(allocated.pane.B);
+        if (edge === 'recreated') {
+          expect(allocated.tab).not.toBe(state.tab);
+          expect(allocated.pane.A).not.toBe(state.pane.A);
+          expect(allocated.pane.B).not.toBe(state.pane.B);
+        }
+      }
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+test('agent start allows 30 seconds while prompt wait remains 5 seconds', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'timeouts', 'plan.synthesis');
+    expect((await next(f, ['timeouts'])).code).toBe(0);
+    const start: string[] = database(f).starts[0];
+    expect(start[start.indexOf('--timeout') + 1]).toBe('30000');
+    const prompt: string[] = calls(f).find((args) => args[0] === 'agent' && args[1] === 'prompt')!;
+    expect(prompt.slice(4)).toEqual(['--wait', '--until', 'working', '--timeout', '5000']);
+  } finally {
+    f.clean();
+  }
+});
