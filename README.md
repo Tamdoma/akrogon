@@ -26,6 +26,8 @@ akrogon config
 
 Initialization writes `issues/config.yaml`, creates `issues/open` and the lessons scaffold, adds generated-path ignore entries and registers the repository in the machine configuration. Repeat setup preserves existing choices. For repositories without tests, `--toolkit <lang>=<runner>` records a toolkit choice without installing dependencies. `akrogon config` shows the effective machine and repository settings.
 
+The registration key in the machine configuration is persistent repository identity and must match each leaf’s `repo` value. Its registered directory path may change independently while keeping the same key. Changing the repository root or `worktree_root` requires manual reconciliation of existing worktree locations, Git metadata and recorded `state.worktree` paths before dispatch can resume.
+
 This repository's [reference index](REFERENCE.md) links its areas.
 
 ## Command

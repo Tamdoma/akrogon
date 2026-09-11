@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSync, renameSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, entry, leaf, yaml, fakeGh, type GhFixture, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
@@ -870,6 +870,99 @@ for (const invalid of ['duplicate', 'mismatch']) {
     }
   });
 }
+
+test('next selection and sweep report both repo keys without dispatching or changing the mismatched leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'wrong-key', 'plan.synthesis', { repo: 'other' });
+    const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
+    const selected: Result = await next(f, ['wrong-key']);
+    expect(selected.code).not.toBe(0);
+    expect(database(f).prompts).toHaveLength(0);
+    leaf(f, 'healthy', 'plan.synthesis');
+    const sweep: Result = await next(f, ['--all']);
+    expect(sweep.code).not.toBe(0);
+    for (const result of [selected, sweep]) {
+      const diagnostic: z.infer<typeof skipSchema> = skips(result).find((skip) => skip.path === path)!;
+      expect(diagnostic.repo).toBe('repo');
+      expect(diagnostic.error).toContain(path);
+      expect(diagnostic.error).toMatch(/stored[^\n]*other/i);
+      expect(diagnostic.error).toMatch(/registered[^\n]*repo/i);
+    }
+    expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
+      'plan-issue healthy slot=B phase=plan.synthesis',
+    ]);
+    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
+    expect(existsSync(resolve(f.root, 'issues/worktrees/wrong-key'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+for (const moved of ['worktree root', 'repo root'] as const) {
+  test(`changed ${moved} reports recorded and expected worktrees without creating or prompting`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const recorded: string = resolve(f.root, 'issues/worktrees/relocated');
+      await command(['git', 'worktree', 'add', '-b', 'relocated', recorded], f.root);
+      leaf(f, 'relocated', 'plan.synthesis', { worktree: recorded });
+      const root: string = moved === 'repo root' ? resolve(f.home, 'moved-repo') : f.root;
+      const worktreeRoot: string = moved === 'worktree root' ? 'issues/new-worktrees' : 'issues/worktrees';
+      if (moved === 'repo root') renameSync(f.root, root);
+      else yaml(resolve(root, 'issues/config.yaml'), { worktree_root: worktreeRoot });
+      configure(f, { repos: { repo: root } });
+      const relocated: DispatchFixture = { ...f, root };
+      const path: string = resolve(root, 'issues/open/issue/relocated');
+      const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
+      const expected: string = resolve(root, worktreeRoot, 'relocated');
+      const existing: boolean = existsSync(expected);
+      const worktrees: string = await command(['git', 'worktree', 'list', '--porcelain'], root);
+      const result: Result = await next(relocated, ['relocated']);
+      expect(result.code).not.toBe(0);
+      expect(skips(result)).toHaveLength(1);
+      const error: string = skips(result)[0].error;
+      expect(error).toContain(recorded);
+      expect(error).toContain(expected);
+      expect(error).toMatch(/recorded/i);
+      expect(error).toMatch(/expected/i);
+      expect(error).toMatch(/move/i);
+      expect(error).toMatch(/restore/i);
+      expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
+      expect(existsSync(expected)).toBe(existing);
+      expect(await command(['git', 'worktree', 'list', '--porcelain'], root)).toBe(worktrees);
+      expect(database(f).prompts).toHaveLength(0);
+      expect(database(f).tabs).toHaveLength(0);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+test('moving a repo with the same registered key supports status, phase and dispatch without a recorded worktree', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'movable', 'plan.synthesis');
+    const root: string = resolve(f.home, 'moved-repo');
+    renameSync(f.root, root);
+    configure(f, { repos: { repo: root } });
+    const moved: DispatchFixture = { ...f, root };
+    const status: Result = await cli(moved, ['status', 'movable']);
+    expect(status.code).toBe(0);
+    expect(status.stdout).toContain('repo: repo');
+    expect((await cli(moved, ['phase', 'movable', 'implement', '--slot', 'B'])).code).toBe(0);
+    expect((await next(moved, ['movable'])).code).toBe(0);
+    const state: State = readState(resolve(root, 'issues/open/issue/movable'));
+    expect(state.repo).toBe('repo');
+    expect(state.phase).toBe('implement');
+    expect(state.worktree).toBe(resolve(root, 'issues/worktrees/movable'));
+    expect(await command(['git', 'branch', '--show-current'], state.worktree)).toBe('movable');
+    expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
+      'implement-issue movable slot=B phase=implement',
+    ]);
+  } finally {
+    f.clean();
+  }
+});
 
 test('unknown directory population reserves all new capacity but allows existing tabs', async () => {
   const f: DispatchFixture = await dispatchFixture();

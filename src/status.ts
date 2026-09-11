@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { expandPath, globalHome, readGlobal, readRepo, requireRepo, type GlobalConfig, type Repo } from './config';
-import { findLeaf, readState, stateSchema, type Leaf, type State } from './state';
+import { findLeaf, readState, stateSchema, RepoMismatchError, type Leaf, type State } from './state';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
 import { issueFolders } from './park';
 
@@ -45,7 +45,7 @@ function scanRepo(name: string, registeredPath: string): Scan {
       if (entries.some((entry) => entry.name === 'state.yaml')) {
         path = resolve(folder, 'state.yaml');
         const state: State = readState(folder);
-        z.literal(repo.name).parse(state.repo);
+        if (state.repo !== repo.name) throw new RepoMismatchError(folder, state.repo, repo.name);
         stateSchema.shape.slug.refine((slug) => !slugs.has(slug), 'Duplicate leaf slug').parse(state.slug);
         slugs.add(state.slug);
         return [{ path: folder, state }];
@@ -61,6 +61,7 @@ function scanRepo(name: string, registeredPath: string): Scan {
     return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log: readLog(repo.root) };
   } catch (error) {
     if (
+      error instanceof RepoMismatchError ||
       error instanceof z.ZodError ||
       error instanceof SyntaxError ||
       (error instanceof Error && 'code' in error && typeof error.code === 'string' && /^E[A-Z]+$/.test(error.code))

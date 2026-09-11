@@ -15,7 +15,16 @@ import {
   type Repo,
   type GlobalConfig,
 } from './config';
-import { readState, saveState, withLock, withRepoLock, withLeafLocks, type Leaf, type State } from './state';
+import {
+  readState,
+  saveState,
+  RepoMismatchError,
+  withLock,
+  withRepoLock,
+  withLeafLocks,
+  type Leaf,
+  type State,
+} from './state';
 import { requiredSlots, routing, type Slot } from './routing';
 import {
   herdr,
@@ -86,7 +95,7 @@ function discover(repo: Repo, invocation: Invocation): Inventory {
     if (entries.some((entry) => entry.name === 'state.yaml')) {
       try {
         const state: State = readState(path);
-        if (state.repo !== repo.name) throw new Error(`Leaf repo mismatch: ${path}`);
+        if (state.repo !== repo.name) throw new RepoMismatchError(path, state.repo, repo.name);
         result.leaves.push({ path, state });
       } catch (error) {
         if (!(error instanceof Error)) throw error;
@@ -215,7 +224,9 @@ function launch(global: GlobalConfig, slot: Slot): { kind: string; args: string[
 async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
   const path: string = resolve(repo.root, repo.config.worktree_root, leaf.state.slug);
   if (leaf.state.worktree !== undefined && leaf.state.worktree !== path)
-    throw new Error(`Worktree path mismatch: ${leaf.state.worktree}`);
+    throw new Error(
+      `Worktree path mismatch: recorded "${leaf.state.worktree}", expected "${path}". Move the worktree to the expected path and reconcile Git metadata and state.worktree, or restore the previous repository/worktree root.`,
+    );
   if (existsSync(path)) {
     if (realpathSync(await command(['git', 'rev-parse', '--show-toplevel'], path)) !== realpathSync(path))
       throw new Error(`Not a worktree root: ${path}`);

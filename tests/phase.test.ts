@@ -10,6 +10,25 @@ import { z } from 'zod';
 function bytes(path: string): string {
   return readFileSync(resolve(path, 'state.yaml'), 'utf8');
 }
+test('valid phase transition rejects a mismatched repo key without changing state or history', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'wrong-key', 'plan.synthesis', { repo: 'other' });
+    const before: string = bytes(path);
+    const history: string = resolve(f.root, 'issues/log.jsonl');
+    writeFileSync(history, '');
+    const result: Result = await cli(f, ['phase', 'wrong-key', 'implement', '--slot', 'B']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain(path);
+    expect(result.stderr).toMatch(/stored[^\n]*other/i);
+    expect(result.stderr).toMatch(/registered[^\n]*repo/i);
+    expect(bytes(path)).toBe(before);
+    expect(readFileSync(history, 'utf8')).toBe('');
+  } finally {
+    f.clean();
+  }
+});
+
 test('real same-slot and different-slot races record once and refuse stale moves unchanged', async () => {
   const f: Fixture = await fixture();
   try {

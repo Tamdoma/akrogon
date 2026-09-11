@@ -37,6 +37,12 @@ export type State = z.infer<typeof stateSchema>;
 
 export type Leaf = { path: string; state: State };
 
+export class RepoMismatchError extends Error {
+  constructor(path: string, stored: string, registered: string) {
+    super(`Leaf repo mismatch at ${path}: stored key "${stored}", registered key "${registered}"`);
+  }
+}
+
 export function readState(path: string): State {
   return stateSchema.parse(Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8')));
 }
@@ -58,7 +64,7 @@ export function allLeaves(repo: Repo): Leaf[] {
   const slugs: Set<string> = new Set();
   for (const leaf of leaves) {
     if (slugs.has(leaf.state.slug)) throw new Error(`Duplicate leaf slug: ${leaf.state.slug}`);
-    if (leaf.state.repo !== repo.name) throw new Error(`Leaf repo mismatch: ${leaf.path}`);
+    if (leaf.state.repo !== repo.name) throw new RepoMismatchError(leaf.path, leaf.state.repo, repo.name);
     slugs.add(leaf.state.slug);
   }
   return leaves;

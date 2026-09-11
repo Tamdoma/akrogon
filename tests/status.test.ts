@@ -235,6 +235,35 @@ test('incomplete repositories report exact paths before readable trees and exit 
   }
 });
 
+test('repo mismatch identifies both keys in overview and detail while healthy repos remain visible', async () => {
+  const f: Fixture = await fixture();
+  const g: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'wrong-key', 'plan.synthesis', { repo: 'other' });
+    leaf(g, 'visible', 'implement', { repo: 'healthy' });
+    register(f, { repo: f.root, healthy: g.root });
+    const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
+    const overview: Result = await cli(f, ['status']);
+    expect(overview.code).not.toBe(0);
+    const diagnostic: { unreadable: string; path: string; error: string } = z
+      .object({ unreadable: z.string(), path: z.string(), error: z.string() })
+      .parse(JSON.parse(overview.stdout.split('\n')[0]));
+    expect(diagnostic).toMatchObject({ unreadable: 'repo', path: resolve(path, 'state.yaml') });
+    expect(overview.stdout).toContain('visible');
+    const detail: Result = await cli(f, ['status', 'wrong-key']);
+    expect(detail.code).not.toBe(0);
+    for (const error of [diagnostic.error, detail.stderr]) {
+      expect(error).toContain(path);
+      expect(error).toMatch(/stored[^\n]*other/i);
+      expect(error).toMatch(/registered[^\n]*repo/i);
+    }
+    expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
+  } finally {
+    f.clean();
+    g.clean();
+  }
+});
+
 test('overview rejects repo mismatches and duplicate slugs within an open repo', async () => {
   const f: Fixture = await fixture();
   try {
