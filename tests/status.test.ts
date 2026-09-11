@@ -213,12 +213,19 @@ test('incomplete repositories report exact paths before readable trees and exit 
     rmSync(history, { recursive: true });
     const open: string = resolve(f.root, 'issues/open');
     rmSync(open, { recursive: true });
-    await verify(open);
+    mkdirSync(resolve(f.root, 'issues/parked/resting'), { recursive: true });
+    for (const make of [(): void => undefined, (): void => mkdirSync(open)]) {
+      make();
+      const empty: Result = await cli(f, ['status'], f.home);
+      expect(empty.code).toBe(0);
+      expect(empty.stdout).not.toContain('unreadable');
+      expect(empty.stdout.split('\n').slice(0, 3)).toEqual(['bad', '  parked  resting', 'good']);
+    }
+    rmSync(open, { recursive: true });
     writeFileSync(open, 'file');
     await verify(open);
     rmSync(open);
     mkdirSync(open);
-    expect((await cli(f, ['status'], f.home)).code).toBe(0);
     const missing: string = resolve(f.home, 'missing');
     register(f, { bad: missing, good: g.root });
     await verify(missing);

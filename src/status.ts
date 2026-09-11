@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, type Dirent } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { expandPath, globalHome, readGlobal, readRepo, requireRepo, type GlobalConfig, type Repo } from './config';
@@ -55,7 +55,8 @@ function scanRepo(name: string, registeredPath: string): Scan {
         .sort((a, b) => a.name.localeCompare(b.name))
         .flatMap((entry) => walk(resolve(folder, entry.name)));
     }
-    const leaves: Leaf[] = walk(resolve(repo.root, 'issues/open'));
+    const open: string = resolve(repo.root, 'issues/open');
+    const leaves: Leaf[] = existsSync(open) ? walk(open) : [];
     path = resolve(repo.root, 'issues/log.jsonl');
     return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log: readLog(repo.root) };
   } catch (error) {
@@ -149,7 +150,7 @@ export async function statusCommand(slug: string | undefined): Promise<void> {
   for (const scan of scans) {
     if (!scan.ok) continue;
     console.log(scan.repo.name);
-    console.log(render([['  LEAF', ...header.slice(1)], ...rows(scan, now)]).join('\n'));
+    if (scan.leaves.length > 0) console.log(render([['  LEAF', ...header.slice(1)], ...rows(scan, now)]).join('\n'));
     if (scan.parked.length > 0) console.log(`  parked  ${scan.parked.join(', ')}`);
   }
   if (scans.some((scan) => !scan.ok)) process.exitCode = 1;

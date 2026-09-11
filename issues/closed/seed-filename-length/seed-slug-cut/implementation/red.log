@@ -1,0 +1,56 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 1 changed file, running 1/8 test files
+
+tests/pull.test.ts:
+65 |     expect(files['1-renamed-title.md']).toContain('# Renamed ../ title');
+66 |     expect(files['1-renamed-title.md']).toContain('acme/project#1');
+67 |     expect(files['1-renamed-title.md']).toContain('https://github.com/acme/project/issues/1');
+68 |     expect(files['1-renamed-title.md']).toContain(body);
+69 |     expect(files['101-issue.md']).not.toContain('null');
+70 |     expect(files[`102-${'x'.repeat(40)}.md`]).toBeDefined();
+                                                   ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/seed-slug-cut/tests/pull.test.ts:70:47)
+(fail) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [69.22ms]
+100 |       issue(110, `${'X'.repeat(39)} tail`),
+101 |     ];
+102 |     script(gh, [{ stdout: JSON.stringify([issues]), args: listingArgs }]);
+103 |     expect((await cli(f, ['pull'], f.root, gh.env)).code).toBe(0);
+104 |     const names: string[] = Object.keys(snapshot(f));
+105 |     expect(names).toEqual([
+                        ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "104-alpha-bravo-charlie-delta-echo-foxtrot.md",
+-   "105-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.md",
+-   "106-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.md",
++   "104-alpha-bravo-charlie-delta-echo-foxtrot-golf-hotel.md",
++   "105-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.md",
++   "106-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-tail.md",
+    "107-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.md",
+    "108-alpha-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.md",
+-   "109-alpha-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.md",
+-   "110-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.md",
++   "109-alpha-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-tail.md",
++   "110-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-tail.md",
+  ]
+
+- Expected  - 5
++ Received  + 5
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/seed-slug-cut/tests/pull.test.ts:105:19)
+(fail) pull caps slugs at word boundaries and hard cuts oversized first words [61.54ms]
+(pass) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [341.15ms]
+(pass) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [255.27ms]
+(pass) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [176.86ms]
+(pass) concurrent pulls serialize listing and reconciliation [296.98ms]
+(pass) startup runs pull all before next all and wrappers forward arguments [9.49ms]
+
+ 5 pass
+ 2 fail
+ 57 expect() calls
+Ran 7 tests across 1 file. [1233.00ms]

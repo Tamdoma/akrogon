@@ -1,0 +1,16 @@
+bun test v1.4.0 (34cbb9a40)
+--changed: 2 changed files, running 1/8 test files
+
+tests/pull.test.ts:
+(pass) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [186.44ms]
+(pass) pull caps slugs at word boundaries and hard cuts oversized first words [67.49ms]
+(pass) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [354.28ms]
+(pass) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [259.91ms]
+(pass) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [171.01ms]
+(pass) concurrent pulls serialize listing and reconciliation [296.94ms]
+(pass) startup runs pull all before next all and wrappers forward arguments [8.60ms]
+
+ 7 pass
+ 0 fail
+ 77 expect() calls
+Ran 7 tests across 1 file. [1366.00ms]
