@@ -1,5 +1,5 @@
-import { lstatSync, mkdirSync, readdirSync, readlinkSync, symlinkSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs';
+import { dirname, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { readGlobal, toolRoot, type GlobalConfig } from './config';
 import { command, quote } from './shell';
@@ -8,18 +8,30 @@ type Link = { source: string; destination: string };
 
 export async function install(): Promise<void> {
   const global: GlobalConfig = readGlobal();
+  const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
   const skills: string[] = readdirSync(resolve(toolRoot, 'skills'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
   const links: Link[] = [
     { source: resolve(toolRoot, 'src/akrogon.ts'), destination: resolve(homedir(), '.local/bin/akrogon') },
-    ...['.claude/skills', '.agents/skills'].flatMap((root) =>
+    ...roots.flatMap((root) =>
       skills.map((skill) => ({
         source: resolve(toolRoot, 'skills', skill),
         destination: resolve(homedir(), root, skill),
       })),
     ),
   ];
+  const ownedPrefix: string = resolve(toolRoot, 'skills') + sep;
+  for (const root of roots) {
+    const directory: string = resolve(homedir(), root);
+    if (!existsSync(directory)) continue;
+    for (const entry of readdirSync(directory)) {
+      const path: string = resolve(directory, entry);
+      if (!lstatSync(path).isSymbolicLink()) continue;
+      const target: string = resolve(dirname(path), readlinkSync(path));
+      if (target.startsWith(ownedPrefix) && !existsSync(target)) unlinkSync(path);
+    }
+  }
   const conflicts: Link[] = links.filter((link) => {
     const info = lstatSync(link.destination, { throwIfNoEntry: false });
     return (

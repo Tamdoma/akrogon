@@ -47,6 +47,14 @@ if (args[0] === 'notification' && args[1] === 'show') {
   if (db.failNotification) failure('fixture_notification_failed');
   result({});
 }
+if (args[0] === 'integration' && args[1] === 'install') {
+  z.tuple([z.literal('integration'), z.literal('install'), z.string().min(1)]).parse(args);
+  result({});
+}
+if (args[0] === 'plugin' && args[1] === 'link') {
+  z.tuple([z.literal('plugin'), z.literal('link'), z.string().min(1)]).parse(args);
+  result({});
+}
 if (args[0] === 'pane' && args[1] === 'list') result({ panes: db.panes });
 if (args[0] === 'pane' && args[1] === 'get') result({ pane: pane(args[2]) });
 if (args[0] === 'tab' && args[1] === 'list') result({ tabs: db.tabs });
