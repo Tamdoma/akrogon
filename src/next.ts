@@ -300,12 +300,12 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     '--env',
     `AKROGON_BASE=${await base(repo, worktree)}`,
     '--no-focus',
-    ...(workspace === undefined ? [] : ['--workspace', workspace]),
   ];
+  const target: string[] = workspace === undefined ? [] : ['--workspace', workspace];
   const tab: Tab =
     matches.length === 1
       ? matches[0]
-      : (await herdr(['tab', 'create', '--label', state.slug, ...placement], z.object({ tab: tabSchema }))).tab;
+      : (await herdr(['tab', 'create', '--label', state.slug, ...placement, ...target], z.object({ tab: tabSchema }))).tab;
   const tabState: State = { ...state, tab: tab.tab_id };
   saveState(leaf.path, tabState);
   const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === tab.tab_id);
