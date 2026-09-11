@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename, relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { type RepoConfig, type GlobalConfig, globalHome, readGlobal, repoSchema } from './config';
+import { type RepoConfig, type GlobalConfig, globalHome, readGlobal, repoSchema, within } from './config';
 import { command, writeYaml } from './shell';
 
 export function writeRepoConfig(root: string, config: RepoConfig): void {
@@ -35,9 +35,12 @@ export async function initialize(
   if (!existsSync(lessons)) writeFileSync(lessons, '# Lessons\n');
   const ignore: string = resolve(root, '.gitignore');
   const prior: string = existsSync(ignore) ? readFileSync(ignore, 'utf8') : '';
-  const additions: string[] = ['issues/worktrees/', 'issues/seeds/', '.lock'].filter(
-    (line) => !prior.split('\n').includes(line),
-  );
+  const worktreeRoot: string = resolve(root, config.worktree_root);
+  const additions: string[] = [
+    ...(worktreeRoot !== root && within(worktreeRoot, root) ? [`${relative(root, worktreeRoot)}/`] : []),
+    'issues/seeds/',
+    '.lock',
+  ].filter((line) => !prior.split('\n').includes(line));
   if (additions.length > 0)
     writeFileSync(ignore, prior + (prior !== '' && !prior.endsWith('\n') ? '\n' : '') + additions.join('\n') + '\n');
   writeYaml(resolve(globalHome(), 'config.yaml'), {
