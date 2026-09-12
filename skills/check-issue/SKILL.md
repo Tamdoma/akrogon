@@ -38,7 +38,7 @@ Compare tests with acceptance criteria and reject mocks of the unit under test a
 
 All `checks` commands block, optional `advisory` failures are Nits, and a report gap blocks only when material to correctness or verification.
 
-Rerun checks only for a code change, missing evidence or a specific concern, leaving doc/index authorship with B and recording any reusable lesson found here as one active mechanism/date/history line plus a history file with case, evidence and learning.
+Rerun checks only for a code change, missing evidence or a specific concern, leaving doc/index authorship with B and recording any reusable lesson found here as one active mechanism/date/history line plus a history file with case, evidence and learning, committed on the leaf branch because `akrogon phase` refuses a dirty worktree.
 
 On re-check after `check.fix`, inspect only the repair diff from the prior reviewed head (or recorded rebase/conflict baseline), append A's results to `review-A.md`, confirm earlier findings and add a blocking finding only for a defect introduced by the repair.
 

@@ -86,6 +86,10 @@ export const tabSchema = z.object({ tab_id: z.string(), label: z.string() });
 
 export type Tab = z.infer<typeof tabSchema>;
 
+export const workspaceSchema = z.object({ workspace_id: z.string(), label: z.string() });
+
+export type Workspace = z.infer<typeof workspaceSchema>;
+
 export async function herdr<T>(args: string[], schema: z.ZodType<T>): Promise<T> {
   const argv: string[] = ['herdr', ...args];
   const cwd: string = process.cwd();
@@ -104,4 +108,8 @@ export async function panes(): Promise<Pane[]> {
 
 export async function tabs(): Promise<Tab[]> {
   return (await herdr(['tab', 'list'], z.object({ tabs: z.array(tabSchema) }))).tabs;
+}
+
+export async function workspaces(): Promise<Workspace[]> {
+  return (await herdr(['workspace', 'list'], z.object({ workspaces: z.array(workspaceSchema) }))).workspaces;
 }

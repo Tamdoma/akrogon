@@ -1,11 +1,15 @@
 #!/usr/bin/env bun
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { z } from 'zod';
-import { paneSchema, tabSchema, type Pane, type Tab } from '../src/shell';
+import { paneSchema, tabSchema, workspaceSchema, type Pane, type Tab } from '../src/shell';
 
 const databaseSchema = z.object({
   panes: z.array(paneSchema),
   tabs: z.array(tabSchema),
+  workspaces: z.array(workspaceSchema).default([
+    { workspace_id: 'w1', label: 'repo' },
+    { workspace_id: 'w3', label: 'other' },
+  ]),
   serial: z.number(),
   paneListStdout: z.string().optional(),
   failPrompts: z.boolean().default(false),
@@ -65,6 +69,7 @@ if (args[0] === 'pane' && args[1] === 'list') {
 }
 if (args[0] === 'pane' && args[1] === 'get') result({ pane: pane(args[2]) });
 if (args[0] === 'tab' && args[1] === 'list') result({ tabs: db.tabs });
+if (args[0] === 'workspace' && args[1] === 'list') result({ workspaces: db.workspaces });
 if (args[0] === 'tab' && args[1] === 'create') {
   const workspace: string = args.includes('--workspace') ? flag('--workspace') : 'w1';
   const tab: Tab = { tab_id: `${workspace}:t${++db.serial}`, label: flag('--label') };

@@ -74,6 +74,7 @@ export async function pullRepo(repo: Repo): Promise<void> {
     for (const entry of readdirSync(seeds, { withFileTypes: true }))
       if (entry.isFile() && /^\d+-.*\.md$/.test(entry.name) && !desired.has(entry.name))
         unlinkSync(resolve(seeds, entry.name));
+    console.log(`${repo.name}: ${desired.size} open issues pulled`);
   });
 }
 

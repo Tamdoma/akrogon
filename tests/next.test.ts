@@ -418,9 +418,9 @@ test('a closed tab hook from a merged leaf sweeps and starts the next leaf', asy
       ...db,
       tabs: db.tabs.filter((item) => item.tab_id !== tab),
       panes: db.panes.filter((pane) => pane.tab_id !== tab),
+      workspaces: [{ workspace_id: 'w2', label: 'repo' }],
     });
     const closed: Result = await next(f, [], {
-      HERDR_WORKSPACE_ID: 'w2',
       HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
         event: 'tab_closed',
         data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w2' },

@@ -32,6 +32,7 @@ import {
   herdr,
   panes,
   tabs,
+  workspaces,
   paneSchema,
   tabSchema,
   command,
@@ -41,6 +42,7 @@ import {
   type Pane,
   type Tab,
   type Result,
+  type Workspace,
 } from './shell';
 import { commitMove, completeOwner, recoverMerge } from './phase';
 
@@ -306,9 +308,10 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   }
   const state: State = await ensureWorktree(repo, leaf);
   const worktree: string = z.string().parse(state.worktree);
-  const workspace: string | undefined = process.env.HERDR_WORKSPACE_ID || undefined;
+  const workspace: Workspace | undefined = (await workspaces()).find((item) => item.label === repo.name);
+  if (workspace === undefined) throw new Error(`No herdr workspace labeled ${repo.name}`);
   const placement: string[] = ['--cwd', worktree, '--env', `AKROGON_BASE=${await base(repo, worktree)}`, '--no-focus'];
-  const target: string[] = workspace === undefined ? [] : ['--workspace', workspace];
+  const target: string[] = ['--workspace', workspace.workspace_id];
   const tab: Tab =
     matches.length === 1
       ? matches[0]

@@ -120,10 +120,8 @@ export async function transition(
   if (state.phase !== 'failed' && (slot === undefined || !required.includes(slot)))
     throw new Error('A required --slot is missing or invalid');
   if (slot !== undefined && state.done.includes(slot)) throw new Error(`Slot already recorded: ${slot}`);
-  if (requested === 'check.review' && state.worktree !== undefined) {
-    await requireClean(state.worktree);
-    await requireCodeOnly(repo, state.worktree);
-  }
+  if (state.worktree !== undefined) await requireClean(state.worktree);
+  if (requested === 'check.review' && state.worktree !== undefined) await requireCodeOnly(repo, state.worktree);
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
   const recorded: State = {
