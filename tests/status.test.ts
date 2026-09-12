@@ -274,7 +274,7 @@ test('repo mismatch identifies both keys in overview and detail while healthy re
     leaf(g, 'visible', 'implement', { repo: 'healthy' });
     register(f, { repo: f.root, healthy: g.root });
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
-    const overview: Result = await cli(f, ['status']);
+    const overview: Result = await cli(f, ['status'], f.home);
     expect(overview.code).not.toBe(0);
     const diagnostic: { unreadable: string; path: string; error: string } = z
       .object({ unreadable: z.string(), path: z.string(), error: z.string() })
@@ -403,7 +403,7 @@ for (const nesting of ['', 'invalid', 'epic/issue/extra/invalid']) {
       renameSync(resolve(source, 'state.yaml'), resolve(path, 'state.yaml'));
       rmSync(source, { recursive: true });
       const before: Record<string, string> = snapshot(f.root);
-      const overview: Result = await cli(f, ['status']);
+      const overview: Result = await cli(f, ['status'], f.home);
       expect(overview.code).toBe(1);
       expect(overview.stdout).toContain('"unreadable":"repo"');
       expect(overview.stdout).toContain(resolve(path, 'state.yaml'));
@@ -456,3 +456,31 @@ for (const owner of ['issue', 'epic/issue']) {
     }
   });
 }
+
+test('--charts lists every chart with decided counts, unspecified items, stage and age', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const store: string = resolve(f.root, 'issues/chart');
+    mkdirSync(resolve(store, 'routed/decisions'), { recursive: true });
+    writeFileSync(
+      resolve(store, 'routed/CHART.md'),
+      '# Chart: routed\n\n## Decisions So Far\n- one\n\n## Not Yet Specified\n- a gap\n- another\n\nHanded off 2026-09-11\n',
+    );
+    writeFileSync(resolve(store, 'routed/decisions/one.md'), '# One\n\n## Question\nq\n\n## Resolution\nyes\n');
+    writeFileSync(resolve(store, 'routed/decisions/two.md'), '# Two\n\n## Question\nq\n\n## Resolution\n');
+    mkdirSync(resolve(store, 'blank'), { recursive: true });
+    writeFileSync(resolve(store, 'blank/CHART.md'), '# Chart: blank\n\n## Not Yet Specified\n- None.\n');
+    const result: Result = await cli(f, ['status', '--charts']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).not.toContain('no open leaves');
+    const routed: string = result.stdout.split('\n').find((line) => /^\s*routed\s/.test(line))!;
+    expect(routed).toMatch(/routed\s+1\/2\s+2\s+handed off\s+\d+m$/);
+    const blank: string = result.stdout.split('\n').find((line) => /^\s*blank\s/.test(line))!;
+    expect(blank).toMatch(/blank\s+0\/0\s+0\s+empty\s+\d+m$/);
+    expect((await cli(f, ['status', 'x', '--charts'])).code).not.toBe(0);
+    rmSync(store, { recursive: true });
+    expect((await cli(f, ['status', '--charts'])).stdout).toBe('repo\n  no charts');
+  } finally {
+    f.clean();
+  }
+});

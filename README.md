@@ -40,7 +40,7 @@ This repository's [reference index](docs/reference-index.md) links its areas.
 | `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>]` | Record a lifecycle pass through validated phase transitions. |
 | `akrogon next [<slug>\|<path>\|--all]` | Dispatch eligible work for a leaf, path or all registered repositories. With no argument, use the current directory or Herdr hook context. |
 | `akrogon pull [--all]` | Import open GitHub issues into seeds for the current repository or all registered repositories. |
-| `akrogon status [<slug>]` | Show the registered repository board, or a current-repository leaf's state and recent history. |
+| `akrogon status [<slug>\|--charts]` | Show the current repository's board, every registered repository when run outside one, one leaf's state and recent history, or the chart store with `--charts`. |
 | `akrogon sync` | Commit eligible issue records, rebase and push through the configured remote. |
 | `akrogon park <issue>... \| --all` | Move eligible whole issues to `issues/parked/`. Use top-level issue folder names or `--all`, never both. `--all` skips running issues and prerequisites needed by open work. |
 | `akrogon unpark <issue>... \| --all` | Restore whole issues to `issues/open/`. Use top-level issue folder names or `--all`, never both. Refuse moves that leave open work depending on parked leaves. |

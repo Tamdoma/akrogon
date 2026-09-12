@@ -588,6 +588,18 @@ async function selectLeaves(
   return { repo, leaves: selected };
 }
 
+async function cleanupRepos(repos: Repo[], invocation: Invocation): Promise<void> {
+  for (const repo of repos)
+    for (const leaf of discover(repo, invocation).leaves.filter((leaf) => leaf.state.phase === 'merged')) {
+      try {
+        await cleanupMerged(repo, leaf);
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        report(invocation, repo.name, leaf.path, error, leaf.state.slug);
+      }
+    }
+}
+
 export async function nextCommand(input: string | undefined): Promise<void> {
   const rawEvent: string | undefined = input === undefined ? process.env.HERDR_PLUGIN_EVENT_JSON : undefined;
   const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
@@ -612,19 +624,12 @@ export async function nextCommand(input: string | undefined): Promise<void> {
           );
           if (outcome === 'completed') await sweepAll(global, invocation);
         } else await sweep(global, selection.repo, selection.leaves, invocation);
+        if (input === undefined) await cleanupRepos([selection.repo], invocation);
         return;
       }
       if (input === '--all') {
         await sweepAll(global, invocation);
-        for (const repo of registeredRepos(global, invocation).repos)
-          for (const leaf of discover(repo, invocation).leaves.filter((leaf) => leaf.state.phase === 'merged')) {
-            try {
-              await cleanupMerged(repo, leaf);
-            } catch (error) {
-              if (!(error instanceof Error)) throw error;
-              report(invocation, repo.name, leaf.path, error, leaf.state.slug);
-            }
-          }
+        await cleanupRepos(registeredRepos(global, invocation).repos, invocation);
         return;
       }
       if (event?.event === 'tab_closed') {

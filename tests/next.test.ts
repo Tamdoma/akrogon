@@ -959,6 +959,23 @@ test('dirty merged worktree cleanup reports the original git error and still swe
   }
 }, 15000);
 
+test('bare next from inside the repo cleans up its merged leaves', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const done: string = leaf(f, 'done', 'plan.synthesis', {}, 'done-issue');
+    expect((await next(f, ['done'])).code).toBe(0);
+    const worktree: string = readState(done).worktree!;
+    saveState(done, { ...readState(done), phase: 'merged' });
+    leaf(f, 'healthy', 'plan.synthesis', {}, 'healthy-issue');
+    const result: Result = await next(f, []);
+    expect(result.code).toBe(0);
+    expect(existsSync(worktree)).toBe(false);
+    expect(database(f).prompts.at(-1)?.text).toContain('healthy');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 for (const scope of ['global', 'repo', 'leaf'] as const) {
   test(`${scope} lock acquisition failure is fatal`, async () => {
     const f: DispatchFixture = await dispatchFixture();

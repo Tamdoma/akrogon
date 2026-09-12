@@ -1,7 +1,16 @@
-import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, type Dirent } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
-import { expandPath, globalHome, readGlobal, readRepo, requireRepo, type GlobalConfig, type Repo } from './config';
+import {
+  currentRepo,
+  expandPath,
+  globalHome,
+  readGlobal,
+  readRepo,
+  requireRepo,
+  type GlobalConfig,
+  type Repo,
+} from './config';
 import { findLeaf, readState, stateSchema, RepoMismatchError, validateLeafDepth, type Leaf, type State } from './state';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
 import { issueFolders } from './park';
@@ -110,25 +119,152 @@ function rows(scan: Scan & { ok: true }, now: number): string[][] {
     while (shared < groups.length && shared < previous.length && groups[shared] === previous[shared]) shared++;
     previous = groups;
     return [
-      ...groups.slice(shared).map((group, offset) => [`${'  '.repeat(shared + offset + 1)}${group}`, '', '', '', '']),
-      cells(leaf, scan.log, now, '  '.repeat(groups.length + 1)),
+      ...groups.slice(shared).map((group, offset) => [`${indent(shared + offset)}${group}`, '', '', '', '']),
+      cells(leaf, scan.log, now, indent(groups.length)),
     ];
   });
 }
 
-function render(lines: string[][]): string[] {
-  const widths: number[] = header.map((title, column) =>
-    Math.max(title.length, ...lines.map((line) => line[column].length)),
-  );
-  return lines.map((line) =>
-    header
-      .map((_, column) => line[column].padEnd(widths[column]))
-      .join('  ')
-      .trimEnd(),
-  );
+function indent(depth: number): string {
+  return `  ${'   '.repeat(depth)}`;
 }
 
-export async function statusCommand(slug: string | undefined): Promise<void> {
+const colorEnabled: boolean =
+  process.stdout.isTTY === true && (process.env.NO_COLOR ?? '') === '' && process.env.TERM !== 'dumb';
+
+function paint(code: string, text: string): string {
+  return colorEnabled && code !== '' && text !== '' ? `\x1b[${code}m${text}\x1b[0m` : text;
+}
+
+const phaseColor: Record<string, string> = { plan: '34', implement: '33', check: '35', merge: '32', failed: '31' };
+
+const stageColor: Record<string, string> = { 'handed off': '32', charting: '33', empty: '2' };
+
+function style(title: string, text: string, kind: 'header' | 'group' | 'leaf'): string {
+  if (kind === 'header') return paint('2', text);
+  if (title === 'LEAF' || title === 'CHART') return kind === 'group' ? paint('1', text) : text;
+  if (title === 'PHASE') return paint(phaseColor[text.split('.')[0]] ?? '', text);
+  if (title === 'STAGE') return paint(stageColor[text] ?? '', text);
+  if (title === 'BLOCKED BY') return paint('2', text);
+  return text;
+}
+
+function wrap(text: string, width: number, separator: string): string[] {
+  const lines: string[] = [];
+  for (const token of text.split(separator)) {
+    const last: string | undefined = lines.at(-1);
+    if (last !== undefined && `${last}${separator}${token}`.length <= width)
+      lines[lines.length - 1] = `${last}${separator}${token}`;
+    else lines.push(token);
+  }
+  return lines;
+}
+
+function widths(titles: string[], lines: string[][]): number[] {
+  const natural: number[] = titles.map((title, column) =>
+    Math.max(title.length, ...lines.map((line) => line[column].length)),
+  );
+  const columns: number | undefined = process.stdout.isTTY === true ? process.stdout.columns : undefined;
+  if (columns === undefined || titles !== header) return natural;
+  const budget: number = columns - natural[0] - natural[1] - natural[2] - 8;
+  const half: number = Math.floor(budget / 2);
+  if (natural[3] + natural[4] <= budget || half < 16) return natural;
+  const blocked: number = natural[3] <= half ? natural[3] : Math.max(half, budget - natural[4]);
+  return [natural[0], natural[1], natural[2], blocked, budget - blocked];
+}
+
+function stacked(titles: string[], lines: string[][]): string[] {
+  return lines.slice(1).flatMap((line) => {
+    const kind: 'group' | 'leaf' = line[1] === '' ? 'group' : 'leaf';
+    const pad: string = ' '.repeat(line[0].length - line[0].trimStart().length + 2);
+    return [
+      style(titles[0], line[0], kind),
+      ...titles.slice(1).flatMap((title, offset) => {
+        const text: string = line[offset + 1];
+        return text === '' ? [] : [`${pad}${paint('2', title.toLowerCase())}  ${style(title, text, kind)}`];
+      }),
+    ];
+  });
+}
+
+function render(titles: string[], lines: string[][]): string[] {
+  const width: number[] = widths(titles, lines);
+  const columns: number | undefined = process.stdout.isTTY === true ? process.stdout.columns : undefined;
+  if (columns !== undefined && width.reduce((sum, w) => sum + w + 2, -2) > columns) return stacked(titles, lines);
+  return lines.flatMap((line) => {
+    const kind: 'header' | 'group' | 'leaf' = line[1] === titles[1] ? 'header' : line[1] === '' ? 'group' : 'leaf';
+    const cell: string[][] = line.map((text, column) =>
+      titles[column] === 'BLOCKED BY'
+        ? wrap(text, width[column], ' ')
+        : titles[column] === 'NOTE'
+          ? wrap(text, width[column], ' · ')
+          : [text],
+    );
+    const height: number = Math.max(...cell.map((part) => part.length));
+    return Array.from({ length: height }, (_, row) =>
+      titles
+        .map((title, column) => {
+          const text: string = cell[column][row] ?? '';
+          return `${style(title, text, kind)}${' '.repeat(Math.max(0, width[column] - text.length))}`;
+        })
+        .join('  ')
+        .trimEnd(),
+    );
+  });
+}
+
+const chartHeader: string[] = ['CHART', 'DECIDED', 'UNSPECIFIED', 'STAGE', 'AGE'];
+
+function since(ms: number): string {
+  const minutes: number = Math.max(0, Math.floor(ms / 60000));
+  return minutes < 60
+    ? `${minutes}m`
+    : minutes < 1440
+      ? `${Math.floor(minutes / 60)}h`
+      : `${Math.floor(minutes / 1440)}d`;
+}
+
+function section(markdown: string, title: string): string[] {
+  const body: string | undefined = markdown.split(/^## /m).find((part) => part.startsWith(title));
+  return body === undefined
+    ? []
+    : body
+        .split('\n')
+        .slice(1)
+        .filter((line) => /^\s*[-*]\s*\S/.test(line) && !/^\s*[-*]\s*(none|nothing)\b/i.test(line));
+}
+
+function chartRow(folder: string, name: string, now: number): string[] {
+  const chart: string = resolve(folder, 'CHART.md');
+  const markdown: string = readFileSync(chart, 'utf8');
+  const decisions: string = resolve(folder, 'decisions');
+  const files: string[] = existsSync(decisions) ? readdirSync(decisions).filter((entry) => entry.endsWith('.md')) : [];
+  const resolved: number = files.filter((entry) =>
+    /^## Resolution\s*\n\s*\S/m.test(readFileSync(resolve(decisions, entry), 'utf8')),
+  ).length;
+  const unspecified: number = section(markdown, 'Not Yet Specified').length;
+  const stage: string = /^Handed off\b/m.test(markdown)
+    ? 'handed off'
+    : files.length + unspecified > 0
+      ? 'charting'
+      : 'empty';
+  return [`  ${name}`, `${resolved}/${files.length}`, String(unspecified), stage, since(now - statSync(chart).mtimeMs)];
+}
+
+function chartRows(root: string, now: number): string[][] {
+  const store: string = resolve(root, 'issues/chart');
+  if (!existsSync(store)) return [];
+  const single: boolean = existsSync(resolve(store, 'CHART.md'));
+  return single
+    ? [chartRow(store, 'chart', now)]
+    : readdirSync(store, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && existsSync(resolve(store, entry.name, 'CHART.md')))
+        .map((entry) => entry.name)
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => chartRow(resolve(store, name), name, now));
+}
+
+export async function statusCommand(slug: string | undefined, charts: boolean = false): Promise<void> {
   const global: GlobalConfig = readGlobal();
   if (slug !== undefined) {
     const repo: Repo = await requireRepo(global, process.cwd());
@@ -143,7 +279,9 @@ export async function statusCommand(slug: string | undefined): Promise<void> {
     return;
   }
   const now: number = Date.now();
+  const current: Repo | null = await currentRepo(global, process.cwd());
   const scans: Scan[] = Object.entries(global.repos)
+    .filter(([name]) => current === null || name === current.name)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, path]) => scanRepo(name, path));
   for (const scan of scans) {
@@ -157,8 +295,16 @@ export async function statusCommand(slug: string | undefined): Promise<void> {
   }
   for (const scan of scans) {
     if (!scan.ok) continue;
-    console.log(scan.repo.name);
-    if (scan.leaves.length > 0) console.log(render([['  LEAF', ...header.slice(1)], ...rows(scan, now)]).join('\n'));
+    console.log(paint('1;4', scan.repo.name));
+    if (charts) {
+      const lines: string[][] = chartRows(scan.repo.root, now);
+      if (lines.length > 0)
+        console.log(render(chartHeader, [['  CHART', ...chartHeader.slice(1)], ...lines]).join('\n'));
+      else console.log('  no charts');
+      continue;
+    }
+    if (scan.leaves.length > 0)
+      console.log(render(header, [['  LEAF', ...header.slice(1)], ...rows(scan, now)]).join('\n'));
     else console.log('  no open leaves');
     if (scan.parked.length > 0) console.log(`  parked  ${scan.parked.join(', ')}`);
   }

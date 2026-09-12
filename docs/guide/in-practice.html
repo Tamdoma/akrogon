@@ -70,8 +70,9 @@
     <div class="day">
       <div><h3>Watching</h3><span class="meta">glance, do not stare</span></div>
       <div>
-        <pre><code>akrogon status                 <span class="c"># every repo, every open leaf, phase, age, blockers</span>
+        <pre><code>akrogon status                 <span class="c"># this repo's open leaves, phase, age, blockers; every repo when run outside one</span>
 akrogon status rename-flag     <span class="c"># one leaf's state and last ten log lines</span>
+akrogon status --charts        <span class="c"># every chart: decided/total decisions, unspecified items, stage, age</span>
                                <span class="c"># status also lists parked issues per repo</span>
 herdr plugin log list --plugin akrogon   <span class="c"># why the hook did or did not act</span></code></pre>
         <p>Or read the tab. A on the left, B on the right. Or read the leaf folder: <code>plan.md</code>, <code>review-A.md</code>, <code>review-B.md</code>.</p>

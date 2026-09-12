@@ -13,7 +13,9 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
       ? { slot: { type: 'string' }, verdict: { type: 'string' } }
       : verb === 'next' || verb === 'pull' || verb === 'park' || verb === 'unpark'
         ? { all: { type: 'boolean' } }
-        : {};
+        : verb === 'status'
+          ? { charts: { type: 'boolean' } }
+          : {};
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(3),
@@ -60,8 +62,9 @@ switch (verb) {
     await (await import('./park')).parkCommand(verb, positionals, values.all === true, process.cwd());
     break;
   case 'status':
+    if (values.charts === true && positionals.length !== 0) throw new Error('Use a slug or --charts, not both');
     z.array(z.string()).max(1).parse(positionals);
-    await (await import('./status')).statusCommand(positionals[0]);
+    await (await import('./status')).statusCommand(positionals[0], values.charts === true);
     break;
   case 'install':
     z.tuple([]).parse(positionals);

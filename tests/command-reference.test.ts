@@ -17,7 +17,7 @@ const contracts: Record<string, string> = {
   sync: '',
   park: '<issue>... | --all',
   unpark: '<issue>... | --all',
-  status: '[<slug>]',
+  status: '[<slug>|--charts]',
 };
 
 function commandRows(markdown: string): CommandRow[] {
@@ -92,6 +92,8 @@ test('argument contracts reject lost values, requiredness and exclusive alternat
     ['next', '[<slug>|<path>]'],
     ['pull', '--all'],
     ['status', '<slug>'],
+    ['status', '[<slug>]'],
+    ['status', '--charts'],
     ...['park', 'unpark'].flatMap((verb: string): [string, string][] =>
       ['<issue>...', '--all', '<issue>... --all', '[<issue>... | --all]', '<issue> | --all'].map(
         (args: string): [string, string] => [verb, args],
