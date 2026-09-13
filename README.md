@@ -51,7 +51,7 @@ This repository's [reference index](docs/reference-index.md) links its areas.
 
 | Skill | Purpose |
 | --- | --- |
-| [chart-issues](skills/chart-issues/SKILL.md) | Turn operator notes and imported reports into decisions and leaf contracts. |
+| [chart-issues](skills/chart-issues/SKILL.md) | Turn operator notes and imported reports into forks and leaf contracts. |
 | [plan-issue](skills/plan-issue/SKILL.md) | Write an execution plan, with paired discussion when enabled. |
 | [implement-issue](skills/implement-issue/SKILL.md) | Implement a plan or repair review findings using the configured worker mode. |
 | [check-issue](skills/check-issue/SKILL.md) | Review concrete defects and verify repairs. |

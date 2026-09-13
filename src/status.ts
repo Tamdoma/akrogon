@@ -213,7 +213,7 @@ function render(titles: string[], lines: string[][]): string[] {
   });
 }
 
-const chartHeader: string[] = ['CHART', 'DECIDED', 'UNSPECIFIED', 'STAGE', 'AGE'];
+const chartHeader: string[] = ['CHART', 'TAKEN', 'FOG', 'STAGE', 'AGE'];
 
 function since(ms: number): string {
   const minutes: number = Math.max(0, Math.floor(ms / 60000));
@@ -237,18 +237,14 @@ function section(markdown: string, title: string): string[] {
 function chartRow(folder: string, name: string, now: number): string[] {
   const chart: string = resolve(folder, 'CHART.md');
   const markdown: string = readFileSync(chart, 'utf8');
-  const decisions: string = resolve(folder, 'decisions');
-  const files: string[] = existsSync(decisions) ? readdirSync(decisions).filter((entry) => entry.endsWith('.md')) : [];
-  const resolved: number = files.filter((entry) =>
-    /^## Resolution\s*\n\s*\S/m.test(readFileSync(resolve(decisions, entry), 'utf8')),
+  const forks: string = resolve(folder, 'forks');
+  const files: string[] = existsSync(forks) ? readdirSync(forks).filter((entry) => entry.endsWith('.md')) : [];
+  const taken: number = files.filter((entry) =>
+    /^## Taken\s*\n\s*\S/m.test(readFileSync(resolve(forks, entry), 'utf8')),
   ).length;
-  const unspecified: number = section(markdown, 'Not Yet Specified').length;
-  const stage: string = /^Handed off\b/m.test(markdown)
-    ? 'handed off'
-    : files.length + unspecified > 0
-      ? 'charting'
-      : 'empty';
-  return [`  ${name}`, `${resolved}/${files.length}`, String(unspecified), stage, since(now - statSync(chart).mtimeMs)];
+  const fog: number = section(markdown, 'Fog').length;
+  const stage: string = /^Handed off\b/m.test(markdown) ? 'handed off' : files.length + fog > 0 ? 'charting' : 'empty';
+  return [`  ${name}`, `${taken}/${files.length}`, String(fog), stage, since(now - statSync(chart).mtimeMs)];
 }
 
 function chartRows(root: string, now: number): string[][] {

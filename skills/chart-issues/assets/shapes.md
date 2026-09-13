@@ -8,11 +8,11 @@ Read before creating a chart or handing off. Paths below are relative to the aut
 issues/chart/<chart-slug>/
   CHART.md
   INTAKE.md
-  decisions/<decision-slug>.md
+  forks/<fork-slug>.md
   slots/<pass>.md                 # only for peer exchanges
 ```
 
-Charts stay here after handoff. They have no state.yaml or lifecycle phase. Create decisions/ even for a fully settled direct item. On resume, CHART.md points to the selected decision and its context rather than requiring a full chart reread.
+Charts stay here after handoff. They have no state.yaml or lifecycle phase. Create forks/ even for a fully settled direct item. On resume, CHART.md points to the selected fork and its context rather than requiring a full chart reread.
 
 ```markdown
 # Chart: <destination>
@@ -20,20 +20,20 @@ Charts stay here after handoff. They have no state.yaml or lifecycle phase. Crea
 ## Destination
 <observable outcome>
 
-## Decisions So Far
-- [<decision>](decisions/<decision-slug>.md): <settled answer>
+## Forks taken
+- [<fork>](forks/<fork-slug>.md): <settled answer>
 
-## Open Decisions
-- [<question>](decisions/<decision-slug>.md): <what blocks it, if anything>
+## Forks open
+- [<fork>](forks/<fork-slug>.md): <what blocks it, if anything>
 
-## Not Yet Specified
+## Fog
 <material work in scope whose question cannot yet be stated precisely>
 
-## Out Of Scope
+## Off route
 <excluded work and reasons>
 ```
 
-Preserve useful territory-map findings under the relevant chart section or decision. After valid handoff, append `Handed off <YYYY-MM-DD>` to CHART.md without moving it. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts.
+Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` to CHART.md without moving it. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts.
 
 ```markdown
 # Intake: <chart-slug>
@@ -59,25 +59,25 @@ Preserve useful territory-map findings under the relevant chart section or decis
 <inspected evidence and interpretation, not attributed to the reporter>
 ```
 
-GitHub identity comes from the mirror's `Source: owner/repo#n` line. Compare exact identities against parsed `sources` in all open/closed leaf states and GitHub provenance entries in all chart intakes, including handed-off charts. Compare legacy repo-relative paths against legacy provenance entries, not substrings in report bodies. Deduplicate repeated identities in the current batch too. A local path never enters leaf `sources`. Keep source files unchanged and preserve copied report bytes beneath the source headings. An unsuccessful GitHub refresh supplies no permission to drain a stale mirror.
+GitHub identity comes from the mirror's `Source: owner/repo#n` line. Compare exact identities against parsed `sources` in all open/closed leaf states and GitHub provenance entries in all chart intakes, including handed-off charts. Compare legacy repo-relative paths against legacy provenance entries, not substrings in report bodies. Deduplicate repeated identities in the current intake too. A local path never enters leaf `sources`. Keep source files unchanged and preserve copied report bytes beneath the source headings. An unsuccessful GitHub refresh supplies no permission to drain a stale mirror.
 
 ```markdown
-# <Decision question>
+# <fork title>
 
 ## Question
-<the precise question>
+<one or more Q blocks, each holding the precise question>
 
 ### Carries
-<existing locks, related decision paths and verbatim operator corrections>
+<existing locks, related fork paths and verbatim operator corrections>
 
 ## Findings
 <grounded evidence, independent A/B attribution and remaining disagreements>
 
-## Resolution
+## Taken
 <operator answer verbatim, reason and foreclosed alternatives>
 ```
 
-Unresolved questions have no invented Resolution. A sharp question gets its own file even while blocked. Work whose question is not sharp stays in Not Yet Specified. Ruling work out of scope records the reason in Out Of Scope instead of pretending a route decision was settled. Reshape the remaining questions after each answer.
+One fork file holds one or more questions that are always presented together on one screen. A fork is taken when every material question in it is taken; partial answers stay under `## Findings` and `## Taken` is written only then. A taken fork is never reopened: a correction before handoff is a new fork naming the one it supersedes, the original stays verbatim, and only the effective answer becomes a binding decision. Unresolved questions have no invented Taken. A question sharp enough to travel alone gets its own fork file even while blocked. Work whose question is not sharp stays in Fog. Ruling work out records the reason in Off route instead of pretending a fork was taken. Reshape the remaining questions after each answer.
 
 ## Handoff tree
 
@@ -115,7 +115,7 @@ EPIC.md lists immediate issues, ISSUE.md lists immediate leaves, each one line p
 - [<leaf>](<leaf>/brief.md): <purpose>
 ```
 
-Container indexes hold no lifecycle state or global order. Slugs are lowercase hyphenated words without ordering markers. Leaf slugs are unique across the proposed batch and existing open/closed leaves in the destination repo. Independently checkable outcomes can run in parallel, even when files overlap; only actual prerequisites enter blocked-by.
+Container indexes hold no lifecycle state or global order. Slugs are lowercase hyphenated words without ordering markers. Leaf slugs are unique across the proposed handoff and existing open/closed leaves in the destination repo. Independently checkable outcomes can run in parallel, even when files overlap; only actual prerequisites enter blocked-by.
 
 ## Leaf files
 
@@ -136,7 +136,7 @@ Container indexes hold no lifecycle state or global order. Slugs are lowercase h
 # Design: <leaf>
 
 ## Binding decisions, verbatim
-<each applicable resolved decision, retaining heading, answer, reason and
+<each applicable binding decision, retaining heading, answer, reason and
 foreclosed alternatives>
 
 <standing creation-locked block and current interpretation from standing-design.md>
@@ -145,7 +145,7 @@ foreclosed alternatives>
 <owned surfaces, literal interfaces, exclusions and necessary dependencies>
 ```
 
-Each design is self-contained. Copy every binding decision into each affected leaf, with explicit exclusions for decisions that do not belong there. Cross-leaf claims name an owner whose own brief/design accepts that responsibility. Known human-only prerequisites have a named owner and recorded completion before handoff, separately from any `hand_built` choice.
+Each design is self-contained. Copy every binding decision into each affected leaf, with explicit exclusions for binding decisions that do not belong there. Cross-leaf claims name an owner whose own brief/design accepts that responsibility. Known human-only prerequisites have a named owner and recorded completion before handoff, separately from any `hand_built` choice.
 
 ```yaml
 slug: sample-change
@@ -163,8 +163,8 @@ A GitHub report has exactly one completion owner, an issue or an epic: every lea
 
 ## Preflight and validation
 
-Prepare the complete contracts and attended handoff batch before writing. Check all proposed destination folders and index files for occupancy, including partial leaf folders without state.yaml, and refuse the handoff on any collision. Before any handoff write, also refuse an existing `issues/closed/<top-level-owner-folder-name>` and name that conflicting destination, even if empty or missing state and indexes. The completion owner is the standalone issue or the epic, not a nested child issue. Never overwrite a sentinel brief or reuse an occupied leaf destination. Check slug uniqueness across open/closed and the proposal. Resolve every blocked-by slug to an existing leaf folder with valid state or a proposed prerequisite, and refuse missing targets and circular prerequisites before writes. Emit prerequisite leaves before dependents so no written state names a not-yet-created prerequisite.
+Prepare the complete contracts and attended handoff review before writing. Check all proposed destination folders and index files for occupancy, including partial leaf folders without state.yaml, and refuse the handoff on any collision. Before any handoff write, also refuse an existing `issues/closed/<top-level-owner-folder-name>` and name that conflicting destination, even if empty or missing state and indexes. The completion owner is the standalone issue or the epic, not a nested child issue. Never overwrite a sentinel brief or reuse an occupied leaf destination. Check slug uniqueness across open/closed and the proposal. Resolve every blocked-by slug to an existing leaf folder with valid state or a proposed prerequisite, and refuse missing targets and circular prerequisites before writes. Emit prerequisite leaves before dependents so no written state names a not-yet-created prerequisite.
 
-Read the briefs as an implementer: each criterion can be fulfilled within ownership and dependencies, cross-leaf promises have a matching owner, all binding decisions have a home or explicit exclusion, and known human prerequisites are complete. Obtain the operator's decision for this concrete tree and contracts, honoring session authorization already given.
+Read the briefs as an implementer: each criterion can be fulfilled within ownership and dependencies, cross-leaf promises have a matching owner, all binding decisions have a home or explicit exclusion, and known human prerequisites are complete. Obtain the operator's go-ahead for this concrete tree and contracts, honoring session authorization already given.
 
 Write the leaf files and immediate-child indexes directly at the registered root, then run `akrogon status` there and inspect the actual result. It parses states with the command's schema and checks repo/slug consistency; it does not prove source ownership, dependency existence or prose quality, which require the preceding audit. A failed validation is an unfinished handoff requiring repair, not permission to mark the chart handed off. A successful handoff retains the chart and original inputs, appends the handoff date and ends at the printed footer without dispatch.

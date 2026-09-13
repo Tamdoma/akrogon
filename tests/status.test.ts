@@ -457,19 +457,19 @@ for (const owner of ['issue', 'epic/issue']) {
   });
 }
 
-test('--charts lists every chart with decided counts, unspecified items, stage and age', async () => {
+test('--charts lists every chart with taken counts, fog items, stage and age', async () => {
   const f: Fixture = await fixture();
   try {
     const store: string = resolve(f.root, 'issues/chart');
-    mkdirSync(resolve(store, 'routed/decisions'), { recursive: true });
+    mkdirSync(resolve(store, 'routed/forks'), { recursive: true });
     writeFileSync(
       resolve(store, 'routed/CHART.md'),
-      '# Chart: routed\n\n## Decisions So Far\n- one\n\n## Not Yet Specified\n- a gap\n- another\n\nHanded off 2026-09-11\n',
+      '# Chart: routed\n\n## Forks taken\n- one\n\n## Fog\n- a gap\n- another\n\nHanded off 2026-09-11\n',
     );
-    writeFileSync(resolve(store, 'routed/decisions/one.md'), '# One\n\n## Question\nq\n\n## Resolution\nyes\n');
-    writeFileSync(resolve(store, 'routed/decisions/two.md'), '# Two\n\n## Question\nq\n\n## Resolution\n');
+    writeFileSync(resolve(store, 'routed/forks/one.md'), '# One\n\n## Question\nq\n\n## Taken\nyes\n');
+    writeFileSync(resolve(store, 'routed/forks/two.md'), '# Two\n\n## Question\nq\n\n## Taken\n');
     mkdirSync(resolve(store, 'blank'), { recursive: true });
-    writeFileSync(resolve(store, 'blank/CHART.md'), '# Chart: blank\n\n## Not Yet Specified\n- None.\n');
+    writeFileSync(resolve(store, 'blank/CHART.md'), '# Chart: blank\n\n## Fog\n- None.\n');
     const result: Result = await cli(f, ['status', '--charts']);
     expect(result.code).toBe(0);
     expect(result.stdout).not.toContain('no open leaves');
