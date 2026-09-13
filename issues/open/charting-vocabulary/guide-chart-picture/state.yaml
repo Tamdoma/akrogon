@@ -1,5 +1,5 @@
 slug: guide-chart-picture
-phase: plan.synthesis
+phase: implement
 created: 2026-09-13
 repo: akrogon
 debate: "no"
@@ -9,7 +9,7 @@ sources:
   []
 failed_notified: false
 busy_since: 
-  B: 2026-09-13T21:42:24.927Z
+  B: 2026-09-13T21:48:03.159Z
 busy_notified: 
   {}
 attempts: 
@@ -28,4 +28,4 @@ pane:
 prompted: 
   B: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-guide-chart-picture--/2026-09-13T21-42-21-661Z_01a09cb8-a4dd-760e-a450-d529253375a6.jsonl
 prompted_at: 
-  B: 2026-09-13T21:42:24.927Z
+  B: 2026-09-13T21:48:03.159Z
