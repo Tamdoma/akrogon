@@ -36,6 +36,7 @@
     <a href="install.html">Install</a>
     <a href="setup.html">Setup</a>
     <a href="create.html">Create</a>
+    <a href="chart.html">Chart</a>
     <a href="next.html">Next</a>
     <a href="phases.html">Phases</a>
     <a href="files.html">Files</a>
@@ -52,7 +53,7 @@
 <div class="wrap hero"><h1>In practice</h1></div>
 <section id="day" class="sec" aria-label="A working day">
   <div class="wrap" data-animate>
-    <div class="head"><span class="eyebrow">11 · A working day</span><h2>What you actually do, hour by hour</h2></div>
+    <div class="head"><span class="eyebrow">12 · A working day</span><h2>What you actually do, hour by hour</h2></div>
     <div class="day">
       <div><h3>Morning</h3><span class="meta">start</span></div>
       <div>
@@ -64,7 +65,7 @@
     <div class="day">
       <div><h3>Adding work</h3><span class="meta">any time</span></div>
       <div>
-        <p>In your own agent session, run <code>/chart-issues</code>. It imports pulled seeds, asks what it must, and writes the leaf. A small clear item goes straight to handoff. Or write the two files by hand. Then <code>akrogon sync</code>. The next hook call, or <code>akrogon next</code>, picks it up.</p>
+        <p>In your own agent session, run <code><a href="chart.html">/chart-issues</a></code>. It imports pulled seeds, asks what it must, and writes the leaf. A small clear item goes straight to handoff. Or write the two files by hand. Then <code>akrogon sync</code>. The next hook call, or <code>akrogon next</code>, picks it up.</p>
       </div>
     </div>
     <div class="day">
@@ -99,7 +100,7 @@ herdr plugin log list --plugin akrogon   <span class="c"># why the hook did or d
 <div class="band">
 <section id="cases" class="sec" aria-label="Use cases">
   <div class="wrap" data-animate>
-    <div class="head"><span class="eyebrow">11 · Use cases</span><h2>The questions that come up, answered</h2></div>
+    <div class="head"><span class="eyebrow">12 · Use cases</span><h2>The questions that come up, answered</h2></div>
 
     <h3>I have one epic and one normal issue. Can they run in parallel?</h3>
     <p>Yes, by default. Every ready leaf in every repo competes for the same seats. If the epic has three unblocked leaves and the global <code>max_active</code> is 3, the epic can take all three and the issue waits for the first merge. Set the optional <code>max_active</code> in that repo's <code>issues/config.yaml</code> to cap its share. The tool does not balance between folders.</p>

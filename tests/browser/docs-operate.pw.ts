@@ -10,6 +10,7 @@ const destinations: string[] = [
   'install',
   'setup',
   'create',
+  'chart',
   'next',
   'phases',
   'files',
@@ -50,7 +51,7 @@ async function reveal(page: Page): Promise<void> {
 }
 
 const idea: string = readFileSync(new URL('idea.html', docs), 'utf8');
-const names: string[] = ['install', 'setup', 'create', 'next', 'merge'];
+const names: string[] = ['install', 'setup', 'create', 'chart', 'next', 'merge'];
 
 function section(source: string, name: string): string {
   const document: string = source.slice(source.lastIndexOf('<section', source.indexOf(`id="${name}"`)));

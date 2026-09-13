@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The idea · Akrogon Guide</title>
+<title>Chart a destination · Akrogon Guide</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Martian+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -30,13 +30,13 @@
   </div>
   <nav class="wrap" aria-label="Pages">
     <a href="index.html">Home</a>
-    <a href="idea.html" aria-current="page">The idea</a>
+    <a href="idea.html">The idea</a>
     <a href="parts.html">Parts</a>
     <a href="state.html">State</a>
     <a href="install.html">Install</a>
     <a href="setup.html">Setup</a>
     <a href="create.html">Create</a>
-    <a href="chart.html">Chart</a>
+    <a href="chart.html" aria-current="page">Chart</a>
     <a href="next.html">Next</a>
     <a href="phases.html">Phases</a>
     <a href="files.html">Files</a>
@@ -50,42 +50,32 @@
 </header>
 
 <main id="top">
-<section id="idea" class="sec" aria-label="The idea">
+<div class="band">
+<section id="chart" class="sec" aria-label="Chart a destination">
   <div class="wrap" data-animate>
-    <div class="zig">
-      <div class="copy">
-        <span class="eyebrow">01 · The idea</span>
-        <h2>One file says where the work is. Everything else follows from that.</h2>
-        <p>You write a short description of one piece of work into a folder. Akrogon opens a terminal tab with two agents in it. Agent <b>B</b> (Codex) plans and builds. Agent <b>A</b> (Claude) reviews and merges. They hand the work back and forth through a fixed list of phases until it lands on <code>main</code>.</p>
-        <p>There is no server and no database. The phase of every piece of work is one line in a file called <code>state.yaml</code>. When an agent finishes, it changes that line with one command. A hook notices, reads the file, and prompts whoever is next.</p>
-        <p>You are the operator. You decide what gets built, answer questions during planning, and read reviews when something fails. You do not watch the agents work.</p>
-      </div>
-      <div class="fig">
-        <svg class="ill" viewBox="0 0 460 320" role="img" aria-label="The loop: the state file names a phase, the hook fires, next reads the file, and the right agent is prompted.">
-          <g transform="translate(160,16)"><rect x="0" y="0" width="140" height="60" rx="8" class="node"/><text x="70" y="26" text-anchor="middle" class="ill-data big">state.yaml</text><text x="70" y="46" text-anchor="middle" class="ill-data sage">phase: implement</text></g>
-          <path class="pipe" d="M300 46 Q400 60 400 150"/>
-          <g transform="translate(330,150)"><rect x="0" y="0" width="120" height="60" rx="8" class="node light"/><text x="60" y="26" text-anchor="middle" class="ill-data big">herdr hook</text><text x="60" y="46" text-anchor="middle" class="ill-data">agent went idle</text></g>
-          <path class="pipe" d="M390 210 Q390 290 230 290 Q70 290 70 210"/>
-          <g transform="translate(10,150)"><rect x="0" y="0" width="120" height="60" rx="8" class="node light"/><text x="60" y="26" text-anchor="middle" class="ill-data big">akrogon next</text><text x="60" y="46" text-anchor="middle" class="ill-data">reads the file</text></g>
-          <path class="pipe" d="M70 150 Q60 60 160 46"/>
-          <g transform="translate(230,118)"><rect x="-10" y="-10" width="20" height="15" rx="2" fill="var(--sage-500)"/><rect x="-5" y="-6" width="10" height="6" rx="1" fill="var(--parchment)" opacity=".55"/><rect x="-9" y="7" width="18" height="18" fill="var(--sage-500)"/></g>
-          <text x="230" y="162" text-anchor="middle" class="ill-data sage">agent B is prompted</text>
-          <text x="230" y="178" text-anchor="middle" class="ill-data">implement-issue</text>
-          <text x="230" y="194" text-anchor="middle" class="ill-data">rename-flag</text>
-          <text x="230" y="250" text-anchor="middle" class="ill-data">it works, then runs akrogon phase,</text>
-          <text x="230" y="266" text-anchor="middle" class="ill-data">which rewrites state.yaml</text>
-          <path class="ground" d="M20 310 H440"/>
-        </svg>
-        <p class="cap">file → hook → next → prompt · the whole loop</p>
-      </div>
-    </div>
-    <div class="why"><span class="eyebrow">Why two vendors</span><p>One model reviewing its own work misses the same things twice. In the first real run, A found only style nits by reading the code. B found four real bugs by running it. Two different minds catch more.</p></div>
-    <div class="why"><span class="eyebrow">Why a file and not a program</span><p>A running program can be in a wrong state. A file cannot. If akrogon crashes, nothing is lost. If you want to change what happens next, you edit one line. Both agents, git, and you can all read the same file with nothing running.</p></div>
+    <div class="head"><span class="eyebrow">07 · Chart a destination</span><h2>Draw the map, then take every fork</h2><p class="lede">A chart turns one fuzzy goal into a route you approve piece by piece. The agent walks the territory. You pick a side at every split.</p></div>
+    <p>Charting starts with the territory: the whole problem space for one destination. The agent looks at it and draws a map. The map holds the forks it can see, the questions a practitioner would ask, and the places a beginner trips. It is shown to you, never saved as its own file.</p>
+    <p>The sharp parts of the map become forks. A fork is one place where the route splits and you pick a side. The parts the agent can see but cannot yet phrase as a sharp question stay as fog.</p>
+    <p>Forks are put to you in rounds. One round is one screen holding every open question across all open forks. Every question lists exhaustive options with one recommended. You answer, and the fork is taken. A taken fork is never reopened.</p>
+    <p>Every answer redraws the map. Fog clears into new forks. A challenge check or a look at a live surface can expose a fork nobody saw. New forks can appear at any round.</p>
+    <p>When no fork is open and no fog is left, the route is clear. The chart hands off: it writes the leaves with <code>blocked-by</code> wired between them.</p>
+    <h3>A real chart: a seat that quits mid-phase</h3>
+    <p>The destination was "a seat that quits mid-phase gets picked up without me diagnosing it". The first map showed three forks and one patch of fog.</p>
+    <div class="tbl"><table>
+      <tr><th>Round</th><th>Fork put to you</th><th>Taken</th></tr>
+      <tr><td>1</td><td>How to detect a quit seat: heartbeat, watcher, or elapsed time since the last prompt</td><td>Elapsed time. A quit seat and a slow seat look identical. Only time separates them.</td></tr>
+      <tr><td>2</td><td>Who triggers the re-prompt: a timer, or the events that already call dispatch</td><td>The events. No new process. The cost: single-seat phases wait for a touch.</td></tr>
+      <tr><td>3</td><td>What happens after repeated misses</td><td>Fail the leaf loudly after three.</td></tr>
+      <tr><td>4</td><td>Should briefs list needed keys up front</td><td>Yes. The Operator inputs section in briefs is the result.</td></tr>
+    </table></div>
+    <p>The fog was whether charting should have prevented the credential stop in the first place. It cleared after round 1 and became the fourth fork. The chart ended with four forks taken, none open, no fog, and one thing off route by choice: automatic healing in single-seat phases with nobody touching the leaf. Route clear, hand off.</p>
+    <div class="why"><span class="eyebrow">Why fog has a name</span><p>A fuzzy part of the map with no name gets handled differently every time. Named, it is watched: every round either clears it into forks or leaves it visible on the chart.</p></div>
   </div>
 </section>
+</div>
 <div class="pager">
-  <a class="prev" href="index.html"><span class="meta">previous</span><span class="t">Home</span></a>
-  <a class="next" href="parts.html"><span class="meta">next</span><span class="t">Parts</span></a>
+  <a class="prev" href="create.html"><span class="meta">previous</span><span class="t">Create</span></a>
+  <a class="next" href="next.html"><span class="meta">next</span><span class="t">Next</span></a>
 </div>
 </main>
 <footer class="footer">

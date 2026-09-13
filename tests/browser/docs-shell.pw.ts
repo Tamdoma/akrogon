@@ -10,6 +10,7 @@ const destinations: string[] = [
   'install',
   'setup',
   'create',
+  'chart',
   'next',
   'phases',
   'files',
@@ -76,7 +77,7 @@ test('complete file navigation and rendering', async ({ page }, testInfo): Promi
     await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true });
   }
   const items: Locator = page.locator('.toc li');
-  await expect(items).toHaveCount(16);
+  await expect(items).toHaveCount(17);
   expect(
     await items
       .locator('a')

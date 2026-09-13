@@ -10,6 +10,7 @@ const destinations: string[] = [
   'install',
   'setup',
   'create',
+  'chart',
   'next',
   'phases',
   'files',

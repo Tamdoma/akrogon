@@ -36,6 +36,7 @@
     <a href="install.html">Install</a>
     <a href="setup.html">Setup</a>
     <a href="create.html">Create</a>
+    <a href="chart.html">Chart</a>
     <a href="next.html">Next</a>
     <a href="phases.html">Phases</a>
     <a href="files.html" aria-current="page">Files</a>
@@ -53,7 +54,7 @@
   <div class="wrap" data-animate>
     <div class="zig flip">
       <div class="copy">
-        <span class="eyebrow">09 · Where files live</span>
+        <span class="eyebrow">10 · Where files live</span>
         <h2>The leaf branch carries code. The checkout carries issues.</h2>
         <p>Two places write to the repo at the same time. Agents build on the leaf branch inside the worktree. Akrogon and the skills write plans, reviews, state, and the log inside your registered checkout, on <code>main</code>.</p>
         <p>The rule that keeps them from colliding: <b>nothing under <code>issues/</code> is ever committed on a leaf branch.</b> The <code>phase</code> command checks this at handoff and refuses if it finds one.</p>
@@ -99,11 +100,11 @@
       <tr><td>design.md</td><td>you, via chart-issues</td><td>Locked decisions. Agents do not reopen them.</td></tr>
       <tr><td>positions-A.md · positions-B.md</td><td>A, B</td><td>Independent plans, debate mode only.</td></tr>
       <tr><td>rebuttal-A.md · rebuttal-B.md</td><td>A, B</td><td>One reply each, debate mode only.</td></tr>
-      <tr><td>plan.md</td><td>B</td><td>The final plan. Settled choices, read-first paths, ordered checklist, acceptance criteria.</td></tr>
+      <tr><td>plan.md</td><td>B</td><td>The final plan. Settled decisions, read-first paths, ordered checklist, acceptance criteria.</td></tr>
       <tr><td>implementation/brief.md</td><td>B</td><td>What was built, check output, the commit.</td></tr>
       <tr><td>review-A.md · review-B.md</td><td>A, B</td><td>Findings, evidence, verdict. A appends re-checks and merge evidence here.</td></tr>
       <tr><td>questions/&lt;id&gt;.md</td><td>either</td><td>One peer question and its answer, when an agent had to ask the other.</td></tr>
-      <tr><td>issues/chart/&lt;issue&gt;/</td><td>you, via chart-issues</td><td>The chart and its fork files. When the issue closes, the whole folder moves to <code>issues/closed/&lt;issue&gt;/chart/</code>.</td></tr>
+      <tr><td>issues/chart/&lt;issue&gt;/</td><td>you, via chart-issues</td><td>The <a href="chart.html">chart</a> and its fork files. When the issue closes, the whole folder moves to <code>issues/closed/&lt;issue&gt;/chart/</code>.</td></tr>
       <tr><td>issues/log.jsonl</td><td>akrogon</td><td>One line per phase change: time, slot, commit, diff size.</td></tr>
     </table></div>
   </div>

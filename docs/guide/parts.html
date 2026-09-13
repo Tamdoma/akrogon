@@ -36,6 +36,7 @@
     <a href="install.html">Install</a>
     <a href="setup.html">Setup</a>
     <a href="create.html">Create</a>
+    <a href="chart.html">Chart</a>
     <a href="next.html">Next</a>
     <a href="phases.html">Phases</a>
     <a href="files.html">Files</a>
@@ -52,13 +53,21 @@
 <div class="band">
 <section id="parts" class="sec" aria-label="Every moving part">
   <div class="wrap" data-animate>
-    <div class="head"><span class="eyebrow">02 · Every moving part</span><h2>The words, one at a time</h2><p class="lede">Twelve words cover the whole system. Read them once and the rest of this guide reads easily.</p></div>
+    <div class="head"><span class="eyebrow">02 · Every moving part</span><h2>The words, one at a time</h2><p class="lede">Twenty words cover the whole system. Read them once and the rest of this guide reads easily.</p></div>
     <div class="tbl"><table>
       <tr><th>Word</th><th>What it is</th><th>Where it lives</th></tr>
       <tr><td>Repo</td><td>A git checkout you registered with akrogon. It has an <code>issues/</code> folder. This is called the <b>registered checkout</b>. It is the only place issue files are written.</td><td><code>config.yaml</code> → <code>repos</code></td></tr>
       <tr><td>Issue</td><td>One unit of intent, like "add a status command". A folder under <code>issues/open/</code>.</td><td><code>issues/open/&lt;issue&gt;/</code></td></tr>
       <tr><td>Epic</td><td>A folder of several issues that belong together. Just a folder. Nothing in the tool treats it specially except folder targeting.</td><td><code>issues/open/&lt;epic&gt;/&lt;issue&gt;/</code></td></tr>
       <tr><td>Leaf</td><td>Any folder that has a <code>state.yaml</code>. This is the thing agents actually work on. A small issue is one leaf. A big issue is a folder holding several leaves.</td><td>the folder with <code>state.yaml</code></td></tr>
+      <tr><td>Territory</td><td>The whole problem space for one destination.</td><td>nowhere on disk — it is what the agent looks at</td></tr>
+      <tr><td>Map</td><td>What the agent sees when it looks at the territory: forks, practitioner questions, beginner pitfalls. Drawn at open, redrawn after every answer, never saved as its own file.</td><td>nowhere on disk</td></tr>
+      <tr><td>Fog</td><td>A part of the map the agent can see but cannot yet phrase as a sharp question. One patch per bullet in <code>CHART.md</code>; clears into forks as answers land.</td><td><code>CHART.md</code> → <code>## Fog</code></td></tr>
+      <tr><td>Fork</td><td>One topic where the route splits. A fork holds one or more questions that always travel together on one screen. A fork is taken when every material question in it is taken, and a taken fork is never reopened.</td><td>one file per fork under <code>forks/</code></td></tr>
+      <tr><td>Question</td><td>One Q block inside a fork: explainer, evidence, exhaustive options with one recommended, pitfalls. An explicit choice takes it; a request for explanation does not.</td><td>a Q block inside a fork file</td></tr>
+      <tr><td>Round</td><td>One screen put to you: every currently material question across all open forks, one reply key, one challenge check.</td><td>one screen in your agent session</td></tr>
+      <tr><td>Chart</td><td>The one page per destination: forks taken, forks open, fog, off route.</td><td><code>issues/chart/&lt;issue&gt;/CHART.md</code></td></tr>
+      <tr><td>Off route</td><td>Work deliberately left past the destination, with the reason.</td><td>a section in <code>CHART.md</code></td></tr>
       <tr><td>Phase</td><td>One word in <code>state.yaml</code>: where the leaf is right now. Planning, building, reviewing, merging. This is the <b>only</b> signal the tool reads.</td><td><code>state.yaml</code> → <code>phase</code></td></tr>
       <tr><td>Slot</td><td>A or B. The seat a phase needs. A is Claude, B is Codex. Which model sits in which seat is in the global config.</td><td><code>config.yaml</code> → <code>slots</code></td></tr>
       <tr><td>Tab</td><td>A terminal tab in herdr, one per active leaf. Two panes: A on the left, B on the right.</td><td>herdr</td></tr>
