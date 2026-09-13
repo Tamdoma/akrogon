@@ -40,6 +40,7 @@ export async function commitMove(
     done: [],
     verdict: {},
     prompted: {},
+    prompted_at: {},
     attempts: { A: 0, B: 0 },
     fix_rounds:
       to === 'check.fix'
@@ -112,7 +113,10 @@ export async function transition(
 ): Promise<void> {
   const state: State = readState(leaf.path);
   if (state.phase === 'merged') throw new Error(`Merged is terminal: ${state.slug}`);
-  if (!routing[state.phase].next.includes(requested)) throw new Error(`Illegal move ${state.phase} -> ${requested}`);
+  if (!routing[state.phase].next.includes(requested))
+    throw new Error(
+      `Illegal move ${state.phase} -> ${requested}; from ${state.phase} the legal moves are ${routing[state.phase].next.join(', ')}`,
+    );
   if (state.phase === 'plan.positions' && requested !== (repo.config.rebuttal ? 'plan.rebuttal' : 'plan.synthesis'))
     throw new Error('Destination contradicts rebuttal config');
   const required: readonly Slot[] = requiredSlots(state.phase, state.fix_rounds);

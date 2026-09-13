@@ -29,6 +29,7 @@ export const stateSchema = z
     worktree: z.string().optional(),
     pane: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     prompted: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
+    prompted_at: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
 

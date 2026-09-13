@@ -3,16 +3,16 @@
 ## Destination
 `akrogon pull` writes `<number>-<slug>.md` where the slug is cut to at most 40 characters at a word boundary. The number stays first and identifies the seed.
 
-## Decisions So Far
-- [Slug cut rule](decisions/slug-cut.md): as reported. Direct item, nothing unspecified.
+## Forks taken
+- [Slug cut rule](forks/slug-cut.md): as reported. Direct item, nothing unspecified.
 
-## Open Decisions
+## Forks open
 None.
 
-## Not Yet Specified
+## Fog
 None.
 
-## Out Of Scope
+## Off route
 - Renaming seeds already on disk. The next pull rewrites the desired set and unlinks stale numbered files, so old long names disappear on their own.
 
 Handed off 2026-09-11 into `../../open/seed-filename-length/`.

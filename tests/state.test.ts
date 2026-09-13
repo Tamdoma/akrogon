@@ -63,6 +63,7 @@ for (const area of ['open', 'closed', 'parked']) {
           worktree: '/worktree',
           pane: { A: 'pane-a', B: 'pane-b' },
           prompted: { B: 'session-b' },
+          prompted_at: { B: '2026-09-10T10:00:00Z' },
         };
         const file: string = resolve(path, 'state.yaml');
         yaml(file, { ...supported, ...legacy });

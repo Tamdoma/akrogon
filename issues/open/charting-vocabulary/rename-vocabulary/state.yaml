@@ -1,0 +1,31 @@
+slug: rename-vocabulary
+phase: merged
+created: 2026-09-13
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+failed_notified: false
+busy_since: 
+  A: 2026-09-13T21:39:41.864Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t54
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/rename-vocabulary
+pane: 
+  A: w8:p9J
+  B: w8:p9K
+prompted: 
+  {}
+prompted_at: 
+  {}

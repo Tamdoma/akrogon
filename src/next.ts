@@ -6,6 +6,7 @@ import { parse } from 'shell-quote';
 import {
   readGlobal,
   readRepo,
+  currentRepo,
   commonDirectory,
   globalHome,
   expandPath,
@@ -171,6 +172,7 @@ function idle(pane: Pane): boolean {
 }
 
 const STALL_MS: number = 60 * 60 * 1000;
+const PROMPT_GRACE_MS: number = 2 * 60 * 1000;
 
 async function observeBusy(path: string, state: State, seat: Slot, pane: Pane, now: number): Promise<State> {
   if (pane.agent === null || idle(pane)) {
@@ -310,7 +312,15 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   const worktree: string = z.string().parse(state.worktree);
   const workspace: Workspace | undefined = (await workspaces()).find((item) => item.label === repo.name);
   if (workspace === undefined) throw new Error(`No herdr workspace labeled ${repo.name}`);
-  const placement: string[] = ['--cwd', worktree, '--env', `AKROGON_BASE=${await base(repo, worktree)}`, '--no-focus'];
+  const placement: string[] = [
+    '--cwd',
+    worktree,
+    '--env',
+    `AKROGON_BASE=${await base(repo, worktree)}`,
+    '--env',
+    'GIT_EDITOR=true',
+    '--no-focus',
+  ];
   const target: string[] = ['--workspace', workspace.workspace_id];
   const tab: Tab =
     matches.length === 1
@@ -387,7 +397,12 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
       saveState(leaf.path, { ...state, attempts: { ...state.attempts, [slot]: 2 } });
       continue;
     }
-    if (pane.agent !== null && state.prompted[slot] !== undefined && pane.agent_session?.value === state.prompted[slot])
+    if (
+      pane.agent !== null &&
+      state.prompted[slot] !== undefined &&
+      pane.agent_session?.value === state.prompted[slot] &&
+      Date.now() - Date.parse(state.prompted_at[slot] ?? '') < PROMPT_GRACE_MS
+    )
       return;
     if (state.attempts[slot] >= 3) {
       await commitMove(repo, leaf, state, 'failed', slot);
@@ -442,7 +457,11 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
       const prompted: Pane = await currentPane(ready.pane_id);
       const observed: State = await observeBusy(leaf.path, readState(leaf.path), seat, prompted, Date.now());
       const session: string | undefined = prompted.agent_session?.value;
-      saveState(leaf.path, { ...observed, prompted: { ...observed.prompted, [slot]: session } });
+      saveState(leaf.path, {
+        ...observed,
+        prompted: { ...observed.prompted, [slot]: session },
+        prompted_at: { ...observed.prompted_at, [slot]: new Date().toISOString() },
+      });
       return;
     }
     if (!retryable(result)) throw new CommandError(args, repo.root, result);
@@ -527,7 +546,7 @@ async function cleanupMerged(repo: Repo, leaf: Leaf): Promise<void> {
   const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === leaf.state.tab);
   if (members.length > 0) await command(['herdr', 'tab', 'close', z.string().parse(leaf.state.tab)]);
   if (leaf.state.worktree !== undefined && existsSync(leaf.state.worktree)) {
-    await command(['git', 'worktree', 'remove', leaf.state.worktree], repo.root);
+    await command(['git', 'worktree', 'remove', '--force', leaf.state.worktree], repo.root);
     await command(['git', 'branch', '-d', leaf.state.slug], repo.root);
   }
 }
@@ -603,6 +622,19 @@ async function cleanupRepos(repos: Repo[], invocation: Invocation): Promise<void
     }
 }
 
+async function paneOwners(
+  global: GlobalConfig,
+  invocation: Invocation,
+  hookPane: string,
+): Promise<{ repo: Repo; leaf: Leaf }[]> {
+  const live: Pane | undefined = (await panes()).find((pane) => pane.pane_id === hookPane);
+  return registeredRepos(global, invocation).repos.flatMap((repo) =>
+    discover(repo, invocation)
+      .leaves.filter((leaf) => ownsPane(leaf, live, hookPane))
+      .map((leaf) => ({ repo, leaf })),
+  );
+}
+
 export async function nextCommand(input: string | undefined): Promise<void> {
   const rawEvent: string | undefined = input === undefined ? process.env.HERDR_PLUGIN_EVENT_JSON : undefined;
   const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
@@ -610,8 +642,10 @@ export async function nextCommand(input: string | undefined): Promise<void> {
   const global: GlobalConfig = readGlobal();
   const invocation: Invocation = { skipped: new Set() };
   const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
+  const hooked: boolean =
+    hookPane !== undefined && (event !== undefined || (await paneOwners(global, invocation, hookPane)).length > 0);
   const selection: Selection | undefined =
-    input !== '--all' && event?.event !== 'tab_closed' && (input !== undefined || hookPane === undefined)
+    input !== '--all' && event?.event !== 'tab_closed' && (input !== undefined || !hooked)
       ? await selectLeaves(global, invocation, input)
       : undefined;
   if (selection === undefined || selection.leaves.length > 0)
@@ -631,8 +665,14 @@ export async function nextCommand(input: string | undefined): Promise<void> {
         return;
       }
       if (input === '--all') {
-        await sweepAll(global, invocation);
-        await cleanupRepos(registeredRepos(global, invocation).repos, invocation);
+        const current: Repo | null = await currentRepo(global, process.cwd());
+        if (current === null) {
+          await sweepAll(global, invocation);
+          await cleanupRepos(registeredRepos(global, invocation).repos, invocation);
+        } else {
+          await sweep(global, current, discover(current, invocation).leaves, invocation);
+          await cleanupRepos([current], invocation);
+        }
         return;
       }
       if (event?.event === 'tab_closed') {
@@ -648,12 +688,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
         return;
       }
       if (input === undefined && hookPane !== undefined) {
-        const live: Pane | undefined = (await panes()).find((pane) => pane.pane_id === hookPane);
-        const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
-          discover(repo, invocation)
-            .leaves.filter((leaf) => ownsPane(leaf, live, hookPane))
-            .map((leaf) => ({ repo, leaf })),
-        );
+        const owners: { repo: Repo; leaf: Leaf }[] = await paneOwners(global, invocation, hookPane);
         if (owners.length > 1) throw new Error(`Multiple leaves own hook pane: ${hookPane}`);
         if (owners.length === 0) return;
         const owner: { repo: Repo; leaf: Leaf } = owners[0];

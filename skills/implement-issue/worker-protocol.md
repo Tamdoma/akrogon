@@ -14,6 +14,8 @@ A report missing changed files/reasons, tests/results, known limitations or unve
 
 A mismatch names the conflicting requirement, actual code/interface or scale evidence, and the smallest brief correction; B revises the brief and reruns the affected worker, without escalating the implementation choice to the operator or changing phase.
 
+A worker that stops without a report, whether over its turn budget, cut off at the output limit or failed by the provider, keeps its landed edits; B lists what that brief still owes from the worktree state and delegates only that remainder as a new sub-brief, never the original brief again.
+
 ## Failure ownership
 
 Workers run only the brief's changed-test command against B's supplied base and repair failures within their brief; the full suite belongs to B after the final worker.

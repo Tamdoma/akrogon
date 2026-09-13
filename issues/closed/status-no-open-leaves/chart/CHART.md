@@ -5,17 +5,17 @@
 
 Single issue `status-no-open-leaves`, single leaf `status-empty-open-fix`. Owns #1.
 
-## Decisions So Far
-- [Missing open folder is zero leaves](decisions/missing-open-is-zero.md): copied from the prior chart, still valid.
+## Forks taken
+- [Missing open folder is zero leaves](forks/missing-open-is-zero.md): copied from the prior chart, still valid.
 - Re-intake: operator 2026-09-11 `14a`, fix rather than drop; prior leaf was deleted outside akrogon.
 
-## Open Decisions
+## Forks open
 None.
 
-## Not Yet Specified
+## Fog
 None.
 
-## Out Of Scope
+## Off route
 - Other unreadable-repo paths keep the `unreadable` JSON line and exit 1.
 
 Handed off 2026-09-11 into `../../open/status-no-open-leaves/`.

@@ -13,28 +13,28 @@ Issues and leaves (all parallel unless noted):
 
 Epic owns #10 and #14; each issue owns the sources listed.
 
-## Decisions So Far
-- [How are the ten reports grouped?](decisions/split-epic.md): epic with six issues.
-- [Sync branch and scope](decisions/sync-branch-scope.md): refuse off default branch, commit only issue records, global then repo lock, ignore configured worktree root.
-- [Dispatch error report](decisions/dispatch-error-report.md): per-scope stderr JSON, nonzero aggregate, unreadable occupancy counts as active.
-- [Stall signal](decisions/stall-signal.md): notify and show duration after 60 minutes busy, no interruption.
-- [Failed notice once](decisions/failed-notice-once.md): delivery recorded in state per failure episode.
-- [Source owner closure](decisions/source-owner-closure.md): close issue-owned sources at issue completion, before any rename, completion sweep before cleanup.
-- [Repo field](decisions/repo-field.md): key stays enforced, clearer mismatch and relocation messages.
-- [Blind review](decisions/blind-review.md): no peer questions in check.review.
-- [Discord chunk stop](decisions/discord-chunk-stop.md): keep stopping, report counts.
-- [Tree preflight](decisions/tree-preflight.md): reject bad depth at read, refuse closed-name reuse at handoff, name parked in Missing leaf.
-- [Extra panes](decisions/extra-panes.md): ignored, seats stay recorded.
-- [Dead fields delete](decisions/dead-fields-delete.md): remove priority and slot everywhere with a migration pass.
-- [Pull origin](decisions/pull-origin.md): keep origin, document remote and issues_repo routing.
+## Forks taken
+- [How are the ten reports grouped?](forks/split-epic.md): epic with six issues.
+- [Sync branch and scope](forks/sync-branch-scope.md): refuse off default branch, commit only issue records, global then repo lock, ignore configured worktree root.
+- [Dispatch error report](forks/dispatch-error-report.md): per-scope stderr JSON, nonzero aggregate, unreadable occupancy counts as active.
+- [Stall signal](forks/stall-signal.md): notify and show duration after 60 minutes busy, no interruption.
+- [Failed notice once](forks/failed-notice-once.md): delivery recorded in state per failure episode.
+- [Source owner closure](forks/source-owner-closure.md): close issue-owned sources at issue completion, before any rename, completion sweep before cleanup.
+- [Repo field](forks/repo-field.md): key stays enforced, clearer mismatch and relocation messages.
+- [Blind review](forks/blind-review.md): no peer questions in check.review.
+- [Discord chunk stop](forks/discord-chunk-stop.md): keep stopping, report counts.
+- [Tree preflight](forks/tree-preflight.md): reject bad depth at read, refuse closed-name reuse at handoff, name parked in Missing leaf.
+- [Extra panes](forks/extra-panes.md): ignored, seats stay recorded.
+- [Dead fields delete](forks/dead-fields-delete.md): remove priority and slot everywhere with a migration pass.
+- [Pull origin](forks/pull-origin.md): keep origin, document remote and issues_repo routing.
 
-## Open Decisions
+## Forks open
 None.
 
-## Not Yet Specified
+## Fog
 None.
 
-## Out Of Scope
+## Off route
 - Pi and codex skill folders: settled and closed in `install-prune-dead-links`.
 - shapes.md state template: consistent as written.
 - `logMove` after commit: intentional and tested; leaf `argument-and-response-errors` only makes the committed move distinguishable in the error.

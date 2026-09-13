@@ -30,7 +30,7 @@ End this section by restating the reasons and exceptions so they remain attached
 
 Each step names its file and acceptance criterion, with tests derived before code and red/green evidence where relevant.
 
-Advisory size: about N files and under M turns; work clearly beyond it returns a mismatch with evidence, not a hard cutoff.
+Advisory size: about N files and under M turns, with M at least four turns per file because each file costs a read, an edit and a test run; work clearly beyond it returns a mismatch with evidence, not a hard cutoff.
 
 ## 7. Commands
 

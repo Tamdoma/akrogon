@@ -117,11 +117,11 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     expect(cell(result.stdout, row, 'PHASE')).toBe('failed');
     const noteText: string = cell(result.stdout, row, 'NOTE');
     expect(noteText).toContain('done A');
-    expect(noteText).toContain('attempts A:2 B:3');
+    expect(noteText).toContain('A:2 B:3');
     expect(noteText).toContain('fix rounds 2');
     expect(noteText).toContain('A:fix');
     expect(noteText).toContain('B:nits');
-    expect(noteText).toContain('tab w1:t9');
+    expect(noteText).not.toContain('w1:t9');
     expect(cell(result.stdout, row, 'BLOCKED BY')).toBe('missing');
     expect(cell(result.stdout, row, 'AGE')).toBe('7m');
     const epic: number = rows.findIndex((line) => line.trim() === 'epic');

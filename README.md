@@ -38,8 +38,8 @@ This repository's [reference index](docs/reference-index.md) links its areas.
 | `akrogon init --from <proposal.yaml> [--toolkit <lang>=<runner>]` | Initialize or update repository configuration and registration. |
 | `akrogon config` | Print effective configuration for the current repository. |
 | `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>]` | Record a lifecycle pass through validated phase transitions. |
-| `akrogon next [<slug>\|<path>\|--all]` | Dispatch eligible work for a leaf, path or all registered repositories. With no argument, use the current directory or Herdr hook context. |
-| `akrogon pull [--all]` | Import open GitHub issues into seeds for the current repository or all registered repositories. |
+| `akrogon next [<slug>\|<path>\|--all]` | Dispatch eligible work for a leaf or path. `--all` sweeps every leaf of the current repository, or every registered repository when run outside one. With no argument, use the current directory or Herdr hook context. |
+| `akrogon pull [--all]` | Import open GitHub issues into seeds for the current repository. `--all` also works outside a repository, importing for every registered one. |
 | `akrogon status [<slug>\|--charts]` | Show the current repository's board, every registered repository when run outside one, one leaf's state and recent history, or the chart store with `--charts`. |
 | `akrogon sync` | Commit eligible issue records, rebase and push through the configured remote. |
 | `akrogon park <issue>... \| --all` | Move eligible whole issues to `issues/parked/`. Use top-level issue folder names or `--all`, never both. `--all` skips running issues and prerequisites needed by open work. |

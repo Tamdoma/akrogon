@@ -42,13 +42,15 @@ With B, A owns interviewing and recording, sends only intake, current Question a
 
 Record operator answers and their reasons in fork files, keep sharp questions distinct from fog, and reshape the remaining chart after answers; handoff becomes ready only when no material question or fog requires the implementer to guess, with small optional prototypes explicitly chosen as measurements whose scratch code is discarded.
 
-Warn as soon as a genuinely human-only prerequisite appears, name its owner and record completion before opening a leaf; credential access alone does not qualify, and the distinct operator choice `hand_built` cannot replace completing known prerequisites.
+Warn as soon as a genuinely human-only prerequisite appears, name its owner and record completion before opening a leaf; the distinct operator choice `hand_built` cannot replace completing known prerequisites. Credentials are not such a prerequisite but are anticipated, never discovered by a blocked seat: every brief lists the keys, logins and env values its leaf needs by variable name, what each is and where the operator obtains it, and the handoff batch names the ones absent from the consumer repo's gitignored `.env` so the operator fills them before dispatch.
 
 ## Handoff
 
 Prepare the complete contracts using shapes and standing design, and present one attended handoff review with tree, scope, registered repo, relevant operator choices and the implementation debate recommendation: `debate` defaults to no and is asked once at the door, very small issues skip the question and use no, and naming B does not set this field; recognize concrete handoff authorization already supplied in the session instead of asking again.
 
-Audit the proposed contracts as an implementer before writing: criteria execute inside their ownership, cross-leaf claims have an owner, every binding decision has a home or exclusion, destinations are unoccupied, `issues/closed/<top-level-owner-folder-name>` does not exist even as an empty folder without state or indexes (the owner is the standalone issue or epic, not a nested child issue), leaf slugs are unique, dependencies exist or are proposed prerequisites, and each source belongs to one completion owner whose every leaf receives it; refuse collisions naming the conflicting destination and refuse missing dependencies before any handoff write, then emit prerequisites before dependents and inspect `akrogon status` for schema-valid output as described in shapes.
+When B is named, leaf writing is a mandatory two-slot exchange after approval and before any handoff write: A drafts every brief and design to the scratchpad, B reviews each draft as an implementer and returns disagreements with evidence, A merges the consensus, marking changed lines `(A)`, `(B)`, `(both)` in the draft and carrying any held disagreement into the leaf design, and only the merged contracts reach `issues/open/`.
+
+Audit the proposed contracts as an implementer and run the preflight in shapes before writing, refusing collisions by naming the conflicting destination and missing dependencies before any handoff write.
 
 After valid handoff append `Handed off <date>` to CHART.md, retaining the chart and source inputs in place; command dispatch remains the authority, so finish without running `akrogon next` or a chart phase transition.
 

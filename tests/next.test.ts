@@ -33,8 +33,13 @@ function calls(f: DispatchFixture): string[][] {
         .map((line) => z.array(z.string()).parse(JSON.parse(line)))
     : [];
 }
-async function next(f: DispatchFixture, args: string[], env: NodeJS.ProcessEnv = {}): Promise<Result> {
-  return cli(f, ['next', ...args], f.root, { ...f.env, ...env });
+async function next(
+  f: DispatchFixture,
+  args: string[],
+  env: NodeJS.ProcessEnv = {},
+  cwd: string = f.root,
+): Promise<Result> {
+  return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
 
 for (const kind of ['relative file', 'absolute file', 'file symlink']) {
@@ -125,6 +130,74 @@ test('next creates one worktree/tab under concurrent hooks, prompts configured B
     f.clean();
   }
 }, 15000);
+
+test('next from an operator pane owning no leaf dispatches by cwd instead of returning silently', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'shell', 'plan.synthesis');
+    expect((await next(f, [], { HERDR_PANE_ID: 'operator' })).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(1);
+    expect(readState(path).attempts.B).toBe(1);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next re-prompts an idle seat whose prompt is older than the grace period and the phase never moved', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'stalled', 'plan.synthesis');
+    expect((await next(f, ['stalled'])).code).toBe(0);
+    const b: string = readState(path).pane.B!;
+    const db: Database = database(f);
+    saveDatabase(f, { ...db, panes: db.panes.map((p) => (p.pane_id === b ? { ...p, agent_status: 'idle' } : p)) });
+    expect((await next(f, ['stalled'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(1);
+    const state: State = readState(path);
+    saveState(path, { ...state, prompted_at: { B: new Date(Date.now() - 3 * 60 * 1000).toISOString() } });
+    expect((await next(f, ['stalled'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(2);
+    expect(readState(path).attempts.B).toBe(2);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a stale prompt never re-prompts a busy or done seat, and three stale misses fail the leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'misses', 'plan.synthesis');
+    expect((await next(f, ['misses'])).code).toBe(0);
+    const stale = (): void =>
+      saveState(path, { ...readState(path), prompted_at: { B: new Date(Date.now() - 3 * 60 * 1000).toISOString() } });
+    const status = (agent_status: 'idle' | 'working'): void => {
+      const db: Database = database(f);
+      saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status })) });
+    };
+    status('working');
+    stale();
+    expect((await next(f, ['misses'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(1);
+    status('idle');
+    saveState(path, { ...readState(path), done: ['B'] });
+    expect((await next(f, ['misses'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(1);
+    saveState(path, { ...readState(path), done: [] });
+    expect((await next(f, ['misses'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(2);
+    expect(readState(path).attempts.B).toBe(2);
+    stale();
+    expect((await next(f, ['misses'])).code).toBe(0);
+    expect(readState(path).phase).toBe('plan.synthesis');
+    expect(readState(path).attempts.B).toBe(3);
+    status('idle');
+    stale();
+    expect((await next(f, ['misses'])).code).toBe(0);
+    expect(readState(path).phase).toBe('failed');
+  } finally {
+    f.clean();
+  }
+}, 20000);
 
 test('next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -469,11 +542,26 @@ test('per-repo capacity leaves uncapped repos to fill the global ceiling', async
     leaf(g, 'b-two', 'plan.synthesis', { repo: 'other' });
     configure(f, { max_active: 3, repos: { repo: f.root, other: g.root } });
     yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 1 });
-    const result: Result = await next(f, ['--all']);
+    const result: Result = await next(f, ['--all'], {}, f.home);
     expect(result.code).toBe(0);
     const labels: string[] = database(f).tabs.map((tab) => tab.label);
     expect(labels.filter((label) => label.startsWith('a-'))).toHaveLength(1);
     expect(labels.filter((label) => label.startsWith('b-'))).toHaveLength(2);
+  } finally {
+    f.clean();
+    g.clean();
+  }
+}, 15000);
+
+test('next --all inside a checkout sweeps only that repo', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const g: Fixture = await fixture();
+  try {
+    leaf(f, 'a-one', 'plan.synthesis');
+    leaf(g, 'b-one', 'plan.synthesis', { repo: 'other' });
+    configure(f, { repos: { repo: f.root, other: g.root } });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['a-one']);
   } finally {
     f.clean();
     g.clean();
@@ -783,7 +871,7 @@ test('agent names support identical repo-local slugs and long numeric-leading sl
     leaf(g, slug, 'plan.synthesis', { repo: 'other' });
     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
     yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, other: g.root } });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'], {}, f.home)).code).toBe(0);
     const db: Database = database(f);
     expect(db.starts).toHaveLength(2);
     expect(new Set(db.starts.map((args) => args[2])).size).toBe(2);
@@ -876,6 +964,7 @@ for (const mode of ['startup', 'hook', 'cwd'] as const) {
         f,
         mode === 'startup' ? ['--all'] : [],
         mode === 'hook' ? { HERDR_PANE_ID: readState(healthy).pane.B } : {},
+        mode === 'startup' ? f.home : f.root,
       );
       expect(result.code).toBe(1);
       expect(skips(result)).toHaveLength(1);
@@ -937,7 +1026,7 @@ for (const capacity of [3, 4]) {
   }, 15000);
 }
 
-test('dirty merged worktree cleanup reports the original git error and still sweeps', async () => {
+test('dirty merged worktree cleanup drops the leftover and removes the worktree', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const dirty: string = leaf(f, 'dirty', 'plan.synthesis', {}, 'dirty-issue');
@@ -947,12 +1036,9 @@ test('dirty merged worktree cleanup reports the original git error and still swe
     saveState(dirty, { ...readState(dirty), phase: 'merged' });
     leaf(f, 'healthy', 'plan.synthesis', {}, 'healthy-issue');
     const result: Result = await next(f, ['--all']);
-    expect(result.code).toBe(1);
-    expect(skips(result)).toHaveLength(1);
-    expect(skips(result)[0]).toMatchObject({ slug: 'dirty' });
-    expect(skips(result)[0].error).toContain('worktree');
-    expect(skips(result)[0].error).toContain('untracked');
-    expect(existsSync(worktree)).toBe(true);
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(existsSync(worktree)).toBe(false);
     expect(database(f).prompts.at(-1)?.text).toContain('healthy');
   } finally {
     f.clean();

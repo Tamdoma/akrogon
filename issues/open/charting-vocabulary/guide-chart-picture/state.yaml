@@ -1,0 +1,31 @@
+slug: guide-chart-picture
+phase: plan.synthesis
+created: 2026-09-13
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - rename-vocabulary
+sources: 
+  []
+failed_notified: false
+busy_since: 
+  B: 2026-09-13T21:42:24.927Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 1
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t55
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/guide-chart-picture
+pane: 
+  A: w8:p9M
+  B: w8:p9N
+prompted: 
+  B: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-guide-chart-picture--/2026-09-13T21-42-21-661Z_01a09cb8-a4dd-760e-a450-d529253375a6.jsonl
+prompted_at: 
+  B: 2026-09-13T21:42:24.927Z

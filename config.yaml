@@ -1,4 +1,4 @@
-max_active: 6
+max_active: 12
 slots: 
   a: 
     harness: pi
@@ -17,4 +17,4 @@ toolkits:
 repos: 
   akrogon: /home/ivan/Work/infra/akrogon
   framework: /home/ivan/Work/infra/tamdoma/framework
-  extensions: /home/ivan/.pi/agent/extensions
+  pi-extensions: /home/ivan/.pi/agent/extensions

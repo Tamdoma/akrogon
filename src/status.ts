@@ -92,13 +92,12 @@ function note(state: State, now: number): string {
     return [`busy ${seat} ${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`];
   });
   const attempts: string[] =
-    state.attempts.A + state.attempts.B > 0 ? [`attempts A:${state.attempts.A} B:${state.attempts.B}`] : [];
+    state.attempts.A + state.attempts.B > 0 ? [`A:${state.attempts.A} B:${state.attempts.B}`] : [];
   const fixes: string[] = state.fix_rounds > 0 ? [`fix rounds ${state.fix_rounds}`] : [];
   const verdicts: string[] = Object.entries(state.verdict).map(([slot, value]) => `${slot}:${value}`);
   const verdict: string[] = verdicts.length > 0 ? [`verdict ${verdicts.join(' ')}`] : [];
   const done: string[] = state.done.length > 0 ? [`done ${state.done.join(' ')}`] : [];
-  const tab: string[] = state.tab === undefined ? [] : [`tab ${state.tab}`];
-  return [...done, ...attempts, ...fixes, ...verdict, ...tab, ...busy].join(' · ');
+  return [...done, ...attempts, ...fixes, ...verdict, ...busy].join(' · ');
 }
 
 function cells(leaf: Leaf, log: LogRecord[], now: number, indent: string): string[] {
@@ -117,8 +116,10 @@ function rows(scan: Scan & { ok: true }, now: number): string[][] {
     const groups: string[] = relative(resolve(scan.repo.root, 'issues/open'), leaf.path).split(sep).slice(0, -1);
     let shared: number = 0;
     while (shared < groups.length && shared < previous.length && groups[shared] === previous[shared]) shared++;
+    const separator: string[][] = previous.length > 0 && shared < groups.length ? [['', '', '', '', '']] : [];
     previous = groups;
     return [
+      ...separator,
       ...groups.slice(shared).map((group, offset) => [`${indent(shared + offset)}${group}`, '', '', '', '']),
       cells(leaf, scan.log, now, indent(groups.length)),
     ];
