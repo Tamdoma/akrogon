@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { z } from 'zod';
 import { command, run, type Result } from './shell';
@@ -78,16 +78,16 @@ export function readRepo(name: string, path: string): Repo {
 
 export function within(path: string, parent: string): boolean {
   const diff: string = relative(parent, path);
-  return diff === '' || (!diff.startsWith('../') && diff !== '..' && !isAbsolute(diff));
+  return diff === '' || (!diff.startsWith('../') && diff !== '..');
 }
 
 export async function commonDirectory(cwd: string): Promise<string | null> {
-  const probe: Result = await run(['git', 'rev-parse', '--is-inside-work-tree'], cwd);
-  if (probe.code !== 0) {
-    if (probe.stderr.includes('not a git repository')) return null;
-    throw new Error(JSON.stringify({ cwd, ...probe }));
+  const result: Result = await run(['git', 'rev-parse', '--git-common-dir'], cwd);
+  if (result.code !== 0) {
+    if (result.stderr.includes('not a git repository')) return null;
+    throw new Error(JSON.stringify({ cwd, ...result }));
   }
-  return realpathSync(resolve(cwd, await command(['git', 'rev-parse', '--git-common-dir'], cwd)));
+  return realpathSync(resolve(cwd, result.stdout));
 }
 
 export async function currentRepo(global: GlobalConfig, cwd: string): Promise<Repo | null> {

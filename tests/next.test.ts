@@ -670,7 +670,7 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/landing'),
       closed: resolve(f.root, 'issues/closed/landing'),
-      lock: resolve(f.root, 'issues/open/landing/.lock'),
+      lock: resolve(f.root, 'issues/.lock'),
       worktree,
     };
     writeFileSync(
@@ -903,7 +903,7 @@ test('next awaits sourced completion after a failed rename before removing the w
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/issue'),
       closed,
-      lock: resolve(f.root, 'issues/open/issue/.lock'),
+      lock: resolve(f.root, 'issues/.lock'),
       worktree,
     };
     writeFileSync(
@@ -1062,7 +1062,7 @@ test('bare next from inside the repo cleans up its merged leaves', async () => {
   }
 }, 15000);
 
-for (const scope of ['global', 'repo', 'leaf'] as const) {
+for (const scope of ['global', 'repo'] as const) {
   test(`${scope} lock acquisition failure is fatal`, async () => {
     const f: DispatchFixture = await dispatchFixture();
     try {
@@ -1070,7 +1070,7 @@ for (const scope of ['global', 'repo', 'leaf'] as const) {
       leaf(f, 'zhealthy', 'plan.synthesis');
       symlinkSync(
         resolve(f.home, 'missing/lock'),
-        resolve(scope === 'global' ? f.home : scope === 'repo' ? resolve(f.root, 'issues') : path, '.lock'),
+        resolve(scope === 'global' ? f.home : resolve(f.root, 'issues'), '.lock'),
       );
       const result: Result = await next(f, ['locked']);
       expect(result.code).not.toBe(0);
@@ -1506,7 +1506,7 @@ test('startup retries closure before cleanup and retains failed owners with thei
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/issue'),
       closed: resolve(f.root, 'issues/closed/issue'),
-      lock: resolve(f.root, 'issues/open/issue/.lock'),
+      lock: resolve(f.root, 'issues/.lock'),
       worktree,
     };
     const failure: GhStep[] = [

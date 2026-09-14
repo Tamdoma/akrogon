@@ -24,7 +24,6 @@ import {
   missingLeafMessage,
   withLock,
   withRepoLock,
-  withLeafLocks,
   type Leaf,
   type State,
 } from './state';
@@ -486,58 +485,56 @@ async function dispatchLeaf(
       report(invocation, repo.name, identity.path, new Error(`Missing or unreadable leaf: ${slug}`), slug);
       return 'skipped';
     }
-    return withLeafLocks(leaf, async () => {
-      try {
-        let state: State = readState(leaf.path);
-        if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
-        if (state.hand_built) {
-          if (explicit) throw new Error(`Hand-built leaf cannot be dispatched: ${slug}`);
-          return 'waiting';
-        }
-        if (state.phase !== 'merged' && Object.values(state.pane).length > 0) {
-          const live: Pane[] = await panes();
-          for (const seat of ['A', 'B'] as const) {
-            const pane: Pane | undefined = live.find((pane) => pane.pane_id === state.pane[seat]);
-            if (pane !== undefined) state = await observeBusy(leaf.path, state, seat, pane, Date.now());
-          }
-        }
-        const refreshed: Leaf = { path: leaf.path, state };
-        if (state.phase === 'merge') {
-          const mergeSeat: Slot = seatFor(state, 'A');
-          const active: boolean = (await panes()).some(
-            (pane) => pane.pane_id === state.pane[mergeSeat] && pane.agent !== null && busy(pane),
-          );
-          if (active) return 'waiting';
-        }
-        const recovered: boolean = await recoverMerge(repo, refreshed);
-        const current: Leaf = recovered ? lookup(discover(repo, invocation), slug) : refreshed;
-        if (current.state.phase === 'merged') {
-          await completeOwner(repo, current, false);
-          return 'completed';
-        }
-        if (current.state.phase === 'failed') {
-          if (!current.state.failed_notified) {
-            await command(['herdr', 'notification', 'show', `Failed leaf: ${repo.name}/${slug}`]);
-            saveState(current.path, { ...current.state, failed_notified: true });
-          }
-          return 'waiting';
-        }
-        const dependencies: Leaf[] = current.state['blocked-by'].map((dependency) => lookup(inventory, dependency));
-        if (!dependencies.every((dependency) => dependency.state.phase === 'merged')) {
-          if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
-          return 'waiting';
-        }
-        const allocated: State | null = await allocate(global, repo, current, invocation);
-        if (allocated === null) return 'waiting';
-        for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds))
-          await dispatchSlot(global, repo, { path: current.path, state: allocated }, slot);
+    try {
+      let state: State = readState(leaf.path);
+      if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
+      if (state.hand_built) {
+        if (explicit) throw new Error(`Hand-built leaf cannot be dispatched: ${slug}`);
         return 'waiting';
-      } catch (error) {
-        if (!(error instanceof Error)) throw error;
-        report(invocation, repo.name, leaf.path, error, slug);
-        return 'skipped';
       }
-    });
+      if (state.phase !== 'merged' && Object.values(state.pane).length > 0) {
+        const live: Pane[] = await panes();
+        for (const seat of ['A', 'B'] as const) {
+          const pane: Pane | undefined = live.find((pane) => pane.pane_id === state.pane[seat]);
+          if (pane !== undefined) state = await observeBusy(leaf.path, state, seat, pane, Date.now());
+        }
+      }
+      const refreshed: Leaf = { path: leaf.path, state };
+      if (state.phase === 'merge') {
+        const mergeSeat: Slot = seatFor(state, 'A');
+        const active: boolean = (await panes()).some(
+          (pane) => pane.pane_id === state.pane[mergeSeat] && pane.agent !== null && busy(pane),
+        );
+        if (active) return 'waiting';
+      }
+      const recovered: boolean = await recoverMerge(repo, refreshed);
+      const current: Leaf = recovered ? lookup(discover(repo, invocation), slug) : refreshed;
+      if (current.state.phase === 'merged') {
+        await completeOwner(repo, current, false);
+        return 'completed';
+      }
+      if (current.state.phase === 'failed') {
+        if (!current.state.failed_notified) {
+          await command(['herdr', 'notification', 'show', `Failed leaf: ${repo.name}/${slug}`]);
+          saveState(current.path, { ...current.state, failed_notified: true });
+        }
+        return 'waiting';
+      }
+      const dependencies: Leaf[] = current.state['blocked-by'].map((dependency) => lookup(inventory, dependency));
+      if (!dependencies.every((dependency) => dependency.state.phase === 'merged')) {
+        if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
+        return 'waiting';
+      }
+      const allocated: State | null = await allocate(global, repo, current, invocation);
+      if (allocated === null) return 'waiting';
+      for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds))
+        await dispatchSlot(global, repo, { path: current.path, state: allocated }, slot);
+      return 'waiting';
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, repo.name, leaf.path, error, slug);
+      return 'skipped';
+    }
   });
 }
 

@@ -264,7 +264,7 @@ test('asymmetric and empty leaf sources defer until epic completion under open l
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/epic'),
       closed: resolve(f.root, 'issues/closed/epic'),
-      lock: resolve(f.root, 'issues/open/epic/second/.lock'),
+      lock: resolve(f.root, 'issues/.lock'),
       worktree: last,
     };
     writeFileSync(
@@ -326,7 +326,6 @@ test('source retries recheck state, skip CLOSED, and continue after final failur
       'team/project#2',
       'team/project#3',
       'team/project#4',
-      'malformed',
       'team/project#5',
       'team/project#6',
       'team/project#8',
@@ -539,12 +538,12 @@ test('each completed issue closes only its all-leaf private sources before the f
     const firstProbe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/epic'),
       closed: resolve(f.root, 'issues/closed/epic'),
-      lock: resolve(f.root, 'issues/open/epic/first/.lock'),
+      lock: resolve(f.root, 'issues/.lock'),
       worktree: first,
     };
     const lastProbe: NonNullable<GhStep['probe']> = {
       ...firstProbe,
-      lock: resolve(f.root, 'issues/open/epic/last/.lock'),
+      lock: resolve(f.root, 'issues/.lock'),
       worktree: last,
     };
     writeFileSync(
@@ -632,7 +631,7 @@ for (const scope of ['standalone', 'epic'] as const) {
       const probe: NonNullable<GhStep['probe']> = {
         open: resolve(f.root, 'issues/open', owner),
         closed: resolve(f.root, 'issues/closed', owner),
-        lock: resolve(f.root, 'issues/open', container, '.lock'),
+        lock: resolve(f.root, 'issues/.lock'),
         worktree,
       };
       writeFileSync(
@@ -703,6 +702,48 @@ test('standalone completion closes the union of asymmetric leaf sources', async 
     ).toEqual(['1', '2']);
     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
     expect(existsSync(resolve(f.root, 'issues/closed/issue/union'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+test('invalid sources and empty worktree fail at load without state, log or gh changes', async () => {
+  const cases: { slug: string; extra: object; field: string }[] = [
+    { slug: 'bad-source', extra: { sources: ['malformed'] }, field: 'sources' },
+    { slug: 'empty-worktree', extra: { worktree: '' }, field: 'worktree' },
+  ];
+  for (const item of cases) {
+    const f: Fixture = await fixture();
+    try {
+      const gh: GhFixture = fakeGh(f);
+      const path: string = leaf(f, item.slug, 'plan.synthesis', item.extra);
+      const before: string = bytes(path);
+      const result: Result = await cli(f, ['phase', item.slug, 'implement'], f.root, gh.env);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain(item.field);
+      expect(bytes(path)).toBe(before);
+      expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
+      expect(existsSync(gh.db + '.calls')).toBe(false);
+    } finally {
+      f.clean();
+    }
+  }
+});
+
+test('phase implement fails with Missing worktree when the recorded folder is gone', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = resolve(f.home, 'gone');
+    mkdirSync(worktree);
+    rmSync(worktree, { recursive: true });
+    const path: string = leaf(f, 'gone', 'plan.synthesis', { worktree });
+    const before: string = bytes(path);
+    const result: Result = await cli(f, ['phase', 'gone', 'implement']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('Missing worktree:');
+    expect(result.stderr).toContain(worktree);
+    expect(bytes(path)).toBe(before);
+    expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
   } finally {
     f.clean();
   }

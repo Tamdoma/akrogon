@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mock } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 import * as shell from '../src/shell';
 import { fixture, leaf, type Fixture } from './helpers';
@@ -84,12 +84,7 @@ if (process.argv.length === 2) {
   for (let i: number = 0; i < 100 && existsSync(`/proc/${pid}`); i++) await Bun.sleep(10);
   assert(!existsSync(`/proc/${pid}`));
   console.log(JSON.stringify({ elapsedMs, deadPid: pid, attempts: pids.length }));
-  for (const lock of [
-    resolve(f.home, '.lock'),
-    resolve(f.root, 'issues/.lock'),
-    resolve(dirname(path), '.lock'),
-    resolve(path, '.lock'),
-  ]) {
+  for (const lock of [resolve(f.home, '.lock'), resolve(f.root, 'issues/.lock')]) {
     await shell.command(['flock', '-n', lock, 'true']);
     console.log(JSON.stringify({ reacquiredLock: lock }));
   }

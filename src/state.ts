@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { basename, dirname, relative, resolve, sep } from 'node:path';
+import { relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
 import { type Repo } from './config';
@@ -7,6 +7,8 @@ import { writeYaml } from './shell';
 import { issueFolders } from './park';
 
 const counts = z.object({ A: z.number().int().nonnegative().default(0), B: z.number().int().nonnegative().default(0) });
+
+export const sourcePattern = /^([a-zA-Z0-9-]+\/(?!\.{1,2}#)[a-zA-Z0-9._-]+)#([1-9][0-9]*)$/;
 
 export const stateSchema = z
   .strictObject({
@@ -16,7 +18,7 @@ export const stateSchema = z
     repo: z.string(),
     debate: z.enum(['yes', 'no']),
     'blocked-by': z.array(z.string()),
-    sources: z.array(z.string()).optional(),
+    sources: z.array(z.string().regex(sourcePattern)).optional(),
     hand_built: z.boolean().optional(),
     failed_notified: z.boolean().default(false),
     busy_since: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
@@ -25,10 +27,10 @@ export const stateSchema = z
     done: z.array(slotSchema).default([]),
     fix_rounds: z.number().int().nonnegative().default(0),
     verdict: z.object({ A: verdictSchema.optional(), B: verdictSchema.optional() }).default({}),
-    tab: z.string().optional(),
-    worktree: z.string().optional(),
-    pane: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
-    prompted: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
+    tab: z.string().min(1).optional(),
+    worktree: z.string().min(1).optional(),
+    pane: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
+    prompted: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
     prompted_at: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
@@ -133,18 +135,4 @@ export async function withLock<T>(path: string, action: () => Promise<T>): Promi
 
 export async function withRepoLock<T>(repo: Repo, action: () => Promise<T>): Promise<T> {
   return withLock(resolve(repo.root, 'issues/.lock'), action);
-}
-
-export async function withLeafLocks<T>(leaf: Leaf, action: () => Promise<T>): Promise<T> {
-  const issue: string = dirname(leaf.path);
-  const parent: string = dirname(issue);
-  const enclosing: string[] = basename(parent) === 'open' || basename(parent) === 'closed' ? [issue] : [parent, issue];
-  async function acquire(paths: string[]): Promise<T> {
-    return paths.length === 0 ? action() : withLock(resolve(paths[0], '.lock'), () => acquire(paths.slice(1)));
-  }
-  return acquire([...enclosing, leaf.path]);
-}
-
-export function dependenciesReady(repo: Repo, state: State): boolean {
-  return state['blocked-by'].map((slug) => findLeaf(repo, slug)).every((leaf) => leaf.state.phase === 'merged');
 }

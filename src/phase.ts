@@ -1,17 +1,7 @@
 import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { readGlobal, requireRepo, target, globalHome, type Repo, within } from './config';
-import {
-  readState,
-  saveState,
-  findLeaf,
-  leavesUnder,
-  withRepoLock,
-  withLeafLocks,
-  withLock,
-  type State,
-  type Leaf,
-} from './state';
+import { readState, saveState, findLeaf, leavesUnder, withRepoLock, withLock, type State, type Leaf } from './state';
 import {
   phaseSchema,
   slotSchema,
@@ -150,6 +140,7 @@ export async function transition(
 }
 
 export async function requireClean(worktree: string): Promise<void> {
+  if (!existsSync(worktree)) throw new Error(`Missing worktree: ${worktree}`);
   const dirty: string = await command(['git', 'status', '--porcelain'], worktree);
   if (dirty !== '') throw new Error(`Uncommitted work in ${worktree}:\n${dirty}`);
 }
@@ -188,10 +179,8 @@ export async function phaseCommand(
   await withLock(resolve(globalHome(), '.lock'), () =>
     withRepoLock(repo, async () => {
       const leaf: Leaf = findLeaf(repo, slug);
-      await withLeafLocks(leaf, async () => {
-        if (leaf.state.phase === 'merged') await completeOwner(repo, leaf, false);
-        await transition(repo, leaf, requested, slot, verdict);
-      });
+      if (leaf.state.phase === 'merged') await completeOwner(repo, leaf, false);
+      await transition(repo, leaf, requested, slot, verdict);
     }),
   );
 }

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { readGlobal, readRepo, currentRepo, requireRepo, type GlobalConfig, type Repo } from './config';
 import { command, retryCommand, CommandError } from './shell';
-import { withRepoLock, type Leaf } from './state';
+import { sourcePattern, withRepoLock, type Leaf } from './state';
 
 const issueSchema = z.object({
   number: z.number().int().positive(),
@@ -107,7 +107,7 @@ export async function pullCommand(all: boolean): Promise<void> {
 class SourceError extends Error {}
 
 async function closeSource(repo: Repo, source: string, commit: string): Promise<void> {
-  const match: RegExpExecArray | null = /^([a-zA-Z0-9-]+\/(?!\.{1,2}#)[a-zA-Z0-9._-]+)#([1-9][0-9]*)$/.exec(source);
+  const match: RegExpExecArray | null = sourcePattern.exec(source);
   if (match === null) throw new SourceError(JSON.stringify({ error: 'Invalid GitHub source', source }));
   const [, repository, number]: string[] = match;
   const view: string[] = [
