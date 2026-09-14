@@ -22,7 +22,7 @@ test('sync commits local changes, rebases on the remote and pushes', async () =>
     writeFileSync(resolve(f.root, 'issues/log.jsonl'), '{"ts":"now"}\n');
     const result: Result = await cli(f, ['sync']);
     expect(result.code, result.stderr).toBe(0);
-    expect(await command(['git', 'status', '--porcelain'], f.root)).toBe('?? issues/.lock');
+    expect(await command(['git', 'status', '--porcelain'], f.root)).toBe('');
     expect(await command(['git', 'log', '--format=%s', '-2'], f.root)).toBe('sync issues\nleaf work');
     expect(await command(['git', 'rev-parse', 'main'], remote)).toBe(
       await command(['git', 'rev-parse', 'HEAD'], f.root),
@@ -74,8 +74,7 @@ async function snapshot(f: Fixture): Promise<string[]> {
 }
 
 async function locksFree(f: Fixture): Promise<void> {
-  for (const path of [resolve(f.home, '.lock'), resolve(f.root, 'issues/.lock')])
-    expect((await run(['flock', '-n', path, 'true'])).code).toBe(0);
+  for (const path of [resolve(f.home, '.lock')]) expect((await run(['flock', '-n', path, 'true'])).code).toBe(0);
 }
 
 for (const advancing of [false, true]) {
@@ -144,7 +143,6 @@ for (const branch of ['side', 'detached HEAD']) {
 for (const path of [
   'outside file \n',
   'issues/seeds/note',
-  'issues/.lock',
   'issues/nested/.lock',
   'issues/worktrees/branch/file',
   'rename',
@@ -228,7 +226,7 @@ function signalFlock(f: Fixture): NodeJS.ProcessEnv {
   return { PATH: `${bin}:${process.env.PATH}` };
 }
 
-test('sync holds global then repo locks through push while real park waits', async () => {
+test('sync holds global lock through push while real park waits', async () => {
   const f: Fixture = await remoteFixture();
   try {
     leaf(f, 'ready', 'plan.synthesis', {}, 'park-me');
@@ -243,8 +241,7 @@ test('sync holds global then repo locks through push while real park waits', asy
     const jobs: Promise<Result>[] = [sync];
     try {
       await waitFor(resolve(f.home, 'pushing'));
-      for (const path of [resolve(f.home, '.lock'), resolve(f.root, 'issues/.lock')])
-        expect((await run(['flock', '-n', path, 'true'])).code).toBe(1);
+      for (const path of [resolve(f.home, '.lock')]) expect((await run(['flock', '-n', path, 'true'])).code).toBe(1);
       const park: Promise<Result> = cli(f, ['park', 'park-me'], f.root, { ...env, LOCK_SIGNAL: 'parking' });
       jobs.push(park);
       await waitFor(resolve(f.home, 'parking'));
@@ -265,47 +262,12 @@ test('sync holds global then repo locks through push while real park waits', asy
   }
 });
 
-test('sync owns global lock while waiting for repo lock', async () => {
-  const f: Fixture = await remoteFixture();
-  const env: NodeJS.ProcessEnv = signalFlock(f);
-  const jobs: Promise<Result>[] = [];
-  const held: Bun.Subprocess<'pipe', 'pipe', 'pipe'> = Bun.spawn(
-    ['flock', '-x', resolve(f.root, 'issues/.lock'), 'sh', '-c', 'printf ready; cat >/dev/null'],
-    { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
-  );
-  try {
-    const reader: ReadableStreamDefaultReader<Uint8Array> = held.stdout.getReader();
-    await reader.read();
-    reader.releaseLock();
-    // Signal only the repo acquisition attempt, after the global lock has been acquired.
-    writeFileSync(
-      resolve(f.home, 'bin/flock'),
-      '#!/bin/sh\ncase "$2" in */issues/.lock) printf ready > "$AKROGON_HOME/waiting";; esac\nexec /usr/bin/flock "$@"\n',
-      { mode: 0o755 },
-    );
-    const before: string[] = await snapshot(f);
-    const sync: Promise<Result> = cli(f, ['sync'], f.root, env);
-    jobs.push(sync);
-    await waitFor(resolve(f.home, 'waiting'));
-    expect((await run(['flock', '-n', resolve(f.home, '.lock'), 'true'])).code).toBe(1);
-    expect(await snapshot(f)).toEqual(before);
-    held.stdin.end();
-    expect((await sync).code).toBe(0);
-    await locksFree(f);
-  } finally {
-    held.stdin.end();
-    await held.exited;
-    await Promise.all(jobs);
-    f.clean();
-  }
-});
-
-for (const location of ['issues/.lock', 'settings [1]*/.lock']) {
+for (const location of ['settings [1]*/.lock']) {
   for (const source of ['local', 'incoming', 'replay']) {
     test(`sync refuses active coordination lock ${location} from ${source}`, async () => {
       const f: Fixture = await remoteFixture();
       try {
-        const home: string = location === 'issues/.lock' ? f.home : resolve(f.root, dirname(location));
+        const home: string = resolve(f.root, dirname(location));
         if (home !== f.home) {
           mkdirSync(home, { recursive: true });
           copyFileSync(resolve(f.home, 'config.yaml'), resolve(home, 'config.yaml'));
@@ -343,8 +305,7 @@ for (const location of ['issues/.lock', 'settings [1]*/.lock']) {
         expect(readFileSync(resolve(f.root, 'file'), 'utf8')).toBe('unrelated edits\n');
         expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8')).toBe('local\n');
         if (source !== 'incoming') expect(readFileSync(resolve(f.root, location), 'utf8')).toBe('operator edits\n');
-        for (const path of [resolve(home, '.lock'), resolve(f.root, 'issues/.lock')])
-          expect((await run(['flock', '-n', path, 'true'])).code).toBe(0);
+        for (const path of [resolve(home, '.lock')]) expect((await run(['flock', '-n', path, 'true'])).code).toBe(0);
       } finally {
         f.clean();
       }

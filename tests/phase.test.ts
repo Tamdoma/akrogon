@@ -267,7 +267,7 @@ test('asymmetric and empty leaf sources defer until epic completion under open l
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/epic'),
       closed: resolve(f.root, 'issues/closed/epic'),
-      lock: resolve(f.root, 'issues/.lock'),
+      lock: resolve(f.home, '.lock'),
       worktree: last,
     };
     writeFileSync(
@@ -541,12 +541,12 @@ test('each completed issue closes only its all-leaf private sources before the f
     const firstProbe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/epic'),
       closed: resolve(f.root, 'issues/closed/epic'),
-      lock: resolve(f.root, 'issues/.lock'),
+      lock: resolve(f.home, '.lock'),
       worktree: first,
     };
     const lastProbe: NonNullable<GhStep['probe']> = {
       ...firstProbe,
-      lock: resolve(f.root, 'issues/.lock'),
+      lock: resolve(f.home, '.lock'),
       worktree: last,
     };
     writeFileSync(
@@ -634,7 +634,7 @@ for (const scope of ['standalone', 'epic'] as const) {
       const probe: NonNullable<GhStep['probe']> = {
         open: resolve(f.root, 'issues/open', owner),
         closed: resolve(f.root, 'issues/closed', owner),
-        lock: resolve(f.root, 'issues/.lock'),
+        lock: resolve(f.home, '.lock'),
         worktree,
       };
       writeFileSync(
@@ -747,6 +747,49 @@ test('phase implement fails with Missing worktree when the recorded folder is go
     expect(result.stderr).toContain(worktree);
     expect(bytes(path)).toBe(before);
     expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('failed exits by command reset attempts and refuse check.fix', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'stuck', 'failed', {
+      fix_rounds: 3,
+      attempts: { A: 1, B: 2 },
+      done: ['A'],
+    });
+    expect((await cli(f, ['phase', 'stuck', 'plan.synthesis'])).code).toBe(0);
+    expect(readState(path)).toMatchObject({ attempts: { A: 0, B: 0 }, done: [], fix_rounds: 0 });
+    const second: string = leaf(f, 'still-stuck', 'failed');
+    const before: string = bytes(second);
+    const logPath: string = resolve(f.root, 'issues/log.jsonl');
+    const logBefore: string | null = existsSync(logPath) ? readFileSync(logPath, 'utf8') : null;
+    const result: Result = await cli(f, ['phase', 'still-stuck', 'check.fix']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('Illegal move');
+    expect(bytes(second)).toBe(before);
+    if (logBefore === null) expect(existsSync(logPath)).toBe(false);
+    else expect(readFileSync(logPath, 'utf8')).toBe(logBefore);
+  } finally {
+    f.clean();
+  }
+});
+
+test('empty branch refuses review naming target', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = resolve(f.home, 'wt');
+    await command(['git', 'worktree', 'add', '-b', 'empty', worktree], f.root);
+    const path: string = leaf(f, 'empty', 'implement', { worktree });
+    const before: string = bytes(path);
+    const logPath: string = resolve(f.root, 'issues/log.jsonl');
+    const result: Result = await cli(f, ['phase', 'empty', 'check.review', '--slot', 'B']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('origin/main');
+    expect(bytes(path)).toBe(before);
+    expect(existsSync(logPath)).toBe(false);
   } finally {
     f.clean();
   }

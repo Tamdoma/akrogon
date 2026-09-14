@@ -32,7 +32,11 @@ export const routing: Record<Phase, Route> = {
   'check.fix': { skill: 'implement-issue', slots: ['B'], next: ['check.review'] },
   merge: { skill: 'merge-issue', slots: ['A'], next: ['merged', 'check.fix'] },
   merged: { skill: null, slots: [], next: [] },
-  failed: { skill: null, slots: [], next: ['implement'] },
+  failed: {
+    skill: null,
+    slots: [],
+    next: ['plan.positions', 'plan.rebuttal', 'plan.synthesis', 'implement', 'check.review', 'merge'],
+  },
 };
 
 export function requiredSlots(phase: Phase, rounds: number): readonly Slot[] {

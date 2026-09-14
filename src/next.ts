@@ -23,7 +23,6 @@ import {
   validateLeafDepth,
   missingLeafMessage,
   withLock,
-  withRepoLock,
   type Leaf,
   type State,
 } from './state';
@@ -44,7 +43,7 @@ import {
   type Result,
   type Workspace,
 } from './shell';
-import { commitMove, completeOwner, recoverMerge } from './phase';
+import { commitMove, completeOwner } from './phase';
 
 const hookEventSchema = z.discriminatedUnion('event', [
   z.object({
@@ -164,7 +163,7 @@ function ownsPane(leaf: Leaf, pane: Pane | undefined, paneId: string): boolean {
 }
 
 function busy(pane: Pane): boolean {
-  return pane.agent_status === 'working' || pane.agent_status === 'blocked';
+  return pane.agent_status === 'working' || pane.agent_status === 'blocked' || pane.agent_status === 'unknown';
 }
 function idle(pane: Pane): boolean {
   return pane.agent_status === 'idle' || pane.agent_status === 'done';
@@ -203,14 +202,6 @@ async function observeBusy(path: string, state: State, seat: Slot, pane: Pane, n
   };
   saveState(path, notified);
   return notified;
-}
-
-function peerOf(slot: Slot): Slot {
-  return slot === 'A' ? 'B' : 'A';
-}
-
-function seatFor(state: State, slot: Slot): Slot {
-  return state.attempts[slot] >= 2 ? peerOf(slot) : slot;
 }
 
 async function currentPane(id: string): Promise<Pane> {
@@ -261,12 +252,9 @@ async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
   return state;
 }
 
-type ActiveCounts = { total: number; perRepo: Map<string, number> };
-
-async function activeCount(global: GlobalConfig, invocation: Invocation): Promise<ActiveCounts> {
+async function activeCount(global: GlobalConfig, invocation: Invocation): Promise<number> {
   const live: Pane[] = await panes();
   const registered: ReturnType<typeof registeredRepos> = registeredRepos(global, invocation);
-  const perRepo: Map<string, number> = new Map();
   let total: number = registered.unknown ? global.max_active : 0;
   for (const repo of registered.repos) {
     const inventory: Inventory = discover(repo, invocation);
@@ -280,9 +268,8 @@ async function activeCount(global: GlobalConfig, invocation: Invocation): Promis
               live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf)),
           ).length;
     total += contribution;
-    perRepo.set(repo.name, contribution);
   }
-  return { total, perRepo };
+  return total;
 }
 
 async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation: Invocation): Promise<State | null> {
@@ -300,12 +287,8 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   );
   if (matches.length > 1) throw new Error(`Multiple tabs for leaf: ${leaf.state.slug}`);
   if (matches.length === 0) {
-    const counts: ActiveCounts = await activeCount(global, invocation);
-    if (
-      counts.total >= global.max_active ||
-      (repo.config.max_active !== undefined && (counts.perRepo.get(repo.name) ?? 0) >= repo.config.max_active)
-    )
-      return null;
+    const total: number = await activeCount(global, invocation);
+    if (total >= global.max_active) return null;
   }
   const state: State = await ensureWorktree(repo, leaf);
   const worktree: string = z.string().parse(state.worktree);
@@ -383,19 +366,9 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
   while (true) {
     const recorded: State = readState(leaf.path);
     if (recorded.phase !== leaf.state.phase || recorded.done.includes(slot)) return;
-    const peer: Slot = peerOf(slot);
-    const seat: Slot = seatFor(recorded, slot);
-    const pane: Pane = await currentPane(z.string().parse(recorded.pane[seat]));
-    const state: State = await observeBusy(leaf.path, recorded, seat, pane, Date.now());
+    const pane: Pane = await currentPane(z.string().parse(recorded.pane[slot]));
+    const state: State = await observeBusy(leaf.path, recorded, slot, pane, Date.now());
     if (pane.agent !== null && busy(pane)) return;
-    if (pane.agent !== null && !idle(pane)) {
-      if (seat === peer) {
-        await commitMove(repo, leaf, state, 'failed', slot);
-        return;
-      }
-      saveState(leaf.path, { ...state, attempts: { ...state.attempts, [slot]: 2 } });
-      continue;
-    }
     if (
       pane.agent !== null &&
       state.prompted[slot] !== undefined &&
@@ -410,7 +383,7 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
     const attempt: State = { ...state, attempts: { ...state.attempts, [slot]: state.attempts[slot] + 1 } };
     saveState(leaf.path, attempt);
     if (pane.agent === null) {
-      const harness: { kind: string; args: string[] } = launch(global, seat);
+      const harness: { kind: string; args: string[] } = launch(global, slot);
       const name: string = `akrogon-${createHash('sha256').update(pane.pane_id).digest('hex').slice(0, 24)}`;
       const started: Result = await run([
         'herdr',
@@ -433,11 +406,8 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
       }
     }
     const ready: Pane = await currentPane(pane.pane_id);
-    await observeBusy(leaf.path, readState(leaf.path), seat, ready, Date.now());
-    if (!idle(ready)) {
-      if (busy(ready)) return;
-      continue;
-    }
+    await observeBusy(leaf.path, readState(leaf.path), slot, ready, Date.now());
+    if (!idle(ready)) return;
     const prompt: string = `${routing[state.phase].skill} ${state.slug} slot=${slot} phase=${state.phase}`;
     const args: string[] = [
       'herdr',
@@ -454,7 +424,7 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
     const result: Result = await run(args);
     if (result.code === 0) {
       const prompted: Pane = await currentPane(ready.pane_id);
-      const observed: State = await observeBusy(leaf.path, readState(leaf.path), seat, prompted, Date.now());
+      const observed: State = await observeBusy(leaf.path, readState(leaf.path), slot, prompted, Date.now());
       const session: string | undefined = prompted.agent_session?.value;
       saveState(leaf.path, {
         ...observed,
@@ -478,64 +448,58 @@ async function dispatchLeaf(
   invocation: Invocation,
 ): Promise<DispatchOutcome> {
   const slug: string = identity.state.slug;
-  return withRepoLock(repo, async () => {
-    const inventory: Inventory = discover(repo, invocation);
-    const leaf: Leaf | undefined = inventory.leaves.find((leaf) => leaf.state.slug === slug);
-    if (leaf === undefined) {
-      report(invocation, repo.name, identity.path, new Error(`Missing or unreadable leaf: ${slug}`), slug);
-      return 'skipped';
-    }
-    try {
-      let state: State = readState(leaf.path);
-      if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
-      if (state.hand_built) {
-        if (explicit) throw new Error(`Hand-built leaf cannot be dispatched: ${slug}`);
-        return 'waiting';
-      }
-      if (state.phase !== 'merged' && Object.values(state.pane).length > 0) {
-        const live: Pane[] = await panes();
-        for (const seat of ['A', 'B'] as const) {
-          const pane: Pane | undefined = live.find((pane) => pane.pane_id === state.pane[seat]);
-          if (pane !== undefined) state = await observeBusy(leaf.path, state, seat, pane, Date.now());
-        }
-      }
-      const refreshed: Leaf = { path: leaf.path, state };
-      if (state.phase === 'merge') {
-        const mergeSeat: Slot = seatFor(state, 'A');
-        const active: boolean = (await panes()).some(
-          (pane) => pane.pane_id === state.pane[mergeSeat] && pane.agent !== null && busy(pane),
-        );
-        if (active) return 'waiting';
-      }
-      const recovered: boolean = await recoverMerge(repo, refreshed);
-      const current: Leaf = recovered ? lookup(discover(repo, invocation), slug) : refreshed;
-      if (current.state.phase === 'merged') {
-        await completeOwner(repo, current, false);
-        return 'completed';
-      }
-      if (current.state.phase === 'failed') {
-        if (!current.state.failed_notified) {
-          await command(['herdr', 'notification', 'show', `Failed leaf: ${repo.name}/${slug}`]);
-          saveState(current.path, { ...current.state, failed_notified: true });
-        }
-        return 'waiting';
-      }
-      const dependencies: Leaf[] = current.state['blocked-by'].map((dependency) => lookup(inventory, dependency));
-      if (!dependencies.every((dependency) => dependency.state.phase === 'merged')) {
-        if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
-        return 'waiting';
-      }
-      const allocated: State | null = await allocate(global, repo, current, invocation);
-      if (allocated === null) return 'waiting';
-      for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds))
-        await dispatchSlot(global, repo, { path: current.path, state: allocated }, slot);
+  const inventory: Inventory = discover(repo, invocation);
+  const leaf: Leaf | undefined = inventory.leaves.find((leaf) => leaf.state.slug === slug);
+  if (leaf === undefined) {
+    report(invocation, repo.name, identity.path, new Error(`Missing or unreadable leaf: ${slug}`), slug);
+    return 'skipped';
+  }
+  try {
+    let state: State = readState(leaf.path);
+    if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
+    if (state.hand_built) {
+      if (explicit) throw new Error(`Hand-built leaf cannot be dispatched: ${slug}`);
       return 'waiting';
-    } catch (error) {
-      if (!(error instanceof Error)) throw error;
-      report(invocation, repo.name, leaf.path, error, slug);
-      return 'skipped';
     }
-  });
+    if (state.phase !== 'merged' && Object.values(state.pane).length > 0) {
+      const live: Pane[] = await panes();
+      for (const seat of ['A', 'B'] as const) {
+        const pane: Pane | undefined = live.find((pane) => pane.pane_id === state.pane[seat]);
+        if (pane !== undefined) state = await observeBusy(leaf.path, state, seat, pane, Date.now());
+      }
+    }
+    if (state.phase === 'merged') {
+      await completeOwner(repo, { path: leaf.path, state }, false);
+      return 'completed';
+    }
+    if (state.phase === 'failed') {
+      if (!state.failed_notified) {
+        await command(['herdr', 'notification', 'show', `Failed leaf: ${repo.name}/${slug}`]);
+        saveState(leaf.path, { ...state, failed_notified: true });
+      }
+      return 'waiting';
+    }
+    if (
+      state.debate === 'yes' &&
+      state.phase === 'plan.synthesis' &&
+      !['positions-A.md', 'positions-B.md'].every((n) => existsSync(resolve(leaf.path, n)))
+    )
+      throw new Error(`Debate leaf skipped its debate: ${slug}; set phase: plan.positions`);
+    const dependencies: Leaf[] = state['blocked-by'].map((dependency) => lookup(inventory, dependency));
+    if (!dependencies.every((dependency) => dependency.state.phase === 'merged')) {
+      if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
+      return 'waiting';
+    }
+    const allocated: State | null = await allocate(global, repo, { path: leaf.path, state }, invocation);
+    if (allocated === null) return 'waiting';
+    for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds))
+      await dispatchSlot(global, repo, { path: leaf.path, state: allocated }, slot);
+    return 'waiting';
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    report(invocation, repo.name, leaf.path, error, slug);
+    return 'skipped';
+  }
 }
 
 async function cleanupMerged(repo: Repo, leaf: Leaf): Promise<void> {
@@ -639,8 +603,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
   const global: GlobalConfig = readGlobal();
   const invocation: Invocation = { skipped: new Set() };
   const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
-  const hooked: boolean =
-    hookPane !== undefined && (event !== undefined || (await paneOwners(global, invocation, hookPane)).length > 0);
+  const hooked: boolean = event !== undefined;
   const selection: Selection | undefined =
     input !== '--all' && event?.event !== 'tab_closed' && (input !== undefined || !hooked)
       ? await selectLeaves(global, invocation, input)

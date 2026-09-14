@@ -168,6 +168,9 @@ test('a stale prompt never re-prompts a busy or done seat, and three stale misse
   try {
     const path: string = leaf(f, 'misses', 'plan.synthesis');
     expect((await next(f, ['misses'])).code).toBe(0);
+    const b: string = readState(path).pane.B!;
+    expect(database(f).prompts).toEqual([{ pane: b, text: 'plan-issue misses slot=B phase=plan.synthesis' }]);
+    expect(readState(path).attempts).toEqual({ A: 0, B: 1 });
     const stale = (): void =>
       saveState(path, { ...readState(path), prompted_at: { B: new Date(Date.now() - 3 * 60 * 1000).toISOString() } });
     const status = (agent_status: 'idle' | 'working'): void => {
@@ -178,6 +181,7 @@ test('a stale prompt never re-prompts a busy or done seat, and three stale misse
     stale();
     expect((await next(f, ['misses'])).code).toBe(0);
     expect(database(f).prompts).toHaveLength(1);
+    expect(readState(path).attempts).toEqual({ A: 0, B: 1 });
     status('idle');
     saveState(path, { ...readState(path), done: ['B'] });
     expect((await next(f, ['misses'])).code).toBe(0);
@@ -185,15 +189,18 @@ test('a stale prompt never re-prompts a busy or done seat, and three stale misse
     saveState(path, { ...readState(path), done: [] });
     expect((await next(f, ['misses'])).code).toBe(0);
     expect(database(f).prompts).toHaveLength(2);
-    expect(readState(path).attempts.B).toBe(2);
+    expect(readState(path).attempts).toEqual({ A: 0, B: 2 });
+    status('idle');
     stale();
     expect((await next(f, ['misses'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(3);
+    expect(readState(path).attempts).toEqual({ A: 0, B: 3 });
     expect(readState(path).phase).toBe('plan.synthesis');
-    expect(readState(path).attempts.B).toBe(3);
     status('idle');
     stale();
     expect((await next(f, ['misses'])).code).toBe(0);
     expect(readState(path).phase).toBe('failed');
+    expect(database(f).prompts.every((p) => p.pane === b)).toBe(true);
   } finally {
     f.clean();
   }
@@ -254,7 +261,7 @@ test('next waits on a blocked agent instead of counting attempts or flipping sea
   }
 }, 15000);
 
-test('next resumes interrupted tab creation, retries same slot twice then peer once and fails', async () => {
+test('next resumes interrupted tab creation, retries same slot twice and fails', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'retry', 'plan.synthesis');
@@ -269,7 +276,7 @@ test('next resumes interrupted tab creation, retries same slot twice then peer o
     expect(db.tabs).toHaveLength(1);
     expect(db.prompts).toHaveLength(3);
     expect(db.prompts[0].pane).toBe(db.prompts[1].pane);
-    expect(db.prompts[2].pane).not.toBe(db.prompts[0].pane);
+    expect(db.prompts[2].pane).toBe(db.prompts[0].pane);
     expect(db.prompts.every((p) => p.text.includes('slot=B'))).toBe(true);
     expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8')).toContain('"to":"failed"');
     const before: number = calls(f).length;
@@ -366,13 +373,11 @@ test('busy seats persist, warn strictly after an hour, retry delivery and clear 
     });
     expect(Object.keys(readState(path).busy_notified)).toEqual(['A', 'B']);
     saveState(path, { ...readState(path), phase: 'plan.synthesis' });
-    for (const status of ['idle', 'done', 'unknown'] as const) {
+    for (const status of ['idle', 'done'] as const) {
       saveDatabase(f, {
         ...database(f),
         panes: database(f).panes.map((p) =>
-          p.pane_id === started.pane.A
-            ? { ...p, agent_status: status, agent: status === 'unknown' ? null : 'fake' }
-            : p,
+          p.pane_id === started.pane.A ? { ...p, agent_status: status, agent: 'fake' } : p,
         ),
       });
       expect((await nextAt(f, 'busy', now + 63 * 60000)).code).toBe(0);
@@ -388,6 +393,33 @@ test('busy seats persist, warn strictly after an hour, retry delivery and clear 
       expect((await nextAt(f, 'busy', now + 64 * 60000)).code).toBe(0);
       expect(readState(path).busy_since.A).toBe(new Date(now + 64 * 60000).toISOString());
     }
+    saveState(path, {
+      ...readState(path),
+      busy_since: { B: readState(path).busy_since.B! },
+      busy_notified: { B: readState(path).busy_notified.B! },
+    });
+    saveDatabase(f, {
+      ...database(f),
+      panes: database(f).panes.map((p) =>
+        p.pane_id === started.pane.A ? { ...p, agent_status: 'unknown', agent: 'fake' } : p,
+      ),
+    });
+    {
+      const promptsBefore: number = database(f).prompts.length;
+      const attemptsBefore: { A: number; B: number } = { ...readState(path).attempts };
+      expect((await nextAt(f, 'busy', now + 63 * 60000)).code).toBe(0);
+      expect(database(f).prompts).toHaveLength(promptsBefore);
+      expect(readState(path).attempts).toEqual(attemptsBefore);
+      expect(readState(path).busy_since.A).toBe(new Date(now + 63 * 60000).toISOString());
+      saveDatabase(f, {
+        ...database(f),
+        panes: database(f).panes.map((p) =>
+          p.pane_id === started.pane.A ? { ...p, agent: 'fake', agent_status: 'working' } : p,
+        ),
+      });
+      expect((await nextAt(f, 'busy', now + 64 * 60000)).code).toBe(0);
+      expect(readState(path).busy_since.A).toBe(new Date(now + 63 * 60000).toISOString());
+    }
     expect((await nextAt(f, 'busy', now + 125 * 60000)).code).toBe(0);
     expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(4);
   } finally {
@@ -395,7 +427,7 @@ test('busy seats persist, warn strictly after an hour, retry delivery and clear 
   }
 }, 30000);
 
-test('logical B fallback warns for physical A and unknown agents retain busy observations', async () => {
+test('unknown panes wait, warn after an hour and keep busy observations', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'fallback', 'plan.synthesis');
@@ -407,27 +439,31 @@ test('logical B fallback warns for physical A and unknown agents retain busy obs
       ...database(f),
       panes: database(f).panes.map((p) => (p.pane_id === initial.pane.B ? { ...p, agent_status: 'unknown' } : p)),
     });
+    const promptsBefore: number = database(f).prompts.length;
     expect((await nextAt(f, 'fallback', now)).code).toBe(0);
-    expect(database(f).prompts.at(-1)).toMatchObject({ pane: initial.pane.A, text: expect.stringContaining('slot=B') });
-    expect(readState(path)).toMatchObject({ attempts: { A: 0, B: 3 }, busy_since: { A: new Date(now).toISOString() } });
-    expect(readState(path).busy_since.B).toBeUndefined();
+    expect(database(f).prompts).toHaveLength(promptsBefore);
+    expect(readState(path)).toMatchObject({ attempts: { A: 0, B: 2 }, busy_since: { B: new Date(now).toISOString() } });
+    expect(readState(path).busy_since.A).toBeUndefined();
     expect((await nextAt(f, 'fallback', now + 61 * 60000)).code).toBe(0);
     const notifications: string[][] = calls(f).filter((args) => args[0] === 'notification');
     expect(notifications).toHaveLength(1);
-    expect(notifications[0][2]).toContain('seat A');
-    expect(readState(path).busy_notified.B).toBeUndefined();
-    const before: State = readState(path);
-    saveState(path, { ...before, done: ['B'] });
-    saveDatabase(f, { ...database(f), panes: database(f).panes.map((p) => ({ ...p, agent_status: 'unknown' })) });
+    expect(notifications[0][2]).toContain('seat B');
+    expect(readState(path).busy_notified.B).toBeDefined();
+    expect(readState(path).busy_notified.A).toBeUndefined();
+    saveState(path, { ...readState(path), done: ['B'] });
+    saveDatabase(f, {
+      ...database(f),
+      panes: database(f).panes.map((p) => ({ ...p, agent: 'fake', agent_status: 'unknown' })),
+    });
     expect((await nextAt(f, 'fallback', now + 62 * 60000)).code).toBe(0);
-    expect(readState(path).busy_since).toEqual(before.busy_since);
-    expect(readState(path).busy_notified).toEqual(before.busy_notified);
+    expect(readState(path).busy_since.B).toBe(new Date(now).toISOString());
+    expect(readState(path).busy_since.A).toBe(new Date(now + 62 * 60000).toISOString());
   } finally {
     f.clean();
   }
 }, 15000);
 
-test('next refuses hand-built and dependencies, respects capacity, and sends unknown panes to idle peers', async () => {
+test('next refuses hand-built and dependencies, respects capacity, and waits on unknown panes', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis');
@@ -448,9 +484,12 @@ test('next refuses hand-built and dependencies, respects capacity, and sends unk
       ...db,
       panes: db.panes.map((p) => (p.pane_id === readState(first).pane.B ? { ...p, agent_status: 'unknown' } : p)),
     });
+    const promptsBefore: number = database(f).prompts.length;
+    const attemptsBefore: { A: number; B: number } = { ...readState(first).attempts };
     expect((await next(f, ['first'])).code).toBe(0);
-    expect(database(f).prompts.at(-1)?.pane).toBe(readState(first).pane.A);
-    expect(database(f).prompts.at(-1)?.text).toContain('slot=B');
+    expect(database(f).prompts).toHaveLength(promptsBefore);
+    expect(readState(first).busy_since.B).toBeDefined();
+    expect(readState(first).attempts).toEqual(attemptsBefore);
   } finally {
     f.clean();
   }
@@ -470,7 +509,7 @@ test('a merged leaf with its tab still open does not count toward max_active', a
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
     expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
-    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['first', 'second']);
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['second']);
     expect(readState(dependent).attempts.B).toBe(1);
   } finally {
     f.clean();
@@ -508,7 +547,7 @@ test('a closed tab hook from a merged leaf sweeps and starts the next leaf', asy
   }
 }, 15000);
 
-test('merged phase leaves tab intact, a hook starts the dependent and only the startup sweep closes it', async () => {
+test('merged phase closes tab on typed next and starts the dependent', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
@@ -522,34 +561,12 @@ test('merged phase leaves tab intact, a hook starts the dependent and only the s
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
     expect((await next(f, [], { HERDR_PANE_ID: b })).code).toBe(0);
-    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['first', 'second']);
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['second']);
     expect(readState(dependent).attempts.B).toBe(1);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(database(f).tabs.map((tab) => tab.label)).toEqual(['second']);
   } finally {
     f.clean();
-  }
-}, 15000);
-
-test('per-repo capacity leaves uncapped repos to fill the global ceiling', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  const g: Fixture = await fixture();
-  try {
-    leaf(f, 'a-one', 'plan.synthesis');
-    leaf(f, 'a-two', 'plan.synthesis');
-    leaf(f, 'a-three', 'plan.synthesis');
-    leaf(g, 'b-one', 'plan.synthesis', { repo: 'other' });
-    leaf(g, 'b-two', 'plan.synthesis', { repo: 'other' });
-    configure(f, { max_active: 3, repos: { repo: f.root, other: g.root } });
-    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 1 });
-    const result: Result = await next(f, ['--all'], {}, f.home);
-    expect(result.code).toBe(0);
-    const labels: string[] = database(f).tabs.map((tab) => tab.label);
-    expect(labels.filter((label) => label.startsWith('a-'))).toHaveLength(1);
-    expect(labels.filter((label) => label.startsWith('b-'))).toHaveLength(2);
-  } finally {
-    f.clean();
-    g.clean();
   }
 }, 15000);
 
@@ -568,59 +585,20 @@ test('next --all inside a checkout sweeps only that repo', async () => {
   }
 }, 15000);
 
-test('global capacity still limits a repo with a larger repo cap', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const first: string = leaf(f, 'first', 'plan.synthesis');
-    const second: string = leaf(f, 'second', 'plan.synthesis');
-    configure(f, { max_active: 1 });
-    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 2 });
-    const result: Result = await next(f, ['--all']);
-    expect(result.code).toBe(0);
-    expect(database(f).tabs).toHaveLength(1);
-    expect(
-      [readState(first).worktree, readState(second).worktree].filter((worktree) => worktree !== undefined),
-    ).toHaveLength(1);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('repo capacity bypasses existing tabs and refuses a second tab-less leaf', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const first: string = leaf(f, 'first', 'plan.synthesis');
-    configure(f, { max_active: 3 });
-    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 1 });
-    expect((await next(f, ['first'])).code).toBe(0);
-    resetPrompts(f, first);
-    const second: string = leaf(f, 'second', 'plan.synthesis');
-    const result: Result = await next(f, ['--all']);
-    expect(result.code).toBe(0);
-    expect(database(f).tabs).toHaveLength(1);
-    expect(database(f).prompts).toHaveLength(1);
-    expect(database(f).prompts[0].text).toContain('first');
-    expect(readState(second).worktree).toBeUndefined();
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('unreadable state reserves its repo capacity and reports its path', async () => {
+test('unreadable state reserves its capacity and reports its path', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
     writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
     const first: string = leaf(f, 'first', 'plan.synthesis');
     const second: string = leaf(f, 'second', 'plan.synthesis');
-    configure(f, { max_active: 5 });
-    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 3 });
+    configure(f, { max_active: 2 });
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(1);
     expect(skips(result)).toHaveLength(1);
     expect(skips(result)[0]).toMatchObject({ path: malformed });
     expect(database(f).tabs).toHaveLength(0);
-    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 4 });
+    configure(f, { max_active: 4 });
     const retried: Result = await next(f, ['--all']);
     expect(retried.code).toBe(1);
     expect(database(f).tabs).toHaveLength(2);
@@ -670,7 +648,7 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/landing'),
       closed: resolve(f.root, 'issues/closed/landing'),
-      lock: resolve(f.root, 'issues/.lock'),
+      lock: resolve(f.home, '.lock'),
       worktree,
     };
     writeFileSync(
@@ -689,15 +667,25 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#8'] });
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
-    const recovered: Result = await next(f, ['landed']);
-    expect(recovered.code).toBe(0);
+    const state: State = readState(path);
+    const promptsBefore: number = database(f).prompts.length;
+    const prompted: Result = await next(f, ['landed']);
+    expect(prompted.code).toBe(0);
+    expect(readState(path).phase).toBe('merge');
+    expect(database(f).prompts).toHaveLength(promptsBefore + 1);
+    expect(database(f).prompts.at(-1)).toMatchObject({
+      pane: state.pane.A,
+      text: 'merge-issue landed slot=A phase=merge',
+    });
+    const completed: Result = await cli(f, ['phase', 'landed', 'merged', '--slot', 'A'], worktree, f.env);
+    expect(completed.code).toBe(0);
+    expect(completed.stdout).toContain('issue complete landing');
     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
     expect(
       readFileSync(gh.db + '.probes', 'utf8')
         .trim()
         .split('\n'),
     ).toHaveLength(2);
-    expect(recovered.stdout).toContain('issue complete landing');
     expect(readState(resolve(f.root, 'issues/closed/landing/landed')).phase).toBe('merged');
     expect(database(f).tabs).toHaveLength(1);
     expect(existsSync(worktree)).toBe(true);
@@ -762,7 +750,7 @@ test('delayed working and idle notifications from the prompted session never con
   }
 }, 15000);
 
-test('uncommitted work in a merge worktree is never recovered as merged', async () => {
+test('uncommitted work in a merge worktree is left to the merge seat', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const remote: string = resolve(f.home, 'remote.git');
@@ -776,10 +764,16 @@ test('uncommitted work in a merge worktree is never recovered as merged', async 
     saveState(path, { ...readState(path), phase: 'merge', prompted: {} });
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
+    const state: State = readState(path);
+    const promptsBefore: number = database(f).prompts.length;
     const result: Result = await next(f, ['dirty']);
-    expect(result.code).not.toBe(0);
-    expect(result.stderr).toContain('Uncommitted work');
+    expect(result.code).toBe(0);
     expect(readState(path).phase).toBe('merge');
+    expect(database(f).prompts).toHaveLength(promptsBefore + 1);
+    expect(database(f).prompts.at(-1)).toMatchObject({
+      pane: state.pane.A,
+      text: 'merge-issue dirty slot=A phase=merge',
+    });
     expect(existsSync(resolve(worktree, 'forgotten'))).toBe(true);
   } finally {
     f.clean();
@@ -826,33 +820,33 @@ test('a live merge retains its completion call after pushing, including a peer r
     await command(['git', 'add', 'landed'], worktree);
     await command(['git', 'commit', '-m', 'landed change'], worktree);
     await command(['git', 'push', 'origin', 'HEAD:main'], worktree);
-    for (const seat of ['A', 'B'] as const) {
-      saveState(path, {
-        ...readState(path),
-        phase: 'merge',
-        attempts: { A: seat === 'A' ? 1 : 3, B: 0 },
-        busy_since: { [seat]: new Date(Date.now() - 61 * 60000).toISOString() },
-        busy_notified: {},
-      });
-      const db: Database = database(f);
-      saveDatabase(f, {
-        ...db,
-        panes: db.panes.map((p) => ({
-          ...p,
-          agent: 'fake',
-          agent_status: p.pane_id === readState(path).pane[seat] ? 'working' : 'idle',
-        })),
-      });
-      expect((await next(f, ['--all'])).code).toBe(0);
-      expect(readState(path).phase).toBe('merge');
-      expect(readState(path).busy_since[seat]).toBeDefined();
-      expect(readState(path).busy_notified[seat]).toBeDefined();
-      expect(
-        calls(f)
-          .filter((args) => args[0] === 'notification')
-          .at(-1)![2],
-      ).toContain(`seat ${seat}`);
-    }
+    saveState(path, {
+      ...readState(path),
+      phase: 'merge',
+      attempts: { A: 1, B: 0 },
+      busy_since: { A: new Date(Date.now() - 61 * 60000).toISOString() },
+      busy_notified: {},
+    });
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      panes: db.panes.map((p) => ({
+        ...p,
+        agent: 'fake',
+        agent_status: p.pane_id === readState(path).pane.A ? 'working' : 'idle',
+      })),
+    });
+    const promptsBefore: number = database(f).prompts.length;
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(readState(path).phase).toBe('merge');
+    expect(database(f).prompts).toHaveLength(promptsBefore);
+    expect(readState(path).busy_since.A).toBeDefined();
+    expect(readState(path).busy_notified.A).toBeDefined();
+    expect(
+      calls(f)
+        .filter((args) => args[0] === 'notification')
+        .at(-1)![2],
+    ).toContain('seat A');
     const completed: Result = await cli(f, ['phase', 'active-merge', 'merged', '--slot', 'A'], worktree, f.env);
     expect(completed.code).toBe(0);
     expect(completed.stdout).toContain('issue complete issue');
@@ -903,7 +897,7 @@ test('next awaits sourced completion after a failed rename before removing the w
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/issue'),
       closed,
-      lock: resolve(f.root, 'issues/.lock'),
+      lock: resolve(f.home, '.lock'),
       worktree,
     };
     writeFileSync(
@@ -1062,16 +1056,13 @@ test('bare next from inside the repo cleans up its merged leaves', async () => {
   }
 }, 15000);
 
-for (const scope of ['global', 'repo'] as const) {
+for (const scope of ['global'] as const) {
   test(`${scope} lock acquisition failure is fatal`, async () => {
     const f: DispatchFixture = await dispatchFixture();
     try {
       const path: string = leaf(f, 'locked', 'plan.synthesis');
       leaf(f, 'zhealthy', 'plan.synthesis');
-      symlinkSync(
-        resolve(f.home, 'missing/lock'),
-        resolve(scope === 'global' ? f.home : resolve(f.root, 'issues'), '.lock'),
-      );
+      symlinkSync(resolve(f.home, 'missing/lock'), resolve(f.home, '.lock'));
       const result: Result = await next(f, ['locked']);
       expect(result.code).not.toBe(0);
       expect(result.stderr).toContain('lock');
@@ -1285,7 +1276,7 @@ test('explicit unreadable targets retain the original error without a missing-ta
   }
 });
 
-test('a selected leaf removed before its repo lock is reported as skipped', async () => {
+test('a selected leaf removed before its global lock is reported as skipped', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const gone: string = leaf(f, 'gone', 'plan.synthesis');
@@ -1295,7 +1286,7 @@ test('a selected leaf removed before its repo lock is reported as skipped', asyn
       { mode: 0o755 },
     );
     const result: Result = await next(f, ['gone'], {
-      REMOVE_BEFORE_LOCK: resolve(f.root, 'issues/.lock'),
+      REMOVE_BEFORE_LOCK: resolve(f.home, '.lock'),
       REMOVE_LEAF: gone,
     });
     expect(result.code).toBe(1);
@@ -1306,18 +1297,6 @@ test('a selected leaf removed before its repo lock is reported as skipped', asyn
     f.clean();
   }
 });
-
-test('recovery fetch deadline releases dispatch locks without transitioning', async () => {
-  const result: Result = await run([
-    'timeout',
-    '5',
-    process.execPath,
-    resolve(import.meta.dir, 'fetch-deadline-harness.ts'),
-  ]);
-  expect(result.code).toBe(0);
-  expect(result.stderr).toBe('');
-  expect(result.stdout).toContain('"stateUnchanged":true');
-}, 10000);
 
 for (const session of [null, undefined]) {
   test(`next prompts an idle agent with ${session === null ? 'null' : 'omitted'} session data`, async () => {
@@ -1342,7 +1321,7 @@ for (const session of [null, undefined]) {
   });
 }
 
-for (const seat of ['A', 'B'] as const) {
+for (const seat of ['A'] as const) {
   test(`blocked merge seat ${seat} prevents fetch and clean checks in a dirty worktree`, async () => {
     const f: DispatchFixture = await dispatchFixture();
     try {
@@ -1396,6 +1375,43 @@ for (const seat of ['A', 'B'] as const) {
     }
   });
 }
+
+test('a blocked non-merge seat does not stall a merge leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const remote: string = resolve(f.home, 'remote.git');
+    await command(['git', 'init', '--bare', remote]);
+    await command(['git', 'remote', 'add', 'origin', remote], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
+    expect((await next(f, ['blocked-merge'])).code).toBe(0);
+    const state: State = readState(path);
+    writeFileSync(resolve(state.worktree!, 'unfinished'), 'dirty merge work\n');
+    saveState(path, { ...state, phase: 'merge' });
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      panes: db.panes.map((pane) => ({
+        ...pane,
+        agent: 'fake',
+        agent_status: pane.pane_id === state.pane.B ? 'blocked' : 'idle',
+      })),
+    });
+    const promptsBefore: number = database(f).prompts.length;
+    const result: Result = await next(f, ['blocked-merge']);
+    expect(result.code).toBe(0);
+    expect(readState(path).phase).toBe('merge');
+    expect(database(f).prompts).toHaveLength(promptsBefore + 1);
+    expect(database(f).prompts.at(-1)).toMatchObject({
+      pane: state.pane.A,
+      text: 'merge-issue blocked-merge slot=A phase=merge',
+    });
+    expect(readState(path).busy_since.B).toBeDefined();
+    expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
+  } finally {
+    f.clean();
+  }
+}, 15000);
 
 for (const missing of ['neither', 'A', 'B', 'both'] as const) {
   test(`recorded seats stay authoritative with an extra pane first and ${missing} missing`, async () => {
@@ -1506,7 +1522,7 @@ test('startup retries closure before cleanup and retains failed owners with thei
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/issue'),
       closed: resolve(f.root, 'issues/closed/issue'),
-      lock: resolve(f.root, 'issues/.lock'),
+      lock: resolve(f.home, '.lock'),
       worktree,
     };
     const failure: GhStep[] = [
@@ -1671,3 +1687,83 @@ for (const owner of ['issue', 'epic/issue']) {
     }
   });
 }
+
+test('merge leaf with landed branch re-prompts its idle seat instead of auto-recovering', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const remote: string = resolve(f.home, 'remote.git');
+    await command(['git', 'init', '--bare', remote]);
+    await command(['git', 'remote', 'add', 'origin', remote], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const path: string = leaf(f, 'landed-merge', 'plan.synthesis');
+    expect((await next(f, ['landed-merge'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    writeFileSync(resolve(worktree, 'landed'), 'real change\n');
+    await command(['git', 'add', 'landed'], worktree);
+    await command(['git', 'commit', '-m', 'landed change'], worktree);
+    await command(['git', 'push', 'origin', 'HEAD:main'], worktree);
+    saveState(path, { ...readState(path), phase: 'merge', prompted: {} });
+    const state: State = readState(path);
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      panes: db.panes.map((p) => ({
+        ...p,
+        agent: 'fake',
+        agent_status: p.pane_id === state.pane.A ? 'idle' : 'working',
+      })),
+    });
+    const promptsBefore: number = database(f).prompts.length;
+    expect((await next(f, ['landed-merge'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(promptsBefore + 1);
+    expect(database(f).prompts.at(-1)).toMatchObject({
+      pane: state.pane.A,
+      text: 'merge-issue landed-merge slot=A phase=merge',
+    });
+    expect(readState(path).phase).toBe('merge');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('debate leaf without positions files refuses dispatch until positions exist', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'debate', 'plan.synthesis', { debate: 'yes' });
+    const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
+    const result: Result = await next(f, ['debate']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('debate');
+    expect(result.stderr).toContain('plan.positions');
+    expect(database(f).tabs).toHaveLength(0);
+    expect(database(f).panes).toHaveLength(0);
+    expect(database(f).prompts).toHaveLength(0);
+    expect(readState(path).worktree).toBeUndefined();
+    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
+    writeFileSync(resolve(path, 'positions-A.md'), 'A\n');
+    writeFileSync(resolve(path, 'positions-B.md'), 'B\n');
+    expect((await next(f, ['debate'])).code).toBe(0);
+    expect(database(f).prompts.at(-1)?.text).toBe('plan-issue debate slot=B phase=plan.synthesis');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('typed next from a leaf pane sweeps and removes merged worktrees', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const donePath: string = leaf(f, 'done', 'plan.synthesis', {}, 'done-issue');
+    expect((await next(f, ['done'])).code).toBe(0);
+    const otherPath: string = leaf(f, 'other', 'plan.synthesis', {}, 'other-issue');
+    expect((await next(f, ['other'])).code).toBe(0);
+    const worktree: string = readState(donePath).worktree!;
+    saveState(donePath, { ...readState(donePath), phase: 'merged' });
+    const otherPane: string = readState(otherPath).pane.B!;
+    expect(existsSync(worktree)).toBe(true);
+    const result: Result = await next(f, [], { HERDR_PANE_ID: otherPane });
+    expect(result.code).toBe(0);
+    expect(existsSync(worktree)).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 15000);

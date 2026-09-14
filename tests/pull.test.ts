@@ -235,27 +235,6 @@ test('missing and invalid origins fail visibly, and all continues after invalid 
   }
 });
 
-test('concurrent pulls serialize listing and reconciliation', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const gh: GhFixture = fakeGh(f);
-    await command(['git', 'remote', 'add', 'origin', 'https://github.com/acme/project'], f.root);
-    script(gh, [
-      { stdout: JSON.stringify([[issue(1, 'Old')]]), delayMs: 200 },
-      { stdout: JSON.stringify([[issue(1, 'New')]]) },
-    ]);
-    const first: Promise<Result> = cli(f, ['pull'], f.root, gh.env);
-    for (let attempt: number = 0; attempt < 100 && !existsSync(gh.db + '.calls'); attempt++) await Bun.sleep(10);
-    expect(existsSync(gh.db + '.calls')).toBe(true);
-    const results: Result[] = await Promise.all([first, cli(f, ['pull'], f.root, gh.env)]);
-    expect(results.map((result) => result.code)).toEqual([0, 0]);
-    expect(readFileSync(gh.db + '.events', 'utf8')).toBe('start\nend\nstart\nend\n');
-    expect(Object.keys(snapshot(f))).toEqual(['1-new.md']);
-  } finally {
-    f.clean();
-  }
-});
-
 test('startup runs pull all before next all and wrappers forward arguments', async () => {
   const plugin: string = resolve(import.meta.dir, '../plugin');
   const manifest = z

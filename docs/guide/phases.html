@@ -71,7 +71,6 @@
 akrogon phase rename-flag merge --slot A --verdict nits</code></pre>
     <p>The command refuses illegal moves, refuses a slot that already reported, and moves the phase only when every required slot has reported. Until then it prints <code>recorded</code> and waits for the other slot. That is why you sometimes see "transition refused" in a pane: the agent tried twice, the second was rejected, and that is correct.</p>
     <div class="why"><span class="eyebrow">Why re-review after a fix uses only A</span><p>B just wrote the fix. B reviewing its own fix costs tokens and adds little. A checks the repair diff only. If A says fix again, B goes another round, up to <code>fix_rounds</code>.</p></div>
-    <div class="why"><span class="eyebrow">Why a stuck agent's work goes to the other pane</span><p>If a slot is prompted twice and does not start, the third try goes to the other agent's pane as a stand-in. A stuck agent is usually a stuck process, not a stuck task. The other pane is a fresh process with the same skill files. After three tries the leaf fails.</p></div>
   </div>
 </section>
 </div>

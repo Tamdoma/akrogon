@@ -103,7 +103,7 @@ herdr plugin log list --plugin akrogon   <span class="c"># why the hook did or d
     <div class="head"><span class="eyebrow">12 · Use cases</span><h2>The questions that come up, answered</h2></div>
 
     <h3>I have one epic and one normal issue. Can they run in parallel?</h3>
-    <p>Yes, by default. Every ready leaf in every repo competes for the same seats. If the epic has three unblocked leaves and the global <code>max_active</code> is 3, the epic can take all three and the issue waits for the first merge. Set the optional <code>max_active</code> in that repo's <code>issues/config.yaml</code> to cap its share. The tool does not balance between folders.</p>
+    <p>Yes, by default. Every ready leaf in every repo competes for the same seats. If the epic has three unblocked leaves and the global <code>max_active</code> is 3, the epic can take all three and the issue waits for the first merge. The tool does not balance between folders.</p>
 
     <h3>I only want this epic to use the free seats</h3>
     <pre><code>akrogon park --all

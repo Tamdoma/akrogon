@@ -132,7 +132,3 @@ export async function withLock<T>(path: string, action: () => Promise<T>): Promi
       throw new Error(JSON.stringify({ lock: path, code, stderr: await new Response(child.stderr).text() }));
   }
 }
-
-export async function withRepoLock<T>(repo: Repo, action: () => Promise<T>): Promise<T> {
-  return withLock(resolve(repo.root, 'issues/.lock'), action);
-}

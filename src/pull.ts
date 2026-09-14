@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { readGlobal, readRepo, currentRepo, requireRepo, type GlobalConfig, type Repo } from './config';
 import { command, retryCommand, CommandError } from './shell';
-import { sourcePattern, withRepoLock, type Leaf } from './state';
+import { sourcePattern, type Leaf } from './state';
 
 const issueSchema = z.object({
   number: z.number().int().positive(),
@@ -40,42 +40,40 @@ function slug(title: string): string {
 }
 
 export async function pullRepo(repo: Repo): Promise<void> {
-  await withRepoLock(repo, async () => {
-    const origin: string = await command(['git', 'remote', 'get-url', 'origin'], repo.root);
-    const match: RegExpExecArray | null =
-      /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([a-zA-Z0-9-]+)\/([a-zA-Z0-9._-]+?)(?:\.git)?\/?$/.exec(
-        origin,
-      );
-    if (match === null || match[2] === '.' || match[2] === '..')
-      throw new Error(JSON.stringify({ error: 'Origin must identify a GitHub repository', repo: repo.name, origin }));
-    const source: string = `${match[1]}/${match[2]}`;
-    const output: string = await retryCommand(
-      [
-        'gh',
-        'api',
-        '--hostname',
-        'github.com',
-        `repos/${source}/issues?state=open&per_page=100`,
-        '--paginate',
-        '--slurp',
-      ],
-      repo.root,
+  const origin: string = await command(['git', 'remote', 'get-url', 'origin'], repo.root);
+  const match: RegExpExecArray | null =
+    /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([a-zA-Z0-9-]+)\/([a-zA-Z0-9._-]+?)(?:\.git)?\/?$/.exec(
+      origin,
     );
-    const issues: Map<number, GitHubIssue> = new Map(parseListing(output).map((issue) => [issue.number, issue]));
-    const desired: Map<string, string> = new Map(
-      [...issues.values()].map((issue) => [
-        `${issue.number}-${slug(issue.title)}.md`,
-        `# ${issue.title}\n\nSource: ${source}#${issue.number}\nURL: ${issue.html_url}\n\n${issue.body ?? ''}`,
-      ]),
-    );
-    const seeds: string = resolve(repo.root, 'issues/seeds');
-    mkdirSync(seeds, { recursive: true });
-    for (const [name, content] of desired) writeFileSync(resolve(seeds, name), content);
-    for (const entry of readdirSync(seeds, { withFileTypes: true }))
-      if (entry.isFile() && /^\d+-.*\.md$/.test(entry.name) && !desired.has(entry.name))
-        unlinkSync(resolve(seeds, entry.name));
-    console.log(`${repo.name}: ${desired.size} open issues pulled`);
-  });
+  if (match === null || match[2] === '.' || match[2] === '..')
+    throw new Error(JSON.stringify({ error: 'Origin must identify a GitHub repository', repo: repo.name, origin }));
+  const source: string = `${match[1]}/${match[2]}`;
+  const output: string = await retryCommand(
+    [
+      'gh',
+      'api',
+      '--hostname',
+      'github.com',
+      `repos/${source}/issues?state=open&per_page=100`,
+      '--paginate',
+      '--slurp',
+    ],
+    repo.root,
+  );
+  const issues: Map<number, GitHubIssue> = new Map(parseListing(output).map((issue) => [issue.number, issue]));
+  const desired: Map<string, string> = new Map(
+    [...issues.values()].map((issue) => [
+      `${issue.number}-${slug(issue.title)}.md`,
+      `# ${issue.title}\n\nSource: ${source}#${issue.number}\nURL: ${issue.html_url}\n\n${issue.body ?? ''}`,
+    ]),
+  );
+  const seeds: string = resolve(repo.root, 'issues/seeds');
+  mkdirSync(seeds, { recursive: true });
+  for (const [name, content] of desired) writeFileSync(resolve(seeds, name), content);
+  for (const entry of readdirSync(seeds, { withFileTypes: true }))
+    if (entry.isFile() && /^\d+-.*\.md$/.test(entry.name) && !desired.has(entry.name))
+      unlinkSync(resolve(seeds, entry.name));
+  console.log(`${repo.name}: ${desired.size} open issues pulled`);
 }
 
 export async function pullCommand(all: boolean): Promise<void> {

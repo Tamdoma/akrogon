@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { readGlobal, requireRepo, target, globalHome, type Repo, within } from './config';
-import { readState, saveState, findLeaf, leavesUnder, withRepoLock, withLock, type State, type Leaf } from './state';
+import { readState, saveState, findLeaf, leavesUnder, withLock, type State, type Leaf } from './state';
 import {
   phaseSchema,
   slotSchema,
@@ -12,7 +12,7 @@ import {
   type Slot,
   type Verdict,
 } from './routing';
-import { command, run, retryCommand, type Result } from './shell';
+import { command } from './shell';
 import { logMove } from './log';
 import { closeSources } from './pull';
 
@@ -35,7 +35,7 @@ export async function commitMove(
     fix_rounds:
       to === 'check.fix' && recorded.phase === 'check.review'
         ? recorded.fix_rounds + 1
-        : recorded.phase === 'failed' && to === 'implement'
+        : recorded.phase === 'failed'
           ? 0
           : recorded.fix_rounds,
   };
@@ -153,19 +153,8 @@ export async function requireCodeOnly(repo: Repo, worktree: string): Promise<voi
     worktree,
   );
   if (files !== '') throw new Error(`Issue files on leaf branch belong to ${resolve(repo.root, 'issues')}:\n${files}`);
-}
-
-export async function recoverMerge(repo: Repo, leaf: Leaf): Promise<boolean> {
-  if (leaf.state.phase !== 'merge') return false;
-  if (leaf.state.worktree === undefined) throw new Error(`Merge leaf has no worktree: ${leaf.state.slug}`);
-  await retryCommand(['git', 'fetch', repo.config.remote, repo.config.default_branch], repo.root, 60000);
-  await requireClean(leaf.state.worktree);
-  const head: string = await command(['git', 'rev-parse', 'HEAD'], leaf.state.worktree);
-  const result: Result = await run(['git', 'merge-base', '--is-ancestor', head, target(repo)], repo.root);
-  if (result.code === 1) return false;
-  if (result.code !== 0) throw new Error(JSON.stringify({ ancestry: head, target: target(repo), ...result }));
-  await transition(repo, leaf, 'merged', 'A', undefined);
-  return true;
+  const changes: string = await command(['git', 'diff', '--name-only', `${target(repo)}...HEAD`], worktree);
+  if (changes === '') throw new Error(`Empty leaf branch: no changes against ${target(repo)}`);
 }
 
 export async function phaseCommand(
@@ -178,11 +167,9 @@ export async function phaseCommand(
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
   const verdict: Verdict | undefined = verdictSchema.optional().parse(rawVerdict);
   const repo: Repo = await requireRepo(readGlobal(), process.cwd());
-  await withLock(resolve(globalHome(), '.lock'), () =>
-    withRepoLock(repo, async () => {
-      const leaf: Leaf = findLeaf(repo, slug);
-      if (leaf.state.phase === 'merged') await completeOwner(repo, leaf, false);
-      await transition(repo, leaf, requested, slot, verdict);
-    }),
-  );
+  await withLock(resolve(globalHome(), '.lock'), async () => {
+    const leaf: Leaf = findLeaf(repo, slug);
+    if (leaf.state.phase === 'merged') await completeOwner(repo, leaf, false);
+    await transition(repo, leaf, requested, slot, verdict);
+  });
 }

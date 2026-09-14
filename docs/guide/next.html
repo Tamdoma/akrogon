@@ -62,7 +62,7 @@
           <li>For every registered repo, walk <code>issues/open/</code> in folder order and look at every leaf.</li>
           <li>Skip a leaf if it is <code>merged</code>, <code>failed</code>, or <code>hand_built</code>. Skip it if any slug in <code>blocked-by</code> is not <code>merged</code>.</li>
           <li>If the leaf already has a tab, prompt whoever its phase needs, if they are idle.</li>
-          <li>If it has no tab, fewer than the global <code>max_active</code> leaves are running anywhere, and either the repo has no <code>max_active</code> or fewer than its <code>max_active</code> leaves are running, create the worktree and branch, open a tab with two panes, start the agent, and send one prompt. Merged leaves never count as running, even if their tab is still open.</li>
+          <li>If it has no tab and fewer than the global <code>max_active</code> leaves are running anywhere, create the worktree and branch, open a tab with two panes, start the agent, and send one prompt. Merged leaves never count as running, even if their tab is still open.</li>
           <li>Exit.</li>
         </ol>
         <p>The prompt is always four words: skill, slug, slot, phase. For example <code>plan-issue rename-flag slot=B phase=plan.synthesis</code>. The agent reads the skill file and does the rest.</p>

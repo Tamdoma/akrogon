@@ -77,7 +77,7 @@ toolkits:
 repos:
   akrogon: /home/me/Work/infra/akrogon
   my-app: /home/me/Work/my-app</code></pre>
-    <div class="why"><span class="eyebrow">Why max_active</span><p>Each active leaf is two agents spending tokens plus a worktree on disk. Three is a lot. The global <code>max_active</code> is the machine ceiling across every registered repo. An optional <code>max_active</code> in a repo's <code>issues/config.yaml</code> caps that repo's share; without it, the repo has no separate limit. Raise the global limit when you have the budget.</p></div>
+    <div class="why"><span class="eyebrow">Why max_active</span><p>Each active leaf is two agents spending tokens plus a worktree on disk. Three is a lot. The global <code>max_active</code> is the machine ceiling across every registered repo. Raise the global limit when you have the budget.</p></div>
   </div>
 </section>
 </div>
