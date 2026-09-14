@@ -9,7 +9,6 @@ interface Message {
   readonly summary: string;
   readonly before: readonly string[];
   readonly now: readonly string[];
-  readonly next: readonly string[];
 }
 interface Webhook {
   readonly name: string;
@@ -34,7 +33,6 @@ const messageSchema: z.ZodType<Message> = z.strictObject({
   summary: z.string().trim().min(1).max(200),
   before: bullets,
   now: bullets,
-  next: bullets,
 });
 const chunkSchema: z.ZodType<string> = z.string().max(2000);
 
@@ -52,7 +50,6 @@ function chunks(message: Message): string[] {
     `## 🧪 ${message.summary} (${stamp(new Date())})`,
     section('Before', message.before),
     section('Now', message.now),
-    section('Next', message.next),
   ];
   return parts.reduce((acc: string[], part: string): string[] => {
     const last: string | undefined = acc.at(-1);

@@ -49,15 +49,14 @@ const sender: string = join(import.meta.dir, 'discord-send.ts');
 const primary: string = 'https://discord.com/api/webhooks/123456/primary-secret';
 const secondary: string = 'https://discord.com/api/webhooks/654321/secondary-secret';
 const today: string = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
-const threeChunks: string[] = [
+const twoChunks: string[] = [
   `## 🧪 Title (${today})\n\n**Before**\n- ${'a'.repeat(1500)}`,
   `**Now**\n- ${'b'.repeat(1500)}`,
-  `**Next**\n- ${'c'.repeat(1500)}`,
 ];
-const threeChunkPayload: string = JSON.stringify({ summary: 'Title', before: ['a'.repeat(1500)], now: ['b'.repeat(1500)], next: ['c'.repeat(1500)] });
+const twoChunkPayload: string = JSON.stringify({ summary: 'Title', before: ['a'.repeat(1500)], now: ['b'.repeat(1500)] });
 const success: Reply = { status: 204, body: '' };
 const rejected: Reply = { status: 500, body: 'busy' };
-const payload: string = JSON.stringify({ summary: 'Project: Search works', before: ['Saved items were lost.'], now: ['Search finds saved items.'], next: ['Nothing needs re-saving.'] });
+const payload: string = JSON.stringify({ summary: 'Project: Search works', before: ['Saved items were lost.'], now: ['Search finds saved items.'] });
 
 async function run(scenario: Scenario): Promise<Result> {
   const root: string = mkdtempSync(join(tmpdir(), 'akrogon-broadcast-'));
@@ -122,13 +121,14 @@ test('delivers one message to configured targets using only the external file, w
   expect(result.exitCode, result.output).toBe(0);
   expect(result.requests.map((request): string => request.url)).toEqual([primary, secondary]);
   expect(JSON.parse(result.requests[0]!.body)).toEqual({
-    content: `## 🧪 Project: Search works (${today})\n\n**Before**\n- Saved items were lost.\n\n**Now**\n- Search finds saved items.\n\n**Next**\n- Nothing needs re-saving.`,
+    content: `## 🧪 Project: Search works (${today})\n\n**Before**\n- Saved items were lost.\n\n**Now**\n- Search finds saved items.`,
   });
+  expect(JSON.parse(result.requests[0]!.body).content).not.toContain(`**${'Next'}**`);
   expect(result.files).toEqual(['.config', '.config/akrogon', '.config/akrogon/env', 'boundary.ts', 'requests.jsonl']);
 });
 
 test('splits a long message into several deliveries at section boundaries', async (): Promise<void> => {
-  const long: string = JSON.stringify({ summary: 'Title', before: ['a'.repeat(1500)], now: ['b'.repeat(1500)], next: ['c'] });
+  const long: string = JSON.stringify({ summary: 'Title', before: ['a'.repeat(1500)], now: ['b'.repeat(1500)] });
   const result: Result = await run({
     secrets: `PRIMARY=${primary}`, targets: ['PRIMARY'], payload: long,
     replies: [{ status: 204, body: '' }, { status: 204, body: '' }],
@@ -138,7 +138,6 @@ test('splits a long message into several deliveries at section boundaries', asyn
   expect(bodies).toHaveLength(2);
   expect(bodies[0]).toStartWith(`## 🧪 Title (${today})\n\n**Before**`);
   expect(bodies[1]).toStartWith('**Now**');
-  expect(bodies[1]).toContain('**Next**');
 });
 
 test('refuses missing secrets, invalid routes and empty targets before sending', async (): Promise<void> => {
@@ -157,10 +156,11 @@ test('refuses missing secrets, invalid routes and empty targets before sending',
 
 test('validates the whole message and all targets before any delivery', async (): Promise<void> => {
   for (const invalid of [
-    JSON.stringify({ summary: '', before: ['a'], now: ['b'], next: ['c'] }),
-    JSON.stringify({ summary: 'Title', before: [], now: ['b'], next: ['c'] }),
-    JSON.stringify({ summary: 'Title', before: ['a'], now: ['b'] }),
-    JSON.stringify({ summary: 'Title', before: ['a'.repeat(2000)], now: ['b'], next: ['c'] }),
+    JSON.stringify({ summary: '', before: ['a'], now: ['b'] }),
+    JSON.stringify({ summary: 'Title', before: [], now: ['b'] }),
+    JSON.stringify({ summary: 'Title', before: ['a'] }),
+    JSON.stringify({ summary: 'Title', before: ['a'], now: ['b'], next: ['c'] }),
+    JSON.stringify({ summary: 'Title', before: ['a'.repeat(2000)], now: ['b'] }),
   ]) {
     const result: Result = await run({ secrets: `PRIMARY=${primary}`, targets: ['PRIMARY'], replies: [], payload: invalid });
     expect(result.exitCode).not.toBe(0);
@@ -250,17 +250,17 @@ test('stops after one response-body retry, preserves final context and attempts 
 
 test('reports partial delivery and sends every chunk to the remaining target', async (): Promise<void> => {
   const result: Result = await run({
-    secrets: `PRIMARY=${primary}\nSECONDARY=${secondary}`, targets: ['PRIMARY', 'SECONDARY'], payload: threeChunkPayload,
-    replies: [success, { status: 500, body: primary }, { status: 429, body: 'primary-secret rejected' }, success, success, success],
+    secrets: `PRIMARY=${primary}\nSECONDARY=${secondary}`, targets: ['PRIMARY', 'SECONDARY'], payload: twoChunkPayload,
+    replies: [success, { status: 500, body: 'busy' }, { status: 429, body: 'primary-secret rejected' }, success, success],
   });
   expect(result.exitCode).not.toBe(0);
   expect(result.requests).toEqual([
-    ...[threeChunks[0], threeChunks[1], threeChunks[1]].map((content: string): RequestTrace => ({ url: primary, body: JSON.stringify({ content }) })),
-    ...threeChunks.map((content: string): RequestTrace => ({ url: secondary, body: JSON.stringify({ content }) })),
+    ...[twoChunks[0], twoChunks[1], twoChunks[1]].map((content: string): RequestTrace => ({ url: primary, body: JSON.stringify({ content }) })),
+    ...twoChunks.map((content: string): RequestTrace => ({ url: secondary, body: JSON.stringify({ content }) })),
   ]);
   expect(result.failures).toEqual([{
-    target: 'PRIMARY', status: 429, body: '[redacted token] rejected', request: { content: threeChunks[1] },
-    delivered: 1, failed: 1, unattempted: 1,
+    target: 'PRIMARY', status: 429, body: '[redacted token] rejected', request: { content: twoChunks[1] },
+    delivered: 1, failed: 1, unattempted: 0,
   }]);
   expect(result.output).toContain('broadcast retry');
   expect(result.output).toContain('broadcast delivered');
@@ -268,35 +268,35 @@ test('reports partial delivery and sends every chunk to the remaining target', a
   expect(result.files).toEqual(['.config', '.config/akrogon', '.config/akrogon/env', 'boundary.ts', 'requests.jsonl']);
 });
 
-for (const delivered of [0, 2]) {
+for (const delivered of [0, 1]) {
   test(`reports exhaustion after ${delivered} completed chunks`, async (): Promise<void> => {
     const result: Result = await run({
-      secrets: `PRIMARY=${primary}`, targets: ['PRIMARY'], payload: threeChunkPayload,
+      secrets: `PRIMARY=${primary}`, targets: ['PRIMARY'], payload: twoChunkPayload,
       replies: [...Array<Reply>(delivered).fill(success), rejected, rejected],
     });
     expect(result.exitCode).not.toBe(0);
-    expect(result.requests).toEqual([...threeChunks.slice(0, delivered), threeChunks[delivered], threeChunks[delivered]]
+    expect(result.requests).toEqual([...twoChunks.slice(0, delivered), twoChunks[delivered], twoChunks[delivered]]
       .map((content: string): RequestTrace => ({ url: primary, body: JSON.stringify({ content }) })));
     expect(result.failures).toEqual([{
-      target: 'PRIMARY', status: 500, body: 'busy', request: { content: threeChunks[delivered] },
-      delivered, failed: 1, unattempted: 2 - delivered,
+      target: 'PRIMARY', status: 500, body: 'busy', request: { content: twoChunks[delivered] },
+      delivered, failed: 1, unattempted: 1 - delivered,
     }]);
   });
 }
 
 test('counts recovered retries once and keeps failing targets independent', async (): Promise<void> => {
   const result: Result = await run({
-    secrets: `PRIMARY=${primary}\nSECONDARY=${secondary}`, targets: ['PRIMARY', 'SECONDARY'], payload: threeChunkPayload,
-    replies: [rejected, success, rejected, rejected, success, success, rejected, rejected],
+    secrets: `PRIMARY=${primary}\nSECONDARY=${secondary}`, targets: ['PRIMARY', 'SECONDARY'], payload: twoChunkPayload,
+    replies: [rejected, success, rejected, rejected, success, rejected, rejected],
   });
   expect(result.exitCode).not.toBe(0);
   expect(result.requests).toEqual([
-    ...[threeChunks[0], threeChunks[0], threeChunks[1], threeChunks[1]].map((content: string): RequestTrace => ({ url: primary, body: JSON.stringify({ content }) })),
-    ...[...threeChunks, threeChunks[2]].map((content: string): RequestTrace => ({ url: secondary, body: JSON.stringify({ content }) })),
+    ...[twoChunks[0], twoChunks[0], twoChunks[1], twoChunks[1]].map((content: string): RequestTrace => ({ url: primary, body: JSON.stringify({ content }) })),
+    ...[twoChunks[0], twoChunks[1], twoChunks[1]].map((content: string): RequestTrace => ({ url: secondary, body: JSON.stringify({ content }) })),
   ]);
   expect(result.failures).toEqual([
-    { target: 'PRIMARY', status: 500, body: 'busy', request: { content: threeChunks[1] }, delivered: 1, failed: 1, unattempted: 1 },
-    { target: 'SECONDARY', status: 500, body: 'busy', request: { content: threeChunks[2] }, delivered: 2, failed: 1, unattempted: 0 },
+    { target: 'PRIMARY', status: 500, body: 'busy', request: { content: twoChunks[1] }, delivered: 1, failed: 1, unattempted: 0 },
+    { target: 'SECONDARY', status: 500, body: 'busy', request: { content: twoChunks[1] }, delivered: 1, failed: 1, unattempted: 0 },
   ]);
 });
 

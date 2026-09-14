@@ -18,9 +18,9 @@ Challenge fuzzy terms.
 Verify with a concrete scenario.
 Check the live surface.
 
-Write for every team member, not only developers: a `<repo>: <headline>` summary in plain words, then three bullet lists the sender renders as sections. `before` says what was wrong or missing, `now` says what changed, `next` says how it helps from here. One plain sentence per bullet, no jargon, no internal paths, model names or test statistics.
+Write for every team member, not only developers: a `<repo>: <headline>` summary where the headline is one plain sentence a non-developer understands, then two bullet lists the sender renders as sections. `before` is always present and says what was wrong or, for an addition, what was missing; `now` says what is better about the system, not what code changed. One plain sentence per bullet, no jargon, no internal paths, file names, command names, code identifiers, unexplained acronyms, model names or test statistics.
 
-Detail scales with the work: a single small leaf gets one or two bullets per section, an issue that settled several leaves gets one bullet per shipped part, and an epic gets more still, always in the same three sections. The sender splits a long message into several Discord posts at section boundaries, so never shorten the truth to fit; benefits are supported by the completed work, and an expected benefit is not a measured saving.
+Detail scales with the work: scale detail to what a broad-audience reader needs, merging parts when that reads better; a small issue gets a few short bullets, and never drop a shipped outcome the reader would care about, always in the same two sections. The sender splits a long message into several Discord posts at section boundaries, so never shorten the truth to fit; benefits are supported by the completed work, and an expected benefit is not a measured saving.
 
 For a necessary peer question, wait for idle, ask once through herdr in Question/Option form requesting `<leaf>/questions/<id>.md` at its current location, run `herdr agent wait` without a timeout, read the file and decide by simplicity, clarity, elegance, cost, speed and quality.
 
@@ -32,7 +32,7 @@ Use [scripts/discord-send.ts](scripts/discord-send.ts) when sending, passing the
 
 ```bash
 bun <skill-folder>/scripts/discord-send.ts --target DISCORD_WEBHOOK_URL <<'JSON'
-{"summary":"Project: Completed change","before":["What was wrong or missing."],"now":["What changed, in one plain sentence."],"next":["How this helps from here."]}
+{"summary":"Project: Completed change","before":["What was wrong or missing."],"now":["What is better about the system, in one plain sentence."]}
 JSON
 ```
 

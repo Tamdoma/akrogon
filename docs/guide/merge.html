@@ -57,7 +57,7 @@
     <div class="metrics">
       <div class="metric"><span class="mnum">A</span><span class="mlabel">merges and broadcasts</span></div>
       <div class="metric"><span class="mnum">1</span><span class="mlabel">message per issue, not per leaf</span></div>
-      <div class="metric"><span class="mnum">3</span><span class="mlabel">sections: before, now, next</span></div>
+      <div class="metric"><span class="mnum">2</span><span class="mlabel">sections: before, now</span></div>
       <div class="metric"><span class="mnum">2000</span><span class="mlabel">chars per discord message</span></div>
     </div>
     <p>A does not merge into your checkout. It fetches, rebases the leaf branch on <code>origin/main</code>, runs every check, and pushes the branch as the new main. If two leaves finish at once, git rejects the second push, A rebases again and retries. If the rebase conflicts, the leaf goes to <code>check.fix</code>, B resolves it, A re-checks.</p>
@@ -69,11 +69,8 @@
 - Searching a large project took several seconds and sometimes timed out.
 
 <span class="y">**Now**</span>
-- Results come back in under a second because the index is built once and reused.
-
-<span class="y">**Next**</span>
-- Nothing to do. The change is live after the next deploy.</code></pre>
-    <p style="margin-top:14px">Detail scales with size. A small issue gets one or two bullets per section. An epic gets more, and the sender splits long messages at section boundaries. The repo name always comes first in the title. Targets are the names listed under <code>broadcast.discord.webhook_env</code>, and the values live only in <code>~/.config/akrogon/env</code>.</p>
+- Results come back in under a second because the index is built once and reused.</code></pre>
+    <p style="margin-top:14px">Detail scales with what a broad-audience reader needs. A small issue gets a few short bullets, parts are merged when that reads better, and no shipped outcome the reader would care about is dropped; the sender splits long messages at section boundaries. The repo name always comes first in the title. Targets are the names listed under <code>broadcast.discord.webhook_env</code>, and the values live only in <code>~/.config/akrogon/env</code>.</p>
     <p style="margin-top:14px">A failed broadcast is visible in the pane but does not reopen the issue. The merge is already done.</p>
   </div>
 </section>
