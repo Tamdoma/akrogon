@@ -63,7 +63,6 @@
       <div class="card"><span class="tag warn">files</span><h4>Issue files never go on a leaf branch</h4><p>The handoff to review refuses any file under <code>issues/</code> on the branch, and refuses a dirty worktree. Agents write issue files only in the registered checkout.</p></div>
       <div class="card"><span class="tag warn">files</span><h4>sync commits everything in the checkout</h4><p><code>akrogon sync</code> stages all changes and commits them as <code>sync issues</code>. Do not leave unrelated half-done code in the registered checkout.</p></div>
       <div class="card"><span class="tag warn">agents</span><h4>Blocked is not counted, stuck is</h4><p>A permission dialog waits for you forever with no penalty. A prompt that does not take counts one attempt. Three attempts and the leaf fails.</p></div>
-      <div class="card"><span class="tag warn">agents</span><h4>Blind positions cannot ask the peer</h4><p>In <code>plan.positions</code> the two plans must be independent. Peer questions are allowed in every other phase, one per need, through a file under <code>questions/</code>.</p></div>
       <div class="card"><span class="tag warn">broadcast</span><h4>Only the merge slot broadcasts</h4><p>Never a subagent, never a cheaper model. The merge pane holds the issue context and closes its own tab as its last act, so anything it hands off could be cut short. A failed broadcast does not reopen the issue.</p></div>
     </div>
   </div>

@@ -18,13 +18,11 @@ Challenge fuzzy terms.
 Verify with a concrete scenario.
 Check the live surface.
 
-For a necessary peer question, wait for idle, ask once through herdr in Question/Option form requesting `<leaf>/questions/<id>.md`, run `herdr agent wait` without a timeout, read the file and decide by simplicity, clarity, elegance, cost, speed and quality.
-
 The command owns state, repair counts and dispatch; a resumed merge inspects the existing rebase, diff and remote ancestry to complete remaining work.
 
 ## merge
 
-Turn a Nit A still holds and finds reusable into one line naming mechanism/date/history in `learnings/LESSONS.md` and a history file with case, evidence and learning, without reading the active list as pass input or adding another turn.
+Turn a Nit A still holds and finds reusable into one line naming mechanism/date/history in the registered checkout's `learnings/LESSONS.md` and a history file with case, evidence and learning, left for the operator to commit, without reading the active list as pass input or adding another turn.
 
 Before pushing, commit scoped outstanding changes, fetch the configured remote, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` after rebase, and run every `checks` command in the worktree, recording evidence in `review-A.md` and advisory failures as Nits.
 
@@ -35,8 +33,6 @@ On a rebase conflict, resolve it in the worktree keeping both true sides, comple
 On red checks, append the failing output, the rebase target commit and the rebased head to `review-A.md`, call `akrogon phase <slug> check.fix --slot A`, and finish with the actual result and repair footer.
 
 Same-line index conflicts retain both true entries and recheck pointers; a broken default branch discovered by this leaf is fixed forward with failing tests as criteria.
-
-If that repair request prints `moved failed`, append A's diagnosis paragraph to `plan.md` before stopping.
 
 After green checks, push `HEAD:<default_branch>` to the configured remote fast-forward only, repeating fetch/rebase/checks after a non-fast-forward rejection; for a lost reply, fetch and use `git merge-base --is-ancestor <pushed-head> <remote>/<default_branch>` to establish whether the intended commit landed before trying again.
 
@@ -56,5 +52,3 @@ Next: <skill> <slug> slot=<A|B> phase=<phase>
 ```
 
 A repair move names `implement-issue <slug> slot=B phase=check.fix`; completion uses `Next: none merged`, failure uses `Next: none failed`, and another unresolved error names its actual reason without inventing a state move.
-
-The lines are printed only; for scrambled context, the first 50–100 words of the other pane can confirm what happened but cannot establish slot, phase, readiness, completion or a peer answer, and missing text does not block.

@@ -58,7 +58,7 @@
       <tr><th>You see</th><th>It means</th><th>Do</th></tr>
       <tr><td>Startup dialog in a pane</td><td>The agent is blocked on a prompt only a human can answer.</td><td>Answer it. The hook continues. No attempt is counted.</td></tr>
       <tr><td>attempts climbing to 2</td><td>The prompt did not take, twice.</td><td>Look at the pane. After three tries the leaf fails.</td></tr>
-      <tr><td>phase: failed</td><td>Three fix rounds, or three prompt failures.</td><td>Read the reviews and A's diagnosis at the end of <code>plan.md</code>. Fix the brief if needed. <code>akrogon phase &lt;slug&gt; &lt;phase&gt;</code>.</td></tr>
+      <tr><td>phase: failed</td><td>Three fix rounds, or three prompt failures.</td><td>Read the reviews. Fix the brief if needed. <code>akrogon phase &lt;slug&gt; &lt;phase&gt;</code>.</td></tr>
       <tr><td>Leaf never starts</td><td>A blocker is not merged, it is hand-built, or every seat is taken.</td><td><code>akrogon next &lt;slug&gt;</code> prints the exact reason.</td></tr>
       <tr><td>Push rejected at merge</td><td>Another leaf landed first.</td><td>Nothing. A fetches, rebases, retries.</td></tr>
       <tr><td>Merge conflict</td><td>Two leaves touched the same lines.</td><td>Nothing. A resolves it in the merge, records the resolution in review-A.md and reruns the checks.</td></tr>

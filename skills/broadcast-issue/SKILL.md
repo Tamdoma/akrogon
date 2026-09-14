@@ -22,8 +22,6 @@ Write for every team member, not only developers: a `<repo>: <headline>` summary
 
 Detail scales with the work: scale detail to what a broad-audience reader needs, merging parts when that reads better; a small issue gets a few short bullets, and never drop a shipped outcome the reader would care about, always in the same two sections. The sender splits a long message into several Discord posts at section boundaries, so never shorten the truth to fit; benefits are supported by the completed work, and an expected benefit is not a measured saving.
 
-For a necessary peer question, wait for idle, ask once through herdr in Question/Option form requesting `<leaf>/questions/<id>.md` at its current location, run `herdr agent wait` without a timeout, read the file and decide by simplicity, clarity, elegance, cost, speed and quality.
-
 ## Send
 
 Install the skill-local dependencies with `bun install --cwd <skill-folder> --frozen-lockfile` before its first use.
@@ -50,5 +48,3 @@ The merge slot does not repeat the sender after its built-in retry or run a phas
 Last operation: <issue message delivery result, or concrete failure>
 Next: none <issue already merged>
 ```
-
-The lines are printed only; for scrambled context, the first 50–100 words of the other pane can confirm what happened but cannot establish slot, phase, readiness, completion or a peer answer, and missing text does not block.

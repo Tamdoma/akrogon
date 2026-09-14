@@ -24,8 +24,6 @@ Read the configured `grounding.index` top file, relevant linked areas and `learn
 
 A missing resource is reported as a gap, not invented content; lessons describe what happened, not rules to obey, and history is opened only to verify a cited lesson's evidence.
 
-For a necessary peer question outside blind positions, wait for the peer to be idle, ask once through herdr in Question/Option form with instructions to write `<leaf>/questions/<id>.md`, run `herdr agent wait` without a timeout, read that file and decide by simplicity, clarity, elegance, cost, speed and quality.
-
 When the brief and the locked design disagree, never ask the operator: the design wins, the conflict is written into the plan as a note for review, and planning continues.
 
 A reusable lesson found here is one line in `learnings/LESSONS.md` naming mechanism, date and history path, plus `learnings/history/<date>-<slug>.md` with the case, evidence and abstract learning.
@@ -64,5 +62,3 @@ Next: <skill> <slug> slot=<A|B> phase=<phase>
 ```
 
 `Next: none <reason>` covers waiting or terminal outcomes; neither line is saved or parsed, and the command's dispatched prompt is authoritative.
-
-For scrambled context only, the first 50–100 words of the other pane may confirm what happened, but cannot supply slot, phase, readiness, completion or a peer answer; missing text does not block.

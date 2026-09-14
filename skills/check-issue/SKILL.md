@@ -38,13 +38,11 @@ Compare tests with acceptance criteria and reject mocks of the unit under test a
 
 All `checks` commands block, optional `advisory` failures are Nits, and a report gap blocks only when material to correctness or verification.
 
-Rerun checks only for a code change, missing evidence or a specific concern, leaving doc/index authorship with B and recording any reusable lesson found here as one active mechanism/date/history line plus a history file with case, evidence and learning, committed on the leaf branch because `akrogon phase` refuses a dirty worktree.
+Rerun checks only for a code change, missing evidence or a specific concern, leaving doc/index authorship with B and recording any reusable lesson found here as one active mechanism/date/history line plus a history file with case, evidence and learning, written under the registered checkout's `learnings/` and left for the operator to commit.
 
 On re-check after `check.fix`, inspect only the repair diff from the prior reviewed head (or the rebased head A recorded at merge), append A's results to `review-A.md`, confirm earlier findings and add a blocking finding only for a defect introduced by the repair.
 
-Only during A's re-check after `check.fix`, still dispatched as `check.review`, may A ask a necessary peer question: wait for idle, ask once through herdr in Question/Option form requesting `<leaf>/questions/<id>.md`, run `herdr agent wait` without a timeout, read the file and decide by simplicity, clarity, elegance, cost, speed and quality.
-
-Finish with `akrogon phase <slug> <next> --slot <A|B> --verdict <ready|nits|fix>`, requesting `check.fix` for fix or `merge` for ready/nits, and if it prints `moved failed` append A's diagnosis paragraph to `plan.md` explaining what kept failing and why before printing the footer and stopping.
+Finish with `akrogon phase <slug> <next> --slot <A|B> --verdict <ready|nits|fix>`, requesting `check.fix` for fix or `merge` for ready/nits, then print the footer and stop.
 
 A `recorded` result waits for the other initial verdict; the command derives the aggregate result, including a fix from the peer, so the requested destination is not proof of movement.
 
@@ -56,5 +54,3 @@ Next: <skill> <slug> slot=<A|B> phase=<phase>
 ```
 
 `check.fix` routes to implement-issue B, `merge` to merge-issue A, an outstanding initial review to check-issue in the remaining slot, and `Next: none <reason>` covers failed or waiting outcomes.
-
-The lines are printed only; for scrambled context, the first 50–100 words of the other pane can confirm what happened but cannot establish slot, phase, readiness, completion or a peer answer, and missing text does not block.

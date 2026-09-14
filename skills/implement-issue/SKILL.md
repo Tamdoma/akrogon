@@ -22,8 +22,6 @@ For leaf work, read `akrogon config` once, locate the unique slug in the registe
 
 Effective settings supply `implement`, `checks`, optional `advisory`, `AKROGON_BASE` and the repair cap; the command owns state/counters and dispatch, while a repeated pass finishes remaining work from the diff and artifacts, rerunning checks for changed code, missing evidence or a specific concern.
 
-For a necessary peer question, wait for idle, ask once through herdr in Question/Option form requesting `<leaf>/questions/<id>.md`, run `herdr agent wait` without a timeout, read the file and decide by simplicity, clarity, elegance, cost, speed and quality.
-
 The plan's read-first list supplies worker context; the index is opened only on a gap, and implement updates affected docs and area index entries before review, keeping affected `AREA.md` files at most 40 lines with exactly Commands, Key files, Non-obvious patterns and See also as second-level sections.
 
 A reusable lesson found during leaf work gets an active line naming mechanism/date/history path and a history file with case, evidence and learning; `learnings/LESSONS.md` is not pass input, and applying a lesson removes its active line and dates its history file without rewriting the historical case.
@@ -65,4 +63,4 @@ Next: <skill> <slug> slot=<A|B> phase=<phase>
 
 After leaf implementation the next pass is check-issue in A and B at `check.review` (one prompt per slot); after repair it is A only, while `Next: none <reason>` covers standalone, waiting or terminal outcomes.
 
-The lines are printed only, with actual command results rather than assumed progress; for scrambled context, the first 50–100 words of the other pane can confirm what happened but cannot establish slot, phase, readiness, completion or a peer answer, and missing text does not block.
+The lines are printed only, with actual command results rather than assumed progress.
