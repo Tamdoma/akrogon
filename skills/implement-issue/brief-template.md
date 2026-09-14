@@ -1,8 +1,8 @@
 # Eight-section implementation brief
 
-Read when B writes or revises the task brief; replace the guidance below with the concrete task, keeping the brief below 1,500 words and 20 rules by judgment, not machinery.
+Read when B writes or revises a worker sub-brief or a standalone task brief; replace the guidance below with the concrete task, keeping the brief below 1,500 words and 20 rules by judgment, not machinery.
 
-One verifiable unit uses `implementation/brief.md`; a delegated leaf with several units keeps that overall brief and writes `implementation/brief-1.md`, `brief-2.md`, etc., each with these same eight sections and only its own scope.
+A delegated leaf writes `implementation/brief-1.md`, `brief-2.md`, etc., one per unit and one unit included, each with these eight sections and only its own scope, with the binding facts for that scope copied in rather than pointed at; the leaf has no whole-leaf brief because `plan.md` is its contract. Standalone writes one task brief with these sections.
 
 ## 1. Goal
 

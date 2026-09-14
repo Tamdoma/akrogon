@@ -11,7 +11,7 @@ The prompt is `check-issue <slug> slot=<A|B> phase=check.review`; initial review
 
 ## Shared context
 
-Read `akrogon config` once, locate the unique slug under the registered repo's authoritative `issues/open/`, then read its `plan.md`, `implementation/brief.md` and this skill's [ponytail.md](ponytail.md) before inspecting the worktree diff.
+Read `akrogon config` once, locate the unique slug under the registered repo's authoritative `issues/open/`, then read its `plan.md` including any implementation notes, `design.md`, `implementation/report.md` and this skill's [ponytail.md](ponytail.md) before inspecting the worktree diff.
 
 Ground in docs first.
 Challenge fuzzy terms.
@@ -24,7 +24,7 @@ The command owns state, verdict aggregation, repair counts and dispatch; an exis
 
 During initial review, both A and B work blind: do not contact or wait for the peer, or read the peer's current review. Record unresolved questions as findings in your own `review-<slot>.md` and account for them in your verdict under the Fix/Nit rules below. Uncertainty alone is not a Fix.
 
-As A, read your own `positions-A.md` and `rebuttal-A.md` first when debate produced them, then judge the whole initial diff against the plan, brief criteria/change list/exclusions/done/report and live contracts, following affected docs and index pointers and checking any lesson claim against its evidence.
+As A, read your own `positions-A.md` and `rebuttal-A.md` first when debate produced them, then judge the whole initial diff against the plan's decisions, criteria, change list and checklist, the design's exclusions, the report and live contracts, following affected docs and index pointers and checking any lesson claim against its evidence.
 
 For each `AREA.md` in the reviewed diff, use one shell command to list the paths it names and whether they exist from the repository root. Record missing paths as a Fix with done-criterion evidence. Open no area file outside that diff and make no extra file reads for this check. For a deleted area file, review the deletion and affected index pointers against the plan without opening the removed file.
 

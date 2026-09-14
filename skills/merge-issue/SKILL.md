@@ -11,7 +11,7 @@ The prompt is `merge-issue <slug> slot=A phase=merge`; A merges in the existing 
 
 ## Shared context
 
-Read `akrogon config` once, locate the unique leaf under the registered repo's authoritative `issues/open/`, and read its plan, implementation report and reviews, using configured `remote` and `default_branch` (defaults `origin` and `main`).
+Read `akrogon config` once, locate the unique leaf under the registered repo's authoritative `issues/open/`, and read its plan, `implementation/report.md` and reviews, using configured `remote` and `default_branch` (defaults `origin` and `main`).
 
 Ground in docs first.
 Challenge fuzzy terms.

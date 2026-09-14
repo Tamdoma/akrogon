@@ -1,6 +1,6 @@
 ---
 name: implement-issue
-description: Implement a leaf plan or repair its review findings, using an eight-section brief and sequential workers or configured inline execution; without a leaf, implement the prompt task standalone.
+description: Implement a leaf plan or repair its review findings, using eight-section worker sub-briefs and sequential workers or configured inline execution; without a leaf, implement the prompt task standalone.
 ---
 
 Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt. After compaction, standalone re-reads its task brief instead of a leaf.
@@ -18,7 +18,7 @@ Challenge fuzzy terms.
 Verify with a concrete scenario.
 Check the live surface.
 
-For leaf work, read `akrogon config` once, locate the unique slug in the registered repo's authoritative `issues/open/`, and use its `plan.md`, `implementation/brief.md` and current review findings while editing only the leaf worktree.
+For leaf work, read `akrogon config` once, locate the unique slug in the registered repo's authoritative `issues/open/`, and use its `plan.md`, `design.md` and current review findings while editing only the leaf worktree.
 
 Effective settings supply `implement`, `checks`, optional `advisory`, `AKROGON_BASE` and the repair cap; the command owns state/counters and dispatch, while a repeated pass finishes remaining work from the diff and artifacts, rerunning checks for changed code, missing evidence or a specific concern.
 
@@ -30,13 +30,13 @@ A reusable lesson found during leaf work gets an active line naming mechanism/da
 
 ## implement
 
-Write `<leaf>/implementation/brief.md` from the template, then implement it in order yourself when config says `inline`, otherwise delegate each bounded sub-brief to a subagent sequentially in this worktree using the worker protocol.
+Before coding, when an implementation-only constraint is missing from `plan.md`, append one dated `## Implementation notes` section naming each constraint and the decision it refines; a locked decision is never changed there, and a conflict with one is a mismatch recorded for review. Then implement the plan's checklist in order yourself when config says `inline`, otherwise write one sub-brief per unit from the template, one unit included, and delegate each to a subagent sequentially in this worktree using the worker protocol.
 
 Inline has no worker, sub-briefs or mismatch returns; both modes run the resolved changed-tests command as work lands with `AKROGON_BASE` from config, and workers receive only that command, not the full suite.
 
 Derive meaningful tests from acceptance criteria before code, demonstrate red then green and a fail-first test for a bug, with no test needed for a trivial one-liner.
 
-After the last implementation unit, run the full suite once as B and every other blocking check, repair any failure by the protocol (yourself in inline mode), then fill the report with command evidence and commit the code on the leaf branch before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
+After the last implementation unit, run the full suite once as B and every other blocking check, repair any failure by the protocol (yourself in inline mode), then commit the code on the leaf branch and write `<leaf>/implementation/report.md` with changed files and reasons, commands run with pasted results and artifact paths, the base and committed head, known limitations and unverified criteria, folding worker returns into it, before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
 
 Every command under `checks` blocks; `advisory` failures are reported as Nits, and a full-suite rerun follows a repair rather than an unchanged successful run.
 
@@ -44,11 +44,11 @@ Finish with `akrogon phase <slug> check.review --slot B`, then print the footer 
 
 ## check.fix
 
-Read the recorded findings and reviewed commit in the existing review files, revise the brief around those defects without weakening criteria or failing tests, and use workers before the last allowed repair round in delegated mode or repair yourself in inline mode and on the final allowed round.
+Read the recorded findings and reviewed commit in the existing review files, revise the plan notes and affected sub-briefs around those defects without weakening criteria or failing tests, and use workers before the last allowed repair round in delegated mode or repair yourself in inline mode and on the final allowed round.
 
 Merge-conflict findings use the same worktree and repair path; integration resolution keeps both true same-line index entries and rechecks their pointers, with any pending rebase completed before recording the repair head.
 
-Run the affected changed tests and required checks, update affected docs/index lines and report with the repair's before/after commits, then finish with `akrogon phase <slug> check.review --slot B`, print the footer and stop.
+Run the affected changed tests and required checks, update affected docs/index lines and append the repair's before and after commits to `report.md`, then finish with `akrogon phase <slug> check.review --slot B`, print the footer and stop.
 
 ## Standalone
 

@@ -22,6 +22,6 @@
 
 ## See also
 
-- `skills/implement-issue/brief-template.md` gives the eight-section contract.
+- `skills/implement-issue/brief-template.md` gives the eight-section worker sub-brief.
 - `src/routing.ts` defines legal phases, required slots and next destinations.
 - `docs/reference-index.md` links the other repository areas.
