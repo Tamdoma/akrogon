@@ -33,7 +33,7 @@ export async function commitMove(
     prompted_at: {},
     attempts: { A: 0, B: 0 },
     fix_rounds:
-      to === 'check.fix'
+      to === 'check.fix' && recorded.phase === 'check.review'
         ? recorded.fix_rounds + 1
         : recorded.phase === 'failed' && to === 'implement'
           ? 0
@@ -135,7 +135,9 @@ export async function transition(
         : 'merge'
       : requested;
   const capped: Phase =
-    destination === 'check.fix' && state.fix_rounds >= repo.config.fix_rounds ? 'failed' : destination;
+    destination === 'check.fix' && state.phase === 'check.review' && state.fix_rounds >= repo.config.fix_rounds
+      ? 'failed'
+      : destination;
   await commitMove(repo, leaf, recorded, capped, slot ?? null);
 }
 

@@ -90,7 +90,10 @@ test('review aggregates verdicts, rechecks only A, caps repairs and permits oper
     expect(readState(path)).toMatchObject({ phase: 'implement', fix_rounds: 0 });
     const mergePath: string = leaf(f, 'conflict', 'merge');
     expect((await cli(f, ['phase', 'conflict', 'check.fix'])).code).toBe(0);
-    expect(readState(mergePath).fix_rounds).toBe(1);
+    expect(readState(mergePath).fix_rounds).toBe(0);
+    const cappedPath: string = leaf(f, 'capped', 'merge', { fix_rounds: 1 });
+    expect((await cli(f, ['phase', 'capped', 'check.fix'])).stdout).toBe('moved check.fix');
+    expect(readState(cappedPath)).toMatchObject({ phase: 'check.fix', fix_rounds: 1 });
     const log = JSON.parse(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').split('\n')[0]);
     expect(log).toMatchObject({
       from: 'check.review',

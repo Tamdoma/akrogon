@@ -46,7 +46,7 @@ Finish with `akrogon phase <slug> check.review --slot B`, then print the footer 
 
 Read the recorded findings and reviewed commit in the existing review files, revise the plan notes and affected sub-briefs around those defects without weakening criteria or failing tests, and use workers before the last allowed repair round in delegated mode or repair yourself in inline mode and on the final allowed round.
 
-Merge-conflict findings use the same worktree and repair path; integration resolution keeps both true same-line index entries and rechecks their pointers, with any pending rebase completed before recording the repair head.
+A repair requested from merge starts at the rebased head recorded in `review-A.md` and treats the failing output as the finding.
 
 Run the affected changed tests and required checks, update affected docs/index lines and append the repair's before and after commits to `report.md`, then finish with `akrogon phase <slug> check.review --slot B`, print the footer and stop.
 

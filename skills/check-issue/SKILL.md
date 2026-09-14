@@ -40,7 +40,7 @@ All `checks` commands block, optional `advisory` failures are Nits, and a report
 
 Rerun checks only for a code change, missing evidence or a specific concern, leaving doc/index authorship with B and recording any reusable lesson found here as one active mechanism/date/history line plus a history file with case, evidence and learning, committed on the leaf branch because `akrogon phase` refuses a dirty worktree.
 
-On re-check after `check.fix`, inspect only the repair diff from the prior reviewed head (or recorded rebase/conflict baseline), append A's results to `review-A.md`, confirm earlier findings and add a blocking finding only for a defect introduced by the repair.
+On re-check after `check.fix`, inspect only the repair diff from the prior reviewed head (or the rebased head A recorded at merge), append A's results to `review-A.md`, confirm earlier findings and add a blocking finding only for a defect introduced by the repair.
 
 Only during A's re-check after `check.fix`, still dispatched as `check.review`, may A ask a necessary peer question: wait for idle, ask once through herdr in Question/Option form requesting `<leaf>/questions/<id>.md`, run `herdr agent wait` without a timeout, read the file and decide by simplicity, clarity, elegance, cost, speed and quality.
 

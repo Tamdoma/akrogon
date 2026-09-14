@@ -126,7 +126,7 @@ akrogon unpark search</code></pre>
     <p>Set <code>max_active: 0</code> in the global config. Running leaves finish their current phase and then nothing new is prompted for leaves without a tab. Leaves that already have tabs keep going.</p>
 
     <h3>Two leaves touched the same lines</h3>
-    <p>Nothing to do. The merge rebase conflicts, the leaf goes to <code>check.fix</code>, B resolves it in the same worktree, A re-checks the repair, then merges.</p>
+    <p>Nothing to do. A resolves the conflict in the merge, records it in review-A.md and reruns the checks; only a red check sends the leaf to <code>check.fix</code>, and the repair is re-reviewed.</p>
 
     <h3>A skill needs changing</h3>
     <p>Skills only change through akrogon leaves in the akrogon repo. File a seed there. Once merged, every agent on the machine sees the new text at its next prompt, because the skill folders are symlinks.</p>

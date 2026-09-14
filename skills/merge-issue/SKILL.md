@@ -30,9 +30,11 @@ Before pushing, commit scoped outstanding changes, fetch the configured remote, 
 
 A local default branch is unnecessary; ordinary git non-fast-forward refusal serializes competing pushes.
 
-On a rebase conflict or red checks, append conflicting files or failing output and the rebase target commit to `review-A.md`, preserve the unfinished rebase context for B, call `akrogon phase <slug> check.fix --slot A`, and finish with the actual result and repair footer.
+On a rebase conflict, resolve it in the worktree keeping both true sides, complete the rebase, and record in `review-A.md` the rebase target, the prior reviewed head, the resolved head and `git range-diff <old-base>..<prior-head> <target>..<resolved-head>` before running the checks, where old-base is the `AKROGON_BASE` value before the post-rebase refresh.
 
-Same-line index conflicts retain both true entries and recheck pointers during repair; any integration drift discovered here follows this same repair path, and a broken default branch discovered by this leaf is fixed forward with failing tests as criteria.
+On red checks, append the failing output, the rebase target commit and the rebased head to `review-A.md`, call `akrogon phase <slug> check.fix --slot A`, and finish with the actual result and repair footer.
+
+Same-line index conflicts retain both true entries and recheck pointers; a broken default branch discovered by this leaf is fixed forward with failing tests as criteria.
 
 If that repair request prints `moved failed`, append A's diagnosis paragraph to `plan.md` before stopping.
 

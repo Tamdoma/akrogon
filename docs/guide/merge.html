@@ -60,7 +60,7 @@
       <div class="metric"><span class="mnum">2</span><span class="mlabel">sections: before, now</span></div>
       <div class="metric"><span class="mnum">2000</span><span class="mlabel">chars per discord message</span></div>
     </div>
-    <p>A does not merge into your checkout. It fetches, rebases the leaf branch on <code>origin/main</code>, runs every check, and pushes the branch as the new main. If two leaves finish at once, git rejects the second push, A rebases again and retries. If the rebase conflicts, the leaf goes to <code>check.fix</code>, B resolves it, A re-checks.</p>
+    <p>A does not merge into your checkout. It fetches, rebases the leaf branch on <code>origin/main</code>, runs every check, and pushes the branch as the new main. If two leaves finish at once, git rejects the second push, A rebases again and retries. If the rebase conflicts, A resolves it, records it in review-A.md and reruns the checks; only a red check goes to <code>check.fix</code>, and the repair is re-reviewed.</p>
     <p style="margin-top:14px">After the push, A runs <code>akrogon phase &lt;slug&gt; merged</code>. If that was the last leaf of the issue, the command prints <code>issue complete</code>, moves the folder to <code>issues/closed/</code>, and closes any linked GitHub issue. A then sends the broadcast itself, in the same session, and closes its own tab as its very last act.</p>
     <p style="margin-top:14px">The broadcast is written for every team member, not just developers. It always has the same shape:</p>
     <pre><code><span class="s">## 🧪 my-app: Search results load in under a second (09/11/26)</span>

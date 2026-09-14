@@ -61,7 +61,7 @@
       <tr><td>phase: failed</td><td>Three fix rounds, or three prompt failures.</td><td>Read the reviews and A's diagnosis at the end of <code>plan.md</code>. Fix the brief if needed. <code>akrogon phase &lt;slug&gt; implement</code>.</td></tr>
       <tr><td>Leaf never starts</td><td>A blocker is not merged, it is hand-built, or every seat is taken.</td><td><code>akrogon next &lt;slug&gt;</code> prints the exact reason.</td></tr>
       <tr><td>Push rejected at merge</td><td>Another leaf landed first.</td><td>Nothing. A fetches, rebases, retries.</td></tr>
-      <tr><td>Merge conflict</td><td>Two leaves touched the same lines.</td><td>Nothing. It goes to <code>check.fix</code>, B resolves, A re-checks.</td></tr>
+      <tr><td>Merge conflict</td><td>Two leaves touched the same lines.</td><td>Nothing. A resolves it in the merge, records the resolution in review-A.md and reruns the checks.</td></tr>
       <tr><td>"Transition refused"</td><td>The agent called <code>phase</code> twice.</td><td>Nothing. The first call worked.</td></tr>
       <tr><td>"Issue files on leaf branch"</td><td>B committed something under <code>issues/</code> on the branch.</td><td>B removes it from the branch and writes it in the checkout instead. The skill text tells it so.</td></tr>
       <tr><td>"Uncommitted work in …"</td><td>B tried to hand off with a dirty worktree.</td><td>B commits. The rule exists because two leaves once passed review with all work uncommitted, and the cleanup deleted it.</td></tr>
