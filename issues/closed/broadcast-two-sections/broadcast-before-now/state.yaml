@@ -1,0 +1,31 @@
+slug: broadcast-before-now
+phase: merged
+created: 2026-09-14
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+failed_notified: false
+busy_since: 
+  A: 2026-09-14T08:10:04.974Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t5B
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/broadcast-before-now
+pane: 
+  A: w8:p9Z
+  B: w8:p90
+prompted: 
+  {}
+prompted_at: 
+  {}
