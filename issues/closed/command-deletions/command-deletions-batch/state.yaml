@@ -1,0 +1,31 @@
+slug: command-deletions-batch
+phase: merged
+created: 2026-09-14
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+failed_notified: false
+busy_since: 
+  A: 2026-09-14T12:18:09.730Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t5D
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/command-deletions-batch
+pane: 
+  A: w8:pA2
+  B: w8:pA3
+prompted: 
+  {}
+prompted_at: 
+  {}

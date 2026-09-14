@@ -9,6 +9,8 @@ Read before presenting an operator round. A short opening paragraph explains wha
 
 <one to three plain sentences: what this thing is, with a concrete example, and what changes depending on the answer; name the inspected path or evidence>
 
+Research: <tier · source with URL or path and the date read · one-sentence finding · what it changed in this question>
+
 - **A (recommended)** <what happens if you pick this, and the one reason it wins>
 - **B** <what happens if you pick this, and its cost>
 
@@ -22,9 +24,20 @@ Challenge check
 <what an experienced practitioner could challenge in these recommendations, including B's remaining disagreements, or why none was found>
 ```
 
-Every round uses this exact shape, on every harness and at every effort level: the opening paragraph, the sentences under each question, the labelled recommendation with its reason, the pitfalls line, the reply key and the challenge check are never cut, even for a small item. Number questions continuously within a round and restart at 1 in the next round.
+Every round uses this exact shape, on every harness and at every effort level: the opening paragraph, the sentences under each question, the research line, the labelled recommendation with its reason, the pitfalls line, the reply key and the challenge check are never cut, even for a small item. Number questions continuously within a round and restart at 1 in the next round.
 
 Present all currently material questions in one complete round and wait for the operator's answer. Plain free text is a valid answer and is preserved verbatim. A question asking for explanation does not itself settle the choice; an explicit choice accompanied by a question does. An omitted material answer stays open. Recommendations and silence cannot supply an operator answer. A challenge exposing another material fork belongs in the next round.
+
+## Research
+
+Every question carries a Research line, and its fork file keeps the full return under Findings: tier, source, finding and what it changed. Tiers, highest first:
+
+1. `operator`: material the operator placed in `issues/chart/sources/` or named in the intake, read before any search.
+2. `practitioner`: a named person or team with a stated track record, in a case study, talk, long-form post or first-hand write-up. Listicles, affiliate pages and AI summaries do not qualify.
+3. `better-than-training`: primary documentation, a specification, source code, a changelog or a measured result stronger or newer than the model's training. Inspected code in this repository and the documentation of the tools it calls sit here.
+4. `model-knowledge`: the model's own knowledge, allowed only with the searches that were run and found nothing stronger.
+
+Use the highest tier reasonably available; a round written from a lower tier when a higher one was available is redone before the operator sees it. For anything outside the repository, practitioners first: name who has done this at scale, why each is worth hearing, where they agree and disagree, and which conditions flip their advice, then synthesize in one paragraph rather than listing sources. Research never settles anything, and it is redone when an operator answer reshapes the question. When B is named, both slots research independently and A merges with attribution.
 
 ## Blind B exchange
 

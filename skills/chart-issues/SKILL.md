@@ -38,6 +38,8 @@ Write one chart folder per destination. When every chart still holds an open for
 
 ## Take
 
+Research precedes every question and is redone when an answer reshapes one. Before a round, gather for each question the strongest source available in the tier order in questions: operator-placed material, a named practitioner, primary documentation or code, and the model's own knowledge only together with the searches that found nothing stronger. A question about this repository's own mechanism cites the inspected file and line and the documentation of the tool it calls; a question about anything outside it names an outside source or the recorded failure to find one. Research decides which questions are asked, which pitfalls they name and which option is recommended, never the answer, and a recommendation that contradicts a practitioner source shows the contradiction in the question.
+
 With B, A owns interviewing and recording, sends only intake, current Question and carries, related fork paths, locks and verbatim operator corrections while developing its own view, then merges the completed independent rounds with `(A)`, `(B)`, `(both)` tags and obtains B's one disagreement-only rebuttal before presenting the complete operator round with challenge check; B answers direct operator requests in its own pane and checks the final shape once before recording a late mechanism or contract change, with restatements exempt.
 
 Record operator answers and their reasons in fork files, keep sharp questions distinct from fog, and reshape the remaining chart after answers; handoff becomes ready only when no material question or fog requires the implementer to guess, with small optional prototypes explicitly chosen as measurements whose scratch code is discarded.

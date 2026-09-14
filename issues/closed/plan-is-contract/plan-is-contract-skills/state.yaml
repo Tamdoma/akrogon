@@ -1,0 +1,31 @@
+slug: plan-is-contract-skills
+phase: merged
+created: 2026-09-14
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+failed_notified: false
+busy_since: 
+  A: 2026-09-14T11:02:25.043Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t5E
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/plan-is-contract-skills
+pane: 
+  A: w8:pA4
+  B: w8:pA5
+prompted: 
+  {}
+prompted_at: 
+  {}

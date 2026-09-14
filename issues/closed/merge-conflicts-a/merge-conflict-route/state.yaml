@@ -1,0 +1,31 @@
+slug: merge-conflict-route
+phase: merged
+created: 2026-09-14
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+failed_notified: false
+busy_since: 
+  A: 2026-09-14T11:41:23.523Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t5F
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/merge-conflict-route
+pane: 
+  A: w8:pA6
+  B: w8:pA7
+prompted: 
+  {}
+prompted_at: 
+  {}

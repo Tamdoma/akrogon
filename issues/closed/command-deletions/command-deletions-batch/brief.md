@@ -1,0 +1,31 @@
+# Brief: command-deletions-batch
+
+## What
+Eight change groups land in `src/next.ts`, `src/phase.ts`, `src/routing.ts`, `src/state.ts`, `src/config.ts`, `src/pull.ts`, `src/sync.ts`, their tests, and five guide lines. Every group deletes code or replaces a hand edit with a command. Valid input behaves exactly as before except where a group names the change.
+
+1. Unknown pane and stand-in. `busy()` in `src/next.ts` also returns true for `agent_status === 'unknown'`. Delete `seatFor`, `peerOf`, the branch in `dispatchSlot` that sets attempts to 2 when a pane is neither busy nor idle, and the merge-seat early return in `dispatchLeaf`. A slot is prompted only in `state.pane[slot]`. Change: an `unknown` pane now waits like a busy one and starts the busy clock.
+2. Failed exit. In `src/routing.ts`, `failed.next` becomes `plan.positions`, `plan.rebuttal`, `plan.synthesis`, `implement`, `check.review`, `merge`. In `commitMove` in `src/phase.ts`, `fix_rounds` resets to 0 on any move out of `failed`; the `check.fix` increment stays. Change: `akrogon phase <slug> <phase>` is the recovery from `failed`; `check.fix` stays illegal from `failed`.
+3. Merge recovery and empty branches. Delete `recoverMerge` from `src/phase.ts` and its call in `dispatchLeaf`; a merge leaf whose seat is idle is re-prompted like any other phase. `requireCodeOnly` in `src/phase.ts` also refuses a branch whose diff against `target(repo)` is empty, with a message naming the target. Change: an empty branch stops at `implement`; a merge session that dies after pushing is re-prompted and records `merged` itself.
+4. Per-repo `max_active`. Delete `max_active` from `repoSchema` in `src/config.ts`, the `repo_max_active` line in `effectiveConfig`, and the per-repo count and check in `activeCount` and `allocate` in `src/next.ts`; `activeCount` returns one number. A repo `issues/config.yaml` carrying `max_active` is refused by the strict schema like any unknown key. All three registered repos have it unset.
+5. Debate gate. In `dispatchLeaf` in `src/next.ts`, before the dependency check, a leaf with `debate === 'yes'`, `phase === 'plan.synthesis'` and no `positions-A.md` or no `positions-B.md` in its folder throws `Debate leaf skipped its debate: <slug>; set phase: plan.positions`. The existing catch reports it and the command exits 1. The `debate` key stays in the schema.
+6. Repo lock. Delete `withRepoLock` from `src/state.ts` and its four callers in `src/phase.ts`, `src/sync.ts`, `src/next.ts`, `src/pull.ts`; the bodies run directly. `sync.ts` keeps its lock-path checks for the global lock only. `pull` runs without any lock. The `.lock` ignore line in `src/init.ts` stays for the global lock.
+7. Hook path. In `nextCommand` in `src/next.ts`, `hooked` becomes `event !== undefined`; the hook branch keeps its `hookPane` guard. Change: a typed `akrogon next` inside a leaf pane sweeps the current repo and runs cleanup like a typed `next` anywhere else.
+8. Guide. Delete the stand-in why box in `docs/guide/phases.html`, the stand-in sentence in the attempts row of `docs/guide/problems.html`, the per-repo `max_active` clause in `docs/guide/next.html`, the commented `max_active` line in `docs/guide/setup.html`, and `max_active` from the repo config comment in `docs/guide/cheat.html`. The `phase: failed` row in `docs/guide/problems.html` names `akrogon phase <slug> <phase>` as the exit.
+
+Tests: delete cases that assert the third try goes to the other pane, the `unknown` attempt jump, merge auto-recovery, per-repo `max_active` and the repo lock; repoint the gh probe `lock` paths and `tests/fetch-deadline-harness.ts` to the global `.lock` under `AKROGON_HOME`; add the cases in the done-criteria.
+
+## Why
+The process review (`process-review-claude.md`, `process-review-slot-b.md`, `astra-6-akrogon-audit.md`) found these mechanisms fired 11 times across 132 leaves with zero rescues, once with a wrong outcome, or never, while costing branches, processes and hand edits. The stand-in put both blind reviews in one session. Two charted debates never ran because nothing compared the key with the phase. The command must stay small enough to hold the dispatch path in one head.
+
+## Done-criteria
+1. `grep -rn "seatFor\|peerOf\|recoverMerge\|withRepoLock\|issues/.lock\|repo_max_active\|perRepo" src/` returns nothing, and `grep -rn "stand-in\|other agent's pane\|other pane" docs/guide/` returns nothing.
+2. A test proves that a seat whose pane reads `unknown` gets no prompt, keeps its attempts, and has `busy_since` set for that seat after the sweep.
+3. A test proves `akrogon phase <slug> plan.synthesis` on a `failed` leaf moves it with attempts `A: 0, B: 0`, `done: []`, `fix_rounds: 0`, and that `akrogon phase <slug> check.fix` on a `failed` leaf is refused as an illegal move with no state or log write.
+4. A test proves `akrogon phase <slug> check.review --slot B` on an `implement` leaf whose worktree HEAD equals the target is refused with a message naming the target and no state or log write.
+5. A test proves `next` on a `merge` leaf whose branch is already an ancestor of the target and whose A pane is idle prompts A again and does not move the phase itself.
+6. A test proves `next` on a `debate: yes` leaf at `plan.synthesis` without `positions-A.md` and `positions-B.md` exits 1, prints the slug and `plan.positions`, creates no tab, pane or worktree, and leaves state unchanged; with both files present the leaf dispatches normally.
+7. `akrogon config` output has no `repo_max_active`, and a repo `issues/config.yaml` with `max_active` fails to parse with an error naming the key.
+8. Every existing gh probe test asserts the global `.lock` under `AKROGON_HOME` is held during closure, and no test or source path names `issues/.lock`.
+9. A test proves a typed `akrogon next` with `HERDR_PANE_ID` set to a leaf pane and no `HERDR_PLUGIN_EVENT_JSON` sweeps the current repo and removes a merged leaf's worktree in the same run.
+10. `bun test`, `bun run typecheck` and `bun run format` pass.
+11. (B) The verification run leaves an artifact: `bash -o pipefail -c 'bun test 2>&1 | tee /tmp/akrogon-command-deletions-batch-test.log'` exits 0 and the implementation report records that path.
