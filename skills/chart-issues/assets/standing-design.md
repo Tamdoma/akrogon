@@ -10,4 +10,4 @@
 - Leaf work is agent-owned. A step physically requiring the operator is a human-only prerequisite completed before the leaf opens. Credential access alone never qualifies. An unforeseen physical blocker ends the attempt and informs the operator.
 - Every secret including production lives in the consumer repo's gitignored .env. The operator explicitly accepts that agents can read it. No secret vault, broker, or off-machine credential pile exists.
 
-Carry the block above verbatim into each leaf design.
+Each leaf design names this file's installed path and writes its own interpretation of these rules.

@@ -23,9 +23,6 @@ Charts stay here after handoff. They have no state.yaml or lifecycle phase. Crea
 ## Forks taken
 - [<fork>](forks/<fork-slug>.md): <settled answer>
 
-## Forks open
-- [<fork>](forks/<fork-slug>.md): <what blocks it, if anything>
-
 ## Fog
 <material work in scope whose question cannot yet be stated precisely>
 
@@ -77,7 +74,7 @@ GitHub identity comes from the mirror's `Source: owner/repo#n` line. Compare exa
 <operator answer verbatim, reason and foreclosed alternatives>
 ```
 
-One fork file holds one or more questions that are always presented together on one screen. A fork is taken when every material question in it is taken; partial answers stay under `## Findings` and `## Taken` is written only then. A taken fork is never reopened: a correction before handoff is a new fork naming the one it supersedes, the original stays verbatim, and only the effective answer becomes a binding decision. Unresolved questions have no invented Taken. A question sharp enough to travel alone gets its own fork file even while blocked. Work whose question is not sharp stays in Fog. Ruling work out records the reason in Off route instead of pretending a fork was taken. Reshape the remaining questions after each answer.
+One fork file holds one or more questions that are always presented together on one screen. A fork is taken when every material question in it is taken; partial answers stay under `## Findings` and `## Taken` is written only then. Append each explicit operator correction with its date, preserve earlier answers, and treat the last appended correction as binding only for the answer it changes. Unresolved questions have no invented Taken. A question sharp enough to travel alone gets its own fork file even while blocked. Work whose question is not sharp stays in Fog. Ruling work out records the reason in Off route instead of pretending a fork was taken. Reshape the remaining questions after each answer. A fork file with no operator answer under `## Taken` is open, and CHART.md lists none.
 
 ## Handoff tree
 
@@ -139,7 +136,7 @@ Container indexes hold no lifecycle state or global order. Slugs are lowercase h
 <each applicable binding decision, retaining heading, answer, reason and
 foreclosed alternatives>
 
-<standing creation-locked block and current interpretation from standing-design.md>
+<installed path of standing-design.md, then the current interpretation: how its rules apply to this leaf>
 
 ## Leaf architecture
 <owned surfaces, literal interfaces, exclusions and necessary dependencies>
@@ -149,7 +146,7 @@ Each design is self-contained. Copy every binding decision into each affected le
 
 ```yaml
 slug: sample-change
-phase: plan.synthesis
+phase: plan.synthesis  # plan.positions when debate: 'yes'
 created: '2026-09-11'
 repo: registered-key
 debate: 'no'
@@ -163,8 +160,8 @@ A GitHub report has exactly one completion owner, an issue or an epic: every lea
 
 ## Preflight and validation
 
-Prepare the complete contracts and attended handoff review before writing. Check all proposed destination folders and index files for occupancy, including partial leaf folders without state.yaml, and refuse the handoff on any collision. Before any handoff write, also refuse an existing `issues/closed/<top-level-owner-folder-name>` and name that conflicting destination, even if empty or missing state and indexes. The completion owner is the standalone issue or the epic, not a nested child issue. Never overwrite a sentinel brief or reuse an occupied leaf destination. Refuse a leaf whose What, done-criteria or owned surfaces touch any path under `issues/`, since a leaf branch carries code only and `akrogon phase` rejects `issues/` diffs; such work is an operator step on main, not a leaf. Check slug uniqueness across open/closed and the proposal. Resolve every blocked-by slug to an existing leaf folder with valid state or a proposed prerequisite, and refuse missing targets and circular prerequisites before writes. Emit prerequisite leaves before dependents so no written state names a not-yet-created prerequisite.
+Prepare the complete contracts and attended handoff review before writing. Check all proposed destination folders and index files for occupancy, including partial leaf folders without state.yaml, and refuse the handoff on any collision. Before any handoff write, also refuse an existing `issues/closed/<top-level-owner-folder-name>` and name that conflicting destination, even if empty or missing state and indexes. The completion owner is the standalone issue or the epic, not a nested child issue. Never overwrite a sentinel brief or reuse an occupied leaf destination. Refuse a leaf whose What, done-criteria or owned surfaces touch any path under `issues/`, since a leaf branch carries code only and `akrogon phase` rejects `issues/` diffs; such work is an operator step on main, not a leaf. Check slug uniqueness across open/closed and the proposal. Resolve every blocked-by slug to an existing leaf folder with valid state or a proposed prerequisite, and refuse missing targets and circular prerequisites before writes. Emit prerequisite leaves before dependents so no written state names a not-yet-created prerequisite. Refuse the handoff while any fork file lacks an operator answer or `## Fog` is not empty.
 
 Read the briefs as an implementer: each criterion can be fulfilled within ownership and dependencies, cross-leaf promises have a matching owner, all binding decisions have a home or explicit exclusion, and known human prerequisites are complete. Obtain the operator's go-ahead for this concrete tree and contracts, honoring session authorization already given.
 
-Write the leaf files and immediate-child indexes directly at the registered root, then run `akrogon status` there and inspect the actual result. It parses states with the command's schema and checks repo/slug consistency; it does not prove source ownership, dependency existence or prose quality, which require the preceding audit. A failed validation is an unfinished handoff requiring repair, not permission to mark the chart handed off. A successful handoff retains the chart and original inputs, appends the handoff date and ends at the printed footer without dispatch.
+Write the leaf files and immediate-child indexes directly at the registered root. Write brief.md and design.md before state.yaml, and a prerequisite leaf's files before its dependents', because dispatch picks up any folder holding a state.yaml. Then run `akrogon status` there and inspect the actual result. It parses states with the command's schema and checks repo/slug consistency; it does not prove source ownership, dependency existence or prose quality, which require the preceding audit. A failed validation is an unfinished handoff requiring repair, not permission to mark the chart handed off. A successful handoff retains the chart and original inputs, appends the handoff date and ends at the printed footer without dispatch.
