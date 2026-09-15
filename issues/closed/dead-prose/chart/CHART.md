@@ -27,3 +27,5 @@ None.
 - Command, tests and log schema unchanged.
 - The chart's mandatory B exchange and blind initial review stay.
 - Designs already open keep their copied standing block.
+
+Handed off 2026-09-14: issues/open/dead-prose/lifecycle-prose and issues/open/dead-prose/chart-prose, phase plan.synthesis, debate no.

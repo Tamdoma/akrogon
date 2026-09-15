@@ -12,3 +12,5 @@ L4 lifecycle skills; L5 chart skill; merge-conflict-route.
 
 ## Taken
 Operator answer (2026-09-14): `29a` two leaves, L4 lifecycle skills and guide, L5 chart skill; L4 blocked-by merge-conflict-route because 20a deletes a clause that leaf touches. Forecloses one leaf.
+Note (2026-09-14): merge-conflict-route merged on origin/main as edda614 before this handoff, so the L4 leaf needs no blocked-by.
+Operator answer (2026-09-14): `32a` debate no, both leaves start at plan.synthesis.

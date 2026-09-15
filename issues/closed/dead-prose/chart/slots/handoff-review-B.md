@@ -1,0 +1,11 @@
+Draft paths below are relative to `/tmp/claude-1000/-home-ivan-Work-infra-akrogon/310b67d8-66ea-47f1-9694-0130ac3ae16f/scratchpad/handoff-l45/`.
+
+- F1. `lifecycle-prose/brief.md:18` cannot pass within ownership. The required empty `diagnosis` search also matches the unchanged seed-intake exclusions at `fec7bc6:skills/seed-issue/SKILL.md:26` and `fec7bc6:docs/guide/create.html:61`. Neither file is owned (`lifecycle-prose/design.md:43`). Restrict this check to the retired failed-diagnosis instructions, preserving those unrelated uses.
+
+- F2. `chart-prose/brief.md:17` requires one `## Fog` match, but its own preflight addition contains a second literal `## Fog` (`chart-prose/design.md:48`), alongside the retained heading at `skills/chart-issues/assets/shapes.md:29`. Count the heading with `^## Fog$`, or inspect the single Fog section semantically.
+
+- F3. `chart-prose/design.md:44` only appends the correction sentence. It leaves `skills/chart-issues/assets/shapes.md:80` requiring every correction to create a new superseding fork. A fresh implementer can preserve that mechanism and append corrections there, or follow the locked append-to-existing-answer behavior. Replace the old correction clause rather than layering the new rule after it, preserving original answers and the unaffected settlement rules (`issues/chart/dead-prose/forks/corrections.md:14`).
+
+- F4. `chart-prose/brief.md:9` and `chart-prose/design.md:45` add a mandatory sentence for every standing rule, including every inapplicable rule. The locked answer requires an installed-path pointer and the interpretation paragraph, not nine individually required sentences (`issues/chart/dead-prose/forks/standing-block.md:14`; `skills/chart-issues/assets/standing-design.md:3-11`). Remove the new per-rule sentence requirement and retain the agreed pointer plus leaf-specific interpretation.
+
+- F5. Two source line references do not match the specified local baseline. `chart-prose/brief.md:9` places the binding-decision copying sentence at shapes.md:147, which is blank. It is at `skills/chart-issues/assets/shapes.md:148`. `chart-prose/design.md:53` quotes “every fork in every chart is taken” at SKILL.md:36, also blank. It is at `skills/chart-issues/SKILL.md:37`. Correct both references before handoff.
