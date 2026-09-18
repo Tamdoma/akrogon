@@ -1212,7 +1212,10 @@ test('foreign leaves do not consume capacity while healthy leaves in both repos 
         .prompts.map((p) => p.text)
         .sort(),
     ).toEqual(
-      ['plan-issue healthy slot=B phase=plan.synthesis', 'plan-issue other-healthy slot=B phase=plan.synthesis'].sort(),
+      [
+        `plan-issue healthy slot=B phase=plan.synthesis leaf=${f.root}/issues/open/issue/healthy`,
+        `plan-issue other-healthy slot=B phase=plan.synthesis leaf=${g.root}/issues/open/issue/other-healthy`,
+      ].sort(),
     );
     foreign.forEach((p: string, i: number) => expect(readFileSync(resolve(p, 'state.yaml'), 'utf8')).toBe(before[i]));
   } finally {
