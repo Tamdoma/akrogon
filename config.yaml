@@ -19,3 +19,5 @@ repos:
   framework: /home/ivan/Work/infra/tamdoma/framework
   pi-extensions: /home/ivan/.pi/agent/extensions
   mdcny-ghl-data-pulls: /home/ivan/Work/personal/MDConsultingNY/mdcny-ghl-data-pulls
+  boulevard-automation: /home/ivan/Work/personal/MDConsultingNY/boulevard-automation
+  clinique-la-roya: /home/ivan/Work/personal/MDConsultingNY/clinique-la-roya
