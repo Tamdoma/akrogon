@@ -115,7 +115,8 @@ export async function transition(
     throw new Error('A required --slot is missing or invalid');
   if (slot !== undefined && state.done.includes(slot)) throw new Error(`Slot already recorded: ${slot}`);
   if (state.worktree !== undefined) await requireClean(state.worktree);
-  if (requested === 'check.review' && state.worktree !== undefined) await requireCodeOnly(repo, state.worktree);
+  if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path);
+  if (requested === 'check.review' && state.worktree !== undefined) await requireNonEmpty(repo, state.worktree);
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
   const recorded: State = {
@@ -147,12 +148,15 @@ export async function requireClean(worktree: string): Promise<void> {
   if (dirty !== '') throw new Error(`Uncommitted work in ${worktree}:\n${dirty}`);
 }
 
-export async function requireCodeOnly(repo: Repo, worktree: string): Promise<void> {
+export async function requireNoIssueFiles(repo: Repo, worktree: string, leafPath: string): Promise<void> {
   const files: string = await command(
     ['git', 'diff', '--name-only', `${target(repo)}...HEAD`, '--', 'issues'],
     worktree,
   );
-  if (files !== '') throw new Error(`Issue files on leaf branch belong to ${resolve(repo.root, 'issues')}:\n${files}`);
+  if (files !== '') throw new Error(`Issue files on leaf branch belong in ${leafPath}:\n${files}`);
+}
+
+export async function requireNonEmpty(repo: Repo, worktree: string): Promise<void> {
   const changes: string = await command(['git', 'diff', '--name-only', `${target(repo)}...HEAD`], worktree);
   if (changes === '') throw new Error(`Empty leaf branch: no changes against ${target(repo)}`);
 }

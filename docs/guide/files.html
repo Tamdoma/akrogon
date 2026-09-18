@@ -57,7 +57,7 @@
         <span class="eyebrow">10 · Where files live</span>
         <h2>The leaf branch carries code. The checkout carries issues.</h2>
         <p>Two places write to the repo at the same time. Agents build on the leaf branch inside the worktree. Akrogon and the skills write plans, reviews, state, and the log inside your registered checkout, on <code>main</code>.</p>
-        <p>The rule that keeps them from colliding: <b>nothing under <code>issues/</code> is ever committed on a leaf branch.</b> The <code>phase</code> command checks this at handoff and refuses if it finds one.</p>
+        <p>The rule that keeps them from colliding: <b>nothing under <code>issues/</code> is ever committed on a leaf branch.</b> The <code>phase</code> command checks this on every move and refuses if it finds one.</p>
         <p>So after a merge, <code>main</code> on the remote has the new code, and your checkout has new issue files that are not pushed yet. One command reconciles the two.</p>
         <pre><code>akrogon sync</code></pre>
         <p>It stages everything in the checkout, commits it as <code>sync issues</code> if anything is staged, pulls with rebase, and pushes. Agent work is never overwritten. Your issue files ride on top of it.</p>

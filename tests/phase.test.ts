@@ -794,3 +794,64 @@ test('empty branch refuses review naming target', async () => {
     f.clean();
   }
 });
+
+test('planning move refuses issue files on branch naming leaf path, then records when clean', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = resolve(f.home, 'wt-stray');
+    await command(['git', 'worktree', 'add', '-b', 'stray', worktree], f.root);
+    const path: string = leaf(f, 'stray', 'plan.positions', { worktree });
+    mkdirSync(resolve(worktree, 'issues/open/issue/stray'), { recursive: true });
+    writeFileSync(resolve(worktree, 'issues/open/issue/stray/positions-B.md'), 'stray artifact\n');
+    await command(['git', 'add', 'issues'], worktree);
+    await command(['git', 'commit', '-m', 'artifact on branch'], worktree);
+    const refused: Result = await cli(f, ['phase', 'stray', 'plan.rebuttal', '--slot', 'B']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain(resolve(f.root, 'issues/open/issue/stray'));
+    expect(refused.stderr).toContain('positions-B.md');
+    expect(readState(path)).toMatchObject({ phase: 'plan.positions', done: [] });
+    await command(['git', 'reset', '--hard', 'HEAD~1'], worktree);
+    const recorded: Result = await cli(f, ['phase', 'stray', 'plan.rebuttal', '--slot', 'B']);
+    expect(recorded.stdout).toBe('recorded');
+    expect(readState(path).done).toEqual(['B']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('planning synthesis with empty branch moves to implement', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = resolve(f.home, 'wt-empty-plan');
+    await command(['git', 'worktree', 'add', '-b', 'empty-plan', worktree], f.root);
+    leaf(f, 'empty-plan', 'plan.synthesis', { worktree });
+    const result: Result = await cli(f, ['phase', 'empty-plan', 'implement']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe('moved implement');
+  } finally {
+    f.clean();
+  }
+});
+
+test('failed restart refuses issue files on branch but allows move without worktree', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = resolve(f.home, 'wt-recover');
+    await command(['git', 'worktree', 'add', '-b', 'recover', worktree], f.root);
+    const recoverPath: string = leaf(f, 'recover', 'failed', { worktree });
+    mkdirSync(resolve(worktree, 'issues/open/issue/recover'), { recursive: true });
+    writeFileSync(resolve(worktree, 'issues/open/issue/recover/artifact.md'), 'stray\n');
+    await command(['git', 'add', 'issues'], worktree);
+    await command(['git', 'commit', '-m', 'artifact on branch'], worktree);
+    const refused: Result = await cli(f, ['phase', 'recover', 'implement']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain(recoverPath);
+    expect(readState(recoverPath).phase).toBe('failed');
+    leaf(f, 'no-wt', 'failed');
+    const moved: Result = await cli(f, ['phase', 'no-wt', 'implement']);
+    expect(moved.code).toBe(0);
+    expect(moved.stdout).toBe('moved implement');
+  } finally {
+    f.clean();
+  }
+});

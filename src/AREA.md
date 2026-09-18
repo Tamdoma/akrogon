@@ -17,7 +17,7 @@
 
 - Repository identity comes from registration and the shared Git directory.
 - A phase move can be committed even when later log collection fails.
-- Review handoff rejects dirty worktrees and branch changes under `issues/`.
+- Every phase move rejects a dirty worktree and branch changes under `issues/`; the empty-branch refusal applies only at review handoff.
 - External command retries warn once, then preserve the last failure context.
 
 ## See also
