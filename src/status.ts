@@ -244,7 +244,11 @@ function chartRow(folder: string, name: string, now: number): string[] {
     /^## Taken\s*\n\s*\S/m.test(readFileSync(resolve(forks, entry), 'utf8')),
   ).length;
   const fog: number = section(markdown, 'Fog').length;
-  const stage: string = /^Handed off\b/m.test(markdown) ? 'handed off' : files.length + fog > 0 ? 'charting' : 'empty';
+  const stage: string =
+    markdown
+      .match(/^(Handed off|Closed|Held)\b/gm)
+      ?.at(-1)
+      ?.toLowerCase() ?? (files.length + fog > 0 ? 'charting' : 'empty');
   return [`  ${name}`, `${taken}/${files.length}`, String(fog), stage, since(now - statSync(chart).mtimeMs)];
 }
 

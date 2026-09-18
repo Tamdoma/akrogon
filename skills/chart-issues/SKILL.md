@@ -54,7 +54,7 @@ When B is named, leaf writing is a mandatory two-slot exchange after approval an
 
 Audit the proposed contracts as an implementer and run the preflight in shapes before writing, refusing collisions by naming the conflicting destination and missing dependencies before any handoff write.
 
-After valid handoff append `Handed off <date>` to CHART.md, retaining the chart and source inputs in place; command dispatch remains the authority, so finish without running `akrogon next` or a chart phase transition.
+After valid handoff append `Handed off <YYYY-MM-DD>` on its own line to CHART.md, retaining the chart and source inputs in place; command dispatch remains the authority, so finish without running `akrogon next` or a chart phase transition. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative.
 
 ## Printed footer
 

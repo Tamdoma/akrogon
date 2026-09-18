@@ -30,7 +30,7 @@ Charts stay here after handoff. They have no state.yaml or lifecycle phase. Crea
 <excluded work and reasons>
 ```
 
-Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` to CHART.md without moving it. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts.
+Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts.
 
 ```markdown
 # Intake: <chart-slug>

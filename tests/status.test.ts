@@ -484,3 +484,54 @@ test('--charts lists every chart with taken counts, fog items, stage and age', a
     f.clean();
   }
 });
+
+test('--charts derives stage from last terminal marker line', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const store: string = resolve(f.root, 'issues/chart');
+    mkdirSync(resolve(store, 'trailing'), { recursive: true });
+    writeFileSync(
+      resolve(store, 'trailing/CHART.md'),
+      '# Chart: trailing\n\n## Fog\n- None.\n\nHanded off 2026-09-11 into foo\n',
+    );
+    mkdirSync(resolve(store, 'forward'), { recursive: true });
+    writeFileSync(
+      resolve(store, 'forward/CHART.md'),
+      '# Chart: forward\n\n## Fog\n- None.\n\nHeld 2026-09-15: waiting\n\nHanded off 2026-09-17\n',
+    );
+    mkdirSync(resolve(store, 'backward'), { recursive: true });
+    writeFileSync(
+      resolve(store, 'backward/CHART.md'),
+      '# Chart: backward\n\n## Fog\n- None.\n\nHanded off 2026-09-11\n\nHeld 2026-09-15: waiting\n',
+    );
+    mkdirSync(resolve(store, 'buried'), { recursive: true });
+    writeFileSync(
+      resolve(store, 'buried/CHART.md'),
+      '# Chart: buried\n\n## Fog\n- None.\n\n## Off route\n- Closed the gap on x\n',
+    );
+    mkdirSync(resolve(store, 'shuttered/forks'), { recursive: true });
+    writeFileSync(
+      resolve(store, 'shuttered/CHART.md'),
+      '# Chart: shuttered\n\n## Fog\n- None.\n\nClosed 2026-09-12: done\n',
+    );
+    writeFileSync(resolve(store, 'shuttered/forks/keep.md'), '# Keep\n\n## Question\nq\n\n## Taken\n');
+    const result: Result = await cli(f, ['status', '--charts']);
+    expect(result.code).toBe(0);
+    const row = (name: string): string =>
+      result.stdout.split('\n').find((line) => new RegExp(`^\\s*${name}\\s`).test(line))!;
+    expect(row('trailing')).toMatch(/trailing\s+0\/0\s+0\s+handed off\s+\d+m$/);
+    expect(row('forward')).toMatch(/forward\s+0\/0\s+0\s+handed off\s+\d+m$/);
+    expect(row('backward')).toMatch(/backward\s+0\/0\s+0\s+held\s+\d+m$/);
+    expect(row('buried')).toMatch(/buried\s+0\/0\s+0\s+empty\s+\d+m$/);
+    expect(row('shuttered')).toMatch(/shuttered\s+0\/1\s+0\s+closed\s+\d+m$/);
+    rmSync(store, { recursive: true });
+    mkdirSync(store, { recursive: true });
+    writeFileSync(resolve(store, 'CHART.md'), '# Chart: solo\n\n## Fog\n- None.\n\nHeld 2026-09-15: waiting\n');
+    const single: Result = await cli(f, ['status', '--charts']);
+    expect(single.code).toBe(0);
+    const solo: string = single.stdout.split('\n').find((line) => /^\s*chart\s/.test(line))!;
+    expect(solo).toMatch(/chart\s+0\/0\s+0\s+held\s+\d+m$/);
+  } finally {
+    f.clean();
+  }
+});
