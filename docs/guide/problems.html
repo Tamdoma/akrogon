@@ -69,6 +69,7 @@
       <tr><td>Broadcast did not arrive</td><td>The webhook env is missing, or the merge pane closed before sending.</td><td>Check <code>~/.config/akrogon/env</code>. Send it by hand with the sender script from the skill folder, using the issue's briefs.</td></tr>
       <tr><td>A lingering tab or worktree after merge</td><td>The startup sweep has not run yet.</td><td><code>akrogon next --all</code>, or restart herdr.</td></tr>
       <tr><td>"Unrelated worktree"</td><td>A folder at the worktree path belongs to a different repo.</td><td>Remove it by hand. A worktree parked mid-rebase is fine and is dispatched normally.</td></tr>
+      <tr><td>One JSON line naming a repo, count and paths</td><td>Leaves stored under a different repo key, e.g. inherited from another repo.</td><td>Nothing automatic — they are never dispatched, cleaned or counted; move or fix them by hand.</td></tr>
     </table></div>
   </div>
 </section>

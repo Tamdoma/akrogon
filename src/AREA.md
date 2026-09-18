@@ -19,6 +19,7 @@
 - A phase move can be committed even when later log collection fails.
 - Every phase move rejects a dirty worktree and branch changes under `issues/`; the empty-branch refusal applies only at review handoff.
 - External command retries warn once, then preserve the last failure context.
+- Foreign leaves are summarized once per repo and excluded from capacity and dispatch.
 
 ## See also
 

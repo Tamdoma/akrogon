@@ -942,7 +942,14 @@ test('next awaits sourced completion after a failed rename before removing the w
   }
 }, 15000);
 
-const skipSchema = z.object({ repo: z.string(), path: z.string(), slug: z.string().optional(), error: z.string() });
+const skipSchema = z.object({
+  repo: z.string(),
+  path: z.string(),
+  slug: z.string().optional(),
+  error: z.string(),
+  count: z.number().int().optional(),
+  paths: z.array(z.object({ path: z.string(), stored: z.string() })).optional(),
+});
 function skips(result: Result): z.infer<typeof skipSchema>[] {
   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
 }
@@ -1116,7 +1123,16 @@ for (const invalid of ['duplicate', 'mismatch']) {
       leaf(f, 'healthy', 'plan.synthesis');
       const result: Result = await next(f, ['--all']);
       expect(result.code).toBe(1);
-      expect(skips(result).some((skip) => skip.path === path)).toBe(true);
+      if (invalid === 'mismatch') {
+        expect(skips(result)).toHaveLength(1);
+        const summary: z.infer<typeof skipSchema> = skips(result)[0];
+        expect(summary.repo).toBe('repo');
+        expect(summary.count).toBe(1);
+        expect(summary.paths).toContainEqual({ path, stored: 'wrong' });
+        expect(skips(result).some((skip) => skip.error.includes('repo mismatch'))).toBe(false);
+      } else {
+        expect(skips(result).some((skip) => skip.path === path)).toBe(true);
+      }
       expect(database(f).prompts.every((prompt) => prompt.text.includes('healthy'))).toBe(true);
       expect(database(f).prompts).toHaveLength(1);
     } finally {
@@ -1137,11 +1153,11 @@ test('next selection and sweep report both repo keys without dispatching or chan
     const sweep: Result = await next(f, ['--all']);
     expect(sweep.code).not.toBe(0);
     for (const result of [selected, sweep]) {
-      const diagnostic: z.infer<typeof skipSchema> = skips(result).find((skip) => skip.path === path)!;
+      expect(skips(result)).toHaveLength(1);
+      const diagnostic: z.infer<typeof skipSchema> = skips(result)[0];
       expect(diagnostic.repo).toBe('repo');
-      expect(diagnostic.error).toContain(path);
-      expect(diagnostic.error).toMatch(/stored[^\n]*other/i);
-      expect(diagnostic.error).toMatch(/registered[^\n]*repo/i);
+      expect(diagnostic.count).toBe(1);
+      expect(diagnostic.paths).toContainEqual({ path, stored: 'other' });
     }
     expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
       `plan-issue healthy slot=B phase=plan.synthesis leaf=${f.root}/issues/open/issue/healthy`,
@@ -1152,6 +1168,162 @@ test('next selection and sweep report both repo keys without dispatching or chan
     f.clean();
   }
 });
+
+test('foreign leaves summarize once per repo with count and paths', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const a: string = leaf(f, 'foreign-a', 'plan.synthesis', { repo: 'other' });
+    const b: string = leaf(f, 'foreign-b', 'plan.synthesis', { repo: 'other' });
+    const c: string = leaf(f, 'foreign-c', 'plan.synthesis', { repo: 'third' });
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(1);
+    const summary: z.infer<typeof skipSchema> = skips(result)[0];
+    expect(summary.repo).toBe('repo');
+    expect(summary.count).toBe(3);
+    expect(summary.paths).toHaveLength(3);
+    expect(summary.paths).toContainEqual({ path: a, stored: 'other' });
+    expect(summary.paths).toContainEqual({ path: b, stored: 'other' });
+    expect(summary.paths).toContainEqual({ path: c, stored: 'third' });
+    expect(database(f).prompts).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('foreign leaves do not consume capacity while healthy leaves in both repos dispatch', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const g: Fixture = await fixture();
+  try {
+    const foreign: string[] = [];
+    for (let i: number = 0; i < 5; i++) foreign.push(leaf(f, `foreign-${i}`, 'plan.synthesis', { repo: 'other' }));
+    const before: string[] = foreign.map((p: string) => readFileSync(resolve(p, 'state.yaml'), 'utf8'));
+    leaf(f, 'healthy', 'plan.synthesis');
+    leaf(g, 'other-healthy', 'plan.synthesis', { repo: 'other' });
+    configure(f, { max_active: 2, repos: { repo: f.root, other: g.root } });
+    const result: Result = await next(f, ['--all'], {}, f.home);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(1);
+    expect(skips(result)[0].count).toBe(5);
+    expect(database(f).prompts).toHaveLength(2);
+    expect(database(f).tabs).toHaveLength(2);
+    expect(
+      database(f)
+        .prompts.map((p) => p.text)
+        .sort(),
+    ).toEqual(
+      ['plan-issue healthy slot=B phase=plan.synthesis', 'plan-issue other-healthy slot=B phase=plan.synthesis'].sort(),
+    );
+    foreign.forEach((p: string, i: number) => expect(readFileSync(resolve(p, 'state.yaml'), 'utf8')).toBe(before[i]));
+  } finally {
+    f.clean();
+    g.clean();
+  }
+}, 15000);
+
+test('foreign slugs are missing for lookup and dispatch', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const foreign: string = leaf(f, 'foreign-dep', 'plan.synthesis', { repo: 'other' });
+    const before: string = readFileSync(resolve(foreign, 'state.yaml'), 'utf8');
+    const blocked: string = leaf(f, 'blocked', 'plan.synthesis', { 'blocked-by': ['foreign-dep'] });
+    const sweep: Result = await next(f, ['--all']);
+    expect(sweep.code).toBe(1);
+    expect(skips(sweep)).toHaveLength(2);
+    const perLeaf: z.infer<typeof skipSchema> | undefined = skips(sweep).find((s) => s.slug === 'blocked');
+    expect(perLeaf).toBeDefined();
+    expect(perLeaf!.path).toBe(blocked);
+    expect(perLeaf!.error).toContain('foreign-dep');
+    expect(database(f).prompts).toHaveLength(0);
+    const direct: Result = await next(f, ['foreign-dep']);
+    expect(direct.code).not.toBe(0);
+    expect(skips(direct)).toHaveLength(1);
+    expect(skips(direct)[0].count).toBe(1);
+    expect(skips(direct)[0].paths).toContainEqual({ path: foreign, stored: 'other' });
+    expect(database(f).prompts).toHaveLength(0);
+    expect(readFileSync(resolve(foreign, 'state.yaml'), 'utf8')).toBe(before);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('unreadable leaves reserve capacity while foreign leaves summarize separately', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'healthy', 'plan.synthesis');
+    const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
+    writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
+    const fa: string = leaf(f, 'foreign-a', 'plan.synthesis', { repo: 'other' });
+    const fb: string = leaf(f, 'foreign-b', 'plan.synthesis', { repo: 'other' });
+    configure(f, { max_active: 2 });
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(2);
+    const summary: z.infer<typeof skipSchema> | undefined = skips(result).find((s) => s.count !== undefined);
+    expect(summary).toBeDefined();
+    expect(summary!.repo).toBe('repo');
+    expect(summary!.count).toBe(2);
+    expect(summary!.paths).toContainEqual({ path: fa, stored: 'other' });
+    expect(summary!.paths).toContainEqual({ path: fb, stored: 'other' });
+    expect(skips(result).some((s) => s.path === malformed)).toBe(true);
+    expect(database(f).prompts).toHaveLength(0);
+    expect(database(f).tabs).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('merged foreign leaves survive cleanup with worktree branch and tab intact', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const open: string = leaf(f, 'survivor', 'plan.synthesis');
+    expect((await next(f, ['survivor'])).code).toBe(0);
+    const dispatched: State = readState(open);
+    const worktree: string = z.string().parse(dispatched.worktree);
+    const tab: string = z.string().parse(dispatched.tab);
+    saveState(open, { ...dispatched, repo: 'other', phase: 'merged' });
+    mkdirSync(resolve(f.root, 'issues/closed/issue'), { recursive: true });
+    const closed: string = resolve(f.root, 'issues/closed/issue/survivor');
+    renameSync(open, closed);
+    const before: string = readFileSync(resolve(closed, 'state.yaml'), 'utf8');
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(1);
+    expect(skips(result)[0].count).toBe(1);
+    expect(skips(result)[0].paths).toContainEqual({ path: closed, stored: 'other' });
+    expect(readFileSync(resolve(closed, 'state.yaml'), 'utf8')).toBe(before);
+    expect(existsSync(worktree)).toBe(true);
+    expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/survivor'], f.root)).code).toBe(0);
+    expect(database(f).tabs.some((t) => t.tab_id === tab)).toBe(true);
+    expect(calls(f).filter((args: string[]) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('two repos summarize once per repo on every invocation', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const g: Fixture = await fixture();
+  try {
+    const fa: string = leaf(f, 'foreign-in-repo', 'plan.synthesis', { repo: 'other' });
+    const fb: string = leaf(g, 'foreign-in-other', 'plan.synthesis', { repo: 'repo' });
+    configure(f, { repos: { repo: f.root, other: g.root } });
+    for (let i: number = 0; i < 2; i++) {
+      const result: Result = await next(f, ['--all'], {}, f.home);
+      expect(result.code).toBe(1);
+      expect(skips(result)).toHaveLength(2);
+      const byRepo: Map<string, z.infer<typeof skipSchema>> = new Map(skips(result).map((s) => [s.repo, s]));
+      expect(byRepo.get('repo')?.count).toBe(1);
+      expect(byRepo.get('other')?.count).toBe(1);
+      expect(byRepo.get('repo')?.paths).toContainEqual({ path: fa, stored: 'other' });
+      expect(byRepo.get('other')?.paths).toContainEqual({ path: fb, stored: 'repo' });
+    }
+    expect(database(f).prompts).toHaveLength(0);
+  } finally {
+    f.clean();
+    g.clean();
+  }
+}, 15000);
 
 for (const moved of ['worktree root', 'repo root'] as const) {
   test(`changed ${moved} reports recorded and expected worktrees without creating or prompting`, async () => {

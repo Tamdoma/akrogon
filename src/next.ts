@@ -16,16 +16,7 @@ import {
   type Repo,
   type GlobalConfig,
 } from './config';
-import {
-  readState,
-  saveState,
-  RepoMismatchError,
-  validateLeafDepth,
-  missingLeafMessage,
-  withLock,
-  type Leaf,
-  type State,
-} from './state';
+import { readState, saveState, validateLeafDepth, missingLeafMessage, withLock, type Leaf, type State } from './state';
 import { requiredSlots, routing, type Slot } from './routing';
 import {
   herdr,
@@ -71,7 +62,7 @@ const hookEventSchema = z.discriminatedUnion('event', [
 type HookEvent = z.infer<typeof hookEventSchema>;
 
 type Invocation = { skipped: Set<string> };
-type Inventory = { leaves: Leaf[]; unreadable: number; unknown: boolean };
+type Inventory = { leaves: Leaf[]; unreadable: number; unknown: boolean; foreign: { path: string; stored: string }[] };
 type DispatchOutcome = 'completed' | 'waiting' | 'skipped';
 
 function report(invocation: Invocation, repo: string, path: string, error: Error, slug?: string): void {
@@ -84,7 +75,7 @@ function report(invocation: Invocation, repo: string, path: string, error: Error
 }
 
 function discover(repo: Repo, invocation: Invocation): Inventory {
-  const result: Inventory = { leaves: [], unreadable: 0, unknown: false };
+  const result: Inventory = { leaves: [], unreadable: 0, unknown: false, foreign: [] };
   function visit(path: string, areaRoot: string): void {
     let entries: Dirent[];
     try {
@@ -99,8 +90,8 @@ function discover(repo: Repo, invocation: Invocation): Inventory {
       try {
         validateLeafDepth(areaRoot, path);
         const state: State = readState(path);
-        if (state.repo !== repo.name) throw new RepoMismatchError(path, state.repo, repo.name);
-        result.leaves.push({ path, state });
+        if (state.repo !== repo.name) result.foreign.push({ path, stored: state.repo });
+        else result.leaves.push({ path, state });
       } catch (error) {
         if (!(error instanceof Error)) throw error;
         report(invocation, repo.name, path, error);
@@ -129,6 +120,19 @@ function discover(repo: Repo, invocation: Invocation): Inventory {
   for (const leaf of result.leaves.filter((leaf) => duplicates.has(leaf.state.slug))) {
     report(invocation, repo.name, leaf.path, new Error(`Duplicate leaf slug: ${leaf.state.slug}`));
     result.unreadable += 1;
+  }
+  if (result.foreign.length > 0 && !invocation.skipped.has(repo.name)) {
+    invocation.skipped.add(repo.name);
+    for (const entry of result.foreign) invocation.skipped.add(`${repo.name}/${entry.path}`);
+    console.error(
+      JSON.stringify({
+        repo: repo.name,
+        path: result.foreign[0].path,
+        error: `Foreign leaves in repo "${repo.name}": ${result.foreign.length} leaves stored under other keys`,
+        count: result.foreign.length,
+        paths: result.foreign,
+      }),
+    );
   }
   return { ...result, leaves: result.leaves.filter((leaf) => !duplicates.has(leaf.state.slug)) };
 }
@@ -564,7 +568,8 @@ async function selectLeaves(
           (leaf) => within(leaf.path, folder) || within(folder, leaf.path) || inWorktree(folder, leaf),
         );
   if (selected.length === 0) {
-    if (inventory.unreadable > 0 || inventory.unknown) return { repo, leaves: selected };
+    if (inventory.unreadable > 0 || inventory.unknown || inventory.foreign.length > 0)
+      return { repo, leaves: selected };
     if (input !== undefined && !existsSync(folder)) throw new Error(missingLeafMessage(repo, input));
     throw new Error(`No leaves match: ${input ?? cwd}`);
   }
