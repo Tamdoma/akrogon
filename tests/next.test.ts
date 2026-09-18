@@ -117,7 +117,9 @@ test('next creates one worktree/tab under concurrent hooks, prompts configured B
     expect(db.tabs).toHaveLength(1);
     expect(db.panes).toHaveLength(2);
     expect(db.prompts).toHaveLength(1);
-    expect(db.prompts[0].text).toBe('plan-issue build slot=B phase=plan.synthesis');
+    expect(db.prompts[0].text).toBe(`plan-issue build slot=B phase=plan.synthesis leaf=${path}`);
+    expect(db.prompts[0].text.endsWith(` leaf=${f.root}/issues/open/issue/build`)).toBe(true);
+    expect(db.prompts[0].text.split(' leaf=')[1]).not.toContain('issues/worktrees');
     console.log(db.prompts[0].text);
     expect(db.starts[0]).toContain('strong-b');
     expect(calls(f).some((args) => args[0] === 'notification')).toBe(false);
@@ -169,7 +171,9 @@ test('a stale prompt never re-prompts a busy or done seat, and three stale misse
     const path: string = leaf(f, 'misses', 'plan.synthesis');
     expect((await next(f, ['misses'])).code).toBe(0);
     const b: string = readState(path).pane.B!;
-    expect(database(f).prompts).toEqual([{ pane: b, text: 'plan-issue misses slot=B phase=plan.synthesis' }]);
+    expect(database(f).prompts).toEqual([
+      { pane: b, text: `plan-issue misses slot=B phase=plan.synthesis leaf=${path}` },
+    ]);
     expect(readState(path).attempts).toEqual({ A: 0, B: 1 });
     const stale = (): void =>
       saveState(path, { ...readState(path), prompted_at: { B: new Date(Date.now() - 3 * 60 * 1000).toISOString() } });
@@ -675,8 +679,10 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)).toMatchObject({
       pane: state.pane.A,
-      text: 'merge-issue landed slot=A phase=merge',
+      text: `merge-issue landed slot=A phase=merge leaf=${path}`,
     });
+    expect(database(f).prompts.at(-1)?.text?.endsWith(` leaf=${f.root}/issues/open/landing/landed`)).toBe(true);
+    expect(database(f).prompts.at(-1)?.text?.split(' leaf=')[1]).not.toContain('issues/worktrees');
     const completed: Result = await cli(f, ['phase', 'landed', 'merged', '--slot', 'A'], worktree, f.env);
     expect(completed.code).toBe(0);
     expect(completed.stdout).toContain('issue complete landing');
@@ -718,7 +724,7 @@ test('exited hooks resolve persisted pane hints and preserve the surviving slot'
     expect(readState(path).pane.B).toBe(b);
     expect(readState(path).pane.A).not.toBe(a);
     expect(readState(path).attempts).toEqual({ A: 2, B: 1 });
-    expect(database(f).prompts.at(-1)?.text).toBe('plan-issue exited slot=A phase=plan.positions');
+    expect(database(f).prompts.at(-1)?.text).toBe(`plan-issue exited slot=A phase=plan.positions leaf=${path}`);
     expect(database(f).starts.at(-1)).toContain('strong-a');
     expect(database(f).tabs).toHaveLength(1);
   } finally {
@@ -772,7 +778,7 @@ test('uncommitted work in a merge worktree is left to the merge seat', async () 
     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)).toMatchObject({
       pane: state.pane.A,
-      text: 'merge-issue dirty slot=A phase=merge',
+      text: `merge-issue dirty slot=A phase=merge leaf=${path}`,
     });
     expect(existsSync(resolve(worktree, 'forgotten'))).toBe(true);
   } finally {
@@ -871,7 +877,12 @@ test('agent names support identical repo-local slugs and long numeric-leading sl
     expect(new Set(db.starts.map((args) => args[2])).size).toBe(2);
     expect(db.starts.every((args) => /^[a-z][a-z0-9_-]{0,31}$/.test(args[2]))).toBe(true);
     expect(db.tabs.map((tab) => tab.label)).toEqual([slug, slug]);
-    expect(db.prompts.every((prompt) => prompt.text === `plan-issue ${slug} slot=B phase=plan.synthesis`)).toBe(true);
+    expect(new Set(db.prompts.map((prompt) => prompt.text))).toEqual(
+      new Set([
+        `plan-issue ${slug} slot=B phase=plan.synthesis leaf=${f.root}/issues/open/issue/${slug}`,
+        `plan-issue ${slug} slot=B phase=plan.synthesis leaf=${g.root}/issues/open/issue/${slug}`,
+      ]),
+    );
   } finally {
     f.clean();
     g.clean();
@@ -983,7 +994,7 @@ test('missing dependencies skip their leaf while readable unmet dependencies wai
     expect(skips(result)[0].slug).toBe('broken');
     expect(skips(result)[0].error).toContain('nonexistent');
     expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
-      'plan-issue healthy slot=B phase=plan.synthesis',
+      `plan-issue healthy slot=B phase=plan.synthesis leaf=${f.root}/issues/open/issue/healthy`,
     ]);
   } finally {
     f.clean();
@@ -1133,7 +1144,7 @@ test('next selection and sweep report both repo keys without dispatching or chan
       expect(diagnostic.error).toMatch(/registered[^\n]*repo/i);
     }
     expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
-      'plan-issue healthy slot=B phase=plan.synthesis',
+      `plan-issue healthy slot=B phase=plan.synthesis leaf=${f.root}/issues/open/issue/healthy`,
     ]);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
     expect(existsSync(resolve(f.root, 'issues/worktrees/wrong-key'))).toBe(false);
@@ -1200,7 +1211,7 @@ test('moving a repo with the same registered key supports status, phase and disp
     expect(state.worktree).toBe(resolve(root, 'issues/worktrees/movable'));
     expect(await command(['git', 'branch', '--show-current'], state.worktree)).toBe('movable');
     expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
-      'implement-issue movable slot=B phase=implement',
+      `implement-issue movable slot=B phase=implement leaf=${root}/issues/open/issue/movable`,
     ]);
   } finally {
     f.clean();
@@ -1312,7 +1323,7 @@ for (const session of [null, undefined]) {
       });
       expect((await next(f, ['sessionless'])).code).toBe(0);
       expect(database(f).prompts).toEqual([
-        { pane: readState(path).pane.B!, text: 'plan-issue sessionless slot=B phase=plan.synthesis' },
+        { pane: readState(path).pane.B!, text: `plan-issue sessionless slot=B phase=plan.synthesis leaf=${path}` },
       ]);
       expect(database(f).starts).toHaveLength(1);
     } finally {
@@ -1404,7 +1415,7 @@ test('a blocked non-merge seat does not stall a merge leaf', async () => {
     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)).toMatchObject({
       pane: state.pane.A,
-      text: 'merge-issue blocked-merge slot=A phase=merge',
+      text: `merge-issue blocked-merge slot=A phase=merge leaf=${path}`,
     });
     expect(readState(path).busy_since.B).toBeDefined();
     expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
@@ -1718,7 +1729,7 @@ test('merge leaf with landed branch re-prompts its idle seat instead of auto-rec
     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)).toMatchObject({
       pane: state.pane.A,
-      text: 'merge-issue landed-merge slot=A phase=merge',
+      text: `merge-issue landed-merge slot=A phase=merge leaf=${path}`,
     });
     expect(readState(path).phase).toBe('merge');
   } finally {
@@ -1743,7 +1754,7 @@ test('debate leaf without positions files refuses dispatch until positions exist
     writeFileSync(resolve(path, 'positions-A.md'), 'A\n');
     writeFileSync(resolve(path, 'positions-B.md'), 'B\n');
     expect((await next(f, ['debate'])).code).toBe(0);
-    expect(database(f).prompts.at(-1)?.text).toBe('plan-issue debate slot=B phase=plan.synthesis');
+    expect(database(f).prompts.at(-1)?.text).toBe(`plan-issue debate slot=B phase=plan.synthesis leaf=${path}`);
   } finally {
     f.clean();
   }
@@ -1763,6 +1774,25 @@ test('typed next from a leaf pane sweeps and removes merged worktrees', async ()
     const result: Result = await next(f, [], { HERDR_PANE_ID: otherPane });
     expect(result.code).toBe(0);
     expect(existsSync(worktree)).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('spaced repo root dispatches leaf= with the complete spaced authoritative folder', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const spaced: string = resolve(f.home, 'repo root');
+    renameSync(f.root, spaced);
+    const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: spaced } });
+    const f2: DispatchFixture = { ...f, root: spaced };
+    leaf(f2, 'spaced', 'plan.synthesis');
+    expect((await next(f2, ['spaced'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(1);
+    expect(database(f).prompts[0].text).toBe(
+      `plan-issue spaced slot=B phase=plan.synthesis leaf=${spaced}/issues/open/issue/spaced`,
+    );
   } finally {
     f.clean();
   }

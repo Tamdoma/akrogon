@@ -65,7 +65,7 @@
           <li>If it has no tab and fewer than the global <code>max_active</code> leaves are running anywhere, create the worktree and branch, open a tab with two panes, start the agent, and send one prompt. Merged leaves never count as running, even if their tab is still open.</li>
           <li>Exit.</li>
         </ol>
-        <p>The prompt is always four words: skill, slug, slot, phase. For example <code>plan-issue rename-flag slot=B phase=plan.synthesis</code>. The agent reads the skill file and does the rest.</p>
+        <p>The prompt is always five fields: skill, slug, slot, phase, and the leaf's folder. For example <code>plan-issue rename-flag slot=B phase=plan.synthesis leaf=/home/me/repo/issues/open/issue/rename-flag</code>. The agent reads the skill file and does the rest.</p>
       </div>
       <div class="fig">
         <svg class="ill" viewBox="0 0 460 340" role="img" aria-label="Next walks the leaves in folder order, skips blocked and finished ones, and starts ready ones until the active limit is reached.">

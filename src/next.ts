@@ -408,7 +408,7 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
     const ready: Pane = await currentPane(pane.pane_id);
     await observeBusy(leaf.path, readState(leaf.path), slot, ready, Date.now());
     if (!idle(ready)) return;
-    const prompt: string = `${routing[state.phase].skill} ${state.slug} slot=${slot} phase=${state.phase}`;
+    const prompt: string = `${routing[state.phase].skill} ${state.slug} slot=${slot} phase=${state.phase} leaf=${leaf.path}`;
     const args: string[] = [
       'herdr',
       'agent',

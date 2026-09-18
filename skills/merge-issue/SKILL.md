@@ -7,11 +7,13 @@ Re-read this file and its references only after compaction. A file already read 
 
 # Merge issue
 
-The prompt is `merge-issue <slug> slot=A phase=merge`; A merges in the existing leaf worktree.
+The prompt is `merge-issue <slug> slot=A phase=merge leaf=<folder>`; A merges in the existing leaf worktree.
 
 ## Shared context
 
 Read `akrogon config` once, locate the unique leaf under the registered repo's authoritative `issues/open/`, and read its plan, `implementation/report.md` and reviews, using configured `remote` and `default_branch` (defaults `origin` and `main`).
+
+Pass artifacts are written under the `leaf=` folder while code is read and edited only in the worktree, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`.
 
 Ground in docs first.
 Challenge fuzzy terms.
@@ -24,13 +26,13 @@ The command owns state, repair counts and dispatch; a resumed merge inspects the
 
 Turn a Nit A still holds and finds reusable into one line naming mechanism/date/history in the registered checkout's `learnings/LESSONS.md` and a history file with case, evidence and learning, left for the operator to commit, without reading the active list as pass input or adding another turn.
 
-Before pushing, commit scoped outstanding changes, fetch the configured remote, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` after rebase, and run every `checks` command in the worktree, recording evidence in `review-A.md` and advisory failures as Nits.
+Before pushing, commit scoped outstanding changes, fetch the configured remote, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` after rebase, and run every `checks` command in the worktree, recording evidence in `review-A.md` under the `leaf=` folder and advisory failures as Nits.
 
 A local default branch is unnecessary; ordinary git non-fast-forward refusal serializes competing pushes.
 
-On a rebase conflict, resolve it in the worktree keeping both true sides, complete the rebase, and record in `review-A.md` the rebase target, the prior reviewed head, the resolved head and `git range-diff <old-base>..<prior-head> <target>..<resolved-head>` before running the checks, where old-base is the `AKROGON_BASE` value before the post-rebase refresh.
+On a rebase conflict, resolve it in the worktree keeping both true sides, complete the rebase, and record in `review-A.md` under the `leaf=` folder the rebase target, the prior reviewed head, the resolved head and `git range-diff <old-base>..<prior-head> <target>..<resolved-head>` before running the checks, where old-base is the `AKROGON_BASE` value before the post-rebase refresh.
 
-On red checks, append the failing output, the rebase target commit and the rebased head to `review-A.md`, call `akrogon phase <slug> check.fix --slot A`, and finish with the actual result and repair footer.
+On red checks, append the failing output, the rebase target commit and the rebased head to `review-A.md` under the `leaf=` folder, call `akrogon phase <slug> check.fix --slot A`, and finish with the actual result and repair footer.
 
 Same-line index conflicts retain both true entries and recheck pointers; a broken default branch discovered by this leaf is fixed forward with failing tests as criteria.
 
@@ -48,7 +50,7 @@ Finish by printing the footer, then close this tab with `herdr tab close "$HERDR
 
 ```text
 Last operation: <push/check evidence and observed phase result>
-Next: <skill> <slug> slot=<A|B> phase=<phase>
+Next: <skill> <slug> slot=<A|B> phase=<phase> leaf=<folder>
 ```
 
-A repair move names `implement-issue <slug> slot=B phase=check.fix`; completion uses `Next: none merged`, failure uses `Next: none failed`, and another unresolved error names its actual reason without inventing a state move.
+A repair move names `implement-issue <slug> slot=B phase=check.fix leaf=<folder>`; completion uses `Next: none merged`, failure uses `Next: none failed`, and another unresolved error names its actual reason without inventing a state move.
