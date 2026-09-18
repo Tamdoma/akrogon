@@ -1,0 +1,45 @@
+# Artifact placement: independent operator round B
+
+## Q1
+
+Does `akrogon phase` refuse `issues/` files on the leaf branch at every transition that has a worktree, with the nonempty-branch condition kept at `check.review` only?
+
+Context: `src/phase.ts:117-118` checks cleanliness on every phase call with a worktree, but committed issue changes only when entering review. The current helper also rejects empty branches (`src/phase.ts:150-157`), while allocation already creates a worktree for planning (`src/next.ts:293-299`). Failed-state recovery has no required slot (`src/phase.ts:112-115`, `src/routing.ts:35-38`), so the branch rule must depend on worktree presence, not on a slot or a list of planning phases.
+
+Research: Operator > practitioner > primary code/docs > model knowledge. The intake locks code-only leaf branches and failure at the offending transition. The practitioner report describes committed debate files passing planning transitions. Inspected the phase guard, routing table, allocation and `tests/phase.test.ts:127-155`, and searched `requireCodeOnly`, `commitMove(`, `failed` and `ensureWorktree` in phase/next. The test covers issue-file rejection at review, not earlier planning. No external research or practitioner interview was conducted.
+
+A (recommended): Yes. Separate issue-diff rejection from the nonempty-branch requirement. On every otherwise valid `phase` call with a recorded worktree, check cleanliness and reject net `issues/` changes before recording either slot completion or a phase move. Keep the nonempty check only when the requested destination is `check.review`, including the existing recovery case. The error should name the authoritative leaf folder and offending paths. This enforces the existing ownership rule while permitting planning before any code changes.
+
+B: Keep issue-diff rejection at review and rely on explicit destinations during planning. This keeps transition behavior unchanged and avoids earlier recovery blocks, but lets the reported mistake advance through planning again. It would require relaxing the intake's requirement to fail at the offending transition, so it is not an equally compliant implementation choice.
+
+Pitfalls: Calling the current helper unchanged on every move rejects clean, empty planning branches. Check before `done` is saved, including the first of two slots (`src/phase.ts:121-128`). A recorded but missing worktree remains an error, while absence of a recorded worktree is not a reason to allocate one during `phase`. Recovery from `failed` with a contaminated worktree should require repair, not a slot-based bypass. Scope this to `akrogon phase`: dispatch can record failure directly through `commitMove` (`src/next.ts:380`), and blocking that diagnostic failure path is not required. This detects net branch changes at transition time, not each filesystem write or every historical commit.
+
+## Q2
+
+Does the dispatch prompt carry the absolute authoritative leaf folder, in addition to skill text naming the write destination?
+
+Context: Panes start in the worktree (`src/next.ts:298-299`), but dispatch currently sends only skill, slug, slot and phase (`src/next.ts:411`). Planning identifies the authoritative read location but gives bare write filenames (`skills/plan-issue/SKILL.md:14,33,41,49`), and review has the same ambiguity (`skills/check-issue/SKILL.md:14,33`). Implementation briefs and merge review updates also need the registered destination (`skills/implement-issue/SKILL.md:31,39`, `skills/merge-issue/SKILL.md:27,31`).
+
+Research: Operator > practitioner > primary code/docs > model knowledge. The intake explicitly covers positions, rebuttals, plans, implementation briefs and reviews. The practitioner report links worktree cwd to misplaced artifacts. Searched `authoritative`, `prompt`, `Write`, `write`, review filenames and `report.md` across all four lifecycle skills, and inspected prompt construction and pane allocation. No external research was needed to establish those local facts. The recommendation is an inference from those facts, not evidence that every harness has reproduced the failure.
+
+A (recommended): Yes. Include the already resolved absolute `leaf.path` as the authoritative artifact directory in every dispatched lifecycle prompt. Make the matching skill instructions explicitly resolve all leaf pass artifacts there, including delegated worker briefs and reports, while code inspection and edits use the worktree. This supplies the destination where the agent receives its assignment and covers later phases as well as debate.
+
+B: Clarify all skill write destinations but keep prompts unchanged, requiring the agent to obtain the registered root from `akrogon config` and locate the slug. This avoids changing the dispatched prompt contract and can support manual invocation, but repeats a lookup the dispatcher has already completed and leaves more opportunity for cwd-relative writes.
+
+Pitfalls: Adding a path is guidance, not proof that an agent obeyed it, so retain Q1's enforcement. Pass the resolved leaf directory without inventing another authority or searching worktree copies. Represent paths containing spaces unambiguously and do not turn prompt text into an executable shell command. Preserve manual skill use through its existing authoritative config lookup, and keep standalone implementation behavior outside this leaf-only contract. Verify that dispatch supplies the correct directory and that skills use it, rather than requiring arbitrary prose wording. No automatic copying or active consumer repair belongs here.
+
+## Q3
+
+Do transitions also require the phase's pass artifact to exist in the authoritative folder, or does missing-artifact diagnosis stay at dispatch (today's debate gate)?
+
+Context: The current dispatch check only requires the two authoritative positions files before debate synthesis (`src/next.ts:482-487`). Phase routing includes two-slot positions/rebuttals, B-only synthesis/implementation, initial two-slot review and A-only review after repair (`src/routing.ts:27-43`). Failed recovery has no required pass slot (`src/phase.ts:114`), so a universal artifact gate would need additional rules beyond the placement fix.
+
+Research: Operator > practitioner > primary code/docs > model knowledge. The intake requests correct placement and rejection of issue changes on leaf branches, not a new artifact-completeness system. The practitioner incident establishes wrong placement, not that every missing artifact needs a new transition guard. Inspected dispatch's existence check, routing/requiredSlots, phase's per-slot recording and the skill artifact filenames, with the searches recorded under Q1 and Q2. No practitioner answer authorizes broader artifact gating yet.
+
+A (recommended): Keep the existing authoritative debate gate and add no new artifact-completeness gate in this change. Q1 rejects misplaced branch changes and Q2 makes the intended destination explicit. This keeps the work focused and preserves legitimate recovery behavior, with the stated limitation that a clean branch does not prove a pass artifact was written.
+
+B: Also require the completing slot's applicable pass artifact at each normal phase completion. This catches an omitted artifact earlier even when the branch is clean, but needs an explicit artifact mapping, handling for disabled debate/rebuttal, review rounds, merge updates and slotless failed recovery. Choose it only if the operator expands the contract to include completeness. Artifact existence alone still does not prove that its contents belong to this pass.
+
+Pitfalls: Today's dispatch gate is narrow, not general missing-artifact validation. Never require the peer's artifact before recording the first slot, require rebuttals when rebuttal is disabled, or derive a filename from an absent failed-recovery slot. If B is chosen, use functional checks such as existence and nonempty content where required, not exact headings or wording. A stale artifact can satisfy either check. Do not search or restore from a worktree copy, and do not treat “positions absent here” as proof that debate never happened.
+
+Challenge check: The intake already settles code-only branches and authoritative placement, so Q1-B would reopen that requirement rather than merely select another implementation. Q2-A plus Q1-A reduces ambiguity and enforces the existing boundary, but cannot guarantee that every artifact exists, which is why Q3-A must state that limit. “Every transition” must mean each applicable `akrogon phase` call before any completion state is saved, including failed recovery with a worktree, not automatic failure bookkeeping. Recommend Q1-A, Q2-A and Q3-A. The operator's “18 first, then 17” sets work order only, and the separate mismatch-reporting fork adds no dependency. The prompt forbids writes under `issues/` while explicitly naming this output there, so this named round file is treated as the sole output exception. No other issue artifact, implementation file or consumer state was changed.

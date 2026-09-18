@@ -1,0 +1,5 @@
+# Fork round prompt (blind, slot B)
+
+Chart: /home/ivan/Work/infra/akrogon/issues/chart/foreign-leaf-diagnostics. Read INTAKE.md and forks/mismatch-reporting.md (Question and Carries; ignore Findings, write your own). Operator selection: "18 first, then 17"; chart 18 is handed off. No operator corrections yet.
+
+Task: write a full independent operator round for the three questions in the fork file, same shape as your artifact-placement round (question aloud; context with file:line; Research line with tier and searches; A recommended and B with reason or cost; Pitfalls; end with Challenge check). Surfaces: src/next.ts:77-135 (report, discover), :536-572 (selectLeaves, unreadable handling), :515-534 (sweep), src/init.ts:16-49, src/status.ts:44-74,288-289, tests/next.test.ts:1098-1130, tests/status.test.ts:269-320. Do not write under issues/ except the named output. Write to exactly /home/ivan/Work/infra/akrogon/issues/chart/foreign-leaf-diagnostics/slots/mismatch-reporting-B.md and reply only with that path.

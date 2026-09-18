@@ -1,0 +1,11 @@
+## phase-issue-diff-guard
+
+- **F1 — Wrong test reference.** `brief.md:14` attributes empty-branch refusal coverage to `tests/phase.test.ts:127-155`. That test retains a code commit after removing the issue-artifact commit, then checks dirty review behavior. Empty-branch refusal is covered at `tests/phase.test.ts:780-795`. Name both tests in criterion 5 so the split preserves the actual empty-branch regression.
+
+## prompt-leaf-folder
+
+- **F2 — Lesson relocation has no complete owner.** `brief.md:4` includes lessons among artifacts moved under `leaf=`, but existing lessons live at repository-level `learnings/LESSONS.md` and `learnings/history/` (`skills/plan-issue/SKILL.md:23,29`, `skills/implement-issue/SKILL.md:27`). `src/init.ts:34` creates the repository-level index, and `docs/guide/learn.html:58` says every plan reads it. The leaf owns prompt/write lines and prompt-shape documentation, not initialization or migration of lesson readers. Moving lesson writes alone disconnects them from that index. Remove lessons from the relocation promise and preserve their existing contract, or explicitly assign the additional migration and reader changes before handoff.
+
+- **F3 — Missing standalone negative case.** `brief.md:12` says any prompt without `leaf=` falls back to registered-leaf lookup. Standalone implementation also lacks `leaf=`, but explicitly performs no config or leaf reads (`skills/implement-issue/SKILL.md:10,53-57`). Scope the fallback to a manual invocation naming a leaf slug. Add a verification case distinguishing manual leaf invocation without `leaf=` from standalone implementation without a slug, preserving standalone's local artifacts and no-config behavior.
+
+- **F4 — Missing path-with-spaces edge test.** `design.md:13` binds the interface to passing paths with spaces as-is and reading through end of line, but `brief.md:10-11` only requires ordinary planning/non-planning paths and exclusion of the worktree path. Add a fixture whose registered root contains spaces and verify the harness receives the complete authoritative directory in one prompt argument. `src/next.ts:411-417` constructs and passes that argument, so this test belongs to this leaf and directly verifies its chosen interface.
