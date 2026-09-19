@@ -57,6 +57,7 @@ function expectedCalls(): string[][] {
 test('install creates all four absent harness roots and repeats without changing links or herdr arguments', async () => {
   const f: Fixture = await fixture();
   try {
+    expect(skills).toContain('watch-issues');
     const env: NodeJS.ProcessEnv = installEnv(f);
     for (const root of roots) expect(existsSync(resolve(f.home, root))).toBe(false);
     expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0, stderr: '' });
