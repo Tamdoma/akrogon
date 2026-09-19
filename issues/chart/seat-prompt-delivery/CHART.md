@@ -16,3 +16,5 @@ None.
 
 ## Territory findings
 See `slots/map-merged.md` and `forks/delivery-retry.md`.
+
+Handed off 2026-09-19
