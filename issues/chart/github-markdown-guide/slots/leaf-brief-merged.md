@@ -1,0 +1,17 @@
+# Brief: guide-markdown
+
+## What
+Replace the HTML operator guide with a markdown guide in the repository, README.md as the entrance. README opens with the software-factory sentence, names its reader, and lists the reading order above the existing install, init, command and skills reference. The 16 topic pages (idea, parts, state, install, setup, create, chart, next, phases, files, merge, in-practice, limits, problems, learn, cheat) are rewritten as docs/guide/<stem>.md for a reader who already runs coding agents, from first principles and in practice, with src/, config.yaml and skills/ as the only truth about akrogon. A new docs/guide/gacp.md holds the gacp bash function for .bashrc with a beginner explanation. docs/guide/*.html, style.css, the four browser specs, four Playwright configs and the @playwright/test dependency are removed. One bun test checks every relative link and heading anchor in README.md and docs/guide/*.md.
+
+## Why
+The HTML guide is unpublished and only opens as file URLs, its tests check fonts and shell bytes, and twelve of its claims no longer match the code, including the first example a new operator would copy (a one-level leaf that validateLeafDepth refuses). The operator wants one place, GitHub, with docs a newcomer to software factories can follow.
+
+## Done-criteria
+1. README.md first sentence is the software-factory sentence from the design, the reader sentence follows under the title, and a reading-order list links every docs/guide page in the order of the design; the `## Command` and skills tables remain and tests/command-reference.test.ts passes, with the init row and its test expectation corrected together where src/akrogon.ts shows `--from` optional.
+2. docs/guide/ contains exactly the 17 markdown files named in the design and no .html or .css; each page ends with a previous/next line and a link to README.
+3. Every claim about akrogon behavior in README.md and docs/guide/*.md matches src/, config.yaml or skills/; the implementation report lists each correction against the old HTML with file:line evidence, covering at least the twelve findings in the design, and where src/, config.yaml and skills/ contradict each other the page documents the code's behavior and the report names the conflicting instruction.
+4. Every page is written for the stated reader in the voice in the design: what the thing is and why it exists, how it works, one concrete use; one running example issue reused across pages; example paths and slugs visibly placeholders and consistent across pages.
+5. docs/guide/gacp.md contains the function as a subshell-bodied `gacp() ( ... )` with the script body from the design, a plain explanation of what each step does, when to use it versus `akrogon sync`, and the .bashrc install line; `bash -n` on the extracted function passes and a run in a temporary repo with a fake origin commits, rebases and pushes.
+6. tests/browser/ is gone, @playwright/test is removed from package.json and bun.lock, tests/AREA.md and docs/reference-index.md describe the markdown guide, and `bun test` plus `tsc --noEmit` pass.
+7. A new bun test fails on a broken relative link or missing heading anchor in README.md or docs/guide/*.md and passes on the delivered tree; the report shows one deliberate broken link making it fail.
+8. The report contains one reader walkthrough: the running example taken from create through merged using only the new pages, with each command's expected output stated.
