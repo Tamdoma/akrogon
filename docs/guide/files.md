@@ -57,4 +57,29 @@ Lesson files are outside the issue store. The skills leave them for the operator
 
 This separation keeps plans and reviews available at their authoritative location while the code follows its own review and merge path.
 
+```text
+Registered checkout on default branch
+                 |
+                 v
+       validate branch and staged paths
+                 |
+                 v
+       fetch + check integration hazards
+                 |
+                 v
+       stage eligible issue records
+       (no seeds, locks or worktrees)
+                 |
+                 v
+          commit if changed
+                 |
+                 v
+         rebase + restore edits
+                 |
+                 v
+        push to configured remote
+```
+
+For export-csv, sync publishes the brief and review records from the main checkout. A refusal or conflict stops the flow before push.
+
 Previous: [Phases](phases.md) · Next: [gacp](gacp.md) · [Home](../../README.md)

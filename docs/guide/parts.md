@@ -36,6 +36,24 @@ The two folders may share a name. The inner folder is the leaf. Its name is the 
 
 Larger work can use an epic above its issues. Akrogon discovers leaves two or three levels below the open directory.
 
+```text
+~/Work/widgets/issues/open/
++-- data-exports/                  epic
+    +-- EPIC.md
+    +-- csv/                       issue
+        +-- ISSUE.md
+        +-- export-csv/            leaf
+        |   +-- brief.md
+        |   +-- design.md
+        |   +-- state.yaml
+        +-- download-button/       another leaf
+            +-- brief.md
+            +-- design.md
+            +-- state.yaml
+```
+
+In this larger example, export-csv is one leaf inside the csv issue and data-exports epic. Only the leaves have lifecycle state.
+
 The main stores are:
 
 ```text

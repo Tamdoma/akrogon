@@ -32,6 +32,21 @@ When paired planning is enabled, both seats first propose a plan without seeing 
 
 The seats can use the same harness and model. Two seats give you separate passes over the work, not a guarantee that mistakes will be caught.
 
+```text
+Pass                     Seat A         Seat B
+----------------------   ------------   ------------
+Positions, if debate     own proposal   own proposal
+Rebuttal, if enabled     own response   own response
+Synthesis                -              final plan
+Implement                -              code + tests
+Initial check.review     own review     own review
+check.fix                -              repairs
+Repair check.review      repair review  -
+Merge                    check + push   -
+```
+
+For export-csv, B builds the serializer, both seats review it, and A checks repairs and merges. A and B name jobs, so both can use the same harness and model.
+
 ## The concrete use
 
 For CSV export, the brief might say:

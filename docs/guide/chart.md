@@ -2,6 +2,26 @@
 
 Charting turns a rough request into work an agent can execute. Use it when important choices are still open.
 
+```text
++-- chart: the route to a defined outcome ------------+
+| intake: "I need CSV exports"                        |
+|   |                                                 |
+|   v                                                 |
+| territory map: code, choices, risks, dependencies   |
+|   |                                                 |
+|   v                                                 |
+| fork: all rows or filtered rows?                    |
+|   +-- taken: filtered rows ------> destination      |
+|   |                               useful CSV export |
+|   +-- alternative not chosen                        |
+|                                                     |
+| fog: large-account behavior not yet surveyed        |
+| off route: PDF export, deliberately excluded        |
++-----------------------------------------------------+
+```
+
+For export-csv, the destination is the result you want, and the chart records how to reach it. The territory map surveys the ground before you choose a route.
+
 For CSV export, you might need to decide:
 
 - Which columns belong in the file?
@@ -44,6 +64,24 @@ For CSV export, the map might find an existing serializer, a download route and 
 
 The map also names questions an experienced practitioner would ask and likely pitfalls. Examples include spreadsheet formula handling, embedded newlines and memory use on large exports. These are questions to investigate, not automatic additions to scope.
 
+```text
+                 territory map
+                       |
+       +---------------+---------------+
+       |               |               |
+       v               v               v
+  live surfaces      forks          pitfalls
+  JSON exporter      row choice     quoted newlines
+  download route     column order   large datasets
+       |               |               |
+       +---------------+---------------+
+                       |
+                       v
+            scope and possible leaves
+```
+
+For export-csv, inspecting the existing exporter may remove work you thought you needed. The map also exposes risks while you can still change the scope.
+
 ## Research before recommendations
 
 Every material question includes a research line: source, finding and how it affected the options.
@@ -59,6 +97,24 @@ This keeps a confident suggestion from passing as evidence. For a question about
 
 Research informs the recommendation. You still choose the answer.
 
+```text
+Research tiers: seek the highest available
++---------------------------------------------------+
+| 1 operator          Material you supplied         |
+| 2 practitioner      Firsthand experience          |
+| 3 better-than-training  Docs, code, measurements  |
+| 4 model-knowledge   No stronger source found      |
++---------------------------------------------------+
+                        |
+                        v
+             evidence -> recommendation
+                              |
+                              v
+                     your answer -> taken
+```
+
+For export-csv, your requirements and inspected code anchor the options, with outside research where needed. Research supports the route choice; it does not choose for you.
+
 ## Forks are decisions; fog needs investigation
 
 A fork is a question precise enough to answer. For example: should CSV include all rows or only the current filter?
@@ -68,6 +124,25 @@ The round gives options, a recommendation with its reason and the pitfalls of th
 Fog is work whose question is not clear yet. “Exports behave strangely on large accounts” may need reproduction before anyone can propose a useful choice.
 
 Ruled-out work goes under Off route with its reason. It is not silently treated as agreed scope.
+
+```text
+Unclear in-scope ground
+         |
+         v
+       FOG ---- investigate ----> sharp question
+                                      |
+                                      v
+                                    FORK
+                                      |
+                               operator chooses
+                                      |
+                                      v
+                                    TAKEN
+
+Deliberately excluded ----> OFF ROUTE + reason
+```
+
+For export-csv, unexplained slow exports stay in fog until investigation makes the question clear. PDF export can be off route, while the row-selection fork becomes taken only after you answer.
 
 The records look like this:
 
@@ -86,6 +161,27 @@ Charting can run in one slot. If you name a B pane, both slots first map and res
 
 This gives you a second view before the interview settles the scope. Naming a charting peer does not automatically enable implementation debate.
 
+```text
+                 same intake
+                      |
+             +--------+--------+
+             v                 v
+        A researches      B researches
+        independently     independently
+             |                 |
+             +--------+--------+
+                      v
+             A merges with attribution
+                      |
+                      v
+             B rebuts disagreements
+                      |
+                      v
+              operator answers
+```
+
+For export-csv, the two views can expose different risks before you choose the behavior. They share the request first, not each other's conclusions.
+
 ## Turn the answers into a buildable contract
 
 Handoff waits until no material fork or fog leaves the implementer guessing. Each leaf gets a bounded outcome, concrete completion criteria and a design containing its binding decisions.
@@ -103,5 +199,31 @@ Cross-leaf promises need matching owners. Human-only prerequisites need an owner
 When a B pane is part of charting, B also reads the draft contracts as an implementer before they are written to the open tree.
 
 You get work that can be dispatched without reopening product decisions in the middle of a coding pass.
+
+```text
++----------------------+
+| CHART                |
+| Destination clear    |
+| Forks taken          |
+| No material fog      |
+| Prerequisites met    |
++----------------------+
+            |
+            v
+     HANDOFF: reviewed contracts
+            |
+            v
++----------------------+
+| LEAF                 |
+| brief.md             |
+| design.md            |
+| state.yaml           |
++----------------------+
+            |
+            v
+      manual dispatch
+```
+
+For export-csv, handoff is the moment the map becomes a contract: chosen rows, owned files and checks become the leaf's instructions. Handoff writes that contract; you still decide when to dispatch.
 
 Previous: [Create](create.md) · Next: [Next](next.md) · [Home](../../README.md)

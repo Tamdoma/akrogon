@@ -16,6 +16,29 @@ A phase is one step in a leaf's workflow. Seats report completion through Akrogo
 
 Review verdicts are ready, nits or fix. Ready and nits allow merge. Fix sends the leaf to repair, subject to the configured repair-round limit.
 
+```text
+plan.positions -> plan.rebuttal -> plan.synthesis
+      |          (if enabled)            ^
+      +---------- skip rebuttal ---------+
+                                         |
+                                         v
+                                     implement
+                                         |
+                                         v
+                    +------------> check.review
+                    |                    |
+                check.fix <--- fix ------+
+                    ^                    |
+                    |               ready / nits
+                    |                    v
+                    +-- red checks --- merge ---> merged
+
+Any active phase ---> failed ---> any active phase
+                                  (never merged)
+```
+
+For export-csv, a quoting defect sends review back to repair, while a recorded blocker stops the leaf in failed. Without debate, the leaf starts at plan.synthesis; after recovery, you choose any active phase that fits the remaining work.
+
 ## How a phase moves
 
 The worker reports the destination phase and its seat. For example, B finishes implementation with:

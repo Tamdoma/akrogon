@@ -67,6 +67,25 @@ Leave those fields to the commands. Editing them by hand can make the file disag
 
 A prompt delivery failure and a seat-declared blocker are different failures. Read the recorded reason before choosing a recovery.
 
+```text
++------------+   read   +-----------+
+| state.yaml |--------->| next pass |
++------------+          +-----------+
+      ^                      |
+      | save                 v
+      |              prompt required seats
+      |                      |
+      |                      v
+      |                  seats work
+      |                      |
+      |                      v
+      |                phase command
+      |                      |
+      +---- record done or move phase
+```
+
+For export-csv, the first review verdict is recorded while the other required seat is outstanding. A completed transition saves the new phase and clears the previous pass's bookkeeping.
+
 ## One concrete use
 
 Check the leaf before changing it:

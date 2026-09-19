@@ -1,0 +1,32 @@
+slug: docs-impact-rule
+phase: merged
+created: 2026-09-19
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t67
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/docs-impact-rule
+pane: 
+  A: w8:pBH
+  B: w8:pBJ
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

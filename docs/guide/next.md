@@ -59,7 +59,23 @@ issues/open/export-csv/
 issues/parked/export-csv/
 ```
 
-Akrogon refuses to park allocated work or leave open work depending on parked leaves. With the all option, it skips issues that cannot be parked:
+Akrogon refuses to park allocated work or leave open work depending on parked leaves.
+
+```text
+issues/open/export-csv/
+          |
+        park        only when eligible
+          v
+issues/parked/export-csv/
+          |
+       unpark
+          v
+issues/open/export-csv/
+          |
+   eligible for dispatch again
+```
+
+Park export-csv when you want it out of future sweeps. Unparking restores queue membership, not permission to bypass dependencies or capacity. With the all option, it skips issues that cannot be parked:
 
 ```sh
 akrogon park --all
@@ -82,5 +98,16 @@ Manual dispatch is the normal way to start work. Once a leaf is running, the sta
 Use parking for work that should stay out of later sweeps. Use dependencies for work that truly needs another result first.
 
 For CSV export, the formatter and an unrelated settings fix can run independently. A download button that calls the new formatter has a real dependency.
+
+```text
+export-csv -- merges --> download-button may run
+                             blocked-by: export-csv
+
+settings-fix ----------> can run independently
+
+New allocations share the global max_active limit.
+```
+
+For export-csv, finish the formatter before starting a button that depends on it. An unrelated settings fix needs no ordering edge.
 
 Previous: [Chart](chart.md) · Next: [Phases](phases.md) · [Home](../../README.md)

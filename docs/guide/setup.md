@@ -81,6 +81,20 @@ For widgets, a possible layout is:
 
 That is an example layout, not a required source directory. Existing projects can keep their own documentation locations.
 
+```text
+docs/reference-index.md
+       |
+       +--> src/export/AREA.md
+       |       |
+       |       +--> exporter code
+       |       +--> export tests
+       |       +--> commands and local constraints
+       |
+       +--> simple area's code or document directly
+```
+
+For export-csv, the index points the planner to the export area, then to the files and checks it needs. A simple area can link straight to code without adding an AREA file.
+
 AREA files stay short: at most 40 lines, with Commands, Key files, Non-obvious patterns and See also sections. They point to real files rather than duplicate the code.
 
 Planning reads the configured index and relevant areas. It carries useful paths into the plan's read-first list. Implementation uses that list and updates affected docs and area entries. Review follows affected pointers and checks paths in changed AREA files.

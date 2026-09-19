@@ -61,6 +61,31 @@ The second command should print the function definition.
 5. Pull fetches origin/main and rebases local commits onto it. Autostash temporarily stores unstaged changes.
 6. Push sends the result to origin/main.
 
+```text
+Current directory changes     Already staged changes
+            |                           |
+         git add .                      |
+            +-------------+-------------+
+                          v
+                    whole index
+                          |
+                   commit if changed
+                          |
+                          v
+               pull origin/main
+               rebase + autostash
+                          |
+                  +-------+-------+
+                  |               |
+               success          failure
+                  |               |
+                  v               v
+                push       try rebase abort
+                           stop with error
+```
+
+For export-csv, gacp commits the leaf records only if that is all you stage. A failed pull does not erase the local commit made earlier in this flow.
+
 Pass a multiword message in quotes:
 
 ```sh

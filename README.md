@@ -16,13 +16,21 @@ Start with init-issues to give agents the project's settings, checks and code ma
 
 Then release a leaf. The execution skills plan, build, review, repair and merge it. Files record the work between passes. Herdr holds the seats and triggers dispatch events.
 
-For the CSV example:
-
 ```text
-Request -> researched decisions -> leaf contract -> plan
-        -> code and tests -> review -> repair if needed
-        -> checked merge -> completion update
+YOU + CHARTING             EXECUTION SEATS
++------------------+       +---------------------+
+| Request          |       | Plan -> Implement   |
+| Research         |       |           |         |
+| Decisions        |       |           v         |
+| Leaf contracts   |------>| Review <-> Fix      |
++------------------+       |           |         |
+        handoff            |           v         |
+   then manual dispatch    | Merge -> Update*    |
+                           +---------------------+
+* Completion update when configured
 ```
+
+For export-csv, you settle the rows and columns before dispatch. The seats build, check and merge that contract.
 
 You control the queue through dispatch, parking and dependencies. Failure records show what stopped. Sync saves issue records. An optional Claude Code watch checks progress while you are away.
 
