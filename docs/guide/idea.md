@@ -6,7 +6,7 @@ Here's the whole thing, and I mean the whole thing: a file says the phase, a hoo
 
 Say you've got a repo called `widgets`. It's a registered checkout, which just means a git checkout you've listed in `config.yaml` so Akrogon knows where its `issues/` folder lives. Inside it you've got an issue, that's a folder under `issues/open/` holding one unit of intent. Ours is `export-csv`: add `widgets export --format csv` that prints `id,name,price` rows to stdout. Small. Checkable. Perfect.
 
-That'ssue holds a leaf. A leaf is the folder with a `state.yaml` in it, and it's the thing agents actually work on. Ours lives at `issues/open/export-csv/export-csv/` with `slug: export-csv`. The nesting looks redundant at first — issue folder holding a leaf folder with the same name — but that's the rule: a leaf sits two or three levels under `issues/open/`, so an issue can grow more leaves later without moving.
+That issue holds a leaf. A leaf is the folder with a `state.yaml` in it, and it's the thing agents actually work on. Ours lives at `issues/open/export-csv/export-csv/` with `slug: export-csv`. The nesting looks redundant at first — issue folder holding a leaf folder with the same name — but that's the rule: a leaf sits two or three levels under `issues/open/`, so an issue can grow more leaves later without moving.
 
 The leaf's `state.yaml` has a `phase` line. A phase is one word saying where the leaf is right now: planning, building, reviewing, merging. When an agent finishes, it runs `akrogon phase export-csv <next-phase>` and that line changes. That's the only way phases move. You don't edit the file to move forward, you run the command, because the command also resets the bookkeeping (we'll get to that in [State](state.md)).
 

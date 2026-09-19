@@ -6,7 +6,7 @@ Prerequisites: leaves exist under issues/open/ with valid states. Which director
 
     akrogon next --all
 
-What you should see: usually nothing. Quiet success. With a slug that can't start, it prints the reason: blocked, hand-built, no seat. What to do when it fails: read the reason. Missing leaf means slug typo or parked. No leaves match means wrong folder. Hand-built can't be dispatched means you asked explicitly for a hand-built leaf — that one is on you.
+What you should see: usually nothing. Quiet success. With a slug that can't start, it prints the reason when there is one: dependencies not merged, hand-built can't be dispatched. A full machine prints nothing — waiting for a seat is silent. What to do when it fails: read the reason, or check akrogon status when there isn't one. Missing leaf means slug typo or parked. No leaves match means wrong folder.
 
 In order, for --all inside a repo, it sweeps that repo's leaves; outside any repo, it sweeps every registered repo. A lot of people miss that. Inside widgets, next --all means widgets. Outside, in your home, it means everywhere. Same for bare next: inside a repo it nudges that repo, then cleans that repo's merged leaves.
 
@@ -30,7 +30,7 @@ akrogon next with no arg looks at every leaf in the repo you're standing in, the
 
 akrogon next <folder> looks only at leaves under that folder. The folder can be an epic, an issue, or one leaf, or a worktree path. You want only this epic to take the free seats right now? This is it. But note: it starts only that folder now; the next hook call sweeps everything again. To keep work out for real, park it.
 
-akrogon next <slug> looks at exactly this leaf. Prints the reason if it can't start: blocked, hand-built, no seat. One leaf is stuck and you want to know why? This one. For us: akrogon next export-csv.
+akrogon next <slug> looks at exactly this leaf. Prints the reason if it can't start and the reason is an error: dependencies not merged, hand-built can't be dispatched. Waiting on a free seat prints nothing — check akrogon status instead. One leaf is stuck and you want to know why? This one. For us: akrogon next export-csv.
 
 ## Parking work you don't want yet
 
@@ -53,6 +53,6 @@ Folder scan. Among leaves that are ready, the tool starts them in folder order u
 
 An epic is not a queue. If five leaves in an epic have no blockers, they all count as ready and race for seats along with every other ready leaf in every repo. If you want an epic to run in a fixed order, chain the leaves with blocked-by. The prose in EPIC.md, ISSUE.md, or brief.md is for humans and planners. The tool never reads it for ordering.
 
-Concrete use: you synced export-csv, you run akrogon next export-csv from ~/Work/widgets. If it says nothing, check akrogon status export-csv — you should see a tab and worktree assigned. If it says dependencies not merged, you named a blocker that's not done. If it says no seat, max_active is full — wait for a merge or raise the ceiling.
+Concrete use: you synced export-csv, you run akrogon next export-csv from ~/Work/widgets. If it says nothing, check akrogon status export-csv — you should see a tab and worktree assigned. If it says dependencies not merged, you named a blocker that's not done. If it says nothing and status shows no tab, max_active is full — wait for a merge or raise the ceiling.
 
 Previous: [Chart](chart.md) · Next: [Phases](phases.md) · [Home](../../README.md)

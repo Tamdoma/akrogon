@@ -1,6 +1,6 @@
 # Cheat sheet
 
-Everything on one screen. Print it. I've it taped to my monitor, slightly crooked.
+Everything on one screen. Print it. I've got it taped to my monitor, slightly crooked.
 
     once per machine
     bun install && bun src/akrogon.ts install
