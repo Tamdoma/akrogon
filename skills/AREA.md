@@ -20,6 +20,7 @@
 - Implementation mode selects inline work or sequential bounded workers.
 - Worker returns include changed-test evidence; B runs the final full suite.
 - Lifecycle seats send no questions and pause for nothing; a human-only blocker is recorded and the pass ends with `failed`.
+- Env-file rule is an invariant of every phase skill: `.env` and `.env.*` are never opened, printed, or written by a tool, and presence is checked by name with `bun --env-file=<file>` printing `present`/`absent`.
 
 ## See also
 

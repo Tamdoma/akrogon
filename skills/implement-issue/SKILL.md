@@ -30,6 +30,8 @@ A reusable lesson found during leaf work gets an active line naming mechanism/da
 
 The B seat proceeds without posing questions or holding the pass open, deciding from the plan, the design, and the worktree alone. When a step physically requires the operator (a permission B cannot grant, an env value B cannot obtain), B writes the blocker and the exact operator action into its current pass artifact, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot B`, and ends the pass.
 
+B never opens, prints, appends to, or writes `.env` or `.env.*` with any tool, instead running any script that needs values as `bun --env-file=<file> <script>` to print only results, never values, and checking presence by name with such a script printing `present`/`absent` per name, ending the pass with the stop above when a required value is absent.
+
 ## implement
 
 Before coding, when an implementation-only constraint is missing from `plan.md` under the `leaf=` folder, append one dated `## Implementation notes` section naming each constraint and the decision it refines; a locked decision is never changed there, and a conflict with one is a mismatch recorded for review. Then implement the plan's checklist in order yourself when config says `inline`, otherwise write one sub-brief per unit from the template, one unit included, and delegate each to a subagent sequentially in this worktree using the worker protocol.

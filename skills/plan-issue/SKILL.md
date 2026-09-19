@@ -28,6 +28,8 @@ A missing resource is reported as a gap, not invented content; lessons describe 
 
 This seat puts no questions to anyone and pauses for no reply: it plans from the brief, the design, and live surfaces only. When a step physically requires the operator (a permission this seat cannot grant, an env value it cannot obtain), the seat writes the blocker and the exact operator action into its current pass artifact, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot <its seat from the dispatch prompt>`, and ends the pass.
 
+This seat never opens, prints, appends to, or writes `.env` or `.env.*` with any tool, instead running any script that needs values as `bun --env-file=<file> <script>` to print only results, never values, and checking presence by name with such a script printing `present`/`absent` per name, ending the pass with the stop above when a required value is absent.
+
 When the brief and the locked design disagree, the design wins: the conflict is written into the plan as a note for review, and planning continues.
 
 A reusable lesson found here is one line in `learnings/LESSONS.md` naming mechanism, date and history path, plus `learnings/history/<date>-<slug>.md` with the case, evidence and abstract learning.
@@ -54,7 +56,7 @@ As B, write `plan.md` under the `leaf=` folder with stable D1…Dn decisions, re
 
 The synthesis resolves implementation choices without reopening locked scope; it contains acceptance criteria before implementation derives tests, preserves a real open limitation, and names a dependency only when execution actually requires ordering.
 
-Every credential the design names by variable name is checked in the registered repo's gitignored `.env`; each one absent there and unobtainable by this seat is a human-only blocker recorded in `plan.md` with the `add <VAR> to .env` action, what the value is, and where the operator obtains it, then the seat runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see plan.md>" --slot B` and ends the pass instead of finishing with `implement`.
+Every credential the design names by variable name is checked by name with `bun --env-file=.env -e 'console.log(["VAR_A","VAR_B"].map(k => k + ": " + (process.env[k] === undefined ? "absent" : "present")).join("\n"))'` with the design names in the list, printing `present`/`absent` per name; each one absent there and unobtainable by this seat is a human-only blocker recorded in `plan.md` with the `add <VAR> to .env` action, what the value is, and where the operator obtains it, then the seat runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see plan.md>" --slot B` and ends the pass instead of finishing with `implement`.
 
 Finish with `akrogon phase <slug> implement --slot B`, then print the footer and stop.
 
