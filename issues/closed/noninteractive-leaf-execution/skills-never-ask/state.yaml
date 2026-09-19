@@ -1,0 +1,32 @@
+slug: skills-never-ask
+phase: merged
+created: 2026-09-19
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - failed-with-cause
+sources: 
+  - "Tamdoma/akrogon#19"
+  - "Tamdoma/akrogon#20"
+failed_notified: false
+busy_since: 
+  A: 2026-09-19T08:09:19.880Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t50
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/skills-never-ask
+pane: 
+  A: w8:pB4
+  B: w8:pB5
+prompted: 
+  {}
+prompted_at: 
+  {}

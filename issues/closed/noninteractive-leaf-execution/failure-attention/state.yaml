@@ -1,0 +1,32 @@
+slug: failure-attention
+phase: merged
+created: 2026-09-19
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - failed-with-cause
+sources: 
+  - "Tamdoma/akrogon#19"
+  - "Tamdoma/akrogon#20"
+failed_notified: false
+busy_since: 
+  A: 2026-09-19T08:34:32.104Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 1
+verdict: 
+  {}
+tab: w8:t5Z
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/failure-attention
+pane: 
+  A: w8:pB2
+  B: w8:pB3
+prompted: 
+  {}
+prompted_at: 
+  {}
