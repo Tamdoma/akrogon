@@ -9,7 +9,7 @@ const readme: string = readFileSync(resolve(import.meta.dir, '../README.md'), 'u
 const source: string = readFileSync(resolve(import.meta.dir, '../src/akrogon.ts'), 'utf8');
 const contracts: Record<string, string> = {
   install: '',
-  init: '--from <proposal.yaml> [--toolkit <lang>=<runner>]',
+  init: '[--from <proposal.yaml>] [--toolkit <lang>=<runner>]',
   config: '',
   phase: '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>]',
   next: '[<slug>|<path>|--all]',

@@ -1,6 +1,30 @@
 # Akrogon
 
-Akrogon runs an issue lifecycle through paired coding agents in Herdr. Skills shape work, plan it, implement it, review it and merge it. The command tracks phases and dispatches the next pass.
+You already run coding agents. Akrogon is for when you want a system that runs them for you.
+
+Akrogon is a lightweight software factory that runs work you define through planning, implementation, review and merge using two configurable coding-agent seats in Herdr. You own the issues, the calls, and the cleanup when a leaf gets stuck. It stops at merge — deployment is yours, and that's deliberate.
+
+A file says the phase, a hook fires, the next agent gets prompted, repeat until merged. That's the loop you'll learn here. Read in order — each page links to the next — and you'll go from install to merged without guessing. I wrote it for someone who already runs agents and doesn't need git explained, just Akrogon.
+
+## Guide
+
+1. [The idea](docs/guide/idea.md)
+2. [Parts](docs/guide/parts.md)
+3. [State](docs/guide/state.md)
+4. [Install](docs/guide/install.md)
+5. [Setup](docs/guide/setup.md)
+6. [Create](docs/guide/create.md)
+7. [Chart](docs/guide/chart.md)
+8. [Next](docs/guide/next.md)
+9. [Phases](docs/guide/phases.md)
+10. [Files](docs/guide/files.md)
+11. [gacp](docs/guide/gacp.md)
+12. [Merge](docs/guide/merge.md)
+13. [In practice](docs/guide/in-practice.md)
+14. [Limits](docs/guide/limits.md)
+15. [Problems](docs/guide/problems.md)
+16. [Learn](docs/guide/learn.md)
+17. [Cheat sheet](docs/guide/cheat.md)
 
 ## Install
 
@@ -11,7 +35,7 @@ bun install
 bun src/akrogon.ts install
 ```
 
-Before installation, set the machine's slots, harness commands and registered repositories in `config.yaml` at the tool root, or in the directory selected by `AKROGON_HOME`. Installation reads that configuration, links `akrogon` into `~/.local/bin`, links each skill into `~/.claude/skills` and `~/.agents/skills`, installs each configured Herdr harness integration and links the [plugin](plugin/). Put `~/.local/bin` on `PATH`. Conflicting destinations stop installation and print removal commands for review.
+Before installation, set the machine's slots, harness commands and registered repositories in `config.yaml` at the tool root, or in the directory selected by `AKROGON_HOME`. Installation reads that configuration, links `akrogon` into `~/.local/bin`, links each skill into `~/.claude/skills`, `~/.agents/skills`, `~/.codex/skills` and `~/.pi/agent/skills`, installs each configured Herdr harness integration and links the [plugin](plugin/). Put `~/.local/bin` on `PATH`. Conflicting destinations stop installation and print removal commands for review.
 
 Update with `git pull` in the tool checkout. The installed command and skills use that checkout through symlinks.
 
@@ -32,30 +56,30 @@ This repository's [reference index](docs/reference-index.md) links its areas.
 
 ## Command
 
-| Invocation | Effect |
-| --- | --- |
-| `akrogon install` | Link this checkout's command, skills and Herdr integration. |
-| `akrogon init --from <proposal.yaml> [--toolkit <lang>=<runner>]` | Initialize or update repository configuration and registration. |
-| `akrogon config` | Print effective configuration for the current repository. |
-| `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>]` | Record a lifecycle pass through validated phase transitions; `--reason` declares a stop into `failed`. |
-| `akrogon next [<slug>\|<path>\|--all]` | Dispatch eligible work for a leaf or path. `--all` sweeps every leaf of the current repository, or every registered repository when run outside one. With no argument, use the current directory or Herdr hook context. |
-| `akrogon pull [--all]` | Import open GitHub issues into seeds for the current repository. `--all` also works outside a repository, importing for every registered one. |
-| `akrogon status [<slug>\|--charts]` | Show the current repository's board, every registered repository when run outside one, one leaf's state and recent history, or the chart store with `--charts`. |
-| `akrogon sync` | Commit eligible issue records, rebase and push through the configured remote. |
-| `akrogon park <issue>... \| --all` | Move eligible whole issues to `issues/parked/`. Use top-level issue folder names or `--all`, never both. `--all` skips running issues and prerequisites needed by open work. |
-| `akrogon unpark <issue>... \| --all` | Restore whole issues to `issues/open/`. Use top-level issue folder names or `--all`, never both. Refuse moves that leave open work depending on parked leaves. |
+| Invocation                                                                           | Effect                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `akrogon install`                                                                    | Link this checkout's command, skills and Herdr integration.                                                                                                                                                             |
+| `akrogon init [--from <proposal.yaml>] [--toolkit <lang>=<runner>]`                  | Initialize or update repository configuration and registration.                                                                                                                                                         |
+| `akrogon config`                                                                     | Print effective configuration for the current repository.                                                                                                                                                               |
+| `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>]` | Record a lifecycle pass through validated phase transitions; `--reason` declares a stop into `failed`.                                                                                                                  |
+| `akrogon next [<slug>\|<path>\|--all]`                                               | Dispatch eligible work for a leaf or path. `--all` sweeps every leaf of the current repository, or every registered repository when run outside one. With no argument, use the current directory or Herdr hook context. |
+| `akrogon pull [--all]`                                                               | Import open GitHub issues into seeds for the current repository. `--all` also works outside a repository, importing for every registered one.                                                                           |
+| `akrogon status [<slug>\|--charts]`                                                  | Show the current repository's board, every registered repository when run outside one, one leaf's state and recent history, or the chart store with `--charts`.                                                         |
+| `akrogon sync`                                                                       | Commit eligible issue records, rebase and push through the configured remote.                                                                                                                                           |
+| `akrogon park <issue>... \| --all`                                                   | Move eligible whole issues to `issues/parked/`. Use top-level issue folder names or `--all`, never both. `--all` skips running issues and prerequisites needed by open work.                                            |
+| `akrogon unpark <issue>... \| --all`                                                 | Restore whole issues to `issues/open/`. Use top-level issue folder names or `--all`, never both. Refuse moves that leave open work depending on parked leaves.                                                          |
 
 `issues/parked/` is committed issue data. `sync` requires the registered repository's checked-out `default_branch`, refusing detached HEAD, other branches and already-staged paths outside eligible records. Its new commit includes only changes under `issues/`, excluding `issues/seeds/`, files named `.lock` and the configured `worktree_root`. It holds the global then repository lock, fetches, rebases and pushes through `remote`, preserving unrelated local edits on success. Coordination-lock hazards and ignored-path collisions cause refusal, and restoration conflicts stop the push. GitHub intake is separate: `pull` reads this repository's GitHub `origin`, while `remote` selects where code integrates. Consumer projects route reports through `seed-issue` with `issues_repo: owner/repo` in root `akrogon.yaml`. That setting does not redirect `pull`.
 
 ## Skills
 
-| Skill | Purpose |
-| --- | --- |
-| [chart-issues](skills/chart-issues/SKILL.md) | Turn operator notes and imported reports into forks and leaf contracts. |
-| [plan-issue](skills/plan-issue/SKILL.md) | Write an execution plan, with paired discussion when enabled. |
+| Skill                                              | Purpose                                                                      |
+| -------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [chart-issues](skills/chart-issues/SKILL.md)       | Turn operator notes and imported reports into forks and leaf contracts.      |
+| [plan-issue](skills/plan-issue/SKILL.md)           | Write an execution plan, with paired discussion when enabled.                |
 | [implement-issue](skills/implement-issue/SKILL.md) | Implement a plan or repair review findings using the configured worker mode. |
-| [check-issue](skills/check-issue/SKILL.md) | Review concrete defects and verify repairs. |
-| [merge-issue](skills/merge-issue/SKILL.md) | Rebase reviewed work, run checks and push a fast-forward merge. |
-| [seed-issue](skills/seed-issue/SKILL.md) | File one observation as unverified GitHub intake. |
-| [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a factual completed-issue update to configured Discord targets. |
-| [init-issues](skills/init-issues/SKILL.md) | Inspect a repository and initialize its lifecycle configuration. |
+| [check-issue](skills/check-issue/SKILL.md)         | Review concrete defects and verify repairs.                                  |
+| [merge-issue](skills/merge-issue/SKILL.md)         | Rebase reviewed work, run checks and push a fast-forward merge.              |
+| [seed-issue](skills/seed-issue/SKILL.md)           | File one observation as unverified GitHub intake.                            |
+| [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a factual completed-issue update to configured Discord targets.         |
+| [init-issues](skills/init-issues/SKILL.md)         | Inspect a repository and initialize its lifecycle configuration.             |
