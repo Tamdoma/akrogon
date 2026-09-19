@@ -36,6 +36,8 @@ Inline has no worker, sub-briefs or mismatch returns; both modes run the resolve
 
 Derive meaningful tests from acceptance criteria before code, demonstrate red then green and a fail-first test for a bug, with no test needed for a trivial one-liner.
 
+A credential still absent from `.env` at implement is never requested as a pasted value: tell the operator to add the named variable to `.env` and wait, and only when the operator says to proceed without it record the affected criterion as unverified.
+
 After the last implementation unit, run the full suite once as B and every other blocking check, repair any failure by the protocol (yourself in inline mode), then commit the code on the leaf branch and write `<leaf>/implementation/report.md` with changed files and reasons, commands run with pasted results and artifact paths, the base and committed head, known limitations and unverified criteria, folding worker returns into it, before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
 
 Every command under `checks` blocks; `advisory` failures are reported as Nits, and a full-suite rerun follows a repair rather than an unchanged successful run.

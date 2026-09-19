@@ -1,0 +1,31 @@
+slug: prompt-leaf-folder
+phase: merged
+created: 2026-09-19
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#18"
+failed_notified: false
+busy_since: 
+  A: 2026-09-18T22:32:31.265Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t5V
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/prompt-leaf-folder
+pane: 
+  A: w8:pAV
+  B: w8:pAW
+prompted: 
+  {}
+prompted_at: 
+  {}

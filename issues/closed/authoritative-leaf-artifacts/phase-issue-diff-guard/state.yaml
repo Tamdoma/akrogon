@@ -1,0 +1,31 @@
+slug: phase-issue-diff-guard
+phase: merged
+created: 2026-09-19
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#18"
+failed_notified: false
+busy_since: 
+  A: 2026-09-18T22:27:22.863Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t5T
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/phase-issue-diff-guard
+pane: 
+  A: w8:pAS
+  B: w8:pAT
+prompted: 
+  {}
+prompted_at: 
+  {}

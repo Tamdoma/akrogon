@@ -1,0 +1,31 @@
+slug: foreign-leaf-summary
+phase: merged
+created: 2026-09-19
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#17"
+failed_notified: false
+busy_since: 
+  A: 2026-09-18T22:41:56.635Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t5W
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/foreign-leaf-summary
+pane: 
+  A: w8:pAX
+  B: w8:pAY
+prompted: 
+  {}
+prompted_at: 
+  {}

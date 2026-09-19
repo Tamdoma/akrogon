@@ -52,6 +52,8 @@ As B, write `plan.md` under the `leaf=` folder with stable D1…Dn decisions, re
 
 The synthesis resolves implementation choices without reopening locked scope; it contains acceptance criteria before implementation derives tests, preserves a real open limitation, and names a dependency only when execution actually requires ordering.
 
+Every credential the design names by variable name is checked in the registered repo's gitignored `.env`; each absent one goes into the plan under `## Operator actions` as `add <VAR> to .env` with what it is and where the operator obtains it, and the footer repeats that list so the operator fills `.env` before implement starts.
+
 Finish with `akrogon phase <slug> implement --slot B`, then print the footer and stop.
 
 ## Printed footer
