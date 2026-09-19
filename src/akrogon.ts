@@ -10,7 +10,7 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
   verb === 'init'
     ? { from: { type: 'string' }, toolkit: { type: 'string' } }
     : verb === 'phase'
-      ? { slot: { type: 'string' }, verdict: { type: 'string' } }
+      ? { slot: { type: 'string' }, verdict: { type: 'string' }, reason: { type: 'string' } }
       : verb === 'next' || verb === 'pull' || verb === 'park' || verb === 'unpark'
         ? { all: { type: 'boolean' } }
         : verb === 'status'
@@ -39,7 +39,7 @@ switch (verb) {
     break;
   case 'phase': {
     const [slug, phase]: [string, string] = z.tuple([z.string(), z.string()]).parse(positionals);
-    await (await import('./phase')).phaseCommand(slug, phase, values.slot, values.verdict);
+    await (await import('./phase')).phaseCommand(slug, phase, values.slot, values.verdict, values.reason);
     break;
   }
   case 'next':

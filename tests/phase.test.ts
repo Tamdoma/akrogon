@@ -752,7 +752,7 @@ test('phase implement fails with Missing worktree when the recorded folder is go
   }
 });
 
-test('failed exits by command reset attempts and refuse check.fix', async () => {
+test('failed exits by command reset attempts and allow check.fix', async () => {
   const f: Fixture = await fixture();
   try {
     const path: string = leaf(f, 'stuck', 'failed', {
@@ -763,15 +763,9 @@ test('failed exits by command reset attempts and refuse check.fix', async () => 
     expect((await cli(f, ['phase', 'stuck', 'plan.synthesis'])).code).toBe(0);
     expect(readState(path)).toMatchObject({ attempts: { A: 0, B: 0 }, done: [], fix_rounds: 0 });
     const second: string = leaf(f, 'still-stuck', 'failed');
-    const before: string = bytes(second);
-    const logPath: string = resolve(f.root, 'issues/log.jsonl');
-    const logBefore: string | null = existsSync(logPath) ? readFileSync(logPath, 'utf8') : null;
     const result: Result = await cli(f, ['phase', 'still-stuck', 'check.fix']);
-    expect(result.code).not.toBe(0);
-    expect(result.stderr).toContain('Illegal move');
-    expect(bytes(second)).toBe(before);
-    if (logBefore === null) expect(existsSync(logPath)).toBe(false);
-    else expect(readFileSync(logPath, 'utf8')).toBe(logBefore);
+    expect(result.stdout).toBe('moved check.fix');
+    expect(readState(second)).toMatchObject({ phase: 'check.fix', fix_rounds: 0 });
   } finally {
     f.clean();
   }
@@ -828,6 +822,179 @@ test('planning synthesis with empty branch moves to implement', async () => {
     const result: Result = await cli(f, ['phase', 'empty-plan', 'implement']);
     expect(result.code).toBe(0);
     expect(result.stdout).toBe('moved implement');
+  } finally {
+    f.clean();
+  }
+});
+
+test('stop from implement on dirty worktree records blocked failure and clears busy fields', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = resolve(f.home, 'wt-stop');
+    await command(['git', 'worktree', 'add', '-b', 'stop', worktree], f.root);
+    const stamp: string = '2026-09-11T12:00:00.000Z';
+    const path: string = leaf(f, 'stop', 'implement', {
+      worktree,
+      tab: 'tab-1',
+      pane: { B: 'pane-b' },
+      busy_since: { B: stamp },
+      busy_notified: { B: stamp },
+      prompted: { B: 'sess' },
+      prompted_at: { B: stamp },
+    });
+    writeFileSync(resolve(worktree, 'dirty'), 'x\n');
+    const result: Result = await cli(f, ['phase', 'stop', 'failed', '--reason', 'x']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe('moved failed');
+    expect(readState(path)).toMatchObject({
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'x' },
+      busy_since: {},
+      busy_notified: {},
+      prompted: {},
+      prompted_at: {},
+      tab: 'tab-1',
+      worktree,
+      pane: { B: 'pane-b' },
+    });
+    expect(existsSync(resolve(worktree, 'dirty'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+test('stops land in failed immediately without phase advance and validate slots', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { rebuttal: true });
+    const truePath: string = leaf(f, 'pos-true', 'plan.positions');
+    expect((await cli(f, ['phase', 'pos-true', 'failed', '--slot', 'A', '--reason', 'x'])).stdout).toBe('moved failed');
+    expect(readState(truePath)).toMatchObject({
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'plan.positions', slot: 'A', reason: 'x' },
+    });
+    yaml(resolve(f.root, 'issues/config.yaml'), { rebuttal: false });
+    const falsePath: string = leaf(f, 'pos-false', 'plan.positions');
+    expect((await cli(f, ['phase', 'pos-false', 'failed', '--slot', 'A', '--reason', 'x'])).stdout).toBe(
+      'moved failed',
+    );
+    expect(readState(falsePath).failure).toEqual({
+      cause: 'blocked',
+      phase: 'plan.positions',
+      slot: 'A',
+      reason: 'x',
+    });
+    const reviewPath: string = leaf(f, 'stop-review', 'check.review');
+    const review: Result = await cli(f, ['phase', 'stop-review', 'failed', '--slot', 'A', '--reason', 'x']);
+    expect(review.stdout).toBe('moved failed');
+    expect(readState(reviewPath).failure).toEqual({
+      cause: 'blocked',
+      phase: 'check.review',
+      slot: 'A',
+      reason: 'x',
+    });
+    const mergePath: string = leaf(f, 'stop-merge', 'merge');
+    const merge: Result = await cli(f, ['phase', 'stop-merge', 'failed', '--reason', 'x']);
+    expect(merge.stdout).toBe('moved failed');
+    expect(readState(mergePath).failure).toEqual({ cause: 'blocked', phase: 'merge', slot: 'A', reason: 'x' });
+    leaf(f, 'bad-slot', 'implement');
+    const bad: Result = await cli(f, ['phase', 'bad-slot', 'failed', '--slot', 'A', '--reason', 'x']);
+    expect(bad.code).not.toBe(0);
+    expect(bad.stderr).toContain('required --slot');
+    const donePath: string = leaf(f, 'done-slot', 'plan.positions', { done: ['A'] });
+    const doneBefore: string = bytes(donePath);
+    const done: Result = await cli(f, ['phase', 'done-slot', 'failed', '--slot', 'A', '--reason', 'x']);
+    expect(done.code).not.toBe(0);
+    expect(done.stderr).toContain('Slot already recorded');
+    expect(bytes(donePath)).toBe(doneBefore);
+  } finally {
+    f.clean();
+  }
+});
+
+test('blocked restart skips clean check and removes failure while attempts restart refuses dirty', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const blockedWt: string = resolve(f.home, 'wt-blocked');
+    await command(['git', 'worktree', 'add', '-b', 'blocked', blockedWt], f.root);
+    const blockedPath: string = leaf(f, 'blocked-restart', 'failed', {
+      worktree: blockedWt,
+      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'x' },
+    });
+    writeFileSync(resolve(blockedWt, 'dirty'), 'x\n');
+    const moved: Result = await cli(f, ['phase', 'blocked-restart', 'implement']);
+    expect(moved.code).toBe(0);
+    expect(moved.stdout).toBe('moved implement');
+    expect(existsSync(resolve(blockedWt, 'dirty'))).toBe(true);
+    expect(readState(blockedPath).failure).toBeUndefined();
+    expect(readFileSync(resolve(blockedPath, 'state.yaml'), 'utf8')).not.toMatch(/^failure:/m);
+    const attemptsWt: string = resolve(f.home, 'wt-attempts');
+    await command(['git', 'worktree', 'add', '-b', 'attempts', attemptsWt], f.root);
+    const attemptsPath: string = leaf(f, 'attempts-restart', 'failed', {
+      worktree: attemptsWt,
+      failure: { cause: 'attempts', phase: 'check.review', slot: 'A', reason: 'fix rounds exhausted' },
+    });
+    writeFileSync(resolve(attemptsWt, 'dirty'), 'x\n');
+    const refused: Result = await cli(f, ['phase', 'attempts-restart', 'implement']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('Uncommitted work');
+    expect(readState(attemptsPath).phase).toBe('failed');
+  } finally {
+    f.clean();
+  }
+});
+
+test('failed routing and reason misuse are guarded', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const fixPath: string = leaf(f, 'to-fix', 'failed');
+    expect((await cli(f, ['phase', 'to-fix', 'check.fix'])).stdout).toBe('moved check.fix');
+    expect(readState(fixPath).phase).toBe('check.fix');
+    leaf(f, 'to-merged', 'failed');
+    const merged: Result = await cli(f, ['phase', 'to-merged', 'merged']);
+    expect(merged.code).not.toBe(0);
+    expect(merged.stderr).toContain('Illegal move');
+    leaf(f, 'no-reason', 'implement');
+    const missing: Result = await cli(f, ['phase', 'no-reason', 'failed', '--slot', 'B']);
+    expect(missing.code).not.toBe(0);
+    expect(missing.stderr).toContain('Failed requires --reason');
+    leaf(f, 'bad-reason', 'implement');
+    const misuse: Result = await cli(f, ['phase', 'bad-reason', 'check.review', '--slot', 'B', '--reason', 'x']);
+    expect(misuse.code).not.toBe(0);
+    expect(misuse.stderr).toContain('--reason is only valid for failed');
+  } finally {
+    f.clean();
+  }
+});
+
+test('merge to merged clears busy fields', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const stamp: string = '2026-09-11T12:00:00.000Z';
+    leaf(f, 'busy-merged', 'merge', { busy_since: { A: stamp }, busy_notified: { A: stamp } }, 'standalone');
+    const result: Result = await cli(f, ['phase', 'busy-merged', 'merged']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('moved merged');
+    const closed: string = resolve(f.root, 'issues/closed/standalone/busy-merged');
+    expect(readState(closed)).toMatchObject({ busy_since: {}, busy_notified: {} });
+  } finally {
+    f.clean();
+  }
+});
+
+test('fix cap records attempts failure', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1 });
+    const path: string = leaf(f, 'cap', 'check.review', { fix_rounds: 1 });
+    const result: Result = await cli(f, ['phase', 'cap', 'check.fix', '--slot', 'A', '--verdict', 'fix']);
+    expect(result.stdout).toBe('moved failed');
+    expect(readState(path).failure).toEqual({
+      cause: 'attempts',
+      phase: 'check.review',
+      slot: 'A',
+      reason: 'fix rounds exhausted',
+    });
   } finally {
     f.clean();
   }

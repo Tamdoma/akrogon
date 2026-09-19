@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
+import { z } from 'zod';
 import { readGlobal, requireRepo, target, globalHome, type Repo, within } from './config';
-import { readState, saveState, findLeaf, leavesUnder, withLock, type State, type Leaf } from './state';
+import { readState, saveState, findLeaf, leavesUnder, withLock, type Failure, type State, type Leaf } from './state';
 import {
   phaseSchema,
   slotSchema,
@@ -22,6 +23,7 @@ export async function commitMove(
   recorded: State,
   to: Phase,
   slot: Slot | null,
+  failure?: Failure,
 ): Promise<State> {
   const after: State = {
     ...recorded,
@@ -32,6 +34,9 @@ export async function commitMove(
     prompted: {},
     prompted_at: {},
     attempts: { A: 0, B: 0 },
+    failure: to === 'failed' ? failure : undefined,
+    busy_since: to === 'failed' || to === 'merged' ? {} : recorded.busy_since,
+    busy_notified: to === 'failed' || to === 'merged' ? {} : recorded.busy_notified,
     fix_rounds:
       to === 'check.fix' && recorded.phase === 'check.review'
         ? recorded.fix_rounds + 1
@@ -100,6 +105,7 @@ export async function transition(
   requested: Phase,
   explicitSlot: Slot | undefined,
   verdict: Verdict | undefined,
+  reason: string | undefined,
 ): Promise<void> {
   const state: State = readState(leaf.path);
   if (state.phase === 'merged') throw new Error(`Merged is terminal: ${state.slug}`);
@@ -107,14 +113,30 @@ export async function transition(
     throw new Error(
       `Illegal move ${state.phase} -> ${requested}; from ${state.phase} the legal moves are ${routing[state.phase].next.join(', ')}`,
     );
-  if (state.phase === 'plan.positions' && requested !== (repo.config.rebuttal ? 'plan.rebuttal' : 'plan.synthesis'))
+  if (requested === 'failed' && reason === undefined) throw new Error('Failed requires --reason');
+  if (requested !== 'failed' && reason !== undefined) throw new Error('--reason is only valid for failed');
+  if (
+    state.phase === 'plan.positions' &&
+    requested !== 'failed' &&
+    requested !== (repo.config.rebuttal ? 'plan.rebuttal' : 'plan.synthesis')
+  )
     throw new Error('Destination contradicts rebuttal config');
   const required: readonly Slot[] = requiredSlots(state.phase, state.fix_rounds);
   const slot: Slot | undefined = explicitSlot ?? (required.length === 1 ? required[0] : undefined);
   if (state.phase !== 'failed' && (slot === undefined || !required.includes(slot)))
     throw new Error('A required --slot is missing or invalid');
   if (slot !== undefined && state.done.includes(slot)) throw new Error(`Slot already recorded: ${slot}`);
-  if (state.worktree !== undefined) await requireClean(state.worktree);
+  if (requested === 'failed') {
+    await commitMove(repo, leaf, state, 'failed', slot ?? null, {
+      cause: 'blocked',
+      phase: state.phase,
+      slot: slot ?? required[0],
+      reason: reason as string,
+    });
+    return;
+  }
+  if (state.worktree !== undefined && !(state.phase === 'failed' && state.failure?.cause === 'blocked'))
+    await requireClean(state.worktree);
   if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path);
   if (requested === 'check.review' && state.worktree !== undefined) await requireNonEmpty(repo, state.worktree);
   if ((state.phase === 'check.review') !== (verdict !== undefined))
@@ -139,7 +161,16 @@ export async function transition(
     destination === 'check.fix' && state.phase === 'check.review' && state.fix_rounds >= repo.config.fix_rounds
       ? 'failed'
       : destination;
-  await commitMove(repo, leaf, recorded, capped, slot ?? null);
+  await commitMove(
+    repo,
+    leaf,
+    recorded,
+    capped,
+    slot ?? null,
+    capped === 'failed'
+      ? { cause: 'attempts', phase: 'check.review', slot: slot ?? required[0], reason: 'fix rounds exhausted' }
+      : undefined,
+  );
 }
 
 export async function requireClean(worktree: string): Promise<void> {
@@ -166,14 +197,16 @@ export async function phaseCommand(
   rawPhase: string,
   rawSlot: string | boolean | undefined,
   rawVerdict: string | boolean | undefined,
+  rawReason: string | boolean | undefined,
 ): Promise<void> {
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
   const verdict: Verdict | undefined = verdictSchema.optional().parse(rawVerdict);
+  const reason: string | undefined = z.string().min(1).optional().parse(rawReason);
   const repo: Repo = await requireRepo(readGlobal(), process.cwd());
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
     if (leaf.state.phase === 'merged') await completeOwner(repo, leaf, false);
-    await transition(repo, leaf, requested, slot, verdict);
+    await transition(repo, leaf, requested, slot, verdict, reason);
   });
 }

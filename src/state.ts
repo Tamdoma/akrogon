@@ -8,6 +8,16 @@ import { issueFolders } from './park';
 
 const counts = z.object({ A: z.number().int().nonnegative().default(0), B: z.number().int().nonnegative().default(0) });
 
+export const failureSchema = z.strictObject({
+  cause: z.enum(['blocked', 'attempts']),
+  phase: phaseSchema,
+  slot: slotSchema,
+  reason: z.string().min(1),
+  delivery: z.string().optional(),
+});
+
+export type Failure = z.infer<typeof failureSchema>;
+
 export const sourcePattern = /^([a-zA-Z0-9-]+\/(?!\.{1,2}#)[a-zA-Z0-9._-]+)#([1-9][0-9]*)$/;
 
 export const stateSchema = z
@@ -32,6 +42,7 @@ export const stateSchema = z
     pane: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
     prompted: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
     prompted_at: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
+    failure: failureSchema.optional(),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
 

@@ -535,3 +535,28 @@ test('--charts derives stage from last terminal marker line', async () => {
     f.clean();
   }
 });
+
+test('failed leaves show cause and reason in NOTE and terminal phases suppress busy', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const now: number = Date.now();
+    const busy: string = new Date(now - 62 * 60000).toISOString();
+    leaf(f, 'with-cause', 'failed', {
+      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'needs api key' },
+      busy_since: { A: busy },
+    });
+    leaf(f, 'legacy-failed', 'failed', { busy_since: { A: busy } });
+    leaf(f, 'done-leaf', 'merged', { busy_since: { A: busy, B: busy } });
+    leaf(f, 'active-leaf', 'implement', { busy_since: { A: busy } });
+    const result: Result = await cli(f, ['status']);
+    expect(result.code).toBe(0);
+    expect(cell(result.stdout, leafRow(result.stdout, 'with-cause'), 'NOTE')).toContain('failed blocked needs api key');
+    expect(cell(result.stdout, leafRow(result.stdout, 'legacy-failed'), 'NOTE')).toBe('failed');
+    expect(cell(result.stdout, leafRow(result.stdout, 'with-cause'), 'NOTE')).not.toContain('busy');
+    expect(cell(result.stdout, leafRow(result.stdout, 'legacy-failed'), 'NOTE')).not.toContain('busy');
+    expect(cell(result.stdout, leafRow(result.stdout, 'done-leaf'), 'NOTE')).not.toContain('busy');
+    expect(cell(result.stdout, leafRow(result.stdout, 'active-leaf'), 'NOTE')).toContain('busy A 1h02m');
+  } finally {
+    f.clean();
+  }
+});

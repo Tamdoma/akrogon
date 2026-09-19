@@ -155,6 +155,36 @@ for (const owner of ['issue', 'epic/issue']) {
   });
 }
 
+test('failure record round-trips and rejects unknown keys', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'example', 'failed', {
+      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'waiting' },
+    });
+    expect(readState(path).failure).toEqual({
+      cause: 'blocked',
+      phase: 'implement',
+      slot: 'B',
+      reason: 'waiting',
+    });
+    saveState(path, readState(path));
+    expect(readState(path).failure).toEqual({
+      cause: 'blocked',
+      phase: 'implement',
+      slot: 'B',
+      reason: 'waiting',
+    });
+    yaml(resolve(path, 'state.yaml'), {
+      ...canonical,
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'waiting', extra: true },
+    });
+    expect(() => readState(path)).toThrow(z.ZodError);
+  } finally {
+    f.clean();
+  }
+});
+
 test('findLeaf ignores parked folders without state and unsupported nesting', async () => {
   const f: Fixture = await fixture();
   try {

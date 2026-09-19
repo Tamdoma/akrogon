@@ -24,18 +24,18 @@ export type Verdict = z.infer<typeof verdictSchema>;
 type Route = { skill: string | null; slots: readonly Slot[]; next: readonly Phase[] };
 
 export const routing: Record<Phase, Route> = {
-  'plan.positions': { skill: 'plan-issue', slots: ['A', 'B'], next: ['plan.rebuttal', 'plan.synthesis'] },
-  'plan.rebuttal': { skill: 'plan-issue', slots: ['A', 'B'], next: ['plan.synthesis'] },
-  'plan.synthesis': { skill: 'plan-issue', slots: ['B'], next: ['implement'] },
-  implement: { skill: 'implement-issue', slots: ['B'], next: ['check.review'] },
-  'check.review': { skill: 'check-issue', slots: ['A', 'B'], next: ['merge', 'check.fix'] },
-  'check.fix': { skill: 'implement-issue', slots: ['B'], next: ['check.review'] },
-  merge: { skill: 'merge-issue', slots: ['A'], next: ['merged', 'check.fix'] },
+  'plan.positions': { skill: 'plan-issue', slots: ['A', 'B'], next: ['plan.rebuttal', 'plan.synthesis', 'failed'] },
+  'plan.rebuttal': { skill: 'plan-issue', slots: ['A', 'B'], next: ['plan.synthesis', 'failed'] },
+  'plan.synthesis': { skill: 'plan-issue', slots: ['B'], next: ['implement', 'failed'] },
+  implement: { skill: 'implement-issue', slots: ['B'], next: ['check.review', 'failed'] },
+  'check.review': { skill: 'check-issue', slots: ['A', 'B'], next: ['merge', 'check.fix', 'failed'] },
+  'check.fix': { skill: 'implement-issue', slots: ['B'], next: ['check.review', 'failed'] },
+  merge: { skill: 'merge-issue', slots: ['A'], next: ['merged', 'check.fix', 'failed'] },
   merged: { skill: null, slots: [], next: [] },
   failed: {
     skill: null,
     slots: [],
-    next: ['plan.positions', 'plan.rebuttal', 'plan.synthesis', 'implement', 'check.review', 'merge'],
+    next: ['plan.positions', 'plan.rebuttal', 'plan.synthesis', 'implement', 'check.review', 'check.fix', 'merge'],
   },
 };
 

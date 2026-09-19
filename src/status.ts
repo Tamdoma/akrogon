@@ -85,19 +85,26 @@ function scanRepo(name: string, registeredPath: string): Scan {
 const header: string[] = ['LEAF', 'PHASE', 'AGE', 'BLOCKED BY', 'NOTE'];
 
 function note(state: State, now: number): string {
-  const busy: string[] = (['A', 'B'] as const).flatMap((seat) => {
-    const since: string | undefined = state.busy_since[seat];
-    if (since === undefined) return [];
-    const minutes: number = Math.max(0, Math.floor((now - Date.parse(since)) / 60000));
-    return [`busy ${seat} ${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`];
-  });
+  const busy: string[] =
+    state.phase === 'failed' || state.phase === 'merged'
+      ? []
+      : (['A', 'B'] as const).flatMap((seat) => {
+          const since: string | undefined = state.busy_since[seat];
+          if (since === undefined) return [];
+          const minutes: number = Math.max(0, Math.floor((now - Date.parse(since)) / 60000));
+          return [`busy ${seat} ${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`];
+        });
   const attempts: string[] =
     state.attempts.A + state.attempts.B > 0 ? [`A:${state.attempts.A} B:${state.attempts.B}`] : [];
   const fixes: string[] = state.fix_rounds > 0 ? [`fix rounds ${state.fix_rounds}`] : [];
   const verdicts: string[] = Object.entries(state.verdict).map(([slot, value]) => `${slot}:${value}`);
   const verdict: string[] = verdicts.length > 0 ? [`verdict ${verdicts.join(' ')}`] : [];
   const done: string[] = state.done.length > 0 ? [`done ${state.done.join(' ')}`] : [];
-  return [...done, ...attempts, ...fixes, ...verdict, ...busy].join(' · ');
+  const failed: string[] =
+    state.phase === 'failed'
+      ? [state.failure === undefined ? 'failed' : `failed ${state.failure.cause} ${state.failure.reason}`]
+      : [];
+  return [...failed, ...done, ...attempts, ...fixes, ...verdict, ...busy].join(' · ');
 }
 
 function cells(leaf: Leaf, log: LogRecord[], now: number, indent: string): string[] {

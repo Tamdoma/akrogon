@@ -265,10 +265,11 @@ async function activeCount(global: GlobalConfig, invocation: Invocation): Promis
     const contribution: number = inventory.unknown
       ? global.max_active
       : inventory.unreadable > 0
-        ? inventory.leaves.length + inventory.unreadable
+        ? inventory.leaves.filter((leaf) => leaf.state.phase !== 'failed').length + inventory.unreadable
         : inventory.leaves.filter(
             (leaf) =>
               leaf.state.phase !== 'merged' &&
+              leaf.state.phase !== 'failed' &&
               live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf)),
           ).length;
     total += contribution;
@@ -381,7 +382,12 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
     )
       return;
     if (state.attempts[slot] >= 3) {
-      await commitMove(repo, leaf, state, 'failed', slot);
+      await commitMove(repo, leaf, state, 'failed', slot, {
+        cause: 'attempts',
+        phase: state.phase,
+        slot,
+        reason: 'attempts exhausted',
+      });
       return;
     }
     const attempt: State = { ...state, attempts: { ...state.attempts, [slot]: state.attempts[slot] + 1 } };
@@ -465,7 +471,7 @@ async function dispatchLeaf(
       if (explicit) throw new Error(`Hand-built leaf cannot be dispatched: ${slug}`);
       return 'waiting';
     }
-    if (state.phase !== 'merged' && Object.values(state.pane).length > 0) {
+    if (state.phase !== 'merged' && state.phase !== 'failed' && Object.values(state.pane).length > 0) {
       const live: Pane[] = await panes();
       for (const seat of ['A', 'B'] as const) {
         const pane: Pane | undefined = live.find((pane) => pane.pane_id === state.pane[seat]);

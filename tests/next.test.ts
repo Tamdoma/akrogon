@@ -204,6 +204,12 @@ test('a stale prompt never re-prompts a busy or done seat, and three stale misse
     stale();
     expect((await next(f, ['misses'])).code).toBe(0);
     expect(readState(path).phase).toBe('failed');
+    expect(readState(path).failure).toEqual({
+      cause: 'attempts',
+      phase: 'plan.synthesis',
+      slot: 'B',
+      reason: 'attempts exhausted',
+    });
     expect(database(f).prompts.every((p) => p.pane === b)).toBe(true);
   } finally {
     f.clean();
@@ -1968,6 +1974,96 @@ test('spaced repo root dispatches leaf= with the complete spaced authoritative f
     expect(database(f).prompts[0].text).toBe(
       `plan-issue spaced slot=B phase=plan.synthesis leaf=${spaced}/issues/open/issue/spaced`,
     );
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a failed leaf with its tab still open does not count toward max_active', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
+    const second: string = leaf(f, 'second', 'plan.synthesis', {}, 'second-issue');
+    configure(f, { max_active: 1 });
+    expect((await next(f, ['first'])).code).toBe(0);
+    saveState(first, {
+      ...readState(first),
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'B', reason: 'capacity test' },
+      busy_since: {},
+      busy_notified: {},
+      failed_notified: true,
+    });
+    expect((await next(f, ['second'])).code).toBe(0);
+    expect(
+      database(f)
+        .tabs.map((tab) => tab.label)
+        .sort(),
+    ).toEqual(['first', 'second']);
+    expect(readState(second).attempts.B).toBe(1);
+    expect(readState(second).worktree).toBeDefined();
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a failed leaf does not reserve capacity in the unreadable branch', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const g: Fixture = await fixture();
+  try {
+    const failedPath: string = leaf(f, 'failed-one', 'plan.synthesis', {}, 'failed-issue');
+    expect((await next(f, ['failed-one'])).code).toBe(0);
+    saveState(failedPath, {
+      ...readState(failedPath),
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'B', reason: 'capacity test' },
+      busy_since: {},
+      busy_notified: {},
+      failed_notified: true,
+    });
+    const malformed: string = leaf(f, 'malformed', 'plan.synthesis', {}, 'bad-issue');
+    writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
+    const healthy: string = leaf(g, 'healthy', 'plan.synthesis', { repo: 'other' });
+    configure(f, { max_active: 2, repos: { repo: f.root, other: g.root } });
+    const result: Result = await next(f, [healthy]);
+    expect(result.code).toBe(1);
+    expect(skips(result).map((skip) => skip.path)).toContain(malformed);
+    expect(
+      database(f)
+        .tabs.map((tab) => tab.label)
+        .sort(),
+    ).toEqual(['failed-one', 'healthy']);
+    expect(readState(healthy).attempts.B).toBe(1);
+    expect(readState(healthy).worktree).toBeDefined();
+  } finally {
+    f.clean();
+    g.clean();
+  }
+}, 15000);
+
+test('a failed leaf with a blocked pane is not seat-observed', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'stuck', 'plan.synthesis');
+    expect((await next(f, ['stuck'])).code).toBe(0);
+    const promptsBefore: number = database(f).prompts.length;
+    expect(promptsBefore).toBe(1);
+    const b: string = readState(path).pane.B!;
+    saveState(path, {
+      ...readState(path),
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'B', reason: 'stuck test' },
+      busy_since: {},
+      busy_notified: {},
+      failed_notified: true,
+    });
+    const db: Database = database(f);
+    saveDatabase(f, { ...db, panes: db.panes.map((p) => (p.pane_id === b ? { ...p, agent_status: 'blocked' } : p)) });
+    expect((await next(f, ['stuck'])).code).toBe(0);
+    expect((await next(f, ['stuck'])).code).toBe(0);
+    expect(readState(path).busy_since).toEqual({});
+    expect(readState(path).busy_notified).toEqual({});
+    expect(database(f).prompts).toHaveLength(promptsBefore);
   } finally {
     f.clean();
   }
