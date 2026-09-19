@@ -1,41 +1,60 @@
 # Files
 
-The leaf branch carries code. The checkout carries issues. Two writers, two folders, one remote. The branch never touches issues/. Say that when you're confused — it fixes most confusion.
+The main checkout holds the issue record. The leaf worktree holds the code changes.
 
-What it's: the split between where code lives and where plans live. Why it exists: before it, plans and reviews were committed on the leaf branch and also in the checkout. Every merge produced rebase conflicts on the same review file. Now each folder has exactly one writer, and conflicts in issues/ can't happen. How it works: the phase command checks on every move and refuses if it finds issues/ files on the branch or a dirty worktree. The file that makes it so is the branch diff itself, checked against the registered checkout.
+For our example, start with these records:
 
-Two places write to the repo at the same time. Agents build on the leaf branch inside the worktree. Akrogon and the skills write plans, reviews, state, and the log inside your registered checkout, on main.
+```text
+~/Work/widgets/issues/open/export-csv/
+  ISSUE.md
+  export-csv/
+    brief.md
+    state.yaml
+```
 
-The rule that keeps them from colliding: nothing under issues/ is ever committed on a leaf branch. The phase command checks this on every move and refuses if it finds one.
-
-So after a merge, main on the remote has the new code, and your checkout has new issue files that are not pushed yet. One command reconciles the two:
-
-    akrogon sync
-
-It stages only eligible issue records in the checkout — issues/ minus seeds, lock files, and the worktree root — commits as sync issues if anything is staged, fetches, rebases with autostash, and pushes. It refuses the wrong branch, detached HEAD, and any already-staged paths outside those records. Your unrelated half-done code is left alone, not swept in. Agent work is never overwritten. Your issue files ride on top of it.
-
-A concrete use: export-csv just merged. Origin main has the new widgets export code. Your ~/Work/widgets checkout on main has updated state.yaml, review-A.md, log.jsonl, and the closed folder move. You run akrogon sync from ~/Work/widgets. It commits the issue files, rebases onto the new main, pushes. Now checkout and remote agree.
+Later passes add planning and review artifacts inside the leaf folder. Keep those records out of the leaf's code commits.
 
 ## What each artifact is
 
-brief.md, written by you. What and why. The done criteria. Ours says CSV header plus rows, JSON still works, tests cover both.
+- **ISSUE.md** explains the overall goal and related leaves.
+- **brief.md** is the leaf contract: scope, ownership, constraints and completion criteria.
+- **design.md**, when present, records decisions needed to implement the brief.
+- **state.yaml** records lifecycle progress.
+- **Planning artifacts** hold the seats' proposals, disagreements and final plan.
+- **Implementation artifacts** record what was built and how it was checked.
+- **Review artifacts** record concrete defects and verdicts.
 
-design.md, written by you via chart-issues. Locked decisions. Agents don't reopen them.
+The skills define which pass artifacts to write. Read the brief first, then the artifacts required for your phase.
 
-positions-A.md and positions-B.md, written by A and B. Independent plans, debate mode only. Export-csv with debate no doesn't have these.
+For CSV export, keep a product decision such as column order in the contract. Put the chosen implementation steps in the plan. Put a failing quote-escaping case in the review findings.
 
-rebuttal-A.md and rebuttal-B.md, A and B. One reply each, debate mode only.
+Commit issue records from the main checkout:
 
-plan.md, written by B. The final plan. Settled decisions, read-first paths, ordered checklist, acceptance criteria.
+```sh
+cd ~/Work/widgets
+akrogon sync
+```
 
-implementation/report.md, written by B. What was built, check output, the commit. Before and after heads for repairs.
+That command commits eligible issue data. It excludes imported seeds, lock files and the configured worktree directory. It does not commit the leaf's code for you.
 
-review-A.md and review-B.md, written by A and B. Findings, evidence, verdict. A appends re-checks and merge evidence here — rebase target, pushed head, conflict resolutions.
+When the containing issue is complete, Akrogon moves its records into the closed store. If it belongs to an epic, the whole epic must be complete before that top-level folder moves.
 
-issues/chart/<issue>/, written by you via chart-issues. The chart and its fork files. When the issue closes, the whole folder moves to issues/closed/<issue>/chart/.
+## sync: save lifecycle records separately from code
 
-issues/log.jsonl, written by akrogon. One line per phase change: time, slot, commit, diff size. Tail it when status is not enough.
+You can edit briefs and inspect reviews in the main checkout while agents change code in worktrees. Sync publishes the eligible lifecycle records without treating every local edit as issue data.
 
-I read plan.md first when I open a leaf, then the reviews. Brief tells me what they wanted, plan tells me what they decided, reviews tell me what broke. Everything else is backup.
+For example, after clarifying the CSV acceptance cases:
+
+```sh
+cd ~/Work/widgets
+git status --short
+akrogon sync
+```
+
+Sync takes coordination locks, commits eligible issue changes, fetches, rebases and pushes through the configured remote. It preserves unrelated local edits on success. Restoration conflicts stop the push.
+
+Lesson files are outside the issue store. The skills leave them for the operator to commit.
+
+This separation keeps plans and reviews available at their authoritative location while the code follows its own review and merge path.
 
 Previous: [Phases](phases.md) · Next: [gacp](gacp.md) · [Home](../../README.md)

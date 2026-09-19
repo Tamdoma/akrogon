@@ -1,36 +1,84 @@
 # Phases
 
-Nine phases, in the order they happen. Every phase names who works, what skill they follow, and what moves it forward. A leaf with debate no skips the first two — which is us, export-csv runs debate no and starts at synthesis.
+A phase is one step in a leaf's workflow. Seats report completion through Akrogon so it can decide what comes next.
 
-1. plan.positions, A plus B, plan-issue. Each writes a plan alone, not reading the other. Then to plan.rebuttal, or straight to synthesis if rebuttal is false in repo config. Debate mode only. I rarely use debate for small things. It's good for gnarly ones.
+| Phase | Who works | Result |
+| --- | --- | --- |
+| plan.positions | A and B | Independent plans. |
+| plan.rebuttal | A and B | Responses to disagreements, when enabled. |
+| plan.synthesis | B | One execution plan. |
+| implement | B | Code and validation. |
+| check.review | A and B initially | Review verdicts. After a repair, A reviews the fix. |
+| check.fix | B | Repairs for review findings. |
+| merge | A | Checks, rebase and push. |
+| merged | Nobody | Completed leaf. |
+| failed | Nobody | Stopped work that needs a decision or recovery. |
 
-2. plan.rebuttal, A plus B, plan-issue. Each reads the other plan and replies once. Then to plan.synthesis. Debate mode only.
-
-3. plan.synthesis, B, plan-issue. Writes the final plan.md, or the only plan when debate is off. Then to implement. For export-csv this is the start: B reads brief.md, the grounding index, lessons, and writes the plan with checklist and acceptance criteria.
-
-4. implement, B, implement-issue. Builds it in the worktree, runs every check, writes implementation/report.md, commits the code on the branch. Then to check.review. The move is refused if the worktree is dirty or if any file under issues/ is on the branch. Also refused if the branch is empty when moving into review — no empty leaves.
-
-5. check.review, A plus B first time, then A only after fixes. check-issue. Each reviews the diff and writes review-A.md or review-B.md with a verdict: ready, nits, or fix. If nobody said fix, go to merge. Otherwise to check.fix. Verdicts are required here; other phases forbid them.
-
-6. check.fix, B, implement-issue. Repairs the listed defects. Then to check.review, but only A reviews this time. Each review to fix loop adds one to fix_rounds. Past the cap, go to failed. The cap is fix_rounds in repo config, default 3.
-
-7. merge, A, merge-issue. Rebases the branch on origin/main, runs every check, pushes the branch as the new main, records lessons. Then to merged. A rebase conflict is resolved by A and recorded in review-A.md. A red check goes to check.fix instead, and the repair is re-reviewed.
-
-8. merged, nobody. Terminal. When every leaf in the issue is merged, the issue folder moves to issues/closed/, linked GitHub issues are closed, and the broadcast goes out if configured. The tab closes itself — A closes it as its very last act. The worktree and branch are removed at the next hand-typed next or startup sweep, not by the hook.
-
-9. failed, you. Waits. Read the reviews, fix the brief if the brief was the problem, then send it back with akrogon phase <slug> <phase>. From failed you can go to any active phase listed in routing — positions, rebuttal, synthesis, implement, review, fix, merge — not just implement. Pick where it should resume. The command resets fix_rounds when leaving failed, and clears attempts, done, verdict, prompted. It also records a failure entry with cause, phase, slot, reason.
+Review verdicts are ready, nits or fix. Ready and nits allow merge. Fix sends the leaf to repair, subject to the configured repair-round limit.
 
 ## How a phase moves
 
-An agent ends its phase by running one command. This is the only way a phase changes.
+The worker reports the destination phase and its seat. For example, B finishes implementation with:
 
-    akrogon phase export-csv check.review --slot B
-    akrogon phase export-csv merge --slot A --verdict nits
+```sh
+akrogon phase export-csv check.review --slot B
+```
 
-The command refuses illegal moves, refuses a slot that already reported, and moves the phase only when every required slot has reported. Until then it prints recorded and waits for the other slot. That's why you sometimes see transition refused in a pane: the agent tried twice, the second was rejected, and that's correct. Don't panic.
+At a paired step, one seat's completion does not finish the whole phase. Akrogon waits for both required seats.
 
-Why re-review after a fix uses only A: B just wrote the fix. B reviewing its own fix costs tokens and adds little. A checks the repair diff only. If A says fix again, B goes another round, up to fix_rounds.
+A review pass includes a verdict:
 
-Concrete use: export-csv in widgets at implement, B finishes, runs phase export-csv check.review --slot B. Both seats review. A says nits, B says ready. No fix, so next is merge. A merges, pushes, runs phase export-csv merged --slot A. If that was the last leaf, the command prints issue complete and moves issues/open/export-csv to issues/closed/export-csv. Done.
+```sh
+akrogon phase export-csv merge --slot A --verdict ready
+```
+
+The command validates the transition and checks the required artifacts and worktree conditions. Do not edit the phase field to bypass a refusal.
+
+When a seat cannot continue, it records a reason:
+
+```sh
+akrogon phase export-csv failed --reason "CSV column order needs a decision" --slot B
+```
+
+After resolving the cause, resume at the active phase that fits the work:
+
+```sh
+akrogon phase export-csv plan.synthesis
+akrogon next export-csv
+```
+
+Failed can resume at any active phase. It cannot jump directly to merged. Recovery resets the recorded pass and delivery bookkeeping. It does not repair code or resolve the blocker for you.
+
+## plan-issue: turn the contract into steps
+
+Planning chooses how to meet the brief without changing its locked scope. The final plan names decisions, read-first files, interfaces, an ordered checklist and verification.
+
+For CSV export, it might identify the current export function, add a serializer and name tests for quotes and empty data.
+
+Chart handoff defaults to no implementation debate. B then writes the plan directly in synthesis. With debate enabled, A and B write independent positions first. The repository's rebuttal setting determines whether they get a rebuttal round before B synthesizes the plan.
+
+Debate gives you separate implementation proposals when the tradeoff warrants it. It is not required for a small settled change.
+
+## implement-issue: build and show the evidence
+
+B follows the plan in the leaf worktree. Depending on configuration, B works inline or delegates bounded units to sequential workers.
+
+Tests come from the acceptance criteria. The skill calls for meaningful failing-then-passing evidence, with a trivial one-line change exempt from new tests.
+
+B runs changed tests as work lands, then the full suite and other blocking checks before handoff. The implementation report records the code changes, commands, results, commits and any limitations.
+
+You get a reviewable change and evidence of what was checked. A claim that “tests pass” without the relevant result is not the intended handoff.
+
+## check-issue: review defects, then verify the repair
+
+Both seats review the initial change independently without reading the peer's current review. They judge the diff against the contract, plan and evidence.
+
+A blocking finding needs a concrete defect, failed check or broken contract. A preference alone is a nit.
+
+Suppose a CSV field containing a newline creates an extra row. If that violates the contract, the reviewer records the case and requests a fix. B repairs it and runs the relevant checks.
+
+A then reviews the repair diff. That pass confirms the earlier findings and can block a new defect introduced by the repair. It does not restart an unrestricted review of the whole feature.
+
+The configured repair cap prevents an endless review cycle. If the cap is exhausted, the leaf fails with a recorded cause.
 
 Previous: [Next](next.md) · Next: [Files](files.md) · [Home](../../README.md)

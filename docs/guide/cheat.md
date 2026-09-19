@@ -1,48 +1,118 @@
 # Cheat sheet
 
-Everything on one screen. Print it. I've got it taped to my monitor, slightly crooked.
+Use these commands from the directory named above each block. Replace the example slug when working on another leaf.
 
-    once per machine
-    bun install && bun src/akrogon.ts install
+Install from the Akrogon checkout:
 
-    once per repo
-    akrogon init --toolkit typescript="bun test"
-    akrogon config
+```sh
+bun install
+bun src/akrogon.ts install
+```
 
-    create work, in your own agent session
-    /seed-issue       /chart-issues
-    akrogon pull
-    akrogon sync
+Set up a repository from an agent opened at its root:
 
-    run, with export-csv in widgets as the example
-    akrogon next --all
-    akrogon next issues/open/export-csv
-    akrogon next export-csv
-    akrogon phase export-csv check.review --slot B --verdict fix
-    akrogon phase export-csv merge --slot A --verdict nits
+```text
+/init-issues
+```
 
-    look
-    akrogon status
-    akrogon status export-csv
-    akrogon status --charts
-    tail issues/log.jsonl
-    herdr plugin log list --plugin akrogon
+Check the example repository:
 
-    order
-    blocked-by: [export-csv]
-    hand_built: true
-    max_active: 0
-    akrogon park search billing
-    akrogon unpark search
-    akrogon unpark --all
+```sh
+cd ~/Work/widgets
+akrogon config
+akrogon status
+```
 
-    files
-    ~/Work/infra/akrogon/config.yaml
-    ~/Work/widgets/issues/config.yaml
-    ~/.config/akrogon/env
-    issues/open/export-csv/export-csv/state.yaml
-    issues/worktrees/export-csv
+Create or investigate work in your agent session:
 
-Notes I keep forgetting: sync commits only eligible issues, not everything. next --all inside a repo means that repo, outside means everywhere. priority is ignored. failed can resume to any active phase, not just implement. gacp is loose, sync is strict.
+```text
+/seed-issue Describe the observation and evidence
+/chart-issues Add CSV export to widgets
+```
+
+Import reports and save eligible issue records:
+
+```sh
+akrogon pull
+akrogon sync
+```
+
+Dispatch one leaf, a folder, or the current repository:
+
+```sh
+akrogon next export-csv
+akrogon next issues/open/export-csv
+akrogon next --all
+```
+
+Inspect the leaf:
+
+```sh
+akrogon status export-csv
+akrogon status --charts
+tail issues/log.jsonl
+```
+
+Report completed implementation as B:
+
+```sh
+akrogon phase export-csv check.review --slot B
+```
+
+Report A's review verdict:
+
+```sh
+akrogon phase export-csv merge --slot A --verdict nits
+```
+
+Record a blocker, then recover only after it is resolved:
+
+```sh
+akrogon phase export-csv failed --reason "Required permission is missing" --slot B
+akrogon phase export-csv implement
+akrogon next export-csv
+```
+
+Park and restore a whole unallocated issue:
+
+```sh
+akrogon park export-csv
+akrogon unpark export-csv
+```
+
+Start or stop the optional watcher in Claude Code only:
+
+```text
+/watch-issues
+/watch-issues stop
+```
+
+Common paths, using the default worktree root:
+
+```text
+~/Work/widgets/issues/config.yaml
+~/Work/widgets/issues/open/export-csv/export-csv/brief.md
+~/Work/widgets/issues/open/export-csv/export-csv/state.yaml
+~/Work/widgets/issues/worktrees/export-csv/
+~/.config/akrogon/env
+```
+
+Remember: capacity counts leaves across repositories. Failed can resume at any active phase. Sync selects eligible issue records. Gacp commits the entire staged index.
+
+## Pick the skill by the result you need
+
+| Need | Skill | What you get |
+| --- | --- | --- |
+| Set up a project | init-issues | Inspected settings, checks and grounding. |
+| Capture a problem | seed-issue | One unverified GitHub report. |
+| Decide what to build | chart-issues | Researched choices and leaf contracts. |
+| Plan the change | plan-issue | File-level steps and verification. |
+| Build or repair it | implement-issue | Code, checks and an implementation report. |
+| Check the result | check-issue | Evidence-backed verdicts. |
+| Land reviewed work | merge-issue | Checked code pushed to the default branch. |
+| Announce completion | broadcast-issue | A factual issue update. |
+| Check while away | watch-issues | Optional Claude Code cron inspection. |
+
+Invoke setup, intake, charting and watching when you need them. Dispatch selects the execution skills from the leaf's phase. You do not need to run every skill by hand.
 
 Previous: [Learn](learn.md) · Next: [README](../../README.md) · [Home](../../README.md)

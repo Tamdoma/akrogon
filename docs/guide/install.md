@@ -1,47 +1,86 @@
 # Install
 
-One command per machine. Do it once, then forget it. I mean that — updates are just git pull.
+Install Akrogon on the machine where you run Herdr and your coding agents.
 
 ## Prerequisites
 
-You need bun, git, flock, herdr, and the agent CLIs your seats use. If you'll pull GitHub issues, you also need an authenticated gh. And set your machine's slots, harness commands, and registered repos in config.yaml at the tool root first — or in the directory picked by AKROGON_HOME if you use that. Install reads that file, it doesn't invent it.
+You need:
 
-Which directory you're in: the Akrogon tool checkout. Mine is ~/Work/infra/akrogon. Yours can be anywhere, the symlinks handle it.
+- Bun and Git.
+- Herdr.
+- The harness CLIs named in your machine configuration.
+- The flock command for locking.
+- An authenticated GitHub CLI for GitHub intake and issue closure.
+
+Check that the commands are available:
+
+```sh
+bun --version
+git --version
+herdr --help
+flock --version
+gh auth status
+```
 
 ## The command
 
-    cd ~/Work/infra/akrogon
-    bun install
-    bun src/akrogon.ts install
+From the Akrogon checkout, install dependencies and create the links:
 
-What you should see: not much. No output means it worked, apart from maybe a path print for the env file on first run. What it did:
+```sh
+bun install
+bun src/akrogon.ts install
+```
 
-1. Linked the command. ~/.local/bin/akrogon now points at the source. Edit src/ and it's live. Make sure ~/.local/bin is on your PATH, or you'll stare at command not found for longer than you would admit.
-2. Linked the skills. Every folder in skills/ gets linked into all four agent skill roots: ~/.claude/skills, ~/.agents/skills, ~/.codex/skills, and ~/.pi/agent/skills. Both seats read the same skill text. When a skill changes on main, every agent sees it on its next prompt, because they are symlinks.
-3. Linked the plugin and harness integrations. It runs herdr integration install for each configured harness kind, then herdr plugin link for the bundled plugin. The plugin runs akrogon pull --all and akrogon next --all at Herdr start, and akrogon next on agent status changes, pane exit/close, and tab close.
+Installation links the command, skills and Herdr plugin. It also installs the configured harness integrations. If a destination conflicts with an existing file, installation stops and prints removal commands for you to review.
 
-What to do when it fails: if a destination already exists and is not the right link, install prints the rm commands and stops. Run them — after you have looked, don't blindly nuke — and install again. If a harness kind is missing from config, it complains about that instead; fix config.yaml and retry.
+The links point back to this checkout. Update it with:
 
-Update the tool with git pull in the checkout. Nothing needs reinstalling. The command and skills follow the checkout through symlinks, which is why I keep saying forget it.
+```sh
+git pull
+```
+
+Make sure your shell can find the command directory:
+
+```text
+~/.local/bin
+```
+
+Skills are linked into these roots:
+
+```text
+~/.claude/skills
+~/.agents/skills
+~/.codex/skills
+~/.pi/agent/skills
+```
+
+A linked skill still needs the tools it was written for. In particular, watch-issues runs only in Claude Code.
 
 ## Global config, since you'll stare at it next
 
-Lives at the tool root, config.yaml — or under AKROGON_HOME if you set that. It says which agents run, how to launch them, and which repos exist. Here is a small one with our running repo widgets in it:
+The machine configuration lives at the Akrogon root, or in the directory selected by AKROGON_HOME:
 
-    max_active: 3
-    slots:
-      a: { harness: pi, model: devin/swe-2-max, effort: max }
-      b: { harness: pi, model: devin/swe-2-max, effort: max }
-    harnesses:
-      pi: "pi --model {model} --thinking {effort} -a --exclude-tools request_user_input"
-    toolkits:
-      typescript: bun:test
-    repos:
-      akrogon: /home/me/Work/infra/akrogon
-      widgets: /home/me/Work/widgets
+```text
+config.yaml
+```
 
-Slots are seats with a configured harness and model. Both seats can be the same harness and model — mine are — or different. Vendor spread is a choice. The {model} and {effort} bits get filled in at launch. max_active is the machine ceiling across every registered repo, not per repo.
+It defines the harness commands, the two seats, registered repositories and a global capacity limit.
 
-Why max_active? Each active leaf is two agents spending tokens plus a worktree on disk. Three is already a lot. Raise it when you have got budget and disk, lower it to 0 when you want everything to sit still. I keep mine low during the day and raise it overnight. Your call. You'll later run export-csv in widgets under it.
+The current checked-in seats both use pi with the devin/swe-2-max model. A and B are roles, not fixed model names.
+
+For the examples in this guide, register the project under the name widgets:
+
+```yaml
+repos:
+  widgets: ~/Work/widgets
+```
+
+The max_active setting limits new leaf allocations across registered repositories. It does not count individual seats or stop work already running. The value must be a positive integer.
+
+## What installation gives you
+
+You get one command for the lifecycle and the same skill files in the supported harness roots. Each seat can use the configured harness without changing the leaf contract.
+
+The plugin connects Herdr events to dispatch. You still choose when to release new work. Installation does not turn every open request into a running agent.
 
 Previous: [State](state.md) · Next: [Setup](setup.md) · [Home](../../README.md)

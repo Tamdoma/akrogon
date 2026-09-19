@@ -1,0 +1,4 @@
+Changed files and reasons: deleted docs/guide/*.html (17 files) + docs/guide/style.css (old guide surface, criterion 1); deleted tests/browser/ (4 .pw.ts specs, playwright.config.ts, 3 per-spec configs, criterion 2); removed @playwright/test from package.json devDependencies and ran bun install to drop it (+playwright/playwright-core) from bun.lock (criterion 3). Untouched: tests/AREA.md, docs/reference-index.md, tests/docs-links.test.ts, the 17 .md pages, all other deps.
+Tests run: AKROGON_BASE=b1bdde3105a673cf57f350b8e3c636ce3b9eee6b bun test --changed="$AKROGON_BASE" -> 4 pass, 0 fail (tests/command-reference.test.ts, 21 changed files, 1 test file run). Verified: ls docs/guide/ shows only 17 .md; tests/browser/ gone; grep -i playwright package.json bun.lock empty.
+Known limitations: none known.
+Unverified criteria: none.

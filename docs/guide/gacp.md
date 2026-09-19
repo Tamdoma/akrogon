@@ -1,12 +1,23 @@
 # gacp
 
-A tiny shell function for pushing issue edits. Stage this directory, commit the whole staged index on main, rebase, push. That's it. I use it after hand-editing issues/ when I don't want sync strictness.
+This Bash function stages files, commits them, pulls remote changes and pushes to origin/main.
 
-Prerequisites: git checkout on main, remote named origin with main. Which directory you're in: the repo checkout where you edited issues/ — for us, ~/Work/widgets. gacp stages the current subtree, not the whole repo, so cd where you mean it.
+Use it only when you have checked what will be committed. It stages the current directory and commits the entire staged index, including files staged earlier.
+
+For the running example, use the main checkout:
+
+```sh
+cd ~/Work/widgets
+git status --short
+```
 
 ## The function
 
-Paste this into ~/.bashrc, then run source ~/.bashrc. The outer parens make it a subshell, so set -e and exit never touch your interactive shell. That bit matters — without the subshell, a failed gacp could close your shell. With it, it just returns non-zero.
+Paste this function into your Bash startup file:
+
+```text
+~/.bashrc
+```
 
 ```bash
 gacp() (
@@ -30,30 +41,76 @@ git push origin main
 )
 ```
 
-To install: copy the block above into the end of ~/.bashrc, save, then source ~/.bashrc in every open shell. Test with type gacp — it should print the function, not command not found.
+The parentheses run the function in a subshell. Its shell options and exit commands do not change or close your interactive shell.
+
+Load it in each open Bash shell:
+
+```sh
+source ~/.bashrc
+type gacp
+```
+
+The second command should print the function definition.
 
 ## Beginner walkthrough, line by line
 
-set -euo pipefail means fail fast. Any command fails, undefined variable, or broken pipe kills the function right there. You want that. Silent half-pushes are worse than loud stops.
+1. The shell options stop most unhandled command failures and reject unset variables.
+2. The branch check requires main. A different branch or detached checkout stops the function.
+3. Staging adds changes under the current directory.
+4. If the index has changes, Git commits everything staged. The first argument is the message.
+5. Pull fetches origin/main and rebases local commits onto it. Autostash temporarily stores unstaged changes.
+6. Push sends the result to origin/main.
 
-branch gets the current branch name. If you're not on main, it stops and tells you to finish or abort the rebase first. Why main only? Because issue files live on main in the registered checkout. Pushing them from a leaf branch would mix code and issues, which the phase command forbids anyway.
+Pass a multiword message in quotes:
 
-git add . stages the current directory subtree. Not the whole repo — the folder you're in plus below. If you're in ~/Work/widgets/issues/open/export-csv, it stages that. If you're in ~/Work/widgets, it stages everything under it that's not ignored. I usually run it from the repo root so I don't miss a file. Heads up: this stages whatever is there, including unrelated edits if you left them lying around. That's the difference from sync, see below.
+```sh
+gacp "Add export-csv leaf"
+```
 
-git diff --cached --quiet checks if anything is staged. If yes, commit with your message or add issues by default. So gacp means commit message add issues, gacp my message means commit my message. The commit includes everything staged, not just issues/ — again, looser than sync.
+With no argument, the default message is:
 
-git pull --rebase --autostash origin main fetches and replays your commit on top of the remote. Autostash stashes unrelated unstaged edits, reapplies after. If the rebase works, git push origin main pushes. Done.
+```text
+add issues
+```
 
-If the pull fails: it grabs the conflicting file list, aborts the rebase, prints checkout unchanged plus the files, and prints the manual fix line. Here is the honest bit — checkout unchanged is not a full rollback. Your commit already exists locally before the pull ran. The rebase abort undoes the replay, not the commit. Your work is safe, but it's committed, not uncommitted. To truly undo, you would reset soft after. The script doesn't do that for you, and that's fine as long as you know.
+If pull fails, the function tries to abort the rebase and report conflicting files. The earlier local commit still exists. The function's “checkout unchanged” message does not mean that it undid that commit.
 
-What you should see on success: nothing much, maybe rebase lines and push output. On conflict: gacp conflict, rebase aborted, checkout unchanged, plus file list and the resolve-by-hand line. What to do when it fails: follow that line — pull rebase by hand, fix files, add, continue with GIT_EDITOR=true so it doesn't open an editor, then gacp again.
+A pull can also fail before a rebase starts. In that case, abort can fail too, and the function stops before printing its custom advice. Read Git's actual error and check the checkout:
+
+```sh
+git status
+```
+
+Resolve the reported problem before running the function again. Do not treat every pull failure as a merge conflict.
 
 ## When to use gacp vs akrogon sync
 
-Use akrogon sync when you want strict and safe: it commits only eligible issue records — issues/ minus seeds, locks, worktrees — and refuses the wrong branch and any staged paths outside them. If you left half-done code staged, sync stops and tells you. That's what you want most days.
+For routine issue-record updates, use:
 
-Use gacp after editing issues/ when you want quick and loose: stage this directory, commit the whole staged index on main, rebase, push. It doesn't check eligibility. It will happily commit whatever you staged. That's handy for a fast issues push, dangerous if your checkout is messy. My rule: clean checkout, gacp is fine. Messy checkout, sync saves me from myself.
+```sh
+cd ~/Work/widgets
+akrogon sync
+```
 
-Concrete use: you just hand-wrote issues/open/export-csv/export-csv/brief.md and state.yaml in ~/Work/widgets. You cd ~/Work/widgets, run gacp add export-csv leaf. It stages, commits, rebases, pushes. Then akrogon next export-csv picks it up. Or run akrogon sync instead if you have other edits lying around — sync will refuse rather than sweep them in.
+Sync selects eligible issue records and refuses unrelated staged files. It uses the configured remote and default branch.
+
+Use gacp when you deliberately want its broader staging behavior and your project uses origin/main. For example, after writing the export-csv brief and state:
+
+```sh
+cd ~/Work/widgets
+git status --short
+gacp "Add export-csv leaf"
+akrogon next export-csv
+```
+
+Check the status output first. Gacp does not know which files belong to the issue lifecycle.
+
+## Check the scope before using the shortcut
+
+The benefit is fewer commands for a deliberate ordinary Git commit. The cost is that the function has no knowledge of Akrogon's record rules.
+
+At the repository root, staging includes all non-ignored changes beneath it. From a subdirectory, it stages that subtree. Previously staged changes remain part of the commit in either case.
+
+Use sync for routine lifecycle records. Use gacp only when its full commit scope is what you intend.
 
 Previous: [Files](files.md) · Next: [Merge](merge.md) · [Home](../../README.md)

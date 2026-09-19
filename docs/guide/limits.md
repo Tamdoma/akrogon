@@ -1,25 +1,47 @@
 # Limits
 
-Things that will surprise you if you don't know them. Read this before you get surprised. I got surprised by most of these, so you don't have to.
+Keep these boundaries in mind when deciding what to dispatch.
 
-Ordering: blocked-by is checked before every dispatch. Not once at start, every time next looks at the leaf. Edit the list, run next, it matters. A running leaf with a tab still gets its blockers checked — dispatch doesn't skip that because a tab exists. Change order before you need it, not after you're annoyed.
+- **Dependencies govern dispatch.** They are checked on each pass, including for leaves with tabs. Changing a dependency does not interrupt a prompt already running.
+- **Dependencies name leaves.** To wait for several independent leaves, list each one. Naming one “last leaf” works only if its own dependencies cover the others.
+- **Capacity is global.** The max_active limit applies across registered repositories. It must be a positive integer. Existing allocations can continue at the limit.
+- **There is no priority field.** Old priority values are ignored. Use dependencies for actual prerequisites and parking to keep work out of the queue.
+- **Folder targeting is temporary.** It limits that dispatch pass. Later sweeps can consider other open leaves.
+- **Cleanup is separate from idle events.** Manual repository sweeps and startup cleanup remove completed worktrees. A normal hook pass does not delete them.
+- **Failed leaves do not restart themselves.** Read the reason and resume an appropriate active phase.
 
-Ordering: blocked-by only names leaves. Not epics, not issues. To wait for a whole epic, name its last leaf. One line in one file. For export-csv, if export-json must wait, put blocked-by [export-csv] in export-json. That's it.
+For example, start CSV export without dispatching another folder in that pass:
 
-Capacity: max_active is machine-wide, first come first served. Counted across every registered repo. The global value is the machine ceiling. Ready leaves start in folder order. One epic can take every seat. Priority in state.yaml is not read — old files may have it, the command ignores it. I keep max_active at 3. One busy epic plus export-csv waiting taught me why.
+```sh
+cd ~/Work/widgets
+akrogon next issues/open/export-csv
+```
 
-Capacity: folder targeting doesn't reserve seats. next <folder> starts only that folder leaves now, but the next hook call sweeps everything, and startup runs --all. To keep work out of the loop for real, use akrogon park. Targeting is a nudge, parking is a fence.
+That command does not reserve capacity for the folder.
 
-Cleanup happens only when you or startup run next. Herdr idle signal flickers between tool calls, so nothing destructive is tied to it. A merge closes its own tab. Worktrees and branches wait for a hand-typed akrogon next in that repo, next --all, or the next Herdr start. The hook never deletes worktrees. That's deliberate — deleting on a flicker would be awful.
+Keep lifecycle records in the registered checkout and code changes in the leaf worktree:
 
-The last tab may stay open. If a merge session dies before its final close, the tab lingers until the next startup sweep or hand-typed next cleanup. It's harmless. Close it by hand or run akrogon next --all. I close them by hand when I see them. Takes two seconds.
+```text
+~/Work/widgets/issues/open/export-csv/export-csv/
+~/Work/widgets/issues/worktrees/export-csv/
+```
 
-Files: issue files never go on a leaf branch. Every phase move refuses any file under issues/ on the branch, and refuses a dirty worktree. The move into review also refuses an empty branch. Agents write issue files only in the registered checkout. Export-csv code lives on branch export-csv in the worktree; its plan and reviews live on main in ~/Work/widgets/issues/. Different places, different branches, no overlap.
+The second path uses the default worktree root. Your configuration may choose another.
 
-Files: sync commits only eligible issue records. Not everything. akrogon sync stages issues/ minus seeds, lock files, and the worktree root, commits as sync issues, rebases, pushes. It refuses staged paths outside those records. You can leave half-done code in the checkout and sync will stop rather than sweep it in. That's safer than it sounds — I leave messes everywhere.
+Normal phase moves enforce worktree and artifact conditions. Recording a failure is allowed without first cleaning a blocked worktree. Do not assume that every phase move applies the same checks.
 
-Agents: blocked is not counted, stuck is. A permission dialog waits for you forever with no penalty. A prompt that doesn't take counts one attempt. Three consecutive failed deliveries and the leaf fails. Attempts reset when a prompt lands. So answering a dialog is free, ignoring a broken pane is not.
+Sync commits only eligible issue records. It refuses unrelated staged files. It can preserve unrelated unstaged changes during its rebase, but conflicts still need attention.
 
-Broadcast: only the merge slot broadcasts. Never a subagent, never a cheaper model. The merge pane holds the issue context and closes its own tab as its last act, so anything it hands off could be cut short. A failed broadcast doesn't reopen the issue. The merge is done, the message just did not send.
+A blocked or unknown agent is not treated as idle. Repeated failed prompt deliveries count toward failure, while a successful delivery resets that seat's attempts. A permission dialog is not proof of a delivery failure.
+
+Only the merge seat sends the completion broadcast. A failed notification leaves the code merge complete.
+
+## What remains your responsibility
+
+You choose the work, resolve product decisions and provide permissions or credentials that agents cannot obtain.
+
+Keep the contracts accurate. A two-seat review can check the agreed behavior, but it cannot make a missing product requirement appear.
+
+For CSV export, choosing the wrong columns is still wrong even if both agents implement and test that choice correctly.
 
 Previous: [In practice](in-practice.md) · Next: [Problems](problems.md) · [Home](../../README.md)

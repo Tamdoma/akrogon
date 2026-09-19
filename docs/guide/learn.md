@@ -1,15 +1,48 @@
 # Learn
 
-Where leftovers go. Reviews produce three kinds of leftovers. Each has exactly one exit, so nothing piles up. I love this part — no drawer of almost-ideas.
+A review can reveal something useful beyond the current fix. Keep that knowledge separate from the leaf's required repairs.
 
-Nit. A finding that's not a defect. Stays in the review file. At merge, A decides: a reusable rule becomes a lesson, real work becomes a seed. Not both, not neither. One exit. For export-csv, say B left a nit: CSV quoting should use the standard library, not hand-rolled quotes. Not a defect, tests pass, but worth remembering. That stays in review-B.md until merge, then A turns it into a lesson line about quoting.
+**A fix** is needed for the leaf to meet its contract. For CSV export, losing a field containing a comma is a defect if correct CSV quoting is required.
 
-Lesson. One line plus a history file. One line in learnings/LESSONS.md naming mechanism, date, and history path, plus a dated file under learnings/history/ with case, evidence, learning. Every plan reads the lines. Plans treat them as observations, not rules — history opened only to verify evidence. Lessons get pruned at chart open when they stop being useful; the chart offers a prune and you say what goes. I prune aggressively. Stale lessons are worse than none, they sound wise and steer wrong.
+**A nit** does not block merge. It stays in the review record. Whether a performance concern is a nit depends on the requirements and evidence, not just whether the brief names a row count.
 
-Seed. A GitHub issue. Filed with seed-issue. It posts to the repo named by issues_repo in a root akrogon.yaml when that file exists, otherwise to the repo own GitHub origin. A project that uses a framework gets that one-line file so its reports land on the framework. If it's about a skill, it goes to the akrogon repo, because skills only change through akrogon leaves. Otherwise it goes to the repo the work is in — for us, widgets.
+**A lesson** records a reusable finding. The merge skill can turn a reusable nit into a short entry and a supporting history file:
 
-Concrete use: export-csv review finds CSV is slow on 100k rows. Not a defect — done criteria did not mention speed — so it's a nit. At merge, A decides it's real work: files a seed streaming-export for later. That seed gets pulled, charted, becomes a leaf. Full loop. Nothing lost, nothing fixed without a plan.
+```text
+learnings/LESSONS.md
+learnings/history/
+```
 
-Why agents don't fix nits as they see them? Then every review becomes a small implementation with no plan and no second reviewer. Nits become seeds, seeds become leaves, leaves get the full loop. Slow? A bit. Safer? Much. I've watched drive-by fixes break more than they fixed. Let the loop do it.
+For example, a lesson could record how a tested CSV library handled embedded newlines that an earlier implementation missed. Include the evidence so later agents can check whether it applies.
+
+Plans read the lesson list. Lessons are observations to verify, not permanent rules. Charting can propose removing stale entries.
+
+**A seed** records work to investigate later. If large exports need streaming, file that as a separate observation rather than expanding the current leaf during review:
+
+```text
+/seed-issue Large CSV exports may need streaming; include the measured case
+```
+
+The seed skill routes reports through the root repository setting when present:
+
+```yaml
+issues_repo: owner/repo
+```
+
+That setting lives in:
+
+```text
+akrogon.yaml
+```
+
+Without it, the skill uses the repository's GitHub origin. A report about an Akrogon skill belongs in Akrogon.
+
+New work still needs investigation and a contract. Do not treat every review suggestion as permission to change more code.
+
+## Keep useful evidence without growing every leaf
+
+Lessons help later planning find a proven constraint. Seeds preserve possible work without quietly adding it to the current implementation.
+
+For CSV export, a reproducible memory problem can become new intake. The current leaf still has a clear finish line. Later charting decides whether the new report warrants work.
 
 Previous: [Problems](problems.md) · Next: [Cheat sheet](cheat.md) · [Home](../../README.md)

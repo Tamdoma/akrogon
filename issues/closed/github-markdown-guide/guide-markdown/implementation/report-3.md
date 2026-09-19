@@ -1,0 +1,4 @@
+Changed files and reasons: tests/docs-links.test.ts created (slugify + headingSlugs + linkTargets + brokenLinks(sourcePath, markdown, resolver) checker, positive test over README.md + docs/guide/*.md, negative tests for dead file and missing anchors with/without path); tests/AREA.md updated (dropped playwright command, browser config key file, 3 browser pattern lines, added docs-links key file, 23 lines, 4 sections); docs/reference-index.md updated (Documentation line now the markdown operator guide, one-line format kept).
+Tests run: bun test tests/docs-links.test.ts -> 3 pass, 0 fail, 8 expects; AKROGON_BASE=b1bdde3105a673cf57f350b8e3c636ce3b9eee6b bun test --changed="$AKROGON_BASE" -> 7 pass, 0 fail across tests/command-reference.test.ts + tests/docs-links.test.ts.
+Known limitations: none known.
+Unverified criteria: none.

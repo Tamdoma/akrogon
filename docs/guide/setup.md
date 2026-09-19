@@ -1,54 +1,96 @@
 # Setup
 
-Once per repo you want agents in. After this, the repo knows its branch, its checks, and where its leaves live.
+Initialize each repository before dispatching work. The examples use:
+
+```text
+~/Work/widgets
+```
 
 ## The easy way
 
-Open your own agent session in the repo and run the init-issues skill. It inspects the repo, proposes the settings below, writes the proposal to a temp file outside the repo, and calls akrogon init --from for you. Then it verifies. You answer the questions it can't settle by looking. That's it.
+Open an agent at the repository root and invoke the setup skill:
 
-I use the skill for real repos. The direct way is for empty or test-less toys, or when you want to feel the sharp edges.
+```text
+/init-issues
+```
+
+It inspects the project and proposes the branch, checks and documentation used to guide agents. It also maps the code areas and creates missing grounding documents.
+
+Review the proposal. Then let the skill call the initialization command.
 
 ## The direct way
 
-Prerequisites: Akrogon installed. No registration yet — that happens here. You just need a git checkout and to know if it has tests.
+You can supply a YAML proposal yourself:
 
-Which directory you're in: the repo root. For our running example, that's the widgets checkout:
+```sh
+cd ~/Work/widgets
+akrogon init --from /path/to/proposal.yaml
+akrogon config
+```
 
-    cd ~/Work/widgets
-    akrogon init --toolkit typescript="bun test"
-    akrogon config
+The command writes repository configuration, creates the issue and lesson scaffolds, adds ignore entries and registers the repository.
 
-The first command initialises. --from is optional — without it, init reuses the existing issues/config.yaml if there's one, or starts empty. --toolkit records a toolkit choice without installing anything, for repos without tests yet. The second command prints what an agent will see: effective global plus repo settings.
+It writes configuration. It does not inspect your code and decide how to divide it into areas.
 
-What you should see: init's quiet. config prints YAML with your slots, checks, repo name widgets, all of it. If it says repo none, you're not in a registered checkout — check you ran init in the right root.
+Running init again preserves existing settings unless the proposal changes them. For a project without tests, the toolkit option records your choice. It does not install the test runner:
 
-What to do when it fails: Repo name already registered means the folder name is taken by a different path. Rename the folder or fix the global config.yaml. Expected toolkit pair means you forgot the equals sign. I do that about half the time.
-
-What init writes: issues/config.yaml, creates issues/open/ and learnings/LESSONS.md, adds ignore lines for worktrees, seeds, and lock files, and registers the repo in the global config under its folder name. Running it again keeps existing choices.
+```sh
+akrogon init --toolkit typescript="bun test"
+```
 
 ## Repo config, the parts you'll care about
 
-    remote: origin
-    default_branch: main
-    worktree_root: issues/worktrees
-    rebuttal: true
-    fix_rounds: 3
-    implement: subagents
-    checks:
-      format: bun run format
-      test: bun test
-      typecheck: bun run typecheck
-    advisory: []
-    grounding:
-      index: docs/reference-index.md
-    broadcast:
-      discord:
-        webhook_env: [DISCORD_WEBHOOK_URL]
+Repository settings live here:
 
-Quick tour. remote and default_branch say where code integrates. worktree_root says where leaf checkouts go — default issues/worktrees, and changing it later means reconciling existing paths by hand, so pick once. rebuttal says whether debate mode gets a reply round. fix_rounds caps review-to-fix loops before failed. implement is subagents or inline. checks must all pass before review and before merge; advisory failures get reported as nits but don't block. grounding.index is the short map planners read first. broadcast is optional Discord routing when an issue completes.
+```text
+~/Work/widgets/issues/config.yaml
+```
 
-For changed-tests, use the AKROGON_BASE form from the skill — it compares against the leaf branch point, and Akrogon sets that variable in every pane. Secrets like webhook URLs go in ~/.config/akrogon/env, one NAME=value per line, never in the repo.
+Check these choices:
 
-One more thing, since it bites: the registration key in the machine config is persistent repo identity and must match each leaf's repo value. Ours is widgets everywhere. Changing the repo root or worktree_root means manual reconciliation of worktree locations, git metadata, and recorded state.worktree paths before dispatch resumes. The export-csv leaf will use repo widgets here.
+- **default_branch** is where reviewed work lands.
+- **remote** selects the Git remote used for integration.
+- **checks** lists the commands that must pass before merge.
+- **grounding** points agents to the project's reference index, or disables that lookup.
+- **worktree_root** says where leaf checkouts go.
+- **rebuttal** controls the paired planning rebuttal.
+- **fix_rounds** limits review repair rounds.
+
+Use the effective configuration to check the result:
+
+```sh
+akrogon config
+```
+
+The machine registration key is the repository's identity. For our example, each leaf uses widgets as its repo value. Moving the project directory does not require changing that identity.
+
+If you move the repository or its worktree root, reconcile existing worktrees and recorded paths before dispatching again. Changing a config path does not move a checkout.
+
+## Grounding: help agents find the right code
+
+Grounding gives the agent a short route into an unfamiliar repository. The reference index points to areas. An area's document names useful commands, files and local constraints.
+
+The setup skill reuses a suitable existing index. If none exists, it creates a small one. It adds an AREA file only where an index line is not enough.
+
+For widgets, a possible layout is:
+
+```text
+~/Work/widgets/docs/reference-index.md
+~/Work/widgets/src/export/AREA.md
+```
+
+That is an example layout, not a required source directory. Existing projects can keep their own documentation locations.
+
+AREA files stay short: at most 40 lines, with Commands, Key files, Non-obvious patterns and See also sections. They point to real files rather than duplicate the code.
+
+Planning reads the configured index and relevant areas. It carries useful paths into the plan's read-first list. Implementation uses that list and updates affected docs and area entries. Review follows affected pointers and checks paths in changed AREA files.
+
+For CSV export, this can lead the planner straight to the existing JSON exporter and its tests. It also gives later leaves an updated route to the new CSV code.
+
+## What init-issues adds to init
+
+The skill chooses settings from the repository it inspects. The command writes and validates configuration.
+
+You get checks that use the project's actual tools, plus a map of the code. Calling the command alone does not perform that investigation. Its default grounding setting can be none.
 
 Previous: [Install](install.md) · Next: [Create](create.md) · [Home](../../README.md)

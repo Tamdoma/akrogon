@@ -1,53 +1,96 @@
 # State
 
-`state.yaml` is the leaf's truth. You write the first lines when you create it. Akrogon writes the rest. And — small tangent, because I learned this the hard way — you can edit it by hand when nothing's running, but you move phases with the command, not the editor. The command resets bookkeeping; the editor doesn't.
+The state file tells Akrogon what should happen next. It is separate from the code in the leaf's worktree.
 
 ## What it looks like
 
-Here's `export-csv` in `widgets`, at `issues/open/export-csv/export-csv/state.yaml`. I trimmed the noisy bits so you can see the shape:
+A new CSV export leaf can start with:
 
 ```yaml
 slug: export-csv
-phase: plan.synthesis
-created: 2026-09-11
+created: '2026-09-19'
 repo: widgets
+phase: plan.synthesis
 debate: 'no'
 blocked-by: []
-hand_built: false
-attempts: { A: 0, B: 1 }
-done: []
-fix_rounds: 0
-verdict: {}
-tab: w8:tE
-worktree: /home/me/widgets/issues/worktrees/export-csv
-pane: { A: w8:pN, B: w8:pP }
-prompted: { B: session-id }
+sources: []
 ```
 
-What it's: the leaf's memory. Why it exists: so dispatch, both seats, git, and you can all agree on what's next without anything running. How it works: `next` reads it before every dispatch, `phase` rewrites it on every move. The file that makes it so is the leaf's own `state.yaml`, validated against the schema in code.
+Save it here:
+
+```text
+~/Work/widgets/issues/open/export-csv/export-csv/state.yaml
+```
+
+The repo value must match the registration key in the machine configuration.
 
 ## The fields you'll actually touch
 
-- `slug`: unique across the repo. Lowercase and dashes. Becomes the branch name and the tab label. Ours is `export-csv`, shocking, I know.
-- `phase`: where it's. One of the nine phases you'll meet in [Phases](phases.md). It's the main signal, not the only one. `done` says which seats reported, `prompted` says which session got the prompt, panes say what's alive, `hand_built` says skip me, `blocked-by` says wait. All of those steer `next`.
-- `debate`: `yes` means both seats write a plan alone, reply once, then B synthesises. `no` means B just plans. Start phase is `plan.positions` for yes, `plan.synthesis` for no. For `export-csv` we use `no` — it's small, debate would be theatre.
-- `blocked-by`: leaf slugs. The leaf can't start until every one is `merged`. This is the only ordering rule. It's checked before every dispatch, not just once at start, so editing it actually matters.
-- `hand_built`: set `true` to drive it yourself. `next` skips it completely. Useful for the first leaf in a new repo, before you trust the loop there.
+- **repo** identifies the registered repository.
+- **phase** selects the lifecycle step. Use the phase command for changes.
+- **blocked-by** lists prerequisite leaf slugs.
+- **hand_built** keeps a leaf out of automatic dispatch.
 
-Old files sometimes have `priority` or `slot` lines. The command ignores them now. Priority never steers order; order is `blocked-by` plus folder scan. Don't add them to new leaves.
+For example, a download-button leaf can wait for the export code:
+
+```yaml
+slug: download-button
+created: '2026-09-19'
+repo: widgets
+phase: plan.synthesis
+debate: 'no'
+blocked-by:
+  - export-csv
+sources: []
+```
+
+Use hand_built when you intend to handle the leaf yourself:
+
+```yaml
+slug: export-csv
+created: '2026-09-19'
+repo: widgets
+phase: plan.synthesis
+debate: 'no'
+blocked-by: []
+hand_built: true
+sources: []
+```
+
+That prevents later dispatch. It does not stop an agent already working.
 
 ## The fields Akrogon owns
 
-You can read these, don't hand-edit them mid-run:
+Akrogon records the worktree, Herdr tab, completed seats, review verdicts and prompt delivery attempts. It also records failure details.
 
-- `attempts`: consecutive failed deliveries per seat. Reset to 0 when a prompt actually lands. A permission dialog waiting for you doesn't count. A prompt that doesn't take counts one. At 3 the leaf fails loudly. So `B: 1` above means one delivery missed, not one prompt sent.
-- `done`: seats that reported this phase. When every required seat is in it, the phase moves. Until then `phase` prints `recorded` and waits.
-- `fix_rounds`: how many review-to-fix loops so far. Capped by repo config. Past the cap goes to `failed`.
-- `verdict`: what each reviewer said: `ready`, `nits`, or `fix`.
-- `tab`, `pane`, `worktree`, `prompted`: which Herdr tab and panes belong to this leaf, where the branch is checked out, which session got which prompt. If these look stale after a crash, `next` reconciles them; don't clean them by hand unless the tab's really gone.
+Leave those fields to the commands. Editing them by hand can make the file disagree with the running agents.
+
+A prompt delivery failure and a seat-declared blocker are different failures. Read the recorded reason before choosing a recovery.
 
 ## One concrete use
 
-You're staring at `export-csv` wondering why it won't start. You read `state.yaml`: `phase: plan.synthesis`, `blocked-by: [schema]`, `hand_built: false`. Then you check `schema`'s phase. If it's not `merged`, that's your answer — no seat, no logs, just the file. Or you run `akrogon next export-csv` and it prints the reason. Either way, the file told you first.
+Check the leaf before changing it:
+
+```sh
+cd ~/Work/widgets
+akrogon status export-csv
+```
+
+If a failed leaf is ready to continue, choose the appropriate active phase:
+
+```sh
+akrogon phase export-csv implement
+akrogon next export-csv
+```
+
+A failed leaf can resume at any active phase. It does not have to return to the phase where it stopped. Choose based on the work already completed. See [Phases](phases.md).
+
+## Why the record survives a conversation
+
+The state and artifacts live in files. A later pass can read the brief, plan, implementation report and reviews even when an earlier conversation has ended.
+
+This supports resuming unfinished work. It is not a full process checkpoint. The seat still needs to inspect the current diff and any Git operation in progress.
+
+For CSV export, a failed merge may leave valid code and a useful review behind. Recovery should preserve that work and finish the missing step, rather than start the feature again.
 
 Previous: [Parts](parts.md) · Next: [Install](install.md) · [Home](../../README.md)

@@ -1,33 +1,73 @@
 # Merge
 
-How work lands, and how the team hears about it. A merges, then A tells everyone. One actor, end to end. I like that — no handoff to lose the plot.
+Seat A merges reviewed work. It fetches the configured remote, rebases onto the default branch and runs the configured checks.
 
-What it's: the merge phase plus the broadcast. Why it exists: reviewed code still needs to land cleanly on main and the team still needs to know. How it works: the merge-issue skill in seat A, in the leaf worktree, finishing with akrogon phase merged. The files that make it so are the branch itself and review-A.md where A records what happened.
+For CSV export, those checks should cover quoting, empty input and the existing JSON export.
 
-A doesn't merge into your checkout. It fetches, rebases the leaf branch on origin/main, runs every check, and pushes the branch as the new main fast-forward only. If two leaves finish at once, git rejects the second push, A fetches, rebases again and retries. If the rebase conflicts, A resolves it, records it in review-A.md and reruns the checks; only a red check goes to check.fix, and the repair is re-reviewed. Other push errors are reported with cause, not retried as competing merges.
+The push must be fast-forward. If another leaf lands first, A fetches, rebases and checks again. It does not force-push over the other change.
 
-After the push, A runs akrogon phase export-csv merged --slot A. If that was the last leaf of the issue, the command prints issue complete, moves the folder to issues/closed/, and closes any linked GitHub issues. A then sends the broadcast itself, in the same session, and closes its own tab as its very last act. The worktree and branch wait for the next hand-typed next or startup sweep to be removed.
+If rebase conflicts occur, A resolves them and records evidence of what changed. If checks fail, the leaf returns to repair. Other push errors are reported with their cause.
 
-Concrete use: export-csv passed review with nits. A rebases export-csv onto origin/main, runs format, test, typecheck, pushes. Push succeeds. A runs phase merged, sees issue complete, sends the broadcast below, closes the tab. You run akrogon sync in ~/Work/widgets to pull the issue files closed. Done. The feature is on main.
+After confirming that the push landed, A records completion:
+
+```sh
+akrogon phase export-csv merged --slot A
+```
+
+Do not run that command just to make a blocked leaf disappear. It means the code has landed.
+
+When all leaves in an issue are merged, the command can report:
+
+```text
+issue complete
+```
+
+Completed records move to the closed store. An issue inside an epic waits for the whole epic before the top-level folder moves.
+
+The merge seat closes its tab as its last action. A manual repository sweep or startup cleanup removes completed worktrees and branches:
+
+```sh
+cd ~/Work/widgets
+akrogon next
+```
 
 ## The broadcast
 
-One message per issue, not per leaf. Two sections: before, now. Written for every team member, not just developers. No jargon, no file names, no command names. The repo name always comes first in the title. Split into several Discord posts at section boundaries if long — 2000 chars per message max — never shortened to fit.
+If Discord targets are configured, the merge seat sends a completion update when the issue completes. It sends the update itself, in the same session.
 
-For export-csv it might look like:
+The message describes the user-visible change. For our example:
 
-    widgets: Export widgets to CSV in one command (09/11/26)
+```text
+Before:
+- Exported data needed another conversion step for a spreadsheet.
 
-    Before
-    - Getting widget data out meant copy-pasting from the UI or writing a one-off script.
-    - Large lists were slow to move and easy to mess up.
+Now:
+- Users can export CSV directly.
+- Values containing commas and quotes stay in their fields.
+```
 
-    Now
-    - widgets export --format csv prints id,name,price rows to stdout with a header.
-    - The existing JSON export still works the same.
+That is an example, not a measured claim about your project. The actual message must match the completed briefs.
 
-Small issue, short bullets. A big issue gets more, parts merged when that reads better, no shipped outcome dropped. Targets are the names listed under broadcast.discord.webhook_env, values live only in ~/.config/akrogon/env. Only the merge slot sends, never a subagent or another model — the tab closes as soon as this pane goes idle after merged, so anything handed off could be cut short.
+Webhook variable names belong in repository configuration. Their values are read from:
 
-A failed broadcast is visible in the pane but doesn't reopen the issue. The merge is already done. Check the env file, send by hand with the sender script from the skill folder if you care. I've had one fail because I renamed the webhook var and forgot the env. The code was still merged. Just noisy.
+```text
+~/.config/akrogon/env
+```
+
+A failed broadcast does not reopen the issue or undo the merge. Read the reported delivery error before deciding what to resend.
+
+## merge-issue: check the version that will land
+
+Other leaves may merge while CSV export is in review. A rebase can change the code the checks need to exercise.
+
+The merge skill runs checks after integration with the current default branch. This gives you evidence for the version being pushed, including any conflict resolution.
+
+A successful merge ends the leaf's code work. Deployment remains your project's responsibility.
+
+## broadcast-issue: explain the completed outcome
+
+The broadcast skill turns completed briefs into a factual before-and-after update for configured Discord targets. It runs when the whole issue completes, not after every leaf.
+
+This gives people following the project a short account of what they can now do. It should report the actual outcome, not implementation jargon or benefits that were never measured.
 
 Previous: [gacp](gacp.md) · Next: [In practice](in-practice.md) · [Home](../../README.md)

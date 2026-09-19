@@ -1,61 +1,93 @@
 # In practice
 
-What you actually do, hour by hour, plus the questions that come up. This is the page I wish I had on day one. Read it with coffee. Prerequisites: installed, widgets set up, a leaf like export-csv exists. Which directory you're in: ~/Work/widgets for sync and targeted next, anywhere for status.
+Start with one small leaf. Watch it move through the phases before filling the queue.
+
+For CSV export, a small brief can cover formatting and tests without also redesigning the export screen.
 
 ## A working day
 
-Morning, start. Open Herdr. The plugin runs akrogon pull --all and akrogon next --all. Merged leaves from yesterday are cleaned up, new GitHub issues land in issues/seeds/, and every ready leaf starts up to the seat limit. If you would rather choose what starts, set max_active to 0 before opening Herdr, then raise it and run akrogon next <folder> yourself. I do this on Mondays when I want to pick the order.
+1. Check the board and read any failure causes.
+2. Chart new work if its requirements are still unclear.
+3. Start the leaves you want to run.
+4. Inspect progress when needed.
+5. Sync issue records after editing them.
 
-Bring your checkout up to date with the code that merged overnight:
+From the example repository:
 
-    akrogon sync
+```sh
+cd ~/Work/widgets
+akrogon status
+akrogon next export-csv
+akrogon status export-csv
+akrogon sync
+```
 
-Run that from the registered checkout, ~/Work/widgets for us. It commits your issue files, rebases, pushes. Quiet success.
+These are separate steps, not a script you need to repeat on a timer.
 
-Adding work, any time. In your own agent session, run /chart-issues. It imports pulled seeds, asks what it must, and writes the leaf. A small clear item like export-csv goes straight to handoff with the same files. Or write the two files by hand. Then akrogon sync or gacp. The next hook call, or akrogon next, picks it up.
+Keep work you do not want dispatched in the parked store:
 
-Watching, glance don't stare. From anywhere:
+```sh
+akrogon park export-csv
+```
 
-    akrogon status
-    akrogon status export-csv
-    akrogon status --charts
-    herdr plugin log list --plugin akrogon
-
-The first shows this repo open leaves, phase, age, blockers — every repo when run outside one, plus parked per repo. The second shows one leaf state and last ten log lines. The third shows every chart: taken and total forks, fog items, stage, age. The fourth shows why the hook did or did not act. Or read the tab — A left, B right. Or read the leaf folder: plan.md, review-A.md, review-B.md. I mostly read status and the reviews. Tabs are for when something smells off.
-
-Answering, when asked. An agent showing a startup dialog or permission prompt is blocked on a human. Answer it in the pane. The hook sees the status change and continues. No attempt is counted against the leaf. Blocked is free, stuck is not — more in [Limits](limits.md).
-
-A failed leaf shows a Herdr notification. Read review-A.md and the last paragraph of plan.md, fix the brief if the brief was the problem, then:
-
-    akrogon phase export-csv implement --slot B
-
-Or whichever phase it should resume from — failed can go to any active phase, not just implement. The command resets fix_rounds and attempts. Don't edit phase by hand to move forward; the command owns the bookkeeping.
-
-Evening, stop. Close Herdr, or just leave it. Every leaf phase is in its file. Nothing is lost. Tomorrow startup sweep resumes from the files. The last tab that merged closes itself. If one is still open, the startup sweep closes it. Run akrogon sync once more so the day issue files are on the remote.
+Parking is for unallocated work. It is not a way to interrupt a running agent.
 
 ## The questions that come up, answered
 
-I've one epic and one normal issue. Can they run in parallel? Yes, by default. Every ready leaf in every repo competes for the same seats. If the epic has three unblocked leaves and the global max_active is 3, the epic can take all three and the issue waits for the first merge. The tool doesn't balance between folders. It's first come, first served. I've learned to park the epic when I want the small thing first.
+**Do I have to keep sending prompts?**
 
-I only want this epic to use the free seats. Park everything, then unpark the one epic:
+Normally, Herdr events trigger dispatch as seats finish. A manual next pass can pick up eligible work. Failed leaves need recovery first.
 
-    akrogon park --all
-    akrogon unpark search
+**Can I leave it running?**
 
-Parked folders sit in issues/parked/ and no sweep touches them, not the hook and not startup next --all. When the epic is done, akrogon unpark --all brings the rest back. Running leaves can't be parked, so park before you start the day. To keep one leaf inside an epic from starting, give it a blocker or set hand_built true.
+You can, but an agent can still hit a permission prompt, lose its session or fail to deliver a result. Akrogon core has no timed watcher.
 
-I want to stop today and do it in a different order tomorrow. Nothing is remembered between runs except state.yaml. Edit the blocked-by lists of leaves that have not started. Add a slug to make one wait, remove a slug to free one. Then run next. Two limits: a leaf that already has a tab keeps its tab, but blockers still gate every dispatch — add a blocker to a running leaf and its next prompt never fires — and you can only name leaves, so to make issue 2 wait for a whole epic, name the epic last leaf.
+Claude Code has an optional watch skill:
 
-I want to run one leaf by hand. Set hand_built true. next skips it. Do the work yourself in a branch, and move its phase with the same akrogon phase commands the agents use. Useful for the first leaf of a new repo, before you trust the loop there. I did export-csv by hand first, then let the loop take export-json. Good way to learn.
+```text
+/watch-issues
+```
 
-I want to send a leaf back. Use akrogon phase <slug> <phase> to where it should resume, then akrogon next <slug>. The command resets done, verdict, prompted, attempts, and fix_rounds when leaving failed. Don't edit phase by hand — the file is truth, but the command keeps the truth consistent. Old advice said edit by hand. That was wrong and cost me a stuck leaf once.
+It checks the repository's open leaves on a 20-minute session cron. It can dispatch eligible work and recover failures when the evidence supports doing so. Human-only blockers are reported for you to resolve.
 
-I want to stop one running leaf. Close its tab. Nothing restarts it until the next next, and that will reopen a tab and re-prompt the current phase. If you want it to stay stopped, add a blocker or set hand_built true first. Closing alone is a pause, not a stop.
+The skill can also inspect suspected loops and intervene within its safety rules. Recovery is not a promise that every stuck leaf will finish.
 
-I want to pause everything. Set max_active to 0 in the global config. Leaves without a tab will not get new tabs. Leaves that already have tabs keep getting prompted for their current phase — 0 stops new starts, not in-flight prompts. To freeze harder, close tabs too. I pause this way when I need the machine quiet for a demo.
+This skill requires Claude Code's cron tools. It cannot run in pi or Codex just because installation linked it there. Stop it with:
 
-Two leaves touched the same lines. Nothing to do. A resolves the conflict in the merge, records it in review-A.md and reruns the checks; only a red check sends the leaf to check.fix, and the repair is re-reviewed.
+```text
+/watch-issues stop
+```
 
-A skill needs changing. Skills only change through akrogon leaves in the akrogon repo. File a seed there. Once merged, every agent on the machine sees the new text at its next prompt, because the skill folders are symlinks. Don't hand-edit the linked copies — edit the source via a leaf.
+**What if the leaf fails?**
+
+Read its recorded cause. Fix the underlying problem, choose an active phase and dispatch it again:
+
+```sh
+akrogon status export-csv
+akrogon phase export-csv implement
+akrogon next export-csv
+```
+
+Implementation is only an example recovery point. The correct phase depends on the work already done.
+
+**Can I lower the load while leaves are running?**
+
+Lower the global max_active limit to a positive number. Existing allocations keep progressing. The limit prevents new allocations once capacity is full.
+
+See [Limits](limits.md) before relying on a folder target or state edit to control running work.
+
+## watch-issues: an optional check while you are away
+
+The watch skill runs an initial check, then creates one session cron if work still needs watching. It expires after seven days.
+
+It reads state and uses Herdr to inspect busy seats. A long-running command alone is not enough to declare a loop. The skill looks for repeated failed actions, off-scope work or other concrete evidence.
+
+When justified, it can stop and redirect a seat once per watch. It confirms that the same session is idle with empty input before sending the correction. If that cannot be established, it reports the problem instead.
+
+For nonhuman failures, recovery also needs a usable seat and readable history. Two consecutive unproductive recovery cycles stop further recovery. Human prerequisites are notification-only.
+
+The watch stops when the readable open tree is empty, or when every remaining leaf is waiting on a human prerequisite that has been reported.
+
+You get occasional inspection and bounded intervention. This does not add a watcher to Akrogon core or remove the need to resolve human blockers.
 
 Previous: [Merge](merge.md) · Next: [Limits](limits.md) · [Home](../../README.md)
