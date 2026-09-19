@@ -12,7 +12,7 @@ export const failureSchema = z.strictObject({
   cause: z.enum(['blocked', 'attempts']),
   phase: phaseSchema,
   slot: slotSchema,
-  reason: z.string().min(1),
+  reason: z.string().trim().min(1),
   delivery: z.string().optional(),
 });
 

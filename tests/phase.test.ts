@@ -962,6 +962,20 @@ test('failed routing and reason misuse are guarded', async () => {
     const misuse: Result = await cli(f, ['phase', 'bad-reason', 'check.review', '--slot', 'B', '--reason', 'x']);
     expect(misuse.code).not.toBe(0);
     expect(misuse.stderr).toContain('--reason is only valid for failed');
+    const blankPath: string = leaf(f, 'blank-reason', 'implement');
+    const blankBefore: string = bytes(blankPath);
+    const blank: Result = await cli(f, ['phase', 'blank-reason', 'failed', '--reason', ' ']);
+    expect(blank.code).not.toBe(0);
+    expect(bytes(blankPath)).toBe(blankBefore);
+    const emptyPath: string = leaf(f, 'empty-reason', 'implement');
+    const emptyBefore: string = bytes(emptyPath);
+    const empty: Result = await cli(f, ['phase', 'empty-reason', 'failed', '--reason', '']);
+    expect(empty.code).not.toBe(0);
+    expect(bytes(emptyPath)).toBe(emptyBefore);
+    const paddedPath: string = leaf(f, 'padded-reason', 'implement');
+    const padded: Result = await cli(f, ['phase', 'padded-reason', 'failed', '--reason', '  real reason  ']);
+    expect(padded.code).toBe(0);
+    expect(readState(paddedPath).failure).toMatchObject({ reason: 'real reason' });
   } finally {
     f.clean();
   }

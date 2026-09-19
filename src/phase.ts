@@ -202,7 +202,7 @@ export async function phaseCommand(
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
   const verdict: Verdict | undefined = verdictSchema.optional().parse(rawVerdict);
-  const reason: string | undefined = z.string().min(1).optional().parse(rawReason);
+  const reason: string | undefined = z.string().trim().min(1).optional().parse(rawReason);
   const repo: Repo = await requireRepo(readGlobal(), process.cwd());
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);

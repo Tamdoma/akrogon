@@ -180,6 +180,12 @@ test('failure record round-trips and rejects unknown keys', async () => {
       failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'waiting', extra: true },
     });
     expect(() => readState(path)).toThrow(z.ZodError);
+    yaml(resolve(path, 'state.yaml'), {
+      ...canonical,
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: ' ' },
+    });
+    expect(() => readState(path)).toThrow(z.ZodError);
   } finally {
     f.clean();
   }
