@@ -15,3 +15,5 @@ None.
 - Framework AREA shorthand paths: not deletions, no change.
 - grounding.docs, surfaces, indexed_scopes: unread fields stay as they are; no new consumer.
 - Watchers, hooks or programs that edit docs: excluded by operator lock.
+
+Handed off 2026-09-19
