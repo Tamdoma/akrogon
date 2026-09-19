@@ -8,6 +8,19 @@ export function writeRepoConfig(root: string, config: RepoConfig): void {
   writeYaml(resolve(root, 'issues/config.yaml'), config);
 }
 
+function checkGrounding(root: string, config: RepoConfig): void {
+  if (config.grounding === 'none' || config.grounding.index === undefined) return;
+  const resolved: string = resolve(root, config.grounding.index);
+  const message: string = `Grounding index is not a readable non-empty file: ${resolved}. Complete setup with the init-issues skill.`;
+  let contents: string;
+  try {
+    contents = readFileSync(resolved, 'utf8');
+  } catch (error) {
+    throw new Error(message, { cause: error });
+  }
+  if (contents.trim() === '') throw new Error(message);
+}
+
 export async function initialize(
   cwd: string,
   proposal: string | undefined,
@@ -20,7 +33,7 @@ export async function initialize(
       ? Bun.YAML.parse(readFileSync(resolve(cwd, proposal), 'utf8'))
       : existsSync(repoPath)
         ? Bun.YAML.parse(readFileSync(repoPath, 'utf8'))
-        : {},
+        : { grounding: 'none' },
   );
   const global: GlobalConfig = readGlobal();
   const toolkitPair: RegExpMatchArray | null = toolkit === undefined ? null : toolkit.match(/^([^=\s]+)=(.+)$/);
@@ -28,6 +41,7 @@ export async function initialize(
   const repoName: string = basename(root);
   if (Object.hasOwn(global.repos, repoName) && resolve(globalHome(), global.repos[repoName]) !== root)
     throw new Error(`Repo name already registered: ${repoName}`);
+  checkGrounding(root, config);
   writeRepoConfig(root, config);
   mkdirSync(resolve(root, 'issues/open'), { recursive: true });
   mkdirSync(resolve(root, 'learnings'), { recursive: true });

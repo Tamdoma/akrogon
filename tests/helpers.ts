@@ -19,7 +19,7 @@ export async function fixture(): Promise<Fixture> {
   await command(['git', 'add', '.'], root);
   await command(['git', 'commit', '-m', 'initial'], root);
   await command(['git', 'update-ref', 'refs/remotes/origin/main', 'HEAD'], root);
-  yaml(resolve(root, 'issues/config.yaml'), { checks: { test: 'bun test' } });
+  yaml(resolve(root, 'issues/config.yaml'), { checks: { test: 'bun test' }, grounding: 'none' });
   yaml(resolve(home, 'config.yaml'), {
     slots: {
       a: { harness: 'fake', model: 'strong-a', effort: 'high' },

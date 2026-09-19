@@ -32,17 +32,15 @@ export const repoSchema = z.strictObject({
   implement: z.enum(['subagents', 'inline']).default('subagents'),
   checks: z.record(text, text).default({}),
   advisory: z.array(text).default([]),
-  grounding: z
-    .union([
-      z.literal('none'),
-      z.object({
-        index: text.optional(),
-        docs: z.array(text).optional(),
-        surfaces: z.array(text).optional(),
-        indexed_scopes: z.array(text).optional(),
-      }),
-    ])
-    .default('none'),
+  grounding: z.union([
+    z.literal('none'),
+    z.object({
+      index: text.optional(),
+      docs: z.array(text).optional(),
+      surfaces: z.array(text).optional(),
+      indexed_scopes: z.array(text).optional(),
+    }),
+  ]),
   broadcast: z.object({ discord: z.object({ webhook_env: z.array(text) }) }).optional(),
 });
 
@@ -120,7 +118,7 @@ export async function effectiveConfig(cwd: string): Promise<string> {
   const global: GlobalConfig = readGlobal();
   const repo: Repo | null = await currentRepo(global, cwd);
   const top: string | null = repo === null ? null : await command(['git', 'rev-parse', '--show-toplevel'], cwd);
-  const repoConfig: RepoConfig = repo === null ? repoSchema.parse({}) : repo.config;
+  const repoConfig: RepoConfig = repo === null ? repoSchema.parse({ grounding: 'none' }) : repo.config;
   return Bun.YAML.stringify(
     {
       ...global,

@@ -80,7 +80,7 @@ test('real same-slot and different-slot races record once and refuse stale moves
 test('review aggregates verdicts, rechecks only A, caps repairs and permits operator restart', async () => {
   const f: Fixture = await fixture();
   try {
-    yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1 });
+    yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1, grounding: 'none' });
     const path: string = leaf(f, 'repair', 'check.review');
     const herdr = fakeHerdr(f);
     expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'A'])).code).not.toBe(0);
@@ -227,7 +227,7 @@ test('failed log diagnostics report committed state without replay', async () =>
   const f: Fixture = await fixture();
   try {
     const path: string = leaf(f, 'diagnostic-error', 'plan.synthesis');
-    yaml(resolve(f.root, 'issues/config.yaml'), { default_branch: 'missing-base' });
+    yaml(resolve(f.root, 'issues/config.yaml'), { default_branch: 'missing-base', grounding: 'none' });
     const failed: Result = await cli(f, ['phase', 'diagnostic-error', 'implement']);
     expect(failed.code).not.toBe(0);
     expect(failed.stderr).toContain('implement');
@@ -238,7 +238,7 @@ test('failed log diagnostics report committed state without replay', async () =>
     expect(failed.stderr).toContain('Not a valid object name');
     expect(readState(path).phase).toBe('implement');
     const before: string = bytes(path);
-    yaml(resolve(f.root, 'issues/config.yaml'), {});
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none' });
     const retried: Result = await cli(f, ['phase', 'diagnostic-error', 'implement']);
     expect(retried.code).not.toBe(0);
     expect(retried.stderr).toContain('Illegal move');
@@ -883,7 +883,7 @@ test('stops land in failed immediately without phase advance and validate slots'
   const f: Fixture = await fixture();
   try {
     const herdr = fakeHerdr(f);
-    yaml(resolve(f.root, 'issues/config.yaml'), { rebuttal: true });
+    yaml(resolve(f.root, 'issues/config.yaml'), { rebuttal: true, grounding: 'none' });
     const truePath: string = leaf(f, 'pos-true', 'plan.positions');
     expect(
       (await cli(f, ['phase', 'pos-true', 'failed', '--slot', 'A', '--reason', 'x'], f.root, herdr.env)).stdout,
@@ -892,7 +892,7 @@ test('stops land in failed immediately without phase advance and validate slots'
       phase: 'failed',
       failure: { cause: 'blocked', phase: 'plan.positions', slot: 'A', reason: 'x' },
     });
-    yaml(resolve(f.root, 'issues/config.yaml'), { rebuttal: false });
+    yaml(resolve(f.root, 'issues/config.yaml'), { rebuttal: false, grounding: 'none' });
     const falsePath: string = leaf(f, 'pos-false', 'plan.positions');
     expect(
       (await cli(f, ['phase', 'pos-false', 'failed', '--slot', 'A', '--reason', 'x'], f.root, herdr.env)).stdout,
@@ -1037,7 +1037,7 @@ test('merge to merged clears busy fields', async () => {
 test('fix cap records attempts failure', async () => {
   const f: Fixture = await fixture();
   try {
-    yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1 });
+    yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1, grounding: 'none' });
     const path: string = leaf(f, 'cap', 'check.review', { fix_rounds: 1 });
     const herdr = fakeHerdr(f);
     const result: Result = await cli(

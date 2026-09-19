@@ -88,7 +88,7 @@ akrogon init --from /path/to/proposal.yaml
 akrogon config
 ```
 
-Initialization writes repository configuration, creates issue and lesson scaffolds, adds ignore entries and registers the repository. Repeating setup preserves existing choices unless you change them.
+Initialization writes repository configuration, creates issue and lesson scaffolds, adds ignore entries and registers the repository. Repeating setup preserves existing choices unless you change them. Init refuses a declared index that is not a readable non-empty file. A fresh repo needs an index or an explicit `grounding: none`.
 
 For a repository without tests, you can record a toolkit choice:
 

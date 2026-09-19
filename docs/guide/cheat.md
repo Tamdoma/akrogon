@@ -15,6 +15,8 @@ Set up a repository from an agent opened at its root:
 /init-issues
 ```
 
+Init refuses a declared index that is not a readable non-empty file. A fresh repo needs an index or an explicit `grounding: none`.
+
 Check the example repository:
 
 ```sh

@@ -57,7 +57,7 @@ Reuse a valid configured or discovered top index, or, when no suitable index exi
 
 For an area that cannot be explained in one index line, create an adjacent `AREA.md` and link it from the top index. Use `# <folder> area` and exactly four second-level sections: Commands, Key files, Non-obvious patterns and See also. Keep it at most 40 lines, with repository-relative paths to real files and no overview or exhaustive inventory.
 
-The top index and these needed area documents are the only direct skill-authored repo writes outside `issues/`.
+The top index and these needed area documents are the only direct skill-authored repo writes outside `issues/`. Propose `grounding: none` only when the operator chose it.
 
 ## Initialize and verify
 
@@ -74,7 +74,7 @@ rm -- "$proposal_file"
 
 The command owns both config files, repo registration, `issues/open`, the worktree/seeds/lock ignore entries and current `learnings/LESSONS.md` scaffolding, while the skill does not directly write configs, ignore rules, attributes, packages or scripts.
 
-Read command results and generated files to verify the proposal, registration, index links and preserved consumer manifest, run proposed checks with a real fixture or leaf base for `test_changed`, and remove the temporary proposal also on failure without parsing config YAML or calling `akrogon config` again in this pass.
+Read command results and generated files to verify the proposal, registration, index links and preserved consumer manifest, run proposed checks with a real fixture or leaf base for `test_changed`, and remove the temporary proposal also on failure without parsing config YAML or calling `akrogon config` again in this pass. Do not report setup complete until a top index exists whose rows link to real paths, AREA files exist where one row is not enough, and the proposal `grounding.index` names that index.
 
 Report failing commands as failures, including unresolved setup choices or verification, and print the observed result in the final two lines:
 

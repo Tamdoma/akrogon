@@ -22,7 +22,7 @@ Challenge fuzzy terms.
 Verify with a concrete scenario.
 Check the live surface.
 
-Read the configured `grounding.index` top file, relevant linked areas and `learnings/LESSONS.md` as resources, then preserve the useful paths as the plan's read-first list.
+Read the configured `grounding.index` top file, relevant linked areas and `learnings/LESSONS.md` as resources, then preserve the useful paths as the plan's read-first list. Find candidate docs in that index, its linked AREA files and README.
 
 A missing resource is reported as a gap, not invented content; lessons describe what happened, not rules to obey, and history is opened only to verify a cited lesson's evidence.
 
@@ -52,7 +52,7 @@ Finish with `akrogon phase <slug> plan.synthesis --slot <A|B>`, then print the f
 
 ## plan.synthesis
 
-As B, write `plan.md` under the `leaf=` folder with stable D1…Dn decisions, read-first paths, needed interfaces, ordered file/criterion checklist and concrete verification, integrating both positions and any configured rebuttals when debate ran, or directly using the brief/design when `debate: no`.
+As B, write `plan.md` under the `leaf=` folder with stable D1…Dn decisions, read-first paths, needed interfaces, ordered file/criterion checklist and concrete verification, integrating both positions and any configured rebuttals when debate ran, or directly using the brief/design when `debate: no`. The checklist names every affected agent and human doc one line each, or states in one line that no doc is affected.
 
 The synthesis resolves implementation choices without reopening locked scope; it contains acceptance criteria before implementation derives tests, preserves a real open limitation, and names a dependency only when execution actually requires ordering.
 

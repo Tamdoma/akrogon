@@ -91,6 +91,6 @@ For CSV export, this can lead the planner straight to the existing JSON exporter
 
 The skill chooses settings from the repository it inspects. The command writes and validates configuration.
 
-You get checks that use the project's actual tools, plus a map of the code. Calling the command alone does not perform that investigation. Its default grounding setting can be none.
+You get checks that use the project's actual tools, plus a map of the code. Calling the command alone does not perform that investigation. Init refuses a declared index that is not a readable non-empty file. A fresh repo needs an index or an explicit `grounding: none`.
 
 Previous: [Install](install.md) · Next: [Create](create.md) · [Home](../../README.md)

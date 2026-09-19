@@ -168,7 +168,7 @@ test('pull resolves supported origins, ignores merge remote, and targets the reg
   const f: Fixture = await fixture();
   try {
     const gh: GhFixture = fakeGh(f);
-    yaml(resolve(f.root, 'issues/config.yaml'), { remote: 'upstream' });
+    yaml(resolve(f.root, 'issues/config.yaml'), { remote: 'upstream', grounding: 'none' });
     await command(['git', 'remote', 'add', 'upstream', 'https://github.com/other/merge.git'], f.root);
     await command(['git', 'remote', 'add', 'origin', 'https://github.com/acme/project'], f.root);
     const worktree: string = resolve(f.home, 'worktree');

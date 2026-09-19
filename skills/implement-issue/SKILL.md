@@ -24,7 +24,7 @@ Pass artifacts are written under the `leaf=` folder while code is read and edite
 
 Effective settings supply `implement`, `checks`, optional `advisory`, `AKROGON_BASE` and the repair cap; the command owns state/counters and dispatch, while a repeated pass finishes remaining work from the diff and artifacts, rerunning checks for changed code, missing evidence or a specific concern.
 
-The plan's read-first list supplies worker context; the index is opened only on a gap, and implement updates affected docs and area index entries before review, keeping affected `AREA.md` files at most 40 lines with exactly Commands, Key files, Non-obvious patterns and See also as second-level sections.
+The plan's read-first list supplies worker context and the index is opened only on a gap. Implement updates every doc the plan names plus any doc the diff makes stale before review, keeping affected `AREA.md` files at most 40 lines with exactly Commands, Key files, Non-obvious patterns and See also as second-level sections.
 
 A reusable lesson found during leaf work gets an active line naming mechanism/date/history path and a history file with case, evidence and learning; `learnings/LESSONS.md` is not pass input, and applying a lesson removes its active line and dates its history file without rewriting the historical case.
 

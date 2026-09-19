@@ -12,6 +12,7 @@ test('config combines defaults and repo values, reports none, and recalculates w
       implement: 'inline',
       remote: 'upstream',
       default_branch: 'trunk',
+      grounding: 'none',
     });
     const unset = await cli(f, ['config']);
     expect(unset.code).toBe(0);
@@ -21,6 +22,7 @@ test('config combines defaults and repo values, reports none, and recalculates w
       implement: 'inline',
       remote: 'upstream',
       default_branch: 'trunk',
+      grounding: 'none',
     });
     await command(['git', 'update-ref', 'refs/remotes/upstream/trunk', 'HEAD'], f.root);
     const config = await cli(f, ['config']);
@@ -32,7 +34,11 @@ test('config combines defaults and repo values, reports none, and recalculates w
       repo: 'repo',
       remote: 'upstream',
     });
-    expect(Bun.YAML.parse((await cli(f, ['config'], f.home)).stdout)).toMatchObject({ repo: 'none', fix_rounds: 3 });
+    expect(Bun.YAML.parse((await cli(f, ['config'], f.home)).stdout)).toMatchObject({
+      repo: 'none',
+      fix_rounds: 3,
+      grounding: 'none',
+    });
     const worktree: string = resolve(f.home, 'work');
     await command(['git', 'worktree', 'add', '-b', 'leaf', worktree], f.root);
     const first: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
@@ -47,9 +53,9 @@ test('config combines defaults and repo values, reports none, and recalculates w
     const second: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     expect(second).not.toBe(first);
     expect(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout)).toMatchObject({ AKROGON_BASE: second });
-    yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 0 });
+    yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 0, grounding: 'none' });
     expect((await cli(f, ['config'])).code).not.toBe(0);
-    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 2 });
+    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 2, grounding: 'none' });
     const badRepo = await cli(f, ['config']);
     expect(badRepo.code).not.toBe(0);
     expect(badRepo.stderr).toContain('max_active');
@@ -116,6 +122,20 @@ test('commonDirectory spawns git once per call and reports failures with cwd', a
     expect(failStderr).toContain(f.root);
     expect(failStderr).toContain('disk gone');
     expect(failStdout.trim()).toBe('');
+  } finally {
+    f.clean();
+  }
+});
+
+test('config requires explicit grounding', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { checks: { test: 'bun test' } });
+    expect((await cli(f, ['config'])).code).not.toBe(0);
+    yaml(resolve(f.root, 'issues/config.yaml'), { checks: { test: 'bun test' }, grounding: 'none' });
+    const result = await cli(f, ['config']);
+    expect(result.code).toBe(0);
+    expect(Bun.YAML.parse(result.stdout)).toMatchObject({ grounding: 'none' });
   } finally {
     f.clean();
   }

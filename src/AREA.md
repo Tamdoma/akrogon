@@ -10,6 +10,7 @@
 
 - `src/akrogon.ts` validates CLI arguments and dispatches commands.
 - `src/config.ts` defines config schemas and resolves registered repositories.
+- `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file.
 - `src/phase.ts` aggregates slot completion and enforces handoff guards.
 - `src/shell.ts` wraps subprocesses, retries, YAML writes and Herdr responses.
 
@@ -21,6 +22,7 @@
 - External command retries warn once, then preserve the last failure context.
 - Foreign leaves are summarized once per repo and excluded from capacity and dispatch.
 - Prompt delivery is one attempt per pass per seat; a timeout settles against the seat session file on the next pass.
+- Init refuses a declared grounding index that is not a readable non-empty file without changing files.
 
 ## See also
 

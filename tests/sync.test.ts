@@ -39,7 +39,11 @@ test('sync commits local changes, rebases on the remote and pushes', async () =>
 
 async function remoteFixture(worktreeRoot: string = 'issues/worktrees', branch: string = 'main'): Promise<Fixture> {
   const f: Fixture = await fixture();
-  yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: worktreeRoot, default_branch: branch });
+  yaml(resolve(f.root, 'issues/config.yaml'), {
+    worktree_root: worktreeRoot,
+    default_branch: branch,
+    grounding: 'none',
+  });
   if (branch !== 'main') await command(['git', 'branch', '-m', branch], f.root);
   await command(['git', 'add', 'issues/config.yaml'], f.root);
   await command(['git', 'commit', '-m', 'config'], f.root);

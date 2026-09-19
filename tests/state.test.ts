@@ -116,7 +116,7 @@ for (const area of ['open', 'closed']) {
     test(`allLeaves validates ${area} depth ${depth} before reading state`, async () => {
       const f: Fixture = await fixture();
       try {
-        const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({}) };
+        const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({ grounding: 'none' }) };
         const original: string = leaf(f, 'target', 'plan.synthesis');
         const path: string = resolve(f.root, 'issues', area, ...['owner', 'issue', 'nested', 'target'].slice(0, depth));
         mkdirSync(path, { recursive: true });
@@ -140,7 +140,7 @@ for (const owner of ['issue', 'epic/issue']) {
   test(`findLeaf identifies parked ${owner}/leaf without parsing its state`, async () => {
     const f: Fixture = await fixture();
     try {
-      const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({}) };
+      const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({ grounding: 'none' }) };
       const parked: string = resolve(f.root, 'issues/parked', owner, 'target');
       mkdirSync(parked, { recursive: true });
       writeFileSync(resolve(parked, 'state.yaml'), 'invalid: [');
@@ -199,7 +199,7 @@ test('failure record round-trips and rejects unknown keys', async () => {
 test('findLeaf ignores parked folders without state and unsupported nesting', async () => {
   const f: Fixture = await fixture();
   try {
-    const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({}) };
+    const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({ grounding: 'none' }) };
     mkdirSync(resolve(f.root, 'issues/parked/issue/empty'), { recursive: true });
     const nested: string = resolve(f.root, 'issues/parked/epic/issue/extra/deep');
     mkdirSync(nested, { recursive: true });

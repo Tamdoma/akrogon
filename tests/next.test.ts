@@ -664,7 +664,7 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     await command(['git', 'init', '--bare', remote]);
     await command(['git', 'remote', 'add', 'upstream', remote], f.root);
     await command(['git', 'push', 'upstream', 'HEAD:trunk'], f.root);
-    yaml(resolve(f.root, 'issues/config.yaml'), { remote: 'upstream', default_branch: 'trunk' });
+    yaml(resolve(f.root, 'issues/config.yaml'), { remote: 'upstream', default_branch: 'trunk', grounding: 'none' });
     const path: string = leaf(f, 'landed', 'plan.synthesis', {}, 'landing');
     expect((await next(f, ['landed'])).code).toBe(0);
     expect(readState(path).phase).toBe('plan.synthesis');
@@ -1364,7 +1364,7 @@ for (const moved of ['worktree root', 'repo root'] as const) {
       const root: string = moved === 'repo root' ? resolve(f.home, 'moved-repo') : f.root;
       const worktreeRoot: string = moved === 'worktree root' ? 'issues/new-worktrees' : 'issues/worktrees';
       if (moved === 'repo root') renameSync(f.root, root);
-      else yaml(resolve(root, 'issues/config.yaml'), { worktree_root: worktreeRoot });
+      else yaml(resolve(root, 'issues/config.yaml'), { worktree_root: worktreeRoot, grounding: 'none' });
       configure(f, { repos: { repo: root } });
       const relocated: DispatchFixture = { ...f, root };
       const path: string = resolve(root, 'issues/open/issue/relocated');

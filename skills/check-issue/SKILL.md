@@ -32,7 +32,9 @@ During initial review, both A and B work blind: do not contact or wait for the p
 
 As A, read your own `positions-A.md` and `rebuttal-A.md` first when debate produced them, then judge the whole initial diff against the plan's decisions, criteria, change list and checklist, the design's exclusions, the report and live contracts, following affected docs and index pointers and checking any lesson claim against its evidence.
 
-For each `AREA.md` in the reviewed diff, use one shell command to list the paths it names and whether they exist from the repository root. Record missing paths as a Fix with done-criterion evidence. Open no area file outside that diff and make no extra file reads for this check. For a deleted area file, review the deletion and affected index pointers against the plan without opening the removed file.
+For each `AREA.md` in the reviewed diff, use one shell command to list the paths it names and whether they exist from the repository root. Record missing paths as a Fix with done-criterion evidence. For a deleted area file, review the deletion and affected index pointers against the plan without opening the removed file.
+
+Start from the changed behavior and open the doc page describing it even when the page is unchanged. A wrong claim or a path that does not exist is a Fix. Otherwise write one line that no documented behavior changed.
 
 A's earlier arguments focus attention but are not additional acceptance criteria; missing debate artifacts on a `debate: no` leaf are expected, and `learnings/LESSONS.md` is not review input.
 
