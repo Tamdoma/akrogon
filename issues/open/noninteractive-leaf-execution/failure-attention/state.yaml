@@ -1,0 +1,7 @@
+slug: failure-attention
+phase: plan.synthesis
+created: '2026-09-19'
+repo: akrogon
+debate: 'no'
+blocked-by: [failed-with-cause]
+sources: ['Tamdoma/akrogon#19', 'Tamdoma/akrogon#20']

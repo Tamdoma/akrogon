@@ -1,0 +1,30 @@
+slug: failed-with-cause
+phase: plan.synthesis
+created: 2026-09-19
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#19"
+  - "Tamdoma/akrogon#20"
+failed_notified: false
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+pane: 
+  {}
+prompted: 
+  {}
+prompted_at: 
+  {}
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/failed-with-cause
