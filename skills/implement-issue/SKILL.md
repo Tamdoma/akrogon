@@ -28,6 +28,8 @@ The plan's read-first list supplies worker context; the index is opened only on 
 
 A reusable lesson found during leaf work gets an active line naming mechanism/date/history path and a history file with case, evidence and learning; `learnings/LESSONS.md` is not pass input, and applying a lesson removes its active line and dates its history file without rewriting the historical case.
 
+The B seat proceeds without posing questions or holding the pass open, deciding from the plan, the design, and the worktree alone. When a step physically requires the operator (a permission B cannot grant, an env value B cannot obtain), B writes the blocker and the exact operator action into its current pass artifact, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot B`, and ends the pass.
+
 ## implement
 
 Before coding, when an implementation-only constraint is missing from `plan.md` under the `leaf=` folder, append one dated `## Implementation notes` section naming each constraint and the decision it refines; a locked decision is never changed there, and a conflict with one is a mismatch recorded for review. Then implement the plan's checklist in order yourself when config says `inline`, otherwise write one sub-brief per unit from the template, one unit included, and delegate each to a subagent sequentially in this worktree using the worker protocol.
@@ -36,7 +38,7 @@ Inline has no worker, sub-briefs or mismatch returns; both modes run the resolve
 
 Derive meaningful tests from acceptance criteria before code, demonstrate red then green and a fail-first test for a bug, with no test needed for a trivial one-liner.
 
-A credential still absent from `.env` at implement is never requested as a pasted value: tell the operator to add the named variable to `.env` and wait, and only when the operator says to proceed without it record the affected criterion as unverified.
+A credential still absent from `.env` at implement is never requested as a pasted value: B records the missing variable in `<leaf>/implementation/report.md` as a human-only blocker with the `add <VAR> to .env` action, what the value is, and where the operator obtains it, then runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see implementation/report.md>" --slot B` and ends the pass.
 
 After the last implementation unit, run the full suite once as B and every other blocking check, repair any failure by the protocol (yourself in inline mode), then commit the code on the leaf branch and write `<leaf>/implementation/report.md` with changed files and reasons, commands run with pasted results and artifact paths, the base and committed head, known limitations and unverified criteria, folding worker returns into it, before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
 
@@ -56,7 +58,7 @@ Run the affected changed tests and required checks, update affected docs/index l
 
 Use the prompt as the task, plan briefly in `implementation/brief.md`, derive changed-test commands from the checkout, delegate through the same template/protocol, check the report and changed-test evidence, and repair yourself before returning.
 
-Standalone has no config or leaf reads, lifecycle state/log writes, phase call or checker; its template and protocol are entirely skill-local, and its footer reports completion or the concrete unresolved task limitation.
+Standalone has no config or leaf reads, lifecycle state/log writes, phase call or checker; its template and protocol are entirely skill-local, and its footer reports completion or the concrete unresolved task limitation. Standalone takes the prompt and the checkout as its full input and sends no questions back.
 
 ## Printed footer
 

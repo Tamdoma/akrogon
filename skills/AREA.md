@@ -19,6 +19,7 @@
 - Leaf artifacts go to the registered checkout, code to the leaf worktree.
 - Implementation mode selects inline work or sequential bounded workers.
 - Worker returns include changed-test evidence; B runs the final full suite.
+- Lifecycle seats send no questions and pause for nothing; a human-only blocker is recorded and the pass ends with `failed`.
 
 ## See also
 

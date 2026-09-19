@@ -22,6 +22,8 @@ Check the live surface.
 
 The command owns state, verdict aggregation, repair counts and dispatch; an existing review and unchanged diff are evidence to resume from, not a reason to repeat completed work.
 
+Each review seat reaches its verdict from the artifacts and the diff, posing no questions and leaving the pass unheld while undecided. When a step physically requires the operator (a permission the seat cannot grant, an env value it cannot obtain), the seat writes the blocker and the exact operator action into `review-<slot>.md` under the `leaf=` folder, runs `akrogon phase <slug> failed --reason "<blocker; see review-<slot>.md>" --slot <A|B>`, and ends the pass.
+
 ## check.review
 
 During initial review, both A and B work blind: do not contact or wait for the peer, or read the peer's current review. Record unresolved questions as findings in your own `review-<slot>.md` under the `leaf=` folder and account for them in your verdict under the Fix/Nit rules below. Uncertainty alone is not a Fix.

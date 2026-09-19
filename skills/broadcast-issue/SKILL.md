@@ -11,7 +11,7 @@ This is the merge slot's own terminal task after `issue complete`, never delegat
 
 ## Context and message
 
-Read the issue's supplied briefs and completion evidence plus `akrogon config` in the supplied repo worktree, taking target names from `broadcast.discord.webhook_env` without reading YAML.
+Read the issue's supplied briefs and completion evidence plus `akrogon config` in the supplied repo worktree, taking target names from `broadcast.discord.webhook_env` without reading YAML. The sender works from supplied context alone and directs no questions elsewhere.
 
 Ground in docs first.
 Challenge fuzzy terms.

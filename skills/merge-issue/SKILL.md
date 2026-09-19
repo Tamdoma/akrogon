@@ -22,6 +22,8 @@ Check the live surface.
 
 The command owns state, repair counts and dispatch; a resumed merge inspects the existing rebase, diff and remote ancestry to complete remaining work.
 
+The merge seat completes the pass from its own reads and commands, requesting nothing and stalling for nothing. When a step physically requires the operator (a permission A cannot grant, an env value A cannot obtain), A writes the blocker and the exact operator action into `review-A.md` under the `leaf=` folder, runs `akrogon phase <slug> failed --reason "<blocker; see review-A.md>" --slot A`, and ends the pass. This stop covers only blockers only the operator can clear; rebase conflicts, red checks, and push handling below are unchanged.
+
 ## merge
 
 Turn a Nit A still holds and finds reusable into one line naming mechanism/date/history in the registered checkout's `learnings/LESSONS.md` and a history file with case, evidence and learning, left for the operator to commit, without reading the active list as pass input or adding another turn.
