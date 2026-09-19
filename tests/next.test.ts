@@ -209,6 +209,7 @@ test('a stale prompt never re-prompts a busy or done seat, and three stale misse
       phase: 'plan.synthesis',
       slot: 'B',
       reason: 'attempts exhausted',
+      delivery: 'shown',
     });
     expect(database(f).prompts.every((p) => p.pane === b)).toBe(true);
   } finally {
@@ -290,43 +291,36 @@ test('next resumes interrupted tab creation, retries same slot twice and fails',
     expect(db.prompts.every((p) => p.text.includes('slot=B'))).toBe(true);
     expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8')).toContain('"to":"failed"');
     const before: number = calls(f).length;
+    const stateBefore: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
     expect((await next(f, ['retry'])).code).toBe(0);
     const notified: string[][] = calls(f)
       .slice(before)
       .filter((args) => args[0] === 'notification');
-    expect(notified).toHaveLength(1);
-    expect(notified[0].slice(0, 2)).toEqual(['notification', 'show']);
-    expect(notified[0][2]).toContain('repo');
-    expect(notified[0][2]).toContain('retry');
-    expect(readState(path).failed_notified).toBe(true);
+    expect(notified).toHaveLength(0);
+    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(stateBefore);
   } finally {
     f.clean();
   }
 }, 15000);
 
-test('failed delivery retries, deduplicates sweeps and resets after a phase transition', async () => {
+test('failed leaves never notify on dispatch', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const path: string = leaf(f, 'broken', 'failed');
-    expect(readState(path)).toMatchObject({ failed_notified: false, busy_since: {}, busy_notified: {} });
+    const path: string = leaf(f, 'broken', 'failed', {
+      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'x' },
+    });
+    expect(readState(path)).toMatchObject({ busy_since: {}, busy_notified: {} });
     saveDatabase(f, { ...database(f), failNotification: true });
-    const failed: Result = await next(f, ['broken']);
-    expect(failed.code).not.toBe(0);
-    expect(failed.stderr).toContain('fixture_notification_failed');
-    expect(failed.stderr).toContain('notification');
-    expect(failed.stderr).toContain('broken');
-    expect(readState(path).failed_notified).toBe(false);
-    saveDatabase(f, { ...database(f), failNotification: false });
+    const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
     for (let sweep: number = 0; sweep < 3; sweep++) expect((await next(f, ['broken'])).code).toBe(0);
-    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(2);
-    expect(readState(path).failed_notified).toBe(true);
+    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(0);
     expect(database(f)).toMatchObject({ prompts: [], starts: [], tabs: [], panes: [] });
     expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
-    expect((await cli(f, ['phase', 'broken', 'implement', '--slot', 'B'], f.root, f.env)).code).toBe(0);
-    expect(readState(path).failed_notified).toBe(false);
-    saveState(path, { ...readState(path), phase: 'failed' });
+    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
+    saveDatabase(f, { ...database(f), failNotification: false });
     expect((await next(f, ['broken'])).code).toBe(0);
-    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(3);
+    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(0);
+    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
   } finally {
     f.clean();
   }
@@ -1992,7 +1986,6 @@ test('a failed leaf with its tab still open does not count toward max_active', a
       failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'B', reason: 'capacity test' },
       busy_since: {},
       busy_notified: {},
-      failed_notified: true,
     });
     expect((await next(f, ['second'])).code).toBe(0);
     expect(
@@ -2019,7 +2012,6 @@ test('a failed leaf does not reserve capacity in the unreadable branch', async (
       failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'B', reason: 'capacity test' },
       busy_since: {},
       busy_notified: {},
-      failed_notified: true,
     });
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis', {}, 'bad-issue');
     writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
@@ -2055,7 +2047,6 @@ test('a failed leaf with a blocked pane is not seat-observed', async () => {
       failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'B', reason: 'stuck test' },
       busy_since: {},
       busy_notified: {},
-      failed_notified: true,
     });
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => (p.pane_id === b ? { ...p, agent_status: 'blocked' } : p)) });

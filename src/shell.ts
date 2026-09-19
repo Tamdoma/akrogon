@@ -90,6 +90,29 @@ export const workspaceSchema = z.object({ workspace_id: z.string(), label: z.str
 
 export type Workspace = z.infer<typeof workspaceSchema>;
 
+const herdrErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
+
+const retryableCodes: readonly string[] = [
+  'agent_prompt_stalled',
+  'agent_blocked',
+  'agent_not_ready',
+  'timeout',
+  'wait_timeout',
+  'agent_wait_timeout',
+];
+
+export function retryable(result: Result): boolean {
+  const parsed: unknown = (() => {
+    try {
+      return JSON.parse(result.stderr);
+    } catch {
+      return null;
+    }
+  })();
+  const response = herdrErrorSchema.safeParse(parsed);
+  return response.success && retryableCodes.includes(response.data.error.code);
+}
+
 export async function herdr<T>(args: string[], schema: z.ZodType<T>): Promise<T> {
   const argv: string[] = ['herdr', ...args];
   const cwd: string = process.cwd();

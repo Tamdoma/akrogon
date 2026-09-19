@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { resolve } from 'node:path';
 import { readFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { fixture, cli, leaf, yaml, fakeGh, type GhFixture, type Fixture } from './helpers';
+import { fixture, cli, leaf, yaml, fakeGh, fakeHerdr, type GhFixture, type Fixture } from './helpers';
 import { readState } from '../src/state';
 import { command, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
@@ -9,6 +9,15 @@ import { z } from 'zod';
 
 function bytes(path: string): string {
   return readFileSync(resolve(path, 'state.yaml'), 'utf8');
+}
+function herdrCalls(db: string): string[][] {
+  const callsPath: string = db + '.calls';
+  return existsSync(callsPath)
+    ? readFileSync(callsPath, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
+    : [];
 }
 test('valid phase transition rejects a mismatched repo key without changing state or history', async () => {
   const f: Fixture = await fixture();
@@ -34,7 +43,6 @@ test('real same-slot and different-slot races record once and refuse stale moves
   try {
     const stamp: string = '2026-09-11T12:00:00.000Z';
     const path: string = leaf(f, 'race', 'plan.positions', {
-      failed_notified: true,
       busy_since: { A: stamp },
       busy_notified: { A: stamp },
     });
@@ -50,7 +58,6 @@ test('real same-slot and different-slot races record once and refuse stale moves
     expect((await cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'B'])).code).toBe(0);
     expect(readState(path)).toMatchObject({
       phase: 'plan.rebuttal',
-      failed_notified: false,
       busy_since: { A: stamp },
       busy_notified: { A: stamp },
     });
@@ -75,6 +82,7 @@ test('review aggregates verdicts, rechecks only A, caps repairs and permits oper
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1 });
     const path: string = leaf(f, 'repair', 'check.review');
+    const herdr = fakeHerdr(f);
     expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'A'])).code).not.toBe(0);
     expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'A', '--verdict', 'nits'])).stdout).toBe('recorded');
     expect((await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'B', '--verdict', 'fix'])).stdout).toBe(
@@ -83,10 +91,10 @@ test('review aggregates verdicts, rechecks only A, caps repairs and permits oper
     expect(readState(path).fix_rounds).toBe(1);
     expect((await cli(f, ['phase', 'repair', 'check.review'])).code).toBe(0);
     expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'B', '--verdict', 'ready'])).code).not.toBe(0);
-    expect((await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'A', '--verdict', 'fix'])).stdout).toBe(
-      'moved failed',
-    );
-    expect((await cli(f, ['phase', 'repair', 'implement'])).code).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'A', '--verdict', 'fix'], f.root, herdr.env)).stdout,
+    ).toBe('moved failed');
+    expect((await cli(f, ['phase', 'repair', 'implement'], f.root, herdr.env)).code).toBe(0);
     expect(readState(path)).toMatchObject({ phase: 'implement', fix_rounds: 0 });
     const mergePath: string = leaf(f, 'conflict', 'merge');
     expect((await cli(f, ['phase', 'conflict', 'check.fix'])).code).toBe(0);
@@ -842,13 +850,15 @@ test('stop from implement on dirty worktree records blocked failure and clears b
       prompted: { B: 'sess' },
       prompted_at: { B: stamp },
     });
+    const herdr = fakeHerdr(f);
+    writeFileSync(herdr.db, JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'stop' }], serial: 0 }));
     writeFileSync(resolve(worktree, 'dirty'), 'x\n');
-    const result: Result = await cli(f, ['phase', 'stop', 'failed', '--reason', 'x']);
+    const result: Result = await cli(f, ['phase', 'stop', 'failed', '--reason', 'x'], f.root, herdr.env);
     expect(result.code).toBe(0);
     expect(result.stdout).toBe('moved failed');
     expect(readState(path)).toMatchObject({
       phase: 'failed',
-      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'x' },
+      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'x', delivery: 'shown' },
       busy_since: {},
       busy_notified: {},
       prompted: {},
@@ -857,6 +867,12 @@ test('stop from implement on dirty worktree records blocked failure and clears b
       worktree,
       pane: { B: 'pane-b' },
     });
+    expect(readState(path).failure?.delivery).toBe('shown');
+    const recorded: string[][] = herdrCalls(herdr.db);
+    expect(recorded.filter((c) => c[0] === 'notification')).toEqual([
+      ['notification', 'show', 'repo/stop failed', '--body', 'blocked: x', '--sound', 'request'],
+    ]);
+    expect(recorded.filter((c) => c[1] === 'rename')).toEqual([['tab', 'rename', 'tab-1', 'stop failed']]);
     expect(existsSync(resolve(worktree, 'dirty'))).toBe(true);
   } finally {
     f.clean();
@@ -866,37 +882,53 @@ test('stop from implement on dirty worktree records blocked failure and clears b
 test('stops land in failed immediately without phase advance and validate slots', async () => {
   const f: Fixture = await fixture();
   try {
+    const herdr = fakeHerdr(f);
     yaml(resolve(f.root, 'issues/config.yaml'), { rebuttal: true });
     const truePath: string = leaf(f, 'pos-true', 'plan.positions');
-    expect((await cli(f, ['phase', 'pos-true', 'failed', '--slot', 'A', '--reason', 'x'])).stdout).toBe('moved failed');
+    expect(
+      (await cli(f, ['phase', 'pos-true', 'failed', '--slot', 'A', '--reason', 'x'], f.root, herdr.env)).stdout,
+    ).toBe('moved failed');
     expect(readState(truePath)).toMatchObject({
       phase: 'failed',
       failure: { cause: 'blocked', phase: 'plan.positions', slot: 'A', reason: 'x' },
     });
     yaml(resolve(f.root, 'issues/config.yaml'), { rebuttal: false });
     const falsePath: string = leaf(f, 'pos-false', 'plan.positions');
-    expect((await cli(f, ['phase', 'pos-false', 'failed', '--slot', 'A', '--reason', 'x'])).stdout).toBe(
-      'moved failed',
-    );
+    expect(
+      (await cli(f, ['phase', 'pos-false', 'failed', '--slot', 'A', '--reason', 'x'], f.root, herdr.env)).stdout,
+    ).toBe('moved failed');
     expect(readState(falsePath).failure).toEqual({
       cause: 'blocked',
       phase: 'plan.positions',
       slot: 'A',
       reason: 'x',
+      delivery: 'shown',
     });
     const reviewPath: string = leaf(f, 'stop-review', 'check.review');
-    const review: Result = await cli(f, ['phase', 'stop-review', 'failed', '--slot', 'A', '--reason', 'x']);
+    const review: Result = await cli(
+      f,
+      ['phase', 'stop-review', 'failed', '--slot', 'A', '--reason', 'x'],
+      f.root,
+      herdr.env,
+    );
     expect(review.stdout).toBe('moved failed');
     expect(readState(reviewPath).failure).toEqual({
       cause: 'blocked',
       phase: 'check.review',
       slot: 'A',
       reason: 'x',
+      delivery: 'shown',
     });
     const mergePath: string = leaf(f, 'stop-merge', 'merge');
-    const merge: Result = await cli(f, ['phase', 'stop-merge', 'failed', '--reason', 'x']);
+    const merge: Result = await cli(f, ['phase', 'stop-merge', 'failed', '--reason', 'x'], f.root, herdr.env);
     expect(merge.stdout).toBe('moved failed');
-    expect(readState(mergePath).failure).toEqual({ cause: 'blocked', phase: 'merge', slot: 'A', reason: 'x' });
+    expect(readState(mergePath).failure).toEqual({
+      cause: 'blocked',
+      phase: 'merge',
+      slot: 'A',
+      reason: 'x',
+      delivery: 'shown',
+    });
     leaf(f, 'bad-slot', 'implement');
     const bad: Result = await cli(f, ['phase', 'bad-slot', 'failed', '--slot', 'A', '--reason', 'x']);
     expect(bad.code).not.toBe(0);
@@ -947,6 +979,7 @@ test('blocked restart skips clean check and removes failure while attempts resta
 test('failed routing and reason misuse are guarded', async () => {
   const f: Fixture = await fixture();
   try {
+    const herdr = fakeHerdr(f);
     const fixPath: string = leaf(f, 'to-fix', 'failed');
     expect((await cli(f, ['phase', 'to-fix', 'check.fix'])).stdout).toBe('moved check.fix');
     expect(readState(fixPath).phase).toBe('check.fix');
@@ -973,7 +1006,12 @@ test('failed routing and reason misuse are guarded', async () => {
     expect(empty.code).not.toBe(0);
     expect(bytes(emptyPath)).toBe(emptyBefore);
     const paddedPath: string = leaf(f, 'padded-reason', 'implement');
-    const padded: Result = await cli(f, ['phase', 'padded-reason', 'failed', '--reason', '  real reason  ']);
+    const padded: Result = await cli(
+      f,
+      ['phase', 'padded-reason', 'failed', '--reason', '  real reason  '],
+      f.root,
+      herdr.env,
+    );
     expect(padded.code).toBe(0);
     expect(readState(paddedPath).failure).toMatchObject({ reason: 'real reason' });
   } finally {
@@ -1001,13 +1039,20 @@ test('fix cap records attempts failure', async () => {
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1 });
     const path: string = leaf(f, 'cap', 'check.review', { fix_rounds: 1 });
-    const result: Result = await cli(f, ['phase', 'cap', 'check.fix', '--slot', 'A', '--verdict', 'fix']);
+    const herdr = fakeHerdr(f);
+    const result: Result = await cli(
+      f,
+      ['phase', 'cap', 'check.fix', '--slot', 'A', '--verdict', 'fix'],
+      f.root,
+      herdr.env,
+    );
     expect(result.stdout).toBe('moved failed');
     expect(readState(path).failure).toEqual({
       cause: 'attempts',
       phase: 'check.review',
       slot: 'A',
       reason: 'fix rounds exhausted',
+      delivery: 'shown',
     });
   } finally {
     f.clean();
@@ -1034,5 +1079,118 @@ test('failed restart refuses issue files on branch but allows move without workt
     expect(moved.stdout).toBe('moved implement');
   } finally {
     f.clean();
+  }
+});
+
+test('failed announce renames tabs, tolerates missing tabs, and retries herdr calls', async () => {
+  {
+    const f: Fixture = await fixture();
+    try {
+      const herdr = fakeHerdr(f);
+      writeFileSync(
+        herdr.db,
+        JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'back failed' }], serial: 0 }),
+      );
+      const path: string = leaf(f, 'back', 'failed', { tab: 'tab-1' });
+      const result: Result = await cli(f, ['phase', 'back', 'implement'], f.root, herdr.env);
+      expect(result.code).toBe(0);
+      expect(herdrCalls(herdr.db)).toEqual([['tab', 'rename', 'tab-1', 'back']]);
+      expect(readState(path).phase).toBe('implement');
+    } finally {
+      f.clean();
+    }
+  }
+  {
+    const f: Fixture = await fixture();
+    try {
+      const herdr = fakeHerdr(f);
+      writeFileSync(
+        herdr.db,
+        JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'back failed' }], serial: 0, failRename: true }),
+      );
+      const path: string = leaf(f, 'back', 'failed', { tab: 'tab-1' });
+      const result: Result = await cli(f, ['phase', 'back', 'implement'], f.root, herdr.env);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('timeout');
+      expect(readState(path).phase).toBe('implement');
+      expect(herdrCalls(herdr.db)).toEqual([
+        ['tab', 'rename', 'tab-1', 'back'],
+        ['tab', 'rename', 'tab-1', 'back'],
+      ]);
+    } finally {
+      f.clean();
+    }
+  }
+  {
+    const f: Fixture = await fixture();
+    try {
+      const herdr = fakeHerdr(f);
+      const path: string = leaf(f, 'notab', 'implement');
+      const result: Result = await cli(f, ['phase', 'notab', 'failed', '--reason', 'x'], f.root, herdr.env);
+      expect(result.code).toBe(0);
+      expect(herdrCalls(herdr.db)).toEqual([
+        ['notification', 'show', 'repo/notab failed', '--body', 'blocked: x', '--sound', 'request'],
+      ]);
+      expect(readState(path).failure?.delivery).toBe('shown');
+    } finally {
+      f.clean();
+    }
+  }
+  {
+    const f: Fixture = await fixture();
+    try {
+      const herdr = fakeHerdr(f);
+      writeFileSync(
+        herdr.db,
+        JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'oops' }], serial: 0, failNotification: true }),
+      );
+      const path: string = leaf(f, 'oops', 'implement', { tab: 'tab-1' });
+      const result: Result = await cli(f, ['phase', 'oops', 'failed', '--reason', 'x'], f.root, herdr.env);
+      expect(result.code).not.toBe(0);
+      const recorded: string[][] = herdrCalls(herdr.db);
+      expect(recorded.filter((c) => c[0] === 'notification')).toHaveLength(1);
+      expect(recorded).toContainEqual(['tab', 'rename', 'tab-1', 'oops failed']);
+      expect(readState(path)).toMatchObject({ phase: 'failed', failure: { delivery: 'error' } });
+      const db: { tabs: { label: string }[] } = JSON.parse(readFileSync(herdr.db, 'utf8'));
+      expect(db.tabs[0].label).toBe('oops failed');
+    } finally {
+      f.clean();
+    }
+  }
+  {
+    const f: Fixture = await fixture();
+    try {
+      const herdr = fakeHerdr(f);
+      writeFileSync(
+        herdr.db,
+        JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'oops' }], serial: 0, failRename: true }),
+      );
+      const path: string = leaf(f, 'oops', 'implement', { tab: 'tab-1' });
+      const result: Result = await cli(f, ['phase', 'oops', 'failed', '--reason', 'x'], f.root, herdr.env);
+      expect(result.code).not.toBe(0);
+      expect(readState(path)).toMatchObject({ phase: 'failed', failure: { delivery: 'shown' } });
+      const recorded: string[][] = herdrCalls(herdr.db);
+      expect(recorded.filter((c) => c[0] === 'notification')).toHaveLength(1);
+      expect(recorded.filter((c) => c[1] === 'rename')).toHaveLength(2);
+    } finally {
+      f.clean();
+    }
+  }
+  {
+    const f: Fixture = await fixture();
+    try {
+      const herdr = fakeHerdr(f);
+      writeFileSync(herdr.db, JSON.stringify({ panes: [], tabs: [], serial: 0, failNotificationOnce: true }));
+      const path: string = leaf(f, 'flaky', 'implement');
+      const result: Result = await cli(f, ['phase', 'flaky', 'failed', '--reason', 'x'], f.root, herdr.env);
+      expect(result.code).toBe(0);
+      expect(herdrCalls(herdr.db)).toEqual([
+        ['notification', 'show', 'repo/flaky failed', '--body', 'blocked: x', '--sound', 'request'],
+        ['notification', 'show', 'repo/flaky failed', '--body', 'blocked: x', '--sound', 'request'],
+      ]);
+      expect(readState(path).failure?.delivery).toBe('shown');
+    } finally {
+      f.clean();
+    }
   }
 });

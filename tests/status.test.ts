@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve, relative } from 'node:path';
-import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
+import { fixture, cli, leaf, yaml, fakeHerdr, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
 import { z } from 'zod';
 import { readState, saveState, stateSchema, type State } from '../src/state';
@@ -61,14 +61,6 @@ function snapshot(path: string): Record<string, string> {
     }),
   );
 }
-function fakeHerdr(f: Fixture): NodeJS.ProcessEnv {
-  const bin: string = resolve(f.home, 'bin');
-  mkdirSync(bin);
-  symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
-  const db: string = resolve(f.home, 'herdr.json');
-  writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0 }));
-  return { PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db };
-}
 
 test('overview reads multiple repos outside git, retains hierarchy and recorded fields without writes', async () => {
   const f: Fixture = await fixture();
@@ -105,7 +97,7 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
       event('broken', 'failed', 7),
       event('ordinary', 'failed', 0),
     ]);
-    const env: NodeJS.ProcessEnv = fakeHerdr(f);
+    const env: NodeJS.ProcessEnv = fakeHerdr(f).env;
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const otherBefore: Record<string, string> = snapshot(resolve(g.root, 'issues'));
     const result: Result = await cli(f, ['status'], f.home, env);
@@ -327,7 +319,7 @@ test('detail resolves authoritative closed state from a worktree, limits history
         event('selected', index % 2 === 0 ? 'implement' : 'merged', 20 - index, `record-${index}`),
       ).flatMap((line) => [line, event('other', 'merged', 0)]),
     );
-    const env: NodeJS.ProcessEnv = fakeHerdr(f);
+    const env: NodeJS.ProcessEnv = fakeHerdr(f).env;
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const inertBefore: Record<string, string> = snapshot(resolve(worktree, 'issues'));
     const result: Result = await cli(f, ['status', 'selected'], worktree, env);
@@ -374,7 +366,7 @@ test('busy durations appear in NOTE for every recorded seat without writes or he
       busy_since: { A: new Date(now - 2 * 60000).toISOString(), B: new Date(now + 60000).toISOString() },
     });
     leaf(f, 'empty', 'implement');
-    const env: NodeJS.ProcessEnv = fakeHerdr(f);
+    const env: NodeJS.ProcessEnv = fakeHerdr(f).env;
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const result: Result = await cli(f, ['status'], f.home, env);
     expect(result.code).toBe(0);

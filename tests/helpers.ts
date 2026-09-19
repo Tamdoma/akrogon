@@ -70,6 +70,16 @@ export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}
   return path;
 }
 
+export type HerdrFixture = { db: string; env: NodeJS.ProcessEnv };
+export function fakeHerdr(f: Fixture): HerdrFixture {
+  const bin: string = resolve(f.home, 'herdr-bin');
+  mkdirSync(bin);
+  symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
+  const db: string = resolve(f.home, 'herdr.json');
+  writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0 }));
+  return { db, env: { PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db } };
+}
+
 export type GhFixture = { db: string; env: NodeJS.ProcessEnv };
 export function fakeGh(f: Fixture): GhFixture {
   const bin: string = resolve(f.home, 'gh-bin');

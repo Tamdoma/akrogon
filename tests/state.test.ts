@@ -22,7 +22,7 @@ test('canonical states parse and save without retired fields and retain defaults
     expect(Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8'))).not.toHaveProperty('priority');
     expect(Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8'))).not.toHaveProperty('slot');
     const state: State = stateSchema.parse(canonical);
-    expect(state).toMatchObject({ attempts: { A: 0, B: 0 }, done: [], prompted: {}, failed_notified: false });
+    expect(state).toMatchObject({ attempts: { A: 0, B: 0 }, done: [], prompted: {} });
     saveState(path, state);
     expect(readState(path)).toEqual(state);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).not.toMatch(/^(priority|slot):/m);
@@ -31,14 +31,19 @@ test('canonical states parse and save without retired fields and retain defaults
   }
 });
 
-for (const legacy of [{ priority: 'n' }, { slot: 'B' }, { priority: 'h', slot: 'A' }]) {
+for (const legacy of [{ priority: 'n' }, { slot: 'B' }, { priority: 'h', slot: 'A' }, { failed_notified: true }]) {
   test(`strict schema rejects legacy keys ${Object.keys(legacy).join(', ')}`, () => {
     expect(() => stateSchema.parse({ ...canonical, ...legacy })).toThrow(z.ZodError);
   });
 }
 
 for (const area of ['open', 'closed', 'parked']) {
-  for (const legacy of [{ priority: null }, { slot: ['invalid'] }, { priority: { old: true }, slot: 42 }]) {
+  for (const legacy of [
+    { priority: null },
+    { slot: ['invalid'] },
+    { priority: { old: true }, slot: 42 },
+    { failed_notified: true },
+  ]) {
     test(`${area} lazily migrates ${Object.keys(legacy).join(', ')} regardless of legacy value type`, async () => {
       const f: Fixture = await fixture();
       try {
@@ -52,7 +57,6 @@ for (const area of ['open', 'closed', 'parked']) {
           ...canonical,
           sources: ['team/project#1'],
           hand_built: true,
-          failed_notified: true,
           busy_since: { A: '2026-09-10T10:00:00Z' },
           busy_notified: { A: '2026-09-10T10:00:00Z' },
           attempts: { A: 1, B: 2 },

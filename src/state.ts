@@ -30,7 +30,6 @@ export const stateSchema = z
     'blocked-by': z.array(z.string()),
     sources: z.array(z.string().regex(sourcePattern)).optional(),
     hand_built: z.boolean().optional(),
-    failed_notified: z.boolean().default(false),
     busy_since: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     busy_notified: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     attempts: counts.prefault({}),
@@ -60,7 +59,9 @@ export function readState(path: string): State {
   const parsed: ReturnType<typeof Bun.YAML.parse> = Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8'));
   return stateSchema.parse(
     parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? Object.fromEntries(Object.entries(parsed).filter(([key]) => key !== 'priority' && key !== 'slot'))
+      ? Object.fromEntries(
+          Object.entries(parsed).filter(([key]) => key !== 'priority' && key !== 'slot' && key !== 'failed_notified'),
+        )
       : parsed,
   );
 }

@@ -16,6 +16,8 @@ const databaseSchema = z.object({
   blockOnStart: z.boolean().default(false),
   failSplitOnce: z.boolean().default(false),
   failNotification: z.boolean().default(false),
+  failNotificationOnce: z.boolean().default(false),
+  failRename: z.boolean().default(false),
   prompts: z.array(z.object({ pane: z.string(), text: z.string() })).default([]),
   starts: z.array(z.array(z.string())).default([]),
 });
@@ -48,9 +50,17 @@ function pane(id: string): Pane {
   return found;
 }
 if (args[0] === 'notification' && args[1] === 'show') {
-  z.tuple([z.literal('notification'), z.literal('show'), z.string().min(1)]).parse(args);
+  z.string().min(1).parse(args[2]);
+  if (args.includes('--body') || args.includes('--sound')) {
+    flag('--body');
+    flag('--sound');
+  }
+  if (db.failNotificationOnce) {
+    db.failNotificationOnce = false;
+    failure('timeout');
+  }
   if (db.failNotification) failure('fixture_notification_failed');
-  result({});
+  result({ shown: true, reason: 'shown' });
 }
 if (args[0] === 'integration' && args[1] === 'install') {
   z.tuple([z.literal('integration'), z.literal('install'), z.string().min(1)]).parse(args);
@@ -131,5 +141,12 @@ if (args[0] === 'tab' && args[1] === 'close') {
   db.panes = db.panes.filter((p) => p.tab_id !== args[2]);
   db.tabs = db.tabs.filter((t) => t.tab_id !== args[2]);
   result({});
+}
+if (args[0] === 'tab' && args[1] === 'rename') {
+  const found: Tab | undefined = db.tabs.find((t) => t.tab_id === args[2]);
+  if (found === undefined) failure('tab_not_found');
+  if (db.failRename) failure('timeout');
+  found.label = args[3];
+  result({ tab: found });
 }
 throw new Error(`Unexpected fixture invocation: ${JSON.stringify(args)}`);

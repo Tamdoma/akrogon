@@ -29,6 +29,7 @@ import {
   run,
   CommandError,
   quote,
+  retryable,
   type Pane,
   type Tab,
   type Result,
@@ -344,29 +345,6 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   return allocated;
 }
 
-const herdrErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
-
-const retryableCodes: readonly string[] = [
-  'agent_prompt_stalled',
-  'agent_blocked',
-  'agent_not_ready',
-  'timeout',
-  'wait_timeout',
-  'agent_wait_timeout',
-];
-
-function retryable(result: Result): boolean {
-  const parsed: unknown = (() => {
-    try {
-      return JSON.parse(result.stderr);
-    } catch {
-      return null;
-    }
-  })();
-  const response = herdrErrorSchema.safeParse(parsed);
-  return response.success && retryableCodes.includes(response.data.error.code);
-}
-
 async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: Slot): Promise<void> {
   while (true) {
     const recorded: State = readState(leaf.path);
@@ -482,13 +460,7 @@ async function dispatchLeaf(
       await completeOwner(repo, { path: leaf.path, state }, false);
       return 'completed';
     }
-    if (state.phase === 'failed') {
-      if (!state.failed_notified) {
-        await command(['herdr', 'notification', 'show', `Failed leaf: ${repo.name}/${slug}`]);
-        saveState(leaf.path, { ...state, failed_notified: true });
-      }
-      return 'waiting';
-    }
+    if (state.phase === 'failed') return 'waiting';
     if (
       state.debate === 'yes' &&
       state.phase === 'plan.synthesis' &&

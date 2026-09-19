@@ -2,7 +2,17 @@ import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { readGlobal, requireRepo, target, globalHome, type Repo, within } from './config';
-import { readState, saveState, findLeaf, leavesUnder, withLock, type Failure, type State, type Leaf } from './state';
+import {
+  readState,
+  saveState,
+  findLeaf,
+  leavesUnder,
+  withLock,
+  failureSchema,
+  type Failure,
+  type State,
+  type Leaf,
+} from './state';
 import {
   phaseSchema,
   slotSchema,
@@ -13,9 +23,66 @@ import {
   type Slot,
   type Verdict,
 } from './routing';
-import { command } from './shell';
+import { command, herdr, retryable, CommandError } from './shell';
 import { logMove } from './log';
 import { closeSources } from './pull';
+
+async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
+  try {
+    return await herdr(args, schema);
+  } catch (error) {
+    if (!(error instanceof CommandError) || !retryable(error.result)) throw error;
+    console.warn(
+      JSON.stringify({
+        warning: 'herdr call failed, retrying',
+        slug,
+        command: ['herdr', ...args],
+        code: error.result.code,
+        stderr: error.result.stderr,
+      }),
+    );
+    return await herdr(args, schema);
+  }
+}
+
+async function announceFailed(repo: Repo, leaf: Leaf, state: State): Promise<State> {
+  const failure: Failure = failureSchema.parse(state.failure);
+  let lastError: unknown;
+  let delivery: string = 'error';
+  try {
+    const shown = await herdrCall(
+      [
+        'notification',
+        'show',
+        `${repo.name}/${state.slug} failed`,
+        '--body',
+        `${failure.cause}: ${failure.reason}`,
+        '--sound',
+        'request',
+      ],
+      z.object({ shown: z.boolean(), reason: z.string() }),
+      state.slug,
+    );
+    delivery = shown.reason;
+  } catch (error) {
+    lastError = error;
+  }
+  const announced: State = { ...state, failure: { ...failure, delivery } };
+  saveState(leaf.path, announced);
+  if (state.tab !== undefined) {
+    try {
+      await herdrCall(
+        ['tab', 'rename', state.tab, `${state.slug} failed`],
+        z.object({ tab: z.object({ label: z.string() }) }),
+        state.slug,
+      );
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError !== undefined) throw lastError;
+  return announced;
+}
 
 export async function commitMove(
   repo: Repo,
@@ -28,7 +95,6 @@ export async function commitMove(
   const after: State = {
     ...recorded,
     phase: to,
-    failed_notified: false,
     done: [],
     verdict: {},
     prompted: {},
@@ -47,17 +113,25 @@ export async function commitMove(
   saveState(leaf.path, after);
   console.log(`moved ${to}`);
   // The transition is committed even if diagnostic collection or append fails.
+  let announced: State = after;
   try {
+    if (to === 'failed') announced = await announceFailed(repo, leaf, after);
+    else if (recorded.phase === 'failed' && after.tab !== undefined)
+      await herdrCall(
+        ['tab', 'rename', after.tab, after.slug],
+        z.object({ tab: z.object({ label: z.string() }) }),
+        after.slug,
+      );
     if (to === 'merged') await completeOwner(repo, leaf, true);
   } finally {
     try {
-      await logMove(repo, recorded, after, slot);
+      await logMove(repo, recorded, announced, slot);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       throw new Error(`Move to ${to} is committed, but log append failed: ${error.message}`, { cause: error });
     }
   }
-  return after;
+  return announced;
 }
 
 export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): Promise<void> {
