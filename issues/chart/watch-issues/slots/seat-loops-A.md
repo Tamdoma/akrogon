@@ -1,0 +1,18 @@
+# Fork draft A · seat loops
+
+## Q1 · How does a fire decide a seat is looping or off-scope?
+A (recommended): lead judgment on every busy seat each fire: `herdr agent read <pane> --lines 80`, compared with the leaf brief. Named patterns: the same command or the same edit three or more times with the same result, three or more consecutive tool errors, an edit-undo cycle, work outside the brief's What. A finding is confirmed only when the next fire (20 min later) shows the same pattern still running, except an error streak with a fatal message, which is acted on at once. B: a mechanical counter in the pi extension (tool_call hook) that flags identical calls. Different repo, one more moving part, and it cannot see "off-scope".
+Research (practitioner): OpenHands stuck detector (docs.openhands.dev/sdk/guides/agent-stuck-detector, 2026-09-19): same action+observation 4+, same action+error 3+, monologue 3+, alternating pairs 6+; false positive on record: agents polling a long process with repeated sleeps were killed as loops (OpenHands #5355). Weave router, Brennan Lupyrypa, 2026-08-21, 275k requests/25.5k sessions: same-file thrash (5+ edits one path) 582 events, error streak (3+ failed calls) 161, byte-identical loops single digits. Changed: thresholds 3 and 5, the two-fire confirmation, and "waiting on a long process is not a loop".
+
+## Q2 · Once found, what moves it forward?
+A (recommended): steer the seat. `herdr agent prompt <pane> "<text>"` on a working pi seat is a steering message: pi delivers it after the current tool calls, before the next model call (pi docs usage.md:65-70, rpc.md:62). The text names the evidence, the brief's actual target, the one thing to do next, and the stop path (`akrogon phase <slug> failed --reason "..." --slot <S>`) if the seat cannot. This is what the operator does by hand. Weave's intervention is the same idea: a stronger model looks at the same context and does something different; here the lead writes the way out. B: interrupt with `esc` and re-prompt. Loses the turn in flight for no gain over A. C: fail the leaf and recover on a fresh seat. Discards the phase's work on first sight.
+Research: better-than-training, pi docs above; practitioner, Weave (escalation to a stronger model resolved both true loops on the first try).
+
+## Q3 · The next fire shows the same loop after a steer. Then what?
+A (recommended): interrupt with `esc`, record the stop with `akrogon phase <slug> failed --reason "seat <S> loop: <evidence>; steered at <time>" --slot <S>`, then the existing recovery rule (fresh seat, same phase, bounded by the two-cycle rule in the move log). B: notify only and leave it looping until morning.
+Pitfalls: `esc` aborts the seat's turn; a bash child of that turn is killed by pi's abort (bash.js:64-86). That is the one place the lock "never kill a working process" meets this fork: the process being killed belongs to a seat confirmed looping over two fires and steered once. Code Mode children loop inside the parent's exec call: a steer reaches the parent only when that call returns, so a child loop shows as a busy parent with an unchanged screen; the fire reads the parent screen and the steer waits. codex seats: steering semantics not verified; both slots are pi today (`akrogon config`), codex seats get notify-only.
+
+## Carries
+- Lock: never kill a working process (2026-09-19). This fork asks whether a seat confirmed looping twice and steered once still counts as working.
+- Lock: herdr only.
+- Related: `watch-policy.md` Q4 (recovery bound), `../../seat-prompt-delivery/` (a steer adds a user record to the seat session; that leaf matches the exact prompt text past the pre-send offset, so a steer cannot be mistaken for a delivery).

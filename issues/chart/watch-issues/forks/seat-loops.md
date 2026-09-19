@@ -1,0 +1,46 @@
+# Seat loops: detect, redirect, move forward
+
+## Question
+
+### Q1 · What counts as a seat looping or off-scope?
+Recommended A (both): lead judgment from a bounded pane read of every busy seat each fire, against the leaf brief. Evidence is either repeated completed action-and-result cycles with no new information (same command or same edit three or more times with the same result, three or more consecutive tool errors, an edit-undo cycle) or a concrete action that contradicts the brief's What. Three matching cycles are the cue to read the brief, not a verdict on their own. A quiet screen, busy age, a spinner or a seat waiting on a long command is never a loop. B: repeated cycles only; off-scope is notify-only.
+
+### Q2 · Once found, may the fire steer the seat without interrupting it?
+Recommended A (both): one corrective message through `herdr agent prompt <pane> "<text>"`. On a working pi seat this is a steering message, delivered after the current tool calls and before the next model call. The text names the evidence, the brief's actual target, the one next step, and the seat's own stop path (`akrogon phase <slug> failed --reason "..." --slot <S>`) if it cannot find a permitted resolution. Plain text, no slash commands, no credentials, no relaxed criteria, no new design decision. Verify on the next fire that the seat received it and changed behaviour. B: never send mid-turn; wait for idle or notify.
+
+### Q3 · The steer was consumed and the same loop continues. Then what?
+Precondition for either option (B rebuttal 2): the steer is visible in the seat's session as a user record and the pane shows new repeated actions after it; a queued or unconsumed steer is not a failed steer.
+A (A's option; it relaxes the no-kill lock, B rebuttal 3): interrupt with `esc`, record `akrogon phase <slug> failed --reason "seat <S> loop: <evidence>; steered at <time>" --slot <S>`, then the existing judged recovery on the same seat and session with the phase restarted (`next` re-prompts an existing pane, `src/next.ts:373-389`; no session replacement exists, B rebuttal 1). `esc` aborts the whole turn and kills its bash children, including a productive parallel tool call. Choosing A accepts that.
+B (B's recommendation): no `esc`, no second steer without new evidence; notify with the cause and leave the seat running; the steer text already asks the seat to declare `failed` itself when it has no permitted resolution, and only a quiescent leaf enters the existing recovery.
+
+### Carries
+- Lock: never kill a working process (operator 2026-09-19). Q3-A is an explicit exception to it, not a reinterpretation.
+- Lock: herdr only, no external programs.
+- `watch-policy.md` Q4: recovery bound from the move log; a steer produces no move, so steer dedup relies on the session context and pane evidence, and unknown history after compaction means no second steer.
+- `../../seat-prompt-delivery/`: a steer adds a user record to the seat session; that leaf matches the exact prompt text past the pre-send offset, so a steer cannot be mistaken for a delivery.
+
+## Findings
+- (both) Practitioner, OpenHands stuck detector (docs.openhands.dev/sdk/guides/agent-stuck-detector and software-agent-sdk stuck_detector.py:18,59-75,141-166,251-280, read 2026-09-19): same action+observation 4+, same action+error 3+, monologue 3+, alternating pairs 6+, within a bounded event window; a once-per-error-streak corrective nudge names the failed action and asks for a different approach. False positive on record: agents polling a long process with repeated sleeps were killed as loops (OpenHands #5355).
+- (A) Practitioner, Weave router, Brennan Lupyrypa 2026-08-21, 275k requests / 25.5k sessions in 30 days: same-file thrash (5+ edits to one path) 582 events, error streak (3+ failed calls) 161, byte-identical loops single digits; intervention was escalating the turn to a stronger model, which "looked at the same context and did something different on the first try" in both cases. Changed: the fire's steer is that stronger look.
+- (B) Practitioner, SWE-agent reference (swe-agent.com/latest/reference/agent/): consecutive timeout and total runtime limits with interruption; bounded recovery is importable, interruption is not under this lock.
+- (B, verified by A) Better-than-training: the seats' own extension already steers byte-identical loops at the source: `~/.pi/agent/extensions/tamdoma-pi-tweaks/index.ts:12-20,34-60` hashes tool name, input and content, and sends one steer per 40 results when 30 of the last 40 are re-reads. The watcher owns only the residual: semantic thrash, error streaks with changing text, and off-scope work.
+- (both) Better-than-training, pi docs `usage.md:65-70`, `rpc.md:62`, `sdk.md:224-234`; interactive submit uses steering while streaming (`dist/modes/interactive/interactive-mode.js:2530-2541`). herdr `agent prompt` types text and Enter into the foreground agent (`herdr-patched/src/app/api/agents.rs:62-110`), so on a working pi seat it becomes a steer; a herdr success response is not proof the model consumed it.
+- (B) `esc` in pi aborts the streaming run (`interactive-mode.js:2253-2258`) and bash abort kills the process tree (`bash.js:64-86`). `akrogon phase failed` changes bookkeeping, not the process.
+- (both) Code Mode children have no herdr pane (`tamdoma-subagents/child-session.ts:666-683`); a child loop shows as a busy parent, and a steer reaches the parent only when its exec call returns. A parent waiting on a child that never returns stays notify-only under the lock.
+- (B) Both harness seats are pi today (`akrogon config`); codex steering semantics unverified, codex seats notify-only.
+- (both) Measurement before handoff: one synthetic same-version test that a busy pi seat receives one plain correction at a safe boundary and no concurrent command is cancelled. Not run in this pass.
+
+## Taken
+2026-09-19 operator, verbatim: "1a - but this has to be applied to agents as well as subagents in all harnesses | 2 - explain it elid. It must be able to stop it and resteer it, without increasing the step count that is inside akrogon | 3a"
+
+Recorded:
+- Q1-A for every seat harness (pi, codex, claude) and for subagents. Detection is a pane read, harness-neutral. Code Mode children have no pane; they are judged through the parent's screen and corrected through the parent.
+- Q2 and Q3 merged by the operator's requirement: the watcher may stop and resteer a seat, and akrogon records nothing for it. Ladder per looping seat: (1) pi seat: one steering message while it works (`herdr agent prompt`, delivered before the next model call); other harnesses skip this step. (2) Steer consumed and the loop continues, or a non-pi seat: `herdr agent send-keys <pane> esc`, wait for idle, then one corrective prompt; same seat, same phase, no `akrogon phase`, no attempt, no state write. (3) Loop continues after that: notify with the evidence, nothing else. `esc` on a seat confirmed looping is the operator's explicit exception to the no-kill lock; it can cancel a parallel command in that turn, accepted.
+- Foreclosed: `phase failed` plus recovery for a loop (the seat keeps its phase), a second steer without new evidence, any akrogon field or move for steering, killing the agent process, closing panes.
+
+2026-09-19 operator, verbatim: "yes, but if it doesn't have to stop, then even better. The problem is that if something goes in loops or stalls somewhere, then it's better to stop. It's very difficult to steer it while it's working because the prompt that the user puts in always waits for the tool to finish and in some cases it won't finish. Challenge me if this is not correct." and "this is also not just for pi, but for all harnesses, but the agent should be smart enough to figure it out. I want this to be a very light mold, not something that is core, just something that helps me while I'm away. So we should not be over engineering. In any case. Only the simplest, most elegant solutions to get the work done."
+
+Recorded (final):
+- Correct: a mid-turn message waits for the current tool call; a hung tool never returns it. Default is stop then resteer; the agent may try a mid-turn steer first only when it sees the seat's tools completing.
+- Stop and resteer, all harnesses: `herdr agent send-keys <pane> esc`, `herdr agent wait <pane> --timeout 10000` (settled state), read the pane to confirm an idle seat with an empty input, then one corrective prompt naming the evidence, the brief's target and the next step (for a subagent loop, the child by name, so the parent corrects it with its own child controls). After `esc` the seat's status change fires the herdr plugin and akrogon's own pass re-prompts the seat's phase and charges an attempt (`src/next.ts:350-372`, B final check F4); that is the existing restart and the existing bound (three attempts fail the leaf, then the recovery rule). The watcher writes no akrogon state. Still looping on the next fire: notify, nothing else.
+- Light mold: no harness test matrix (B F2); the agent reads the pane after `esc` and refuses to prompt into a non-empty editor, a blocked dialog or a changed session, notifying instead (B F1). Subagent coverage is through the parent screen and the parent's controls; when the screen does not show the child's actions, notify (B F3).
