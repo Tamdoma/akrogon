@@ -72,11 +72,11 @@ export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}
 
 export type HerdrFixture = { db: string; env: NodeJS.ProcessEnv };
 export function fakeHerdr(f: Fixture): HerdrFixture {
-  const bin: string = resolve(f.home, 'herdr-bin');
+  const bin: string = resolve(f.home, 'bin');
   mkdirSync(bin);
   symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
   const db: string = resolve(f.home, 'herdr.json');
-  writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0 }));
+  writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, prompts: [], starts: [] }));
   return { db, env: { PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db } };
 }
 

@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSync, renameSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, entry, leaf, yaml, fakeGh, type GhFixture, type Fixture } from './helpers';
+import { fixture, cli, entry, leaf, yaml, fakeGh, fakeHerdr, type GhFixture, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
@@ -11,12 +11,7 @@ import { z } from 'zod';
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 async function dispatchFixture(): Promise<DispatchFixture> {
   const f: Fixture = await fixture();
-  const bin: string = resolve(f.home, 'bin');
-  mkdirSync(bin);
-  symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
-  const db: string = resolve(f.home, 'herdr.json');
-  writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, prompts: [], starts: [] }));
-  return { ...f, db, env: { PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db } };
+  return { ...f, ...fakeHerdr(f) };
 }
 function database(f: DispatchFixture): Database {
   return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
