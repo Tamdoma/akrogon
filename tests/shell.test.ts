@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, mkdirSync, symlinkSync, 
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fixture, type Fixture } from './helpers';
-import { CommandError, retryCommand, run, type Result } from '../src/shell';
+import { CommandError, herdrError, paneSchema, retryable, retryCommand, run, type Result } from '../src/shell';
 
 for (const firstFailure of [false, true]) {
   test(`deadline kills sleeping attempt after ${firstFailure ? 'one failure' : 'no failures'}`, async () => {
@@ -120,3 +120,56 @@ await assert.rejects(herdr(['invalid-command'], z.object({})), (error) => {
     }
   });
 }
+
+test('herdrError decodes structured stderr', () => {
+  expect(
+    herdrError({ code: 1, stdout: '', stderr: JSON.stringify({ error: { code: 'timeout', message: 'slow' } }) }),
+  ).toEqual({ code: 'timeout', message: 'slow' });
+});
+
+test('herdrError maps unstructured stderr to exit code', () => {
+  expect(herdrError({ code: 3, stdout: '', stderr: '  boom  \n' })).toEqual({ code: 'exit 3', message: 'boom' });
+  expect(herdrError({ code: 1, stdout: '', stderr: '{"error":{"code":1}}' })).toEqual({
+    code: 'exit 1',
+    message: '{"error":{"code":1}}',
+  });
+});
+
+test('herdrError truncates long stderr to 500 chars', () => {
+  const long: string = 'x'.repeat(600);
+  const decoded: { code: string; message: string } = herdrError({ code: 2, stdout: '', stderr: `  ${long}  ` });
+  expect(decoded.code).toBe('exit 2');
+  expect(decoded.message).toBe('x'.repeat(500));
+});
+
+test('retryable is false on non-JSON stderr without throwing', () => {
+  expect(retryable({ code: 1, stdout: '', stderr: 'plain failure' })).toBe(false);
+  expect(
+    retryable({
+      code: 1,
+      stdout: '',
+      stderr: JSON.stringify({ error: { code: 'timeout', message: 'm' } }),
+    }),
+  ).toBe(true);
+  expect(
+    retryable({
+      code: 1,
+      stdout: '',
+      stderr: JSON.stringify({ error: { code: 'tab_not_found', message: 'm' } }),
+    }),
+  ).toBe(false);
+});
+
+test('paneSchema requires kind when agent_session present', () => {
+  expect(() =>
+    paneSchema.parse({ pane_id: 'p', tab_id: 't', agent_status: 'idle', agent_session: { value: 's' } }),
+  ).toThrow();
+  expect(
+    paneSchema.parse({
+      pane_id: 'p',
+      tab_id: 't',
+      agent_status: 'idle',
+      agent_session: { kind: 'id', value: 's' },
+    }).agent_session,
+  ).toEqual({ kind: 'id', value: 's' });
+});

@@ -528,6 +528,44 @@ test('--charts derives stage from last terminal marker line', async () => {
   }
 });
 
+test('delivery errors surface as prompt tokens unless the seat is busy', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const err = (code: string) => ({
+      command: ['herdr', 'agent', 'prompt'],
+      code,
+      message: 'slow',
+      pane: 'p1',
+      session: 's1',
+      at: '2026-09-19T00:00:00.000Z',
+    });
+    const idle: string = leaf(f, 'prompt-idle', 'implement');
+    saveState(idle, { ...readState(idle), delivery_error: { A: err('timeout') } });
+    const busyAt: string = new Date(Date.now() - 60000).toISOString();
+    const mixed: string = leaf(f, 'prompt-mixed', 'implement', { busy_since: { B: busyAt } });
+    saveState(mixed, {
+      ...readState(mixed),
+      delivery_error: { A: err('timeout'), B: err('agent_not_ready') },
+    });
+    const hidden: string = leaf(f, 'prompt-hidden', 'implement', { busy_since: { A: busyAt } });
+    saveState(hidden, { ...readState(hidden), delivery_error: { A: err('timeout') } });
+    leaf(f, 'legacy-clean', 'implement');
+    const result: Result = await cli(f, ['status']);
+    expect(result.code).toBe(0);
+    expect(cell(result.stdout, leafRow(result.stdout, 'prompt-idle'), 'NOTE')).toContain('A prompt timeout');
+    const mixedNote: string = cell(result.stdout, leafRow(result.stdout, 'prompt-mixed'), 'NOTE');
+    expect(mixedNote).toContain('A prompt timeout');
+    expect(mixedNote).not.toContain('B prompt');
+    expect(mixedNote).toContain('busy B');
+    const hiddenNote: string = cell(result.stdout, leafRow(result.stdout, 'prompt-hidden'), 'NOTE');
+    expect(hiddenNote).not.toContain('prompt');
+    expect(hiddenNote).toContain('busy A');
+    expect(cell(result.stdout, leafRow(result.stdout, 'legacy-clean'), 'NOTE')).not.toContain('prompt');
+  } finally {
+    f.clean();
+  }
+});
+
 test('failed leaves show cause and reason in NOTE and terminal phases suppress busy', async () => {
   const f: Fixture = await fixture();
   try {

@@ -68,6 +68,7 @@ for (const area of ['open', 'closed', 'parked']) {
           pane: { A: 'pane-a', B: 'pane-b' },
           prompted: { B: 'session-b' },
           prompted_at: { B: '2026-09-10T10:00:00Z' },
+          delivery_error: {},
         };
         const file: string = resolve(path, 'state.yaml');
         yaml(file, { ...supported, ...legacy });
@@ -206,6 +207,42 @@ test('findLeaf ignores parked folders without state and unsupported nesting', as
     for (const slug of ['empty', 'deep']) {
       expect(() => findLeaf(repo, slug)).toThrow(new Error(`Missing leaf: ${slug}`));
     }
+  } finally {
+    f.clean();
+  }
+});
+
+test('delivery_error defaults to empty and accepts strict shape', () => {
+  expect(stateSchema.parse(canonical).delivery_error).toEqual({});
+  const error = {
+    command: ['herdr', 'agent', 'prompt'],
+    code: 'timeout',
+    message: 'slow',
+    pane: 'p1',
+    session: 's1',
+    at: '2026-09-19T00:00:00.000Z',
+  };
+  expect(stateSchema.parse({ ...canonical, delivery_error: { B: error } }).delivery_error).toEqual({ B: error });
+  expect(
+    stateSchema.parse({ ...canonical, delivery_error: { B: { ...error, session: null } } }).delivery_error,
+  ).toEqual({ B: { ...error, session: null } });
+  expect(
+    stateSchema.parse({ ...canonical, delivery_error: { A: { ...error, offset: 12 } } }).delivery_error?.A,
+  ).toMatchObject({ offset: 12 });
+  expect(() => stateSchema.parse({ ...canonical, delivery_error: { B: { ...error, extra: true } } })).toThrow(
+    z.ZodError,
+  );
+  expect(() => stateSchema.parse({ ...canonical, delivery_error: { B: { ...error, offset: -1 } } })).toThrow(
+    z.ZodError,
+  );
+});
+
+test('legacy state without delivery_error parses with empty default', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'legacy', 'implement');
+    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).not.toMatch(/^delivery_error:/m);
+    expect(readState(path).delivery_error).toEqual({});
   } finally {
     f.clean();
   }

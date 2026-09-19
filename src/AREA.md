@@ -20,6 +20,7 @@
 - Phase moves reject a dirty worktree and branch changes under `issues/`; a stop into `failed` skips both, a `cause: blocked` restart skips only the dirty check, and the empty-branch refusal applies only at review handoff.
 - External command retries warn once, then preserve the last failure context.
 - Foreign leaves are summarized once per repo and excluded from capacity and dispatch.
+- Prompt delivery is one attempt per pass per seat; a timeout settles against the seat session file on the next pass.
 
 ## See also
 

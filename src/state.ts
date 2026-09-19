@@ -18,6 +18,18 @@ export const failureSchema = z.strictObject({
 
 export type Failure = z.infer<typeof failureSchema>;
 
+export const deliveryErrorSchema = z.strictObject({
+  command: z.array(z.string()),
+  code: z.string(),
+  message: z.string(),
+  pane: z.string(),
+  session: z.string().nullable(),
+  at: z.string(),
+  offset: z.number().int().nonnegative().optional(),
+});
+
+export type DeliveryError = z.infer<typeof deliveryErrorSchema>;
+
 export const sourcePattern = /^([a-zA-Z0-9-]+\/(?!\.{1,2}#)[a-zA-Z0-9._-]+)#([1-9][0-9]*)$/;
 
 export const stateSchema = z
@@ -41,6 +53,7 @@ export const stateSchema = z
     pane: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
     prompted: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
     prompted_at: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
+    delivery_error: z.object({ A: deliveryErrorSchema.optional(), B: deliveryErrorSchema.optional() }).default({}),
     failure: failureSchema.optional(),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');

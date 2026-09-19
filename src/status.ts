@@ -11,7 +11,16 @@ import {
   type GlobalConfig,
   type Repo,
 } from './config';
-import { findLeaf, readState, stateSchema, RepoMismatchError, validateLeafDepth, type Leaf, type State } from './state';
+import {
+  findLeaf,
+  readState,
+  stateSchema,
+  RepoMismatchError,
+  validateLeafDepth,
+  type DeliveryError,
+  type Leaf,
+  type State,
+} from './state';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
 import { issueFolders } from './park';
 
@@ -100,11 +109,15 @@ function note(state: State, now: number): string {
   const verdicts: string[] = Object.entries(state.verdict).map(([slot, value]) => `${slot}:${value}`);
   const verdict: string[] = verdicts.length > 0 ? [`verdict ${verdicts.join(' ')}`] : [];
   const done: string[] = state.done.length > 0 ? [`done ${state.done.join(' ')}`] : [];
+  const prompt: string[] = (['A', 'B'] as const).flatMap((seat) => {
+    const err: DeliveryError | undefined = state.delivery_error[seat];
+    return err !== undefined && state.busy_since[seat] === undefined ? [`${seat} prompt ${err.code}`] : [];
+  });
   const failed: string[] =
     state.phase === 'failed'
       ? [state.failure === undefined ? 'failed' : `failed ${state.failure.cause} ${state.failure.reason}`]
       : [];
-  return [...failed, ...done, ...attempts, ...fixes, ...verdict, ...busy].join(' · ');
+  return [...failed, ...done, ...prompt, ...attempts, ...fixes, ...verdict, ...busy].join(' · ');
 }
 
 function cells(leaf: Leaf, log: LogRecord[], now: number, indent: string): string[] {

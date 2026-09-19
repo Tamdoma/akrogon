@@ -77,7 +77,10 @@ export const paneSchema = z.object({
   cwd: z.string().nullable().default(null),
   agent: z.string().nullable().default(null),
   agent_status: z.enum(['idle', 'done', 'working', 'blocked', 'unknown']),
-  agent_session: z.object({ value: z.string() }).nullable().optional(),
+  agent_session: z
+    .object({ kind: z.enum(['id', 'path']), value: z.string() })
+    .nullable()
+    .optional(),
 });
 
 export type Pane = z.infer<typeof paneSchema>;
@@ -101,16 +104,18 @@ const retryableCodes: readonly string[] = [
   'agent_wait_timeout',
 ];
 
+export function herdrError(result: Result): { code: string; message: string } {
+  try {
+    const response = herdrErrorSchema.safeParse(JSON.parse(result.stderr));
+    if (response.success) return response.data.error;
+  } catch {
+    // fall through to unstructured mapping
+  }
+  return { code: `exit ${result.code}`, message: result.stderr.trim().slice(0, 500) };
+}
+
 export function retryable(result: Result): boolean {
-  const parsed: unknown = (() => {
-    try {
-      return JSON.parse(result.stderr);
-    } catch {
-      return null;
-    }
-  })();
-  const response = herdrErrorSchema.safeParse(parsed);
-  return response.success && retryableCodes.includes(response.data.error.code);
+  return retryableCodes.includes(herdrError(result).code);
 }
 
 export async function herdr<T>(args: string[], schema: z.ZodType<T>): Promise<T> {

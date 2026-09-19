@@ -30,12 +30,14 @@ import {
   CommandError,
   quote,
   retryable,
+  herdrError,
   type Pane,
   type Tab,
   type Result,
   type Workspace,
 } from './shell';
 import { commitMove, completeOwner } from './phase';
+import { sessionFile, deliveredAfter } from './session-file';
 
 const hookEventSchema = z.discriminatedUnion('event', [
   z.object({
@@ -346,86 +348,148 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
 }
 
 async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: Slot): Promise<void> {
-  while (true) {
-    const recorded: State = readState(leaf.path);
-    if (recorded.phase !== leaf.state.phase || recorded.done.includes(slot)) return;
-    const pane: Pane = await currentPane(z.string().parse(recorded.pane[slot]));
-    const state: State = await observeBusy(leaf.path, recorded, slot, pane, Date.now());
-    if (pane.agent !== null && busy(pane)) return;
-    if (
-      pane.agent !== null &&
-      state.prompted[slot] !== undefined &&
-      pane.agent_session?.value === state.prompted[slot] &&
-      Date.now() - Date.parse(state.prompted_at[slot] ?? '') < PROMPT_GRACE_MS
-    )
-      return;
-    if (state.attempts[slot] >= 3) {
-      await commitMove(repo, leaf, state, 'failed', slot, {
+  async function recordDelivery(): Promise<void> {
+    const current: Pane = await currentPane(z.string().parse(readState(leaf.path).pane[slot]));
+    const observed: State = await observeBusy(leaf.path, readState(leaf.path), slot, current, Date.now());
+    saveState(leaf.path, {
+      ...observed,
+      prompted: { ...observed.prompted, [slot]: current.agent_session?.value },
+      prompted_at: { ...observed.prompted_at, [slot]: new Date().toISOString() },
+      delivery_error: { ...observed.delivery_error, [slot]: undefined },
+      attempts: { ...observed.attempts, [slot]: 0 },
+    });
+  }
+
+  async function recordFailure(
+    argv: string[],
+    error: { code: string; message: string },
+    pane: Pane,
+    offset: number | undefined,
+  ): Promise<void> {
+    const base: State = readState(leaf.path);
+    const next: State = {
+      ...base,
+      delivery_error: {
+        ...base.delivery_error,
+        [slot]: {
+          command: argv,
+          code: error.code,
+          message: error.message,
+          pane: pane.pane_id,
+          session: pane.agent_session?.value ?? null,
+          at: new Date().toISOString(),
+          ...(offset === undefined ? {} : { offset }),
+        },
+      },
+      attempts: { ...base.attempts, [slot]: base.attempts[slot] + 1 },
+    };
+    if (next.attempts[slot] >= 3) {
+      await commitMove(repo, leaf, next, 'failed', slot, {
         cause: 'attempts',
-        phase: state.phase,
+        phase: next.phase,
         slot,
-        reason: 'attempts exhausted',
+        reason: `prompt undelivered to seat ${slot} after 3 passes: ${error.code} ${error.message} (pane ${pane.pane_id}, session ${pane.agent_session?.value ?? null})`,
       });
+    } else {
+      saveState(leaf.path, next);
+    }
+  }
+
+  async function unreachable(error: { code: string; message: string }, pane: Pane): Promise<void> {
+    const current: State = readState(leaf.path);
+    await commitMove(repo, leaf, current, 'failed', slot, {
+      cause: 'attempts',
+      phase: current.phase,
+      slot,
+      reason: `seat ${slot} unreachable: ${error.code} ${error.message} (pane ${pane.pane_id})`,
+    });
+  }
+
+  const recorded: State = readState(leaf.path);
+  if (recorded.phase !== leaf.state.phase || recorded.done.includes(slot)) return;
+  const pane: Pane = await currentPane(z.string().parse(recorded.pane[slot]));
+  const state: State = await observeBusy(leaf.path, recorded, slot, pane, Date.now());
+  if (pane.agent !== null && busy(pane)) return;
+  if (
+    pane.agent !== null &&
+    state.prompted[slot] !== undefined &&
+    pane.agent_session?.value === state.prompted[slot] &&
+    Date.now() - Date.parse(state.prompted_at[slot] ?? '') < PROMPT_GRACE_MS
+  )
+    return;
+  const prompt: string = `${routing[state.phase].skill} ${state.slug} slot=${slot} phase=${state.phase} leaf=${leaf.path}`;
+  const pendingOffset: number | undefined = state.delivery_error[slot]?.offset;
+  if (pendingOffset !== undefined && pane.agent_session !== null && pane.agent_session !== undefined) {
+    const resettleFile: string | undefined = sessionFile(pane.agent_session, process.env.HOME ?? '');
+    if (resettleFile !== undefined && deliveredAfter(resettleFile, pendingOffset, prompt)) {
+      await recordDelivery();
       return;
     }
-    const attempt: State = { ...state, attempts: { ...state.attempts, [slot]: state.attempts[slot] + 1 } };
-    saveState(leaf.path, attempt);
-    if (pane.agent === null) {
-      const harness: { kind: string; args: string[] } = launch(global, slot);
-      const name: string = `akrogon-${createHash('sha256').update(pane.pane_id).digest('hex').slice(0, 24)}`;
-      const started: Result = await run([
-        'herdr',
-        'agent',
-        'start',
-        name,
-        '--kind',
-        harness.kind,
-        '--pane',
-        pane.pane_id,
-        '--timeout',
-        '30000',
-        '--',
-        ...harness.args,
-      ]);
-      if (started.code !== 0) {
-        if (!retryable(started)) throw new CommandError(['herdr', 'agent', 'start'], repo.root, started);
-        console.warn(JSON.stringify({ warning: 'agent start failed', slug: state.slug, slot, ...started }));
-        continue;
-      }
-    }
-    const ready: Pane = await currentPane(pane.pane_id);
-    await observeBusy(leaf.path, readState(leaf.path), slot, ready, Date.now());
-    if (!idle(ready)) return;
-    const prompt: string = `${routing[state.phase].skill} ${state.slug} slot=${slot} phase=${state.phase} leaf=${leaf.path}`;
-    const args: string[] = [
+  }
+  if (pane.agent === null) {
+    const harness: { kind: string; args: string[] } = launch(global, slot);
+    const name: string = `akrogon-${createHash('sha256').update(pane.pane_id).digest('hex').slice(0, 24)}`;
+    const startArgv: string[] = [
       'herdr',
       'agent',
-      'prompt',
-      ready.pane_id,
-      prompt,
-      '--wait',
-      '--until',
-      'working',
+      'start',
+      name,
+      '--kind',
+      harness.kind,
+      '--pane',
+      pane.pane_id,
       '--timeout',
-      '5000',
+      '30000',
+      '--',
+      ...harness.args,
     ];
-    const result: Result = await run(args);
-    if (result.code === 0) {
-      const prompted: Pane = await currentPane(ready.pane_id);
-      const observed: State = await observeBusy(leaf.path, readState(leaf.path), slot, prompted, Date.now());
-      const session: string | undefined = prompted.agent_session?.value;
-      saveState(leaf.path, {
-        ...observed,
-        prompted: { ...observed.prompted, [slot]: session },
-        prompted_at: { ...observed.prompted_at, [slot]: new Date().toISOString() },
-      });
+    const started: Result = await run(startArgv);
+    if (started.code !== 0) {
+      const error: { code: string; message: string } = herdrError(started);
+      if (retryable(started)) await recordFailure(startArgv, error, pane, undefined);
+      else await unreachable(error, pane);
       return;
     }
-    if (!retryable(result)) throw new CommandError(args, repo.root, result);
-    console.warn(
-      JSON.stringify({ warning: 'prompt failed', slug: state.slug, slot, attempt: attempt.attempts[slot], ...result }),
-    );
   }
+  const ready: Pane = await currentPane(pane.pane_id);
+  await observeBusy(leaf.path, readState(leaf.path), slot, ready, Date.now());
+  if (!idle(ready)) return;
+  let file: string | undefined;
+  let offset: number | undefined;
+  if (ready.agent_session !== null && ready.agent_session !== undefined) {
+    file = sessionFile(ready.agent_session, process.env.HOME ?? '');
+    if (file !== undefined) {
+      const found: ReturnType<typeof statSync> | undefined = statSync(file, { throwIfNoEntry: false });
+      if (found !== undefined && found.isFile()) offset = found.size;
+    }
+  }
+  const args: string[] = [
+    'herdr',
+    'agent',
+    'prompt',
+    ready.pane_id,
+    prompt,
+    '--wait',
+    '--until',
+    'working',
+    '--timeout',
+    '5000',
+  ];
+  const result: Result = await run(args);
+  if (result.code === 0) {
+    await recordDelivery();
+    return;
+  }
+  const error: { code: string; message: string } = herdrError(result);
+  if (error.code === 'timeout' && file !== undefined && offset !== undefined && deliveredAfter(file, offset, prompt)) {
+    await recordDelivery();
+    return;
+  }
+  if (retryable(result)) {
+    await recordFailure(args, error, ready, error.code === 'timeout' ? offset : undefined);
+    return;
+  }
+  await unreachable(error, ready);
 }
 
 async function dispatchLeaf(

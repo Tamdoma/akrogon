@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { resolve } from 'node:path';
 import { readFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fixture, cli, leaf, yaml, fakeGh, fakeHerdr, type GhFixture, type Fixture } from './helpers';
-import { readState } from '../src/state';
+import { readState, saveState } from '../src/state';
 import { command, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import { z } from 'zod';
@@ -1192,5 +1192,31 @@ test('failed announce renames tabs, tolerates missing tabs, and retries herdr ca
     } finally {
       f.clean();
     }
+  }
+});
+
+test('phase move clears delivery_error', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'clear-error', 'plan.synthesis');
+    saveState(path, {
+      ...readState(path),
+      delivery_error: {
+        B: {
+          command: ['herdr', 'agent', 'prompt'],
+          code: 'timeout',
+          message: 'slow',
+          pane: 'p1',
+          session: 's1',
+          at: '2026-09-19T00:00:00.000Z',
+        },
+      },
+    });
+    expect(readState(path).delivery_error).not.toEqual({});
+    const result: Result = await cli(f, ['phase', 'clear-error', 'implement', '--slot', 'B']);
+    expect(result.code).toBe(0);
+    expect(readState(path).delivery_error).toEqual({});
+  } finally {
+    f.clean();
   }
 });

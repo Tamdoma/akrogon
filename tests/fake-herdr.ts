@@ -3,6 +3,12 @@ import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { z } from 'zod';
 import { paneSchema, tabSchema, workspaceSchema, type Pane, type Tab } from '../src/shell';
 
+const scriptEntrySchema = z.object({
+  code: z.string().optional(),
+  message: z.string().optional(),
+  stderr: z.string().optional(),
+  append: z.string().optional(),
+});
 const databaseSchema = z.object({
   panes: z.array(paneSchema),
   tabs: z.array(tabSchema),
@@ -20,6 +26,8 @@ const databaseSchema = z.object({
   failRename: z.boolean().default(false),
   prompts: z.array(z.object({ pane: z.string(), text: z.string() })).default([]),
   starts: z.array(z.array(z.string())).default([]),
+  startScript: z.array(scriptEntrySchema).default([]),
+  promptScript: z.array(scriptEntrySchema).default([]),
 });
 export type Database = z.infer<typeof databaseSchema>;
 const path: string = z.string().parse(process.env.FAKE_HERDR);
@@ -38,6 +46,18 @@ function failure(code: string): never {
   save();
   console.error(JSON.stringify({ error: { code, message: 'fixture failure' } }));
   process.exit(1);
+}
+function scriptedFailure(entry: z.infer<typeof scriptEntrySchema> | undefined): void {
+  if (entry?.stderr !== undefined) {
+    save();
+    console.error(entry.stderr);
+    process.exit(1);
+  }
+  if (entry?.code !== undefined) {
+    save();
+    console.error(JSON.stringify({ error: { code: entry.code, message: entry.message ?? '' } }));
+    process.exit(1);
+  }
 }
 function flag(name: string): string {
   const index: number = args.indexOf(name);
@@ -121,9 +141,10 @@ if (args[0] === 'agent' && args[1] === 'start') {
     )
   )
     failure('agent_name_taken');
+  scriptedFailure(db.startScript.shift());
   target.agent = flag('--kind');
   target.agent_status = db.blockOnStart ? 'blocked' : 'idle';
-  target.agent_session = { value: `session-${++db.serial}` };
+  target.agent_session = { kind: 'id', value: `session-${++db.serial}` };
   db.starts.push(args);
   result({ agent: target });
 }
@@ -132,6 +153,11 @@ if (args[0] === 'agent' && args[1] === 'prompt') {
   if (!['idle', 'done'].includes(target.agent_status)) throw new Error('Prompt sent to non-idle fixture');
   if (flag('--until') !== 'working' || !args.includes('--wait') || flag('--timeout') !== '5000')
     throw new Error('Wrong prompt wait contract');
+  const scripted = db.promptScript.shift();
+  if (scripted?.append !== undefined && target.agent_session?.kind === 'path') {
+    appendFileSync(target.agent_session.value, scripted.append);
+  }
+  scriptedFailure(scripted);
   db.prompts.push({ pane: target.pane_id, text: args[3] });
   if (db.failPrompts) failure('agent_prompt_stalled');
   target.agent_status = 'working';
