@@ -10,21 +10,23 @@ sources:
   - "Tamdoma/akrogon#20"
 failed_notified: false
 busy_since: 
-  {}
+  B: 2026-09-19T07:13:54.212Z
 busy_notified: 
   {}
 attempts: 
   A: 0
-  B: 0
+  B: 1
 done: 
   []
 fix_rounds: 0
 verdict: 
   {}
-pane: 
-  {}
-prompted: 
-  {}
-prompted_at: 
-  {}
+tab: w8:t5Y
 worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/failed-with-cause
+pane: 
+  A: w8:pA0
+  B: w8:pB1
+prompted: 
+  B: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-failed-with-cause--/2026-09-19T07-13-51-128Z_01a0b883-a818-74ed-a4ac-29fec622ddb5.jsonl
+prompted_at: 
+  B: 2026-09-19T07:13:54.212Z

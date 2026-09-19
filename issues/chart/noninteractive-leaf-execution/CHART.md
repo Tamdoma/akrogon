@@ -6,7 +6,7 @@ Execution seats cannot open a question batch. A seat that cannot proceed ends it
 ## Forks taken
 - [How a blocked seat ends its attempt](forks/blocked-ends-attempt.md): the seat declares the stop, `failed` with a typed cause, everything preserved, explicit operator restart. Corrected 2026-09-19 after #21: no event-driven entry.
 - [Where execution loses the ability to ask](forks/ask-tool-availability.md): `--exclude-tools request_user_input` on the pi harness template (operator config step); seats write the blocker and stop themselves; failed leaves are resumable and do not count toward capacity.
-- [Where a failure notification goes](forks/push-notification.md): herdr only: notification with sound and recorded reason, tab renamed `<slug> failed`; operator sets system toast delivery.
+- [Where a failure notification goes](forks/push-notification.md): herdr only: notification with sound and recorded reason, tab renamed `<slug> failed`; herdr default toast delivery.
 
 ## Fog
 None. Every open question is in forks/.
