@@ -199,6 +199,45 @@ test('init succeeds with non-empty grounding index and preserves it on repeat', 
   }
 });
 
+test('init refuses unknown harness in slots without changing files', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const proposal: string = resolve(f.home, 'proposal.yaml');
+    yaml(proposal, {
+      grounding: 'none',
+      slots: { a: { harness: 'ghost', model: 'm', effort: 'e' } },
+    });
+    const before: InitSnapshot = snapshotInit(f);
+    const result: Result = await cli(f, ['init', '--from', proposal]);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('ghost');
+    expectInitUnchanged(f, before);
+  } finally {
+    f.clean();
+  }
+});
+
+test('init preserves stored slots override on repeat', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const proposal: string = resolve(f.home, 'proposal.yaml');
+    yaml(proposal, {
+      grounding: 'none',
+      slots: { a: { harness: 'fake', model: 'repo-a', effort: 'low' } },
+    });
+    expect((await cli(f, ['init', '--from', proposal])).code).toBe(0);
+    expect(Bun.YAML.parse(readFileSync(resolve(f.root, 'issues/config.yaml'), 'utf8'))).toMatchObject({
+      slots: { a: { harness: 'fake', model: 'repo-a', effort: 'low' } },
+    });
+    expect((await cli(f, ['init'])).code).toBe(0);
+    expect(Bun.YAML.parse(readFileSync(resolve(f.root, 'issues/config.yaml'), 'utf8'))).toMatchObject({
+      slots: { a: { harness: 'fake', model: 'repo-a', effort: 'low' } },
+    });
+  } finally {
+    f.clean();
+  }
+});
+
 test('init with explicit none succeeds and preserves choices on repeat', async () => {
   const f: Fixture = await fixture();
   try {

@@ -25,6 +25,16 @@ akrogon config
 akrogon status
 ```
 
+Override a machine seat for this repo in `issues/config.yaml`; it applies at the next agent start:
+
+```yaml
+slots:
+  b:
+    harness: codex
+    model: gpt-5
+    effort: high
+```
+
 Create or investigate work in your agent session:
 
 ```text

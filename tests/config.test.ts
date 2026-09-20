@@ -127,6 +127,89 @@ test('commonDirectory spawns git once per call and reports failures with cwd', a
   }
 });
 
+test('config rejects invalid slots shapes and accepts empty slots', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { c: { harness: 'fake', model: 'm', effort: 'e' } },
+    });
+    expect((await cli(f, ['config'])).code).not.toBe(0);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { a: { harness: 'fake', model: 'x' } },
+    });
+    expect((await cli(f, ['config'])).code).not.toBe(0);
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', slots: { a: null } });
+    expect((await cli(f, ['config'])).code).not.toBe(0);
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', slots: {} });
+    expect((await cli(f, ['config'])).code).toBe(0);
+  } finally {
+    f.clean();
+  }
+});
+
+test('config prints merged slots from root, linked worktree, and global outside', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { a: { harness: 'fake', model: 'repo-a', effort: 'low' } },
+    });
+    const atRoot = await cli(f, ['config']);
+    expect(atRoot.code).toBe(0);
+    expect(Bun.YAML.parse(atRoot.stdout)).toMatchObject({
+      slots: { a: { model: 'repo-a' }, b: { model: 'strong-b' } },
+    });
+    const linked: string = resolve(f.home, 'linked-slots');
+    await command(['git', 'worktree', 'add', '-b', 'linked-slots', linked], f.root);
+    const atLinked = await cli(f, ['config'], linked);
+    expect(atLinked.code).toBe(0);
+    expect(Bun.YAML.parse(atLinked.stdout)).toMatchObject({
+      slots: { a: { model: 'repo-a' }, b: { model: 'strong-b' } },
+    });
+    const outside = await cli(f, ['config'], f.home);
+    expect(outside.code).toBe(0);
+    expect(Bun.YAML.parse(outside.stdout)).toMatchObject({
+      slots: { a: { model: 'strong-a' }, b: { model: 'strong-b' } },
+    });
+  } finally {
+    f.clean();
+  }
+});
+
+test('config prints per-repo merged slots with two overrides', async () => {
+  const f: Fixture = await fixture();
+  const g: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { a: { harness: 'fake', model: 'f-a', effort: 'low' } },
+    });
+    yaml(resolve(g.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { b: { harness: 'fake', model: 'g-b', effort: 'low' } },
+    });
+    const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, other: g.root } });
+    const fConfig = await cli(f, ['config'], f.root);
+    expect(fConfig.code).toBe(0);
+    expect(Bun.YAML.parse(fConfig.stdout)).toMatchObject({
+      repo: 'repo',
+      slots: { a: { model: 'f-a' }, b: { model: 'strong-b' } },
+    });
+    const gConfig = await cli(f, ['config'], g.root);
+    expect(gConfig.code).toBe(0);
+    expect(Bun.YAML.parse(gConfig.stdout)).toMatchObject({
+      repo: 'other',
+      slots: { a: { model: 'strong-a' }, b: { model: 'g-b' } },
+    });
+  } finally {
+    f.clean();
+    g.clean();
+  }
+});
+
 test('config requires explicit grounding', async () => {
   const f: Fixture = await fixture();
   try {

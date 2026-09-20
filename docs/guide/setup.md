@@ -55,6 +55,7 @@ Check these choices:
 - **worktree_root** says where leaf checkouts go.
 - **rebuttal** controls the paired planning rebuttal.
 - **fix_rounds** limits review repair rounds.
+- **slots** optionally replaces a machine seat for this repo — a full {harness, model, effort} per seat (a or b); it applies at the next agent start.
 
 Use the effective configuration to check the result:
 

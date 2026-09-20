@@ -9,7 +9,7 @@
 ## Key files
 
 - `src/akrogon.ts` validates CLI arguments and dispatches commands.
-- `src/config.ts` defines config schemas and resolves registered repositories.
+- `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
 - `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file.
 - `src/phase.ts` aggregates slot completion and enforces handoff guards.
 - `src/shell.ts` wraps subprocesses, retries, YAML writes and Herdr responses.

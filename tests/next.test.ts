@@ -2566,3 +2566,82 @@ test('a successful prompt clears delivery_error and resets attempts', async () =
     f.clean();
   }
 }, 15000);
+
+test('next uses repo seat overrides for both seats with spaced model as one argv element', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: {
+        a: { harness: 'fake', model: 'repo model a', effort: 'low' },
+        b: { harness: 'fake', model: 'repo-b', effort: 'low' },
+      },
+    });
+    const path: string = leaf(f, 'override', 'plan.positions');
+    expect((await next(f, ['override'])).code).toBe(0);
+    const state: State = readState(path);
+    const db: Database = database(f);
+    const byPane = (pane: string): string[] => {
+      const found: string[] | undefined = db.starts.find((args) => args[args.indexOf('--pane') + 1] === pane);
+      if (found === undefined) throw new Error(`Missing start for pane ${pane}`);
+      return found;
+    };
+    const startA: string[] = byPane(z.string().parse(state.pane.A));
+    const startB: string[] = byPane(z.string().parse(state.pane.B));
+    expect(startA).toContain('repo model a');
+    expect(startA.filter((x) => x === 'repo model a')).toHaveLength(1);
+    expect(startA[startA.indexOf('--kind') + 1]).toBe('fake');
+    expect(startB).toContain('repo-b');
+    expect(startB[startB.indexOf('--kind') + 1]).toBe('fake');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next inherits non-overridden seat from global slots', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { a: { harness: 'fake', model: 'only-a', effort: 'low' } },
+    });
+    const path: string = leaf(f, 'inherit', 'plan.positions');
+    expect((await next(f, ['inherit'])).code).toBe(0);
+    const state: State = readState(path);
+    const db: Database = database(f);
+    const byPane = (pane: string): string[] => {
+      const found: string[] | undefined = db.starts.find((args) => args[args.indexOf('--pane') + 1] === pane);
+      if (found === undefined) throw new Error(`Missing start for pane ${pane}`);
+      return found;
+    };
+    const startA: string[] = byPane(z.string().parse(state.pane.A));
+    const startB: string[] = byPane(z.string().parse(state.pane.B));
+    expect(startA).toContain('only-a');
+    expect(startB).toContain('strong-b');
+    expect(startB[startB.indexOf('--kind') + 1]).toBe('fake');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next refuses unknown harness override before allocation', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { b: { harness: 'ghost', model: 'm', effort: 'e' } },
+    });
+    const path: string = leaf(f, 'ghost-leaf', 'plan.synthesis');
+    const result: Result = await next(f, ['ghost-leaf']);
+    expect(result.code).not.toBe(0);
+    expect(skips(result)[0].error).toContain('ghost');
+    expect(skips(result)[0].error).toContain('repo');
+    expect(skips(result)[0].error).toContain('b');
+    expect(database(f).tabs).toHaveLength(0);
+    expect(database(f).panes).toHaveLength(0);
+    expect(readState(path).worktree).toBeUndefined();
+    expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 15000);

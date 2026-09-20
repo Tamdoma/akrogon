@@ -33,9 +33,10 @@ grounding:
 broadcast:
   discord:
     webhook_env: [DISCORD_WEBHOOK_URL]
+# slots: optional per-repo seat override, e.g. {a: {harness, model, effort}}
 ```
 
-Use existing broadcast routing when present and propose environment-variable names, not secret values, keeping global-only and retired settings out of the repo proposal.
+Use existing broadcast routing when present and propose environment-variable names, not secret values, keeping global-only and retired settings out of the repo proposal. On repeat setup preserve a stored `slots` override, and never write the effective merged seats from `akrogon config` into the proposal — `slots` is proposed only when the repo needs a different seat.
 
 ## Tests and grounding
 

@@ -13,8 +13,10 @@ import {
   base,
   target,
   within,
+  seats,
   type Repo,
   type GlobalConfig,
+  type SlotConfig,
 } from './config';
 import { readState, saveState, validateLeafDepth, missingLeafMessage, withLock, type Leaf, type State } from './state';
 import { requiredSlots, routing, type Slot } from './routing';
@@ -215,8 +217,8 @@ async function currentPane(id: string): Promise<Pane> {
   return (await herdr(['pane', 'get', id], z.object({ pane: paneSchema }))).pane;
 }
 
-function launch(global: GlobalConfig, slot: Slot): { kind: string; args: string[] } {
-  const config: GlobalConfig['slots']['a'] = global.slots[slot === 'A' ? 'a' : 'b'];
+function launch(global: GlobalConfig, repo: Repo, slot: Slot): { kind: string; args: string[] } {
+  const config: SlotConfig = seats(global, repo)[slot === 'A' ? 'a' : 'b'];
   const line: string = global.harnesses[config.harness]
     .replaceAll('{model}', quote(config.model))
     .replaceAll('{effort}', quote(config.effort));
@@ -427,7 +429,7 @@ async function dispatchSlot(global: GlobalConfig, repo: Repo, leaf: Leaf, slot: 
     }
   }
   if (pane.agent === null) {
-    const harness: { kind: string; args: string[] } = launch(global, slot);
+    const harness: { kind: string; args: string[] } = launch(global, repo, slot);
     const name: string = `akrogon-${createHash('sha256').update(pane.pane_id).digest('hex').slice(0, 24)}`;
     const startArgv: string[] = [
       'herdr',
@@ -536,6 +538,7 @@ async function dispatchLeaf(
       if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
       return 'waiting';
     }
+    seats(global, repo);
     const allocated: State | null = await allocate(global, repo, { path: leaf.path, state }, invocation);
     if (allocated === null) return 'waiting';
     for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds))

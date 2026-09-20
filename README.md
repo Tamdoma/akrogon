@@ -65,7 +65,7 @@ bun install
 bun src/akrogon.ts install
 ```
 
-Set the machine's seats, harness commands and registered repositories in the tool-root configuration. AKROGON_HOME can select a different configuration directory.
+Set the machine's seats, harness commands and registered repositories in the tool-root configuration. AKROGON_HOME can select a different configuration directory. A repository may override either seat in `issues/config.yaml`.
 
 Installation links the command, skills and [plugin](plugin/). It also installs the configured Herdr harness integrations. Conflicting destinations stop installation and print removal commands for review.
 

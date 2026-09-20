@@ -42,13 +42,29 @@ export const repoSchema = z.strictObject({
     }),
   ]),
   broadcast: z.object({ discord: z.object({ webhook_env: z.array(text) }) }).optional(),
+  slots: z.strictObject({ a: slotConfigSchema.optional(), b: slotConfigSchema.optional() }).optional(),
 });
+
+export type SlotConfig = z.infer<typeof slotConfigSchema>;
 
 export type GlobalConfig = z.infer<typeof globalSchema>;
 
 export type RepoConfig = z.infer<typeof repoSchema>;
 
 export type Repo = { name: string; root: string; config: RepoConfig };
+
+export function seats(global: GlobalConfig, repo: Repo): { a: SlotConfig; b: SlotConfig } {
+  const resolved: { a: SlotConfig; b: SlotConfig } = {
+    a: repo.config.slots?.a ?? global.slots.a,
+    b: repo.config.slots?.b ?? global.slots.b,
+  };
+  for (const seat of ['a', 'b'] as const) {
+    const harness: string = resolved[seat].harness;
+    if (!Object.hasOwn(global.harnesses, harness))
+      throw new Error(`Missing harness template "${harness}" for seat ${seat} in repo ${repo.name}`);
+  }
+  return resolved;
+}
 
 export const toolRoot: string = resolve(import.meta.dir, '..');
 
@@ -123,6 +139,7 @@ export async function effectiveConfig(cwd: string): Promise<string> {
     {
       ...global,
       ...repoConfig,
+      slots: repo === null ? global.slots : seats(global, repo),
       repo: repo === null ? 'none' : repo.name,
       ...(repo !== null && top !== repo.root ? { AKROGON_BASE: await base(repo, cwd) } : {}),
     },

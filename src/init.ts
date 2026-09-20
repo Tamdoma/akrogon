@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { type RepoConfig, type GlobalConfig, globalHome, readGlobal, repoSchema, within } from './config';
+import { type RepoConfig, type GlobalConfig, globalHome, readGlobal, repoSchema, seats, within } from './config';
 import { command, writeYaml } from './shell';
 
 export function writeRepoConfig(root: string, config: RepoConfig): void {
@@ -41,6 +41,7 @@ export async function initialize(
   const repoName: string = basename(root);
   if (Object.hasOwn(global.repos, repoName) && resolve(globalHome(), global.repos[repoName]) !== root)
     throw new Error(`Repo name already registered: ${repoName}`);
+  seats(global, { name: repoName, root, config });
   checkGrounding(root, config);
   writeRepoConfig(root, config);
   mkdirSync(resolve(root, 'issues/open'), { recursive: true });
