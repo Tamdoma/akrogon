@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { effectiveConfig } from './config';
 import { initialize } from './init';
+import { sourcePattern } from './state';
 
 const verb: string | undefined = process.argv[2];
 
@@ -13,9 +14,11 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
       ? { slot: { type: 'string' }, verdict: { type: 'string' }, reason: { type: 'string' } }
       : verb === 'next' || verb === 'pull' || verb === 'park' || verb === 'unpark'
         ? { all: { type: 'boolean' } }
-        : verb === 'status'
-          ? { charts: { type: 'boolean' } }
-          : {};
+        : verb === 'close'
+          ? { by: { type: 'string' } }
+          : verb === 'status'
+            ? { charts: { type: 'boolean' } }
+            : {};
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(3),
@@ -51,6 +54,12 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./pull')).pullCommand(values.all === true);
     break;
+  case 'close': {
+    const [source]: [string] = z.tuple([z.string().regex(sourcePattern)]).parse(positionals);
+    const by: string = z.string().trim().min(1).parse(values.by);
+    await (await import('./pull')).closeCommand(source, by);
+    break;
+  }
   case 'sync':
     z.tuple([]).parse(positionals);
     await (await import('./sync')).syncCommand(process.cwd());
@@ -71,5 +80,5 @@ switch (verb) {
     await (await import('./install')).install();
     break;
   default:
-    throw new Error('Usage: akrogon <install|init|config|phase|next|pull|park|unpark|sync|status>');
+    throw new Error('Usage: akrogon <install|init|config|phase|next|pull|close|park|unpark|sync|status>');
 }

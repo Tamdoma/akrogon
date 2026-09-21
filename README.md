@@ -135,6 +135,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>]` | Record a pass or declare a failure with its reason. |
 | `akrogon next [<slug>\|<path>\|--all]` | Dispatch eligible work. |
 | `akrogon pull [--all]` | Import open GitHub issues as seeds. |
+| `akrogon close <owner/repo#n> --by <text>` | Close one unowned GitHub issue with a delivered-by note. |
 | `akrogon status [<slug>\|--charts]` | Show the board, leaf history or chart store. |
 | `akrogon sync` | Commit eligible issue records, rebase and push. |
 | `akrogon park <issue>... \| --all` | Set aside whole eligible issues. |

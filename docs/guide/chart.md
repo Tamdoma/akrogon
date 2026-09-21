@@ -125,7 +125,7 @@ Forks are taken one per round. After you answer, the next fork is researched and
 
 Fog is work whose question is not clear yet. “Exports behave strangely on large accounts” may need reproduction before anyone can propose a useful choice.
 
-Ruled-out work goes under Off route with its reason. It is not silently treated as agreed scope.
+Ruled-out work goes under Off route with its reason. It is not silently treated as agreed scope. When a mirrored report is already delivered or a duplicate, the door closes it with `akrogon close <owner/repo#n> --by <text>`.
 
 ```text
 Unclear in-scope ground

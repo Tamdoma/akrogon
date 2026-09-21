@@ -104,7 +104,7 @@ export async function pullCommand(all: boolean): Promise<void> {
 
 class SourceError extends Error {}
 
-async function closeSource(repo: Repo, source: string, commit: string): Promise<void> {
+async function closeSource(repo: Repo, source: string, comment: string): Promise<void> {
   const match: RegExpExecArray | null = sourcePattern.exec(source);
   if (match === null) throw new SourceError(JSON.stringify({ error: 'Invalid GitHub source', source }));
   const [, repository, number]: string[] = match;
@@ -136,7 +136,6 @@ async function closeSource(repo: Repo, source: string, commit: string): Promise<
         }
       })();
       if (state === 'CLOSED') return;
-      const comment: string = `merged ${commit}`;
       const commentExists: boolean =
         attempt === 1 &&
         (await (async (): Promise<boolean> => {
@@ -191,7 +190,7 @@ export async function closeSources(repo: Repo, sources: ReadonlySet<string>, lea
   const failures: { source: string; error: Error }[] = [];
   for (const source of sources) {
     try {
-      await closeSource(repo, source, commit);
+      await closeSource(repo, source, `merged ${commit}`);
     } catch (error) {
       if (!(error instanceof CommandError) && !(error instanceof SourceError)) throw error;
       failures.push({ source, error });
@@ -203,4 +202,10 @@ export async function closeSources(repo: Repo, sources: ReadonlySet<string>, lea
       failures.map((failure) => failure.error),
       `Source closure failed: ${failures.map((failure) => failure.source).join(', ')}`,
     );
+}
+
+export async function closeCommand(source: string, by: string): Promise<void> {
+  const repo: Repo = await requireRepo(readGlobal(), process.cwd());
+  await closeSource(repo, source, `delivered by ${by}`);
+  console.log(`closed ${source} with delivered by ${by}`);
 }

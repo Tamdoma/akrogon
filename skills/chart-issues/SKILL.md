@@ -28,6 +28,8 @@ Read the configured `grounding.index` top file, relevant linked areas and `learn
 
 Import operator notes, and mirrored `issues/seeds/*.md` and legacy `issues/open/<slug>.md` only when the door opens without an operator note or the note asks for them, using the provenance in shapes: skip exact GitHub identities already in open/closed leaf `sources` or any chart intake, and legacy source paths already imported, preserving original reports and copying imported text verbatim separately from agent findings and scope.
 
+At open, name each skipped GitHub identity that is still open on GitHub and offer `akrogon close <owner/repo#n> --by <text>` for it. During the pass, run that command for any identity the chart records as delivered or duplicate, passing what delivered it: the delivering leaf slug and commit, or the other identity.
+
 ## Drain
 
 Show a proportional territory map before grilling, including material forks, practitioner questions and pitfalls grounded in inspected surfaces; when B is named, A and B map independently before A merges with attribution, using the blind file exchange in questions.

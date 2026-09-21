@@ -14,6 +14,7 @@ const contracts: Record<string, string> = {
   phase: '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>]',
   next: '[<slug>|<path>|--all]',
   pull: '[--all]',
+  close: '<owner/repo#n> --by <text>',
   sync: '',
   park: '<issue>... | --all',
   unpark: '<issue>... | --all',
