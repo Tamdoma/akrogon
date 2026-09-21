@@ -32,9 +32,11 @@ Import operator notes, and mirrored `issues/seeds/*.md` and legacy `issues/open/
 
 Show a proportional territory map before grilling, including material forks, practitioner questions and pitfalls grounded in inspected surfaces; when B is named, A and B map independently before A merges with attribution, using the blind file exchange in questions.
 
+A round takes one fork, the next answerable fork first, preferring the one whose answer reshapes the most remaining forks; a destination with one fork costs one round.
+
 Propose the split by destination and speed of resolution before writing: independently checkable outcomes sharing a destination can be parallel leaves of one issue, independent issues run side by side, and only an actual dependency orders work, never file overlap or presentation preference.
 
-Write one chart folder per destination. When every chart still holds an open fork, stop the seed drain for the operator to select one; when every fork in every chart is taken, hand off each chart in order without asking for a selection, asking the debate question once for the whole handoff. A direct single item whose map finds no fog writes the same chart structure and proceeds to handoff immediately.
+Write one chart folder per destination. When every chart still holds an open fork, stop the seed drain for the operator to select one; when every fork in every chart is taken, hand off each chart in order without asking for a selection, asking the debate question once for the whole handoff. A direct single item whose map finds no open fork and no fog writes the same chart structure and proceeds to handoff immediately.
 
 ## Take
 
@@ -42,7 +44,7 @@ Research precedes every question and is redone when an answer reshapes one. Befo
 
 With B, A owns interviewing and recording, sends only intake, current Question and carries, related fork paths, locks and verbatim operator corrections while developing its own view, then merges the completed independent rounds with `(A)`, `(B)`, `(both)` tags and obtains B's one disagreement-only rebuttal before presenting the complete operator round with challenge check; B answers direct operator requests in its own pane and checks the final shape once before recording a late mechanism or contract change, with restatements exempt.
 
-Record operator answers and their reasons in fork files, keep sharp questions distinct from fog, and reshape the remaining chart after answers; handoff becomes ready only when no material question or fog requires the implementer to guess, with small optional prototypes explicitly chosen as measurements whose scratch code is discarded.
+Record operator answers and their reasons in fork files. After each answer, re-read Fog and move newly sharp material questions into their own fork files, removing only that material from Fog. Reshape the remaining forks and update CHART.md's ordered Open forks list before selecting and researching the next fork; handoff becomes ready only when no material question or fog requires the implementer to guess, with small optional prototypes explicitly chosen as measurements whose scratch code is discarded.
 
 Warn as soon as a genuinely human-only prerequisite appears, name its owner and record completion before opening a leaf; the distinct operator choice `hand_built` cannot replace completing known prerequisites. Credentials are not such a prerequisite but are anticipated, never discovered by a blocked seat: every brief lists the keys, logins and env values its leaf needs by variable name, what each is and where the operator obtains it, and the handoff batch names the ones absent from the consumer repo's gitignored `.env` so the operator fills them before dispatch.
 

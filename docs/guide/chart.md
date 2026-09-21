@@ -121,6 +121,8 @@ A fork is a question precise enough to answer. For example: should CSV include a
 
 The round gives options, a recommendation with its reason and the pitfalls of the choice. You can pick an option or answer in your own words.
 
+Forks are taken one per round. After you answer, the next fork is researched and asked.
+
 Fog is work whose question is not clear yet. “Exports behave strangely on large accounts” may need reproduction before anyone can propose a useful choice.
 
 Ruled-out work goes under Off route with its reason. It is not silently treated as agreed scope.
@@ -153,7 +155,7 @@ issues/chart/export-csv/
   forks/row-selection.md
 ```
 
-Intake keeps the original report separate from agent findings. Fork files keep evidence and your recorded answers. The chart points to what remains open.
+Intake keeps the original report separate from agent findings. Fork files keep evidence and your recorded answers. The chart points to what remains open. CHART.md lists open forks in the order they will be taken.
 
 ## Independent views when you bring a second seat
 

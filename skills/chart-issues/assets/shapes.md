@@ -23,6 +23,9 @@ Charts stay here after handoff. They have no state.yaml or lifecycle phase. Crea
 ## Forks taken
 - [<fork>](forks/<fork-slug>.md): <settled answer>
 
+## Open forks
+- [<fork>](forks/<fork-slug>.md): <question in one line>, in the order they will be taken
+
 ## Fog
 <material work in scope whose question cannot yet be stated precisely>
 
@@ -74,7 +77,7 @@ GitHub identity comes from the mirror's `Source: owner/repo#n` line. Compare exa
 <operator answer verbatim, reason and foreclosed alternatives>
 ```
 
-One fork file holds one or more questions that are always presented together on one screen. A fork is taken when every material question in it is taken; partial answers stay under `## Findings` and `## Taken` is written only then. Append each explicit operator correction with its date, preserve earlier answers, and treat the last appended correction as binding only for the answer it changes. Unresolved questions have no invented Taken. A question sharp enough to travel alone gets its own fork file even while blocked. Work whose question is not sharp stays in Fog. Ruling work out records the reason in Off route instead of pretending a fork was taken. Reshape the remaining questions after each answer. A fork file with no operator answer under `## Taken` is open, and CHART.md lists none.
+One fork file holds one or more questions that are always presented together on one screen. A fork is taken when every material question in it is taken; partial answers stay under `## Findings` and `## Taken` is written only then. Append each explicit operator correction with its date, preserve earlier answers, and treat the last appended correction as binding only for the answer it changes. Unresolved questions have no invented Taken. A question sharp enough to travel alone gets its own fork file even while blocked. Work whose question is not sharp stays in Fog. Ruling work out records the reason in Off route instead of pretending a fork was taken. Reshape the remaining questions after each answer. A fork file with no operator answer under `## Taken` is open and appears in CHART.md's Open forks list in the order it will be taken, next first.
 
 ## Handoff tree
 
