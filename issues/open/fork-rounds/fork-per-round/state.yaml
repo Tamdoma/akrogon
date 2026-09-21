@@ -1,0 +1,8 @@
+slug: fork-per-round
+phase: plan.synthesis
+created: '2026-09-21'
+repo: akrogon
+debate: 'no'
+blocked-by: []
+sources:
+  - Tamdoma/akrogon#27

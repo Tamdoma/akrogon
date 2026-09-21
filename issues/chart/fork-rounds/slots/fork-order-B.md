@@ -1,0 +1,19 @@
+Each round now takes one fork. This round settles how the agent chooses the next one and leaves enough context to resume, without rebuilding the old status and dependency system.
+
+### Q1 · Should CHART.md list open forks in the order the agent expects to take them, or should each fork record its prerequisites?
+
+The next fork should be answerable from what is already taken. Among those forks, prefer the answer that unblocks or reshapes the most remaining work. Here, round granularity had to come before fork order: its Taken answer now supplies that context (`issues/chart/fork-rounds/forks/round-granularity.md:19`).
+
+Research: operator · `issues/chart/fork-rounds/forks/round-granularity.md:8,19`, read 2026-09-21 · the operator requires one full-detail round per fork and reshaping between rounds, with minimum changes · this favors an editable reading order rather than a fixed plan. better-than-training · `git show c547564:skills/chart-issues/SKILL.md:228-236`, read 2026-09-21 · the old work lane chose a ready decision that unblocked the most others, then revised the remaining work · keep that selection rule without restoring claims or statuses. better-than-training · `skills/chart-issues/assets/shapes.md:15,67-77` and `skills/chart-issues/SKILL.md:6,45`, read 2026-09-21 · CHART.md already provides the resume entry point, Carries holds related context, and remaining questions must be reshaped after answers · a short ordered list can make the next selection visible using the existing files.
+
+- **A (recommended)** Add a short ordered open-fork list to CHART.md, with linked fork names and a brief reason for the order where it matters. Put the next answerable fork first, preferring the one whose answer unblocks or reshapes the most others. Reconsider the list after each Taken answer. It gives the operator and a resumed agent one place to see what comes next, without a dependency field or a scoring system. Keep any necessary prerequisite explanation in the fork's existing Carries.
+- **B** Record prerequisite fork links in every fork's Carries and choose among forks whose prerequisites are taken. This makes individual dependencies explicit, but requires maintaining links across files and inspecting them to choose the next fork. Do not restore the old Status or blocked-by fields.
+- **C** Record only the selected next fork and its reason in CHART.md. Reassess the other fork files after each answer. This is the smallest written change, but leaves the remaining order invisible and can require more rereading when the session resumes.
+
+Pitfalls: An ordered list is a current judgment, not a promise to ask every listed fork unchanged or evidence that an earlier item is a prerequisite. Read the selected fork's Carries before researching it, and reshape the list after Taken so invalidated questions do not survive by inertia. The current shape explicitly says CHART.md lists no open forks (`skills/chart-issues/assets/shapes.md:77`), so A requires changing that sentence and the CHART.md example together. An empty list is not permission to hand off while fog remains (`skills/chart-issues/assets/shapes.md:163`).
+
+Reply `1-A`, `1-B`, or `1-C`, or give a numbered free-text answer.
+
+Challenge check
+
+An experienced practitioner could prefer B where many independent forks have real prerequisites. That need does not justify restoring a dependency system for this attended, one-fork-at-a-time process. A preserves prerequisite explanations in Carries while making the working order visible. “Reshapes the most” is a judgment, not a count to calculate. If two ready forks are equally useful, either may go first without another operator question. Fork files remain the authority for what is taken, and the list must not invent answers, turn fog into premature questions, or treat off route work as taken.

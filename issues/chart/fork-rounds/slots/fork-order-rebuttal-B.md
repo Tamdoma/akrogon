@@ -1,0 +1,3 @@
+1. The merged round omits the reply key. `skills/chart-issues/assets/questions.md:21,27` requires it in every operator round. Add `Reply 1-A, 1-B, or 1-C, or give a numbered free-text answer.` before Challenge check.
+
+2. The Research line drops the available operator-tier evidence and starts at better-than-training. `skills/chart-issues/assets/questions.md:35,40` requires the highest reasonably available tier. `issues/chart/fork-rounds/forks/round-granularity.md:8,19` supplies the operator's minimal-change constraint and the Taken requirement to reshape remaining forks after each answer. Restore that evidence before the historical and current code references, since it directly supports the recommended editable order.
