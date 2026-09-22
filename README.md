@@ -12,7 +12,7 @@ The guide follows one example: adding CSV export to a project here:
 
 ## How the pieces fit
 
-Start with init-issues to give agents the project's settings, checks and code map. Capture observations with seed-issue. Use chart-issues to investigate choices and write contracts.
+Start with init-akrogon to give agents the project's settings, checks and code map. Capture observations with seed-issue. Use chart-issues to investigate choices and write contracts.
 
 Then release a leaf. The execution skills plan, build, review, repair and merge it. Files record the work between passes. Herdr holds the seats and triggers dispatch events.
 
@@ -87,7 +87,7 @@ git pull
 
 ## Initialize a repository
 
-Run [init-issues](skills/init-issues/SKILL.md) from the project root. It inspects the project and proposes its branch, checks and grounding documents.
+Run [init-akrogon](skills/init-akrogon/SKILL.md) from the project root. It inspects the project and proposes its branch, checks and grounding documents.
 
 The skill writes a YAML proposal, then runs:
 
@@ -185,5 +185,5 @@ That report destination does not redirect pull.
 | [merge-issue](skills/merge-issue/SKILL.md) | Rebase, check and push reviewed work. |
 | [seed-issue](skills/seed-issue/SKILL.md) | File an observation for investigation. |
 | [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a completed-issue update to Discord. |
-| [init-issues](skills/init-issues/SKILL.md) | Inspect a repository and set up its lifecycle. |
+| [init-akrogon](skills/init-akrogon/SKILL.md) | Inspect a repository and set up its lifecycle. |
 | [watch-issues](skills/watch-issues/SKILL.md) | Watch open leaves on an optional 20-minute Claude Code cron. |

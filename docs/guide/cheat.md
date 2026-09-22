@@ -12,7 +12,7 @@ bun src/akrogon.ts install
 Set up a repository from an agent opened at its root:
 
 ```text
-/init-issues
+/init-akrogon
 ```
 
 Init refuses a declared index that is not a readable non-empty file. A fresh repo needs an index or an explicit `grounding: none`.
@@ -115,7 +115,7 @@ Remember: capacity counts leaves across repositories. Failed can resume at any a
 
 | Need | Skill | What you get |
 | --- | --- | --- |
-| Set up a project | init-issues | Inspected settings, checks and grounding. |
+| Set up a project | init-akrogon | Inspected settings, checks and grounding. |
 | Capture a problem | seed-issue | One unverified GitHub report. |
 | Decide what to build | chart-issues | Researched choices and leaf contracts. |
 | Plan the change | plan-issue | File-level steps and verification. |

@@ -8,7 +8,7 @@
 
 ## Key files
 
-- `skills/init-issues/SKILL.md` proposes checks, grounding and repository setup.
+- `skills/init-akrogon/SKILL.md` proposes checks, grounding and repository setup.
 - `skills/implement-issue/SKILL.md` runs implementation and repair passes.
 - `skills/implement-issue/worker-protocol.md` defines worker scope and returns.
 - `skills/check-issue/SKILL.md` defines review evidence and Fix/Nit verdicts.

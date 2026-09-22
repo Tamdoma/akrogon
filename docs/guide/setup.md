@@ -11,7 +11,7 @@ Initialize each repository before dispatching work. The examples use:
 Open an agent at the repository root and invoke the setup skill:
 
 ```text
-/init-issues
+/init-akrogon
 ```
 
 It inspects the project and proposes the branch, checks and documentation used to guide agents. It also maps the code areas and creates missing grounding documents.
@@ -102,7 +102,7 @@ Planning reads the configured index and relevant areas. It carries useful paths 
 
 For CSV export, this can lead the planner straight to the existing JSON exporter and its tests. It also gives later leaves an updated route to the new CSV code.
 
-## What init-issues adds to init
+## What init-akrogon adds to init
 
 The skill chooses settings from the repository it inspects. The command writes and validates configuration.
 

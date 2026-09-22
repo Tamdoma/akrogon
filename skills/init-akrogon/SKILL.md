@@ -1,5 +1,5 @@
 ---
-name: init-issues
+name: init-akrogon
 description: Inspect a repository, propose its issue lifecycle configuration and optional test toolkit, then initialize it through the installed akrogon command.
 ---
 

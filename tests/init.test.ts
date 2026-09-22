@@ -126,7 +126,7 @@ test('init refuses missing grounding index without changing files', async () => 
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('Grounding index is not a readable non-empty file');
     expect(result.stderr).toContain(resolve(f.root, 'docs/missing.md'));
-    expect(result.stderr).toContain('Complete setup with the init-issues skill.');
+    expect(result.stderr).toContain('Complete setup with the init-akrogon skill.');
     expectInitUnchanged(f, before);
   } finally {
     f.clean();
@@ -144,7 +144,7 @@ test('init refuses directory grounding index without changing files', async () =
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('Grounding index is not a readable non-empty file');
     expect(result.stderr).toContain(resolve(f.root, 'docs/index'));
-    expect(result.stderr).toContain('Complete setup with the init-issues skill.');
+    expect(result.stderr).toContain('Complete setup with the init-akrogon skill.');
     expectInitUnchanged(f, before);
   } finally {
     f.clean();
@@ -163,7 +163,7 @@ test('init refuses empty and whitespace-only grounding index without changing fi
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('Grounding index is not a readable non-empty file');
     expect(result.stderr).toContain(resolve(f.root, 'docs/empty.md'));
-    expect(result.stderr).toContain('Complete setup with the init-issues skill.');
+    expect(result.stderr).toContain('Complete setup with the init-akrogon skill.');
     expectInitUnchanged(f, before);
     writeFileSync(resolve(f.root, 'docs/empty.md'), '  \n\t\n');
     const beforeWhitespace: InitSnapshot = snapshotInit(f);
@@ -171,7 +171,7 @@ test('init refuses empty and whitespace-only grounding index without changing fi
     expect(whitespace.code).not.toBe(0);
     expect(whitespace.stderr).toContain('Grounding index is not a readable non-empty file');
     expect(whitespace.stderr).toContain(resolve(f.root, 'docs/empty.md'));
-    expect(whitespace.stderr).toContain('Complete setup with the init-issues skill.');
+    expect(whitespace.stderr).toContain('Complete setup with the init-akrogon skill.');
     expectInitUnchanged(f, beforeWhitespace);
   } finally {
     f.clean();

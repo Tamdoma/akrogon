@@ -11,7 +11,7 @@ export function writeRepoConfig(root: string, config: RepoConfig): void {
 function checkGrounding(root: string, config: RepoConfig): void {
   if (config.grounding === 'none' || config.grounding.index === undefined) return;
   const resolved: string = resolve(root, config.grounding.index);
-  const message: string = `Grounding index is not a readable non-empty file: ${resolved}. Complete setup with the init-issues skill.`;
+  const message: string = `Grounding index is not a readable non-empty file: ${resolved}. Complete setup with the init-akrogon skill.`;
   let contents: string;
   try {
     contents = readFileSync(resolved, 'utf8');
