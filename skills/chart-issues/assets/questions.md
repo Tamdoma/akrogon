@@ -21,7 +21,7 @@ Pitfalls: <the traps behind this choice, one or two sentences>
 Reply `1-A 2-B`, or a numbered free-text answer.
 
 Challenge check
-<what an experienced practitioner could challenge in these recommendations, including B's remaining disagreements, or why none was found>
+<what an experienced practitioner could challenge in these recommendations, including each named peer's remaining disagreements, or why none was found>
 ```
 
 Every round uses this shape, on every harness and at every effort level: the opening paragraph, the sentences under each question, the research line, the labelled recommendation with its reason, the pitfalls line, the reply key and the challenge check. A small round keeps the parts that carry the decision, the reply key and the challenge check. Number questions continuously within a round and restart at 1 in the next round.
