@@ -1860,12 +1860,81 @@ test('startup retains completed issue resources while an epic sibling remains un
     const worktree: string = readState(path).worktree!;
     saveState(path, { ...readState(path), phase: 'merge' });
     expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--resume'], {}, f.home)).code).toBe(0);
     expect(readState(path).phase).toBe('merged');
     expect(existsSync(worktree)).toBe(true);
     expect(await command(['git', 'branch', '--show-current'], worktree)).toBe('done');
     expect(database(f).tabs.map((tab) => tab.label)).toEqual(['done']);
     expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next --resume re-prompts allocated idle leaves in every registered repo without allocating new work', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const g: Fixture = await fixture();
+  try {
+    const aOld: string = leaf(f, 'a-old', 'plan.synthesis');
+    const bOld: string = leaf(g, 'b-old', 'plan.synthesis', { repo: 'other' });
+    configure(f, { repos: { repo: f.root, other: g.root } });
+    expect((await next(f, ['a-old'])).code).toBe(0);
+    expect((await next(f, ['b-old'], {}, g.root)).code).toBe(0);
+    expect(database(f).tabs).toHaveLength(2);
+    resetPrompts(f, aOld);
+    resetPrompts(f, bOld);
+    const aNew: string = leaf(f, 'a-new', 'plan.synthesis');
+    const bNew: string = leaf(g, 'b-new', 'plan.synthesis', { repo: 'other' });
+    const result: Result = await next(f, ['--resume'], {}, f.home);
+    expect(result.code).toBe(0);
+    expect(
+      database(f)
+        .prompts.map((prompt) => prompt.text)
+        .sort(),
+    ).toEqual(
+      [
+        `plan-issue a-old slot=B phase=plan.synthesis leaf=${aOld}`,
+        `plan-issue b-old slot=B phase=plan.synthesis leaf=${bOld}`,
+      ].sort(),
+    );
+    expect(database(f).tabs).toHaveLength(2);
+    for (const path of [aNew, bNew]) {
+      expect(readState(path).tab).toBeUndefined();
+      expect(readState(path).worktree).toBeUndefined();
+      expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
+    }
+    for (const args of [
+      ['--resume', 'a-old'],
+      ['--resume', '--all'],
+    ])
+      expect((await next(f, args, {}, f.home)).code).not.toBe(0);
+  } finally {
+    f.clean();
+    g.clean();
+  }
+}, 15000);
+
+test('next --resume completes and cleans a merged leaf while its unallocated dependent stays untouched', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const done: string = leaf(f, 'done', 'plan.synthesis', {}, 'solo');
+    const dependent: string = leaf(f, 'dependent', 'plan.synthesis', { 'blocked-by': ['done'] }, 'dep-issue');
+    expect((await next(f, ['done'])).code).toBe(0);
+    const worktree: string = readState(done).worktree!;
+    saveState(done, { ...readState(done), phase: 'merged' });
+    expect(existsSync(done)).toBe(true);
+    expect(readState(done).phase).toBe('merged');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    const result: Result = await next(f, ['--resume'], {}, f.home);
+    expect(result.code).toBe(0);
+    expect(existsSync(resolve(f.root, 'issues/closed/solo'))).toBe(true);
+    expect(existsSync(worktree)).toBe(false);
+    expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/done'], f.root)).code).toBe(1);
+    expect(database(f).tabs).toHaveLength(0);
+    expect(database(f).prompts).toHaveLength(0);
+    expect(readState(dependent).tab).toBeUndefined();
+    expect(readState(dependent).worktree).toBeUndefined();
+    expect(readState(dependent).attempts).toEqual({ A: 0, B: 0 });
   } finally {
     f.clean();
   }

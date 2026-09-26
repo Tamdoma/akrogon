@@ -12,7 +12,7 @@ const contracts: Record<string, string> = {
   init: '[--from <proposal.yaml>] [--toolkit <lang>=<runner>]',
   config: '',
   phase: '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>]',
-  next: '[<slug>|<path>|--all]',
+  next: '[<slug>|<path>|--all|--resume]',
   pull: '[--all]',
   close: '<owner/repo#n> --by <text>',
   sync: '',
@@ -91,6 +91,7 @@ test('argument contracts reject lost values, requiredness and exclusive alternat
     ['phase', '<slug> <phase> [--slot <A|B>] [--verdict <verdict>]'],
     ['next', '<slug>|<path>|--all'],
     ['next', '[<slug>|<path>]'],
+    ['next', '[<slug>|<path>|--all]'],
     ['pull', '--all'],
     ['status', '<slug>'],
     ['status', '[<slug>]'],
@@ -109,7 +110,11 @@ test('escaped alternatives and reordered rows preserve argument semantics', () =
   checkReference(
     reference(
       Object.fromEntries(
-        Object.entries({ ...contracts, park: '--all | <issue>...', next: '[--all | <path> | <slug>]' }).reverse(),
+        Object.entries({
+          ...contracts,
+          park: '--all | <issue>...',
+          next: '[--all | <path> | <slug> | --resume]',
+        }).reverse(),
       ),
     ),
     source,

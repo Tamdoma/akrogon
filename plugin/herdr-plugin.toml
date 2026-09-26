@@ -8,7 +8,7 @@ platforms = ["linux"]
 command = ["sh", "pull.sh", "--all"]
 
 [[startup]]
-command = ["sh", "next.sh", "--all"]
+command = ["sh", "next.sh", "--resume"]
 
 [[events]]
 on = "pane.agent_status_changed"

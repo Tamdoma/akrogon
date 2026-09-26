@@ -35,7 +35,7 @@ akrogon next --all
 
 Inside a registered repository, the last command covers that repository. Outside one, it covers all registered repositories. A Herdr hook can also provide context for a targeted pass.
 
-Herdr events trigger further passes as agents work. Startup also runs a sweep. You can run a manual pass when you want to move work forward.
+Herdr events trigger further passes as agents work. Startup resumes allocated work only and cleans up completed worktrees. You can run a manual pass when you want to move work forward.
 
 A completion starts only its dependents in the same repository.
 

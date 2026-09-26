@@ -12,13 +12,15 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
     ? { from: { type: 'string' }, toolkit: { type: 'string' } }
     : verb === 'phase'
       ? { slot: { type: 'string' }, verdict: { type: 'string' }, reason: { type: 'string' } }
-      : verb === 'next' || verb === 'pull' || verb === 'park' || verb === 'unpark'
-        ? { all: { type: 'boolean' } }
-        : verb === 'close'
-          ? { by: { type: 'string' } }
-          : verb === 'status'
-            ? { charts: { type: 'boolean' } }
-            : {};
+      : verb === 'next'
+        ? { all: { type: 'boolean' }, resume: { type: 'boolean' } }
+        : verb === 'pull' || verb === 'park' || verb === 'unpark'
+          ? { all: { type: 'boolean' } }
+          : verb === 'close'
+            ? { by: { type: 'string' } }
+            : verb === 'status'
+              ? { charts: { type: 'boolean' } }
+              : {};
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(3),
@@ -46,9 +48,11 @@ switch (verb) {
     break;
   }
   case 'next':
-    if (values.all === true && positionals.length !== 0) throw new Error('Use a target or --all, not both');
-    z.array(z.string()).max(1).parse(positionals);
-    await (await import('./next')).nextCommand(values.all === true ? '--all' : positionals[0]);
+    if (positionals.length + Number(values.all === true) + Number(values.resume === true) > 1)
+      throw new Error('Use a target, --all or --resume, not combined');
+    await (
+      await import('./next')
+    ).nextCommand(values.resume === true ? '--resume' : values.all === true ? '--all' : positionals[0]);
     break;
   case 'pull':
     z.tuple([]).parse(positionals);

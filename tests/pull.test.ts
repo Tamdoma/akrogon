@@ -235,14 +235,14 @@ test('missing and invalid origins fail visibly, and all continues after invalid 
   }
 });
 
-test('startup runs pull all before next all and wrappers forward arguments', async () => {
+test('startup runs pull all before next resume and wrappers forward arguments', async () => {
   const plugin: string = resolve(import.meta.dir, '../plugin');
   const manifest = z
     .object({ startup: z.array(z.object({ command: z.array(z.string()) })) })
     .parse(Bun.TOML.parse(readFileSync(resolve(plugin, 'herdr-plugin.toml'), 'utf8')));
   expect(manifest.startup.map((item) => item.command)).toEqual([
     ['sh', 'pull.sh', '--all'],
-    ['sh', 'next.sh', '--all'],
+    ['sh', 'next.sh', '--resume'],
   ]);
   const f: Fixture = await fixture();
   try {

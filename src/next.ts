@@ -669,7 +669,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
   const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
   const hooked: boolean = event !== undefined;
   const selection: Selection | undefined =
-    input !== '--all' && event?.event !== 'tab_closed' && (input !== undefined || !hooked)
+    input !== '--all' && input !== '--resume' && event?.event !== 'tab_closed' && (input !== undefined || !hooked)
       ? await selectLeaves(global, invocation, input)
       : undefined;
   if (selection === undefined || selection.leaves.length > 0)
@@ -698,6 +698,20 @@ export async function nextCommand(input: string | undefined): Promise<void> {
           await sweep(global, current, discover(current, invocation).leaves, invocation);
           await cleanupRepos([current], invocation);
         }
+        return;
+      }
+      if (input === '--resume') {
+        for (const repo of registeredRepos(global, invocation).repos)
+          await sweep(
+            global,
+            repo,
+            discover(repo, invocation).leaves.filter(
+              (leaf) =>
+                leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined,
+            ),
+            invocation,
+          );
+        await cleanupRepos(registeredRepos(global, invocation).repos, invocation);
         return;
       }
       if (event?.event === 'tab_closed') {
