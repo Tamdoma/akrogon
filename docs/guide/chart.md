@@ -157,32 +157,32 @@ issues/chart/export-csv/
 
 Intake keeps the original report separate from agent findings. Fork files keep evidence and your recorded answers. The chart points to what remains open. CHART.md lists open forks in the order they will be taken.
 
-## Independent views when you bring a second seat
+## Independent views when you name a peer seat
 
-Charting can run in one slot. If you name a B pane, both slots first map and research independently. A then merges their findings with attribution. B gets one disagreement-only rebuttal before the operator round.
+Charting can run in one slot. If you name a B pane, A and B first map and research independently. C is named only with B and holds the same role, blind to both A's and B's work. A then merges their findings with attribution. Each named peer gets one disagreement-only rebuttal before the operator round.
 
-This gives you a second view before the interview settles the scope. Naming a charting peer does not automatically enable implementation debate.
+This gives you independent views before the interview settles the scope. Naming a charting peer does not automatically enable implementation debate.
 
 ```text
-                 same intake
-                      |
-             +--------+--------+
-             v                 v
-        A researches      B researches
-        independently     independently
-             |                 |
-             +--------+--------+
-                      v
+                    same intake
+                         |
+             +-----------+-----------+
+             v           v           v
+        A researches  B researches  optional C researches
+        independently independently independently
+             |           |           |
+             +-----------+-----------+
+                         v
              A merges with attribution
-                      |
-                      v
-             B rebuts disagreements
-                      |
-                      v
-              operator answers
+                         |
+                         v
+          each named peer rebuts disagreements
+                         |
+                         v
+                 operator answers
 ```
 
-For export-csv, the two views can expose different risks before you choose the behavior. They share the request first, not each other's conclusions.
+For export-csv, the independent views can expose different risks before you choose the behavior. They share the request first, not each other's conclusions.
 
 ## Turn the answers into a buildable contract
 
@@ -198,7 +198,7 @@ For CSV export, the contract can specify:
 
 Cross-leaf promises need matching owners. Human-only prerequisites need an owner and completion before handoff. Required credentials are named, not pasted into the contract.
 
-When a B pane is part of charting, B also reads the draft contracts as an implementer before they are written to the open tree.
+When peer panes are part of charting, each named peer also reads the draft contracts as an implementer before they are written to the open tree.
 
 You get work that can be dispatched without reopening product decisions in the middle of a coding pass.
 

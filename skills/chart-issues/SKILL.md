@@ -20,7 +20,7 @@ Read [questions](assets/questions.md) before an operator round, [shapes](assets/
 
 ## Open
 
-In the first reply, name the operator-supplied B pane or say single slot; read `akrogon config` and use its registered repo root for chart and handoff writes, resolving worktrees through their shared Git common directory rather than their inert issues copy. An unregistered repo can be charted locally, but handoff requires a registered destination; registration and initialization are outside this door.
+In the first reply, name the operator-supplied B pane, then the C pane when given, or say single slot; C is named only with B; read `akrogon config` and use its registered repo root for chart and handoff writes, resolving worktrees through their shared Git common directory rather than their inert issues copy. An unregistered repo can be charted locally, but handoff requires a registered destination; registration and initialization are outside this door.
 
 Run `akrogon pull` at open: report an unregistered or non-GitHub repo and continue charting, while any other failed refresh blocks a drain relying on that refresh rather than permitting stale mirrored intake; independent operator notes can continue.
 
@@ -32,7 +32,7 @@ At open, name each skipped GitHub identity that is still open on GitHub and offe
 
 ## Drain
 
-Show a proportional territory map before grilling, including material forks, practitioner questions and pitfalls grounded in inspected surfaces; when B is named, A and B map independently before A merges with attribution, using the blind file exchange in questions.
+Show a proportional territory map before grilling, including material forks, practitioner questions and pitfalls grounded in inspected surfaces; when peers are named, A and each named peer map independently before A merges with attribution, using the blind file exchange in questions.
 
 A round takes one fork, the next answerable fork first, preferring the one whose answer reshapes the most remaining forks; a destination with one fork costs one round.
 
@@ -44,7 +44,7 @@ Write one chart folder per destination. When every chart still holds an open for
 
 Research precedes every question and is redone when an answer reshapes one. Before a round, gather for each question the strongest source available in the tier order in questions: operator-placed material, a named practitioner, primary documentation or code, and the model's own knowledge only together with the searches that found nothing stronger. A question about this repository's own mechanism cites the inspected file and line and the documentation of the tool it calls; a question about anything outside it names an outside source or the recorded failure to find one. Research decides which questions are asked, which pitfalls they name and which option is recommended, never the answer, and a recommendation that contradicts a practitioner source shows the contradiction in the question.
 
-With B, A owns interviewing and recording, sends only intake, current Question and carries, related fork paths, locks and verbatim operator corrections while developing its own view, then merges the completed independent rounds with `(A)`, `(B)`, `(both)` tags and obtains B's one disagreement-only rebuttal before presenting the complete operator round with challenge check; B answers direct operator requests in its own pane and checks the final shape once before recording a late mechanism or contract change, with restatements exempt.
+With named peers, A owns interviewing and recording, sends only intake, current Question and carries, related fork paths, locks and verbatim operator corrections while developing its own view, then merges the completed independent rounds with agreeing-slot tags such as `(A)`, `(B,C)`, `(A,B,C)` and obtains one disagreement-only rebuttal from each peer before presenting the complete operator round with challenge check; each peer answers direct operator requests in its own pane and checks the final shape once before recording a late mechanism or contract change, with restatements exempt.
 
 Record operator answers and their reasons in fork files. After each answer, re-read Fog and move newly sharp material questions into their own fork files, removing only that material from Fog. Reshape the remaining forks and update CHART.md's ordered Open forks list before selecting and researching the next fork; handoff becomes ready only when no material question or fog requires the implementer to guess, with small optional prototypes explicitly chosen as measurements whose scratch code is discarded.
 
@@ -52,9 +52,9 @@ Warn as soon as a genuinely human-only prerequisite appears, name its owner and 
 
 ## Handoff
 
-Prepare the complete contracts using shapes and standing design, and present one attended handoff review with tree, scope, registered repo, relevant operator choices and the implementation debate recommendation: `debate` defaults to no and is asked once at the door, very small issues skip the question and use no, and naming B does not set this field; recognize concrete handoff authorization already supplied in the session instead of asking again.
+Prepare the complete contracts using shapes and standing design, and present one attended handoff review with tree, scope, registered repo, relevant operator choices and the implementation debate recommendation: `debate` defaults to no and is asked once at the door, very small issues skip the question and use no, and naming a charting peer does not set this field; recognize concrete handoff authorization already supplied in the session instead of asking again.
 
-When B is named, leaf writing is a mandatory two-slot exchange after approval and before any handoff write: A drafts every brief and design to the scratchpad, B reviews each draft as an implementer and returns disagreements with evidence, A merges the consensus, marking changed lines `(A)`, `(B)`, `(both)` in the draft and carrying any held disagreement into the leaf design, and only the merged contracts reach `issues/open/`.
+When peers are named, leaf writing is a mandatory exchange after approval and before any handoff write: A drafts every brief and design to the scratchpad, each named peer reviews each draft as an implementer and returns disagreements with evidence, A merges the consensus, marking changed lines with agreeing-slot tags such as `(A)`, `(B,C)`, `(A,B,C)` in the draft and carrying any held disagreement into the leaf design, and only the merged contracts reach `issues/open/`.
 
 Audit the proposed contracts as an implementer and run the preflight in shapes before writing, refusing collisions by naming the conflicting destination and missing dependencies before any handoff write.
 
