@@ -37,6 +37,8 @@ Inside a registered repository, the last command covers that repository. Outside
 
 Herdr events trigger further passes as agents work. Startup also runs a sweep. You can run a manual pass when you want to move work forward.
 
+A completion starts only its dependents in the same repository.
+
 ## Parking work you don't want yet
 
 Park a whole issue to remove it from the open queue:
@@ -93,9 +95,9 @@ Each dispatch pass makes at most one delivery attempt per pending seat. Repeated
 
 ## Release work without managing every prompt
 
-Manual dispatch is the normal way to start work. Once a leaf is running, the state and Herdr events let the seats progress without you copying the next skill prompt between panes.
+Manual dispatch is the normal way to start work. A completed leaf starts only same-repository leaves that depend on it; every other leaf waits for a manual `akrogon next`. Once a leaf is running, the state and Herdr events let the seats progress without you copying the next skill prompt between panes.
 
-Use parking for work that should stay out of later sweeps. Use dependencies for work that truly needs another result first.
+Use parking for work that should stay out of later manual sweeps. Use dependencies for work that truly needs another result first.
 
 For CSV export, the formatter and an unrelated settings fix can run independently. A download button that calls the new formatter has a real dependency.
 

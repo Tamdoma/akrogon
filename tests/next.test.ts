@@ -546,7 +546,7 @@ test('a merged leaf with its tab still open does not count toward max_active', a
   }
 }, 15000);
 
-test('a closed tab hook from a merged leaf sweeps and starts the next leaf', async () => {
+test('a closed tab hook from a merged leaf starts the dependent', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
@@ -595,6 +595,87 @@ test('merged phase closes tab on typed next and starts the dependent', async () 
     expect(readState(dependent).attempts.B).toBe(0);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(database(f).tabs.map((tab) => tab.label)).toEqual(['second']);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+for (const path of ['targeted', 'tab_closed', 'pane_hook'] as const) {
+  test(`completing a leaf via ${path} starts only same-repo dependents`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    const g: Fixture = await fixture();
+    try {
+      const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
+      const loose: string = leaf(f, 'loose', 'plan.synthesis', {}, 'loose-issue');
+      const second: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
+      const other: string = leaf(g, 'other', 'plan.synthesis', { repo: 'other' });
+      configure(f, { repos: { repo: f.root, other: g.root } });
+      expect((await next(f, ['first'])).code).toBe(0);
+      const tab: string = readState(first).tab!;
+      const b: string = readState(first).pane.B!;
+      saveState(first, { ...readState(first), phase: 'merge' });
+      expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
+      const db: Database = database(f);
+      saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
+      if (path === 'targeted') {
+        expect((await next(f, ['first'])).code).toBe(0);
+      } else if (path === 'tab_closed') {
+        const closedDb: Database = database(f);
+        saveDatabase(f, {
+          ...closedDb,
+          tabs: closedDb.tabs.filter((item) => item.tab_id !== tab),
+          panes: closedDb.panes.filter((pane) => pane.tab_id !== tab),
+        });
+        const closed: Result = await next(f, [], {
+          HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+            event: 'tab_closed',
+            data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w2' },
+          }),
+        });
+        expect(closed.code).toBe(0);
+      } else {
+        const exitedDb: Database = database(f);
+        saveDatabase(f, { ...exitedDb, panes: exitedDb.panes.filter((pane) => pane.pane_id !== b) });
+        const exited: Result = await next(f, [], {
+          HERDR_PANE_ID: b,
+          HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+            event: 'pane_exited',
+            data: { type: 'pane_exited', pane_id: b, workspace_id: 'w1' },
+          }),
+        });
+        expect(exited.code).toBe(0);
+      }
+      const expected: string[] = path === 'tab_closed' ? ['second'] : ['first', 'second'];
+      expect(database(f).tabs.map((item) => item.label)).toEqual(expected);
+      expect(readState(second).attempts.B).toBe(0);
+      for (const untouched of [loose, other]) {
+        expect(readState(untouched).tab).toBeUndefined();
+        expect(readState(untouched).worktree).toBeUndefined();
+        expect(readState(untouched).pane).toEqual({});
+      }
+    } finally {
+      f.clean();
+      g.clean();
+    }
+  }, 15000);
+}
+
+test('a dependent still blocked by an unmerged leaf stays unallocated after its first blocker merges', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
+    leaf(f, 'other', 'plan.synthesis', {}, 'other-issue');
+    const second: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first', 'other'] }, 'second-issue');
+    expect((await next(f, ['first'])).code).toBe(0);
+    saveState(first, { ...readState(first), phase: 'merge' });
+    expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
+    const db: Database = database(f);
+    saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
+    expect((await next(f, ['first'])).code).toBe(0);
+    expect(database(f).tabs.map((item) => item.label)).toEqual(['first']);
+    expect(readState(second).tab).toBeUndefined();
+    expect(readState(second).worktree).toBeUndefined();
+    expect(readState(second).pane).toEqual({});
   } finally {
     f.clean();
   }

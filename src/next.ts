@@ -580,6 +580,20 @@ async function sweep(global: GlobalConfig, repo: Repo, leaves: Leaf[], invocatio
   for (const leaf of ordered) await dispatchLeaf(global, repo, leaf, false, invocation);
 }
 
+async function dispatchDependents(
+  global: GlobalConfig,
+  repo: Repo,
+  completedSlug: string,
+  invocation: Invocation,
+): Promise<void> {
+  await sweep(
+    global,
+    repo,
+    discover(repo, invocation).leaves.filter((leaf) => leaf.state['blocked-by'].includes(completedSlug)),
+    invocation,
+  );
+}
+
 type Selection = { repo: Repo; leaves: Leaf[] };
 
 async function selectLeaves(
@@ -662,6 +676,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
     await withLock(resolve(globalHome(), '.lock'), async () => {
       if (selection !== undefined) {
         if (selection.leaves.length === 1) {
+          const completedSlug: string = selection.leaves[0].state.slug;
           const outcome: DispatchOutcome = await dispatchLeaf(
             global,
             selection.repo,
@@ -669,7 +684,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
             true,
             invocation,
           );
-          if (outcome === 'completed') await sweepAll(global, invocation);
+          if (outcome === 'completed') await dispatchDependents(global, selection.repo, completedSlug, invocation);
         } else await sweep(global, selection.repo, selection.leaves, invocation);
         if (input === undefined) await cleanupRepos([selection.repo], invocation);
         return;
@@ -693,8 +708,9 @@ export async function nextCommand(input: string | undefined): Promise<void> {
         );
         if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
         if (owners.length === 0) return;
+        const completedSlug: string = owners[0].leaf.state.slug;
         const outcome: DispatchOutcome = await dispatchLeaf(global, owners[0].repo, owners[0].leaf, false, invocation);
-        if (outcome === 'completed') await sweepAll(global, invocation);
+        if (outcome === 'completed') await dispatchDependents(global, owners[0].repo, completedSlug, invocation);
         return;
       }
       if (input === undefined && hookPane !== undefined) {
@@ -702,8 +718,9 @@ export async function nextCommand(input: string | undefined): Promise<void> {
         if (owners.length > 1) throw new Error(`Multiple leaves own hook pane: ${hookPane}`);
         if (owners.length === 0) return;
         const owner: { repo: Repo; leaf: Leaf } = owners[0];
+        const completedSlug: string = owner.leaf.state.slug;
         const outcome: DispatchOutcome = await dispatchLeaf(global, owner.repo, owner.leaf, false, invocation);
-        if (outcome === 'completed') await sweepAll(global, invocation);
+        if (outcome === 'completed') await dispatchDependents(global, owner.repo, completedSlug, invocation);
         return;
       }
     });
