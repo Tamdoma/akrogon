@@ -1,6 +1,6 @@
 ---
 name: implement-issue
-description: Implement a leaf plan or repair its review findings, using eight-section worker sub-briefs and sequential workers or configured inline execution; without a leaf, implement the prompt task standalone.
+description: Implement a leaf plan or repair its review findings, using eight-section worker sub-briefs and waves of up to 3 independent workers or configured inline execution; without a leaf, implement the prompt task standalone.
 ---
 
 Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt. After compaction, standalone re-reads its task brief instead of a leaf.
@@ -18,9 +18,9 @@ Challenge fuzzy terms.
 Verify with a concrete scenario.
 Check the live surface.
 
-For leaf work, read `akrogon config` once, locate the unique slug in the registered repo's authoritative `issues/open/`, and use its `plan.md`, `design.md` and current review findings while editing only the leaf worktree.
+For leaf work, read `akrogon config` once, locate the unique slug in the registered repo's authoritative `issues/open/`, and use its `plan.md`, `design.md` and current review findings while editing only the leaf worktree and its worker worktrees.
 
-Pass artifacts are written under the `leaf=` folder while code is read and edited only in the worktree, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`. Standalone keeps its no-config, local-artifact behavior.
+Pass artifacts are written under the `leaf=` folder while code is read and edited only in the leaf worktree and its worker worktrees, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`. Standalone keeps its no-config, local-artifact behavior.
 
 Effective settings supply `implement`, `checks`, optional `advisory`, `AKROGON_BASE` and the repair cap; the command owns state/counters and dispatch, while a repeated pass finishes remaining work from the diff and artifacts, rerunning checks for changed code, missing evidence or a specific concern.
 
@@ -34,7 +34,7 @@ B never opens, prints, appends to, or writes `.env` or `.env.*` with any tool, i
 
 ## implement
 
-Before coding, when an implementation-only constraint is missing from `plan.md` under the `leaf=` folder, append one dated `## Implementation notes` section naming each constraint and the decision it refines; a locked decision is never changed there, and a conflict with one is a mismatch recorded for review. Then implement the plan's checklist in order yourself when config says `inline`, otherwise write one sub-brief per unit from the template, one unit included, and delegate each to a subagent sequentially in this worktree using the worker protocol.
+Before coding, when an implementation-only constraint is missing from `plan.md` under the `leaf=` folder, append one dated `## Implementation notes` section naming each constraint and the decision it refines; a locked decision is never changed there, and a conflict with one is a mismatch recorded for review. Then implement the plan's checklist in order yourself when config says `inline`, otherwise write one sub-brief per unit from the template, one unit included, and delegate them to subagents in waves of up to 3 units with landed prerequisites and independent edits and verification, one at a time when unsure, each in its own worktree, using the worker protocol.
 
 Inline has no worker, sub-briefs or mismatch returns; both modes run the resolved changed-tests command as work lands with `AKROGON_BASE` from config, and workers receive only that command, not the full suite.
 
@@ -42,7 +42,7 @@ Derive meaningful tests from acceptance criteria before code, demonstrate red th
 
 A credential still absent from `.env` at implement is never requested as a pasted value: B records the missing variable in `<leaf>/implementation/report.md` as a human-only blocker with the `add <VAR> to .env` action, what the value is, and where the operator obtains it, then runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see implementation/report.md>" --slot B` and ends the pass.
 
-After the last implementation unit, run the full suite once as B and every other blocking check, repair any failure by the protocol (yourself in inline mode), then commit the code on the leaf branch and write `<leaf>/implementation/report.md` with changed files and reasons, commands run with pasted results and artifact paths, the base and committed head, known limitations and unverified criteria, folding worker returns into it, before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
+After the last implementation unit, with every worker worktree removed, run the full suite once as B and every other blocking check, repair any failure by the protocol (yourself in inline mode), then commit any remaining edits on top of the wave commits on the leaf branch, making no empty commit, and write `<leaf>/implementation/report.md` with changed files and reasons, commands run with pasted results and artifact paths, the base and committed head, known limitations and unverified criteria, folding worker returns into it, before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
 
 Every command under `checks` blocks; `advisory` failures are reported as Nits, and a full-suite rerun follows a repair rather than an unchanged successful run.
 
@@ -50,7 +50,7 @@ Finish with `akrogon phase <slug> check.review --slot B`, then print the footer 
 
 ## check.fix
 
-Read the recorded findings and reviewed commit in the existing review files, revise the plan notes and affected sub-briefs around those defects without weakening criteria or failing tests, and use workers before the last allowed repair round in delegated mode or repair yourself in inline mode and on the final allowed round.
+Read the recorded findings and reviewed commit in the existing review files, revise the plan notes and affected sub-briefs around those defects without weakening criteria or failing tests, and use worker waves before the last allowed repair round in delegated mode or repair yourself in inline mode and on the final allowed round.
 
 A repair requested from merge starts at the rebased head recorded in `review-A.md` and treats the failing output as the finding.
 

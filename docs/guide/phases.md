@@ -84,7 +84,7 @@ Debate gives you separate implementation proposals when the tradeoff warrants it
 
 ## implement-issue: build and show the evidence
 
-B follows the plan in the leaf worktree. Depending on configuration, B works inline or delegates bounded units to sequential workers.
+B follows the plan in the leaf worktree. Depending on configuration, B works inline or delegates bounded units in waves of up to 3 independent workers, each in its own worktree with results cherry-picked onto the lane.
 
 Tests come from the acceptance criteria. The skill calls for meaningful failing-then-passing evidence, with a trivial one-line change exempt from new tests.
 
