@@ -1,0 +1,32 @@
+slug: startup-resume
+phase: merged
+created: 2026-09-26
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#29"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t6K
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/startup-resume
+pane: 
+  A: w8:pC5
+  B: w8:pC6
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

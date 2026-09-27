@@ -1,0 +1,32 @@
+slug: idle-tab-close
+phase: merged
+created: 2026-09-27
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#30"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t6M
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/idle-tab-close
+pane: 
+  A: w8:pC7
+  B: w8:pC8
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

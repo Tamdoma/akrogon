@@ -1,0 +1,32 @@
+slug: completion-dependents
+phase: merged
+created: 2026-09-26
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#29"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t6J
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/completion-dependents
+pane: 
+  A: w8:pC3
+  B: w8:pC4
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
