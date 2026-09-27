@@ -24,7 +24,7 @@ issue complete
 
 Completed records move to the closed store. An issue inside an epic waits for the whole epic before the top-level folder moves.
 
-The merge seat closes its tab as its last action. A manual repository sweep or startup cleanup removes completed worktrees and branches:
+Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. Only those sweeps remove completed worktrees and branches, after the issue folder has moved:
 
 ```sh
 cd ~/Work/widgets

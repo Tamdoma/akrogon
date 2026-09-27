@@ -48,7 +48,7 @@ Gather the completed issue's briefs before its folder may move, then after confi
 
 A failed broadcast is visible but leaves the merge complete, while GitHub closure and completed-folder moves belong to the command.
 
-Finish by printing the footer, then close this tab with `herdr tab close "$HERDR_TAB_ID"` as the very last act; the startup sweep removes the worktree and branch, and closes any tab a merge left open.
+Finish by printing the footer as the last act; the command closes this tab once this pane goes idle or exits after `merged`, a manual sweep or startup cleanup closes any tab a merge left open, and only those sweeps remove the worktree and branch once the issue folder has moved.
 
 ## Printed footer
 

@@ -48,7 +48,7 @@ Run a repository sweep:
 akrogon next
 ```
 
-Cleanup belongs to manual sweeps and startup. A tab left behind by an interrupted merge can also be handled there.
+Hook passes close the tabs of merged leaves, and a tab left behind by an interrupted merge is handled there too. Only sweeps and startup delete a lingering worktree and branch.
 
 **Sync refuses to run.**
 

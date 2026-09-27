@@ -1803,7 +1803,7 @@ test('agent start allows 30 seconds while prompt wait remains 5 seconds', async 
   }
 });
 
-test('startup retries closure before cleanup and retains failed owners with their worktree branch and tab', async () => {
+test('startup retries closure before cleanup and retains failed owners with their worktree and branch while the tab closes', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'retry', 'plan.synthesis');
@@ -1830,8 +1830,8 @@ test('startup retries closure before cleanup and retains failed owners with thei
     expect(failed.stderr).toContain('offline');
     expect(existsSync(worktree)).toBe(true);
     expect(await command(['git', 'branch', '--show-current'], worktree)).toBe('retry');
-    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['retry']);
-    expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
+    expect(database(f).tabs).toHaveLength(0);
+    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(1);
     writeFileSync(
       gh.db,
       JSON.stringify([
@@ -1851,7 +1851,174 @@ test('startup retries closure before cleanup and retains failed owners with thei
   }
 }, 15000);
 
-test('startup retains completed issue resources while an epic sibling remains unfinished', async () => {
+for (const mode of ['--resume', '--all'] as const) {
+  test(`startup retains a merged leaf's worktree and branch while closing its tab as an epic sibling stays unfinished (${mode})`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const path: string = leaf(f, 'done', 'plan.synthesis', {}, 'epic/first');
+      leaf(f, 'waiting', 'plan.synthesis', { hand_built: true }, 'epic/second');
+      expect((await next(f, ['done'])).code).toBe(0);
+      const worktree: string = readState(path).worktree!;
+      saveState(path, { ...readState(path), phase: 'merge' });
+      expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
+      expect((await next(f, [mode], {}, f.home)).code).toBe(0);
+      expect(readState(path).phase).toBe('merged');
+      expect(database(f).tabs).toHaveLength(0);
+      expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(1);
+      expect(existsSync(worktree)).toBe(true);
+      expect(await command(['git', 'branch', '--show-current'], worktree)).toBe('done');
+    } finally {
+      f.clean();
+    }
+  }, 15000);
+}
+
+for (const kind of ['seat-A blocked', 'seat-A unknown', 'seat-B idle', 'seat-B exited', 'unmerged idle'] as const) {
+  test(`a leaf tab survives the ${kind} hook`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const path: string = leaf(f, 'done', 'plan.synthesis', {}, 'epic/first');
+      leaf(f, 'waiting', 'plan.synthesis', { hand_built: true }, 'epic/second');
+      expect((await next(f, ['done'])).code).toBe(0);
+      const seat: 'A' | 'B' = kind.startsWith('seat-B') ? 'B' : 'A';
+      const pane: string = readState(path).pane[seat]!;
+      if (kind !== 'unmerged idle') {
+        saveState(path, { ...readState(path), phase: 'merge' });
+        expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
+      }
+      if (kind === 'seat-B exited') {
+        const db: Database = database(f);
+        saveDatabase(f, { ...db, panes: db.panes.filter((item) => item.pane_id !== pane) });
+      }
+      const status: string = kind === 'seat-A blocked' ? 'blocked' : kind === 'seat-A unknown' ? 'unknown' : 'idle';
+      const result: Result = await next(f, [], {
+        HERDR_PANE_ID: pane,
+        HERDR_PLUGIN_EVENT_JSON: JSON.stringify(
+          kind === 'seat-B exited'
+            ? { event: 'pane_exited', data: { type: 'pane_exited', pane_id: pane, workspace_id: 'w1' } }
+            : {
+                event: 'pane_agent_status_changed',
+                data: { type: 'pane_agent_status_changed', pane_id: pane, workspace_id: 'w1', agent_status: status },
+              },
+        ),
+      });
+      expect(result.code).toBe(0);
+      expect(database(f).tabs.map((tab) => tab.label)).toEqual(['done']);
+      expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
+    } finally {
+      f.clean();
+    }
+  }, 15000);
+}
+
+test('a merged leaf whose tab is already gone makes no tab close call and a driven tab_closed hook stays quiet', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'gone', 'plan.synthesis', {});
+    expect((await next(f, ['gone'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    const tab: string = readState(path).tab!;
+    saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#1'] });
+    const gh: GhFixture = fakeGh(f);
+    f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
+    const probe: NonNullable<GhStep['probe']> = {
+      open: resolve(f.root, 'issues/open/issue'),
+      closed: resolve(f.root, 'issues/closed/issue'),
+      lock: resolve(f.home, '.lock'),
+      worktree,
+    };
+    const failure: GhStep[] = [
+      { stdout: '', code: 1, stderr: 'offline', probe },
+      { stdout: '', code: 1, stderr: 'offline', probe },
+    ];
+    writeFileSync(gh.db, JSON.stringify(failure));
+    expect((await cli(f, ['phase', 'gone', 'merged'], f.root, f.env)).code).not.toBe(0);
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      tabs: db.tabs.filter((item) => item.tab_id !== tab),
+      panes: db.panes.filter((pane) => pane.tab_id !== tab),
+    });
+    writeFileSync(gh.db, JSON.stringify(failure));
+    const failed: Result = await next(f, ['--all']);
+    expect(failed.code).not.toBe(0);
+    expect(failed.stderr).toContain('offline');
+    expect(existsSync(worktree)).toBe(true);
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        { stdout: '{"state":"OPEN"}', probe },
+        { stdout: '', probe },
+      ]),
+    );
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(probe.closed)).toBe(true);
+    expect(existsSync(worktree)).toBe(false);
+    const closed: Result = await next(f, [], {
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'tab_closed',
+        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' },
+      }),
+    });
+    expect(closed.code).toBe(0);
+    expect(closed.stderr).toBe('');
+    expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a merged leaf whose closure failed during phase merged closes its tab on the seat-A idle hook after moving', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'late', 'plan.synthesis', {}, 'late-issue');
+    expect((await next(f, ['late'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#1'] });
+    const gh: GhFixture = fakeGh(f);
+    f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
+    const probe: NonNullable<GhStep['probe']> = {
+      open: resolve(f.root, 'issues/open/late-issue'),
+      closed: resolve(f.root, 'issues/closed/late-issue'),
+      lock: resolve(f.home, '.lock'),
+      worktree,
+    };
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        { stdout: '', code: 1, stderr: 'offline', probe },
+        { stdout: '', code: 1, stderr: 'offline', probe },
+      ]),
+    );
+    expect((await cli(f, ['phase', 'late', 'merged'], f.root, f.env)).code).not.toBe(0);
+    expect(existsSync(resolve(f.root, 'issues/open/late-issue/late/state.yaml'))).toBe(true);
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        { stdout: '{"state":"OPEN"}', probe },
+        { stdout: '', probe },
+      ]),
+    );
+    const a: string = readState(path).pane.A!;
+    const result: Result = await next(f, [], {
+      HERDR_PANE_ID: a,
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'pane_agent_status_changed',
+        data: { type: 'pane_agent_status_changed', pane_id: a, workspace_id: 'w1', agent_status: 'idle' },
+      }),
+    });
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(existsSync(resolve(f.root, 'issues/closed/late-issue/late/state.yaml'))).toBe(true);
+    expect(database(f).tabs).toHaveLength(0);
+    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(1);
+    expect(existsSync(worktree)).toBe(true);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a seat-A idle hook closes the merged leaf tab while the worktree and branch stay', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'done', 'plan.synthesis', {}, 'epic/first');
@@ -1860,12 +2027,19 @@ test('startup retains completed issue resources while an epic sibling remains un
     const worktree: string = readState(path).worktree!;
     saveState(path, { ...readState(path), phase: 'merge' });
     expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
-    expect((await next(f, ['--resume'], {}, f.home)).code).toBe(0);
-    expect(readState(path).phase).toBe('merged');
+    const a: string = readState(path).pane.A!;
+    const result: Result = await next(f, [], {
+      HERDR_PANE_ID: a,
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'pane_agent_status_changed',
+        data: { type: 'pane_agent_status_changed', pane_id: a, workspace_id: 'w1', agent_status: 'idle' },
+      }),
+    });
+    expect(result.code).toBe(0);
+    expect(database(f).tabs).toHaveLength(0);
+    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(1);
     expect(existsSync(worktree)).toBe(true);
-    expect(await command(['git', 'branch', '--show-current'], worktree)).toBe('done');
-    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['done']);
-    expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
+    expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/done'], f.root)).code).toBe(0);
   } finally {
     f.clean();
   }

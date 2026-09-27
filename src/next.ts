@@ -551,10 +551,16 @@ async function dispatchLeaf(
   }
 }
 
+async function closeMergedTab(leaf: Leaf): Promise<void> {
+  if (leaf.state.tab === undefined) return;
+  const tab: string = leaf.state.tab;
+  if (!(await panes()).some((pane) => pane.tab_id === tab)) return;
+  await command(['herdr', 'tab', 'close', tab]);
+}
+
 async function cleanupMerged(repo: Repo, leaf: Leaf): Promise<void> {
+  await closeMergedTab(leaf);
   if (within(leaf.path, resolve(repo.root, 'issues/open'))) return;
-  const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === leaf.state.tab);
-  if (members.length > 0) await command(['herdr', 'tab', 'close', z.string().parse(leaf.state.tab)]);
   if (leaf.state.worktree !== undefined && existsSync(leaf.state.worktree)) {
     await command(['git', 'worktree', 'remove', '--force', leaf.state.worktree], repo.root);
     await command(['git', 'branch', '-d', leaf.state.slug], repo.root);
@@ -735,6 +741,22 @@ export async function nextCommand(input: string | undefined): Promise<void> {
         const completedSlug: string = owner.leaf.state.slug;
         const outcome: DispatchOutcome = await dispatchLeaf(global, owner.repo, owner.leaf, false, invocation);
         if (outcome === 'completed') await dispatchDependents(global, owner.repo, completedSlug, invocation);
+        let rediscovered: Leaf | undefined;
+        try {
+          rediscovered = discover(owner.repo, invocation).leaves.find((leaf) => leaf.state.slug === completedSlug);
+          if (
+            rediscovered !== undefined &&
+            rediscovered.state.phase === 'merged' &&
+            hookPane === rediscovered.state.pane.A &&
+            (event === undefined ||
+              event.event !== 'pane_agent_status_changed' ||
+              (event.data.agent_status !== 'blocked' && event.data.agent_status !== 'unknown'))
+          )
+            await closeMergedTab(rediscovered);
+        } catch (error) {
+          if (!(error instanceof Error)) throw error;
+          report(invocation, owner.repo.name, rediscovered?.path ?? owner.leaf.path, error, completedSlug);
+        }
         return;
       }
     });
