@@ -1,8 +1,32 @@
 slug: parallel-chunks
 phase: plan.synthesis
-created: '2026-09-27'
+created: 2026-09-27
 repo: akrogon
-debate: 'no'
-blocked-by: []
-sources:
-  - Tamdoma/akrogon#31
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#31"
+busy_since: 
+  B: 2026-09-27T12:04:37.813Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t6N
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/parallel-chunks
+pane: 
+  A: w8:pCA
+  B: w8:pCB
+prompted: 
+  B: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-parallel-chunks--/2026-09-27T12-04-34-699Z_01a0e2c0-b30b-71ee-a161-3cb9841f5acc.jsonl
+prompted_at: 
+  B: 2026-09-27T12:04:37.814Z
+delivery_error: 
+  {}
