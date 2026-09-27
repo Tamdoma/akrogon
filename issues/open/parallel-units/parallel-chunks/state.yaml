@@ -1,0 +1,8 @@
+slug: parallel-chunks
+phase: plan.synthesis
+created: '2026-09-27'
+repo: akrogon
+debate: 'no'
+blocked-by: []
+sources:
+  - Tamdoma/akrogon#31
