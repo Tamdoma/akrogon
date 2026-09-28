@@ -70,3 +70,7 @@ A `~` in `worktree_root` keeps its current split: leaf and worker paths use plai
 ## Dependencies
 
 None.
+
+## Implementation notes (2026-09-28)
+
+- B's own workers for this leaf sit at the new sibling path `<worktree_store>/worker-path-u<N>` (registered root plus `issues/worktrees`), not the installed protocol's nested `<lane>/<worktree_root>/...` path. Refines D5/D6: locked Q1-A already puts every new worker beside its leaf, and the nested rule is the defect under fix, so B models the fixed rule. No locked decision changed.
