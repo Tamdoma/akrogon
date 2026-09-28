@@ -30,7 +30,7 @@ Read the configured `grounding.index` top file, relevant linked areas and `learn
 
 Import operator notes, and mirrored `issues/seeds/*.md` and legacy `issues/open/<slug>.md` only when the door opens without an operator note or the note asks for them, using the provenance in shapes: skip exact GitHub identities already in open/closed leaf `sources` or any chart intake, and legacy source paths already imported, preserving original reports and copying imported text verbatim separately from agent findings and scope.
 
-At open, name each skipped GitHub identity that is still open on GitHub and offer `akrogon close <owner/repo#n> --by <text>` for it. During the pass, run that command for any identity the chart records as delivered or duplicate, passing what delivered it: the delivering leaf slug and commit, or the other identity.
+At open, name each skipped GitHub identity that is still open on GitHub and offer `akrogon close <owner/repo#n> --by <text>` for it. During the pass, run that command for any identity the chart records as delivered or duplicate, passing what delivered it: the delivering leaf slug and commit, or the other identity. A confirmed full match with no other owner whose work is undelivered is exempt and stays open as `sources` until its completion owner delivers.
 
 ## Drain
 
@@ -59,6 +59,8 @@ Warn as soon as a genuinely human-only prerequisite appears, name its owner and 
 Prepare the complete contracts using shapes and standing design, and present one attended handoff review with tree, scope, registered repo, relevant operator choices and the implementation debate recommendation: `debate` defaults to no and is asked once at the door, very small issues skip the question and use no, and naming a charting peer does not set this field; recognize concrete handoff authorization already supplied in the session instead of asking again.
 
 When peers are named, leaf writing is a mandatory exchange after approval and before any handoff write: A drafts every brief and design to the scratchpad, each named peer reviews each draft as an implementer and returns disagreements with evidence, A merges the consensus, marking changed lines with agreeing-slot tags such as `(A)`, `(B,C)`, `(A,B,C)` in the draft and carrying any held disagreement into the leaf design, and only the merged contracts reach `issues/open/`.
+
+Check destinations at destination selection and again right before the handoff review, one check when both coincide and the opening pull counting only when it coincides with a checkpoint: checked repos are the source repo plus each selected registered destination, deduplicated within a checkpoint, and the source is never exempt, including when it is also the only destination. At each checkpoint run plain `akrogon pull` with cwd at each checked repo's registered root from `akrogon config` `repos`; report an unregistered or non-GitHub destination and hold the handoff to that destination only, while any other failed refresh likewise holds only that destination and other destinations continue. Then compare each checked destination's `issues/seeds/*.md` against the chart's scoped work, show candidate matches to the operator, and act only on operator confirmation; checking never imports a destination's unrelated seeds.
 
 Audit the proposed contracts as an implementer and the Take operation-proof rule, and run the preflight in shapes before writing, refusing collisions by naming the conflicting destination and missing dependencies before any handoff write.
 
