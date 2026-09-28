@@ -1,5 +1,5 @@
 slug: base-preflight
-phase: implement
+phase: merged
 created: 2026-09-28
 repo: akrogon
 debate: "yes"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   []
 busy_since: 
-  B: 2026-09-28T15:12:22.910Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -25,8 +25,8 @@ pane:
   A: w8:pD5
   B: w8:pD6
 prompted: 
-  B: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-base-preflight--/2026-09-28T14-56-48-987Z_01a0e884-bf5b-75b3-9780-f145c8ea66ec.jsonl
+  {}
 prompted_at: 
-  B: 2026-09-28T15:12:22.910Z
+  {}
 delivery_error: 
   {}

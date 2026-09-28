@@ -1,5 +1,5 @@
 slug: worker-path
-phase: implement
+phase: merged
 created: 2026-09-28
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#37"
 busy_since: 
-  B: 2026-09-28T15:33:48.408Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -25,8 +25,8 @@ pane:
   A: w8:pD9
   B: w8:pDA
 prompted: 
-  B: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-worker-path--/2026-09-28T15-31-26-274Z_01a0e8a4-71c2-7557-9d81-2b1ccb39f4d8.jsonl
+  {}
 prompted_at: 
-  B: 2026-09-28T15:33:48.408Z
+  {}
 delivery_error: 
   {}
