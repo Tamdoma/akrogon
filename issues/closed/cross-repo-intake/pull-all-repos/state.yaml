@@ -1,5 +1,5 @@
 slug: pull-all-repos
-phase: plan.synthesis
+phase: merged
 created: 2026-09-28
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#38"
 busy_since: 
-  B: 2026-09-28T17:04:11.201Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -25,8 +25,8 @@ pane:
   A: w8:pDJ
   B: w8:pDK
 prompted: 
-  B: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-pull-all-repos--/2026-09-28T17-04-07-940Z_01a0e8f9-4f04-7746-b5bb-7f47b0ee07bf.jsonl
+  {}
 prompted_at: 
-  B: 2026-09-28T17:04:11.201Z
+  {}
 delivery_error: 
   {}
