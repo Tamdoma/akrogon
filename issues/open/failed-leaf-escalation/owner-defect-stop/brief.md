@@ -1,0 +1,19 @@
+# Brief: owner-defect-stop
+
+## What
+The watch recognizes a failed leaf whose reason identifies a defect in another leaf's merged work, and notifies once with the owner, the next step and how to restart the watch. It runs no `next <slug>` for a leaf that only waits on unmerged prerequisites. It stops when every remaining leaf is a notified human-prerequisite failure or only waits on one.
+
+## Why
+framework `live-replay` failed at implement because merged sibling work had a defect ("owning leaf ... must reopen first"). The watch reported "unchanged, needs operator" for 5 ticks (about 1h40m) while dependent `update-replay` sat blocked, and the Stop rule never fired because a blocked dependent is not a failed leaf (`skills/watch-issues/SKILL.md:45`). It recurred at 10:25Z on 2026-09-28 with a second upstream defect (Tamdoma/akrogon#33).
+
+## Credentials
+None.
+
+## Done-criteria
+1. The "Failed on a human prerequisite" rule (`SKILL.md:38`) also covers a failure whose reason identifies a defect in another leaf's merged work. The watch resolves the named owner or owner candidates against the readable leaf inventory. For this class the operator charts a new fix leaf and resumes the failed leaf after the fix merges. A merged leaf is never reopened. A defect attributed to an unmerged owner does not enter this class. Missing or ambiguous ownership is reported as unresolved, not assigned by the watch.
+2. The Waiting rule (`SKILL.md:36`) runs no `akrogon next <slug>` for a leaf whose `blocked-by` names an unmerged leaf, because `src/next.ts:536-539` rejects it and the command-error rule would end the fire. It reports the leaf as waiting on that prerequisite.
+3. The Stop rule (`SKILL.md:43-45`) also fires when every remaining leaf is failed on a human prerequisite with shown evidence, or is merged or waiting and every unmerged prerequisite or sibling it waits on leads, directly or through other waiting leaves, to such a failed leaf. An unreadable inventory, an unknown `blocked-by` slug, a runnable leaf or a busy seat prevents stopping.
+4. The first fire that recognizes a merged-owner defect sends one `herdr notification show`, whether or not the watch can stop. It names the failed leaf, its failure phase, the owner or unresolved owner candidates, the waiting dependents, and the next step: settle any ownership question, chart a new fix leaf, then run `akrogon phase <slug> <failure.phase>` after the fix merges and the required seats are idle or absent. It also says the watch stops once nothing else can run and restarts with `/watch-issues`. This notice replaces the `:38` notice for that failure, so one failure gets one notice. Original `failure.delivery=shown` does not count as this notice. Repeats are avoided with the existing watch context, the existing allowance after context loss stays, and no persistent state is added. Credential, permission and other human-prerequisite failures keep their current notice with no fix-leaf instruction.
+5. A walkthrough applies the edited rules to real observer output from fixture repos, run with `OBSERVE_AKROGON` and `OBSERVE_HERDR` stub binaries as in `scripts/observe.test.ts:32-38`. It covers an owner-defect failure with a blocked dependent, the same case with independent runnable work, and a credential failure with a blocked dependent, each with shown and unshown original delivery. It shows one notice per newly recognized failure, no stop while independent work can run, and no fix-leaf instruction for the credential case. The observer output and the decided actions are saved to a file under the OS temp dir, and the implementation report records that path.
+6. The Never list, `src/`, `skills/watch-issues/scripts/` and the observer line format are unchanged.
+7. The configured `checks` commands from `issues/config.yaml` pass.
