@@ -212,7 +212,7 @@ function ageSuffix(value: string | undefined, now: number): string {
   if (diff < 0) diff = 0;
   const h: number = Math.floor(diff / 3600000);
   const m: number = Math.floor((diff % 3600000) / 60000);
-  return `+${h}h${String(m).padStart(2, '0')}m`;
+  return ` busy=${h}h${String(m).padStart(2, '0')}m`;
 }
 
 function formatLeaf(leaf: Leaf, statuses: Map<string, string>, now: number): string {

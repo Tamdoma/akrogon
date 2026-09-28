@@ -125,8 +125,51 @@ test('busy with and without busy_notified', async (): Promise<void> => {
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
     expect(r.code, r.stderr).toBe(0);
     expect(lines(r.stdout)).toEqual([
-      'slug=busy-notified phase=implement attempts=A0,B0 blocked= A=pane-n/working+0h00m B=-/- notified=A',
-      'slug=busy-plain phase=implement attempts=A0,B0 blocked= A=pane-p/working+0h00m B=-/- notified=',
+      'slug=busy-notified phase=implement attempts=A0,B0 blocked= A=pane-n/working busy=0h00m B=-/- notified=A',
+      'slug=busy-plain phase=implement attempts=A0,B0 blocked= A=pane-p/working busy=0h00m B=-/- notified=',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('unparsable busy_since prints no suffix', async (): Promise<void> => {
+  const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
+  try {
+    writeLeaf(root, 'owner', 'busy-garbage', baseState('busy-garbage', 'implement', {
+      pane: { A: 'pane-g' },
+      busy_since: { A: 'not-a-date' },
+    }));
+    const akrogon: string = akrogonOk(root);
+    const herdr: string = herdrOk(root, [
+      { pane_id: 'pane-g', agent_status: 'working' },
+    ]);
+    const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual([
+      'slug=busy-garbage phase=implement attempts=A0,B0 blocked= A=pane-g/working B=-/- notified=',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('future busy_since prints busy=0h00m', async (): Promise<void> => {
+  const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
+  try {
+    const future: string = new Date(Date.now() + 3600000).toISOString();
+    writeLeaf(root, 'owner', 'busy-future', baseState('busy-future', 'implement', {
+      pane: { A: 'pane-f' },
+      busy_since: { A: future },
+    }));
+    const akrogon: string = akrogonOk(root);
+    const herdr: string = herdrOk(root, [
+      { pane_id: 'pane-f', agent_status: 'working' },
+    ]);
+    const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual([
+      'slug=busy-future phase=implement attempts=A0,B0 blocked= A=pane-f/working busy=0h00m B=-/- notified=',
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
