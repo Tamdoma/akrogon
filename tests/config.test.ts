@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fixture, cli, yaml, type Fixture } from './helpers';
 import { command } from '../src/shell';
@@ -173,6 +173,42 @@ test('config prints merged slots from root, linked worktree, and global outside'
     expect(Bun.YAML.parse(outside.stdout)).toMatchObject({
       slots: { a: { model: 'strong-a' }, b: { model: 'strong-b' } },
     });
+  } finally {
+    f.clean();
+  }
+});
+
+test('config prints worktree_store matching the leaf path for every root shape and caller', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const root: string = realpathSync(f.root);
+    const check = (
+      parsed: { worktree_root: string; worktree_store: string },
+      worktreeRoot: string,
+      worktreeStore: string,
+    ): void => {
+      expect(parsed).toMatchObject({ worktree_root: worktreeRoot, worktree_store: worktreeStore });
+      expect(isAbsolute(parsed.worktree_store)).toBe(true);
+    };
+    check(
+      Bun.YAML.parse((await cli(f, ['config'])).stdout),
+      'issues/worktrees',
+      resolve(root, 'issues/worktrees'),
+    );
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: 'custom/trees' });
+    check(Bun.YAML.parse((await cli(f, ['config'])).stdout), 'custom/trees', resolve(root, 'custom/trees'));
+    const absolute: string = resolve(f.home, 'absolute-trees');
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: absolute });
+    const atRoot = Bun.YAML.parse((await cli(f, ['config'])).stdout);
+    check(atRoot, absolute, absolute);
+    const linked: string = resolve(f.home, 'linked-store');
+    await command(['git', 'worktree', 'add', '-b', 'linked-store', linked], f.root);
+    const atLinked = Bun.YAML.parse((await cli(f, ['config'], linked)).stdout);
+    check(atLinked, absolute, absolute);
+    expect(atLinked.worktree_store).toBe(atRoot.worktree_store);
+    const outside = Bun.YAML.parse((await cli(f, ['config'], f.home)).stdout);
+    expect(outside).toMatchObject({ repo: 'none' });
+    expect(outside).not.toHaveProperty('worktree_store');
   } finally {
     f.clean();
   }

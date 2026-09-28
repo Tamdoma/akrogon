@@ -14,6 +14,7 @@ import {
   target,
   within,
   seats,
+  worktreeStore,
   type Repo,
   type GlobalConfig,
   type SlotConfig,
@@ -228,7 +229,7 @@ function launch(global: GlobalConfig, repo: Repo, slot: Slot): { kind: string; a
 }
 
 async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
-  const path: string = resolve(repo.root, repo.config.worktree_root, leaf.state.slug);
+  const path: string = resolve(worktreeStore(repo), leaf.state.slug);
   if (leaf.state.worktree !== undefined && leaf.state.worktree !== path)
     throw new Error(
       `Worktree path mismatch: recorded "${leaf.state.worktree}", expected "${path}". Move the worktree to the expected path and reconcile Git metadata and state.worktree, or restore the previous repository/worktree root.`,
@@ -287,7 +288,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   const liveTabs: Tab[] = await tabs();
   const expected: Leaf = {
     ...leaf,
-    state: { ...leaf.state, worktree: resolve(repo.root, repo.config.worktree_root, leaf.state.slug) },
+    state: { ...leaf.state, worktree: resolve(worktreeStore(repo), leaf.state.slug) },
   };
   const matches: Tab[] = liveTabs.filter(
     (tab) =>

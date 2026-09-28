@@ -122,6 +122,10 @@ export async function requireRepo(global: GlobalConfig, cwd: string): Promise<Re
   return repo;
 }
 
+export function worktreeStore(repo: Repo): string {
+  return resolve(repo.root, repo.config.worktree_root);
+}
+
 export function target(repo: Repo): string {
   return `${repo.config.remote}/${repo.config.default_branch}`;
 }
@@ -141,6 +145,7 @@ export async function effectiveConfig(cwd: string): Promise<string> {
       ...repoConfig,
       slots: repo === null ? global.slots : seats(global, repo),
       repo: repo === null ? 'none' : repo.name,
+      ...(repo !== null ? { worktree_store: worktreeStore(repo) } : {}),
       ...(repo !== null && top !== repo.root ? { AKROGON_BASE: await base(repo, cwd) } : {}),
     },
     null,
