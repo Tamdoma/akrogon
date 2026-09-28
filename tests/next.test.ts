@@ -3098,4 +3098,3 @@ test('next branches a new worktree from the tracking commit, never a same-named 
     f.clean();
   }
 });
-

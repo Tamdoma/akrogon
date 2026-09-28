@@ -540,8 +540,8 @@ async function dispatchLeaf(
       return 'waiting';
     }
     seats(global, repo);
-    // checkBase is the shared predicate: a missing worktree needs remote proof, an existing one only local.
-    const mustCreate: boolean = !existsSync(resolve(repo.root, repo.config.worktree_root, slug));
+    // Mirrors ensureWorktree's path: a missing worktree needs remote proof, an existing one only local.
+    const mustCreate: boolean = !existsSync(resolve(worktreeStore(repo), slug));
     await checkBase(repo, mustCreate);
     const allocated: State | null = await allocate(global, repo, { path: leaf.path, state }, invocation);
     if (allocated === null) return 'waiting';

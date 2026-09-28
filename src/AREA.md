@@ -10,6 +10,7 @@
 ## Key files
 
 - `src/akrogon.ts` validates CLI arguments and dispatches commands.
+- `src/preflight.ts` verifies the configured base remote branch and local tracking ref.
 - `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
 - `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file.
 - `src/phase.ts` aggregates slot completion and enforces handoff guards.
