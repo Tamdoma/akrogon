@@ -125,7 +125,7 @@ Forks are taken one per round. After you answer, the next fork is researched and
 
 Fog is work whose question is not clear yet. “Exports behave strangely on large accounts” may need reproduction before anyone can propose a useful choice.
 
-Ruled-out work goes under Off route with its reason. It is not silently treated as agreed scope. When a mirrored report is already delivered or a duplicate, the door closes it with `akrogon close <owner/repo#n> --by <text>`.
+Ruled-out work goes under Off route with its reason. It is not silently treated as agreed scope. When a mirrored report is already delivered or a duplicate, the door closes it with `akrogon close <owner/repo#n> --by <text>`. The exception is a report confirmed fully covered but still undelivered and unowned: it stays open in `sources` until its completion owner delivers.
 
 ```text
 Unclear in-scope ground
@@ -199,6 +199,8 @@ For CSV export, the contract can specify:
 Cross-leaf promises need matching owners. Human-only prerequisites need an owner and completion before handoff. Required credentials are named, not pasted into the contract.
 
 When peer panes are part of charting, each named peer also reads the draft contracts as an implementer before they are written to the open tree.
+
+Before handoff the door also checks the source repo and each selected destination by running `akrogon pull` in each checked repo's registered root. It does this when a destination is selected and again right before the handoff review. A report already in a destination repo that describes the handed-off work becomes visible this way, so it can enter the leaf's `sources` and close when the delivering issue completes. If a destination refresh fails, only that destination's handoff waits.
 
 You get work that can be dispatched without reopening product decisions in the middle of a coding pass.
 
