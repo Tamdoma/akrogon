@@ -51,4 +51,4 @@ After all finish, A writes the merged file with agreeing-slot attribution such a
 
 ## Optional measurement
 
-Offer a prototype only for a named uncertainty, with the smallest experiment, estimated minutes and a choice to proceed or settle it without measurement. Run an explicitly chosen experiment in a time-boxed scratch sandbox, retain the measured finding in the fork and discard scratch code. A declined or timed-out measurement supplies no evidence and no new lifecycle state.
+Offer a prototype only for a named uncertainty, with the smallest experiment, estimated minutes and a choice to proceed or settle it without measurement. Run an explicitly chosen experiment in a time-boxed scratch sandbox, retain the measured finding in the fork and discard scratch code. A declined or timed-out measurement supplies no evidence and no new lifecycle state. This section covers exploration only and never replaces required operation proof. Declining a required probe holds the handoff under the Take operation-proof rule.
