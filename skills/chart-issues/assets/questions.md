@@ -5,26 +5,26 @@ Read before presenting an operator round. A short opening paragraph explains wha
 ```markdown
 <one plain paragraph: what this round settles and why now>
 
-### Q1 · <the question itself, as a person would ask it aloud, ending in a question mark>
+### 1 · <the question itself, as a person would ask it aloud, ending in a question mark>
 
 <one to three plain sentences: what this thing is, with a concrete example, and what changes depending on the answer; name the inspected path or evidence>
 
 Research: <tier · source with URL or path and the date read · one-sentence finding · what it changed in this question>
 
-- **A (recommended)** <what happens if you pick this, and the one reason it wins>
-- **B** <what happens if you pick this, and its cost>
+- **1a (recommended)** <what happens if you pick this, and the one reason it wins>
+- **1b** <what happens if you pick this, and its cost>
 
 Pitfalls: <the traps behind this choice, one or two sentences>
 
-### Q2 · ...
+### 2 · ...
 
-Reply `1-A 2-B`, or a numbered free-text answer.
+Reply `1a 2b`, or a numbered free-text answer.
 
 Challenge check
 <what an experienced practitioner could challenge in these recommendations, including each named peer's remaining disagreements, or why none was found>
 ```
 
-Every round uses this shape, on every harness and at every effort level: the opening paragraph, the sentences under each question, the research line, the labelled recommendation with its reason, the pitfalls line, the reply key and the challenge check. A small round keeps the parts that carry the decision, the reply key and the challenge check. Number questions continuously within a round and restart at 1 in the next round.
+Every round uses this shape, on every harness and at every effort level: the opening paragraph, the sentences under each question, the research line, the labelled recommendation with its reason, the pitfalls line, the reply key and the challenge check. A small round keeps the parts that carry the decision, the reply key and the challenge check. Number questions continuously within a round and restart at 1 in the next round. Label questions `1`, `2` and options `1a`, `1b`, `2a`, and use no other code scheme in a round.
 
 Present the current fork's material questions in one complete round and wait for the operator's answer; the next fork is researched and presented after that answer. Plain free text is a valid answer and is preserved verbatim. A question asking for explanation does not itself settle the choice; an explicit choice accompanied by a question does. An omitted material answer stays open. Recommendations and silence cannot supply an operator answer. A challenge exposing another material fork belongs in the next round.
 
