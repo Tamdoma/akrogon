@@ -8,9 +8,6 @@ test('sync commits local changes, rebases on the remote and pushes', async () =>
   const f: Fixture = await fixture();
   try {
     const remote: string = resolve(f.home, 'remote.git');
-    await command(['git', 'init', '--bare', '-b', 'main', remote]);
-    await command(['git', 'remote', 'add', 'origin', remote], f.root);
-    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     const other: string = resolve(f.home, 'other');
     await command(['git', 'clone', remote, other]);
     await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
@@ -48,7 +45,6 @@ async function remoteFixture(worktreeRoot: string = 'issues/worktrees', branch: 
   await command(['git', 'add', 'issues/config.yaml'], f.root);
   await command(['git', 'commit', '-m', 'config'], f.root);
   await command(['git', 'init', '--bare', '-b', branch, resolve(f.home, 'remote.git')]);
-  await command(['git', 'remote', 'add', 'origin', resolve(f.home, 'remote.git')], f.root);
   await command(['git', 'push', '-u', 'origin', branch], f.root);
   return f;
 }

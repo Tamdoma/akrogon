@@ -866,10 +866,6 @@ test('delayed working and idle notifications from the prompted session never con
 test('uncommitted work in a merge worktree is left to the merge seat', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const remote: string = resolve(f.home, 'remote.git');
-    await command(['git', 'init', '--bare', remote]);
-    await command(['git', 'remote', 'add', 'origin', remote], f.root);
-    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     const path: string = leaf(f, 'dirty', 'plan.synthesis');
     expect((await next(f, ['dirty'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
@@ -923,9 +919,6 @@ test('a worktree parked mid-rebase is still dispatched', async () => {
 test('a live merge retains its completion call after pushing, including a peer retry', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const remote: string = resolve(f.home, 'remote.git');
-    await command(['git', 'init', '--bare', remote]);
-    await command(['git', 'remote', 'add', 'origin', remote], f.root);
     const path: string = leaf(f, 'active-merge', 'plan.synthesis');
     expect((await next(f, ['active-merge'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
@@ -1618,10 +1611,6 @@ for (const seat of ['A'] as const) {
   test(`blocked merge seat ${seat} prevents fetch and clean checks in a dirty worktree`, async () => {
     const f: DispatchFixture = await dispatchFixture();
     try {
-      const remote: string = resolve(f.home, 'remote.git');
-      await command(['git', 'init', '--bare', remote]);
-      await command(['git', 'remote', 'add', 'origin', remote], f.root);
-      await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
       const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
       expect((await next(f, ['blocked-merge'])).code).toBe(0);
       const state: State = readState(path);
@@ -1672,10 +1661,6 @@ for (const seat of ['A'] as const) {
 test('a blocked non-merge seat does not stall a merge leaf', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const remote: string = resolve(f.home, 'remote.git');
-    await command(['git', 'init', '--bare', remote]);
-    await command(['git', 'remote', 'add', 'origin', remote], f.root);
-    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
     expect((await next(f, ['blocked-merge'])).code).toBe(0);
     const state: State = readState(path);
@@ -2227,10 +2212,6 @@ for (const owner of ['issue', 'epic/issue']) {
 test('merge leaf with landed branch re-prompts its idle seat instead of auto-recovering', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const remote: string = resolve(f.home, 'remote.git');
-    await command(['git', 'init', '--bare', remote]);
-    await command(['git', 'remote', 'add', 'origin', remote], f.root);
-    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     const path: string = leaf(f, 'landed-merge', 'plan.synthesis');
     expect((await next(f, ['landed-merge'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
@@ -2969,3 +2950,152 @@ test('next refuses unknown harness override before allocation', async () => {
     f.clean();
   }
 }, 15000);
+
+type Refusal = z.infer<typeof skipSchema>;
+async function refusal(f: DispatchFixture, slug: string, path: string): Promise<Refusal> {
+  const result: Result = await next(f, [slug]);
+  expect(result.code).toBe(1);
+  const lines: Refusal[] = skips(result);
+  expect(lines).toHaveLength(1);
+  expect(lines[0]).toMatchObject({ repo: 'repo', slug, path });
+  expect(calls(f)).toEqual([]);
+  expect(database(f).tabs).toHaveLength(0);
+  expect(database(f).panes).toHaveLength(0);
+  return lines[0];
+}
+
+for (const { code, remedy, sabotage } of [
+  {
+    code: 'C1',
+    remedy: 'git remote add origin',
+    sabotage: (f: DispatchFixture) => command(['git', 'remote', 'remove', 'origin'], f.root),
+  },
+  {
+    code: 'C2',
+    remedy: 'push',
+    sabotage: async (f: DispatchFixture) => {
+      await command(['git', 'init', '--bare', resolve(f.home, 'empty.git')]);
+      await command(['git', 'remote', 'set-url', 'origin', resolve(f.home, 'empty.git')], f.root);
+    },
+  },
+  {
+    code: 'C3',
+    remedy: 'git fetch origin main',
+    sabotage: (f: DispatchFixture) => command(['git', 'update-ref', '-d', 'refs/remotes/origin/main'], f.root),
+  },
+]) {
+  test(`next refuses a new leaf with a missing base (${code}) before worktree creation`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const path: string = leaf(f, 'fresh', 'plan.synthesis');
+      await sabotage(f);
+      const skip: Refusal = await refusal(f, 'fresh', path);
+      expect(skip.error).toContain(code);
+      expect(skip.error).toContain(remedy);
+      expect(existsSync(resolve(f.root, 'issues/worktrees/fresh'))).toBe(false);
+      expect(readState(path).worktree).toBeUndefined();
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+test('next refuses a leaf branch without a worktree when the remote branch is gone', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    await command(['git', 'branch', 'stale'], f.root);
+    const path: string = leaf(f, 'stale', 'plan.synthesis');
+    await command(['git', 'init', '--bare', resolve(f.home, 'empty.git')]);
+    await command(['git', 'remote', 'set-url', 'origin', resolve(f.home, 'empty.git')], f.root);
+    const skip: Refusal = await refusal(f, 'stale', path);
+    expect(skip.error).toContain('C2');
+    expect(existsSync(resolve(f.root, 'issues/worktrees/stale'))).toBe(false);
+    expect(readState(path).worktree).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
+test('next refuses an existing worktree whose tracking ref is deleted while the remote branch lives', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const worktree: string = resolve(f.root, 'issues/worktrees/resident');
+    await command(['git', 'worktree', 'add', '-b', 'resident', worktree], f.root);
+    const path: string = leaf(f, 'resident', 'plan.synthesis', { worktree });
+    await command(['git', 'update-ref', '-d', 'refs/remotes/origin/main'], f.root);
+    const skip: Refusal = await refusal(f, 'resident', path);
+    expect(skip.error).toContain('C3');
+    expect(skip.error).toContain('git fetch origin main');
+    expect(existsSync(worktree)).toBe(true);
+    expect(readState(path).worktree).toBe(worktree);
+  } finally {
+    f.clean();
+  }
+});
+
+test('next refuses an existing worktree whose tracking ref is deleted when the remote branch is gone', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const worktree: string = resolve(f.root, 'issues/worktrees/resident');
+    await command(['git', 'worktree', 'add', '-b', 'resident', worktree], f.root);
+    const path: string = leaf(f, 'resident', 'plan.synthesis', { worktree });
+    await command(['git', 'update-ref', '-d', 'refs/remotes/origin/main'], f.root);
+    await command(['git', 'init', '--bare', resolve(f.home, 'empty.git')]);
+    await command(['git', 'remote', 'set-url', 'origin', resolve(f.home, 'empty.git')], f.root);
+    const skip: Refusal = await refusal(f, 'resident', path);
+    expect(skip.error).toContain('C2');
+    expect(existsSync(worktree)).toBe(true);
+    expect(readState(path).worktree).toBe(worktree);
+  } finally {
+    f.clean();
+  }
+});
+
+test('next dispatches an existing worktree without querying an unreachable remote', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const worktree: string = resolve(f.root, 'issues/worktrees/resident');
+    await command(['git', 'worktree', 'add', '-b', 'resident', worktree], f.root);
+    leaf(f, 'resident', 'plan.synthesis', { worktree });
+    await command(['git', 'remote', 'set-url', 'origin', resolve(f.home, 'gone.git')], f.root);
+    expect((await next(f, ['resident'])).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+});
+
+test('next refuses to create a worktree while the remote is unreachable', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'fresh', 'plan.synthesis');
+    await command(['git', 'remote', 'set-url', 'origin', resolve(f.home, 'gone.git')], f.root);
+    const skip: Refusal = await refusal(f, 'fresh', path);
+    expect(skip.error).toContain('Unproven');
+    expect(skip.error).toContain('ls-remote');
+    expect(existsSync(resolve(f.root, 'issues/worktrees/fresh'))).toBe(false);
+    expect(readState(path).worktree).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
+test('next branches a new worktree from the tracking commit, never a same-named local ref', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const tracked: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
+    await command(['git', 'commit', '--allow-empty', '-m', 'impostor'], f.root);
+    const impostor: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    await command(['git', 'branch', 'origin/main', impostor], f.root);
+    await command(['git', 'tag', 'origin/main', impostor], f.root);
+    leaf(f, 'fresh', 'plan.synthesis');
+    expect((await next(f, ['fresh'])).code).toBe(0);
+    expect(await command(['git', 'rev-parse', 'refs/heads/fresh'], f.root)).toBe(tracked);
+    const create: string[] | undefined = calls(f).find((args) => args[0] === 'tab' && args[1] === 'create');
+    expect(create).toBeDefined();
+    expect(create!.filter((arg) => arg.startsWith('AKROGON_BASE='))).toEqual([`AKROGON_BASE=${tracked}`]);
+  } finally {
+    f.clean();
+  }
+});
+

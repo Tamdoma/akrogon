@@ -41,7 +41,7 @@ test('pull reconciles every page by number, preserves bodies, excludes PRs, and 
   const f: Fixture = await fixture();
   try {
     const gh: GhFixture = fakeGh(f);
-    await command(['git', 'remote', 'add', 'origin', 'https://github.com/acme/project.git'], f.root);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
     mkdirSync(resolve(f.root, 'issues/seeds'));
     writeFileSync(resolve(f.root, 'issues/seeds/1-old.md'), 'old');
     writeFileSync(resolve(f.root, 'issues/seeds/1-duplicate.md'), 'duplicate');
@@ -89,7 +89,7 @@ test('pull caps slugs at word boundaries and hard cuts oversized first words', a
   const f: Fixture = await fixture();
   try {
     const gh: GhFixture = fakeGh(f);
-    await command(['git', 'remote', 'add', 'origin', 'https://github.com/acme/project.git'], f.root);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
     const issues: Issue[] = [
       issue(104, 'alpha bravo charlie delta echo foxtrot golf hotel'),
       issue(105, 'X'.repeat(41)),
@@ -125,7 +125,7 @@ test('failed, malformed, and invalid listings leave seed bytes unchanged and com
   const f: Fixture = await fixture();
   try {
     const gh: GhFixture = fakeGh(f);
-    await command(['git', 'remote', 'add', 'origin', 'git@github.com:acme/project.git'], f.root);
+    await command(['git', 'remote', 'set-url', 'origin', 'git@github.com:acme/project.git'], f.root);
     mkdirSync(resolve(f.root, 'issues/seeds'));
     writeFileSync(resolve(f.root, 'issues/seeds/1-existing.md'), 'do not touch\n');
     const before: Record<string, string> = snapshot(f);
@@ -170,7 +170,7 @@ test('pull resolves supported origins, ignores merge remote, and targets the reg
     const gh: GhFixture = fakeGh(f);
     yaml(resolve(f.root, 'issues/config.yaml'), { remote: 'upstream', grounding: 'none' });
     await command(['git', 'remote', 'add', 'upstream', 'https://github.com/other/merge.git'], f.root);
-    await command(['git', 'remote', 'add', 'origin', 'https://github.com/acme/project'], f.root);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project'], f.root);
     const worktree: string = resolve(f.home, 'worktree');
     await command(['git', 'worktree', 'add', '-b', 'work', worktree], f.root);
     for (const origin of [
@@ -203,6 +203,7 @@ test('missing and invalid origins fail visibly, and all continues after invalid 
   const bad: Fixture = await fixture();
   try {
     const gh: GhFixture = fakeGh(f);
+    await command(['git', 'remote', 'remove', 'origin'], f.root);
     const missing: Result = await cli(f, ['pull'], f.root, gh.env);
     expect(missing.code).not.toBe(0);
     expect(missing.stderr).toContain('origin');
@@ -214,7 +215,7 @@ test('missing and invalid origins fail visibly, and all continues after invalid 
     await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme'], f.root);
     expect((await cli(f, ['pull'], f.root, gh.env)).code).not.toBe(0);
     await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
-    await command(['git', 'remote', 'add', 'origin', 'https://gitlab.com/acme/project'], bad.root);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://gitlab.com/acme/project'], bad.root);
     const global: GlobalConfig = globalSchema.parse(
       Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')),
     );

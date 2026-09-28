@@ -11,7 +11,6 @@ import {
   globalHome,
   expandPath,
   base,
-  target,
   within,
   seats,
   worktreeStore,
@@ -39,6 +38,7 @@ import {
   type Result,
   type Workspace,
 } from './shell';
+import { checkBase, trackingRef } from './preflight';
 import { commitMove, completeOwner } from './phase';
 import { sessionFile, deliveredAfter } from './session-file';
 
@@ -253,7 +253,7 @@ async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
     await command(
       branch.code === 0
         ? ['git', 'worktree', 'add', path, leaf.state.slug]
-        : ['git', 'worktree', 'add', '-b', leaf.state.slug, path, target(repo)],
+        : ['git', 'worktree', 'add', '-b', leaf.state.slug, path, trackingRef(repo)],
       repo.root,
     );
   }
@@ -540,6 +540,9 @@ async function dispatchLeaf(
       return 'waiting';
     }
     seats(global, repo);
+    // checkBase is the shared predicate: a missing worktree needs remote proof, an existing one only local.
+    const mustCreate: boolean = !existsSync(resolve(repo.root, repo.config.worktree_root, slug));
+    await checkBase(repo, mustCreate);
     const allocated: State | null = await allocate(global, repo, { path: leaf.path, state }, invocation);
     if (allocated === null) return 'waiting';
     for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds))

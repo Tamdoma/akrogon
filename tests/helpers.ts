@@ -18,7 +18,9 @@ export async function fixture(): Promise<Fixture> {
   writeFileSync(resolve(root, 'file'), 'initial\n');
   await command(['git', 'add', '.'], root);
   await command(['git', 'commit', '-m', 'initial'], root);
-  await command(['git', 'update-ref', 'refs/remotes/origin/main', 'HEAD'], root);
+  await command(['git', 'init', '--bare', '-b', 'main', resolve(home, 'remote.git')]);
+  await command(['git', 'remote', 'add', 'origin', resolve(home, 'remote.git')], root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], root);
   yaml(resolve(root, 'issues/config.yaml'), { checks: { test: 'bun test' }, grounding: 'none' });
   yaml(resolve(home, 'config.yaml'), {
     slots: {
