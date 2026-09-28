@@ -11,6 +11,7 @@ const contracts: Record<string, string> = {
   install: '',
   init: '[--from <proposal.yaml>] [--toolkit <lang>=<runner>]',
   config: '',
+  preflight: '',
   phase: '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>]',
   next: '[<slug>|<path>|--all|--resume]',
   pull: '[--all]',

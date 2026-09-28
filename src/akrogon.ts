@@ -34,6 +34,10 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     console.log(await effectiveConfig(process.cwd()));
     break;
+  case 'preflight':
+    z.tuple([]).parse(positionals);
+    await (await import('./preflight')).preflightCommand(process.cwd());
+    break;
   case 'init':
     z.tuple([]).parse(positionals);
     await initialize(
@@ -84,5 +88,5 @@ switch (verb) {
     await (await import('./install')).install();
     break;
   default:
-    throw new Error('Usage: akrogon <install|init|config|phase|next|pull|close|park|unpark|sync|status>');
+    throw new Error('Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|sync|status>');
 }

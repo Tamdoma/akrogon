@@ -3,6 +3,7 @@ import { relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { z } from 'zod';
 import { command, run, type Result } from './shell';
+import { trackingRef } from './preflight';
 
 const text = z.string().min(1);
 
@@ -131,7 +132,7 @@ export function target(repo: Repo): string {
 }
 
 export async function base(repo: Repo, cwd: string): Promise<string> {
-  return command(['git', 'merge-base', 'HEAD', target(repo)], cwd);
+  return command(['git', 'merge-base', 'HEAD', trackingRef(repo)], cwd);
 }
 
 export async function effectiveConfig(cwd: string): Promise<string> {

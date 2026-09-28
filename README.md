@@ -132,6 +132,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon install` | Link the command, skills and Herdr integration. |
 | `akrogon init [--from <proposal.yaml>] [--toolkit <lang>=<runner>]` | Initialize or update repository setup. |
 | `akrogon config` | Print effective configuration. |
+| `akrogon preflight` | Verify the configured base remote branch and local tracking ref. |
 | `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>]` | Record a pass or declare a failure with its reason. |
 | `akrogon next [<slug>\|<path>\|--all\|--resume]` | Dispatch eligible work. |
 | `akrogon pull [--all]` | Import open GitHub issues as seeds. |
