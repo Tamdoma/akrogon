@@ -50,7 +50,9 @@ With named peers, A owns interviewing and recording, sends only intake, current 
 
 Record operator answers and their reasons in fork files. After each answer, re-read Fog and move newly sharp material questions into their own fork files, removing only that material from Fog. Reshape the remaining forks and update CHART.md's ordered Open forks list before selecting and researching the next fork; handoff becomes ready only when no material question or fog requires the implementer to guess, with small optional prototypes explicitly chosen as measurements whose scratch code is discarded.
 
-Warn as soon as a genuinely human-only prerequisite appears, name its owner and record completion before opening a leaf; the distinct operator choice `hand_built` cannot replace completing known prerequisites. Credentials are not such a prerequisite but are anticipated, never discovered by a blocked seat: every brief lists the keys, logins and env values its leaf needs by variable name, what each is and where the operator obtains it, and the handoff batch names the ones absent from the consumer repo's gitignored `.env` so the operator fills them before dispatch.
+Every external operation a brief names, whether API method and path, CLI command or launch flag, gets one real call run with the identity the leaf will use before handoff, recorded in the fork with the command, inputs, identity reference without secret values, version, date, observed result, cleanup result and limits stating what the call does not prove. Writes use the smallest reversible call on a throwaway target with checked cleanup. A provider dry-run or validate call counts only for the property the provider documents it proves, run with the real identity and target. Declining a required probe holds the handoff; when no safe sufficient probe exists the handoff is held and scope is not narrowed. There is no waiver.
+
+Warn as soon as a genuinely human-only prerequisite appears, name its owner and record completion before opening a leaf; the distinct operator choice `hand_built` cannot replace completing known prerequisites. Credentials are not such a prerequisite but are anticipated, never discovered by a blocked seat: every brief lists the keys, logins and env values its leaf needs by variable name, what each is and where the operator obtains it, and the handoff batch names the ones absent from the consumer repo's gitignored `.env` before handoff so the probes can run.
 
 ## Handoff
 
@@ -58,7 +60,7 @@ Prepare the complete contracts using shapes and standing design, and present one
 
 When peers are named, leaf writing is a mandatory exchange after approval and before any handoff write: A drafts every brief and design to the scratchpad, each named peer reviews each draft as an implementer and returns disagreements with evidence, A merges the consensus, marking changed lines with agreeing-slot tags such as `(A)`, `(B,C)`, `(A,B,C)` in the draft and carrying any held disagreement into the leaf design, and only the merged contracts reach `issues/open/`.
 
-Audit the proposed contracts as an implementer and run the preflight in shapes before writing, refusing collisions by naming the conflicting destination and missing dependencies before any handoff write.
+Audit the proposed contracts as an implementer and the Take operation-proof rule, and run the preflight in shapes before writing, refusing collisions by naming the conflicting destination and missing dependencies before any handoff write.
 
 After valid handoff append `Handed off <YYYY-MM-DD>` on its own line to CHART.md, retaining the chart and source inputs in place; command dispatch remains the authority, so finish without running `akrogon next` or a chart phase transition. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative.
 
