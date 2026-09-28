@@ -1,0 +1,32 @@
+slug: chart-destination-intake
+phase: plan.synthesis
+created: 2026-09-28
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#38"
+busy_since: 
+  B: 2026-09-28T17:04:15.342Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t78
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/chart-destination-intake
+pane: 
+  A: w8:pDM
+  B: w8:pDN
+prompted: 
+  B: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-chart-destination-intake--/2026-09-28T17-04-12-061Z_01a0e8f9-5f1d-7093-a4c0-338174f37df2.jsonl
+prompted_at: 
+  B: 2026-09-28T17:04:15.342Z
+delivery_error: 
+  {}
