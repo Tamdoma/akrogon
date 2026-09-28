@@ -1,0 +1,32 @@
+slug: create-peer-panes
+phase: merged
+created: 2026-09-28
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#34"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t6Y
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/create-peer-panes
+pane: 
+  A: w8:pCR
+  B: w8:pCS
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

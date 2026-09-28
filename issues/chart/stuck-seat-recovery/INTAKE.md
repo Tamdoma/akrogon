@@ -6,6 +6,8 @@ A seat whose subagent admission fault has ended, or never needed a human, stops 
 ## Provenance
 - GitHub: Tamdoma/akrogon#32
 - GitHub: Tamdoma/akrogon#35
+- GitHub: Tamdoma/akrogon#36 (duplicate of #35, recorded after handoff)
+- Operator: 2026-09-28 "go with all recommendations" (P1: #36 is a duplicate of #35)
 - Operator: 2026-09-28 "go, create the handoff structure", "for everything needed"
 
 ## Source: Tamdoma/akrogon#32
@@ -79,6 +81,51 @@ When a seat is proven hung (no session writes for N minutes, esc ignored), the w
 ## Urgency
 High. Every hung tool blocks the leaf and its dependents (here live-replay and update-replay) until a human returns. Workaround: operator presses Ctrl+C/kills pi in the pane manually.
 
+## Source: Tamdoma/akrogon#36
+# watch-issues cannot see or answer a seat waiting on a pi confirmation prompt, so the leaf waits for the operator
+
+Source: Tamdoma/akrogon#36
+URL: https://github.com/Tamdoma/akrogon/issues/36
+
+Unverified intake.
+
+## Observation
+On 2026-09-28, in the akrogon watch, `create-peer-panes` seat B (`w8:pCS`, pi) moved to implement and spawned a subagent. pi then showed a confirmation prompt and waited for a human:
+
+```
+Allow subagent outside parent root?
+Resolved child cwd:
+/home/ivan/Work/infra/akrogon/issues/worktrees/create-peer-panes-u1
+This is coordination, not a filesystem sandbox.
+→ Yes
+  No
+```
+
+Gaps:
+- F1. herdr and `scripts/observe.ts` report the seat as `working` (`B=w8:pCS/working busy=0h11m`). The watch treats that as normal busy work, so the prompt goes unnoticed.
+- F1. `herdr agent read <pane> --lines 80` is refused while the seat is working (`agent_not_idle`). Only `--source visible` shows the prompt, and the skill's Busy rule does not mention that flag.
+- F2. `skills/watch-issues/SKILL.md` says "Never answer a seat", and no rule lets the watch read and confirm a prompt. So the watch cannot stand in for the operator, even to approve the leaf's own worker worktree.
+- F2. When the watch agent tried `herdr agent send-keys w8:pCS enter`, the Claude Code auto-mode classifier denied it as a remote shell write. So even an allowed answer needs a permission path.
+
+## Location
+- akrogon: `skills/watch-issues/SKILL.md` (Busy rule, Never list), `skills/watch-issues/scripts/observe.ts`
+- Leaf `create-peer-panes` (issues/open/chart-peer-layout), pane `w8:pCS`
+- pi subagent spawn confirmation ("Allow subagent outside parent root?")
+
+## Reproduction
+1. Run a leaf on a pi seat whose implement step spawns a subagent in a worker worktree outside the seat's cwd (for example `issues/worktrees/<slug>-u1`).
+2. pi shows the "Allow subagent outside parent root?" prompt.
+3. Observe prints the seat as `working`. The watch takes no action, and the leaf stalls until the operator answers.
+
+Seen once on 2026-09-28.
+
+## Expected behavior
+- The watch detects a seat waiting on a confirmation prompt on the first tick.
+- The watch can read the prompt and confirm it when it is safe (for example, the resolved path is the leaf's own worktree), through a permitted command. Otherwise it notifies the operator.
+
+## Urgency
+The leaf stops making progress until the operator answers the prompt by hand, which defeats the watch while the operator is away. Workaround: the operator presses Enter on Yes in the pane.
+
 ## Agent findings
 Full drain maps in slots/ (A, B, C, merged, rebuttals), read 2026-09-28.
 - Chain (A,B,C): pi manager.ts:1120-1127 records a retirement that missed its shutdown deadline. :1252-1258 keeps the admission fault while capacity is 0. It clears only if the shutdown later resolves (:1143-1150) or the manager closes. index.ts:133-134 emits herdr:blocked. herdr-agent-state.ts:191-193 lets blockedCount > 0 win over activity. akrogon src/next.ts:175 counts blocked as busy and :414 skips dispatch. src/shell.ts:100 marks agent_blocked retryable, so dispatch retries in a loop. (C)
@@ -88,3 +135,4 @@ Full drain maps in slots/ (A, B, C, merged, rebuttals), read 2026-09-28.
 - watch-issues SKILL.md:40 acts on busy seats with evidence, but has no admission-fault diagnosis or recovery. The 1 h notifier in next.ts:184,200 runs only inside akrogon next, which a blocked-only leaf need not trigger. (B)
 - busy_since is kept across working to blocked (next.ts:196), so observe.ts:224 can overstate blocked age. (B)
 - #35 (A, not yet peer-mapped): both hangs sat in tamdoma-subagents parallel subagent_spawn calls, the same extension as #32. The report states the operator intent: be absent entirely, with the watcher as a full replacement. That intent conflicts with the seat-stall-detection rule "no clock, poll or watchdog anywhere" and with the watch-issues Never list (no killing an agent process).
+- #36 (A, 2026-09-28, after handoff): duplicate of #35. The prompt is the tamdoma-subagents outside-parent-root confirm, removed by pi-extensions leaf same-repo-worktree-cwd (brief done-criteria 5-6). The asks to let the watch read and answer prompts are foreclosed by restart-hung-seat Q2-A (Never list unchanged). The prompt appeared because create-peer-panes put its worker at repo level against skills/implement-issue/worker-protocol.md:11, which is charted in ../worker-worktree-location/. Observe reporting `working` during a dialog is off route: no dialog remains after the fix.

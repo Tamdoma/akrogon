@@ -7,7 +7,7 @@
 
 ### Carries
 - Operator-placed: /home/ivan/Work/personal/MDConsultingNY/boulevard-automation/scripts/probe-ghl-scopes.ts.
-- Related: `git-base.md`.
+- Related: `git-base.md`. Lock 2026-09-28: `akrogon preflight` is the pre-write handoff check for the git base; akrogon learns no service APIs (Off route).
 
 ## Findings
 - (both) skills/chart-issues/SKILL.md Take lists credentials by name and human prerequisites, no write proof. The boulevard chart used GET calls and accepted "I added the permission" unverified.
