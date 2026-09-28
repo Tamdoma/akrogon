@@ -1,0 +1,15 @@
+# Design: worker-path
+
+## Binding decisions, verbatim
+From issues/chart/worker-worktree-location/forks/worker-location.md, Taken 2026-09-28, operator: "1a | 2 - I'm leaning toward A,  but Can we make a soft deterministic push something that doesn't require the whole machinery but still nudges or pushes the agent to do this. Some kind of a script that activates or something. Think about it. Consult with B. | 3a", then "2 - Is this the simplest solution? I just want to make sure it's not adding another complexity or a big failure point.", then "2b, let's go."
+- Q1-A: a new delegated leaf worker lives at registered root + `worktree_root` + `<slug>-u<N>`, beside its leaf, started from the leaf's committed HEAD. One absolute path is used unchanged for create, spawn, inspect and remove. Reason: one meaning of `worktree_root` everywhere, and the pi confirm that justified nesting is gone. Foreclosed: nested with `<lane>` defined (B).
+- Q2-B: `akrogon config` prints the resolved absolute store as a derived key, like `AKROGON_BASE`, and worker-protocol.md names the worker path from it. `worktree_root` in config output stays as configured. Reason: the defect was a relative value read two ways, and an absolute value removes the second reading with one line and one test and no new failure point. Start commit and caller checkout were never wrong in the transcripts. Foreclosed: creator script (A) as a new failure point solving unobserved problems, prose only (C) as no push.
+- Q3-A: a worker retained at the old nested path finishes where it is. Only new workers use the new path. No occupied path is deleted or reused to match naming. Foreclosed: relocating retained workers (B).
+
+/home/ivan/.claude/skills/chart-issues/assets/standing-design.md, interpreted: no auth, secrets or backend state are involved. No vanity tests: config tests run the real CLI on real temporary git repos, never a mocked resolver. Negative and edge cases are mandatory: unregistered cwd, absolute root, linked-worktree caller. The user-visible flow is the CLI plus the protocol's git command, so done-criterion 5 is a real invocation with a retained output file.
+
+## Leaf architecture
+Owned: src/config.ts (`effectiveConfig` gains `worktree_store`, plus one exported resolver), src/next.ts:231 and :290 (use that resolver instead of the inline `resolve`), tests/config.test.ts, skills/implement-issue/worker-protocol.md.
+Interface: `worktree_store: <absolute path>` in `akrogon config` YAML whenever a registered repo resolves. One function, e.g. `worktreeStore(repo: Repo): string`, returning `resolve(repo.root, repo.config.worktree_root)`, consumed by config output and leaf worktree paths so they cannot drift.
+Exclusions: no script, no new verb, no env var at pane creation, no pi or git hook change, no state fields. src/sync.ts:17 uses `expandPath` (handles `~`) and is unchanged. `worktree_root` handling in src/init.ts is unchanged. Retained-worker recovery and standalone workers are unchanged apart from the path wording.
+Dependencies: none.

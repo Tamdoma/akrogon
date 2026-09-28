@@ -1,19 +1,20 @@
 # Chart: implement workers use one worktree location
 
 ## Destination
-Every implement worker worktree is created at the one location worker-protocol names, and every seat follows it.
+Every new delegated leaf worker worktree is created at `<registered root>/<worktree_root>/<slug>-u<N>`, read from an absolute store path printed by `akrogon config`, used unchanged across creation, spawn and cleanup, starting from the leaf's committed HEAD. Standalone workers and retained-work recovery are unchanged.
 
 ## Forks taken
-None yet.
+- [Worker worktree location](forks/worker-location.md): registered-root store beside the leaf; `akrogon config` prints the absolute store; retained old-path workers finish in place
 
 ## Open forks
-- [Worker worktree location](forks/worker-location.md): keep workers nested in the leaf worktree, or move them to the repo's `issues/worktrees`
+None.
 
 ## Fog
-- Why `create-peer-panes` seat B put its worker at repo level against worker-protocol.md:11. Its pi session transcript is not yet read.
+None. The create-peer-panes deviation is recorded in forks/worker-location.md Findings: the transcript shows no reason.
 
 ## Off route
 - Letting watch-issues answer seat prompts. Foreclosed by stuck-seat-recovery restart-hung-seat Q2-A; #36 closed as a duplicate of #35.
 
 ## Territory findings
-A-only so far. Slot B maps this chart blind when it is selected.
+See `slots/map-merged.md` and `slots/map-rebuttal-B.md`.
+Handed off 2026-09-28

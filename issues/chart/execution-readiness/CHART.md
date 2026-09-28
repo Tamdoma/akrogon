@@ -5,9 +5,10 @@ No leaf state is written until the configured git base is usable and every exter
 
 ## Forks taken
 - [Missing configured git base](forks/git-base.md): refuse with case-specific remediation; one rule in a new read-only `akrogon preflight`, run before handoff writes and at dispatch before `ensureWorktree`; local tracking ref on every dispatch, remote branch also at handoff and new-worktree creation.
+- [Proof of external writes](forks/write-proof.md): one real, recorded call per external operation a brief names, with the leaf's identity, run by the charting agent; reversible writes or documented dry-runs; no safe probe holds the handoff; credentials in .env before handoff.
 
 ## Open forks
-- [Proof of external writes](forks/write-proof.md): what counts as proof and who runs it
+None.
 
 ## Fog
 None.
@@ -19,3 +20,4 @@ None.
 
 ## Territory findings
 See `slots/map-merged.md` and the fork files.
+Handed off 2026-09-28
