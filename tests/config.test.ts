@@ -182,28 +182,29 @@ test('config prints worktree_store matching the leaf path for every root shape a
   const f: Fixture = await fixture();
   try {
     const root: string = realpathSync(f.root);
-    const check = (
-      parsed: { worktree_root: string; worktree_store: string },
-      worktreeRoot: string,
-      worktreeStore: string,
-    ): void => {
+    type StoreParsed = { worktree_root: string; worktree_store: string };
+    const check = (parsed: StoreParsed, worktreeRoot: string, worktreeStore: string): void => {
       expect(parsed).toMatchObject({ worktree_root: worktreeRoot, worktree_store: worktreeStore });
       expect(isAbsolute(parsed.worktree_store)).toBe(true);
     };
     check(
-      Bun.YAML.parse((await cli(f, ['config'])).stdout),
+      Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed,
       'issues/worktrees',
       resolve(root, 'issues/worktrees'),
     );
     yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: 'custom/trees' });
-    check(Bun.YAML.parse((await cli(f, ['config'])).stdout), 'custom/trees', resolve(root, 'custom/trees'));
+    check(
+      Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed,
+      'custom/trees',
+      resolve(root, 'custom/trees'),
+    );
     const absolute: string = resolve(f.home, 'absolute-trees');
     yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: absolute });
-    const atRoot = Bun.YAML.parse((await cli(f, ['config'])).stdout);
+    const atRoot = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
     check(atRoot, absolute, absolute);
     const linked: string = resolve(f.home, 'linked-store');
     await command(['git', 'worktree', 'add', '-b', 'linked-store', linked], f.root);
-    const atLinked = Bun.YAML.parse((await cli(f, ['config'], linked)).stdout);
+    const atLinked = Bun.YAML.parse((await cli(f, ['config'], linked)).stdout) as StoreParsed;
     check(atLinked, absolute, absolute);
     expect(atLinked.worktree_store).toBe(atRoot.worktree_store);
     const outside = Bun.YAML.parse((await cli(f, ['config'], f.home)).stdout);
