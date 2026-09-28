@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { readGlobal, readRepo, currentRepo, requireRepo, type GlobalConfig, type Repo } from './config';
+import { readGlobal, readRepo, requireRepo, type GlobalConfig, type Repo } from './config';
 import { command, retryCommand, CommandError } from './shell';
 import { sourcePattern, type Leaf } from './state';
 
@@ -78,11 +78,8 @@ export async function pullRepo(repo: Repo): Promise<void> {
 
 export async function pullCommand(all: boolean): Promise<void> {
   const global: GlobalConfig = readGlobal();
-  const current: Repo | null = all
-    ? await currentRepo(global, process.cwd())
-    : await requireRepo(global, process.cwd());
-  if (current !== null) {
-    await pullRepo(current);
+  if (!all) {
+    await pullRepo(await requireRepo(global, process.cwd()));
     return;
   }
   const failures: { repo: string; error: Error }[] = [];

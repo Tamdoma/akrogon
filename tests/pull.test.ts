@@ -236,6 +236,69 @@ test('missing and invalid origins fail visibly, and all continues after invalid 
   }
 });
 
+test('pull --all pulls every registered repo from a repo root, a linked worktree, and an unregistered directory', async () => {
+  const f: Fixture = await fixture();
+  const second: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/second.git'], second.root);
+    const global: GlobalConfig = globalSchema.parse(
+      Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')),
+    );
+    yaml(resolve(f.home, 'config.yaml'), {
+      ...global,
+      repos: { repo: f.root, second: second.root },
+    });
+    const worktree: string = resolve(f.home, 'worktree');
+    await command(['git', 'worktree', 'add', '-b', 'work', worktree], f.root);
+    const unregistered: string = resolve(f.home, 'unregistered');
+    mkdirSync(unregistered);
+    for (const cwd of [f.root, worktree, unregistered]) {
+      script(gh, [
+        { stdout: JSON.stringify([[issue(10, 'From Repo')]]) },
+        { stdout: JSON.stringify([[issue(20, 'From Second')]]) },
+      ]);
+      const pulled: Result = await cli(f, ['pull', '--all'], cwd, gh.env);
+      expect(pulled.code).toBe(0);
+      expect(pulled.stdout).toBe('repo: 1 open issues pulled\nsecond: 1 open issues pulled');
+      expect(Object.keys(snapshot(f))).toEqual(['10-from-repo.md']);
+      expect(Object.keys(snapshot(second))).toEqual(['20-from-second.md']);
+      expect(existsSync(resolve(worktree, 'issues/seeds'))).toBe(false);
+    }
+  } finally {
+    f.clean();
+    second.clean();
+  }
+});
+
+test('pull --all from a registered repo pulls the healthy repos and exits non-zero naming the failed repo', async () => {
+  const f: Fixture = await fixture();
+  const bad: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://gitlab.com/acme/bad.git'], bad.root);
+    const global: GlobalConfig = globalSchema.parse(
+      Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')),
+    );
+    yaml(resolve(f.home, 'config.yaml'), {
+      ...global,
+      repos: { repo: f.root, bad: bad.root },
+    });
+    script(gh, [{ stdout: JSON.stringify([[issue(7, 'Still Pulled')]]) }]);
+    const pulled: Result = await cli(f, ['pull', '--all'], f.root, gh.env);
+    expect(pulled.code).not.toBe(0);
+    expect(pulled.stderr).toContain('bad');
+    expect(pulled.stderr).toContain('gitlab.com');
+    expect(pulled.stdout).toBe('repo: 1 open issues pulled');
+    expect(snapshot(f)['7-still-pulled.md']).toBeDefined();
+  } finally {
+    f.clean();
+    bad.clean();
+  }
+});
+
 test('startup runs pull all before next resume and wrappers forward arguments', async () => {
   const plugin: string = resolve(import.meta.dir, '../plugin');
   const manifest = z

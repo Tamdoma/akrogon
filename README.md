@@ -135,7 +135,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon preflight` | Verify the configured base remote branch and local tracking ref. |
 | `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>]` | Record a pass or declare a failure with its reason. |
 | `akrogon next [<slug>\|<path>\|--all\|--resume]` | Dispatch eligible work. |
-| `akrogon pull [--all]` | Import open GitHub issues as seeds. |
+| `akrogon pull [--all]` | Import open GitHub issues as seeds. With --all, pull every registered repository from any directory. |
 | `akrogon close <owner/repo#n> --by <text>` | Close one unowned GitHub issue with a delivered-by note. |
 | `akrogon status [<slug>\|--charts]` | Show the board, leaf history or chart store. |
 | `akrogon sync` | Commit eligible issue records, rebase and push. |
@@ -151,7 +151,7 @@ akrogon next export-csv
 akrogon status export-csv
 ```
 
-A sweep with the all option covers the current repository when run inside one. Outside a registered repository, it covers every registered repository. Pull has the same all-repositories option. Status without arguments also shows all registered repositories when run outside one.
+A next sweep with the all option covers the current repository when run inside one and every registered repository outside one. Pull --all pulls every registered repository from any directory. Status without arguments also shows all registered repositories when run outside one.
 
 Parking uses top-level issue names. It refuses allocated work and moves that break open dependencies. Its all option skips ineligible issues. Parked records remain committed project data.
 
