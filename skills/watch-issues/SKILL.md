@@ -31,7 +31,7 @@ When the evidence warrants a closer look, run `herdr agent read <pane> --lines 8
 
 ## Judge
 
-Required seats by phase: plan.positions A+B, plan.rebuttal A+B, plan.synthesis B, implement B, check.review A+B (A only when `fix_rounds > 0`), check.fix B, merge A; merged and failed need none. Unfinished means not in `done`.
+Required seats by phase: plan.positions A+B, plan.rebuttal A+B, plan.synthesis A, implement A, check.review A+B (B only when `fix_rounds > 0`), check.fix A, merge B; merged and failed need none. Unfinished means not in `done`.
 
 - Waiting: phase is not merged or failed and at least one required unfinished seat is idle or absent. When `blocked=` names a leaf that is not merged in the readable inventory under `issues/open`, run no `akrogon next` for it: explicit `next <slug>` throws on unmerged prerequisites and `next --all` leaves it waiting on its own, so report it as waiting on that prerequisite. A `blocked=` name matching no leaf under `issues/open` is reported as a gap, never assumed merged or unmerged. Otherwise run `akrogon next <slug>`; the command guards the other seats. When several unblocked leaves wait, run `akrogon next --all` from the root instead.
 - Merged still under open: read the state files beneath the leaf's top-level owner folder under `issues/open`, an issue or an epic. If any is not merged, report waiting on siblings and run no `next` for this leaf. If all are merged, run `akrogon next <slug>` once this fire, then re-observe; a failed command follows the command-error rule, and remaining under open alone is not an error. If sibling state cannot be read, report that gap rather than assume completion.

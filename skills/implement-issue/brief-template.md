@@ -1,6 +1,6 @@
 # Eight-section implementation brief
 
-Read when B writes or revises a worker sub-brief or a standalone task brief; replace the guidance below with the concrete task, keeping the brief below 1,500 words and 20 rules by judgment, not machinery.
+Read when A writes or revises a worker sub-brief or a standalone task brief; replace the guidance below with the concrete task, keeping the brief below 1,500 words and 20 rules by judgment, not machinery.
 
 A delegated leaf writes `implementation/brief-1.md`, `brief-2.md`, etc., one per unit and one unit included, each with these eight sections and only its own scope, with the binding facts for that scope copied in rather than pointed at; the leaf has no whole-leaf brief because `plan.md` is its contract. Standalone writes one task brief with these sections.
 
@@ -18,11 +18,11 @@ Concrete paths from the plan, one existing pattern to copy, and this skill folde
 
 ## 4. Change list and needed interfaces
 
-Files and changes, the signatures and data shapes this worker needs, and relevant output from a preceding worker, rather than every interface in the project. For a delegated leaf each brief also records the chunks that must land first, the paths this unit owns, and any shared test resource or consumed output; B uses these records to pick wave members and judge independence.
+Files and changes, the signatures and data shapes this worker needs, and relevant output from a preceding worker, rather than every interface in the project. For a delegated leaf each brief also records the chunks that must land first, the paths this unit owns, and any shared test resource or consumed output; A uses these records to pick wave members and judge independence.
 
 ## 5. Do-not, reasons and exceptions
 
-Task-specific exclusions with why each matters and its actual exception, including: return a mismatch with evidence to the plan author instead of changing scope or an interface; the exception is a revised brief from B authorizing that change.
+Task-specific exclusions with why each matters and its actual exception, including: return a mismatch with evidence to the plan author instead of changing scope or an interface; the exception is a revised brief from A authorizing that change.
 
 End this section by restating the reasons and exceptions so they remain attached to the exclusions.
 
@@ -34,7 +34,7 @@ Advisory size: about N files and under M turns, with M at least four turns per f
 
 ## 7. Commands
 
-The resolved `test_changed` command only, including the supplied `AKROGON_BASE` value for a configured leaf; B runs the full suite separately.
+The resolved `test_changed` command only, including the supplied `AKROGON_BASE` value for a configured leaf; A runs the full suite separately.
 
 If the checkout has no changed-test runner, name the actual targeted check derived from its tools rather than substituting the full suite or inventing a command.
 
