@@ -58,6 +58,11 @@ export async function initialize(
   ].filter((line) => !prior.split('\n').includes(line));
   if (additions.length > 0)
     writeFileSync(ignore, prior + (prior !== '' && !prior.endsWith('\n') ? '\n' : '') + additions.join('\n') + '\n');
+  const attributes: string = resolve(root, '.gitattributes');
+  const priorAttributes: string = existsSync(attributes) ? readFileSync(attributes, 'utf8') : '';
+  const union: string = 'learnings/LESSONS.md merge=union';
+  if (!priorAttributes.split('\n').includes(union))
+    writeFileSync(attributes, priorAttributes + (priorAttributes !== '' && !priorAttributes.endsWith('\n') ? '\n' : '') + union + '\n');
   writeYaml(resolve(globalHome(), 'config.yaml'), {
     ...global,
     repos: { ...global.repos, [repoName]: root },

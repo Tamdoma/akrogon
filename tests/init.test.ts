@@ -1,8 +1,8 @@
 import { test, expect } from 'bun:test';
 import { resolve } from 'node:path';
-import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, readdirSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, readdirSync } from 'node:fs';
 import { fixture, cli, yaml, type Fixture } from './helpers';
-import { command, type Result } from '../src/shell';
+import { command, run, type Result } from '../src/shell';
 
 test('init writes proposal, registration and toolkit and preserves repeated user files', async () => {
   const f: Fixture = await fixture();
@@ -233,6 +233,83 @@ test('init preserves stored slots override on repeat', async () => {
     expect(Bun.YAML.parse(readFileSync(resolve(f.root, 'issues/config.yaml'), 'utf8'))).toMatchObject({
       slots: { a: { harness: 'fake', model: 'repo-a', effort: 'low' } },
     });
+  } finally {
+    f.clean();
+  }
+});
+
+test('init creates .gitattributes with the lessons union merge rule', async () => {
+  const f: Fixture = await fixture();
+  try {
+    expect((await cli(f, ['init'])).code).toBe(0);
+    expect(readFileSync(resolve(f.root, '.gitattributes'), 'utf8')).toBe('learnings/LESSONS.md merge=union\n');
+    expect(await command(['git', 'check-attr', 'merge', '--', 'learnings/LESSONS.md'], f.root)).toBe(
+      'learnings/LESSONS.md: merge: union',
+    );
+  } finally {
+    f.clean();
+  }
+});
+
+test('init appends the union rule to .gitattributes after unterminated content and repeats byte-identical', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const attributes: string = resolve(f.root, '.gitattributes');
+    writeFileSync(attributes, '* text=auto eol=lf');
+    expect((await cli(f, ['init'])).code).toBe(0);
+    const expected: string = '* text=auto eol=lf\nlearnings/LESSONS.md merge=union\n';
+    expect(readFileSync(attributes, 'utf8')).toBe(expected);
+    expect((await cli(f, ['init'])).code).toBe(0);
+    expect(readFileSync(attributes, 'utf8')).toBe(expected);
+  } finally {
+    f.clean();
+  }
+});
+
+test('init writes no lessons rule to the repo info attributes file', async () => {
+  const f: Fixture = await fixture();
+  try {
+    expect((await cli(f, ['init'])).code).toBe(0);
+    const info: string = resolve(
+      f.root,
+      await command(['git', 'rev-parse', '--git-path', 'info/attributes'], f.root),
+    );
+    expect(existsSync(info) ? readFileSync(info, 'utf8') : '').not.toContain('learnings/LESSONS.md');
+  } finally {
+    f.clean();
+  }
+});
+
+test('init union attribute merges concurrent lesson appends and still flags unrelated conflicts on rebase', async () => {
+  const f: Fixture = await fixture();
+  try {
+    expect((await cli(f, ['init'])).code).toBe(0);
+    await command(['git', 'add', '.'], f.root);
+    await command(['git', 'commit', '-m', 'akrogon init'], f.root);
+    await command(['git', 'push', 'origin', 'main'], f.root);
+    const other: string = resolve(f.home, 'other');
+    await command(['git', 'clone', resolve(f.home, 'remote.git'), other]);
+    await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
+    await command(['git', 'config', 'user.name', 'Test'], other);
+    const lessons: string = 'learnings/LESSONS.md';
+    appendFileSync(resolve(f.root, lessons), 'lesson from first\n');
+    await command(['git', 'commit', '-am', 'first lesson'], f.root);
+    appendFileSync(resolve(other, lessons), 'lesson from second\n');
+    await command(['git', 'commit', '-am', 'second lesson'], other);
+    await command(['git', 'push', 'origin', 'main'], other);
+    const pull: Result = await run(['git', 'pull', '--rebase', 'origin', 'main'], f.root);
+    expect(pull.code).toBe(0);
+    const merged: string = readFileSync(resolve(f.root, lessons), 'utf8');
+    expect(merged).toContain('lesson from first');
+    expect(merged).toContain('lesson from second');
+    writeFileSync(resolve(other, 'file'), 'remote change\n');
+    await command(['git', 'commit', '-am', 'remote change'], other);
+    await command(['git', 'push', 'origin', 'main'], other);
+    writeFileSync(resolve(f.root, 'file'), 'local change\n');
+    await command(['git', 'commit', '-am', 'local change'], f.root);
+    const conflicted: Result = await run(['git', 'pull', '--rebase', 'origin', 'main'], f.root);
+    expect(conflicted.code).not.toBe(0);
+    expect((await command(['git', 'diff', '--name-only', '--diff-filter=U'], f.root)).split('\n')).toContain('file');
   } finally {
     f.clean();
   }
