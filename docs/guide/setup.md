@@ -28,7 +28,7 @@ akrogon init --from /path/to/proposal.yaml
 akrogon config
 ```
 
-The command writes repository configuration, creates the issue and lesson scaffolds, adds ignore entries and registers the repository.
+The command writes repository configuration, creates the issue and lesson scaffolds, adds ignore entries, sets the `learnings/LESSONS.md merge=union` attribute and registers the repository.
 
 It writes configuration. It does not inspect your code and decide how to divide it into areas.
 
