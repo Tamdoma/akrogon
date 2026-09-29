@@ -708,12 +708,30 @@ test('unreadable state reserves its capacity and reports its path', async () => 
     expect(result.code).toBe(1);
     expect(skips(result)).toHaveLength(1);
     expect(skips(result)[0]).toMatchObject({ path: malformed });
-    expect(database(f).tabs).toHaveLength(0);
+    expect(database(f).tabs).toHaveLength(1);
     configure(f, { max_active: 4 });
     const retried: Result = await next(f, ['--all']);
     expect(retried.code).toBe(1);
     expect(database(f).tabs).toHaveLength(2);
     expect([first, second].filter((path) => readState(path).worktree !== undefined)).toHaveLength(2);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('one unreadable leaf blocks all capacity at max_active 1', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
+    writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
+    leaf(f, 'pending', 'plan.synthesis');
+    configure(f, { max_active: 1 });
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(1);
+    expect(skips(result)[0]).toMatchObject({ path: malformed });
+    expect(database(f).tabs).toHaveLength(0);
+    expect(database(f).prompts).toHaveLength(0);
   } finally {
     f.clean();
   }
@@ -732,6 +750,35 @@ test('machine-wide capacity includes another registered repo and folder selectio
     expect(database(f).tabs).toHaveLength(1);
     const states = [readState(resolve(f.root, 'issues/open/issue/first')), readState(second)];
     expect(states.filter((state) => state.worktree !== undefined)).toHaveLength(1);
+  } finally {
+    f.clean();
+    g.clean();
+  }
+}, 15000);
+
+test('merged leaves do not reserve capacity for other waiting leaves', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const g: Fixture = await fixture();
+  try {
+    const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
+    writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
+    leaf(f, 'merged-a', 'merged');
+    leaf(f, 'merged-b', 'merged');
+    leaf(f, 'merged-c', 'merged');
+    const first: string = leaf(f, 'first', 'plan.synthesis');
+    const second: string = leaf(f, 'second', 'plan.synthesis');
+    const other: string = leaf(g, 'other', 'plan.synthesis', { repo: 'other' });
+    configure(f, { max_active: 3, repos: { repo: f.root, other: g.root } });
+    await next(f, [other]);
+    await next(f, [first]);
+    expect(readState(other).worktree).toBeDefined();
+    expect(readState(first).worktree).toBeDefined();
+    expect(database(f).tabs).toHaveLength(2);
+    const blocked: Result = await next(f, [second]);
+    expect(blocked.code).not.toBe(0);
+    expect(skips(blocked).some((skip) => skip.path === malformed)).toBe(true);
+    expect(readState(second).worktree).toBeUndefined();
+    expect(database(f).tabs).toHaveLength(2);
   } finally {
     f.clean();
     g.clean();
@@ -1127,11 +1174,13 @@ for (const capacity of [3, 4]) {
           .map((skip) => skip.path)
           .sort(),
       ).toEqual([invalid, malformed].sort());
-      expect(database(f).tabs).toHaveLength(1);
-      expect(database(f).prompts).toHaveLength(1);
-      configure(f, { max_active: 5 });
-      expect((await next(f, ['new'])).code).toBe(1);
-      expect(database(f).tabs).toHaveLength(2);
+      expect(database(f).tabs).toHaveLength(capacity === 3 ? 1 : 2);
+      expect(database(f).prompts).toHaveLength(capacity === 3 ? 1 : 2);
+      if (capacity === 3) {
+        configure(f, { max_active: 5 });
+        expect((await next(f, ['new'])).code).toBe(1);
+        expect(database(f).tabs).toHaveLength(2);
+      }
     } finally {
       f.clean();
     }
@@ -1353,7 +1402,7 @@ test('foreign slugs are missing for lookup and dispatch', async () => {
 test('unreadable leaves reserve capacity while foreign leaves summarize separately', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    leaf(f, 'healthy', 'plan.synthesis');
+    const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
     writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
     const fa: string = leaf(f, 'foreign-a', 'plan.synthesis', { repo: 'other' });
@@ -1369,8 +1418,9 @@ test('unreadable leaves reserve capacity while foreign leaves summarize separate
     expect(summary!.paths).toContainEqual({ path: fa, stored: 'other' });
     expect(summary!.paths).toContainEqual({ path: fb, stored: 'other' });
     expect(skips(result).some((s) => s.path === malformed)).toBe(true);
-    expect(database(f).prompts).toHaveLength(0);
-    expect(database(f).tabs).toHaveLength(0);
+    expect(readState(healthy).worktree).toBeDefined();
+    expect(database(f).prompts).toHaveLength(1);
+    expect(database(f).tabs).toHaveLength(1);
   } finally {
     f.clean();
   }

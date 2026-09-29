@@ -266,19 +266,15 @@ async function activeCount(global: GlobalConfig, invocation: Invocation): Promis
   const live: Pane[] = await panes();
   const registered: ReturnType<typeof registeredRepos> = registeredRepos(global, invocation);
   let total: number = registered.unknown ? global.max_active : 0;
+  const active = (leaf: Leaf): boolean =>
+    leaf.state.phase !== 'merged' &&
+    leaf.state.phase !== 'failed' &&
+    live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf));
   for (const repo of registered.repos) {
     const inventory: Inventory = discover(repo, invocation);
-    const contribution: number = inventory.unknown
+    total += inventory.unknown
       ? global.max_active
-      : inventory.unreadable > 0
-        ? inventory.leaves.filter((leaf) => leaf.state.phase !== 'failed').length + inventory.unreadable
-        : inventory.leaves.filter(
-            (leaf) =>
-              leaf.state.phase !== 'merged' &&
-              leaf.state.phase !== 'failed' &&
-              live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf)),
-          ).length;
-    total += contribution;
+      : inventory.leaves.filter(active).length + inventory.unreadable;
   }
   return total;
 }
