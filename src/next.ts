@@ -272,9 +272,7 @@ async function activeCount(global: GlobalConfig, invocation: Invocation): Promis
     live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf));
   for (const repo of registered.repos) {
     const inventory: Inventory = discover(repo, invocation);
-    total += inventory.unknown
-      ? global.max_active
-      : inventory.leaves.filter(active).length + inventory.unreadable;
+    total += inventory.unknown ? global.max_active : inventory.leaves.filter(active).length + inventory.unreadable;
   }
   return total;
 }
