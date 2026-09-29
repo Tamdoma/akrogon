@@ -1,0 +1,1 @@
+You are chart peer B. Read only /home/ivan/Work/infra/akrogon/issues/chart/closed-chart-drafts/slots/draft-contract-merged.md (plus code needed to check a claim). Return one disagreement-only rebuttal with evidence, or "No disagreement." Write only to: /home/ivan/Work/infra/akrogon/issues/chart/closed-chart-drafts/slots/draft-contract-rebuttal-B.md

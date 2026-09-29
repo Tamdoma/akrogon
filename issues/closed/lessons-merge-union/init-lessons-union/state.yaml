@@ -1,0 +1,32 @@
+slug: init-lessons-union
+phase: merged
+created: 2026-09-29
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#40"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t7F
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/init-lessons-union
+pane: 
+  A: w8:pD0
+  B: w8:pE1
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

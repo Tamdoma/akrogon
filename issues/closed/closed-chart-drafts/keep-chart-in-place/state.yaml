@@ -1,0 +1,32 @@
+slug: keep-chart-in-place
+phase: merged
+created: 2026-09-29
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#39"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t7D
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/keep-chart-in-place
+pane: 
+  A: w8:pDW
+  B: w8:pDX
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
