@@ -26,11 +26,11 @@ type Route = { skill: string | null; slots: readonly Slot[]; next: readonly Phas
 export const routing: Record<Phase, Route> = {
   'plan.positions': { skill: 'plan-issue', slots: ['A', 'B'], next: ['plan.rebuttal', 'plan.synthesis', 'failed'] },
   'plan.rebuttal': { skill: 'plan-issue', slots: ['A', 'B'], next: ['plan.synthesis', 'failed'] },
-  'plan.synthesis': { skill: 'plan-issue', slots: ['B'], next: ['implement', 'failed'] },
-  implement: { skill: 'implement-issue', slots: ['B'], next: ['check.review', 'failed'] },
+  'plan.synthesis': { skill: 'plan-issue', slots: ['A'], next: ['implement', 'failed'] },
+  implement: { skill: 'implement-issue', slots: ['A'], next: ['check.review', 'failed'] },
   'check.review': { skill: 'check-issue', slots: ['A', 'B'], next: ['merge', 'check.fix', 'failed'] },
-  'check.fix': { skill: 'implement-issue', slots: ['B'], next: ['check.review', 'failed'] },
-  merge: { skill: 'merge-issue', slots: ['A'], next: ['merged', 'check.fix', 'failed'] },
+  'check.fix': { skill: 'implement-issue', slots: ['A'], next: ['check.review', 'failed'] },
+  merge: { skill: 'merge-issue', slots: ['B'], next: ['merged', 'check.fix', 'failed'] },
   merged: { skill: null, slots: [], next: [] },
   failed: {
     skill: null,
@@ -40,5 +40,5 @@ export const routing: Record<Phase, Route> = {
 };
 
 export function requiredSlots(phase: Phase, rounds: number): readonly Slot[] {
-  return phase === 'check.review' && rounds > 0 ? ['A'] : routing[phase].slots;
+  return phase === 'check.review' && rounds > 0 ? ['B'] : routing[phase].slots;
 }

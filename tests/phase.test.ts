@@ -26,7 +26,7 @@ test('valid phase transition rejects a mismatched repo key without changing stat
     const before: string = bytes(path);
     const history: string = resolve(f.root, 'issues/log.jsonl');
     writeFileSync(history, '');
-    const result: Result = await cli(f, ['phase', 'wrong-key', 'implement', '--slot', 'B']);
+    const result: Result = await cli(f, ['phase', 'wrong-key', 'implement', '--slot', 'A']);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(path);
     expect(result.stderr).toMatch(/stored[^\n]*other/i);
@@ -77,7 +77,7 @@ test('real same-slot and different-slot races record once and refuse stale moves
   }
 });
 
-test('review aggregates verdicts, rechecks only A, caps repairs and permits operator restart', async () => {
+test('review aggregates verdicts, rechecks only B, caps repairs and permits operator restart', async () => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1, grounding: 'none' });
@@ -90,9 +90,9 @@ test('review aggregates verdicts, rechecks only A, caps repairs and permits oper
     );
     expect(readState(path).fix_rounds).toBe(1);
     expect((await cli(f, ['phase', 'repair', 'check.review'])).code).toBe(0);
-    expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'B', '--verdict', 'ready'])).code).not.toBe(0);
+    expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'A', '--verdict', 'ready'])).code).not.toBe(0);
     expect(
-      (await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'A', '--verdict', 'fix'], f.root, herdr.env)).stdout,
+      (await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'B', '--verdict', 'fix'], f.root, herdr.env)).stdout,
     ).toBe('moved failed');
     expect((await cli(f, ['phase', 'repair', 'implement'], f.root, herdr.env)).code).toBe(0);
     expect(readState(path)).toMatchObject({ phase: 'implement', fix_rounds: 0 });
@@ -139,7 +139,7 @@ test('handoff to review refuses a dirty worktree at every move and issue files o
     await command(['git', 'worktree', 'add', '-b', 'dirty', worktree], f.root);
     const path: string = leaf(f, 'dirty', 'implement', { worktree });
     writeFileSync(resolve(worktree, 'work'), 'done\n');
-    const refused: Result = await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'B']);
+    const refused: Result = await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('Uncommitted work');
     expect(readState(path).phase).toBe('implement');
@@ -149,12 +149,12 @@ test('handoff to review refuses a dirty worktree at every move and issue files o
     writeFileSync(resolve(worktree, 'issues/open/issue/dirty/review-B.md'), 'stray artifact\n');
     await command(['git', 'add', 'issues'], worktree);
     await command(['git', 'commit', '-m', 'artifact on branch'], worktree);
-    const artifacts: Result = await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'B']);
+    const artifacts: Result = await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'A']);
     expect(artifacts.code).not.toBe(0);
     expect(artifacts.stderr).toContain('Issue files on leaf branch');
     expect(readState(path).phase).toBe('implement');
     await command(['git', 'reset', '--hard', 'HEAD~1'], worktree);
-    expect((await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'B'])).code).toBe(0);
+    expect((await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'A'])).code).toBe(0);
     expect(readState(path).phase).toBe('check.review');
     writeFileSync(resolve(worktree, 'lesson'), 'late\n');
     const late: Result = await cli(f, ['phase', 'dirty', 'merge', '--slot', 'A', '--verdict', 'ready']);
@@ -820,7 +820,7 @@ test('empty branch refuses review naming target', async () => {
     const path: string = leaf(f, 'empty', 'implement', { worktree });
     const before: string = bytes(path);
     const logPath: string = resolve(f.root, 'issues/log.jsonl');
-    const result: Result = await cli(f, ['phase', 'empty', 'check.review', '--slot', 'B']);
+    const result: Result = await cli(f, ['phase', 'empty', 'check.review', '--slot', 'A']);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('origin/main');
     expect(bytes(path)).toBe(before);
@@ -840,15 +840,15 @@ test('planning move refuses issue files on branch naming leaf path, then records
     writeFileSync(resolve(worktree, 'issues/open/issue/stray/positions-B.md'), 'stray artifact\n');
     await command(['git', 'add', 'issues'], worktree);
     await command(['git', 'commit', '-m', 'artifact on branch'], worktree);
-    const refused: Result = await cli(f, ['phase', 'stray', 'plan.rebuttal', '--slot', 'B']);
+    const refused: Result = await cli(f, ['phase', 'stray', 'plan.rebuttal', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain(resolve(f.root, 'issues/open/issue/stray'));
     expect(refused.stderr).toContain('positions-B.md');
     expect(readState(path)).toMatchObject({ phase: 'plan.positions', done: [] });
     await command(['git', 'reset', '--hard', 'HEAD~1'], worktree);
-    const recorded: Result = await cli(f, ['phase', 'stray', 'plan.rebuttal', '--slot', 'B']);
+    const recorded: Result = await cli(f, ['phase', 'stray', 'plan.rebuttal', '--slot', 'A']);
     expect(recorded.stdout).toBe('recorded');
-    expect(readState(path).done).toEqual(['B']);
+    expect(readState(path).done).toEqual(['A']);
   } finally {
     f.clean();
   }
@@ -891,7 +891,7 @@ test('stop from implement on dirty worktree records blocked failure and clears b
     expect(result.stdout).toBe('moved failed');
     expect(readState(path)).toMatchObject({
       phase: 'failed',
-      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'x', delivery: 'shown' },
+      failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'x', delivery: 'shown' },
       busy_since: {},
       busy_notified: {},
       prompted: {},
@@ -958,12 +958,12 @@ test('stops land in failed immediately without phase advance and validate slots'
     expect(readState(mergePath).failure).toEqual({
       cause: 'blocked',
       phase: 'merge',
-      slot: 'A',
+      slot: 'B',
       reason: 'x',
       delivery: 'shown',
     });
     leaf(f, 'bad-slot', 'implement');
-    const bad: Result = await cli(f, ['phase', 'bad-slot', 'failed', '--slot', 'A', '--reason', 'x']);
+    const bad: Result = await cli(f, ['phase', 'bad-slot', 'failed', '--slot', 'B', '--reason', 'x']);
     expect(bad.code).not.toBe(0);
     expect(bad.stderr).toContain('required --slot');
     const donePath: string = leaf(f, 'done-slot', 'plan.positions', { done: ['A'] });
@@ -1075,7 +1075,7 @@ test('fix cap records attempts failure', async () => {
     const herdr = fakeHerdr(f);
     const result: Result = await cli(
       f,
-      ['phase', 'cap', 'check.fix', '--slot', 'A', '--verdict', 'fix'],
+      ['phase', 'cap', 'check.fix', '--slot', 'B', '--verdict', 'fix'],
       f.root,
       herdr.env,
     );
@@ -1083,7 +1083,7 @@ test('fix cap records attempts failure', async () => {
     expect(readState(path).failure).toEqual({
       cause: 'attempts',
       phase: 'check.review',
-      slot: 'A',
+      slot: 'B',
       reason: 'fix rounds exhausted',
       delivery: 'shown',
     });
@@ -1246,10 +1246,33 @@ test('phase move clears delivery_error', async () => {
       },
     });
     expect(readState(path).delivery_error).not.toEqual({});
-    const result: Result = await cli(f, ['phase', 'clear-error', 'implement', '--slot', 'B']);
+    const result: Result = await cli(f, ['phase', 'clear-error', 'implement', '--slot', 'A']);
     expect(result.code).toBe(0);
     expect(readState(path).delivery_error).toEqual({});
   } finally {
     f.clean();
   }
 });
+
+for (const { phase, slot, extra } of [
+  { phase: 'plan.synthesis', slot: 'B' },
+  { phase: 'implement', slot: 'B' },
+  { phase: 'check.fix', slot: 'B' },
+  { phase: 'merge', slot: 'A' },
+  { phase: 'check.review', slot: 'A', extra: { fix_rounds: 1 } },
+]) {
+  test(`${phase} refuses a --slot ${slot} move without changing state or log`, async () => {
+    const f: Fixture = await fixture();
+    try {
+      const path: string = leaf(f, 'wrong-seat', phase, extra ?? {});
+      const before: string = bytes(path);
+      const result: Result = await cli(f, ['phase', 'wrong-seat', 'failed', '--slot', slot, '--reason', 'x']);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('required --slot');
+      expect(bytes(path)).toBe(before);
+      expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
+    } finally {
+      f.clean();
+    }
+  });
+}

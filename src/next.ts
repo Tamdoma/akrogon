@@ -745,7 +745,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
           if (
             rediscovered !== undefined &&
             rediscovered.state.phase === 'merged' &&
-            hookPane === rediscovered.state.pane.A &&
+            hookPane === rediscovered.state.pane.B &&
             (event === undefined ||
               event.event !== 'pane_agent_status_changed' ||
               (event.data.agent_status !== 'blocked' && event.data.agent_status !== 'unknown'))
