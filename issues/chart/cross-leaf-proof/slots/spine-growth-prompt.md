@@ -1,0 +1,7 @@
+You are a charting peer. Do not edit any repo file except your output file.
+
+Independently write a full operator round for fork /home/ivan/Work/infra/akrogon/issues/chart/cross-leaf-proof/forks/spine-growth.md (read its Question and Carries only). Locked so far: /home/ivan/Work/infra/akrogon/issues/chart/cross-leaf-proof/forks/proof-selection.md section "## Taken" (read that section only). Map context: /home/ivan/Work/infra/akrogon/issues/chart/cross-leaf-proof/slots/map-merged.md and the "Map corrections" section of /home/ivan/Work/infra/akrogon/issues/chart/cross-leaf-proof/slots/proof-selection-merged.md.
+
+Use the round shape in /home/ivan/Work/infra/akrogon/skills/chart-issues/assets/questions.md. The operator asked for very plain language: short sentences, no jargon, a concrete example per question. Keep file:line evidence and research lines. Inspect at least framework /home/ivan/Work/infra/tamdoma/framework .claude/workspaces/seo/satellite-network/test/run-fixture-network.ts, issues/open/satellite-network-simplify/satellite-foundation/fixture-network/{brief,design}.md, and akrogon skills/chart-issues/SKILL.md, skills/chart-issues/assets/{shapes,standing-design}.md, skills/merge-issue/SKILL.md, skills/implement-issue/ponytail.md. Look for practitioner sources beyond those already cited (walking skeleton, consumer-driven contracts) if they change the recommendation.
+
+Write it to exactly /home/ivan/Work/infra/akrogon/issues/chart/cross-leaf-proof/slots/spine-growth-<SLOT>.md. Reply only 'done'.

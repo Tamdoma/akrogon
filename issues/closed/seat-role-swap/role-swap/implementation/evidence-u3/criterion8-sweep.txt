@@ -1,0 +1,18 @@
+$ rg -n 'slot=[AB]|--slot [AB]|review-[AB]\\.md|[Ss]eat [AB]|[Ss]lot [AB]|\\bAs [AB]\\b|\\b[AB] (merges|implements|reviews|re-?checks|synthesi)' docs/guide/idea.md docs/guide/phases.md docs/guide/merge.md docs/guide/cheat.md docs/guide/install.md docs/guide/parts.md README.md src/AREA.md
+
+docs/guide/cheat.md:71:akrogon phase export-csv check.review --slot A
+docs/guide/cheat.md:77:akrogon phase export-csv merge --slot B --verdict nits
+docs/guide/cheat.md:83:akrogon phase export-csv failed --reason "Required permission is missing" --slot A
+docs/guide/phases.md:11:| check.review | A and B initially | Review verdicts. After a repair, B reviews the fix. |
+docs/guide/phases.md:47:akrogon phase export-csv check.review --slot A
+docs/guide/phases.md:55:akrogon phase export-csv merge --slot B --verdict ready
+docs/guide/phases.md:63:akrogon phase export-csv failed --reason "CSV column order needs a decision" --slot A
+docs/guide/phases.md:81:Chart handoff defaults to no implementation debate. A then writes the plan directly in synthesis. With debate enabled, A and B write independent positions first. The repository's rebuttal setting determines whether they get a rebuttal round before A synthesizes the plan.
+docs/guide/merge.md:3:Seat B merges reviewed work. It fetches the configured remote, rebases onto the default branch and runs the configured checks.
+docs/guide/merge.md:14:akrogon phase export-csv merged --slot B
+docs/guide/idea.md:29:Seats A and B have different jobs. A implements the change. B handles merge. Both review the first implementation.
+docs/guide/idea.md:36:Pass                     Seat A         Seat B
+sweep_exit=0
+
+
+NOTE: all hits are new-job statements (A implements/repairs/fails, B merges/reviews repairs). Zero old-job hits.

@@ -1,0 +1,9 @@
+# review-rules, slot A
+
+Evidence: #11 prep built the subject allowlist in prepare-briefs.ts:715 and verify rebuilt it without subjects in verify-network.ts:326; they "disagree by construction" (report.md #11). #12 auditor heading match missed the writer's heading. #14 chrome check demanded uniqueness the worker instruction never stated (report.md:307-316). #16 P2 required distinct pairs 2 heroes cannot give 4 sites.
+
+Already covered by taken rules: spine-growth 3a runs real (or recorded-from-real) producer output through every consumer and check in the spine. A new check that the real generator cannot satisfy at spine scale fails the spine inside the check's own leaf. #16 was at 4 sites, the fixture's own size, so the grown spine catches it. proof-selection 1a makes an untested failure a review Fix.
+
+Q1 writer/checker: 1a one owner per rule. Code writers and checkers import one function. When the writer is a model, its instruction states the rule the checker enforces (taken from the checker's definition, not rewritten), and real writer output runs through the checker (spine 3a). The chart names the rule's owner when writer and checker sit in different leaves. Review Fix: a leaf that adds or changes a check whose rule another code path re-implements. Keep independent assertions about observable output (B's R5). 1b review-only: review sees one leaf, but prep and verify were different leaves. 1c nothing: #10-#12, #14 recur.
+
+Q2 capacity: 2a narrow to what the spine misses. A check whose pass depends on scale (pool size vs site count) states its bound and tests the boundary at target scale; a generator that cannot meet the bound fails at plan with a clear error, not at review. Real-output passing is already covered by spine 3a. 2b require a separate real passing and failing example for every check: duplicates the spine. 2c nothing extra: scale beyond fixture size escapes.

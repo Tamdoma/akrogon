@@ -1,0 +1,28 @@
+Verify-only files: all three VERIFIED UNCHANGED. No role statement (no seat letter bound to a job).
+All seat/slot mentions are generic (roles, both seats, per-seat, <A|B> placeholder, config plumbing).
+
+=== docs/guide/parts.md: seat/job statements (A/B + job verbs, seat letters) ===
+(no matches)
+=== docs/guide/parts.md: every seat|slot mention ===
+14:| Seat | One of the two agent roles, A or B. |
+73:For a small command-line export, one leaf is enough. Do not split work just to fill both seats. The seats already work on the same leaf.
+79:Herdr holds the running seats. Its plugin events give Akrogon opportunities to dispatch the next pass.
+
+=== README.md: seat/job statements (A/B + job verbs, seat letters) ===
+(no matches)
+=== README.md: every seat|slot mention ===
+3:Akrogon is a lightweight software factory for people who already use coding agents. It runs defined work through planning, implementation, review and merge using two configurable agent seats in Herdr.
+17:Then release a leaf. The execution skills plan, build, review, repair and merge it. Files record the work between passes. Herdr holds the seats and triggers dispatch events.
+20:YOU + CHARTING             EXECUTION SEATS
+33:For export-csv, you settle the rows and columns before dispatch. The seats build, check and merge that contract.
+68:Set the machine's seats, harness commands and registered repositories in the tool-root configuration. AKROGON_HOME can select a different configuration directory. A repository may override either seat in `issues/config.yaml`.
+136:| `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>]` | Record a pass or declare a failure with its reason. |
+
+=== src/AREA.md: seat/job statements (A/B + job verbs, seat letters) ===
+(no matches)
+=== src/AREA.md: every seat|slot mention ===
+14:- `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
+16:- `src/phase.ts` aggregates slot completion and enforces handoff guards.
+26:- Prompt delivery is one attempt per pass per seat; a timeout settles against the seat session file on the next pass.
+
+

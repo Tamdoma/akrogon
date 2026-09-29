@@ -1,0 +1,1165 @@
+bun test v1.4.2 (744846f84)
+--changed: 3 changed files, running 2/15 test files
+
+tests/next.test.ts:
+(pass) next rejects relative file before dispatch or leaf mutation [41.82ms]
+(pass) next rejects absolute file before dispatch or leaf mutation [39.32ms]
+(pass) next rejects file symlink before dispatch or leaf mutation [50.65ms]
+(pass) next dispatches an explicit leaf folder [320.80ms]
+(pass) next dispatches an explicit worktree path [324.43ms]
+(pass) next reports Herdr response context for not-json-response [73.01ms]
+(pass) next reports Herdr response context for {"result":{"panes":"invalid-panes"}} [73.64ms]
+120 |     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).not.toMatch(/^(priority|slot):/m);
+121 |     const db: Database = database(f);
+122 |     expect(db.tabs).toHaveLength(1);
+123 |     expect(db.panes).toHaveLength(2);
+124 |     expect(db.prompts).toHaveLength(1);
+125 |     expect(db.prompts[0].text).toBe(`plan-issue build slot=A phase=plan.synthesis leaf=${path}`);
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: "plan-issue build slot=A phase=plan.synthesis leaf=/tmp/akrogon-s5kaGE/repo/issues/open/issue/build"
+Received: "plan-issue build slot=B phase=plan.synthesis leaf=/tmp/akrogon-s5kaGE/repo/issues/open/issue/build"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:125:32)
+(fail) next creates one worktree/tab under concurrent hooks, prompts configured A, ignores working events and resolves hook cwd [478.65ms]
+(pass) next from an operator pane owning no leaf dispatches by cwd instead of returning silently [302.92ms]
+163 |     expect((await next(f, ['stalled'])).code).toBe(0);
+164 |     expect(database(f).prompts).toHaveLength(1);
+165 |     const state: State = readState(path);
+166 |     saveState(path, { ...state, prompted_at: { A: new Date(Date.now() - 3 * 60 * 1000).toISOString() } });
+167 |     expect((await next(f, ['stalled'])).code).toBe(0);
+168 |     expect(database(f).prompts).toHaveLength(2);
+                                      ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 2
+Received length: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:168:33)
+(fail) next re-prompts an idle seat whose prompt is older than the grace period and the phase never moved [638.21ms]
+176 |   const f: DispatchFixture = await dispatchFixture();
+177 |   try {
+178 |     const path: string = leaf(f, 'misses', 'plan.synthesis');
+179 |     expect((await next(f, ['misses'])).code).toBe(0);
+180 |     const a: string = readState(path).pane.A!;
+181 |     expect(database(f).prompts).toEqual([
+                                      ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+-     "pane": "w1:p2",
+-     "text": "plan-issue misses slot=A phase=plan.synthesis leaf=/tmp/akrogon-OioqCk/repo/issues/open/issue/misses",
++     "pane": "w1:p3",
++     "text": "plan-issue misses slot=B phase=plan.synthesis leaf=/tmp/akrogon-OioqCk/repo/issues/open/issue/misses",
+    },
+  ]
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:181:33)
+(fail) a stale prompt never re-prompts a busy or done seat, succeeds without failing, and three failing passes fail the leaf [312.43ms]
+232 |   const f: DispatchFixture = await dispatchFixture();
+233 |   try {
+234 |     const path: string = leaf(f, 'flicker', 'plan.synthesis');
+235 |     expect((await next(f, ['flicker'])).code).toBe(0);
+236 |     const a: string = readState(path).pane.A!;
+237 |     expect(readState(path).prompted.A).toBeDefined();
+                                             ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:237:40)
+(fail) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [308.31ms]
+265 |   try {
+266 |     const path: string = leaf(f, 'dialog', 'plan.synthesis');
+267 |     saveDatabase(f, { ...database(f), blockOnStart: true });
+268 |     expect((await next(f, ['dialog'])).code).toBe(0);
+269 |     expect(database(f).prompts).toHaveLength(0);
+270 |     expect(readState(path).busy_since.A).toBeDefined();
+                                               ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:270:42)
+(fail) next waits on a blocked agent instead of counting attempts or flipping seats [277.81ms]
+293 |     expect((await next(f, ['retry'])).code).not.toBe(0);
+294 |     expect(database(f).tabs).toHaveLength(1);
+295 |     saveDatabase(f, { ...database(f), failPrompts: true });
+296 |     expect((await next(f, ['retry'])).code).toBe(0);
+297 |     expect(readState(path).phase).toBe('plan.synthesis');
+298 |     expect(readState(path).attempts.A).toBe(1);
+                                             ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:298:40)
+(fail) next resumes interrupted tab creation, fails after three failing passes [473.11ms]
+(pass) failed leaves never notify on dispatch [164.54ms]
+(pass) busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes [2632.24ms]
+472 |       panes: database(f).panes.map((p) => (p.pane_id === initial.pane.A ? { ...p, agent_status: 'unknown' } : p)),
+473 |     });
+474 |     const promptsBefore: number = database(f).prompts.length;
+475 |     expect((await nextAt(f, 'fallback', now)).code).toBe(0);
+476 |     expect(database(f).prompts).toHaveLength(promptsBefore);
+477 |     expect(readState(path)).toMatchObject({ attempts: { A: 2, B: 0 }, busy_since: { A: new Date(now).toISOString() } });
+                                  ^
+error: expect(received).toMatchObject(expected)
+
+  {
+    "attempts": {
+      "A": 2,
+      "B": 0,
+    },
++   "blocked-by": [],
++   "busy_notified": {},
+    "busy_since": {
+-     "A": "2026-09-11T12:00:00.000Z",
++     "B": "2026-09-11T12:00:00.000Z",
+    },
++   "created": "2026-09-10",
++   "debate": "no",
++   "delivery_error": {},
++   "done": [],
++   "fix_rounds": 0,
++   "pane": {
++     "A": "w1:p2",
++     "B": "w1:p3",
++   },
++   "phase": "plan.synthesis",
++   "prompted": {},
++   "prompted_at": {
++     "B": "2026-09-29T20:35:12.176Z",
++   },
++   "repo": "repo",
++   "slug": "fallback",
++   "tab": "w1:t1",
++   "verdict": {},
++   "worktree": "/tmp/akrogon-1EBCcI/repo/issues/worktrees/fallback",
+  }
+
+- Expected  - 1
++ Received  + 22
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:477:29)
+(fail) unknown panes wait, warn after an hour and keep busy observations [488.17ms]
+518 |     });
+519 |     const promptsBefore: number = database(f).prompts.length;
+520 |     const attemptsBefore: { A: number; B: number } = { ...readState(first).attempts };
+521 |     expect((await next(f, ['first'])).code).toBe(0);
+522 |     expect(database(f).prompts).toHaveLength(promptsBefore);
+523 |     expect(readState(first).busy_since.A).toBeDefined();
+                                                ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:523:43)
+(fail) next refuses hand-built and dependencies, respects capacity, and waits on unknown panes [602.12ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [718.91ms]
+(pass) a closed tab hook from a merged leaf starts the dependent [661.79ms]
+(pass) merged phase closes tab on typed next and starts the dependent [932.36ms]
+(pass) completing a leaf via targeted starts only same-repo dependents [702.72ms]
+(pass) completing a leaf via tab_closed starts only same-repo dependents [702.31ms]
+646 |           }),
+647 |         });
+648 |         expect(exited.code).toBe(0);
+649 |       }
+650 |       const expected: string[] = path === 'tab_closed' ? ['second'] : ['first', 'second'];
+651 |       expect(database(f).tabs.map((item) => item.label)).toEqual(expected);
+                                                               ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "first",
+    "second",
+  ]
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:651:58)
+(fail) completing a leaf via pane_hook starts only same-repo dependents [749.74ms]
+(pass) a dependent still blocked by an unmerged leaf stays unallocated after its first blocker merges [388.07ms]
+(pass) next --all inside a checkout sweeps only that repo [326.63ms]
+(pass) unreadable state reserves its capacity and reports its path [810.60ms]
+(pass) one unreadable leaf blocks all capacity at max_active 1 [122.08ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [399.72ms]
+(pass) merged leaves do not reserve capacity for other waiting leaves [735.99ms]
+831 |     const promptsBefore: number = database(f).prompts.length;
+832 |     const prompted: Result = await next(f, ['landed']);
+833 |     expect(prompted.code).toBe(0);
+834 |     expect(readState(path).phase).toBe('merge');
+835 |     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
+836 |     expect(database(f).prompts.at(-1)).toMatchObject({
+                                             ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "pane": "w1:p3",
+-   "text": "merge-issue landed slot=B phase=merge leaf=/tmp/akrogon-cBdz8O/repo/issues/open/landing/landed",
++   "pane": "w1:p2",
++   "text": "merge-issue landed slot=A phase=merge leaf=/tmp/akrogon-cBdz8O/repo/issues/open/landing/landed",
+  }
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:836:40)
+(fail) next recovers only merge-phase work by ancestry against a non-default remote target [605.63ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [728.12ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [552.35ms]
+926 |     const promptsBefore: number = database(f).prompts.length;
+927 |     const result: Result = await next(f, ['dirty']);
+928 |     expect(result.code).toBe(0);
+929 |     expect(readState(path).phase).toBe('merge');
+930 |     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
+931 |     expect(database(f).prompts.at(-1)).toMatchObject({
+                                             ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "pane": "w1:p3",
+-   "text": "merge-issue dirty slot=B phase=merge leaf=/tmp/akrogon-BqywTO/repo/issues/open/issue/dirty",
++   "pane": "w1:p2",
++   "text": "merge-issue dirty slot=A phase=merge leaf=/tmp/akrogon-BqywTO/repo/issues/open/issue/dirty",
+  }
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:931:40)
+(fail) uncommitted work in a merge worktree is left to the merge seat [585.90ms]
+(pass) a worktree parked mid-rebase is still dispatched [557.81ms]
+992 |       })),
+993 |     });
+994 |     const promptsBefore: number = database(f).prompts.length;
+995 |     expect((await next(f, ['--all'])).code).toBe(0);
+996 |     expect(readState(path).phase).toBe('merge');
+997 |     expect(database(f).prompts).toHaveLength(promptsBefore);
+                                      ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 2
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:997:33)
+(fail) a live merge retains its completion call after pushing, including a peer retry [576.60ms]
+1024 |     const db: Database = database(f);
+1025 |     expect(db.starts).toHaveLength(2);
+1026 |     expect(new Set(db.starts.map((args) => args[2])).size).toBe(2);
+1027 |     expect(db.starts.every((args) => /^[a-z][a-z0-9_-]{0,31}$/.test(args[2]))).toBe(true);
+1028 |     expect(db.tabs.map((tab) => tab.label)).toEqual([slug, slug]);
+1029 |     expect(new Set(db.prompts.map((prompt) => prompt.text))).toEqual(
+                                                                    ^
+error: expect(received).toEqual(expected)
+
+  Set {
+-   "plan-issue 123-this-is-a-valid-leaf-slug-longer-than-thirty-characters slot=A phase=plan.synthesis leaf=/tmp/akrogon-1rDMhi/repo/issues/open/issue/123-this-is-a-valid-leaf-slug-longer-than-thirty-characters",
+-   "plan-issue 123-this-is-a-valid-leaf-slug-longer-than-thirty-characters slot=A phase=plan.synthesis leaf=/tmp/akrogon-Zr4gl9/repo/issues/open/issue/123-this-is-a-valid-leaf-slug-longer-than-thirty-characters",
++   "plan-issue 123-this-is-a-valid-leaf-slug-longer-than-thirty-characters slot=B phase=plan.synthesis leaf=/tmp/akrogon-1rDMhi/repo/issues/open/issue/123-this-is-a-valid-leaf-slug-longer-than-thirty-characters",
++   "plan-issue 123-this-is-a-valid-leaf-slug-longer-than-thirty-characters slot=B phase=plan.synthesis leaf=/tmp/akrogon-Zr4gl9/repo/issues/open/issue/123-this-is-a-valid-leaf-slug-longer-than-thirty-characters",
+  }
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1029:62)
+(fail) agent names support identical repo-local slugs and long numeric-leading slugs [567.91ms]
+(pass) next awaits sourced completion after a failed rename before removing the worktree [755.35ms]
+(pass) missing registration is isolated during startup [545.84ms]
+(pass) missing registration is isolated during hook [540.09ms]
+(pass) missing registration is isolated during cwd [578.07ms]
+1147 |     const result: Result = await next(f, ['--all']);
+1148 |     expect(result.code).toBe(1);
+1149 |     expect(skips(result)).toHaveLength(1);
+1150 |     expect(skips(result)[0].slug).toBe('broken');
+1151 |     expect(skips(result)[0].error).toContain('nonexistent');
+1152 |     expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
+                                                                    ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "plan-issue healthy slot=A phase=plan.synthesis leaf=/tmp/akrogon-ESTFJU/repo/issues/open/issue/healthy",
++   "plan-issue healthy slot=B phase=plan.synthesis leaf=/tmp/akrogon-ESTFJU/repo/issues/open/issue/healthy",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1152:62)
+(fail) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [307.50ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 3 [903.52ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 4 [815.74ms]
+(pass) dirty merged worktree cleanup drops the leftover and removes the worktree [671.91ms]
+(pass) bare next from inside the repo cleans up its merged leaves [682.99ms]
+(pass) global lock acquisition failure is fatal [48.88ms]
+(pass) lock finalization failures and invalid hook events remain fatal [370.06ms]
+(pass) duplicate leaf identity never dispatches an arbitrary leaf [319.04ms]
+(pass) mismatch leaf identity never dispatches an arbitrary leaf [321.47ms]
+1308 |       const diagnostic: z.infer<typeof skipSchema> = skips(result)[0];
+1309 |       expect(diagnostic.repo).toBe('repo');
+1310 |       expect(diagnostic.count).toBe(1);
+1311 |       expect(diagnostic.paths).toContainEqual({ path, stored: 'other' });
+1312 |     }
+1313 |     expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
+                                                                    ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "plan-issue healthy slot=A phase=plan.synthesis leaf=/tmp/akrogon-MDgy59/repo/issues/open/issue/healthy",
++   "plan-issue healthy slot=B phase=plan.synthesis leaf=/tmp/akrogon-MDgy59/repo/issues/open/issue/healthy",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1313:62)
+(fail) next selection and sweep report both repo keys without dispatching or changing the mismatched leaf [344.07ms]
+(pass) foreign leaves summarize once per repo with count and paths [47.87ms]
+1360 |     expect(database(f).tabs).toHaveLength(2);
+1361 |     expect(
+1362 |       database(f)
+1363 |         .prompts.map((p) => p.text)
+1364 |         .sort(),
+1365 |     ).toEqual(
+             ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "plan-issue healthy slot=A phase=plan.synthesis leaf=/tmp/akrogon-DlzL5e/repo/issues/open/issue/healthy",
+-   "plan-issue other-healthy slot=A phase=plan.synthesis leaf=/tmp/akrogon-tYb9A8/repo/issues/open/issue/other-healthy",
++   "plan-issue healthy slot=B phase=plan.synthesis leaf=/tmp/akrogon-DlzL5e/repo/issues/open/issue/healthy",
++   "plan-issue other-healthy slot=B phase=plan.synthesis leaf=/tmp/akrogon-tYb9A8/repo/issues/open/issue/other-healthy",
+  ]
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1365:7)
+(fail) foreign leaves do not consume capacity while healthy leaves in both repos dispatch [608.18ms]
+(pass) foreign slugs are missing for lookup and dispatch [72.54ms]
+(pass) unreadable leaves reserve capacity while foreign leaves summarize separately [305.82ms]
+(pass) merged foreign leaves survive cleanup with worktree branch and tab intact [357.16ms]
+(pass) two repos summarize once per repo on every invocation [93.83ms]
+(pass) changed worktree root reports recorded and expected worktrees without creating or prompting [117.23ms]
+(pass) changed repo root reports recorded and expected worktrees without creating or prompting [112.00ms]
+1528 |     configure(f, { repos: { repo: root } });
+1529 |     const moved: DispatchFixture = { ...f, root };
+1530 |     const status: Result = await cli(moved, ['status', 'movable']);
+1531 |     expect(status.code).toBe(0);
+1532 |     expect(status.stdout).toContain('repo: repo');
+1533 |     expect((await cli(moved, ['phase', 'movable', 'implement', '--slot', 'A'])).code).toBe(0);
+                                                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1533:87)
+(fail) moving a repo with the same registered key supports status, phase and dispatch without a recorded worktree [80.15ms]
+(pass) unknown directory population reserves all new capacity but allows existing tabs [628.97ms]
+(pass) non-Error throws cross the scoped discovery boundary unchanged [46.84ms]
+(pass) explicit unreadable targets retain the original error without a missing-target stack [99.35ms]
+(pass) a selected leaf removed before its global lock is reported as skipped [44.30ms]
+1647 |       saveDatabase(f, {
+1648 |         ...db,
+1649 |         panes: db.panes.map((pane) => ({ ...pane, agent_session: session })),
+1650 |       });
+1651 |       expect((await next(f, ['sessionless'])).code).toBe(0);
+1652 |       expect(database(f).prompts).toEqual([
+                                         ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+-     "pane": "w1:p2",
+-     "text": "plan-issue sessionless slot=A phase=plan.synthesis leaf=/tmp/akrogon-3pjmNN/repo/issues/open/issue/sessionless",
++     "pane": "w1:p3",
++     "text": "plan-issue sessionless slot=B phase=plan.synthesis leaf=/tmp/akrogon-3pjmNN/repo/issues/open/issue/sessionless",
+    },
+  ]
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1652:35)
+(fail) next prompts an idle agent with null session data [558.29ms]
+1647 |       saveDatabase(f, {
+1648 |         ...db,
+1649 |         panes: db.panes.map((pane) => ({ ...pane, agent_session: session })),
+1650 |       });
+1651 |       expect((await next(f, ['sessionless'])).code).toBe(0);
+1652 |       expect(database(f).prompts).toEqual([
+                                         ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+-     "pane": "w1:p2",
+-     "text": "plan-issue sessionless slot=A phase=plan.synthesis leaf=/tmp/akrogon-YnidXs/repo/issues/open/issue/sessionless",
++     "pane": "w1:p3",
++     "text": "plan-issue sessionless slot=B phase=plan.synthesis leaf=/tmp/akrogon-YnidXs/repo/issues/open/issue/sessionless",
+    },
+  ]
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1652:35)
+(fail) next prompts an idle agent with omitted session data [538.87ms]
+1694 |       const after: State = readState(path);
+1695 |       const since: string = z.string().datetime().parse(after.busy_since[seat]);
+1696 |       if (seat === 'A') {
+1697 |         expect(before.busy_since.A).toBe(since);
+1698 |       } else {
+1699 |         expect(before.busy_since.B).toBeUndefined();
+                                           ^
+error: expect(received).toBeUndefined()
+
+Received: "2026-09-29T20:35:35.639Z"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1699:37)
+(fail) blocked merge seat B prevents fetch and clean checks in a dirty worktree [591.34ms]
+1729 |     });
+1730 |     const promptsBefore: number = database(f).prompts.length;
+1731 |     const result: Result = await next(f, ['blocked-merge']);
+1732 |     expect(result.code).toBe(0);
+1733 |     expect(readState(path).phase).toBe('merge');
+1734 |     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
+                                       ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 2
+Received length: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1734:33)
+(fail) a blocked non-merge seat does not stall a merge leaf [520.97ms]
+1772 |         if (missing !== slot && missing !== 'both') expect(allocated.pane[slot]).toBe(state.pane[slot]);
+1773 |         else expect(allocated.pane[slot]).not.toBe(state.pane[slot]);
+1774 |       }
+1775 |       if (missing === 'A' || missing === 'B') expect(splits[0][2]).toBe(state.pane[missing === 'A' ? 'B' : 'A']!);
+1776 |       if (missing === 'both') expect(splits.map((args) => args[2])).toEqual(['operator', allocated.pane.A!]);
+1777 |       expect(database(f).prompts.at(-1)?.pane).toBe(allocated.pane.A);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: "w1:p2"
+Received: "w1:p3"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1777:48)
+(fail) recorded seats stay authoritative with an extra pane first and neither missing [586.35ms]
+1772 |         if (missing !== slot && missing !== 'both') expect(allocated.pane[slot]).toBe(state.pane[slot]);
+1773 |         else expect(allocated.pane[slot]).not.toBe(state.pane[slot]);
+1774 |       }
+1775 |       if (missing === 'A' || missing === 'B') expect(splits[0][2]).toBe(state.pane[missing === 'A' ? 'B' : 'A']!);
+1776 |       if (missing === 'both') expect(splits.map((args) => args[2])).toEqual(['operator', allocated.pane.A!]);
+1777 |       expect(database(f).prompts.at(-1)?.pane).toBe(allocated.pane.A);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: "w1:p5"
+Received: "w1:p3"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1777:48)
+(fail) recorded seats stay authoritative with an extra pane first and A missing [575.69ms]
+1772 |         if (missing !== slot && missing !== 'both') expect(allocated.pane[slot]).toBe(state.pane[slot]);
+1773 |         else expect(allocated.pane[slot]).not.toBe(state.pane[slot]);
+1774 |       }
+1775 |       if (missing === 'A' || missing === 'B') expect(splits[0][2]).toBe(state.pane[missing === 'A' ? 'B' : 'A']!);
+1776 |       if (missing === 'both') expect(splits.map((args) => args[2])).toEqual(['operator', allocated.pane.A!]);
+1777 |       expect(database(f).prompts.at(-1)?.pane).toBe(allocated.pane.A);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: "w1:p2"
+Received: "w1:p5"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1777:48)
+(fail) recorded seats stay authoritative with an extra pane first and B missing [591.46ms]
+1772 |         if (missing !== slot && missing !== 'both') expect(allocated.pane[slot]).toBe(state.pane[slot]);
+1773 |         else expect(allocated.pane[slot]).not.toBe(state.pane[slot]);
+1774 |       }
+1775 |       if (missing === 'A' || missing === 'B') expect(splits[0][2]).toBe(state.pane[missing === 'A' ? 'B' : 'A']!);
+1776 |       if (missing === 'both') expect(splits.map((args) => args[2])).toEqual(['operator', allocated.pane.A!]);
+1777 |       expect(database(f).prompts.at(-1)?.pane).toBe(allocated.pane.A);
+                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: "w1:p5"
+Received: "w1:p6"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1777:48)
+(fail) recorded seats stay authoritative with an extra pane first and both missing [615.68ms]
+1811 |         expect(
+1812 |           calls(f)
+1813 |             .slice(before)
+1814 |             .filter((args) => args[0] === 'pane' && args[1] === 'split'),
+1815 |         ).toHaveLength(1);
+1816 |         expect(updated.prompts.at(-1)?.pane).toBe(allocated.pane.A);
+                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "w1:p2"
+Received: "w1:p3"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1816:46)
+(fail) allocation handles an interrupted tab [482.65ms]
+(pass) allocation handles an empty tab [465.04ms]
+1811 |         expect(
+1812 |           calls(f)
+1813 |             .slice(before)
+1814 |             .filter((args) => args[0] === 'pane' && args[1] === 'split'),
+1815 |         ).toHaveLength(1);
+1816 |         expect(updated.prompts.at(-1)?.pane).toBe(allocated.pane.A);
+                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "w1:p6"
+Received: "w1:p7"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1816:46)
+(fail) allocation handles an recreated tab [656.51ms]
+(pass) agent start allows 30 seconds while prompt wait remains 5 seconds [327.15ms]
+(pass) startup retries closure before cleanup and retains failed owners with their worktree and branch while the tab closes [661.51ms]
+(pass) startup retains a merged leaf's worktree and branch while closing its tab as an epic sibling stays unfinished (--resume) [451.52ms]
+(pass) startup retains a merged leaf's worktree and branch while closing its tab as an epic sibling stays unfinished (--all) [450.24ms]
+(pass) a leaf tab survives the seat-B blocked hook [448.71ms]
+(pass) a leaf tab survives the seat-B unknown hook [431.90ms]
+1938 |                 data: { type: 'pane_agent_status_changed', pane_id: pane, workspace_id: 'w1', agent_status: status },
+1939 |               },
+1940 |         ),
+1941 |       });
+1942 |       expect(result.code).toBe(0);
+1943 |       expect(database(f).tabs.map((tab) => tab.label)).toEqual(['done']);
+                                                              ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "done",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1943:56)
+(fail) a leaf tab survives the seat-A idle hook [493.43ms]
+1938 |                 data: { type: 'pane_agent_status_changed', pane_id: pane, workspace_id: 'w1', agent_status: status },
+1939 |               },
+1940 |         ),
+1941 |       });
+1942 |       expect(result.code).toBe(0);
+1943 |       expect(database(f).tabs.map((tab) => tab.label)).toEqual(['done']);
+                                                              ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "done",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:1943:56)
+(fail) a leaf tab survives the seat-A exited hook [465.84ms]
+(pass) a leaf tab survives the unmerged idle hook [493.08ms]
+(pass) a merged leaf whose tab is already gone makes no tab close call and a driven tab_closed hook stays quiet [683.41ms]
+2045 |       }),
+2046 |     });
+2047 |     expect(result.code).toBe(0);
+2048 |     expect(result.stderr).toBe('');
+2049 |     expect(existsSync(resolve(f.root, 'issues/closed/late-issue/late/state.yaml'))).toBe(true);
+2050 |     expect(database(f).tabs).toHaveLength(0);
+                                    ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 0
+Received length: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2050:30)
+(fail) a merged leaf whose closure failed during phase merged closes its tab on the seat-B idle hook after moving [550.03ms]
+2071 |         event: 'pane_agent_status_changed',
+2072 |         data: { type: 'pane_agent_status_changed', pane_id: b, workspace_id: 'w1', agent_status: 'idle' },
+2073 |       }),
+2074 |     });
+2075 |     expect(result.code).toBe(0);
+2076 |     expect(database(f).tabs).toHaveLength(0);
+                                    ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 0
+Received length: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2076:30)
+(fail) a seat-B idle hook closes the merged leaf tab while the worktree and branch stay [404.61ms]
+2100 |     expect(result.code).toBe(0);
+2101 |     expect(
+2102 |       database(f)
+2103 |         .prompts.map((prompt) => prompt.text)
+2104 |         .sort(),
+2105 |     ).toEqual(
+             ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "plan-issue a-old slot=A phase=plan.synthesis leaf=/tmp/akrogon-P4UY0P/repo/issues/open/issue/a-old",
+-   "plan-issue b-old slot=A phase=plan.synthesis leaf=/tmp/akrogon-3PaF4m/repo/issues/open/issue/b-old",
++   "plan-issue a-old slot=B phase=plan.synthesis leaf=/tmp/akrogon-P4UY0P/repo/issues/open/issue/a-old",
++   "plan-issue b-old slot=B phase=plan.synthesis leaf=/tmp/akrogon-3PaF4m/repo/issues/open/issue/b-old",
+  ]
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2105:7)
+(fail) next --resume re-prompts allocated idle leaves in every registered repo without allocating new work [1025.48ms]
+(pass) next --resume completes and cleans a merged leaf while its unallocated dependent stays untouched [390.66ms]
+{"repo":"repo","path":"/tmp/akrogon-5FEnfc/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-5FEnfc/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-5FEnfc/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-5FEnfc/repo/issues/open/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects open/ before any flock [71.75ms]
+{"repo":"repo","path":"/tmp/akrogon-MaqPJl/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-MaqPJl/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-MaqPJl/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-MaqPJl/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects open/invalid before any flock [73.32ms]
+{"repo":"repo","path":"/tmp/akrogon-mvW5TU/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-mvW5TU/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-mvW5TU/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-mvW5TU/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects open/epic/issue/extra/invalid before any flock [71.57ms]
+{"repo":"repo","path":"/tmp/akrogon-PDz2i1/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-PDz2i1/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-PDz2i1/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-PDz2i1/repo/issues/closed/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects closed/ before any flock [68.29ms]
+{"repo":"repo","path":"/tmp/akrogon-Rf8SGw/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-Rf8SGw/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-Rf8SGw/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-Rf8SGw/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects closed/invalid before any flock [80.32ms]
+{"repo":"repo","path":"/tmp/akrogon-N4mQFj/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-N4mQFj/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-N4mQFj/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-N4mQFj/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+(pass) explicit next rejects closed/epic/issue/extra/invalid before any flock [66.46ms]
+(pass) invalid merged depth stays excluded during --all with healthy work [307.09ms]
+(pass) invalid merged depth stays excluded during . with healthy work [315.92ms]
+(pass) invalid merged depth stays excluded during hook with healthy work [531.31ms]
+error: Missing leaf: resting (parked)
+(pass) next identifies dormant issue/resting without parsing and prefers active leaves [599.60ms]
+error: Missing leaf: resting (parked)
+(pass) next identifies dormant epic/issue/resting without parsing and prefers active leaves [595.17ms]
+(pass) merge leaf with landed branch re-prompts its idle seat instead of auto-recovering [565.84ms]
+2310 |     expect(readState(path).worktree).toBeUndefined();
+2311 |     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
+2312 |     writeFileSync(resolve(path, 'positions-A.md'), 'A\n');
+2313 |     writeFileSync(resolve(path, 'positions-B.md'), 'B\n');
+2314 |     expect((await next(f, ['debate'])).code).toBe(0);
+2315 |     expect(database(f).prompts.at(-1)?.text).toBe(`plan-issue debate slot=A phase=plan.synthesis leaf=${path}`);
+                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "plan-issue debate slot=A phase=plan.synthesis leaf=/tmp/akrogon-1ioKOO/repo/issues/open/issue/debate"
+Received: "plan-issue debate slot=B phase=plan.synthesis leaf=/tmp/akrogon-1ioKOO/repo/issues/open/issue/debate"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2315:46)
+(fail) debate leaf without positions files refuses dispatch until positions exist [348.02ms]
+(pass) typed next from a leaf pane sweeps and removes merged worktrees [818.42ms]
+2346 |     yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: spaced } });
+2347 |     const f2: DispatchFixture = { ...f, root: spaced };
+2348 |     leaf(f2, 'spaced', 'plan.synthesis');
+2349 |     expect((await next(f2, ['spaced'])).code).toBe(0);
+2350 |     expect(database(f).prompts).toHaveLength(1);
+2351 |     expect(database(f).prompts[0].text).toBe(
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: "plan-issue spaced slot=A phase=plan.synthesis leaf=/tmp/akrogon-B0jFWg/repo root/issues/open/issue/spaced"
+Received: "plan-issue spaced slot=B phase=plan.synthesis leaf=/tmp/akrogon-B0jFWg/repo root/issues/open/issue/spaced"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2351:41)
+(fail) spaced repo root dispatches leaf= with the complete spaced authoritative folder [320.32ms]
+(pass) a failed leaf with its tab still open does not count toward max_active [636.86ms]
+(pass) a failed leaf does not reserve capacity in the unreadable branch [631.80ms]
+(pass) a failed leaf with a blocked pane is not seat-observed [392.39ms]
+2448 |   try {
+2449 |     const path: string = leaf(f, 'charge', 'plan.synthesis');
+2450 |     saveDatabase(f, { ...database(f), promptScript: [{ code: 'agent_prompt_stalled', message: 'stalled for test' }] });
+2451 |     expect((await next(f, ['charge'])).code).toBe(0);
+2452 |     const state: State = readState(path);
+2453 |     expect(state.attempts.A).toBe(1);
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2453:30)
+(fail) retryable prompt failure charges one attempt, records delivery_error, and sends one prompt [292.25ms]
+2477 |     const path: string = leaf(f, 'three-fails', 'plan.synthesis');
+2478 |     const fail = { code: 'agent_prompt_stalled', message: 'stalled' };
+2479 |     saveDatabase(f, { ...database(f), promptScript: [{ ...fail }, { ...fail }, { ...fail }] });
+2480 |     expect((await next(f, ['three-fails'])).code).toBe(0);
+2481 |     expect(readState(path).phase).toBe('plan.synthesis');
+2482 |     expect(readState(path).attempts.A).toBe(1);
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2482:40)
+(fail) three consecutive prompt failures fail the leaf during the third pass [318.24ms]
+2507 |   const f: DispatchFixture = await dispatchFixture();
+2508 |   try {
+2509 |     const path: string = leaf(f, 'reset', 'plan.synthesis');
+2510 |     saveDatabase(f, { ...database(f), promptScript: [{ code: 'agent_prompt_stalled', message: 'first' }] });
+2511 |     expect((await next(f, ['reset'])).code).toBe(0);
+2512 |     expect(readState(path).attempts.A).toBe(1);
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2512:40)
+(fail) a successful prompt between failures resets attempts [295.20ms]
+(pass) a pass that starts the agent then observes it not idle charges nothing [281.16ms]
+2573 |       promptScript: [{ code: 'timeout', message: 'wait timed out', append: line }],
+2574 |     });
+2575 |     expect(existsSync(resolve(fakeHome, '.pi'))).toBe(false);
+2576 |     expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
+2577 |     const state: State = readState(path);
+2578 |     expect(state.prompted.A).toBe(sessFile);
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/akrogon-vApItn/sess-found.jsonl"
+Received: undefined
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2578:30)
+(fail) timeout settlement records delivery when exact user text lands after the offset [442.26ms]
+2610 |       promptScript: [{ code: 'timeout', message: 'wait timed out' }],
+2611 |     });
+2612 |     expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
+2613 |     const state: State = readState(path);
+2614 |     expect(state.prompted.A).toBeUndefined();
+2615 |     expect(state.attempts.A).toBe(1);
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2615:30)
+(fail) timeout settlement ignores the same text before the offset [428.29ms]
+2648 |       promptScript: [{ code: 'timeout', message: 'wait timed out', append: assistant + tool }],
+2649 |     });
+2650 |     expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
+2651 |     const state: State = readState(path);
+2652 |     expect(state.prompted.A).toBeUndefined();
+2653 |     expect(state.attempts.A).toBe(1);
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2653:30)
+(fail) timeout settlement ignores prompt text inside assistant and tool records [430.47ms]
+2684 |         { code: 'timeout', message: 'wait timed out', append: line + '{"type":"message","message":{"role":"user"' },
+2685 |       ],
+2686 |     });
+2687 |     expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
+2688 |     const state: State = readState(path);
+2689 |     expect(state.prompted.A).toBe(sessFile);
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "/tmp/akrogon-IotnBz/sess-partial.jsonl"
+Received: undefined
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2689:30)
+(fail) timeout settlement ignores a trailing partial line but keeps earlier records [442.51ms]
+2714 |         item.pane_id === a ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile } } : item,
+2715 |       ),
+2716 |       promptScript: [{ code: 'timeout', message: 'wait timed out' }],
+2717 |     });
+2718 |     expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
+2719 |     expect(readState(path).attempts.A).toBe(1);
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2719:40)
+(fail) a record appended after a timeout is recognized by the next pass without resending [469.19ms]
+2757 |       ),
+2758 |       promptScript: [{ code: 'timeout', message: 'wait timed out' }],
+2759 |     });
+2760 |     expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
+2761 |     const state: State = readState(path);
+2762 |     expect(state.attempts.A).toBe(1);
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2762:30)
+(fail) timeout with a missing session file records a plain error without offset [450.17ms]
+2773 |     const slug: string = 'timeout-id';
+2774 |     const path: string = leaf(f, slug, 'plan.synthesis');
+2775 |     saveDatabase(f, { ...database(f), blockOnStart: true });
+2776 |     expect((await next(f, [slug])).code).toBe(0);
+2777 |     const a: string = readState(path).pane.A!;
+2778 |     const sessionId: string = database(f).panes.find((item) => item.pane_id === a)!.agent_session!.value;
+                                                                                           ^
+TypeError: undefined is not an object (evaluating 'database(f).panes.find((item) => item.pane_id === a).agent_session.value')
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2778:85)
+(fail) timeout settlement resolves id-kind references under HOME [259.71ms]
+2814 |       panes: db0.panes.map((item) => (item.pane_id === a ? { ...item, agent_status: 'idle' } : item)),
+2815 |       promptScript: [{ code: 'timeout', message: 'wait timed out' }],
+2816 |     });
+2817 |     expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
+2818 |     const state: State = readState(path);
+2819 |     expect(state.attempts.A).toBe(1);
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2819:30)
+(fail) timeout with an unresolvable id records a plain error without offset [459.16ms]
+2829 |   try {
+2830 |     const path: string = leaf(f, 'start-fail', 'plan.synthesis');
+2831 |     saveDatabase(f, { ...database(f), startScript: [{ code: 'agent_not_ready', message: 'not ready yet' }] });
+2832 |     expect((await next(f, ['start-fail'])).code).toBe(0);
+2833 |     const first: State = readState(path);
+2834 |     expect(first.attempts.A).toBe(1);
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2834:30)
+(fail) a retryable agent start failure charges once without prompting, then recovers [234.39ms]
+2860 |     const failed: State[] = states.filter((item) => item.phase === 'failed');
+2861 |     const ok: State[] = states.filter((item) => item.phase === 'plan.synthesis');
+2862 |     expect(failed).toHaveLength(1);
+2863 |     expect(ok).toHaveLength(1);
+2864 |     expect(failed[0].failure?.cause).toBe('attempts');
+2865 |     expect(failed[0].failure?.reason.startsWith('seat A unreachable: boom bad thing')).toBe(true);
+                                                                                              ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2865:88)
+(fail) a non-retryable prompt code fails unreachable without throwing and siblings still dispatch [644.88ms]
+2879 |     const result: Result = await next(f, ['--all']);
+2880 |     expect(result.code).toBe(0);
+2881 |     const states: State[] = [readState(aPath), readState(bPath)];
+2882 |     const failed: State[] = states.filter((item) => item.phase === 'failed');
+2883 |     expect(failed).toHaveLength(1);
+2884 |     expect(failed[0].failure?.reason.startsWith('seat A unreachable: exit 1 oops not json')).toBe(true);
+                                                                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2884:94)
+(fail) non-JSON prompt stderr fails unreachable with exit code and trimmed message [636.29ms]
+2897 |     const result: Result = await next(f, ['--all']);
+2898 |     expect(result.code).toBe(0);
+2899 |     const states: State[] = [readState(aPath), readState(bPath)];
+2900 |     const failed: State[] = states.filter((item) => item.phase === 'failed');
+2901 |     expect(failed).toHaveLength(1);
+2902 |     expect(failed[0].failure?.reason.startsWith('seat A unreachable: exit 1 {"error":{"code":123}}')).toBe(true);
+                                                                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2902:103)
+(fail) malformed prompt error JSON fails unreachable with exit code [639.42ms]
+2910 |   const f: DispatchFixture = await dispatchFixture();
+2911 |   try {
+2912 |     const path: string = leaf(f, 'clear', 'plan.synthesis');
+2913 |     saveDatabase(f, { ...database(f), promptScript: [{ code: 'agent_prompt_stalled', message: 'first' }] });
+2914 |     expect((await next(f, ['clear'])).code).toBe(0);
+2915 |     expect(readState(path).attempts.A).toBe(1);
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/next.test.ts:2915:40)
+(fail) a successful prompt clears delivery_error and resets attempts [291.34ms]
+(pass) next uses repo seat overrides for both seats with spaced model as one argv element [433.44ms]
+(pass) next inherits non-overridden seat from global slots [423.36ms]
+(pass) next refuses unknown harness override before allocation [50.69ms]
+(pass) next refuses a new leaf with a missing base (C1) before worktree creation [48.63ms]
+(pass) next refuses a new leaf with a missing base (C2) before worktree creation [51.48ms]
+(pass) next refuses a new leaf with a missing base (C3) before worktree creation [51.76ms]
+(pass) next refuses a leaf branch without a worktree when the remote branch is gone [50.25ms]
+(pass) next refuses an existing worktree whose tracking ref is deleted while the remote branch lives [51.78ms]
+(pass) next refuses an existing worktree whose tracking ref is deleted when the remote branch is gone [55.17ms]
+(pass) next dispatches an existing worktree without querying an unreachable remote [326.67ms]
+(pass) next refuses to create a worktree while the remote is unreachable [50.88ms]
+(pass) next branches a new worktree from the tracking commit, never a same-named local ref [319.80ms]
+
+tests/phase.test.ts:
+(pass) valid phase transition rejects a mismatched repo key without changing state or history [46.20ms]
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [180.65ms]
+88 |     expect((await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'B', '--verdict', 'fix'])).stdout).toBe(
+89 |       'moved check.fix',
+90 |     );
+91 |     expect(readState(path).fix_rounds).toBe(1);
+92 |     expect((await cli(f, ['phase', 'repair', 'check.review'])).code).toBe(0);
+93 |     expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'A', '--verdict', 'ready'])).code).not.toBe(0);
+                                                                                                            ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/phase.test.ts:93:104)
+(fail) review aggregates verdicts, rechecks only B, caps repairs and permits operator restart [175.29ms]
+139 |     await command(['git', 'worktree', 'add', '-b', 'dirty', worktree], f.root);
+140 |     const path: string = leaf(f, 'dirty', 'implement', { worktree });
+141 |     writeFileSync(resolve(worktree, 'work'), 'done\n');
+142 |     const refused: Result = await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'A']);
+143 |     expect(refused.code).not.toBe(0);
+144 |     expect(refused.stderr).toContain('Uncommitted work');
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Uncommitted work"
+Received: "195 |   )\n196 |     throw new Error('Destination contradicts rebuttal config');\n197 |   const required: readonly Slot[] = requiredSlots(state.phase, state.fix_rounds);\n198 |   const slot: Slot | undefined = explicitSlot ?? (required.length === 1 ? required[0] : undefined);\n199 |   if (state.phase !== 'failed' && (slot === undefined || !required.includes(slot)))\n200 |     throw new Error('A required --slot is missing or invalid');\n                    ^\nerror: A required --slot is missing or invalid\n      at transition (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/src/phase.ts:200:15)\n      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/src/phase.ts:283:11)\n      at withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/src/state.ts:151:18)\n      at async phaseCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/src/phase.ts:280:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/phase.test.ts:144:28)
+(fail) handoff to review refuses a dirty worktree at every move and issue files on the branch, then passes [45.09ms]
+(pass) completion reports each issue once, moves only finished containers, and refuses repeated merged [145.00ms]
+(pass) completion leaves a chart holding a same-slug draft in place and keeps the inventory readable [143.62ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [144.66ms]
+(pass) failed log diagnostics report committed state without replay [71.36ms]
+(pass) asymmetric and empty leaf sources defer until epic completion under open locks [249.27ms]
+(pass) source retries recheck state, skip CLOSED, and continue after final failures without moving [548.91ms]
+(pass) sourced completion without worktree context fails before rename without a fabricated commit [44.99ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [184.98ms]
+(pass) failed or malformed retry comment listing prevents another close and continues later sources [611.45ms]
+(pass) each completed issue closes only its all-leaf private sources before the final epic closure [269.52ms]
+(pass) standalone closure failure retries outstanding sources on next without replaying completion [302.73ms]
+(pass) epic closure failure retries outstanding sources on next without replaying completion [307.70ms]
+(pass) standalone completion closes the union of asymmetric leaf sources [160.12ms]
+(pass) invalid sources and empty worktree fail at load without state, log or gh changes [83.05ms]
+(pass) phase implement fails with Missing worktree when the recorded folder is gone [40.25ms]
+(pass) failed exits by command reset attempts and allow check.fix [73.69ms]
+820 |     const path: string = leaf(f, 'empty', 'implement', { worktree });
+821 |     const before: string = bytes(path);
+822 |     const logPath: string = resolve(f.root, 'issues/log.jsonl');
+823 |     const result: Result = await cli(f, ['phase', 'empty', 'check.review', '--slot', 'A']);
+824 |     expect(result.code).not.toBe(0);
+825 |     expect(result.stderr).toContain('origin/main');
+                                ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "origin/main"
+Received: "195 |   )\n196 |     throw new Error('Destination contradicts rebuttal config');\n197 |   const required: readonly Slot[] = requiredSlots(state.phase, state.fix_rounds);\n198 |   const slot: Slot | undefined = explicitSlot ?? (required.length === 1 ? required[0] : undefined);\n199 |   if (state.phase !== 'failed' && (slot === undefined || !required.includes(slot)))\n200 |     throw new Error('A required --slot is missing or invalid');\n                    ^\nerror: A required --slot is missing or invalid\n      at transition (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/src/phase.ts:200:15)\n      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/src/phase.ts:283:11)\n      at withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/src/state.ts:151:18)\n      at async phaseCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/src/phase.ts:280:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/phase.test.ts:825:27)
+(fail) empty branch refuses review naming target [44.99ms]
+846 |     expect(refused.stderr).toContain('positions-B.md');
+847 |     expect(readState(path)).toMatchObject({ phase: 'plan.positions', done: [] });
+848 |     await command(['git', 'reset', '--hard', 'HEAD~1'], worktree);
+849 |     const recorded: Result = await cli(f, ['phase', 'stray', 'plan.rebuttal', '--slot', 'A']);
+850 |     expect(recorded.stdout).toBe('recorded');
+851 |     expect(readState(path).done).toEqual(['B']);
+                                       ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "B",
++   "A",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/phase.test.ts:851:34)
+(fail) planning move refuses issue files on branch naming leaf path, then records when clean [84.96ms]
+(pass) planning synthesis with empty branch moves to implement [51.59ms]
+887 |     writeFileSync(herdr.db, JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'stop' }], serial: 0 }));
+888 |     writeFileSync(resolve(worktree, 'dirty'), 'x\n');
+889 |     const result: Result = await cli(f, ['phase', 'stop', 'failed', '--reason', 'x'], f.root, herdr.env);
+890 |     expect(result.code).toBe(0);
+891 |     expect(result.stdout).toBe('moved failed');
+892 |     expect(readState(path)).toMatchObject({
+                                  ^
+error: expect(received).toMatchObject(expected)
+
+  {
++   "attempts": {
++     "A": 0,
++     "B": 0,
++   },
++   "blocked-by": [],
+    "busy_notified": {},
+    "busy_since": {},
++   "created": "2026-09-10",
++   "debate": "no",
++   "delivery_error": {},
++   "done": [],
+    "failure": {
+      "cause": "blocked",
+      "delivery": "shown",
+      "phase": "implement",
+      "reason": "x",
+-     "slot": "A",
++     "slot": "B",
+    },
++   "fix_rounds": 0,
+    "pane": {
+      "B": "pane-b",
+    },
+    "phase": "failed",
+    "prompted": {},
+    "prompted_at": {},
++   "repo": "repo",
++   "slug": "stop",
+    "tab": "tab-1",
++   "verdict": {},
+    "worktree": "/tmp/akrogon-Vl6BFq/wt-stop",
+  }
+
+- Expected  - 1
++ Received  + 14
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/phase.test.ts:892:29)
+(fail) stop from implement on dirty worktree records blocked failure and clears busy fields [121.18ms]
+953 |       delivery: 'shown',
+954 |     });
+955 |     const mergePath: string = leaf(f, 'stop-merge', 'merge');
+956 |     const merge: Result = await cli(f, ['phase', 'stop-merge', 'failed', '--reason', 'x'], f.root, herdr.env);
+957 |     expect(merge.stdout).toBe('moved failed');
+958 |     expect(readState(mergePath).failure).toEqual({
+                                               ^
+error: expect(received).toEqual(expected)
+
+  {
+    "cause": "blocked",
+    "delivery": "shown",
+    "phase": "merge",
+    "reason": "x",
+-   "slot": "B",
++   "slot": "A",
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/phase.test.ts:958:42)
+(fail) stops land in failed immediately without phase advance and validate slots [224.61ms]
+(pass) blocked restart skips clean check and removes failure while attempts restart refuses dirty [81.55ms]
+(pass) failed routing and reason misuse are guarded [233.05ms]
+(pass) merge to merged clears busy fields [47.09ms]
+1077 |       f,
+1078 |       ['phase', 'cap', 'check.fix', '--slot', 'B', '--verdict', 'fix'],
+1079 |       f.root,
+1080 |       herdr.env,
+1081 |     );
+1082 |     expect(result.stdout).toBe('moved failed');
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: "moved failed"
+Received: ""
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/phase.test.ts:1082:27)
+(fail) fix cap records attempts failure [43.58ms]
+(pass) failed restart refuses issue files on branch but allows move without worktree [81.45ms]
+(pass) failed announce renames tabs, tolerates missing tabs, and retries herdr calls [517.71ms]
+1245 |         },
+1246 |       },
+1247 |     });
+1248 |     expect(readState(path).delivery_error).not.toEqual({});
+1249 |     const result: Result = await cli(f, ['phase', 'clear-error', 'implement', '--slot', 'A']);
+1250 |     expect(result.code).toBe(0);
+                               ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/role-swap-u1/tests/phase.test.ts:1250:25)
+(fail) phase move clears delivery_error [45.63ms]
+
+58 tests failed:
+(fail) next creates one worktree/tab under concurrent hooks, prompts configured A, ignores working events and resolves hook cwd [478.65ms]
+(fail) next re-prompts an idle seat whose prompt is older than the grace period and the phase never moved [638.21ms]
+(fail) a stale prompt never re-prompts a busy or done seat, succeeds without failing, and three failing passes fail the leaf [312.43ms]
+(fail) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [308.31ms]
+(fail) next waits on a blocked agent instead of counting attempts or flipping seats [277.81ms]
+(fail) next resumes interrupted tab creation, fails after three failing passes [473.11ms]
+(fail) unknown panes wait, warn after an hour and keep busy observations [488.17ms]
+(fail) next refuses hand-built and dependencies, respects capacity, and waits on unknown panes [602.12ms]
+(fail) completing a leaf via pane_hook starts only same-repo dependents [749.74ms]
+(fail) next recovers only merge-phase work by ancestry against a non-default remote target [605.63ms]
+(fail) uncommitted work in a merge worktree is left to the merge seat [585.90ms]
+(fail) a live merge retains its completion call after pushing, including a peer retry [576.60ms]
+(fail) agent names support identical repo-local slugs and long numeric-leading slugs [567.91ms]
+(fail) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [307.50ms]
+(fail) next selection and sweep report both repo keys without dispatching or changing the mismatched leaf [344.07ms]
+(fail) foreign leaves do not consume capacity while healthy leaves in both repos dispatch [608.18ms]
+(fail) moving a repo with the same registered key supports status, phase and dispatch without a recorded worktree [80.15ms]
+(fail) next prompts an idle agent with null session data [558.29ms]
+(fail) next prompts an idle agent with omitted session data [538.87ms]
+(fail) blocked merge seat B prevents fetch and clean checks in a dirty worktree [591.34ms]
+(fail) a blocked non-merge seat does not stall a merge leaf [520.97ms]
+(fail) recorded seats stay authoritative with an extra pane first and neither missing [586.35ms]
+(fail) recorded seats stay authoritative with an extra pane first and A missing [575.69ms]
+(fail) recorded seats stay authoritative with an extra pane first and B missing [591.46ms]
+(fail) recorded seats stay authoritative with an extra pane first and both missing [615.68ms]
+(fail) allocation handles an interrupted tab [482.65ms]
+(fail) allocation handles an recreated tab [656.51ms]
+(fail) a leaf tab survives the seat-A idle hook [493.43ms]
+(fail) a leaf tab survives the seat-A exited hook [465.84ms]
+(fail) a merged leaf whose closure failed during phase merged closes its tab on the seat-B idle hook after moving [550.03ms]
+(fail) a seat-B idle hook closes the merged leaf tab while the worktree and branch stay [404.61ms]
+(fail) next --resume re-prompts allocated idle leaves in every registered repo without allocating new work [1025.48ms]
+(fail) debate leaf without positions files refuses dispatch until positions exist [348.02ms]
+(fail) spaced repo root dispatches leaf= with the complete spaced authoritative folder [320.32ms]
+(fail) retryable prompt failure charges one attempt, records delivery_error, and sends one prompt [292.25ms]
+(fail) three consecutive prompt failures fail the leaf during the third pass [318.24ms]
+(fail) a successful prompt between failures resets attempts [295.20ms]
+(fail) timeout settlement records delivery when exact user text lands after the offset [442.26ms]
+(fail) timeout settlement ignores the same text before the offset [428.29ms]
+(fail) timeout settlement ignores prompt text inside assistant and tool records [430.47ms]
+(fail) timeout settlement ignores a trailing partial line but keeps earlier records [442.51ms]
+(fail) a record appended after a timeout is recognized by the next pass without resending [469.19ms]
+(fail) timeout with a missing session file records a plain error without offset [450.17ms]
+(fail) timeout settlement resolves id-kind references under HOME [259.71ms]
+(fail) timeout with an unresolvable id records a plain error without offset [459.16ms]
+(fail) a retryable agent start failure charges once without prompting, then recovers [234.39ms]
+(fail) a non-retryable prompt code fails unreachable without throwing and siblings still dispatch [644.88ms]
+(fail) non-JSON prompt stderr fails unreachable with exit code and trimmed message [636.29ms]
+(fail) malformed prompt error JSON fails unreachable with exit code [639.42ms]
+(fail) a successful prompt clears delivery_error and resets attempts [291.34ms]
+(fail) review aggregates verdicts, rechecks only B, caps repairs and permits operator restart [175.29ms]
+(fail) handoff to review refuses a dirty worktree at every move and issue files on the branch, then passes [45.09ms]
+(fail) empty branch refuses review naming target [44.99ms]
+(fail) planning move refuses issue files on branch naming leaf path, then records when clean [84.96ms]
+(fail) stop from implement on dirty worktree records blocked failure and clears busy fields [121.18ms]
+(fail) stops land in failed immediately without phase advance and validate slots [224.61ms]
+(fail) fix cap records attempts failure [43.58ms]
+(fail) phase move clears delivery_error [45.63ms]
+
+ 110 pass
+ 58 fail
+ 1228 expect() calls
+Ran 168 tests across 2 files. [63.16s]

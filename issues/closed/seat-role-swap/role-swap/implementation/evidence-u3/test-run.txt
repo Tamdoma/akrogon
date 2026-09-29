@@ -1,0 +1,10 @@
+$ bun install
+9 packages installed
+
+$ AKROGON_BASE=3704d86a92d6369be36bf600ca413be79cf81c22 bun test --changed="3704d86a92d6369be36bf600ca413be79cf81c22"
+bun test v1.4.2 (744846f84)
+--changed: 6 changed files, but no test files are affected
+
+ 0 pass
+ 0 fail
+Ran 0 tests across 0 files. [9.00ms]

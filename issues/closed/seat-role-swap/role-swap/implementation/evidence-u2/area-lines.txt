@@ -1,0 +1,5 @@
+30 skills/AREA.md
+3:## Commands
+9:## Key files
+17:## Non-obvious patterns
+26:## See also
