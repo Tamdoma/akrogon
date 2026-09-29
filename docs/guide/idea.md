@@ -26,7 +26,7 @@ The file records progress. It does not restore an agent's lost conversation or p
 
 ## Why two seats instead of one smart agent
 
-Seats A and B have different jobs. B implements the change. A handles merge. Both review the first implementation.
+Seats A and B have different jobs. A implements the change. B handles merge. Both review the first implementation.
 
 When paired planning is enabled, both seats first propose a plan without seeing the other's answer. They then resolve disagreements before implementation.
 
@@ -37,15 +37,15 @@ Pass                     Seat A         Seat B
 ----------------------   ------------   ------------
 Positions, if debate     own proposal   own proposal
 Rebuttal, if enabled     own response   own response
-Synthesis                -              final plan
-Implement                -              code + tests
+Synthesis                final plan     -
+Implement                code + tests   -
 Initial check.review     own review     own review
-check.fix                -              repairs
-Repair check.review      repair review  -
-Merge                    check + push   -
+check.fix                repairs        -
+Repair check.review      -              repair review
+Merge                    -              check + push
 ```
 
-For export-csv, B builds the serializer, both seats review it, and A checks repairs and merges. A and B name jobs, so both can use the same harness and model.
+For export-csv, A builds the serializer, both seats review it, and B checks repairs and merges. A and B name jobs, so both can use the same harness and model.
 
 ## The concrete use
 

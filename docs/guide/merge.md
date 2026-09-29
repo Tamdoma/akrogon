@@ -1,17 +1,17 @@
 # Merge
 
-Seat A merges reviewed work. It fetches the configured remote, rebases onto the default branch and runs the configured checks.
+Seat B merges reviewed work. It fetches the configured remote, rebases onto the default branch and runs the configured checks.
 
 For CSV export, those checks should cover quoting, empty input and the existing JSON export.
 
-The push must be fast-forward. If another leaf lands first, A fetches, rebases and checks again. It does not force-push over the other change.
+The push must be fast-forward. If another leaf lands first, B fetches, rebases and checks again. It does not force-push over the other change.
 
-If rebase conflicts occur, A resolves them and records evidence of what changed. If checks fail, the leaf returns to repair. Other push errors are reported with their cause.
+If rebase conflicts occur, B resolves them and records evidence of what changed. If checks fail, the leaf returns to repair. Other push errors are reported with their cause.
 
-After confirming that the push landed, A records completion:
+After confirming that the push landed, B records completion:
 
 ```sh
-akrogon phase export-csv merged --slot A
+akrogon phase export-csv merged --slot B
 ```
 
 Do not run that command just to make a blocked leaf disappear. It means the code has landed.

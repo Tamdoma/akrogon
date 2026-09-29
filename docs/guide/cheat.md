@@ -65,22 +65,22 @@ akrogon status --charts
 tail issues/log.jsonl
 ```
 
-Report completed implementation as B:
+Report completed implementation as A:
 
 ```sh
-akrogon phase export-csv check.review --slot B
+akrogon phase export-csv check.review --slot A
 ```
 
-Report A's review verdict:
+Report B's review verdict:
 
 ```sh
-akrogon phase export-csv merge --slot A --verdict nits
+akrogon phase export-csv merge --slot B --verdict nits
 ```
 
 Record a blocker, then recover only after it is resolved:
 
 ```sh
-akrogon phase export-csv failed --reason "Required permission is missing" --slot B
+akrogon phase export-csv failed --reason "Required permission is missing" --slot A
 akrogon phase export-csv implement
 akrogon next export-csv
 ```

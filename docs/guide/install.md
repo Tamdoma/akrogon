@@ -66,7 +66,7 @@ config.yaml
 
 It defines the harness commands, the two seats, registered repositories and a global capacity limit.
 
-The current checked-in seats both use pi with the devin/swe-2-max model. A and B are roles, not fixed model names.
+A and B are roles, not fixed model names. Check `config.yaml` for the current seats.
 
 For the examples in this guide, register the project under the name widgets:
 
