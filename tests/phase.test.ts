@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { resolve } from 'node:path';
-import { readFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, rmSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { fixture, cli, leaf, yaml, fakeGh, fakeHerdr, type GhFixture, type Fixture } from './helpers';
 import { readState, saveState } from '../src/state';
 import { command, type Result } from '../src/shell';
@@ -181,8 +181,8 @@ test('completion reports each issue once, moves only finished containers, and re
     expect((await cli(f, ['phase', 'three', 'merged'])).stdout).toContain('issue complete second');
     expect(existsSync(resolve(f.root, 'issues/closed/epic/first/one/state.yaml'))).toBe(true);
     expect(existsSync(resolve(f.root, 'issues/open/epic'))).toBe(false);
-    expect(existsSync(resolve(f.root, 'issues/closed/epic/chart/CHART.md'))).toBe(true);
-    expect(existsSync(resolve(f.root, 'issues/chart/epic'))).toBe(false);
+    expect(existsSync(resolve(f.root, 'issues/chart/epic/CHART.md'))).toBe(true);
+    expect(existsSync(resolve(f.root, 'issues/closed/epic/chart'))).toBe(false);
     const repeated: Result = await cli(f, ['phase', 'three', 'merged']);
     expect(repeated.code).not.toBe(0);
     expect(repeated.stdout).not.toContain('issue complete');
@@ -193,6 +193,39 @@ test('completion reports each issue once, moves only finished containers, and re
     f.clean();
   }
 });
+
+function snapshot(dir: string, prefix: string = ''): Map<string, Buffer> {
+  return new Map(
+    readdirSync(dir).flatMap((entry): [string, Buffer][] => {
+      const path: string = resolve(dir, entry);
+      const name: string = prefix === '' ? entry : `${prefix}/${entry}`;
+      return statSync(path).isDirectory() ? [...snapshot(path, name)] : [[name, readFileSync(path)]];
+    }),
+  );
+}
+
+test('completion leaves a chart holding a same-slug draft in place and keeps the inventory readable', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const alpha: string = leaf(f, 'alpha', 'merge', {}, 'epic/one');
+    leaf(f, 'beta', 'merge', {}, 'epic/two');
+    const chart: string = resolve(f.root, 'issues/chart/epic');
+    const slot: string = resolve(chart, 'slots/leaf-draft/alpha');
+    mkdirSync(slot, { recursive: true });
+    writeFileSync(resolve(chart, 'CHART.md'), '# Chart: epic\n');
+    writeFileSync(resolve(slot, 'state.yaml'), readFileSync(resolve(alpha, 'state.yaml')));
+    const before: Map<string, Buffer> = snapshot(chart);
+    for (const slug of ['alpha', 'beta']) expect((await cli(f, ['phase', slug, 'merged'])).code).toBe(0);
+    expect(snapshot(chart)).toEqual(before);
+    const all: Result = await cli(f, ['next', '--all'], f.root, fakeHerdr(f).env);
+    expect(all.code).toBe(0);
+    expect(all.stderr).not.toContain('Invalid leaf depth');
+    expect(all.stderr).not.toContain('Duplicate leaf slug');
+    expect((await cli(f, ['status', 'alpha'])).code).toBe(0);
+  } finally {
+    f.clean();
+  }
+}, 15000);
 
 test('failed log preserves committed state and failed container rename retries without replay', async () => {
   const f: Fixture = await fixture();
@@ -679,8 +712,8 @@ for (const scope of ['standalone', 'epic'] as const) {
       expect(retried.stdout).not.toContain('issue complete');
       expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
       expect(existsSync(probe.open)).toBe(false);
-      expect(existsSync(resolve(probe.closed, 'chart/CHART.md'))).toBe(true);
-      expect(existsSync(chart)).toBe(false);
+      expect(existsSync(resolve(chart, 'CHART.md'))).toBe(true);
+      expect(existsSync(resolve(probe.closed, 'chart'))).toBe(false);
       expect((await cli(f, ['phase', 'retry', 'merged'], f.root, gh.env)).code).not.toBe(0);
       expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
     } finally {

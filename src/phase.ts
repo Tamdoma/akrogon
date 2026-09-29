@@ -170,8 +170,6 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   if (!complete) return;
   mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
   renameSync(owner, destination);
-  const chart: string = resolve(repo.root, 'issues/chart', basename(owner));
-  if (existsSync(chart)) renameSync(chart, resolve(destination, 'chart'));
 }
 
 export async function transition(
