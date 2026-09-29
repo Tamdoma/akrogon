@@ -270,10 +270,7 @@ test('init writes no lessons rule to the repo info attributes file', async () =>
   const f: Fixture = await fixture();
   try {
     expect((await cli(f, ['init'])).code).toBe(0);
-    const info: string = resolve(
-      f.root,
-      await command(['git', 'rev-parse', '--git-path', 'info/attributes'], f.root),
-    );
+    const info: string = resolve(f.root, await command(['git', 'rev-parse', '--git-path', 'info/attributes'], f.root));
     expect(existsSync(info) ? readFileSync(info, 'utf8') : '').not.toContain('learnings/LESSONS.md');
   } finally {
     f.clean();
