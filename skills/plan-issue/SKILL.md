@@ -54,6 +54,8 @@ Finish with `akrogon phase <slug> plan.synthesis --slot <A|B>`, then print the f
 
 As B, write `plan.md` under the `leaf=` folder with stable D1…Dn decisions, read-first paths, needed interfaces, ordered file/criterion checklist and concrete verification, integrating both positions and any configured rebuttals when debate ran, or directly using the brief/design when `debate: no`. The checklist names every affected agent and human doc one line each, or states in one line that no doc is affected.
 
+plan.md maps each done-criterion to its proof command, the failure it catches, a size (seconds, minutes, hours or unknown) and a rerun trigger, and a slow-run leaf's plan names its restart boundaries.
+
 The synthesis resolves implementation choices without reopening locked scope; it contains acceptance criteria before implementation derives tests, preserves a real open limitation, and names a dependency only when execution actually requires ordering.
 
 Every credential the design names by variable name is checked by name with `bun --env-file=.env -e 'console.log(["VAR_A","VAR_B"].map(k => k + ": " + (process.env[k] === undefined ? "absent" : "present")).join("\n"))'` with the design names in the list, printing `present`/`absent` per name; each one absent there and unobtainable by this seat is a human-only blocker recorded in `plan.md` with the `add <VAR> to .env` action, what the value is, and where the operator obtains it, then the seat runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see plan.md>" --slot B` and ends the pass instead of finishing with `implement`.

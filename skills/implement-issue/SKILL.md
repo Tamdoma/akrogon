@@ -29,6 +29,7 @@ The plan's read-first list supplies worker context and the index is opened only 
 A reusable lesson found during leaf work gets an active line naming mechanism/date/history path and a history file with case, evidence and learning; `learnings/LESSONS.md` is not pass input, and applying a lesson removes its active line and dates its history file without rewriting the historical case.
 
 The B seat proceeds without posing questions or holding the pass open, deciding from the plan, the design, and the worktree alone. When a step physically requires the operator (a permission B cannot grant, an env value B cannot obtain), B writes the blocker and the exact operator action into its current pass artifact, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot B`, and ends the pass.
+A fix that needs a locked decision changed ends the pass the same way, with `akrogon phase <slug> failed --reason` naming that decision.
 
 B never opens, prints, appends to, or writes `.env` or `.env.*` with any tool, instead running any script that needs values as `bun --env-file=<file> <script>` to print only results, never values, and checking presence by name with such a script printing `present`/`absent` per name, ending the pass with the stop above when a required value is absent.
 
@@ -43,6 +44,8 @@ Derive meaningful tests from acceptance criteria before code, demonstrate red th
 A credential still absent from `.env` at implement is never requested as a pasted value: B records the missing variable in `<leaf>/implementation/report.md` as a human-only blocker with the `add <VAR> to .env` action, what the value is, and where the operator obtains it, then runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see implementation/report.md>" --slot B` and ends the pass.
 
 After the last implementation unit, with every worker worktree removed, run the full suite once as B and every other blocking check, repair any failure by the protocol (yourself in inline mode), then commit any remaining edits on top of the wave commits on the leaf branch, making no empty commit, and write `<leaf>/implementation/report.md` with changed files and reasons, commands run with pasted results and artifact paths, the base and committed head, known limitations and unverified criteria, folding worker returns into it, before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
+The report records wall time for every command sized minutes, hours or unknown.
+For a slow run it also records the in-branch fixes made, the reused stages with their source commit, what changed and which stages it feeds, and the blocked checks.
 
 Every command under `checks` blocks; `advisory` failures are reported as Nits, and a full-suite rerun follows a repair rather than an unchanged successful run.
 

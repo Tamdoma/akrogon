@@ -44,6 +44,8 @@ A Fix is wrong behavior, a broken contract or concrete maintainability defect, i
 
 Compare tests with acceptance criteria and reject mocks of the unit under test and akrogon tests of prose/output wording, except commands, numbers or fixed references that run literally as written.
 
+A Fix is also a failure the leaf's code can cause left untested in the leaf (a gap fillable only by a slow but correct test is a Nit), a second copy of a rule kept without its reason and agreement test or a reproducible writer/checker disagreement on that rule, and a group-size-dependent check lacking either its stated need for the target count or its target-size test. Look-alike code alone is not a Fix, and these triggers add no review rerun beyond the rerun rule below.
+
 All `checks` commands block, optional `advisory` failures are Nits, and a report gap blocks only when material to correctness or verification.
 
 Rerun checks only for a code change, missing evidence or a specific concern, leaving doc/index authorship with B and recording any reusable lesson found here as one active mechanism/date/history line plus a history file with case, evidence and learning, written under the registered checkout's `learnings/` and left for the operator to commit.
