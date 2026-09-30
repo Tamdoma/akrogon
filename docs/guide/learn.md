@@ -2,11 +2,11 @@
 
 A review can reveal something useful beyond the current fix. Keep that knowledge separate from the leaf's required repairs.
 
-**A fix** is needed for the leaf to meet its contract. For CSV export, losing a field containing a comma is a defect if correct CSV quoting is required.
+**A fix** blocks merge until repaired. It names its realistic source, its consequence today, and the criterion, check or gap it hits. For CSV export, losing a field containing a comma is a fix when real user content shows the loss and correct CSV quoting is required, while a handcrafted string alone is a nit.
 
-**A nit** does not block merge. It stays in the review record. Whether a performance concern is a nit depends on the requirements and evidence, not just whether the brief names a row count.
+**A nit** does not block merge. It stays in the review record with the reproduction or concern, why it is deferred, and what evidence would promote it to a fix. Repair works fixes only, so a nit gets no separate work or test.
 
-**A lesson** records a reusable finding. The merge skill can turn a reusable nit into a short entry and a supporting history file:
+**A lesson** records a reusable finding from a nit that stayed in the review record. The merge skill can turn that nit into a short entry and a supporting history file:
 
 ```text
 learnings/LESSONS.md

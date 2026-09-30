@@ -86,7 +86,7 @@ Debate gives you separate implementation proposals when the tradeoff warrants it
 
 A follows the plan in the leaf worktree. Depending on configuration, A works inline or delegates bounded units in waves of up to 3 independent workers, each in its own worktree with results cherry-picked onto the lane.
 
-Tests come from the acceptance criteria. The skill calls for meaningful failing-then-passing evidence, with a trivial one-line change exempt from new tests.
+Tests come from the acceptance criteria. The skill calls for the smallest set that proves every criterion, with a trivial one-line change exempt from new tests. A missing or bad test blocks only when a criterion has no test that would catch its failure, a realistic fix has no test, or a test mocks the unit under test.
 
 A runs changed tests as work lands, then the full suite and other blocking checks before handoff. The implementation report records the code changes, commands, results, commits and any limitations.
 
@@ -96,7 +96,7 @@ You get a reviewable change and evidence of what was checked. A claim that “te
 
 Both seats review the initial change independently without reading the peer's current review. They judge the diff against the contract, plan and evidence.
 
-A blocking finding needs a concrete defect, failed check or broken contract. A preference alone is a nit.
+A blocking fix names its realistic source, its consequence today, and the criterion, check or gap it hits. The source is a real build, a real user action or content, a real integration, or untrusted input an attacker can send, while a handcrafted reproduction alone is a nit. Failed checks and scenarios a criterion names always block.
 
 Suppose a CSV field containing a newline creates an extra row. If that violates the contract, the reviewer records the case and requests a fix. A repairs it and runs the relevant checks.
 
