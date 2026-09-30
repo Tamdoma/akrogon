@@ -1,0 +1,1 @@
+Remove the research claim that diminishing returns begin at roughly 70% coverage. [Dodds explicitly says he invented that number and had no scientific basis for it](https://kentcdodds.com/blog/write-tests). His guidance supports choosing tests for confidence per cost, not an evidence-based coverage threshold.

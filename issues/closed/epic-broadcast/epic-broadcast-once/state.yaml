@@ -1,0 +1,32 @@
+slug: epic-broadcast-once
+phase: merged
+created: 2026-09-30
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#42"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 1
+verdict: 
+  {}
+tab: w8:t7N
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/epic-broadcast-once
+pane: 
+  A: w8:pEC
+  B: w8:pED
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

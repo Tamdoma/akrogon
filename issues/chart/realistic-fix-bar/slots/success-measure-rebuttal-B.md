@@ -1,0 +1,3 @@
+The all-time repair ratio mixes cohorts: 9 and 94 include unfinished leaves, while 74 and 225 count completed leaves. My completed-cohort calculation from both logs gives **8/74 (0.11)** and **87/225 (0.39)** review→repair entries per completed leaf. Use those numbers or label the numerator and denominator separately.
+
+More escaped-bug seeds do not establish that the bar is too loose. Seeds are unverified intake (`issues/seeds/43-check-issue-treats-contrived.md`). Count confirmed, attributable escapes over equally observed cohorts, report consequences, and investigate an increase rather than assert policy causation.
