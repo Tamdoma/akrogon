@@ -1,0 +1,8 @@
+slug: guarded-peer-wait
+phase: plan.synthesis
+created: '2026-09-30'
+repo: akrogon
+debate: 'no'
+blocked-by: []
+sources:
+  - Tamdoma/akrogon#44

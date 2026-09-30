@@ -1,5 +1,5 @@
 slug: realistic-review-bar
-phase: plan.synthesis
+phase: merged
 created: 2026-09-30
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#43"
 busy_since: 
-  A: 2026-09-30T16:28:40.486Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -16,7 +16,7 @@ attempts:
   B: 0
 done: 
   []
-fix_rounds: 0
+fix_rounds: 1
 verdict: 
   {}
 tab: w8:t7Q
@@ -25,8 +25,8 @@ pane:
   A: w8:pEF
   B: w8:pEG
 prompted: 
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-realistic-review-bar--/2026-09-30T16-28-37-177Z_01a0f325-83b9-74df-bdf4-b33af9eab6ed.jsonl
+  {}
 prompted_at: 
-  A: 2026-09-30T16:28:40.486Z
+  {}
 delivery_error: 
   {}
