@@ -98,7 +98,7 @@ Both seats review the initial change independently without reading the peer's cu
 
 A blocking fix names its realistic source, its consequence today, and the criterion, check or gap it hits. The source is a real build, a real user action or content, a real integration, or untrusted input an attacker can send, while a handcrafted reproduction alone is a nit. Failed checks and scenarios a criterion names always block.
 
-Suppose a CSV field containing a newline creates an extra row. If that violates the contract, the reviewer records the case and requests a fix. A repairs it and runs the relevant checks.
+Suppose a CSV field with a newline pasted from a user spreadsheet creates an extra row. If that breaks the import criterion, the reviewer records the source, consequence, and criterion and requests a fix. A repairs it and runs the relevant checks.
 
 B then reviews the repair diff. That pass confirms the earlier findings and can block a new defect introduced by the repair. It does not restart an unrestricted review of the whole feature.
 
