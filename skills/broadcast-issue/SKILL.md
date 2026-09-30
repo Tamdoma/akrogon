@@ -1,17 +1,17 @@
 ---
 name: broadcast-issue
-description: Compose and send one factual update for a completed issue to its configured Discord targets, run by the merge slot itself after issue completion.
+description: Compose and send one factual update for a completed standalone issue or epic to its configured Discord targets, run by the merge slot itself after `issue complete` or `epic complete`.
 ---
 
 Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt. After compaction, use the completed issue context supplied by the merger if its folder moved.
 
 # Broadcast issue
 
-This is the merge slot's own terminal task after `issue complete`, never delegated, not another leaf phase; one completed issue produces one message delivered to its configured targets.
+This is the merge slot's own terminal task after `issue complete` or `epic complete`, never delegated, not another leaf phase; one completed standalone issue or one completed epic produces one message delivered to its configured targets.
 
 ## Context and message
 
-Read the issue's supplied briefs and completion evidence plus `akrogon config` in the supplied repo worktree, taking target names from `broadcast.discord.webhook_env` without reading YAML. The sender works from supplied context alone and directs no questions elsewhere.
+Read the completion owner's supplied briefs (the issue's, or every leaf brief under the epic when the leaf has one) and completion evidence plus `akrogon config` in the supplied repo worktree, taking target names from `broadcast.discord.webhook_env` without reading YAML. The sender works from supplied context alone and directs no questions elsewhere.
 
 Ground in docs first.
 Challenge fuzzy terms.

@@ -1,6 +1,6 @@
 ---
 name: merge-issue
-description: Rebase a reviewed leaf onto its configured remote branch, run checks, push fast-forward, and request one broadcast only when the issue completes.
+description: Rebase a reviewed leaf onto its configured remote branch, run checks, push fast-forward, gather the completion owner's briefs, and run one broadcast only when `issue complete` or `epic complete` prints.
 ---
 
 Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
@@ -44,7 +44,7 @@ After green checks, push `HEAD:<default_branch>` to the configured remote fast-f
 
 Other push errors are reported with their cause rather than retried as competing merges, and an unchanged successful check run is reused only when neither code nor integration changed.
 
-Gather the completed issue's briefs before its folder may move, then after confirmed push success run `akrogon phase <slug> merged --slot B`, and only when this invocation prints `issue complete`, run the broadcast-issue skill yourself in this session with that issue context and repo worktree; the broadcast is always sent by the merge slot, never by a subagent or another agent, because the tab closes as soon as this pane goes idle after `merged`.
+Gather the completion owner's briefs (the issue's, or every leaf brief under the epic when the leaf has one) before its folder may move, then after confirmed push success run `akrogon phase <slug> merged --slot B`, and only when this invocation prints `issue complete` or `epic complete`, run the broadcast-issue skill yourself in this session with that context and repo worktree; the broadcast is always sent by the merge slot, never by a subagent or another agent, because the tab closes as soon as this pane goes idle after `merged`.
 
 A failed broadcast is visible but leaves the merge complete, while GitHub closure and completed-folder moves belong to the command.
 
