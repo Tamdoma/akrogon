@@ -197,7 +197,9 @@ test('completion prints only when the owner finishes, stays silent on inner issu
       ['penultimate', 'last'].map((slug) => cli(f, ['phase', slug, 'merged'])),
     );
     expect(standalone.every((r) => r.code === 0)).toBe(true);
-    expect(standalone.flatMap((r) => r.stdout.split('\n')).filter((line) => line.includes('complete'))).toEqual(['issue complete standalone']);
+    expect(standalone.flatMap((r) => r.stdout.split('\n')).filter((line) => line.includes('complete'))).toEqual([
+      'issue complete standalone',
+    ]);
     expect(existsSync(resolve(f.root, 'issues/closed/standalone/last/state.yaml'))).toBe(true);
   } finally {
     f.clean();
