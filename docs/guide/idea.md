@@ -86,7 +86,7 @@ Observation: users need CSV
   -> review: find concrete defects
   -> fix and re-check, when needed
   -> merge: rebase, check and push
-  -> broadcast: report the completed issue, when configured
+  -> broadcast: report the completed issue or epic, when configured
 ```
 
 State files and pass artifacts connect these steps. Herdr supplies the agent panes and events. Skills tell the agents how to do each job. Akrogon's commands validate and record the transitions.

@@ -16,13 +16,19 @@ akrogon phase export-csv merged --slot B
 
 Do not run that command just to make a blocked leaf disappear. It means the code has landed.
 
-When all leaves in an issue are merged, the command can report:
+When the last leaf of a standalone issue merges, the command reports:
 
 ```text
-issue complete
+issue complete <issue>
 ```
 
-Completed records move to the closed store. An issue inside an epic waits for the whole epic before the top-level folder moves.
+When the last leaf of an epic merges, it reports:
+
+```text
+epic complete <epic>
+```
+
+Completed records move to the closed store. An issue inside an epic prints no completion line and waits for the whole epic before the top-level folder moves.
 
 Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. Only those sweeps remove completed worktrees and branches, after the issue folder has moved:
 
@@ -33,7 +39,7 @@ akrogon next
 
 ## The broadcast
 
-If Discord targets are configured, the merge seat sends a completion update when the issue completes. It sends the update itself, in the same session.
+If Discord targets are configured, the merge seat sends a completion update when a standalone issue or a whole epic completes. It sends the update itself, in the same session.
 
 The message describes the user-visible change. For our example:
 
@@ -66,7 +72,7 @@ A successful merge ends the leaf's code work. Deployment remains your project's 
 
 ## broadcast-issue: explain the completed outcome
 
-The broadcast skill turns completed briefs into a factual before-and-after update for configured Discord targets. It runs when the whole issue completes, not after every leaf.
+The broadcast skill turns completed briefs into a factual before-and-after update for configured Discord targets. It runs once when a standalone issue or a whole epic completes, not after every leaf or inner issue.
 
 This gives people following the project a short account of what they can now do. It should report the actual outcome, not implementation jargon or benefits that were never measured.
 

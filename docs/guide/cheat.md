@@ -122,7 +122,7 @@ Remember: capacity counts leaves across repositories. Failed can resume at any a
 | Build or repair it | implement-issue | Code, checks and an implementation report. |
 | Check the result | check-issue | Evidence-backed verdicts. |
 | Land reviewed work | merge-issue | Checked code pushed to the default branch. |
-| Announce completion | broadcast-issue | A factual issue update. |
+| Announce completion | broadcast-issue | A factual update for a completed issue or epic. |
 | Check while away | watch-issues | Optional Claude Code cron inspection. |
 
 Invoke setup, intake, charting and watching when you need them. Dispatch selects the execution skills from the leaf's phase. You do not need to run every skill by hand.

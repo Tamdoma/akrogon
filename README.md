@@ -185,6 +185,6 @@ That report destination does not redirect pull.
 | [check-issue](skills/check-issue/SKILL.md) | Review defects and verify repairs. |
 | [merge-issue](skills/merge-issue/SKILL.md) | Rebase, check and push reviewed work. |
 | [seed-issue](skills/seed-issue/SKILL.md) | File an observation for investigation. |
-| [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a completed-issue update to Discord. |
+| [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a completed-issue-or-epic update to Discord. |
 | [init-akrogon](skills/init-akrogon/SKILL.md) | Inspect a repository and set up its lifecycle. |
 | [watch-issues](skills/watch-issues/SKILL.md) | Watch open leaves on an optional 20-minute Claude Code cron. |
