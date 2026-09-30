@@ -10,7 +10,7 @@ The outcome and plan decision IDs; standalone assigns its brief's own decision I
 
 ## 2. Numbered acceptance criteria
 
-Observable outcomes written before code; each nontrivial criterion has a meaningful verification, a bug has fail-first evidence, and trivial one-liners need no test.
+Observable outcomes written before code; write the smallest test set proving every done-criterion, one test may prove several criteria, with one before and after proof per real bug fixed; extra negative or edge cases need a named concrete consequence on a realistic path (a broken required outcome, a security boundary, data loss or an unsafe mutation); extend existing tests before adding files; trivial one-liners need no test.
 
 ## 3. Read-first list
 
@@ -40,11 +40,11 @@ If the checkout has no changed-test runner, name the actual targeted check deriv
 
 ## 8. Done-when, evidence and report
 
-Acceptance outcomes and pasted command results, with a path to any required end-to-end artifact; limitations and unverified criteria remain explicit.
+Acceptance outcomes and pasted command results; the report links each done-criterion and each real bug fix to its test or evidence, with a path to any required end-to-end artifact; limitations and unverified criteria remain explicit.
 
 For akrogon command work, scenarios use temporary repositories, real files/processes and herdr/gh replaced at one boundary, with no real panes, install roots, GitHub or herdr socket; tests need an observable contract or observed defect, not coverage or wording except literal commands, numbers and fixed references.
 
-For a user-visible flow, include a real invocation or request with evidence; browser flows use headless Playwright Chromium with trace on and video off, recorded as a consumer dev dependency when first needed.
+End to end evidence with an artifact is required only when browser or runtime behavior or cross-component wiring cannot be shown by a smaller check or when a criterion asks for it; then a user-visible flow uses a real invocation or request with evidence, and browser flows use headless Playwright Chromium with trace on and video off, recorded as a consumer dev dependency when first needed.
 
 End the concrete brief with these four fill-in lines, accepting equivalent wording by content:
 

@@ -39,7 +39,7 @@ Before coding, when an implementation-only constraint is missing from `plan.md` 
 
 Inline has no worker, sub-briefs or mismatch returns; both modes run the resolved changed-tests command as work lands with `AKROGON_BASE` from config, and workers receive only that command, not the full suite.
 
-Derive meaningful tests from acceptance criteria before code, demonstrate red then green and a fail-first test for a bug, with no test needed for a trivial one-liner.
+Write the smallest test set proving every done-criterion before code, one test may prove several criteria, with one before and after proof per real bug fixed; extra negative or edge cases need a named concrete consequence on a realistic path (a broken required outcome, a security boundary, data loss or an unsafe mutation); extend existing tests before adding files; the report links each done-criterion and each real bug fix to its test or evidence; trivial one-liners need no test.
 
 A credential still absent from `.env` at implement is never requested as a pasted value: A records the missing variable in `<leaf>/implementation/report.md` as a human-only blocker with the `add <VAR> to .env` action, what the value is, and where the operator obtains it, then runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see implementation/report.md>" --slot A` and ends the pass.
 
@@ -57,7 +57,7 @@ Read the recorded findings and reviewed commit in the existing review files, rev
 
 A repair requested from merge starts at the rebased head recorded in `review-B.md` and treats the failing output as the finding.
 
-Run the affected changed tests and required checks, update affected docs/index lines and append the repair's before and after commits to `report.md` under the `leaf=` folder, then finish with `akrogon phase <slug> check.review --slot A`, print the footer and stop.
+Do required work for Fixes only; Nits get no separate work or test and may only disappear incidentally through Fix repair. Run the affected changed tests and required checks, update affected docs/index lines and append the repair's before and after commits to `report.md` under the `leaf=` folder, then finish with `akrogon phase <slug> check.review --slot A`, print the footer and stop.
 
 ## Standalone
 
