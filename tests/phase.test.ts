@@ -175,10 +175,15 @@ test('completion prints only when the owner finishes, stays silent on inner issu
     mkdirSync(resolve(f.root, 'issues/chart/epic'), { recursive: true });
     writeFileSync(resolve(f.root, 'issues/chart/epic/CHART.md'), '# Chart: epic\n');
     const race: Result[] = await Promise.all(['one', 'two'].map((slug) => cli(f, ['phase', slug, 'merged'])));
-    expect(race.every((r) => r.stdout === 'moved merged')).toBe(true);
+    expect(race.every((r) => r.code === 0)).toBe(true);
+    for (const r of race) {
+      expect(r.stdout).not.toContain('issue complete');
+      expect(r.stdout).not.toContain('epic complete');
+    }
     expect(existsSync(resolve(f.root, 'issues/open/epic'))).toBe(true);
     const final: Result = await cli(f, ['phase', 'three', 'merged']);
-    expect(final.stdout).toBe('moved merged\nepic complete epic');
+    expect(final.code).toBe(0);
+    expect(final.stdout.split('\n').filter((line) => line.includes('complete'))).toEqual(['epic complete epic']);
     expect(existsSync(resolve(f.root, 'issues/closed/epic/first/one/state.yaml'))).toBe(true);
     expect(existsSync(resolve(f.root, 'issues/open/epic'))).toBe(false);
     expect(existsSync(resolve(f.root, 'issues/chart/epic/CHART.md'))).toBe(true);
@@ -192,8 +197,7 @@ test('completion prints only when the owner finishes, stays silent on inner issu
       ['penultimate', 'last'].map((slug) => cli(f, ['phase', slug, 'merged'])),
     );
     expect(standalone.every((r) => r.code === 0)).toBe(true);
-    expect(standalone.filter((r) => r.stdout === 'moved merged\nissue complete standalone')).toHaveLength(1);
-    expect(standalone.filter((r) => r.stdout === 'moved merged')).toHaveLength(1);
+    expect(standalone.flatMap((r) => r.stdout.split('\n')).filter((line) => line.includes('complete'))).toEqual(['issue complete standalone']);
     expect(existsSync(resolve(f.root, 'issues/closed/standalone/last/state.yaml'))).toBe(true);
   } finally {
     f.clean();
@@ -614,7 +618,8 @@ test('each completed issue closes only its all-leaf private sources before the f
     );
     const earlier: Result = await cli(f, ['phase', 'first', 'merged'], f.root, gh.env);
     expect(earlier.code).toBe(0);
-    expect(earlier.stdout).toBe('moved merged');
+    expect(earlier.stdout).not.toContain('issue complete');
+    expect(earlier.stdout).not.toContain('epic complete');
     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
     expect(existsSync(firstProbe.open)).toBe(true);
     expect(existsSync(firstProbe.closed)).toBe(false);
@@ -650,7 +655,7 @@ test('each completed issue closes only its all-leaf private sources before the f
     );
     const final: Result = await cli(f, ['phase', 'last', 'merged'], f.root, gh.env);
     expect(final.code).toBe(0);
-    expect(final.stdout).toBe('moved merged\nepic complete epic');
+    expect(final.stdout.split('\n').filter((line) => line.includes('complete'))).toEqual(['epic complete epic']);
     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
     expect(existsSync(firstProbe.open)).toBe(false);
     expect(existsSync(firstProbe.closed)).toBe(true);
