@@ -166,8 +166,8 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
     );
     await closeSources(repo, remaining, leaf);
   }
-  if (justMerged) console.log(`issue complete ${basename(issue)}`);
   if (!complete) return;
+  if (justMerged) console.log(`${owner === issue ? 'issue' : 'epic'} complete ${basename(owner)}`);
   mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
   renameSync(owner, destination);
 }

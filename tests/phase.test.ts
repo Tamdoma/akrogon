@@ -166,7 +166,7 @@ test('handoff to review refuses a dirty worktree at every move and issue files o
   }
 });
 
-test('completion reports each issue once, moves only finished containers, and refuses repeated merged', async () => {
+test('completion prints only when the owner finishes, stays silent on inner issues and retries', async () => {
   const f: Fixture = await fixture();
   try {
     leaf(f, 'one', 'merge', {}, 'epic/first');
@@ -175,20 +175,26 @@ test('completion reports each issue once, moves only finished containers, and re
     mkdirSync(resolve(f.root, 'issues/chart/epic'), { recursive: true });
     writeFileSync(resolve(f.root, 'issues/chart/epic/CHART.md'), '# Chart: epic\n');
     const race: Result[] = await Promise.all(['one', 'two'].map((slug) => cli(f, ['phase', slug, 'merged'])));
-    expect(race.every((r) => r.code === 0)).toBe(true);
-    expect(race.filter((r) => r.stdout.includes('issue complete first'))).toHaveLength(1);
+    expect(race.every((r) => r.stdout === 'moved merged')).toBe(true);
     expect(existsSync(resolve(f.root, 'issues/open/epic'))).toBe(true);
-    expect((await cli(f, ['phase', 'three', 'merged'])).stdout).toContain('issue complete second');
+    const final: Result = await cli(f, ['phase', 'three', 'merged']);
+    expect(final.stdout).toBe('moved merged\nepic complete epic');
     expect(existsSync(resolve(f.root, 'issues/closed/epic/first/one/state.yaml'))).toBe(true);
     expect(existsSync(resolve(f.root, 'issues/open/epic'))).toBe(false);
     expect(existsSync(resolve(f.root, 'issues/chart/epic/CHART.md'))).toBe(true);
     expect(existsSync(resolve(f.root, 'issues/closed/epic/chart'))).toBe(false);
     const repeated: Result = await cli(f, ['phase', 'three', 'merged']);
     expect(repeated.code).not.toBe(0);
-    expect(repeated.stdout).not.toContain('issue complete');
-    leaf(f, 'single', 'merge', {}, 'standalone');
-    expect((await cli(f, ['phase', 'single', 'merged'])).stdout).toContain('issue complete standalone');
-    expect(existsSync(resolve(f.root, 'issues/closed/standalone/single/state.yaml'))).toBe(true);
+    expect(repeated.stdout).not.toContain('complete');
+    leaf(f, 'penultimate', 'merge', {}, 'standalone');
+    leaf(f, 'last', 'merge', {}, 'standalone');
+    const standalone: Result[] = await Promise.all(
+      ['penultimate', 'last'].map((slug) => cli(f, ['phase', slug, 'merged'])),
+    );
+    expect(standalone.every((r) => r.code === 0)).toBe(true);
+    expect(standalone.filter((r) => r.stdout === 'moved merged\nissue complete standalone')).toHaveLength(1);
+    expect(standalone.filter((r) => r.stdout === 'moved merged')).toHaveLength(1);
+    expect(existsSync(resolve(f.root, 'issues/closed/standalone/last/state.yaml'))).toBe(true);
   } finally {
     f.clean();
   }
@@ -249,6 +255,7 @@ test('failed log preserves committed state and failed container rename retries w
     rmSync(resolve(f.root, 'issues/closed/closing'), { recursive: true });
     const retried: Result = await cli(f, ['phase', 'close-error', 'merged']);
     expect(retried.stdout).not.toContain('issue complete');
+    expect(retried.stdout).not.toContain('epic complete');
     expect(existsSync(resolve(f.root, 'issues/closed/closing/close-error/state.yaml'))).toBe(true);
     expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1);
   } finally {
@@ -607,7 +614,7 @@ test('each completed issue closes only its all-leaf private sources before the f
     );
     const earlier: Result = await cli(f, ['phase', 'first', 'merged'], f.root, gh.env);
     expect(earlier.code).toBe(0);
-    expect(earlier.stdout).toContain('issue complete first');
+    expect(earlier.stdout).toBe('moved merged');
     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
     expect(existsSync(firstProbe.open)).toBe(true);
     expect(existsSync(firstProbe.closed)).toBe(false);
@@ -643,7 +650,7 @@ test('each completed issue closes only its all-leaf private sources before the f
     );
     const final: Result = await cli(f, ['phase', 'last', 'merged'], f.root, gh.env);
     expect(final.code).toBe(0);
-    expect(final.stdout).toContain('issue complete last');
+    expect(final.stdout).toBe('moved merged\nepic complete epic');
     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
     expect(existsSync(firstProbe.open)).toBe(false);
     expect(existsSync(firstProbe.closed)).toBe(true);
@@ -690,6 +697,7 @@ for (const scope of ['standalone', 'epic'] as const) {
       const failed: Result = await cli(f, ['phase', 'retry', 'merged'], f.root, gh.env);
       expect(failed.code).not.toBe(0);
       expect(failed.stdout).not.toContain('issue complete');
+      expect(failed.stdout).not.toContain('epic complete');
       expect(failed.stderr).toContain('offline');
       expect(readState(path).phase).toBe('merged');
       expect(existsSync(chart)).toBe(true);
@@ -710,6 +718,7 @@ for (const scope of ['standalone', 'epic'] as const) {
       const retried: Result = await cli(f, ['next', 'retry'], f.root, gh.env);
       expect(retried.code).toBe(0);
       expect(retried.stdout).not.toContain('issue complete');
+      expect(retried.stdout).not.toContain('epic complete');
       expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
       expect(existsSync(probe.open)).toBe(false);
       expect(existsSync(resolve(chart, 'CHART.md'))).toBe(true);
