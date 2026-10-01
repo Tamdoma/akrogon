@@ -70,7 +70,7 @@ akrogon phase export-csv plan.synthesis
 akrogon next export-csv
 ```
 
-Failed can resume at any active phase. It cannot jump directly to merged. Recovery resets the recorded pass and delivery bookkeeping. It does not repair code or resolve the blocker for you.
+Failed can resume at any active phase. It cannot jump directly to merged. Recovery resets the recorded pass and delivery bookkeeping. It does not repair code or resolve the blocker for you. A call carrying `--slot` cannot move a failed leaf; recovery omits `--slot`.
 
 ## plan-issue: turn the contract into steps
 

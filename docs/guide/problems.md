@@ -24,6 +24,8 @@ akrogon phase export-csv implement
 akrogon next export-csv
 ```
 
+A call carrying `--slot` cannot move a failed leaf; recovery omits `--slot` after the blocker is resolved.
+
 **A seat looks idle but receives no prompt.**
 
 The harness may report blocked or unknown, or a recently sent prompt may still be within its grace period. Inspect the actual seat before assuming it is safe to resend work.
