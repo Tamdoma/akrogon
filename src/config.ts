@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { command, run, type Result } from './shell';
 import { trackingRef } from './preflight';
@@ -126,6 +127,15 @@ export async function requireRepo(global: GlobalConfig, cwd: string): Promise<Re
 
 export function worktreeStore(repo: Repo): string {
   return resolve(repo.root, repo.config.worktree_root);
+}
+
+export function leafTemp(repo: Repo, slug: string): string {
+  const override: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
+  if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
+    throw new Error(`Invalid AKROGON_LEAF_TEMP_ROOT: must be a non-blank absolute path`);
+  const root: string = override ?? `/var/tmp/akrogon-${process.getuid!()}`;
+  const hex: string = createHash('sha256').update(repo.root + "\n" + slug).digest('hex').slice(0, 12);
+  return resolve(root, `${slug.slice(0, 20)}-${hex}`);
 }
 
 export function target(repo: Repo): string {
