@@ -1,0 +1,32 @@
+slug: check-scheduling
+phase: merged
+created: 2026-10-01
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#48"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t7W
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/check-scheduling
+pane: 
+  A: w8:pEV
+  B: w8:pEW
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

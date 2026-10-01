@@ -14,3 +14,5 @@ Slow checks run once where they prove something: leaves prove their own criteria
 - Check-record runner (seed points 1-3): operator chose 1a; no savings shown in the motivating case and safe reuse needs declared inputs.
 - Framework config cleanup (duplicate parity/contracts under several `checks` names) and emdash-conversion C1: framework operator decisions, not akrogon code.
 - Post-merge scheduled main health run (tamdoma/framework#115): separate framework issue.
+
+Handed off 2026-10-01
