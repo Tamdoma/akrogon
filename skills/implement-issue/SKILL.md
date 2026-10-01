@@ -41,7 +41,7 @@ A never opens, prints, appends to, or writes `.env` or `.env.*` with any tool, i
 
 ## implement
 
-Before coding, when an implementation-only constraint is missing from `plan.md` under the `leaf=` folder, append one dated `## Implementation notes` section naming each constraint and the decision it refines; a locked decision is never changed there, and a conflict with one is a mismatch recorded for review. Then implement the plan's checklist in order yourself when config says `inline`, otherwise write one sub-brief per unit from the template, one unit included, and delegate them to subagents in waves of up to 3 units with landed prerequisites and independent edits and verification, one at a time when unsure, each in its own worktree, using the worker protocol.
+Before coding, when an implementation-only constraint is missing from `plan.md` under the `leaf=` folder, append one dated `## Implementation notes` section naming each constraint and the decision it refines; a locked decision is never changed there, and a conflict with one is a mismatch recorded for review. Then implement the plan yourself in wave order, then listed order inside a wave, when config says `inline`, otherwise write one sub-brief per unit from the template, one unit included, and delegate them to subagents with A running each plan wave whole, up to 3 workers at once, and waiting on all together, each in its own worktree, using the worker protocol.
 
 Inline has no worker, sub-briefs or mismatch returns; both modes run the resolved changed-tests command as work lands with `AKROGON_BASE` from config, and workers receive only that command, not A's criterion proof and every `checks` command run.
 
@@ -63,7 +63,7 @@ Finish with `akrogon phase <slug> check.review --slot A`, then print the footer 
 
 A red test or check with no cause in the leaf's diff takes the Shared context base-run rule before any repair.
 
-Read the recorded findings and reviewed commit in the existing review files, revise the plan notes and affected sub-briefs around those defects without weakening criteria or failing tests, and use worker waves before the last allowed repair round in delegated mode or repair yourself in inline mode and on the final allowed round. A criterion still red after those repair rounds takes the failed exit under Shared context.
+Read the recorded findings and reviewed commit in the existing review files, revise the plan notes and affected sub-briefs around those defects without weakening criteria or failing tests, and use worker waves before the last allowed repair round, grouping repair sub-briefs by the same rule so findings with disjoint paths and no shared resource repair in one wave, in delegated mode or repair yourself in inline mode and on the final allowed round. A criterion still red after those repair rounds takes the failed exit under Shared context.
 
 A repair requested from merge starts at the rebased head recorded in `review-B.md` and treats the failing output as the finding.
 

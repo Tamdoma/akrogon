@@ -18,7 +18,7 @@ Concrete paths from the plan, one existing pattern to copy, and this skill folde
 
 ## 4. Change list and needed interfaces
 
-Files and changes, the signatures and data shapes this worker needs, and relevant output from a preceding worker, rather than every interface in the project. For a delegated leaf each brief also records the chunks that must land first, the paths this unit owns, and any shared test resource or consumed output; A uses these records to pick wave members and judge independence.
+Files and changes, the signatures and data shapes this worker needs, and relevant output from a preceding worker, rather than every interface in the project. For a delegated leaf each brief also records the chunks that must land first, the paths this unit owns, and any shared test resource or consumed output; the records carry the plan's wave values into the sub-brief, and A groups from them only when the plan has no wave grouping.
 
 ## 5. Do-not, reasons and exceptions
 
