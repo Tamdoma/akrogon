@@ -14,7 +14,11 @@ A report missing changed files/reasons, tests/results, known limitations or unve
 
 A mismatch names the conflicting requirement, actual code/interface or scale evidence, and the smallest brief correction; A revises the brief and reruns the affected worker, without escalating the implementation choice to the operator or changing phase.
 
-A worker that stops without a report, whether over its turn budget, cut off at the output limit or failed by the provider, keeps its landed edits and its worktree; A lists what that brief still owes from the retained worktree's state and delegates only that remainder as a new sub-brief, never the original brief again.
+A worker whose failed result carries a provider error in its error text (the pi-retried kind: overloaded, 429/500/502/503/504, rate limit, unavailable, network and stream drops; never quota, billing or context overflow) is relaunched once, only after the old worker has ended, with its retained worktree as the spawn cwd and its original brief plus this added line verbatim:
+
+> A previous worker died here. Check what is already done (criteria, commits, changed files and external effects such as uploads) before repeating work. Keep what is correct. Finish the brief.
+
+A second provider failure of the same unit ends a leaf pass `failed`, with a reason naming the provider, the error text and both transcript paths; standalone, which makes no phase calls, reports the same contents in its return instead. A worker stopped by its turn budget or the output limit keeps the remainder rule: A lists what that brief still owes from the retained worktree's state and delegates only that remainder as a new sub-brief, never the original brief again.
 
 ## Failure ownership
 

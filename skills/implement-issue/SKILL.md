@@ -31,6 +31,8 @@ A reusable lesson found during leaf work gets an active line naming mechanism/da
 The A seat proceeds without posing questions or holding the pass open, deciding from the plan, the design, and the worktree alone. When a step physically requires the operator (a permission A cannot grant, an env value A cannot obtain), A writes the blocker and the exact operator action into its current pass artifact, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot A`, and ends the pass.
 A fix that needs a locked decision changed ends the pass the same way, with `akrogon phase <slug> failed --reason` naming that decision.
 
+A done-criterion still failing during implement or check.fix after the repairs the protocol permits (a red full suite sub-brief, a slow-run leaf's in-branch fix) and unable to pass within the leaf's owned surfaces ends the pass the same way, with `akrogon phase <slug> failed --reason "<criterion> red: <cause>" --slot A`; it is never handed off as pre-existing, base red or modulo anything.
+
 A never opens, prints, appends to, or writes `.env` or `.env.*` with any tool, instead running any script that needs values as `bun --env-file=<file> <script>` to print only results, never values, and checking presence by name with such a script printing `present`/`absent` per name, ending the pass with the stop above when a required value is absent.
 
 ## implement
@@ -53,7 +55,7 @@ Finish with `akrogon phase <slug> check.review --slot A`, then print the footer 
 
 ## check.fix
 
-Read the recorded findings and reviewed commit in the existing review files, revise the plan notes and affected sub-briefs around those defects without weakening criteria or failing tests, and use worker waves before the last allowed repair round in delegated mode or repair yourself in inline mode and on the final allowed round.
+Read the recorded findings and reviewed commit in the existing review files, revise the plan notes and affected sub-briefs around those defects without weakening criteria or failing tests, and use worker waves before the last allowed repair round in delegated mode or repair yourself in inline mode and on the final allowed round. A criterion still red after those repair rounds takes the failed exit under Shared context.
 
 A repair requested from merge starts at the rebased head recorded in `review-B.md` and treats the failing output as the finding.
 
