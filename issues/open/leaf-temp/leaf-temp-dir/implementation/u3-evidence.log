@@ -1,0 +1,19 @@
+=== grep TMPDIR ===
+skills/check-issue/SKILL.md:18:Temp files, logs, and base copies go under `$TMPDIR`, never a fixed `/tmp/<name>`; anything needed later goes in the leaf folder.
+skills/implement-issue/SKILL.md:25:Temp files, logs, and base copies go under `$TMPDIR`, never a fixed `/tmp/<name>`; anything needed later goes in the leaf folder.
+skills/merge-issue/SKILL.md:18:Temp files, logs, and base copies go under `$TMPDIR`, never a fixed `/tmp/<name>`; anything needed later goes in the leaf folder.
+
+=== guide temp-folder lines ===
+docs/guide/merge.md:33:Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. Only those sweeps remove completed worktrees and branches, after the issue folder has moved, and delete the leaf's temp folder once the merged leaf's tab is confirmed gone:
+docs/guide/problems.md:53:Hook passes close the tabs of merged leaves, and a tab left behind by an interrupted merge is handled there too. Only sweeps and startup delete a lingering worktree and branch, and the leaf's temp folder once the merged leaf's tab is confirmed gone.
+docs/guide/limits.md:10:- **Cleanup is separate from idle events.** A normal hook pass closes the tab of a merged seat; only manual repository sweeps and startup cleanup delete completed worktrees and branches, and the leaf's temp folder once the merged leaf's tab is confirmed gone.
+
+=== contradiction sweep ===
+[exit 1. Full output (0 bytes): /home/ivan/Work/infra/akrogon/issues/worktrees/leaf-temp-dir-u3/.pi-command-logs/command-94656549-8dde-4774-858f-4c8a45bb2acc.log]
+=== changed tests ===
+bun test v1.4.2 (744846f84)
+--changed: 7 changed files, but no test files are affected
+
+ 0 pass
+ 0 fail
+Ran 0 tests across 0 files. [10.00ms]

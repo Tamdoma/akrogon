@@ -1,0 +1,78 @@
+diff --git i/docs/guide/limits.md w/docs/guide/limits.md
+index 29d815a..8bb1e61 100644
+--- i/docs/guide/limits.md
++++ w/docs/guide/limits.md
+@@ -7,7 +7,7 @@ Keep these boundaries in mind when deciding what to dispatch.
+ - **Capacity is global.** The max_active limit applies across registered repositories. It must be a positive integer. Existing allocations can continue at the limit.
+ - **There is no priority field.** Old priority values are ignored. Use dependencies for actual prerequisites and parking to keep work out of the queue.
+ - **Folder targeting is temporary.** It limits that dispatch pass. Later manual `akrogon next` passes can consider other open leaves.
+-- **Cleanup is separate from idle events.** A normal hook pass closes the tab of a merged seat; only manual repository sweeps and startup cleanup delete completed worktrees and branches.
++- **Cleanup is separate from idle events.** A normal hook pass closes the tab of a merged seat; only manual repository sweeps and startup cleanup delete completed worktrees and branches, and the leaf's temp folder once the merged leaf's tab is confirmed gone.
+ - **A completion starts only its dependents.** A merged leaf dispatches same-repo leaves that name it in `blocked-by`. Other open leaves start only through a manual `akrogon next`.
+ - **Failed leaves do not restart themselves.** Read the reason and resume an appropriate active phase.
+ 
+diff --git i/docs/guide/merge.md w/docs/guide/merge.md
+index 1d857d6..aa287aa 100644
+--- i/docs/guide/merge.md
++++ w/docs/guide/merge.md
+@@ -30,7 +30,7 @@ epic complete <epic>
+ 
+ Completed records move to the closed store. An issue inside an epic prints no completion line and waits for the whole epic before the top-level folder moves.
+ 
+-Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. Only those sweeps remove completed worktrees and branches, after the issue folder has moved:
++Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. Only those sweeps remove completed worktrees and branches, after the issue folder has moved, and delete the leaf's temp folder once the merged leaf's tab is confirmed gone:
+ 
+ ```sh
+ cd ~/Work/widgets
+diff --git i/docs/guide/problems.md w/docs/guide/problems.md
+index cacc4aa..ffbd18a 100644
+--- i/docs/guide/problems.md
++++ w/docs/guide/problems.md
+@@ -50,7 +50,7 @@ Run a repository sweep:
+ akrogon next
+ ```
+ 
+-Hook passes close the tabs of merged leaves, and a tab left behind by an interrupted merge is handled there too. Only sweeps and startup delete a lingering worktree and branch.
++Hook passes close the tabs of merged leaves, and a tab left behind by an interrupted merge is handled there too. Only sweeps and startup delete a lingering worktree and branch, and the leaf's temp folder once the merged leaf's tab is confirmed gone.
+ 
+ **Sync refuses to run.**
+ 
+diff --git i/skills/check-issue/SKILL.md w/skills/check-issue/SKILL.md
+index 126b671..0e4b5da 100644
+--- i/skills/check-issue/SKILL.md
++++ w/skills/check-issue/SKILL.md
+@@ -15,6 +15,8 @@ Read `akrogon config` once, locate the unique slug under the registered repo's a
+ 
+ Pass artifacts are written under the `leaf=` folder while code is read and edited only in the worktree, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`.
+ 
++Temp files, logs, and base copies go under `$TMPDIR`, never a fixed `/tmp/<name>`; anything needed later goes in the leaf folder.
++
+ Ground in docs first.
+ Challenge fuzzy terms.
+ Verify with a concrete scenario.
+diff --git i/skills/implement-issue/SKILL.md w/skills/implement-issue/SKILL.md
+index b25c6a4..6d380ab 100644
+--- i/skills/implement-issue/SKILL.md
++++ w/skills/implement-issue/SKILL.md
+@@ -22,6 +22,8 @@ For leaf work, read `akrogon config` once, locate the unique slug in the registe
+ 
+ Pass artifacts are written under the `leaf=` folder while code is read and edited only in the leaf worktree and its worker worktrees, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`. Standalone keeps its no-config, local-artifact behavior.
+ 
++Temp files, logs, and base copies go under `$TMPDIR`, never a fixed `/tmp/<name>`; anything needed later goes in the leaf folder.
++
+ Effective settings supply `implement`, `checks`, optional `advisory`, `AKROGON_BASE` and the repair cap; the command owns state/counters and dispatch, while a repeated pass finishes remaining work from the diff and artifacts, rerunning checks for changed code, missing evidence or a specific concern.
+ 
+ The plan's read-first list supplies worker context and the index is opened only on a gap. Implement updates every doc the plan names plus any doc the diff makes stale before review, keeping affected `AREA.md` files at most 40 lines with exactly Commands, Key files, Non-obvious patterns and See also as second-level sections.
+diff --git i/skills/merge-issue/SKILL.md w/skills/merge-issue/SKILL.md
+index 6cd53f6..cb98cec 100644
+--- i/skills/merge-issue/SKILL.md
++++ w/skills/merge-issue/SKILL.md
+@@ -15,6 +15,8 @@ Read `akrogon config` once, locate the unique leaf under the registered repo's a
+ 
+ Pass artifacts are written under the `leaf=` folder while code is read and edited only in the worktree, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`.
+ 
++Temp files, logs, and base copies go under `$TMPDIR`, never a fixed `/tmp/<name>`; anything needed later goes in the leaf folder.
++
+ Ground in docs first.
+ Challenge fuzzy terms.
+ Verify with a concrete scenario.

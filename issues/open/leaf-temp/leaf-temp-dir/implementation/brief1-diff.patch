@@ -1,0 +1,137 @@
+diff --git i/src/config.ts w/src/config.ts
+index a434b71..3f06a97 100644
+--- i/src/config.ts
++++ w/src/config.ts
+@@ -1,6 +1,7 @@
+ import { existsSync, readFileSync, realpathSync } from 'node:fs';
+-import { relative, resolve } from 'node:path';
++import { isAbsolute, relative, resolve } from 'node:path';
+ import { homedir } from 'node:os';
++import { createHash } from 'node:crypto';
+ import { z } from 'zod';
+ import { command, run, type Result } from './shell';
+ import { trackingRef } from './preflight';
+@@ -128,6 +129,15 @@ export function worktreeStore(repo: Repo): string {
+   return resolve(repo.root, repo.config.worktree_root);
+ }
+ 
++export function leafTemp(repo: Repo, slug: string): string {
++  const override: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
++  if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
++    throw new Error(`Invalid AKROGON_LEAF_TEMP_ROOT: must be a non-blank absolute path`);
++  const root: string = override ?? `/var/tmp/akrogon-${process.getuid!()}`;
++  const hex: string = createHash('sha256').update(repo.root + "\n" + slug).digest('hex').slice(0, 12);
++  return resolve(root, `${slug.slice(0, 20)}-${hex}`);
++}
++
+ export function target(repo: Repo): string {
+   return `${repo.config.remote}/${repo.config.default_branch}`;
+ }
+diff --git i/src/next.ts w/src/next.ts
+index 8b1d752..85a30cb 100644
+--- i/src/next.ts
++++ w/src/next.ts
+@@ -1,4 +1,4 @@
+-import { existsSync, realpathSync, readdirSync, statSync, type Dirent } from 'node:fs';
++import { chmodSync, existsSync, lstatSync, mkdirSync, realpathSync, readdirSync, rmSync, statSync, type Dirent } from 'node:fs';
+ import { resolve } from 'node:path';
+ import { createHash } from 'node:crypto';
+ import { z } from 'zod';
+@@ -14,6 +14,7 @@ import {
+   within,
+   seats,
+   worktreeStore,
++  leafTemp,
+   type Repo,
+   type GlobalConfig,
+   type SlotConfig,
+@@ -296,6 +297,37 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
+     if (total >= global.max_active) return null;
+   }
+   const state: State = await ensureWorktree(repo, leaf);
++  const scratch: string = leafTemp(repo, state.slug);
++  function ensurePrivateDir(path: string): void {
++    function validate(): void {
++      const existing = lstatSync(path);
++      if (existing.isSymbolicLink() || !existing.isDirectory())
++        throw new Error(`Refusing leaf temp path (not a directory): ${path}`);
++      if (statSync(path).uid !== process.getuid!())
++        throw new Error(`Refusing foreign-owned leaf temp path: ${path}`);
++    }
++    try {
++      validate();
++    } catch (error) {
++      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
++      try {
++        mkdirSync(path, { mode: 0o700 });
++      } catch (mkdirError) {
++        if ((mkdirError as NodeJS.ErrnoException).code !== 'EEXIST') throw mkdirError;
++        validate();
++      }
++      chmodSync(path, 0o700);
++      return;
++    }
++    try {
++      mkdirSync(path, { mode: 0o700 });
++    } catch (error) {
++      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
++    }
++    chmodSync(path, 0o700);
++  }
++  ensurePrivateDir(resolve(scratch, '..'));
++  ensurePrivateDir(scratch);
+   const worktree: string = z.string().parse(state.worktree);
+   const workspace: Workspace | undefined = (await workspaces()).find((item) => item.label === repo.name);
+   if (workspace === undefined) throw new Error(`No herdr workspace labeled ${repo.name}`);
+@@ -306,6 +338,8 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
+     `AKROGON_BASE=${await base(repo, worktree)}`,
+     '--env',
+     'GIT_EDITOR=true',
++    '--env',
++    `TMPDIR=${scratch}`,
+     '--no-focus',
+   ];
+   const target: string[] = ['--workspace', workspace.workspace_id];
+@@ -549,15 +583,24 @@ async function dispatchLeaf(
+   }
+ }
+ 
+-async function closeMergedTab(leaf: Leaf): Promise<void> {
+-  if (leaf.state.tab === undefined) return;
++async function removeLeafTemp(repo: Repo, slug: string): Promise<void> {
++  const path: string = leafTemp(repo, slug);
++  if (!existsSync(path)) return;
++  rmSync(path, { recursive: true, force: true });
++  await command(['git', 'worktree', 'prune'], repo.root);
++}
++
++async function closeMergedTab(leaf: Leaf): Promise<boolean> {
++  if (leaf.state.tab === undefined) return false;
+   const tab: string = leaf.state.tab;
+-  if (!(await panes()).some((pane) => pane.tab_id === tab)) return;
++  if (!(await panes()).some((pane) => pane.tab_id === tab)) return false;
+   await command(['herdr', 'tab', 'close', tab]);
++  return true;
+ }
+ 
+ async function cleanupMerged(repo: Repo, leaf: Leaf): Promise<void> {
+-  await closeMergedTab(leaf);
++  const hadLive: boolean = await closeMergedTab(leaf);
++  if (!hadLive) await removeLeafTemp(repo, leaf.state.slug);
+   if (within(leaf.path, resolve(repo.root, 'issues/open'))) return;
+   if (leaf.state.worktree !== undefined && existsSync(leaf.state.worktree)) {
+     await command(['git', 'worktree', 'remove', '--force', leaf.state.worktree], repo.root);
+@@ -727,6 +770,13 @@ export async function nextCommand(input: string | undefined): Promise<void> {
+         if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
+         if (owners.length === 0) return;
+         const completedSlug: string = owners[0].leaf.state.slug;
++        if (owners[0].leaf.state.phase === 'merged')
++          try {
++            await removeLeafTemp(owners[0].repo, completedSlug);
++          } catch (error) {
++            if (!(error instanceof Error)) throw error;
++            report(invocation, owners[0].repo.name, owners[0].leaf.path, error, completedSlug);
++          }
+         const outcome: DispatchOutcome = await dispatchLeaf(global, owners[0].repo, owners[0].leaf, false, invocation);
+         if (outcome === 'completed') await dispatchDependents(global, owners[0].repo, completedSlug, invocation);
+         return;

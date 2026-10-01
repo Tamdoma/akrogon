@@ -1,0 +1,32 @@
+slug: base-red-exit
+phase: merge
+created: 2026-10-01
+repo: akrogon
+debate: "yes"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#50"
+busy_since: 
+  B: 2026-10-01T11:20:45.852Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 1
+verdict: 
+  {}
+tab: w8:t81
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/base-red-exit
+pane: 
+  A: w8:pF4
+  B: w8:pF5
+prompted: 
+  B: 01a0f71a-8ad6-7692-8775-f3d5972609a4
+prompted_at: 
+  B: 2026-10-01T11:20:45.852Z
+delivery_error: 
+  {}
