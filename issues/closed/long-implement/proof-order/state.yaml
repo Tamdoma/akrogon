@@ -1,5 +1,5 @@
-slug: wave-table
-phase: implement
+slug: proof-order
+phase: merged
 created: 2026-10-01
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#51"
 busy_since: 
-  A: 2026-10-01T18:16:32.764Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -19,14 +19,14 @@ done:
 fix_rounds: 0
 verdict: 
   {}
-tab: w8:t83
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/wave-table
+tab: w8:t84
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/proof-order
 pane: 
-  A: w8:pF7
-  B: w8:pF8
+  A: w8:pF9
+  B: w8:pFA
 prompted: 
-  A: 1b65290b-a576-414e-9bd3-3bd11b9bef9a
+  {}
 prompted_at: 
-  A: 2026-10-01T18:16:32.764Z
+  {}
 delivery_error: 
   {}
