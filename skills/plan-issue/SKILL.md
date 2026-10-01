@@ -52,7 +52,7 @@ Finish with `akrogon phase <slug> plan.synthesis --slot <A|B>`, then print the f
 
 ## plan.synthesis
 
-As A, write `plan.md` under the `leaf=` folder with stable D1…Dn decisions, read-first paths, needed interfaces, ordered file/criterion checklist and concrete verification, integrating both positions and any configured rebuttals when debate ran, or directly using the brief/design when `debate: no`. The checklist names every affected agent and human doc one line each, or states in one line that no doc is affected.
+As A, write `plan.md` under the `leaf=` folder with stable D1…Dn decisions, read-first paths, needed interfaces, a file/criterion checklist grouped into waves, and concrete verification, integrating both positions and any configured rebuttals when debate ran, or directly using the brief/design when `debate: no`. Each unit lists the paths it owns, any shared test resource it uses (a live fixture, account or test site counts) and the units that must land first. Units with disjoint owned paths, no shared test resource and no dependency on another member of the same wave share a wave, up to 3 per wave. A unit whose prerequisite is in an earlier wave goes in a later wave, and units needing the same landed prerequisite can share that later wave. The checklist names every affected agent and human doc one line each, or states in one line that no doc is affected.
 
 plan.md maps each done-criterion to its proof command, the failure it catches, a size (seconds, minutes, hours or unknown) and a rerun trigger, and a slow-run leaf's plan names its restart boundaries.
 
