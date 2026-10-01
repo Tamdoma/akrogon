@@ -31,7 +31,7 @@ A reusable lesson found during leaf work gets an active line naming mechanism/da
 The A seat proceeds without posing questions or holding the pass open, deciding from the plan, the design, and the worktree alone. When a step physically requires the operator (a permission A cannot grant, an env value A cannot obtain), A writes the blocker and the exact operator action into its current pass artifact, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot A`, and ends the pass.
 A fix that needs a locked decision changed ends the pass the same way, with `akrogon phase <slug> failed --reason` naming that decision.
 
-A done-criterion still failing during implement or check.fix after the repairs the protocol permits (a red full suite sub-brief, a slow-run leaf's in-branch fix) and unable to pass within the leaf's owned surfaces ends the pass the same way, with `akrogon phase <slug> failed --reason "<criterion> red: <cause>" --slot A`; it is never handed off as pre-existing, base red or modulo anything.
+A done-criterion still failing during implement or check.fix after the repairs the protocol permits (a red criterion-proof or checks sub-brief, a slow-run leaf's in-branch fix) and unable to pass within the leaf's owned surfaces ends the pass the same way, with `akrogon phase <slug> failed --reason "<criterion> red: <cause>" --slot A`; it is never handed off as pre-existing, base red or modulo anything.
 
 A never opens, prints, appends to, or writes `.env` or `.env.*` with any tool, instead running any script that needs values as `bun --env-file=<file> <script>` to print only results, never values, and checking presence by name with such a script printing `present`/`absent` per name, ending the pass with the stop above when a required value is absent.
 
@@ -39,17 +39,17 @@ A never opens, prints, appends to, or writes `.env` or `.env.*` with any tool, i
 
 Before coding, when an implementation-only constraint is missing from `plan.md` under the `leaf=` folder, append one dated `## Implementation notes` section naming each constraint and the decision it refines; a locked decision is never changed there, and a conflict with one is a mismatch recorded for review. Then implement the plan's checklist in order yourself when config says `inline`, otherwise write one sub-brief per unit from the template, one unit included, and delegate them to subagents in waves of up to 3 units with landed prerequisites and independent edits and verification, one at a time when unsure, each in its own worktree, using the worker protocol.
 
-Inline has no worker, sub-briefs or mismatch returns; both modes run the resolved changed-tests command as work lands with `AKROGON_BASE` from config, and workers receive only that command, not the full suite.
+Inline has no worker, sub-briefs or mismatch returns; both modes run the resolved changed-tests command as work lands with `AKROGON_BASE` from config, and workers receive only that command, not A's criterion proof and every `checks` command run.
 
 Write the smallest test set proving every done-criterion before code, one test may prove several criteria, with one before and after proof per real bug fixed; extra negative or edge cases need a named concrete consequence on a realistic path (a broken required outcome, a security boundary, data loss or an unsafe mutation); extend existing tests before adding files; the report links each done-criterion and each real bug fix to its test or evidence; trivial one-liners need no test.
 
 A credential still absent from `.env` at implement is never requested as a pasted value: A records the missing variable in `<leaf>/implementation/report.md` as a human-only blocker with the `add <VAR> to .env` action, what the value is, and where the operator obtains it, then runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see implementation/report.md>" --slot A` and ends the pass.
 
-After the last implementation unit, with every worker worktree removed, run the full suite once as A and every other blocking check, repair any failure by the protocol (yourself in inline mode), then commit any remaining edits on top of the wave commits on the leaf branch, making no empty commit, and write `<leaf>/implementation/report.md` with changed files and reasons, commands run with pasted results and artifact paths, the base and committed head, known limitations and unverified criteria, folding worker returns into it, before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
+After the last implementation unit, with every worker worktree removed, supply passing proof for every done-criterion, run changed tests including affected consumers and every `checks` command, reuse unchanged evidence, run `merge_checks` only at merge unless a done-criterion needs a whole run, repair any failure by the protocol (yourself in inline mode), then commit any remaining edits on top of the wave commits on the leaf branch, making no empty commit, and write `<leaf>/implementation/report.md` with changed files and reasons, commands run with pasted results and artifact paths, the base and committed head, known limitations and unverified criteria, folding worker returns into it, before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
 The report records wall time for every command sized minutes, hours or unknown.
 For a slow run it also records the in-branch fixes made, the reused stages with their source commit, what changed and which stages it feeds, and the blocked checks.
 
-Every command under `checks` blocks; `advisory` failures are reported as Nits, and a full-suite rerun follows a repair rather than an unchanged successful run.
+Every command under `checks` blocks; `advisory` failures are reported as Nits.
 
 Finish with `akrogon phase <slug> check.review --slot A`, then print the footer and stop.
 
@@ -59,7 +59,7 @@ Read the recorded findings and reviewed commit in the existing review files, rev
 
 A repair requested from merge starts at the rebased head recorded in `review-B.md` and treats the failing output as the finding.
 
-Do required work for Fixes only; Nits get no separate work or test and may only disappear incidentally through Fix repair. Run the affected changed tests and required checks, update affected docs/index lines and append the repair's before and after commits to `report.md` under the `leaf=` folder, then finish with `akrogon phase <slug> check.review --slot A`, print the footer and stop.
+Do required work for Fixes only; Nits get no separate work or test and may only disappear incidentally through Fix repair. After every repair, supply passing proof for every done-criterion, run changed tests including affected consumers and every `checks` command, reuse unchanged evidence, run `merge_checks` only at merge unless a done-criterion needs a whole run, update affected docs/index lines and append the repair's before and after commits to `report.md` under the `leaf=` folder, then finish with `akrogon phase <slug> check.review --slot A`, print the footer and stop.
 
 ## Standalone
 
