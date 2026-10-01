@@ -33,6 +33,8 @@ A fix that needs a locked decision changed ends the pass the same way, with `akr
 
 A done-criterion still failing during implement or check.fix after the repairs the protocol permits (a red criterion-proof or checks sub-brief, a slow-run leaf's in-branch fix) and unable to pass within the leaf's owned surfaces ends the pass the same way, with `akrogon phase <slug> failed --reason "<criterion> red: <cause>" --slot A`; it is never handed off as pre-existing, base red or modulo anything.
 
+During implement end and check.fix, a red test or check with no cause in the leaf's diff (failing output plus `git diff AKROGON_BASE...HEAD` shows no touched file or plausible cause; a judgment gate, never automatic) runs that same command once, same command, args, and whole-folder or single-file scope, in the corresponding working directory inside the detached base checkout at `AKROGON_BASE`, allocated with `base_worktree=$(mktemp -d)` then `git worktree add --detach "$base_worktree" "$AKROGON_BASE"` (`mktemp` uses exported leaf `TMPDIR`, otherwise system temp; no fixed path), installing dependencies there with the leaf's installation method, redirecting logs to files outside the worktree, capturing exit result, both log paths, and failing names and tails from both runs, then `git worktree remove --force "$base_worktree"` before either outcome. Red on base ends with `akrogon phase <slug> failed --reason "<command> red on base <sha>" --slot A` and `implementation/report.md` records base SHA, both log paths, and failing names and tails from both runs, a stop, never a handoff, creating no path to check.review or merge, while green on base takes the existing repair path.
+
 A never opens, prints, appends to, or writes `.env` or `.env.*` with any tool, instead running any script that needs values as `bun --env-file=<file> <script>` to print only results, never values, and checking presence by name with such a script printing `present`/`absent` per name, ending the pass with the stop above when a required value is absent.
 
 ## implement
@@ -45,6 +47,8 @@ Write the smallest test set proving every done-criterion before code, one test m
 
 A credential still absent from `.env` at implement is never requested as a pasted value: A records the missing variable in `<leaf>/implementation/report.md` as a human-only blocker with the `add <VAR> to .env` action, what the value is, and where the operator obtains it, then runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see implementation/report.md>" --slot A` and ends the pass.
 
+A red test or check with no cause in the leaf's diff takes the Shared context base-run rule before any repair.
+
 After the last implementation unit, with every worker worktree removed, supply passing proof for every done-criterion, run changed tests including affected consumers and every `checks` command, reuse unchanged evidence, run `merge_checks` only at merge unless a done-criterion needs a whole run, repair any failure by the protocol (yourself in inline mode), then commit any remaining edits on top of the wave commits on the leaf branch, making no empty commit, and write `<leaf>/implementation/report.md` with changed files and reasons, commands run with pasted results and artifact paths, the base and committed head, known limitations and unverified criteria, folding worker returns into it, before handoff; `akrogon phase` refuses a dirty worktree and refuses any file under `issues/` on the branch, because every issue artifact is written only in the registered checkout.
 The report records wall time for every command sized minutes, hours or unknown.
 For a slow run it also records the in-branch fixes made, the reused stages with their source commit, what changed and which stages it feeds, and the blocked checks.
@@ -54,6 +58,8 @@ Every command under `checks` blocks; `advisory` failures are reported as Nits.
 Finish with `akrogon phase <slug> check.review --slot A`, then print the footer and stop.
 
 ## check.fix
+
+A red test or check with no cause in the leaf's diff takes the Shared context base-run rule before any repair.
 
 Read the recorded findings and reviewed commit in the existing review files, revise the plan notes and affected sub-briefs around those defects without weakening criteria or failing tests, and use worker waves before the last allowed repair round in delegated mode or repair yourself in inline mode and on the final allowed round. A criterion still red after those repair rounds takes the failed exit under Shared context.
 

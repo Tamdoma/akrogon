@@ -22,6 +22,7 @@
 - Worker returns include changed-test evidence; A runs criterion proof plus every `checks` command before review, with `merge_checks` only at merge.
 - Lifecycle seats send no questions and pause for nothing; a human-only blocker is recorded and the pass ends with `failed`.
 - Env-file rule is an invariant of every phase skill: `.env` and `.env.*` are never opened, printed, or written by a tool, and presence is checked by name with `bun --env-file=<file>` printing `present`/`absent`.
+- A red test or check with no cause in the leaf's diff stops with one base run at `AKROGON_BASE`; plans prove the brief's criteria with the leaf's own tests and `checks`, adding no `merge_checks` or whole-suite requirement the brief does not name.
 
 ## See also
 

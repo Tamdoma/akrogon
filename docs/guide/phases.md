@@ -74,7 +74,7 @@ Failed can resume at any active phase. It cannot jump directly to merged. Recove
 
 ## plan-issue: turn the contract into steps
 
-Planning chooses how to meet the brief without changing its locked scope. The final plan names decisions, read-first files, interfaces, an ordered checklist and verification.
+Planning chooses how to meet the brief without changing its locked scope. The final plan names decisions, read-first files, interfaces, an ordered checklist and verification. The plan proves the brief's done-criteria with the leaf's own tests and `checks` commands and adds no `merge_checks` or whole-suite requirement the brief does not name; a whole run the brief names stays.
 
 For CSV export, it might identify the current export function, add a serializer and name tests for quotes and empty data.
 
@@ -88,7 +88,7 @@ A follows the plan in the leaf worktree. Depending on configuration, A works inl
 
 Tests come from the acceptance criteria. The skill calls for the smallest set that proves every criterion, with a trivial one-line change exempt from new tests. A missing or bad test blocks only when a criterion has no test that would catch its failure, a realistic fix has no test, or a test mocks the unit under test.
 
-A runs changed tests as work lands, then criterion proof plus every `checks` command before handoff and after repair, reusing unchanged evidence; `merge_checks` run only at merge unless a criterion needs a whole run. The implementation report records the code changes, commands, results, commits and any limitations.
+A runs changed tests as work lands, then criterion proof plus every `checks` command before handoff and after repair, reusing unchanged evidence; `merge_checks` run only at merge unless a criterion needs a whole run the brief names. When a red test or check has no cause in the leaf's diff, A runs that same command once at `AKROGON_BASE` in a detached worktree and ends the pass with `failed` when base is red too. The implementation report records the code changes, commands, results, commits and any limitations.
 
 You get a reviewable change and evidence of what was checked. A claim that “tests pass” without the relevant result is not the intended handoff.
 
@@ -96,7 +96,7 @@ You get a reviewable change and evidence of what was checked. A claim that “te
 
 Both seats review the initial change independently without reading the peer's current review. They judge the diff against the contract, plan and evidence.
 
-A blocking fix names its realistic source, its consequence today, and the criterion, check or gap it hits. The source is a real build, a real user action or content, a real integration, or untrusted input an attacker can send, while a handcrafted reproduction alone is a nit. Failed checks and scenarios a criterion names always block.
+A blocking fix names its realistic source, its consequence today, and the criterion, check or gap it hits. The source is a real build, a real user action or content, a real integration, or untrusted input an attacker can send, while a handcrafted reproduction alone is a nit. Failed checks and scenarios a criterion names always block. When a red test or check has no cause in the leaf's diff, the reviewing seat runs that same command once at `AKROGON_BASE` in a detached worktree and ends the pass with `failed` when base is red too.
 
 Suppose a CSV field with a newline pasted from a user spreadsheet creates an extra row. If that breaks the import criterion, the reviewer records the source, consequence, and criterion and requests a fix. A repairs it and runs the relevant checks.
 
