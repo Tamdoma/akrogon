@@ -17,3 +17,5 @@ One line per lesson: mechanism, date, history file. A line leaves when applied o
 - check-issue review: `z.string().min(1)` accepts whitespace-only input, so a "non-empty reason" contract stored `' '`; require `.trim().min(1)` or `\S` and probe with a blank argument. 2026-09-19. history/2026-09-19-min1-not-nonblank.md
 - chart-issues open: the door cited stale skill lines because local main was 5 commits behind origin/main and `akrogon pull` refreshes only issue mirrors; compare `main..origin/main` before citing lines. 2026-09-27. history/2026-09-27-stale-door-checkout.md
 - herdr plugin commands: startup and hooks run with the plugin directory as cwd, which for akrogon is inside a registered repo, so cwd-sensitive `--all` narrowed startup `pull --all` to akrogon; check a hook command's cwd behavior before trusting it to cover every repo. 2026-09-28. history/2026-09-28-plugin-cwd-pull.md
+
+- Explanatory prose assertions couple behavior tests to wording. Prefer refusal, reason and side-effect assertions in criteria. 2026-10-01. History: [failed-stop-guard wording](history/2026-10-01-failed-stop-guard-wording.md).

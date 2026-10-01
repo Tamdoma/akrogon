@@ -1,0 +1,34 @@
+slug: failed-stop-guard
+phase: merged
+created: 2026-10-01
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#45"
+  - "Tamdoma/akrogon#46"
+  - "Tamdoma/akrogon#47"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t7S
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/failed-stop-guard
+pane: 
+  A: w8:pEN
+  B: w8:pEP
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

@@ -1,0 +1,33 @@
+This round settles whether a failed leaf can be resumed by a late seat completion. The observed stop was committed correctly, but an in-flight seat immediately undid it. A command guard can preserve the stop without a new phase, field, command or clock.
+
+### 1 · Should a phase call carrying `--slot` be refused when the leaf is already failed?
+
+Yes. Framework log entries show `check.fix -> failed` at 04:52:31.027Z, followed by `failed -> check.review --slot A` at 04:52:31.961Z, which also reset fix_rounds from 1 to 0 (FW/issues/log.jsonl:1203-1204). The failed route permits every active destination, has no required seats, and transition explicitly exempts failed from slot validation (AK/src/routing.ts:35-43; AK/src/phase.ts:197-200).
+
+Research: operator · named framework incident log, FW/issues/log.jsonl:1203-1204, read 2026-10-01 · the accepted late call reversed a real stop in 934ms · make the failed boundary enforceable in the command, not a seat instruction. Research: better-than-training · AK/src/phase.ts:183,197-214,268-284 and AK/src/state.ts:139-158, read 2026-10-01 · the CLI already holds an exclusive lock while reading state and transitioning · the cause is a permitted transition, not missing serialization, so reuse that boundary.
+
+- **1a (recommended)** When current state is `failed`, reject any phase call with an explicit `--slot`, before any state, log or external side effect. Preserve recovery without `--slot`, every currently legal active destination and its existing worktree checks. This removes the observed class of late seat calls with one command invariant and no new mechanism.
+- **1b** Keep command behavior and require the operator to stop the running seat and confirm it is idle before marking the leaf failed. Cost: every stop depends on correct coordination, and another caller can still undo a committed failure. A seat-side “check state before handoff” has the same problem because its check and phase call are separate operations. This does not make the selected red-criterion stop hold mechanically.
+
+Pitfalls: test `explicitSlot`, not a slot inferred for ordinary single-seat phases (AK/src/phase.ts:198). Seats must still enter failed with their valid slot from an active phase. The guard applies to any explicit seat, failure cause and active target, not only A, check.fix or C1. Refusal must return an error naming the failed state and recovery contract, rather than silently succeeding. The legal no-slot recovery preserves blocked dirty work and the existing attempts-failure cleanliness requirement (AK/src/phase.ts:211-214; AK/tests/phase.test.ts:996-1022).
+
+Scope and caller evidence: the CLI forwards the supplied slot directly (AK/src/akrogon.ts:49-51); lifecycle seats consistently use `--slot` for their phase calls (AK/skills/plan-issue/SKILL.md:43,51,63; implement-issue/SKILL.md:52,60; check-issue/SKILL.md:55; merge-issue/SKILL.md:39,47). Document the failed-state refusal beside recovery in AK/docs/guide/problems.md:20-25 and phases.md:66-73. Preserve these skill calls rather than teaching seats to omit the slot after a refusal. Update only text that needs to state this command contract.
+
+The watch already performs selected recoveries without a slot after checking seats are idle/absent (AK/skills/watch-issues/SKILL.md:38-39). Consequently 1a means “only the recovery form can leave failed,” not “only a human process can leave failed.” Keep that existing delegated recovery behavior. Prohibiting it is a separate policy change and is not needed for this incident. The watch-framework stop is an operator-directed action, not authority to change the ordinary watch's Never list (watch-issues/SKILL.md:52).
+
+Other callers do not bypass this proposed resume boundary: next's direct commitMove calls enter failed for delivery failures (AK/src/next.ts:384-402), and dispatch returns waiting for an already failed leaf (:524). Place the guard in transition, inside phaseCommand's existing lock; do not put a blanket slot ban in commitMove, which also performs valid seat stops and completion.
+
+Concrete probe, performed on current code: an isolated fixture from AK/tests/helpers.ts:11-32, with fake Herdr (:76-84), started a check.fix leaf, invoked `phase stop-race failed --slot A --reason "C1 remains red"`, then `phase stop-race check.review --slot A`. Both returned exit 0, printing `moved failed` and `moved check.review`; final phase was check.review. This reproduces the defect with the actual CLI, without touching live panes or records. The temporary fixture was removed. No patch was made in this round.
+
+Acceptance probe after implementation:
+- Reproduce stop then late completion through the real CLI. Stop succeeds, late completion fails, and state/failure/counters/log bytes remain exactly as they were after the stop. No resume rename or notification is issued by the refused call.
+- From failed, test explicit A and B against every legal active target for both blocked and attempts causes. Reject all. Keep existing no-slot recovery coverage for active destinations, counter reset, issue-file refusal, blocked dirty-tree preservation and attempts dirty-tree refusal (AK/tests/phase.test.ts:812-825,996-1038,1111-1125).
+- Exercise real concurrent CLI processes under the existing lock with controlled ordering, using process/barrier coordination rather than sleeps. If the stop commits first, the later slot call must fail. If completion commits first and the stop is valid in that resulting phase, the stop must leave failed. Verify seat stops from active phases and valid active handoffs still work.
+- Run `bun test tests/phase.test.ts` and the repository's required checks after the minimal change. There is no need to stop a live framework leaf merely to prove this transition rule.
+
+Reply `1a`, `1b`, or a numbered free-text answer.
+
+Challenge check
+The flag denotes caller intent, not authentication. Any process can omit it, so 1a prevents protocol-following late seat calls, not a deliberate bypass. It also does not cancel workers or prevent subsequent code/artifact writes. Before no-slot recovery, the operator or delegated recovery workflow must settle the old pass and resolve the blocker. A stale call arriving after an intentional resume is a different case, and this proposal does not claim generation fencing without a new field. No peer slots were read, so peer disagreements remain unknown. This change belongs to akrogon's phase implementation and its direct contract documentation/tests, and leaves the chart's no-clock and red-criterion locks intact.
+
+Paths: AK = /home/ivan/Work/infra/akrogon; FW = /home/ivan/Work/infra/tamdoma/framework.
