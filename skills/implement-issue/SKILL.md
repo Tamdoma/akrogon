@@ -22,6 +22,8 @@ For leaf work, read `akrogon config` once, locate the unique slug in the registe
 
 Pass artifacts are written under the `leaf=` folder while code is read and edited only in the leaf worktree and its worker worktrees, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`. Standalone keeps its no-config, local-artifact behavior.
 
+Temp files, logs, and base copies go under `$TMPDIR`, never a fixed `/tmp/<name>`; anything needed later goes in the leaf folder.
+
 Effective settings supply `implement`, `checks`, optional `advisory`, `AKROGON_BASE` and the repair cap; the command owns state/counters and dispatch, while a repeated pass finishes remaining work from the diff and artifacts, rerunning checks for changed code, missing evidence or a specific concern.
 
 The plan's read-first list supplies worker context and the index is opened only on a gap. Implement updates every doc the plan names plus any doc the diff makes stale before review, keeping affected `AREA.md` files at most 40 lines with exactly Commands, Key files, Non-obvious patterns and See also as second-level sections.

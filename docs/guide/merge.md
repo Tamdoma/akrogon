@@ -30,7 +30,7 @@ epic complete <epic>
 
 Completed records move to the closed store. An issue inside an epic prints no completion line and waits for the whole epic before the top-level folder moves.
 
-Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. Only those sweeps remove completed worktrees and branches, after the issue folder has moved:
+Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. Only those sweeps remove completed worktrees and branches, after the issue folder has moved, and delete the leaf's temp folder once the merged leaf's tab is confirmed gone:
 
 ```sh
 cd ~/Work/widgets

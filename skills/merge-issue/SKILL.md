@@ -15,6 +15,8 @@ Read `akrogon config` once, locate the unique leaf under the registered repo's a
 
 Pass artifacts are written under the `leaf=` folder while code is read and edited only in the worktree, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`.
 
+Temp files, logs, and base copies go under `$TMPDIR`, never a fixed `/tmp/<name>`; anything needed later goes in the leaf folder.
+
 Ground in docs first.
 Challenge fuzzy terms.
 Verify with a concrete scenario.
