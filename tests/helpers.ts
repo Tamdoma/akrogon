@@ -5,6 +5,9 @@ import { command, type Result } from '../src/shell';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
 export type Fixture = { home: string; root: string; clean: () => void };
+export function leafTempRoot(f: Fixture): string {
+  return resolve(f.home, 'leaf-temp');
+}
 export function yaml(path: string, data: object): void {
   writeFileSync(path, Bun.YAML.stringify(data));
 }
@@ -39,9 +42,11 @@ export async function cli(
   env: NodeJS.ProcessEnv = {},
   timeout?: number,
 ): Promise<Result> {
+  const withDefault: NodeJS.ProcessEnv =
+    'AKROGON_LEAF_TEMP_ROOT' in env ? env : { ...env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) };
   const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, entry, ...args], {
     cwd,
-    env: { ...process.env, AKROGON_HOME: f.home, HERDR_PANE_ID: '', ...env },
+    env: { ...process.env, AKROGON_HOME: f.home, HERDR_PANE_ID: '', ...withDefault },
     timeout,
     killSignal: 'SIGKILL',
     stdin: 'ignore',
@@ -79,7 +84,7 @@ export function fakeHerdr(f: Fixture): HerdrFixture {
   symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
   const db: string = resolve(f.home, 'herdr.json');
   writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, prompts: [], starts: [] }));
-  return { db, env: { PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db } };
+  return { db, env: { PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) } };
 }
 
 export type GhFixture = { db: string; env: NodeJS.ProcessEnv };
