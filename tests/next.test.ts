@@ -3310,11 +3310,25 @@ test('leaf temp path bounds stay short with mocked uid', async () => {
     const code: string =
       'delete process.env.AKROGON_LEAF_TEMP_ROOT; ' +
       'process.getuid = () => 1234567890; ' +
-      'const { leafTemp } = await import(' + JSON.stringify(configPath) + '); ' +
-      'const slug = ' + JSON.stringify(slug) + '; ' +
-      'const p1 = leafTemp({ name: ' + JSON.stringify('repo') + ', root: ' + JSON.stringify(rootOne) + ', config: {} }, slug); ' +
-      'const p2 = leafTemp({ name: ' + JSON.stringify('repo') + ', root: ' + JSON.stringify(rootTwo) + ', config: {} }, slug); ' +
-      'const { basename } = await import(' + JSON.stringify('node:path') + '); ' +
+      'const { leafTemp } = await import(' +
+      JSON.stringify(configPath) +
+      '); ' +
+      'const slug = ' +
+      JSON.stringify(slug) +
+      '; ' +
+      'const p1 = leafTemp({ name: ' +
+      JSON.stringify('repo') +
+      ', root: ' +
+      JSON.stringify(rootOne) +
+      ', config: {} }, slug); ' +
+      'const p2 = leafTemp({ name: ' +
+      JSON.stringify('repo') +
+      ', root: ' +
+      JSON.stringify(rootTwo) +
+      ', config: {} }, slug); ' +
+      'const { basename } = await import(' +
+      JSON.stringify('node:path') +
+      '); ' +
       'console.log(JSON.stringify({ p1: p1, p2: p2, len: Buffer.byteLength(p1), base: basename(p1), prefix: slug.slice(0, 20) }));';
     const env: NodeJS.ProcessEnv = { ...process.env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) };
     delete env.AKROGON_LEAF_TEMP_ROOT;
@@ -3537,7 +3551,9 @@ test('fixture temp root isolates every TMPDIR and envs carry override', async ()
     expect('AKROGON_LEAF_TEMP_ROOT' in stripped).toBe(false);
     const before: number = calls(f).length;
     expect((await cli(f, ['next', 'second-tmp'], f.root, stripped)).code).toBe(0);
-    const fresh: string[][] = calls(f).slice(before).filter((args) => args[0] === 'tab' && args[1] === 'create');
+    const fresh: string[][] = calls(f)
+      .slice(before)
+      .filter((args) => args[0] === 'tab' && args[1] === 'create');
     expect(fresh).toHaveLength(1);
     const secondTmp: string = tmpdirOf(fresh[0]);
     expect(secondTmp.startsWith(root + '/')).toBe(true);
@@ -3554,6 +3570,3 @@ test('fixture temp root isolates every TMPDIR and envs carry override', async ()
     f.clean();
   }
 }, 15000);
-
-
-

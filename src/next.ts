@@ -1,4 +1,14 @@
-import { chmodSync, existsSync, lstatSync, mkdirSync, realpathSync, readdirSync, rmSync, statSync, type Dirent } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  realpathSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  type Dirent,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -303,8 +313,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
       const existing = lstatSync(path);
       if (existing.isSymbolicLink() || !existing.isDirectory())
         throw new Error(`Refusing leaf temp path (not a directory): ${path}`);
-      if (statSync(path).uid !== process.getuid!())
-        throw new Error(`Refusing foreign-owned leaf temp path: ${path}`);
+      if (statSync(path).uid !== process.getuid!()) throw new Error(`Refusing foreign-owned leaf temp path: ${path}`);
     }
     try {
       validate();

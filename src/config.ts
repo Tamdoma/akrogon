@@ -134,7 +134,10 @@ export function leafTemp(repo: Repo, slug: string): string {
   if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
     throw new Error(`Invalid AKROGON_LEAF_TEMP_ROOT: must be a non-blank absolute path`);
   const root: string = override ?? `/var/tmp/akrogon-${process.getuid!()}`;
-  const hex: string = createHash('sha256').update(repo.root + "\n" + slug).digest('hex').slice(0, 12);
+  const hex: string = createHash('sha256')
+    .update(repo.root + '\n' + slug)
+    .digest('hex')
+    .slice(0, 12);
   return resolve(root, `${slug.slice(0, 20)}-${hex}`);
 }
 
