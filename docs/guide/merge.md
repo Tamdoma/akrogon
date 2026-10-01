@@ -1,6 +1,6 @@
 # Merge
 
-Seat B merges reviewed work. It fetches the configured remote, rebases onto the default branch and runs the configured checks.
+Seat B merges reviewed work. It fetches the configured remote, rebases onto the default branch and runs every `checks` command, then every `merge_checks` command.
 
 For CSV export, those checks should cover quoting, empty input and the existing JSON export.
 

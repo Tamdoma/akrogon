@@ -88,7 +88,7 @@ A follows the plan in the leaf worktree. Depending on configuration, A works inl
 
 Tests come from the acceptance criteria. The skill calls for the smallest set that proves every criterion, with a trivial one-line change exempt from new tests. A missing or bad test blocks only when a criterion has no test that would catch its failure, a realistic fix has no test, or a test mocks the unit under test.
 
-A runs changed tests as work lands, then the full suite and other blocking checks before handoff. The implementation report records the code changes, commands, results, commits and any limitations.
+A runs changed tests as work lands, then criterion proof plus every `checks` command before handoff and after repair, reusing unchanged evidence; `merge_checks` run only at merge unless a criterion needs a whole run. The implementation report records the code changes, commands, results, commits and any limitations.
 
 You get a reviewable change and evidence of what was checked. A claim that “tests pass” without the relevant result is not the intended handoff.
 

@@ -19,7 +19,7 @@
 - Skills guide agents; the command owns phase changes, counters and dispatch.
 - Leaf artifacts go to the registered checkout, code to the leaf worktree.
 - Implementation mode selects inline work or bounded workers in waves of up to 3 independent units, each in its own worktree with results cherry-picked onto the lane.
-- Worker returns include changed-test evidence; A runs the final full suite.
+- Worker returns include changed-test evidence; A runs criterion proof plus every `checks` command before review, with `merge_checks` only at merge.
 - Lifecycle seats send no questions and pause for nothing; a human-only blocker is recorded and the pass ends with `failed`.
 - Env-file rule is an invariant of every phase skill: `.env` and `.env.*` are never opened, printed, or written by a tool, and presence is checked by name with `bun --env-file=<file>` printing `present`/`absent`.
 
