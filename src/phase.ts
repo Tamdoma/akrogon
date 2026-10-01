@@ -182,6 +182,10 @@ export async function transition(
 ): Promise<void> {
   const state: State = readState(leaf.path);
   if (state.phase === 'merged') throw new Error(`Merged is terminal: ${state.slug}`);
+  if (state.phase === 'failed' && explicitSlot !== undefined)
+    throw new Error(
+      `Leaf is failed. A seat cannot resume it. Operator recovery omits --slot after the blocker is resolved.${state.failure?.reason === undefined ? '' : ` Reason: ${state.failure.reason}`}`,
+    );
   if (!routing[state.phase].next.includes(requested))
     throw new Error(
       `Illegal move ${state.phase} -> ${requested}; from ${state.phase} the legal moves are ${routing[state.phase].next.join(', ')}`,
