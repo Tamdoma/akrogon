@@ -17,7 +17,7 @@ Run `akrogon config` once per setup pass to read effective global and repo choic
 
 Preserve existing effective repo choices on repeat setup, prefer established commands verified against the installed tools, and batch only questions inspection cannot settle before showing one concrete proposal without another blanket approval when initialization is already authorized.
 
-Propose every repo key below, using inspected values or these defaults, including only real check commands and placing only deliberately nonblocking commands in `advisory` because every `checks` command blocks:
+Propose every repo key below, using inspected values or these defaults, including only real check commands and placing only deliberately nonblocking commands in `advisory` because every `checks` command blocks, and slow full-suite commands in `merge_checks`, which block only at merge:
 
 ```yaml
 remote: origin
@@ -27,6 +27,7 @@ rebuttal: true
 fix_rounds: 3
 implement: subagents
 checks: {}
+merge_checks: {}
 advisory: []
 grounding:
   index: docs/reference-index.md

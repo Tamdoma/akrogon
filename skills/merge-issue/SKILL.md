@@ -30,7 +30,7 @@ The merge seat never opens, prints, appends to, or writes `.env` or `.env.*` wit
 
 Turn a Nit B still holds and finds reusable into one line naming mechanism/date/history in the registered checkout's `learnings/LESSONS.md` and a history file with case, evidence and learning, left for the operator to commit, without reading the active list as pass input or adding another turn.
 
-Before pushing, commit scoped outstanding changes, fetch the configured remote, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` after rebase, and run every `checks` command in the worktree, recording evidence in `review-B.md` under the `leaf=` folder and advisory failures as Nits.
+Before pushing, commit scoped outstanding changes, fetch the configured remote, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` after rebase, and run every `checks` command, then every `merge_checks` command, in the worktree, recording evidence in `review-B.md` under the `leaf=` folder and advisory failures as Nits.
 
 A local default branch is unnecessary; ordinary git non-fast-forward refusal serializes competing pushes.
 

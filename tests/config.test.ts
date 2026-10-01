@@ -247,6 +247,27 @@ test('config prints per-repo merged slots with two overrides', async () => {
   }
 });
 
+test('config reports merge_checks separately from checks', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none' });
+    expect(Bun.YAML.parse((await cli(f, ['config'])).stdout)).toMatchObject({ merge_checks: {} });
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      merge_checks: { full: 'bun run verify' },
+      grounding: 'none',
+    });
+    const result = await cli(f, ['config']);
+    expect(result.code).toBe(0);
+    expect(Bun.YAML.parse(result.stdout)).toMatchObject({
+      checks: { test: 'bun test' },
+      merge_checks: { full: 'bun run verify' },
+    });
+  } finally {
+    f.clean();
+  }
+});
+
 test('config requires explicit grounding', async () => {
   const f: Fixture = await fixture();
   try {

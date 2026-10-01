@@ -32,6 +32,7 @@ export const repoSchema = z.strictObject({
   fix_rounds: z.number().int().positive().default(3),
   implement: z.enum(['subagents', 'inline']).default('subagents'),
   checks: z.record(text, text).default({}),
+  merge_checks: z.record(text, text).default({}),
   advisory: z.array(text).default([]),
   grounding: z.union([
     z.literal('none'),
