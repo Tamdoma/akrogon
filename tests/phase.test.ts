@@ -1,7 +1,17 @@
 import { test, expect } from 'bun:test';
 import { resolve } from 'node:path';
 import { readFileSync, existsSync, mkdirSync, rmSync, writeFileSync, readdirSync, statSync } from 'node:fs';
-import { fixture, cli, leaf, yaml, fakeGh, fakeHerdr, type GhFixture, type Fixture } from './helpers';
+import {
+  fixture,
+  cli,
+  leaf,
+  yaml,
+  fakeGh,
+  fakeHerdr,
+  type GhFixture,
+  type HerdrFixture,
+  type Fixture,
+} from './helpers';
 import { readState, saveState } from '../src/state';
 import { command, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
@@ -19,6 +29,8 @@ function herdrCalls(db: string): string[][] {
         .map((line) => z.array(z.string()).parse(JSON.parse(line)))
     : [];
 }
+const seatRefusal: string =
+  'Leaf is failed. A seat cannot resume it. Operator recovery omits --slot after the blocker is resolved.';
 test('valid phase transition rejects a mismatched repo key without changing state or history', async () => {
   const f: Fixture = await fixture();
   try {
@@ -1292,3 +1304,83 @@ for (const { phase, slot, extra } of [
     }
   });
 }
+
+test('failed leaf with explicit slot is refused without effect', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const history: string = resolve(f.root, 'issues/log.jsonl');
+    writeFileSync(history, '');
+    const cases: { slug: string; extra: object; args: string[]; reason?: string }[] = [
+      {
+        slug: 'seat-review',
+        extra: { failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'needs decision' } },
+        args: ['phase', 'seat-review', 'check.review', '--slot', 'A'],
+        reason: 'needs decision',
+      },
+      {
+        slug: 'seat-implement',
+        extra: { failure: { cause: 'blocked', phase: 'check.fix', slot: 'A', reason: 'worktree locked' } },
+        args: ['phase', 'seat-implement', 'implement', '--slot', 'B'],
+        reason: 'worktree locked',
+      },
+      {
+        slug: 'seat-merge',
+        extra: { failure: { cause: 'blocked', phase: 'check.review', slot: 'A', reason: 'verdict dispute' } },
+        args: ['phase', 'seat-merge', 'merge', '--slot', 'B', '--verdict', 'ready'],
+        reason: 'verdict dispute',
+      },
+      {
+        slug: 'seat-attempts',
+        extra: {
+          failure: { cause: 'attempts', phase: 'check.review', slot: 'A', reason: 'fix rounds exhausted' },
+        },
+        args: ['phase', 'seat-attempts', 'check.review', '--slot', 'B'],
+        reason: 'fix rounds exhausted',
+      },
+      {
+        slug: 'seat-recordless',
+        extra: {},
+        args: ['phase', 'seat-recordless', 'implement', '--slot', 'A'],
+      },
+    ];
+    for (const item of cases) {
+      const path: string = leaf(f, item.slug, 'failed', item.extra);
+      const before: string = bytes(path);
+      const result: Result = await cli(f, item.args, f.root, herdr.env);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain(seatRefusal);
+      if (item.reason !== undefined) expect(result.stderr).toContain(item.reason);
+      expect(bytes(path)).toBe(before);
+      expect(readFileSync(history, 'utf8')).toBe('');
+    }
+    expect(herdrCalls(herdr.db)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('in-flight seat move after stop stays failed', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const path: string = leaf(f, 'seat', 'check.fix', { fix_rounds: 1 });
+    const stopped: Result = await cli(
+      f,
+      ['phase', 'seat', 'failed', '--slot', 'A', '--reason', 'x'],
+      f.root,
+      herdr.env,
+    );
+    expect(stopped.stdout).toBe('moved failed');
+    const before: string = bytes(path);
+    const calls: number = herdrCalls(herdr.db).length;
+    const refused: Result = await cli(f, ['phase', 'seat', 'check.review', '--slot', 'A'], f.root, herdr.env);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain(seatRefusal);
+    expect(bytes(path)).toBe(before);
+    expect(readState(path)).toMatchObject({ phase: 'failed', fix_rounds: 1 });
+    expect(herdrCalls(herdr.db)).toHaveLength(calls);
+  } finally {
+    f.clean();
+  }
+});
