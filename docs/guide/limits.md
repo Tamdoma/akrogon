@@ -7,7 +7,7 @@ Keep these boundaries in mind when deciding what to dispatch.
 - **Capacity is global.** The max_active limit applies across registered repositories. It must be a positive integer. Existing allocations can continue at the limit.
 - **There is no priority field.** Old priority values are ignored. Use dependencies for actual prerequisites and parking to keep work out of the queue.
 - **Folder targeting is temporary.** It limits that dispatch pass. Later manual `akrogon next` passes can consider other open leaves.
-- **Cleanup is separate from idle events.** A normal hook pass closes the tab of a merged seat; only manual repository sweeps and startup cleanup delete completed worktrees and branches, and the leaf's temp folder once the merged leaf's tab is confirmed gone.
+- **Cleanup is separate from idle events.** A normal hook pass closes the tab of a merged seat; the closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only manual repository sweeps and startup cleanup delete completed worktrees and branches.
 - **A completion starts only its dependents.** A merged leaf dispatches same-repo leaves that name it in `blocked-by`. Other open leaves start only through a manual `akrogon next`.
 - **Failed leaves do not restart themselves.** Read the reason and resume an appropriate active phase.
 

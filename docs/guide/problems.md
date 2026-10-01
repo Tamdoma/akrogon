@@ -50,7 +50,7 @@ Run a repository sweep:
 akrogon next
 ```
 
-Hook passes close the tabs of merged leaves, and a tab left behind by an interrupted merge is handled there too. Only sweeps and startup delete a lingering worktree and branch, and the leaf's temp folder once the merged leaf's tab is confirmed gone.
+Hook passes close the tabs of merged leaves, and a tab left behind by an interrupted merge is handled there too. The closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only sweeps and startup delete a lingering worktree and branch.
 
 **Sync refuses to run.**
 
