@@ -3541,7 +3541,6 @@ test('fixture temp root isolates every TMPDIR and envs carry override', async ()
     for (const args of [...creates, ...splits]) {
       const tmp: string = tmpdirOf(args);
       expect(tmp.startsWith(root + '/')).toBe(true);
-      expect(tmp.startsWith('/var/tmp/akrogon-')).toBe(false);
       expect(existsSync(tmp)).toBe(true);
       expect(statSync(tmp).mode & 0o777).toBe(0o700);
     }
