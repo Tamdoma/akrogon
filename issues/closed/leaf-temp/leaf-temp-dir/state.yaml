@@ -1,5 +1,5 @@
 slug: leaf-temp-dir
-phase: implement
+phase: merged
 created: 2026-10-01
 repo: akrogon
 debate: "yes"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#49"
 busy_since: 
-  A: 2026-10-01T11:02:57.192Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -16,7 +16,7 @@ attempts:
   B: 0
 done: 
   []
-fix_rounds: 0
+fix_rounds: 1
 verdict: 
   {}
 tab: w8:t70
@@ -25,8 +25,8 @@ pane:
   A: w8:pF2
   B: w8:pF3
 prompted: 
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-leaf-temp-dir--/2026-10-01T10-54-54-178Z_01a0f71a-58e2-774d-abd9-7cb9332bf6a6.jsonl
+  {}
 prompted_at: 
-  A: 2026-10-01T11:02:57.192Z
+  {}
 delivery_error: 
   {}

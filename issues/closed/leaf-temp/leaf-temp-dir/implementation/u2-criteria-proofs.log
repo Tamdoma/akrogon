@@ -1,0 +1,76 @@
+=== C1 ===
+tests/next.test.ts:
+(pass) recorded seats stay authoritative with an extra pane first and neither missing allocation carries TMPDIR [491.05ms]
+(pass) recorded seats stay authoritative with an extra pane first and A missing allocation carries TMPDIR [524.12ms]
+(pass) recorded seats stay authoritative with an extra pane first and B missing allocation carries TMPDIR [509.02ms]
+(pass) recorded seats stay authoritative with an extra pane first and both missing allocation carries TMPDIR [547.37ms]
+(pass) fresh allocation carries TMPDIR on create and B split with 0700 scratch [282.31ms]
+(pass) allocation carries TMPDIR refuses symlink override with no tab or split [105.18ms]
+(pass) allocation carries TMPDIR refuses file override with no tab or split [105.25ms]
+(pass) allocation carries TMPDIR corrects permissive owned dirs to 0700 [430.24ms]
+
+ 8 pass
+ 140 filtered out
+ 0 fail
+ 96 expect() calls
+Ran 8 tests across 1 file. [3.01s]
+
+=== C2 ===
+bun test v1.4.2 (744846f84)
+
+tests/next.test.ts:
+(pass) leaf temp path bounds stay short with mocked uid [31.61ms]
+
+ 1 pass
+ 147 filtered out
+ 0 fail
+ 9 expect() calls
+Ran 1 test across 1 file. [51.00ms]
+
+=== C3 ===
+
+tests/next.test.ts:
+(pass) closed tab scratch deletes merged folder and prunes inner worktree [305.47ms]
+(pass) closed tab scratch keeps failed folder and sentinel [298.75ms]
+
+ 2 pass
+ 146 filtered out
+ 0 fail
+ 15 expect() calls
+Ran 2 tests across 1 file. [623.00ms]
+
+=== C4 ===
+
+tests/next.test.ts:
+(pass) sweep scratch catch-up deletes open and closed folders with no live panes [735.11ms]
+(pass) sweep scratch catch-up keeps sentinel with live panes then deletes on later sweep [458.46ms]
+
+ 2 pass
+ 146 filtered out
+ 0 fail
+ 32 expect() calls
+Ran 2 tests across 1 file. [1212.00ms]
+
+=== C5 ===
+bun test v1.4.2 (744846f84)
+
+tests/next.test.ts:
+(pass) dispatch recreates missing scratch with same tab and seats [423.93ms]
+
+ 1 pass
+ 147 filtered out
+ 0 fail
+ 11 expect() calls
+Ran 1 test across 1 file. [444.00ms]
+
+=== C6 ===
+bun test v1.4.2 (744846f84)
+
+tests/next.test.ts:
+(pass) fixture temp root isolates every TMPDIR and envs carry override [821.43ms]
+
+ 1 pass
+ 147 filtered out
+ 0 fail
+ 29 expect() calls
+Ran 1 test across 1 file. [841.00ms]

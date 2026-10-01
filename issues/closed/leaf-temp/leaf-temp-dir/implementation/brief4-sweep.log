@@ -1,0 +1,21 @@
+docs/guide/limits.md:10:- **Cleanup is separate from idle events.** A normal hook pass closes the tab of a merged seat; the closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only manual repository sweeps and startup cleanup delete completed worktrees and branches.
+docs/guide/merge.md:33:Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. The closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only those sweeps remove completed worktrees and branches, after the issue folder has moved:
+docs/guide/next.md:24:Sweep the current repository:
+docs/guide/next.md:30:Sweep explicitly:
+docs/guide/next.md:80:Park export-csv when you want it out of future sweeps. Unparking restores queue membership, not permission to bypass dependencies or capacity. With the all option, it skips issues that cannot be parked:
+docs/guide/next.md:100:Use parking for work that should stay out of later manual sweeps. Use dependencies for work that truly needs another result first.
+docs/guide/problems.md:37:Read the error. Common causes include a dirty worktree, issue files committed on the leaf branch, an empty implementation branch or an invalid transition.
+docs/guide/problems.md:47:Run a repository sweep:
+docs/guide/problems.md:53:Hook passes close the tabs of merged leaves, and a tab left behind by an interrupted merge is handled there too. The closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only sweeps and startup delete a lingering worktree and branch.
+---temp---
+docs/guide/gacp.md:61:5. Pull fetches origin/main and rebases local commits onto it. Autostash temporarily stores unstaged changes.
+docs/guide/limits.md:9:- **Folder targeting is temporary.** It limits that dispatch pass. Later manual `akrogon next` passes can consider other open leaves.
+docs/guide/limits.md:10:- **Cleanup is separate from idle events.** A normal hook pass closes the tab of a merged seat; the closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only manual repository sweeps and startup cleanup delete completed worktrees and branches.
+docs/guide/limits.md:36:A blocked or unknown agent is not treated as idle. Repeated failed prompt deliveries count toward failure, while a successful delivery resets that seat's attempts. A permission dialog is not proof of a delivery failure.
+docs/guide/merge.md:33:Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. The closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only those sweeps remove completed worktrees and branches, after the issue folder has moved:
+docs/guide/next.md:94:Each dispatch pass makes at most one delivery attempt per pending seat. Repeated delivery failures can put the leaf into failed. Running next again does not resume a failed leaf. Read its cause and choose a recovery phase first.
+docs/guide/problems.md:33:Do not clear prompt or attempt fields by hand to force delivery.
+docs/guide/problems.md:53:Hook passes close the tabs of merged leaves, and a tab left behind by an interrupted merge is handled there too. The closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only sweeps and startup delete a lingering worktree and branch.
+docs/guide/state.md:64:Akrogon records the worktree, Herdr tab, completed seats, review verdicts and prompt delivery attempts. It also records failure details.
+---confirmed-gone---
+no confirmed-gone hits

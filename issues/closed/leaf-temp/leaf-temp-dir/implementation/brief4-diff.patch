@@ -1,0 +1,39 @@
+diff --git i/docs/guide/limits.md w/docs/guide/limits.md
+index 8bb1e61..80fb3b3 100644
+--- i/docs/guide/limits.md
++++ w/docs/guide/limits.md
+@@ -7,7 +7,7 @@ Keep these boundaries in mind when deciding what to dispatch.
+ - **Capacity is global.** The max_active limit applies across registered repositories. It must be a positive integer. Existing allocations can continue at the limit.
+ - **There is no priority field.** Old priority values are ignored. Use dependencies for actual prerequisites and parking to keep work out of the queue.
+ - **Folder targeting is temporary.** It limits that dispatch pass. Later manual `akrogon next` passes can consider other open leaves.
+-- **Cleanup is separate from idle events.** A normal hook pass closes the tab of a merged seat; only manual repository sweeps and startup cleanup delete completed worktrees and branches, and the leaf's temp folder once the merged leaf's tab is confirmed gone.
++- **Cleanup is separate from idle events.** A normal hook pass closes the tab of a merged seat; the closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only manual repository sweeps and startup cleanup delete completed worktrees and branches.
+ - **A completion starts only its dependents.** A merged leaf dispatches same-repo leaves that name it in `blocked-by`. Other open leaves start only through a manual `akrogon next`.
+ - **Failed leaves do not restart themselves.** Read the reason and resume an appropriate active phase.
+ 
+diff --git i/docs/guide/merge.md w/docs/guide/merge.md
+index aa287aa..e8c1159 100644
+--- i/docs/guide/merge.md
++++ w/docs/guide/merge.md
+@@ -30,7 +30,7 @@ epic complete <epic>
+ 
+ Completed records move to the closed store. An issue inside an epic prints no completion line and waits for the whole epic before the top-level folder moves.
+ 
+-Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. Only those sweeps remove completed worktrees and branches, after the issue folder has moved, and delete the leaf's temp folder once the merged leaf's tab is confirmed gone:
++Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. The closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only those sweeps remove completed worktrees and branches, after the issue folder has moved:
+ 
+ ```sh
+ cd ~/Work/widgets
+diff --git i/docs/guide/problems.md w/docs/guide/problems.md
+index ffbd18a..3eabf40 100644
+--- i/docs/guide/problems.md
++++ w/docs/guide/problems.md
+@@ -50,7 +50,7 @@ Run a repository sweep:
+ akrogon next
+ ```
+ 
+-Hook passes close the tabs of merged leaves, and a tab left behind by an interrupted merge is handled there too. Only sweeps and startup delete a lingering worktree and branch, and the leaf's temp folder once the merged leaf's tab is confirmed gone.
++Hook passes close the tabs of merged leaves, and a tab left behind by an interrupted merge is handled there too. The closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only sweeps and startup delete a lingering worktree and branch.
+ 
+ **Sync refuses to run.**
+ 
