@@ -34,7 +34,7 @@ Advisory size: about N files and under M turns, with M at least four turns per f
 
 ## 7. Commands
 
-The resolved `test_changed` command only, including the supplied `AKROGON_BASE` value for a configured leaf; A runs the full suite separately.
+The resolved `test_changed` command only, including the supplied `AKROGON_BASE` value for a configured leaf; A runs criterion proof and every `checks` command separately.
 
 If the checkout has no changed-test runner, name the actual targeted check derived from its tools rather than substituting the full suite or inventing a command.
 
