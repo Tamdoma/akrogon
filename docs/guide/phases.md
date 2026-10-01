@@ -74,7 +74,7 @@ Failed can resume at any active phase. It cannot jump directly to merged. Recove
 
 ## plan-issue: turn the contract into steps
 
-Planning chooses how to meet the brief without changing its locked scope. The final plan names decisions, read-first files, interfaces, an ordered checklist and verification. The plan proves the brief's done-criteria with the leaf's own tests and `checks` commands and adds no `merge_checks` or whole-suite requirement the brief does not name; a whole run the brief names stays.
+Planning chooses how to meet the brief without changing its locked scope. The final plan names decisions, read-first files, interfaces, a checklist grouped into waves (each unit lists the paths it owns, its shared test resources and the units that must land first) and verification. The plan proves the brief's done-criteria with the leaf's own tests and `checks` commands and adds no `merge_checks` or whole-suite requirement the brief does not name; a whole run the brief names stays.
 
 For CSV export, it might identify the current export function, add a serializer and name tests for quotes and empty data.
 
@@ -84,7 +84,7 @@ Debate gives you separate implementation proposals when the tradeoff warrants it
 
 ## implement-issue: build and show the evidence
 
-A follows the plan in the leaf worktree. Depending on configuration, A works inline or delegates bounded units in waves of up to 3 independent workers, each in its own worktree with results cherry-picked onto the lane.
+A follows the plan in the leaf worktree. Depending on configuration, A works inline or delegates. Delegated, A runs each plan wave whole, up to 3 independent workers at once, each in its own worktree with results cherry-picked onto the lane. Inline work follows wave order.
 
 Tests come from the acceptance criteria. The skill calls for the smallest set that proves every criterion, with a trivial one-line change exempt from new tests. A missing or bad test blocks only when a criterion has no test that would catch its failure, a realistic fix has no test, or a test mocks the unit under test.
 
