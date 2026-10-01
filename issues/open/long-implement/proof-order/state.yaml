@@ -1,0 +1,32 @@
+slug: proof-order
+phase: implement
+created: 2026-10-01
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#51"
+busy_since: 
+  A: 2026-10-01T18:17:30.324Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t84
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/proof-order
+pane: 
+  A: w8:pF9
+  B: w8:pFA
+prompted: 
+  A: 9698e8a6-21e4-4c8c-892a-e9966b40cbb2
+prompted_at: 
+  A: 2026-10-01T18:17:30.325Z
+delivery_error: 
+  {}

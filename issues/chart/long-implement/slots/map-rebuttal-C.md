@@ -1,0 +1,13 @@
+# Rebuttal C: long-implement merged map
+
+Disagreements only. Three are corrections to my own lines. Measurements are from framework `issues/log.jsonl` and the pi session files, rerun 2026-10-01.
+
+- R1 (M4, corrects C) "site-nav ... still ran serially" is wrong. site-nav ran two waves of 3 (01:30 and 02:04 UTC, 34m and 42m), then four single workers sa-7 to sa-10 (24m, 38m, 38m, 53m, 153m in total). A's spot-check in M3 is right. Drop site-nav as evidence for M4. emdash-kit is unchecked at this level.
+- R2 (M3, corrects C) Mean concurrency 1.09 understates wave use. In site-nav's first wave the three workers ran 2m, 12m and 33m, so a real 3-wide wave scores about 1.4. Use wait width instead: in the 46 long implement phases with waits, single-worker waits hold 98h of 116h (84%), and 29 of 46 phases never waited on more than one worker. The serial finding stands on those numbers.
+- R3 (K2 C, P1) The expected gain is smaller than my map implied. A wave lasts as long as its slowest worker, and site-nav's time after the waves was four serial units that a wave table may not remove (a unit that needs U1-U6 on the lane is a real prerequisite). The 54m emdash-launch figure is a best case, not the expected result. P4's measurement should be wait width per phase, not mean concurrency.
+- R4 (K2 A) "One leaf is one wave" is a numeric size gate (at most 3 units per leaf). leaf-run-stalls CHART.md Off route lists "numeric size gate" as locked. It also multiplies the per-leaf cycle: 98 of 236 leaves had at least one fix round, and each leaf needs its own brief, plan, two-seat review and merge.
+- R5 (K2 B) A finite proof repair is not a primary lever. It applies to the proof tail, about 6 of 47 long phases (M6). 84% of long-phase worker wait is serial single-worker waits (R2), which it does not touch. It belongs under K3 only.
+- R6 (K3 B) "Watch recovery treats that as final" adds an operator step for every leaf that hits it, against "removed as much as possible". Today the watch recovers a "failed otherwise" leaf for up to two cycles (watch-issues/SKILL.md:39).
+- R7 (K1) "No mechanism except a clock can guarantee elapsed time" is true. It should not become the chart's destination. The destination should name the measured cause (serial workers), since all three slots keep the lock.
+- R8 (M7) The blueprint-phase-split fix gap is 319m, not 442m: one gap from 2026-09-12 22:56 UTC to a user event, inside a 443m phase. The other 117m was model time.
+- R9 (M7) "About 10%" is a share of long-phase hours, not of phases. Four phases carry it (portal-activation, manifest-lint, blueprint-phase-split, live-replay).
