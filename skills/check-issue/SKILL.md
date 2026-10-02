@@ -1,13 +1,13 @@
 ---
 name: check-issue
-description: Review a leaf implementation with concrete-defect verdicts, or re-check only its repair diff as slot B after check.fix.
+description: Review a leaf implementation with concrete-defect verdicts, repair most Fixes as slot B in check.repair, or re-check A's repair diff as slot B.
 ---
 
 Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
 
 # Check issue
 
-The prompt is `check-issue <slug> slot=<A|B> phase=check.review leaf=<folder>`; initial review has both slots, while a review after repair belongs only to B.
+The prompt is `check-issue <slug> slot=<A|B> phase=check.review leaf=<folder>` or `check-issue <slug> slot=B phase=check.repair leaf=<folder>`, where `phase=check.repair` belongs only to B; initial review has both slots, while a review after repair belongs only to B.
 
 ## Shared context
 
@@ -58,9 +58,29 @@ During check.review, a red test or check with no cause in the leaf's diff (faili
 
 On re-check after `check.fix`, inspect only the repair diff from the prior reviewed head (or the rebased head B recorded at merge), append B's results to `review-B.md` under the `leaf=` folder, confirm earlier findings, apply the same fix-bar with its realistic source, consequence today, and criterion, check or gap, and add a blocking finding only for a defect introduced by the repair.
 
-Finish with `akrogon phase <slug> <next> --slot <A|B> --verdict <ready|nits|fix>`, requesting `check.fix` for fix or `merge` for ready/nits, then print the footer and stop.
+Finish with `akrogon phase <slug> <next> --slot <A|B> --verdict <ready|nits|fix>`, requesting `check.repair` for fix or `merge` for ready/nits, then print the footer and stop.
 
 A `recorded` result waits for the other initial verdict; the command derives the aggregate result, including a fix from the peer, so the requested destination is not proof of movement.
+
+## check.repair
+
+B reads every Fix in the review files for the latest reviewed head, meaning both initial reviews or B's latest re-check entry in `review-B.md`.
+
+B repairs every Fix except plan or design changes, missing planned units, required live runs, and work B judges too large for its pass. Each of those goes under a `Handed to A` heading in `review-B.md`, one line each with the Fix and the reason, and B never edits `plan.md` or `design.md`.
+
+Operator-only items follow the operator-only rule in Shared context and are never handed to A. When only operator actions remain after B's repairs, B makes that rule's one `failed` stop. When `Handed to A` items also remain, B moves to `check.fix`, and A's check.fix makes the stop after its repairs.
+
+Each behavior Fix gets its own commits, never shared with another Fix. First comes a commit adding a test that reproduces the recorded source, run and shown failing, then the fix commit, with the failing and passing output in `review-B.md`.
+
+Each docs or command Fix is its own commit, with before and after evidence (quoted text or command output) in `review-B.md`.
+
+A red test or check with no cause in the leaf's diff takes the same base-run disposition as the check.review paragraph beginning "During check.review, a red test or check".
+
+After repairs, B runs proof for every done-criterion in `plan.md` and every `checks` command, and does not run `merge_checks`, because merge runs them.
+
+B appends a dated `check.repair` entry to `review-B.md` naming each Fix repaired, its commits and its evidence, plus any `Handed to A` list.
+
+Finish with `akrogon phase <slug> merge --slot B` when nothing is handed to A and no operator action is open, or `akrogon phase <slug> check.fix --slot B` when any `Handed to A` item remains; the command counts that handoff and answers `moved failed` at the repair cap. Then print the footer and stop.
 
 ## Printed footer
 
@@ -69,4 +89,4 @@ Last operation: <review findings and actual phase result>
 Next: <skill> <slug> slot=<A|B> phase=<phase> leaf=<folder>
 ```
 
-`check.fix` routes to implement-issue A, `merge` to merge-issue B, an outstanding initial review to check-issue in the remaining slot, and `Next: none <reason>` covers failed or waiting outcomes.
+`check.repair` routes to check-issue B, `check.fix` to implement-issue A, `merge` to merge-issue B, an outstanding initial review to check-issue in the remaining slot, and `Next: none <reason>` covers failed or waiting outcomes.
