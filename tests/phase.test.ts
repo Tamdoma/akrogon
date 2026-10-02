@@ -1221,7 +1221,7 @@ for (const [mode, delivery] of [
       );
       expect(result.code).not.toBe(0);
       expect(readState(path).failure?.delivery).toBe(delivery);
-      const record: { failure: Failure } = JSON.parse(
+      const record: { failure?: Failure } = JSON.parse(
         readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim(),
       );
       expect(record.failure).toEqual(readState(path).failure);

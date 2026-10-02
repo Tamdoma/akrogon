@@ -121,7 +121,7 @@ export async function commitMove(
     if (to === 'merged') await completeOwner(repo, leaf, true);
   } finally {
     try {
-      await logMove(repo, recorded, announced, slot);
+      await logMove(repo, recorded, to === 'failed' ? readState(leaf.path) : announced, slot);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       throw new Error(`Move to ${to} is committed, but log append failed: ${error.message}`, { cause: error });
