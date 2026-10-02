@@ -12,7 +12,7 @@ import {
   type HerdrFixture,
   type Fixture,
 } from './helpers';
-import { readState, saveState } from '../src/state';
+import { readState, saveState, type Failure } from '../src/state';
 import { command, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import { z } from 'zod';
@@ -1199,6 +1199,37 @@ test('failed restart refuses issue files on branch but allows move without workt
     f.clean();
   }
 });
+
+for (const [mode, delivery] of [
+  ['failNotification', 'error'],
+  ['failRename', 'shown'],
+] as const) {
+  test(`failed move logs persisted delivery after ${mode}`, async () => {
+    const f: Fixture = await fixture();
+    try {
+      const herdr: HerdrFixture = fakeHerdr(f);
+      writeFileSync(
+        herdr.db,
+        JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'oops' }], serial: 0, [mode]: true }),
+      );
+      const path: string = leaf(f, 'oops', 'implement', { tab: 'tab-1' });
+      const result: Result = await cli(
+        f,
+        ['phase', 'oops', 'failed', '--slot', 'A', '--reason', 'Required permission is missing'],
+        f.root,
+        herdr.env,
+      );
+      expect(result.code).not.toBe(0);
+      expect(readState(path).failure?.delivery).toBe(delivery);
+      const record: { failure: Failure } = JSON.parse(
+        readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim(),
+      );
+      expect(record.failure).toEqual(readState(path).failure);
+    } finally {
+      f.clean();
+    }
+  });
+}
 
 test('failed announce renames tabs, tolerates missing tabs, and retries herdr calls', async () => {
   {
