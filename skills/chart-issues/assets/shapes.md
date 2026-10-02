@@ -91,12 +91,14 @@ issues/open/<epic>/
     <leaf>/
       brief.md
       design.md
+      readiness.yaml
       state.yaml
   <other-issue>/
     ISSUE.md
     <other-leaf>/
       brief.md
       design.md
+      readiness.yaml
       state.yaml
 ```
 
@@ -147,6 +149,86 @@ foreclosed alternatives>
 
 Each design is self-contained. Copy every binding decision into each affected leaf, with explicit exclusions for binding decisions that do not belong there. Cross-leaf claims name an owner whose own brief/design accepts that responsibility. Known human-only prerequisites have a named owner and recorded completion before handoff, separately from any `hand_built` choice.
 
+### readiness.yaml
+
+The door writes one `<leaf>/readiness.yaml` per leaf with all five sections, leaving unused arrays empty:
+
+```yaml
+inputs:
+  - kind: env
+    name: EXAMPLE_API_TOKEN
+    holder: repo
+    purpose: <what this input unlocks>
+    consumers: [dependent-leaf-slug]
+    steps: <how the operator supplies it>
+    source: <where the value lives>
+    done: <observable presence check>
+  - kind: file
+    name: ca-chain.pem
+    holder: repo
+    purpose: <what this input unlocks>
+    consumers: [dependent-leaf-slug]
+    steps: <how the operator supplies it>
+    source: <where the file lives>
+    done: <observable presence check>
+produces:
+  - name: <artifact the leaf emits>
+    holder: repo
+    consumers: [dependent-leaf-slug]
+    save:
+      entry: <store entry>
+      revision: <revision tag>
+      args: [<selection arg>]
+      value_source: <where the saved value is read>
+grants:
+  - approved:
+      by: <approver>
+      date: <YYYY-MM-DD>
+      answer: <recorded operator answer>
+    principal: <agent identity>
+    account: <service account>
+    credential:
+      name: <credential name>
+      holder: repo
+    targets: [<external system>]
+    fixtures:
+      - account: <service account>
+        purpose: <why the fixture exists>
+        marker: <fixture marker>
+        naming: <name pattern>
+        count: 1
+        cleanup:
+          - step: <removal step>
+            identity: <who removes it>
+        absence_check: <how absence is confirmed>
+    operations: [<allowed operation>]
+    effects: <what the operations touch>
+    bounds: <limits on use>
+    stop_line: <never-cross condition>
+retained:
+  - resources: [<kept resource>]
+    purpose: <why it is kept>
+    owner: <responsible party>
+    remove_by: <YYYY-MM-DD>
+    cost: <ongoing cost>
+    exposure: <who can reach it>
+    cleanup:
+      identity: <who removes it>
+      route: <how removal runs>
+    reason: <why removal waits>
+proofs:
+  - operation: <external operation>
+    command: <command executed>
+    identity: <identity used>
+    target: <system exercised>
+    version: <version under proof>
+    date: <YYYY-MM-DD>
+    result: <observed outcome>
+    cleanup: <post-proof cleanup>
+    limits: <what the proof does not cover>
+    record: issues/chart/<chart>/forks/<fork>.md
+```
+
 ```yaml
 slug: sample-change
 phase: plan.synthesis  # plan.positions when debate: 'yes'
@@ -171,4 +253,4 @@ Read the briefs as an implementer: each criterion can be fulfilled within owners
 
 A chart with a chain names the spine command and a stage table; each stage-owning leaf gets a done-criterion putting its stage in the spine and deleting obsolete stand-ins (blocked-by where it needs the spine first); the chart names the rule owner when writer and checker sit in different leaves; a slow-run leaf's brief states its repair scope and final-proof rule; and the audit refuses a stage-owning leaf without the spine criterion (rules live in standing-design.md, not restated here).
 
-Write the leaf files and immediate-child indexes directly at the registered root. Write brief.md and design.md before state.yaml, and a prerequisite leaf's files before its dependents', because dispatch picks up any folder holding a state.yaml. Then run `akrogon status` there and inspect the actual result. It parses states with the command's schema and checks repo/slug consistency; it does not prove source ownership, dependency existence or prose quality, which require the preceding audit. A failed validation is an unfinished handoff requiring repair, not permission to mark the chart handed off. A successful handoff retains the chart and original inputs, appends the handoff date and ends at the printed footer without dispatch.
+Write the leaf files and immediate-child indexes directly at the registered root. Write brief.md, design.md and readiness.yaml before state.yaml, and a prerequisite leaf's files before its dependents', because dispatch picks up any folder holding a state.yaml. Then run `akrogon status` there and inspect the actual result. It parses states with the command's schema, parses each leaf's readiness.yaml and checks repo/slug consistency; a readiness.yaml that does not parse fails validation. It does not prove source ownership, dependency existence or prose quality, which require the preceding audit. A failed validation is an unfinished handoff requiring repair, not permission to mark the chart handed off. A successful handoff retains the chart and original inputs, appends the handoff date and ends at the printed footer without dispatch.
