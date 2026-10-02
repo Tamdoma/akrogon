@@ -1,0 +1,7 @@
+slug: log-tail
+phase: plan.synthesis
+created: '2026-10-02'
+repo: akrogon
+debate: 'no'
+blocked-by: [watch-scripts-check]
+sources: [Tamdoma/tamdoma-framework#118]

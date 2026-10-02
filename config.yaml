@@ -1,9 +1,9 @@
 max_active: 12
 slots: 
   a: 
-    harness: claude
-    model: claude-opus-5-5
-    effort: medium
+    harness: pi
+    model: devin/swe-2-max
+    effort: high
   b: 
     harness: codex
     model: gpt-6.1-sol

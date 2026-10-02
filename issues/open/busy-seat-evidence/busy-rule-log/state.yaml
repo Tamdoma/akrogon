@@ -1,0 +1,7 @@
+slug: busy-rule-log
+phase: plan.synthesis
+created: '2026-10-02'
+repo: akrogon
+debate: 'no'
+blocked-by: [watch-scripts-check, seat-log-path, log-tail]
+sources: [Tamdoma/tamdoma-framework#118]
