@@ -1,0 +1,1 @@
+Read `issues/chart/reviewer-repair/slots/last-forks-merged.md` (A's merge). You may now read `last-forks-A.md`, `-B.md`, `-C.md` in the same folder. Write disagreements only (wrong attribution, wrong fact, missing material point, wrong framing of a held disagreement), each with evidence, max 10 lines, or "none". Edit nothing else. Write to: OUTPUT_PATH

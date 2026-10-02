@@ -2,12 +2,12 @@ max_active: 12
 slots: 
   a: 
     harness: claude
-    model: claude-sonnet-5-5
-    effort: high
+    model: claude-opus-5-5
+    effort: medium
   b: 
     harness: codex
     model: gpt-6.1-sol
-    effort: high
+    effort: medium
 harnesses: 
   claude: 'claude --model {model} --effort {effort} --settings ''{"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"sonnet","CLAUDE_CODE_SUBAGENT_MODEL_FORCE":"1"}}'' --dangerously-skip-permissions'
   codex: "codex -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access"
