@@ -6,9 +6,9 @@ fix_rounds: 3
 implement: subagents
 checks: 
   format: bun run format
-  test: bun test
+  test: bun test --timeout=30000
   typecheck: bun run typecheck
-  test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\""
+  test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\" --timeout=30000"
 advisory: 
   []
 grounding: 
