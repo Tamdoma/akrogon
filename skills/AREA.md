@@ -20,7 +20,7 @@
 - Leaf artifacts go to the registered checkout, code to the leaf worktree.
 - Implementation mode selects inline work or bounded workers; delegated mode runs each plan wave whole, up to 3 independent units at once, each in its own worktree with results cherry-picked onto the lane.
 - Worker returns include changed-test evidence; A runs criterion proof plus every `checks` command before review, with `merge_checks` only at merge.
-- Lifecycle seats send no questions and pause for nothing; a human-only blocker is recorded and the pass ends with `failed`.
+- Lifecycle seats send no questions and pause for nothing; a human-only blocker is recorded and the pass ends with `failed`; a review finding that needs operator access goes under `Operator actions` by the check-issue rule, never as a Fix.
 - Env-file rule is an invariant of every phase skill: `.env` and `.env.*` are never opened, printed, or written by a tool, and presence is checked by name with `bun --env-file=<file>` printing `present`/`absent`.
 - A red test or check with no cause in the leaf's diff stops with one base run at `AKROGON_BASE`; plans prove the brief's criteria with the leaf's own tests and `checks`, adding no `merge_checks` or whole-suite requirement the brief does not name.
 
