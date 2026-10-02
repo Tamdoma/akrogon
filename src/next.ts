@@ -3,10 +3,12 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  realpathSync,
   readdirSync,
+  readlinkSync,
+  realpathSync,
   rmSync,
   statSync,
+  symlinkSync,
   type Dirent,
 } from 'node:fs';
 import { resolve } from 'node:path';
@@ -269,9 +271,37 @@ async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
       repo.root,
     );
   }
+  await linkEnv(repo, path);
   const state: State = { ...leaf.state, worktree: path };
   saveState(leaf.path, state);
   return state;
+}
+
+async function linkEnv(repo: Repo, worktree: string): Promise<void> {
+  const target: string = resolve(repo.root, '.env');
+  const link: string = resolve(worktree, '.env');
+  const tracked: Result = await run(['git', 'ls-files', '--error-unmatch', '.env'], worktree);
+  if (tracked.code === 0) throw new Error(`Refusing .env link at ${link}: path is tracked by git`);
+  if (tracked.code !== 1)
+    throw new CommandError(['git', 'ls-files', '--error-unmatch', '.env'], worktree, tracked);
+  const ignored: Result = await run(['git', 'check-ignore', '-q', '.env'], worktree);
+  if (ignored.code === 1) throw new Error(`Refusing .env link at ${link}: path is not ignored by git`);
+  if (ignored.code !== 0) throw new CommandError(['git', 'check-ignore', '-q', '.env'], worktree, ignored);
+  const ignoredAtRoot: Result = await run(['git', 'check-ignore', '-q', '.env'], repo.root);
+  if (ignoredAtRoot.code === 1)
+    throw new Error(`Refusing .env link at ${target}: path is not ignored in the registered checkout ${repo.root}`);
+  if (ignoredAtRoot.code !== 0)
+    throw new CommandError(['git', 'check-ignore', '-q', '.env'], repo.root, ignoredAtRoot);
+  let stats: ReturnType<typeof lstatSync>;
+  try {
+    stats = lstatSync(link);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    symlinkSync(target, link);
+    return;
+  }
+  if (stats.isSymbolicLink() && readlinkSync(link) === target) return;
+  throw new Error(`Refusing .env link at ${link}: path exists and does not already link to ${target}`);
 }
 
 async function activeCount(global: GlobalConfig, invocation: Invocation): Promise<number> {
