@@ -50,7 +50,7 @@ class ReadinessError extends Error {}
 function leafGaps(global: GlobalConfig, leaf: Leaf): Gap[] {
   try {
     const readiness: Readiness | null = readReadiness(leaf.path);
-    return readiness === null || leaf.state.phase === 'merged' ? [] : gaps(global, readiness);
+    return readiness === null ? [] : gaps(global, readiness);
   } catch (error) {
     throw new ReadinessError(error instanceof Error ? error.message : String(error));
   }
@@ -334,7 +334,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   }
   for (const scan of scans) {
     if (scan.ok) {
-      for (const leaf of scan.leaves) {
+      for (const leaf of scan.leaves.filter((leaf) => leaf.state.phase !== 'merged')) {
         for (const gap of leaf.missing)
           console.log(
             `Missing: ${scan.repo.name}/${leaf.state.slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`,
