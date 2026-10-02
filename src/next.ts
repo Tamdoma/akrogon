@@ -288,7 +288,7 @@ async function linkEnv(repo: Repo, worktree: string): Promise<void> {
   if (ignored.code !== 0) throw new CommandError(['git', 'check-ignore', '-q', '.env'], worktree, ignored);
   const ignoredAtRoot: Result = await run(['git', 'check-ignore', '-q', '.env'], repo.root);
   if (ignoredAtRoot.code === 1)
-    throw new Error(`Refusing .env link at ${target}: path is not ignored in the registered checkout ${repo.root}`);
+    throw new Error(`Refusing .env link at ${link}: path is not ignored in the registered checkout ${repo.root}`);
   if (ignoredAtRoot.code !== 0) throw new CommandError(['git', 'check-ignore', '-q', '.env'], repo.root, ignoredAtRoot);
   let stats: ReturnType<typeof lstatSync>;
   try {
