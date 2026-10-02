@@ -51,6 +51,7 @@ import {
 } from './shell';
 import { checkBase, trackingRef } from './preflight';
 import { commitMove, completeOwner } from './phase';
+import { readReadiness, gaps } from './readiness';
 import { sessionFile, deliveredAfter } from './session-file';
 
 const hookEventSchema = z.discriminatedUnion('event', [
@@ -578,6 +579,13 @@ async function dispatchLeaf(
     const dependencies: Leaf[] = state['blocked-by'].map((dependency) => lookup(inventory, dependency));
     if (!dependencies.every((dependency) => dependency.state.phase === 'merged')) {
       if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
+      return 'waiting';
+    }
+    const readiness = readReadiness(leaf.path); // throws naming the file when invalid → caught by report → leaf skipped
+    const missing = readiness === null ? [] : gaps(global, readiness);
+    if (missing.length > 0) {
+      if (explicit)
+        throw new Error(`Leaf inputs are missing: ${slug}: ${missing.map((g) => `${g.kind} ${g.name} in ${g.holder}`).join(', ')}`);
       return 'waiting';
     }
     seats(global, repo);

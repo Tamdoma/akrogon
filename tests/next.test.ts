@@ -10,8 +10,10 @@ import {
   appendFileSync,
   statSync,
   chmodSync,
+  mkdtempSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   fixture,
   cli,
@@ -3597,6 +3599,118 @@ test('fixture temp root isolates every TMPDIR and envs carry override', async ()
     for (const args of allCreates) expect(tmpdirOf(args).startsWith(root + '/')).toBe(true);
     const prodRoot: string = '/tmp/akrogon-' + String(process.getuid!());
     expect(root).not.toBe(prodRoot);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+function readinessInput(leafPath: string, input: object): void {
+  yaml(resolve(leafPath, 'readiness.yaml'), { inputs: [input], produces: [], grants: [], retained: [], proofs: [] });
+}
+const envFoo: object = { kind: 'env', name: 'FOO', holder: 'repo', purpose: 'p', consumers: ['x'], steps: 's', source: 't', done: 'd' };
+async function undispatched(f: DispatchFixture, slug: string): Promise<void> {
+  expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+  expect((await run(['git', 'branch', '--list', slug], f.root)).stdout).toBe('');
+  expect(database(f).tabs).toHaveLength(0);
+  expect(database(f).panes).toHaveLength(0);
+  expect(database(f).prompts).toHaveLength(0);
+}
+
+test('next refuses an env-gapped leaf in every missing .env state and dispatches when set', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'gapped', 'plan.synthesis');
+    const path: string = resolve(f.root, 'issues/open/issue/gapped');
+    readinessInput(path, envFoo);
+    for (const env of [undefined, 'BAR=1\n', 'FOO=\n', 'FOO="  "\n']) {
+      if (env === undefined) rmSync(resolve(f.root, '.env'), { force: true });
+      else writeFileSync(resolve(f.root, '.env'), env);
+      const result: Result = await next(f, ['gapped']);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('FOO');
+      await undispatched(f, 'gapped');
+    }
+    writeFileSync(resolve(f.root, '.env'), 'FOO=x\n');
+    expect((await next(f, ['gapped'])).code).toBe(0);
+    expect(database(f).tabs).toHaveLength(1);
+    expect(database(f).prompts).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next refuses a leaf whose declared file input is absent or empty', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'needsfile', 'plan.synthesis');
+    readinessInput(path, { ...envFoo, kind: 'file', name: 'need.txt' });
+    const result: Result = await next(f, ['needsfile']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('need.txt');
+    writeFileSync(resolve(f.root, 'need.txt'), '');
+    const empty: Result = await next(f, ['needsfile']);
+    expect(empty.code).not.toBe(0);
+    expect(empty.stderr).toContain('need.txt');
+    await undispatched(f, 'needsfile');
+    writeFileSync(resolve(f.root, 'need.txt'), 'content\n');
+    expect((await next(f, ['needsfile'])).code).toBe(0);
+    expect(database(f).tabs).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next --all leaves a gapped leaf undispatched while its ungapped sibling dispatches', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const gapped: string = leaf(f, 'gapped', 'plan.synthesis');
+    readinessInput(gapped, envFoo);
+    leaf(f, 'ready', 'plan.synthesis');
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(readState(gapped).worktree).toBeUndefined();
+    expect((await run(['git', 'branch', '--list', 'gapped'], f.root)).stdout).toBe('');
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['ready']);
+    expect(database(f).prompts.every((p) => p.text.includes('ready'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('an input held by an unregistered absolute directory checks that directory .env', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const holder: string = mkdtempSync(resolve(tmpdir(), 'akrogon-holder-'));
+  try {
+    const path: string = leaf(f, 'foreign', 'plan.synthesis');
+    readinessInput(path, { ...envFoo, holder });
+    const refused: Result = await next(f, ['foreign']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('FOO');
+    await undispatched(f, 'foreign');
+    writeFileSync(resolve(holder, '.env'), 'FOO=x\n');
+    expect((await next(f, ['foreign'])).code).toBe(0);
+    expect(database(f).tabs).toHaveLength(1);
+    expect(database(f).prompts).toHaveLength(1);
+  } finally {
+    rmSync(holder, { recursive: true, force: true });
+    f.clean();
+  }
+}, 15000);
+
+test('an invalid readiness.yaml skips the leaf and names the file path', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
+    writeFileSync(resolve(malformed, 'readiness.yaml'), 'inputs: [');
+    const result: Result = await next(f, ['malformed']);
+    expect(result.code).not.toBe(0);
+    expect(skips(result)[0].error).toContain(resolve(malformed, 'readiness.yaml'));
+    await undispatched(f, 'malformed');
+    const invalid: string = leaf(f, 'invalid', 'plan.synthesis');
+    yaml(resolve(invalid, 'readiness.yaml'), { inputs: [{ kind: 'env' }], produces: [], grants: [], retained: [], proofs: [] });
+    const second: Result = await next(f, ['invalid']);
+    expect(second.code).not.toBe(0);
+    expect(skips(second)[0].error).toContain(resolve(invalid, 'readiness.yaml'));
+    await undispatched(f, 'invalid');
   } finally {
     f.clean();
   }
