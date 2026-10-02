@@ -457,3 +457,16 @@ test('concatenated recorded command has no literal identity', async (): Promise<
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Recorded pi source: 2026-09-13T23-58-25-640Z_01a09d35-3768-73ed-8f93-ac97197d0b25.jsonl, lines 13, 15.
+test('unrecognized recorded pi exec commands have no usable identity', async (): Promise<void> => {
+  const dir: string = tmpDir();
+  try {
+    const records: string[] = ["{\"type\": \"session\"}", "{\"type\": \"message\", \"timestamp\": \"2026-09-13T23:58:36.812Z\", \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"toolCall\", \"id\": \"call_01a09d355fb07c82a4ad187ba2ca9a1a|fc_01a09d355fb07c82a4ad187ba2ca9a1a\", \"name\": \"exec\", \"arguments\": {\"code\": \"const r = await tools.bash({command:\\\"wc -l /home/ivan/.pi/agent/extensions/tamdoma-subagents/{index,tools,setup-tools,formatting,command-output,ui,paths,identity,capabilities,install,read-pdf,schemas,host-proof,lifecycle-proof}.ts; echo ---; cat /home/ivan/.pi/agent/extensions/tamdoma-subagents/package.json\\\"});\\ntext(r);\"}}]}}", "{\"type\": \"message\", \"timestamp\": \"2026-09-13T23:58:40.010Z\", \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"toolCall\", \"id\": \"call_01a09d356bc67bb29a614f47760919d6|fc_01a09d356bc67bb29a614f47760919d6\", \"name\": \"exec\", \"arguments\": {\"code\": \"const r = await tools.bash({command:\\\"cat -n /home/ivan/.pi/agent/extensions/tamdoma-subagents/index.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/setup-tools.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/paths.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/identity.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/capabilities.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/schemas.ts\\\"});\\ntext(String(r).slice(0, 30000));\"}}]}}"];
+    const r: RunResult = await runLogTail(writeLog(dir, records));
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual(["2026-09-13T23:58:36.812Z exec  #- -> running:", "2026-09-13T23:58:40.010Z exec  #- -> running:"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
