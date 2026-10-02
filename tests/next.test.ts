@@ -245,6 +245,10 @@ test('a stale prompt never re-prompts a busy or done seat, succeeds without fail
     expect(readState(path).failure?.cause).toBe('attempts');
     expect(readState(path).failure?.slot).toBe('A');
     expect(readState(path).failure?.reason.startsWith('prompt undelivered to seat A after 3 passes:')).toBe(true);
+    const history: string[] = readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n');
+    const record = JSON.parse(history[history.length - 1]);
+    expect(record).toMatchObject({ slug: 'misses', to: 'failed' });
+    expect(record.failure).toEqual(readState(path).failure);
     expect(database(f).prompts.every((p) => p.pane === a)).toBe(true);
   } finally {
     f.clean();

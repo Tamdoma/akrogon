@@ -28,6 +28,7 @@ export async function logMove(repo: Repo, before: State, after: State, slot: Slo
       head,
       diff,
       session,
+      ...(after.failure === undefined ? {} : { failure: after.failure }),
     }) + '\n',
   );
 }

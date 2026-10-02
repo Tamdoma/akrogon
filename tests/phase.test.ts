@@ -155,6 +155,43 @@ test('review fix routes to check.repair, B hands to A, rechecks only B, caps han
   }
 });
 
+test('a failed move logs the state failure object while a moved record omits failure and prints in status', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const path: string = leaf(f, 'log-failure', 'plan.synthesis');
+    const moved: Result = await cli(f, ['phase', 'log-failure', 'implement', '--slot', 'A']);
+    expect(moved.stdout).toBe('moved implement');
+    const history: string = resolve(f.root, 'issues/log.jsonl');
+    const lines: string[] = readFileSync(history, 'utf8').trim().split('\n');
+    const movedRecord = JSON.parse(lines[0]);
+    expect(movedRecord).toMatchObject({ from: 'plan.synthesis', to: 'implement' });
+    expect('failure' in movedRecord).toBe(false);
+    const status: Result = await cli(f, ['status', 'log-failure']);
+    expect(status.code).toBe(0);
+    expect(status.stdout).toContain('History:');
+    expect(status.stdout).toContain(lines[0]);
+    const failed: Result = await cli(
+      f,
+      ['phase', 'log-failure', 'failed', '--slot', 'A', '--reason', 'seats disagree'],
+      f.root,
+      herdr.env,
+    );
+    expect(failed.stdout).toBe('moved failed');
+    const failedRecord = JSON.parse(readFileSync(history, 'utf8').trim().split('\n')[1]);
+    expect(failedRecord).toMatchObject({ from: 'implement', to: 'failed' });
+    expect(failedRecord.failure).toEqual(readState(path).failure);
+    expect(failedRecord.failure).toMatchObject({
+      cause: 'blocked',
+      phase: 'implement',
+      slot: 'A',
+      reason: 'seats disagree',
+    });
+  } finally {
+    f.clean();
+  }
+});
+
 test('handoff to review refuses a dirty worktree at every move and issue files on the branch, then passes', async () => {
   const f: Fixture = await fixture();
   try {
