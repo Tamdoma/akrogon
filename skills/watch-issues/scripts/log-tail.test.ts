@@ -441,3 +441,19 @@ test('edge j: missing file and unknown format exit non-zero naming the path', as
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Recorded Codex source: rollout-2026-10-02T12-45-55-01a0fc38-7cb2-7f31-8388-738b9b09bf4b.jsonl, line 334.
+test('concatenated recorded command has no literal identity', async (): Promise<void> => {
+  const dir: string = tmpDir();
+  try {
+    const code: string = "const dir=load(\"recheckTmp\");const base=\"./.claude/skills/admin-emdash-fleet/test/\";\nconst names=[\"backup-site\",\"backup-store\",\"export-tool\",\"fleet\",\"fleet-lock\",\"register\",\"restore-drill\",\"schedule-install\"];\ntext(await tools.exec_command({cmd:\"bun test \"+names.map(n=>base+n+\".test.ts\").join(\" \")+\" > \"+dir+\"/unit.log 2>&1; result=$?; tail -n 6 \"+dir+\"/unit.log; exit \\\"$result\\\"\",max_output_tokens:800,yield_time_ms:10000}));\n";
+    const r: RunResult = await runLogTail(writeLog(dir, [
+      CODEX_META,
+      codexCall('call_XeabmjvlKAMz9PwGwEd5AqR5', '2026-10-02T11:35:12.999Z', code),
+    ]));
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual(['2026-10-02T11:35:12.999Z exec <expr> #- -> running:']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
