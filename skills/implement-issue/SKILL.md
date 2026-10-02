@@ -72,6 +72,8 @@ Read the recorded findings and reviewed commit in the existing review files, rev
 
 A repair requested from merge starts at the rebased head recorded in `review-B.md` and treats the failing output as the finding.
 
+The newest entry in `review-B.md` decides A's input. A `Handed to A` list from B's check.repair means A repairs only those items. Red merge checks mean the failing output is the finding. Otherwise A repairs every recorded Fix, which covers a leaf already in check.fix before check.repair existed.
+
 When the review files list open items under `Operator actions`, check.fix repairs the doable Fixes and supplies their proof as below, then ends with the one `failed` stop of the operator-only rule in check-issue Shared context instead of `check.review`.
 
 Do required work for Fixes only; Nits get no separate work or test and may only disappear incidentally through Fix repair. After every repair, supply passing proof for every done-criterion in the Shared context proof order, run changed tests including affected consumers and every `checks` command, reuse unchanged evidence, run `merge_checks` only at merge unless a done-criterion needs a whole run, update affected docs/index lines and append the repair's before and after commits to `report.md` under the `leaf=` folder, then finish with `akrogon phase <slug> check.review --slot A`, print the footer and stop.

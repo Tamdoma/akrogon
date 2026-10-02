@@ -55,7 +55,7 @@ Check these choices:
 - **grounding** points agents to the project's reference index, or disables that lookup.
 - **worktree_root** says where leaf checkouts go.
 - **rebuttal** controls the paired planning rebuttal.
-- **fix_rounds** limits review repair rounds.
+- **fix_rounds** limits review repair handoffs to A.
 - **slots** optionally replaces a machine seat for this repo — a full {harness, model, effort} per seat (a or b); it applies at the next agent start.
 
 Use the effective configuration to check the result:

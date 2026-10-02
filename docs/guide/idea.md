@@ -40,12 +40,13 @@ Rebuttal, if enabled     own response   own response
 Synthesis                final plan     -
 Implement                code + tests   -
 Initial check.review     own review     own review
-check.fix                repairs        -
+check.repair             -              repairs
+check.fix                handed repairs -
 Repair check.review      -              repair review
 Merge                    -              check + push
 ```
 
-For export-csv, A builds the serializer, both seats review it, and B checks repairs and merges. A and B name jobs, so both can use the same harness and model.
+For export-csv, A builds the serializer, both seats review it, and B repairs most fixes, checks A's repairs and merges. A and B name jobs, so both can use the same harness and model.
 
 ## The concrete use
 

@@ -9,12 +9,13 @@ A phase is one step in a leaf's workflow. Seats report completion through Akrogo
 | plan.synthesis | A | One execution plan. |
 | implement | A | Code and validation. |
 | check.review | A and B initially | Review verdicts. After a repair, B reviews the fix. |
-| check.fix | A | Repairs for review findings. |
+| check.repair | B | Repairs for most review findings. Hands the rest to A. |
+| check.fix | A | Repairs B handed to A, or red merge checks. |
 | merge | B | Checks, rebase and push. |
 | merged | Nobody | Completed leaf. |
 | failed | Nobody | Stopped work that needs a decision or recovery. |
 
-Review verdicts are ready, nits or fix. Ready and nits allow merge. Fix sends the leaf to repair, subject to the configured repair-round limit.
+Review verdicts are ready, nits or fix. Ready and nits allow merge. Fix sends the leaf to B's repair. Only a handoff to A counts against the configured repair-round limit.
 
 ```text
 plan.positions -> plan.rebuttal -> plan.synthesis
@@ -27,11 +28,13 @@ plan.positions -> plan.rebuttal -> plan.synthesis
                                          v
                     +------------> check.review
                     |                    |
-                check.fix <--- fix ------+
-                    ^                    |
-                    |               ready / nits
-                    |                    v
-                    +-- red checks --- merge ---> merged
+                    |             fix /     \ ready / nits
+                    |                v         |
+                    |         check.repair      |
+                    |            |      \       |
+                    |    handed to A      +---> merge ---> merged
+                    |            v                |
+                    +------- check.fix <-- red checks
 
 Any active phase ---> failed ---> any active phase
                                   (never merged)
@@ -70,7 +73,7 @@ akrogon phase export-csv plan.synthesis
 akrogon next export-csv
 ```
 
-Failed can resume at any active phase. It cannot jump directly to merged. Recovery resets the recorded pass and delivery bookkeeping. Recovery keeps the repair count (`fix_rounds`), so a leaf failed at the cap gets one more repair and a B-only re-check on each recovery. It does not repair code or resolve the blocker for you. A call carrying `--slot` cannot move a failed leaf; recovery omits `--slot`.
+Failed can resume at any active phase. It cannot jump directly to merged. Recovery resets the recorded pass and delivery bookkeeping. Recovery keeps the repair count (`fix_rounds`), so a leaf failed at the cap gets one more A repair and a B-only re-check on each recovery. It does not repair code or resolve the blocker for you. A call carrying `--slot` cannot move a failed leaf; recovery omits `--slot`.
 
 ## plan-issue: turn the contract into steps
 
@@ -98,10 +101,10 @@ Both seats review the initial change independently without reading the peer's cu
 
 A blocking fix names its realistic source, its consequence today, and the criterion, check or gap it hits. The source is a real build, a real user action or content, a real integration, or untrusted input an attacker can send, while a handcrafted reproduction alone is a nit. Failed checks and scenarios a criterion names always block. When a red test or check has no cause in the leaf's diff, the reviewing seat runs that same command once at `AKROGON_BASE` in a detached worktree and ends the pass with `failed` when base is red too.
 
-Suppose a CSV field with a newline pasted from a user spreadsheet creates an extra row. If that breaks the import criterion, the reviewer records the source, consequence, and criterion and requests a fix. A repairs it and runs the relevant checks.
+Suppose a CSV field with a newline pasted from a user spreadsheet creates an extra row. If that breaks the import criterion, the reviewer records the source, consequence, and criterion and requests a fix. B repairs most findings itself, each with a failing test first, then merges. B hands plan or design changes, missing units, required live runs and too-large work to A.
 
-B then reviews the repair diff. That pass confirms the earlier findings and can block a new defect introduced by the repair. It does not restart an unrestricted review of the whole feature.
+B re-checks only A's repair diff. That pass confirms the earlier findings and can block a new defect introduced by the repair. It does not restart an unrestricted review of the whole feature.
 
-The configured repair cap prevents an endless review cycle. If the cap is exhausted, the leaf fails with a recorded cause.
+The configured repair cap prevents an endless review cycle and counts handoffs to A. If the cap is exhausted, the leaf fails with a recorded cause.
 
 Previous: [Next](next.md) · Next: [Files](files.md) · [Home](../../README.md)

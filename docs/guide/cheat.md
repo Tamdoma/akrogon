@@ -120,7 +120,7 @@ Remember: capacity counts leaves across repositories. Failed can resume at any a
 | Decide what to build | chart-issues | Researched choices and leaf contracts. |
 | Plan the change | plan-issue | File-level steps and verification. |
 | Build or repair it | implement-issue | Code, checks and an implementation report. |
-| Check the result | check-issue | Evidence-backed verdicts. |
+| Check the result | check-issue | Evidence-backed verdicts. Repairs most findings (B). |
 | Land reviewed work | merge-issue | Checked code pushed to the default branch. |
 | Announce completion | broadcast-issue | A factual update for a completed issue or epic. |
 | Check while away | watch-issues | Optional Claude Code cron inspection. |
