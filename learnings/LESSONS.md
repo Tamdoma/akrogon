@@ -19,3 +19,4 @@ One line per lesson: mechanism, date, history file. A line leaves when applied o
 - herdr plugin commands: startup and hooks run with the plugin directory as cwd, which for akrogon is inside a registered repo, so cwd-sensitive `--all` narrowed startup `pull --all` to akrogon; check a hook command's cwd behavior before trusting it to cover every repo. 2026-09-28. history/2026-09-28-plugin-cwd-pull.md
 
 - Explanatory prose assertions couple behavior tests to wording. Prefer refusal, reason and side-effect assertions in criteria. 2026-10-01. History: [failed-stop-guard wording](history/2026-10-01-failed-stop-guard-wording.md).
+- bun 1.4.2 preload `setDefaultTimeout` reaches only the first test file, and bunfig has no timeout key. Prove a runner setting with a multi-file probe that fails without it. 2026-10-02. History: [bun preload default timeout](history/2026-10-02-bun-preload-default-timeout.md).
