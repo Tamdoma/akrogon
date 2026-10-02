@@ -1,5 +1,5 @@
 slug: concurrent-suite
-phase: implement
+phase: merged
 created: 2026-10-02
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   []
 busy_since: 
-  A: 2026-10-02T12:37:02.079Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -25,8 +25,8 @@ pane:
   A: w8:pFC
   B: w8:pFD
 prompted: 
-  A: 3c994dd2-4fd2-4966-bda0-65712ea94e00
+  {}
 prompted_at: 
-  A: 2026-10-02T12:37:02.079Z
+  {}
 delivery_error: 
   {}

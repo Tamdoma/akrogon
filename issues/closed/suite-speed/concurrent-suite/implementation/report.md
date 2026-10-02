@@ -57,3 +57,23 @@ Operator action, in the registered checkout `/home/ivan/Work/infra/akrogon/issue
 - `test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\" --timeout=30000"`
 
 After that, re-dispatch implement. A will confirm with `akrogon config`, rerun the configured `checks`, and hand off to check.review. No other code work remains.
+
+## Pass 3 (2026-10-02, operator config change landed)
+Head: 66f85ef367c336a579f88429343658645a3222d3 (no new code). The operator made the config change in registered checkout commit `77e09af`.
+
+Configured `checks`, run exactly as written:
+- `bun run format`: exit 0
+- `bun run typecheck`: exit 0
+- `bun test --timeout=30000`: exit 0, 353 pass, 0 fail, 11.72 s (12 s wall)
+- `test_changed` with `AKROGON_BASE=22c447039b192f4caae6cad4d5b56092941d1bed`: exit 0, 12 pass, 0 fail
+- `grep -c -- '--timeout=30000' issues/config.yaml`: 2
+
+The Pass 2 evidence (3 back-to-back runs and 4 at once, all green with the same flag) still applies, because the code has not changed since.
+
+## Criterion map
+- Done-1 (plain `bun test` passes with the concurrent bunfig): the configured `checks.test` above, plus Pass 2 runs (3 of 3 back-to-back, 4 of 4 at once).
+- D3 serial marks: the 2 shell tests that failed under concurrency in the brief's measurement now pass in every run.
+- Real bug fixed (the 30 s default did not reach files after the first): before, the 3-file probe gave 2 pass and 4 fail with the preload. After, 6 pass and 0 fail with `--timeout=30000`.
+
+Known limitations: a hung test takes 30 s to fail (accepted in the design). The bunfig glob only covers concurrency. The timeout lives in `issues/config.yaml`, so a direct `bun test` without the flag still uses 5000 ms.
+Unverified criteria: none.
