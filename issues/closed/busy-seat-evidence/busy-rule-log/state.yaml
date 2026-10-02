@@ -1,0 +1,34 @@
+slug: busy-rule-log
+phase: merged
+created: 2026-10-02
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - watch-scripts-check
+  - seat-log-path
+  - log-tail
+sources: 
+  - "Tamdoma/tamdoma-framework#118"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t8F
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/busy-rule-log
+pane: 
+  A: w8:pFW
+  B: w8:pFX
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

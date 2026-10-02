@@ -7,12 +7,12 @@ No leaf stops mid-run on a missing key, scope, file or approval: every external 
 - [Readiness contract](forks/readiness-contract.md): each leaf carries a contract the door writes; `akrogon next` refuses dispatch on absent or empty inputs; `status` lists all gaps.
 - [Key creation](forks/key-creation.md): operator creates outside-account keys in one batch before handoff; a leaf stores keys for things it creates itself, declared up front.
 - [Key sheet](forks/key-sheet.md): door shows one sheet of exact steps before proofs; steps stored in each leaf's contract and printed by `status` for later gaps.
+- [Env source](forks/env-source.md): akrogon links the registered checkout's `.env` into each leaf worktree; writes go to the real file.
 
 ## Open forks
-- [Env source](forks/env-source.md): symlink the registered `.env` into the worktree, or pass its path.
 - [Live change grant](forks/live-change-grant.md): approval recorded once at chart time as named targets and operations.
 - [Proof fixtures](forks/proof-fixtures.md): disposable proof resources, real locks untouched.
-- [Blocker record](forks/blocker-record.md): akrogon presence command, or reconcile the user deny rule.
+- [Blocker record](forks/blocker-record.md): akrogon command that checks, records and saves env values by name, or reconcile the user deny rules.
 
 ## Fog
 None.
