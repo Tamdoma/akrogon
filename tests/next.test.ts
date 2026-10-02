@@ -10,6 +10,8 @@ import {
   appendFileSync,
   statSync,
   chmodSync,
+  lstatSync,
+  readlinkSync,
   mkdtempSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
@@ -3726,6 +3728,150 @@ test('an invalid readiness.yaml skips the leaf and names the file path', async (
     expect(second.code).not.toBe(0);
     expect(skips(second)[0].error).toContain(resolve(invalid, 'readiness.yaml'));
     await undispatched(f, 'invalid');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a dispatched worktree links .env to the registered checkout and reads appended lines', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const target: string = resolve(f.root, '.env');
+    writeFileSync(target, 'SYNTHETIC_ONE=1\n');
+    leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const link: string = resolve(f.root, 'issues/worktrees/build/.env');
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(link)).toBe(target);
+    appendFileSync(target, 'SYNTHETIC_TWO=2\n');
+    expect(readFileSync(link, 'utf8')).toBe('SYNTHETIC_ONE=1\nSYNTHETIC_TWO=2\n');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('dispatch recreates a deleted .env link in a reused worktree', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const link: string = resolve(f.root, 'issues/worktrees/build/.env');
+    rmSync(link);
+    expect((await next(f, ['build'])).code).toBe(0);
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(link)).toBe(resolve(f.root, '.env'));
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a pre-linked worktree keeps its .env link unchanged across dispatch', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const worktree: string = resolve(f.root, 'issues/worktrees/build');
+    await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
+    const link: string = resolve(worktree, '.env');
+    symlinkSync(resolve(f.root, '.env'), link);
+    leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(link)).toBe(resolve(f.root, '.env'));
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('without a registered .env the worktree gets a dangling link and no target is created', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const link: string = resolve(f.root, 'issues/worktrees/build/.env');
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(existsSync(resolve(f.root, '.env'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+for (const kind of ['real file', 'tracked file', 'stale link', 'unignored'] as const) {
+  test(`next refuses an .env link over ${kind}`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const worktree: string = resolve(f.root, 'issues/worktrees/build');
+      await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
+      const link: string = resolve(worktree, '.env');
+      if (kind === 'real file') writeFileSync(link, 'SYNTHETIC_SECRET=1\n');
+      if (kind === 'tracked file') {
+        writeFileSync(link, 'SYNTHETIC_SECRET=1\n');
+        await command(['git', 'add', '-f', '.env'], worktree);
+        await command(['git', 'commit', '-m', 'track env'], worktree);
+      }
+      if (kind === 'stale link') symlinkSync(resolve(f.home, 'other-env'), link);
+      if (kind === 'unignored') writeFileSync(resolve(worktree, '.gitignore'), 'node_modules\n');
+      leaf(f, 'build', 'plan.synthesis');
+      const result: Result = await next(f, ['build']);
+      expect(result.code).not.toBe(0);
+      const error: string = skips(result)[0].error;
+      expect(error).toContain(`Refusing .env link at ${link}`);
+      if (kind === 'real file' || kind === 'stale link')
+        expect(error).toContain(`path exists and does not already link to ${resolve(f.root, '.env')}`);
+      if (kind === 'tracked file') expect(error).toContain('path is tracked by git');
+      if (kind === 'unignored') expect(error).toContain('path is not ignored by git');
+      if (kind === 'real file' || kind === 'tracked file')
+        expect(readFileSync(link, 'utf8')).toBe('SYNTHETIC_SECRET=1\n');
+      if (kind === 'stale link') expect(readlinkSync(link)).toBe(resolve(f.home, 'other-env'));
+      if (kind === 'unignored') expect(() => lstatSync(link)).toThrow(/ENOENT/);
+      expect(database(f).prompts).toHaveLength(0);
+      expect(database(f).starts).toHaveLength(0);
+    } finally {
+      f.clean();
+    }
+  }, 15000);
+}
+
+test('next refuses to link .env not ignored in the registered checkout, keeps the worktree, and reuses it after the ignore rule returns', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    writeFileSync(resolve(f.root, '.gitignore'), 'node_modules\n');
+    leaf(f, 'build', 'plan.synthesis');
+    const result: Result = await next(f, ['build']);
+    expect(result.code).not.toBe(0);
+    const target: string = resolve(f.root, '.env');
+    const error: string = skips(result)[0].error;
+    expect(error).toContain(`Refusing .env link at ${target}`);
+    expect(error).toContain(`path is not ignored in the registered checkout ${f.root}`);
+    expect(existsSync(target)).toBe(false);
+    const worktree: string = resolve(f.root, 'issues/worktrees/build');
+    expect(existsSync(worktree)).toBe(true);
+    expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/build'], f.root)).code).toBe(0);
+    expect(database(f).prompts).toHaveLength(0);
+    expect(database(f).starts).toHaveLength(0);
+    writeFileSync(resolve(f.root, '.gitignore'), '.env\n');
+    expect((await next(f, ['build'])).code).toBe(0);
+    expect(readState(resolve(f.root, 'issues/open/issue/build')).worktree).toBe(worktree);
+    expect(lstatSync(resolve(worktree, '.env')).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(resolve(worktree, '.env'))).toBe(target);
+    expect(database(f).prompts).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('merged leaf cleanup removes the worktree and leaves the registered .env untouched', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const target: string = resolve(f.root, '.env');
+    writeFileSync(target, 'SYNTHETIC_ONE=1\n');
+    const path: string = leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    expect(lstatSync(resolve(worktree, '.env')).isSymbolicLink()).toBe(true);
+    saveState(path, { ...readState(path), phase: 'merge' });
+    expect((await cli(f, ['phase', 'build', 'merged'], f.root, f.env)).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(worktree)).toBe(false);
+    expect(readFileSync(target, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
   } finally {
     f.clean();
   }
