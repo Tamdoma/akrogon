@@ -30,7 +30,7 @@ The plan's read-first list supplies worker context and the index is opened only 
 
 A reusable lesson found during leaf work gets an active line naming mechanism/date/history path and a history file with case, evidence and learning; `learnings/LESSONS.md` is not pass input, and applying a lesson removes its active line and dates its history file without rewriting the historical case.
 
-The A seat proceeds without posing questions or holding the pass open, deciding from the plan, the design, and the worktree alone. When a step physically requires the operator (a permission A cannot grant, an env value A cannot obtain), A writes the blocker and the exact operator action into its current pass artifact, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot A`, and ends the pass.
+The A seat proceeds without posing questions or holding the pass open, deciding from the plan, the design, and the worktree alone. When a step physically requires the operator (a permission A cannot grant, an env value A cannot obtain), A writes the blocker and the exact operator action into its current pass artifact, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot A`, and ends the pass. A review finding whose fix needs operator access follows the operator-only rule in check-issue Shared context.
 A fix that needs a locked decision changed ends the pass the same way, with `akrogon phase <slug> failed --reason` naming that decision.
 
 A done-criterion still failing during implement or check.fix after the repairs the protocol permits (a red criterion-proof or checks sub-brief, a slow-run leaf's in-branch fix) and unable to pass within the leaf's owned surfaces ends the pass the same way, with `akrogon phase <slug> failed --reason "<criterion> red: <cause>" --slot A`; it is never handed off as pre-existing, base red or modulo anything.
@@ -71,6 +71,8 @@ A red test or check with no cause in the leaf's diff takes the Shared context ba
 Read the recorded findings and reviewed commit in the existing review files, revise the plan notes and affected sub-briefs around those defects without weakening criteria or failing tests, and use worker waves before the last allowed repair round, grouping repair sub-briefs by the same rule so findings with disjoint paths and no shared resource repair in one wave, in delegated mode or repair yourself in inline mode and on the final allowed round. A criterion still red after those repair rounds takes the failed exit under Shared context.
 
 A repair requested from merge starts at the rebased head recorded in `review-B.md` and treats the failing output as the finding.
+
+When the review files list open items under `Operator actions`, check.fix repairs the doable Fixes and supplies their proof as below, then ends with the one `failed` stop of the operator-only rule in check-issue Shared context instead of `check.review`.
 
 Do required work for Fixes only; Nits get no separate work or test and may only disappear incidentally through Fix repair. After every repair, supply passing proof for every done-criterion in the Shared context proof order, run changed tests including affected consumers and every `checks` command, reuse unchanged evidence, run `merge_checks` only at merge unless a done-criterion needs a whole run, update affected docs/index lines and append the repair's before and after commits to `report.md` under the `leaf=` folder, then finish with `akrogon phase <slug> check.review --slot A`, print the footer and stop.
 
