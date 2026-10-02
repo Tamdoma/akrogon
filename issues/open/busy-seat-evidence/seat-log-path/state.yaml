@@ -1,7 +1,32 @@
 slug: seat-log-path
 phase: plan.synthesis
-created: '2026-10-02'
+created: 2026-10-02
 repo: akrogon
-debate: 'no'
-blocked-by: [watch-scripts-check]
-sources: [Tamdoma/tamdoma-framework#118]
+debate: "no"
+blocked-by: 
+  - watch-scripts-check
+sources: 
+  - "Tamdoma/tamdoma-framework#118"
+busy_since: 
+  A: 2026-10-02T14:41:43.237Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t8D
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/seat-log-path
+pane: 
+  A: w8:pFR
+  B: w8:pFS
+prompted: 
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-seat-log-path--/2026-10-02T14-41-39-954Z_01a0fd10-5072-75f3-a3a9-4cbf34b21c8b.jsonl
+prompted_at: 
+  A: 2026-10-02T14:41:43.237Z
+delivery_error: 
+  {}

@@ -1,5 +1,5 @@
 slug: watch-scripts-check
-phase: implement
+phase: merged
 created: 2026-10-02
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/tamdoma-framework#118"
 busy_since: 
-  A: 2026-10-02T14:36:04.521Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -25,8 +25,8 @@ pane:
   A: w8:pFP
   B: w8:pFQ
 prompted: 
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-watch-scripts-check--/2026-10-02T14-35-00-508Z_01a0fd0a-381c-778f-a4dc-2187d84ab8d5.jsonl
+  {}
 prompted_at: 
-  A: 2026-10-02T14:36:04.521Z
+  {}
 delivery_error: 
   {}
