@@ -665,20 +665,45 @@ test('status detail prints Missing lines between state and History without env v
   }
 });
 
-test('merged leaves produce no Missing lines in overview or detail', async () => {
+test('merged leaves show gaps in open and closed detail but not overview', async () => {
   const f: Fixture = await fixture();
   try {
     const merged: string = leaf(f, 'done-ready', 'merged');
-    yaml(resolve(merged, 'readiness.yaml'), needs('done-ready'));
+    yaml(resolve(merged, 'readiness.yaml'), {
+      inputs: [
+        {
+          kind: 'file',
+          name: 'required.pem',
+          holder: 'repo',
+          purpose: 'certificate',
+          consumers: ['done-ready'],
+          steps: 'restore required.pem',
+          source: 'operator certificate',
+          done: 'file present',
+        },
+      ],
+      produces: [],
+      grants: [],
+      retained: [],
+      proofs: [],
+    });
     const open: string = leaf(f, 'still-open', 'implement');
     yaml(resolve(open, 'readiness.yaml'), needs('still-open'));
     const overview: Result = await cli(f, ['status']);
     expect(overview.code).toBe(0);
     expect(overview.stdout).toContain('Missing: repo/still-open env FOO');
-    expect(overview.stdout).not.toContain('done-ready env');
+    expect(overview.stdout).not.toContain('Missing: repo/done-ready');
     const detail: Result = await cli(f, ['status', 'done-ready']);
     expect(detail.code).toBe(0);
-    expect(detail.stdout).not.toContain('Missing:');
+    const missing: string = 'Missing: repo/done-ready file required.pem in repo: restore required.pem';
+    expect(detail.stdout).toContain(missing);
+    expect(detail.stdout.indexOf('History:')).toBeGreaterThan(detail.stdout.indexOf(missing));
+    const closed: string = resolve(f.root, 'issues/closed/issue');
+    mkdirSync(closed, { recursive: true });
+    renameSync(merged, resolve(closed, 'done-ready'));
+    const closedDetail: Result = await cli(f, ['status', 'done-ready']);
+    expect(closedDetail.code).toBe(0);
+    expect(closedDetail.stdout).toContain(missing);
   } finally {
     f.clean();
   }
