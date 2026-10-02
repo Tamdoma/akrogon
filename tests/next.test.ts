@@ -3242,6 +3242,27 @@ test('fresh allocation carries TMPDIR on create and B split with 0700 scratch', 
   }
 }, 15000);
 
+test('new tab empties stale scratch, live tab keeps it, and seats disable the node compile cache', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'stale-tmp', 'plan.synthesis');
+    expect((await next(f, ['stale-tmp'])).code).toBe(0);
+    const create: string[] = calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!;
+    expect(create).toContain('NODE_DISABLE_COMPILE_CACHE=1');
+    const scratch: string = tmpdirOf(create);
+    writeFileSync(resolve(scratch, 'stale'), 'x\n');
+    expect((await next(f, ['stale-tmp'])).code).toBe(0);
+    expect(existsSync(resolve(scratch, 'stale'))).toBe(true);
+    saveDatabase(f, { ...database(f), tabs: [], panes: [] });
+    expect((await next(f, ['stale-tmp'])).code).toBe(0);
+    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create')).toHaveLength(2);
+    expect(statSync(scratch).mode & 0o777).toBe(0o700);
+    expect(existsSync(resolve(scratch, 'stale'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('allocation carries TMPDIR refuses symlink override with no tab or split', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -3355,7 +3376,7 @@ test('leaf temp path bounds stay short with mocked uid', async () => {
     expect(out.len).toBeLessThanOrEqual(62);
     expect(out.base.startsWith(out.prefix)).toBe(true);
     expect(out.p1).not.toBe(out.p2);
-    expect(out.p1.startsWith('/var/tmp/akrogon-1234567890/')).toBe(true);
+    expect(out.p1.startsWith('/tmp/akrogon-1234567890/')).toBe(true);
     expect(existsSync(out.p1)).toBe(false);
     expect(existsSync(out.p2)).toBe(false);
     expect(existsSync(leafTempRoot(f))).toBe(false);
@@ -3570,7 +3591,7 @@ test('fixture temp root isolates every TMPDIR and envs carry override', async ()
     const allCreates: string[][] = calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create');
     expect(allCreates).toHaveLength(3);
     for (const args of allCreates) expect(tmpdirOf(args).startsWith(root + '/')).toBe(true);
-    const prodRoot: string = '/var/tmp/akrogon-' + String(process.getuid!());
+    const prodRoot: string = '/tmp/akrogon-' + String(process.getuid!());
     expect(root).not.toBe(prodRoot);
   } finally {
     f.clean();

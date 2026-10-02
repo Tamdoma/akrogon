@@ -336,6 +336,8 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     chmodSync(path, 0o700);
   }
   ensurePrivateDir(resolve(scratch, '..'));
+  // No live tab means no seat uses the scratch, so a new tab starts from an empty one.
+  if (matches.length === 0) rmSync(scratch, { recursive: true, force: true });
   ensurePrivateDir(scratch);
   const worktree: string = z.string().parse(state.worktree);
   const workspace: Workspace | undefined = (await workspaces()).find((item) => item.label === repo.name);
@@ -349,6 +351,8 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     'GIT_EDITOR=true',
     '--env',
     `TMPDIR=${scratch}`,
+    '--env',
+    'NODE_DISABLE_COMPILE_CACHE=1',
     '--no-focus',
   ];
   const target: string[] = ['--workspace', workspace.workspace_id];
