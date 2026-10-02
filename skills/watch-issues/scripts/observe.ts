@@ -9,6 +9,7 @@ const phaseSchema = z.enum([
   'plan.synthesis',
   'implement',
   'check.review',
+  'check.repair',
   'check.fix',
   'merge',
   'merged',

@@ -1762,7 +1762,7 @@ test('a blocked non-merge seat does not stall a merge leaf', async () => {
   }
 }, 15000);
 
-test('merge, check.fix and post-repair review dispatch to their swapped seats', async () => {
+test('merge, check.fix, check.repair and post-repair review dispatch to their swapped seats', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'post-repair', 'plan.synthesis');
@@ -1794,11 +1794,18 @@ test('merge, check.fix and post-repair review dispatch to their swapped seats', 
       pane: state.pane.B!,
       text: `check-issue post-repair slot=B phase=check.review leaf=${path}`,
     });
+    saveState(path, { ...readState(path), phase: 'check.repair', prompted: {} });
+    saveDatabase(f, { ...database(f), panes: database(f).panes.map((p) => ({ ...p, agent_status: 'idle' })) });
+    expect((await next(f, ['post-repair'])).code).toBe(0);
+    expect(database(f).prompts.at(-1)).toEqual({
+      pane: state.pane.B!,
+      text: `check-issue post-repair slot=B phase=check.repair leaf=${path}`,
+    });
     expect(
       database(f)
         .prompts.slice(1)
         .map((prompt) => prompt.pane),
-    ).toEqual([state.pane.B!, state.pane.A!, state.pane.B!]);
+    ).toEqual([state.pane.B!, state.pane.A!, state.pane.B!, state.pane.B!]);
   } finally {
     f.clean();
   }
