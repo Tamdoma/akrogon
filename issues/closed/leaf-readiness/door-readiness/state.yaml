@@ -1,0 +1,32 @@
+slug: door-readiness
+phase: merged
+created: 2026-10-02
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - readiness-contract
+sources: 
+  - "Tamdoma/akrogon#52"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t8K
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/door-readiness
+pane: 
+  A: w8:pG4
+  B: w8:pG5
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

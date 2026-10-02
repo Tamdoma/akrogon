@@ -1,0 +1,12 @@
+All three steps done.
+
+**1. `akrogon status seat-demo-pi`** — exit 0. Output included the required line:
+```
+Missing: scratchrepo/seat-demo-pi env AKROGON_DEMO_THROWAWAY_PI in scratchrepo: Operator adds a throwaway value under this name in the repo .env; it is intentionally absent.
+```
+
+**2. `blocker.md`** — written to `issues/open/demo/seat-demo-pi/blocker.md` recording the input name, presence-check attempt, pi seat identity, the missing-from-`.env` error, operator ownership, and the next action. No values recorded.
+
+**3. `akrogon phase seat-demo-pi failed --slot A`** — exit 0. Output: `moved failed`.
+
+Leaf seat-demo-pi is now marked failed with the blocker reason; wait for the operator to add a throwaway value under AKROGON_DEMO_THROWAWAY_PI.
