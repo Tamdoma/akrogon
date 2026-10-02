@@ -1,0 +1,7 @@
+slug: seat-input-rules
+phase: plan.synthesis
+created: '2026-10-02'
+repo: akrogon
+debate: 'no'
+blocked-by: [readiness-contract]
+sources: [Tamdoma/akrogon#52]
