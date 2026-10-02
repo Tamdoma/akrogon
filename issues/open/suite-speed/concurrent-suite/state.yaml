@@ -1,7 +1,32 @@
 slug: concurrent-suite
-phase: plan.synthesis
-created: '2026-10-02'
+phase: implement
+created: 2026-10-02
 repo: akrogon
-debate: 'no'
-blocked-by: []
-sources: []
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  A: 2026-10-02T12:37:02.079Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t86
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/concurrent-suite
+pane: 
+  A: w8:pFC
+  B: w8:pFD
+prompted: 
+  A: 3c994dd2-4fd2-4966-bda0-65712ea94e00
+prompted_at: 
+  A: 2026-10-02T12:37:02.079Z
+delivery_error: 
+  {}

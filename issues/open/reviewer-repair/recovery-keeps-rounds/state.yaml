@@ -1,7 +1,32 @@
 slug: recovery-keeps-rounds
-phase: plan.synthesis
-created: '2026-10-02'
+phase: merged
+created: 2026-10-02
 repo: akrogon
-debate: 'no'
-blocked-by: []
-sources: []
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t88
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/recovery-keeps-rounds
+pane: 
+  A: w8:pFG
+  B: w8:pFH
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

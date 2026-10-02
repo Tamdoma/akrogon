@@ -1,7 +1,32 @@
 slug: operator-only-items
-phase: plan.synthesis
-created: '2026-10-02'
+phase: merged
+created: 2026-10-02
 repo: akrogon
-debate: 'no'
-blocked-by: []
-sources: []
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t87
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/operator-only-items
+pane: 
+  A: w8:pFE
+  B: w8:pFF
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
