@@ -3839,7 +3839,7 @@ test('next refuses to link .env not ignored in the registered checkout, keeps th
     expect(result.code).not.toBe(0);
     const target: string = resolve(f.root, '.env');
     const error: string = skips(result)[0].error;
-    expect(error).toContain(`Refusing .env link at ${target}`);
+    expect(error).toContain(resolve(f.root, 'issues/worktrees/build/.env'));
     expect(error).toContain(`path is not ignored in the registered checkout ${f.root}`);
     expect(existsSync(target)).toBe(false);
     const worktree: string = resolve(f.root, 'issues/worktrees/build');
