@@ -590,3 +590,123 @@ test('failed leaves show cause and reason in NOTE and terminal phases suppress b
     f.clean();
   }
 });
+
+function needs(slug: string, steps: string = 'ask the vault for FOO'): object {
+  return {
+    inputs: [
+      {
+        kind: 'env',
+        name: 'FOO',
+        holder: 'repo',
+        purpose: 'authenticate',
+        consumers: [slug],
+        steps,
+        source: 'vault',
+        done: 'FOO set in .env',
+      },
+    ],
+    produces: [],
+    grants: [],
+    retained: [],
+    proofs: [],
+  };
+}
+
+test('status prints Missing lines after Failed lines and before the repo section without env values', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'broken', 'failed');
+    leaf(f, 'needy', 'implement');
+    const withReadiness: string = leaf(f, 'with-readiness', 'implement');
+    yaml(resolve(withReadiness, 'readiness.yaml'), needs('with-readiness'));
+    writeFileSync(resolve(f.root, '.env'), 'OTHER=secretvalue123\n');
+    const overview: Result = await cli(f, ['status']);
+    expect(overview.code).toBe(0);
+    const missing: string = 'Missing: repo/with-readiness env FOO in repo: ask the vault for FOO';
+    expect(overview.stdout).toContain(missing);
+    const rows: string[] = overview.stdout.split('\n');
+    const failedIndex: number = rows.findIndex((line) => line.startsWith('Failed: '));
+    const missingIndex: number = rows.indexOf(missing);
+    const sectionIndex: number = rows.indexOf('repo');
+    expect(failedIndex).toBeGreaterThanOrEqual(0);
+    expect(missingIndex).toBeGreaterThan(failedIndex);
+    expect(sectionIndex).toBeGreaterThan(missingIndex);
+    expect(rows.filter((line) => line.startsWith('Missing: '))).toHaveLength(1);
+    expect(overview.stdout).not.toContain('secretvalue123');
+    expect(overview.stdout).not.toContain('repo/needy ');
+    expect(overview.stdout).not.toContain('repo/broken ');
+    writeFileSync(resolve(f.root, '.env'), 'OTHER=secretvalue123\nFOO=fill\n');
+    const filled: Result = await cli(f, ['status']);
+    expect(filled.code).toBe(0);
+    expect(filled.stdout).not.toContain('Missing:');
+    expect(filled.stdout).not.toContain('secretvalue123');
+  } finally {
+    f.clean();
+  }
+});
+
+test('status detail prints Missing lines between state and History without env values', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'needs-env', 'implement');
+    yaml(resolve(path, 'readiness.yaml'), needs('needs-env'));
+    writeFileSync(resolve(f.root, '.env'), 'OTHER=secretvalue123\n');
+    const detail: Result = await cli(f, ['status', 'needs-env']);
+    expect(detail.code).toBe(0);
+    const missing: string = 'Missing: repo/needs-env env FOO in repo: ask the vault for FOO';
+    expect(detail.stdout).toContain(missing);
+    expect(detail.stdout.indexOf(missing)).toBeGreaterThan(detail.stdout.indexOf('phase: implement'));
+    expect(detail.stdout.indexOf('History:')).toBeGreaterThan(detail.stdout.indexOf(missing));
+    expect(detail.stdout).not.toContain('secretvalue123');
+    const plain: Result = await cli(f, ['status']);
+    expect(plain.stdout).not.toContain('secretvalue123');
+  } finally {
+    f.clean();
+  }
+});
+
+test('merged leaves produce no Missing lines in overview or detail', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const merged: string = leaf(f, 'done-ready', 'merged');
+    yaml(resolve(merged, 'readiness.yaml'), needs('done-ready'));
+    const open: string = leaf(f, 'still-open', 'implement');
+    yaml(resolve(open, 'readiness.yaml'), needs('still-open'));
+    const overview: Result = await cli(f, ['status']);
+    expect(overview.code).toBe(0);
+    expect(overview.stdout).toContain('Missing: repo/still-open env FOO');
+    expect(overview.stdout).not.toContain('done-ready env');
+    const detail: Result = await cli(f, ['status', 'done-ready']);
+    expect(detail.code).toBe(0);
+    expect(detail.stdout).not.toContain('Missing:');
+  } finally {
+    f.clean();
+  }
+});
+
+test('invalid readiness.yaml reports its path in overview and detail', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'healthy', 'implement');
+    const bad: string = leaf(f, 'bad-readiness', 'implement');
+    const file: string = resolve(bad, 'readiness.yaml');
+    writeFileSync(file, 'inputs: [\n');
+    const overview: Result = await cli(f, ['status']);
+    expect(overview.code).toBe(1);
+    const diagnostic: { unreadable: string; path: string; error: string } = z
+      .object({ unreadable: z.string(), path: z.string(), error: z.string() })
+      .parse(JSON.parse(overview.stdout.split('\n')[0]));
+    expect(diagnostic.unreadable).toBe('repo');
+    expect(diagnostic.path).toBe(file);
+    expect(diagnostic.error).toContain(file);
+    const detail: Result = await cli(f, ['status', 'bad-readiness']);
+    expect(detail.code).not.toBe(0);
+    expect(detail.stderr).toContain(file);
+    writeFileSync(file, 'inputs: []\n');
+    const stillBad: Result = await cli(f, ['status']);
+    expect(stillBad.code).toBe(1);
+    expect(stillBad.stdout.split('\n')[0]).toContain(file);
+  } finally {
+    f.clean();
+  }
+});

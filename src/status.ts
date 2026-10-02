@@ -23,6 +23,7 @@ import {
 } from './state';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
 import { issueFolders } from './park';
+import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 
 const logSchema = z.object({
   ts: z.iso.datetime(),
@@ -39,9 +40,21 @@ const logSchema = z.object({
   session: z.string().nullable(),
 });
 type LogRecord = { record: z.infer<typeof logSchema>; text: string };
+type ScannedLeaf = Leaf & { missing: Gap[] };
 type Scan =
-  | { ok: true; repo: Repo; leaves: Leaf[]; parked: string[]; log: LogRecord[] }
+  | { ok: true; repo: Repo; leaves: ScannedLeaf[]; parked: string[]; log: LogRecord[] }
   | { ok: false; repo: string; path: string; error: string };
+
+class ReadinessError extends Error {}
+
+function leafGaps(global: GlobalConfig, leaf: Leaf): Gap[] {
+  try {
+    const readiness: Readiness | null = readReadiness(leaf.path);
+    return readiness === null || leaf.state.phase === 'merged' ? [] : gaps(global, readiness);
+  } catch (error) {
+    throw new ReadinessError(error instanceof Error ? error.message : String(error));
+  }
+}
 
 function readLog(root: string): LogRecord[] {
   const issues: string = resolve(root, 'issues');
@@ -50,14 +63,14 @@ function readLog(root: string): LogRecord[] {
   return content === '' ? [] : content.split('\n').map((text) => ({ record: logSchema.parse(JSON.parse(text)), text }));
 }
 
-function scanRepo(name: string, registeredPath: string): Scan {
+function scanRepo(name: string, registeredPath: string, global: GlobalConfig): Scan {
   let path: string = expandPath(registeredPath, globalHome());
   try {
     readdirSync(path);
     path = resolve(path, 'issues/config.yaml');
     const repo: Repo = readRepo(name, registeredPath);
     const slugs: Set<string> = new Set();
-    function walk(folder: string): Leaf[] {
+    function walk(folder: string): ScannedLeaf[] {
       path = folder;
       const entries: Dirent[] = readdirSync(folder, { withFileTypes: true });
       if (entries.some((entry) => entry.name === 'state.yaml')) {
@@ -67,7 +80,8 @@ function scanRepo(name: string, registeredPath: string): Scan {
         if (state.repo !== repo.name) throw new RepoMismatchError(folder, state.repo, repo.name);
         stateSchema.shape.slug.refine((slug) => !slugs.has(slug), 'Duplicate leaf slug').parse(state.slug);
         slugs.add(state.slug);
-        return [{ path: folder, state }];
+        path = resolve(folder, 'readiness.yaml');
+        return [{ path: folder, state, missing: leafGaps(global, { path: folder, state }) }];
       }
       return entries
         .filter((entry) => entry.isDirectory())
@@ -75,12 +89,13 @@ function scanRepo(name: string, registeredPath: string): Scan {
         .flatMap((entry) => walk(resolve(folder, entry.name)));
     }
     const open: string = resolve(repo.root, 'issues/open');
-    const leaves: Leaf[] = existsSync(open) ? walk(open) : [];
+    const leaves: ScannedLeaf[] = existsSync(open) ? walk(open) : [];
     path = resolve(repo.root, 'issues/log.jsonl');
     return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log: readLog(repo.root) };
   } catch (error) {
     if (
       error instanceof RepoMismatchError ||
+      error instanceof ReadinessError ||
       error instanceof z.ZodError ||
       error instanceof SyntaxError ||
       (error instanceof Error && 'code' in error && typeof error.code === 'string' && /^E[A-Z]+$/.test(error.code))
@@ -293,7 +308,10 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     const log: LogRecord[] = readLog(repo.root)
       .filter(({ record }) => record.slug === slug)
       .slice(-10);
+    const missing: Gap[] = leafGaps(global, leaf);
     console.log(Bun.YAML.stringify(leaf.state, null, 2).trimEnd());
+    for (const gap of missing)
+      console.log(`Missing: ${repo.name}/${slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`);
     console.log('History:');
     console.log(log.length === 0 ? 'unavailable' : log.map((entry) => entry.text).join('\n'));
     console.log(resolve(leaf.path, 'plan.md'));
@@ -304,7 +322,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   const scans: Scan[] = Object.entries(global.repos)
     .filter(([name]) => current === null || name === current.name)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([name, path]) => scanRepo(name, path));
+    .map(([name, path]) => scanRepo(name, path, global));
   for (const scan of scans) {
     if (!scan.ok) console.log(JSON.stringify({ unreadable: scan.repo, path: scan.path, error: scan.error }));
   }
@@ -312,6 +330,14 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     if (scan.ok) {
       for (const leaf of scan.leaves.filter((leaf) => leaf.state.phase === 'failed'))
         console.log(`Failed: ${scan.repo.name}/${leaf.state.slug}`);
+    }
+  }
+  for (const scan of scans) {
+    if (scan.ok) {
+      for (const leaf of scan.leaves) {
+        for (const gap of leaf.missing)
+          console.log(`Missing: ${scan.repo.name}/${leaf.state.slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`);
+      }
     }
   }
   for (const scan of scans) {
