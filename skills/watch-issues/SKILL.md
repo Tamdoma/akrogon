@@ -25,7 +25,7 @@ Run `bun <skill-folder>/scripts/observe.ts <root>` under a Bash timeout; it prin
 
 Line format, stable field order:
 
-`slug=<slug> phase=<phase> attempts=A<n>,B<n> blocked=<comma-list|empty> A=<pane|->/<status|->[ busy=HhMMm] B=<pane|->/<status|->[ busy=HhMMm] notified=<seats-with-busy_notified|empty>` and for `phase=failed` either ` failed=<cause>@<phase> delivery=<value|-> reason="<reason>"` or ` failed=unknown` when no failure record exists.
+`slug=<slug> phase=<phase> attempts=A<n>,B<n> blocked=<comma-list|empty> A=<pane|->/<status|->[ busy=HhMMm][ logA=<path|->] B=<pane|->/<status|->[ busy=HhMMm][ logB=<path|->] notified=<seats-with-busy_notified|empty>` and for `phase=failed` either ` failed=<cause>@<phase> delivery=<value|-> reason="<reason>"` or ` failed=unknown` when no failure record exists. ` logA=` and ` logB=` appear only when that seat's herdr status is `working`, and `-` means no usable log.
 
 When the evidence warrants a closer look, run `herdr agent read <pane> --lines 80`. Read `issues/log.jsonl` filtered to this repo and slug in order for the recovery bound. Only read-only commands run under a Bash timeout; `next`/`phase` never do, and an interrupted mutation is re-read before anything else.
 
