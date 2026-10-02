@@ -104,12 +104,7 @@ export async function commitMove(
     failure: to === 'failed' ? failure : undefined,
     busy_since: to === 'failed' || to === 'merged' ? {} : recorded.busy_since,
     busy_notified: to === 'failed' || to === 'merged' ? {} : recorded.busy_notified,
-    fix_rounds:
-      to === 'check.fix' && recorded.phase === 'check.review'
-        ? recorded.fix_rounds + 1
-        : recorded.phase === 'failed'
-          ? 0
-          : recorded.fix_rounds,
+    fix_rounds: to === 'check.fix' && recorded.phase === 'check.review' ? recorded.fix_rounds + 1 : recorded.fix_rounds,
   };
   saveState(leaf.path, after);
   console.log(`moved ${to}`);

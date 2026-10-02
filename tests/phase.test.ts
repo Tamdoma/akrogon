@@ -106,8 +106,9 @@ test('review aggregates verdicts, rechecks only B, caps repairs and permits oper
     expect(
       (await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'B', '--verdict', 'fix'], f.root, herdr.env)).stdout,
     ).toBe('moved failed');
+    expect(readState(path)).toMatchObject({ failure: { reason: 'fix rounds exhausted' }, fix_rounds: 1 });
     expect((await cli(f, ['phase', 'repair', 'implement'], f.root, herdr.env)).code).toBe(0);
-    expect(readState(path)).toMatchObject({ phase: 'implement', fix_rounds: 0 });
+    expect(readState(path)).toMatchObject({ phase: 'implement', fix_rounds: 1 });
     const mergePath: string = leaf(f, 'conflict', 'merge');
     expect((await cli(f, ['phase', 'conflict', 'check.fix'])).code).toBe(0);
     expect(readState(mergePath).fix_rounds).toBe(0);
@@ -821,7 +822,7 @@ test('phase implement fails with Missing worktree when the recorded folder is go
   }
 });
 
-test('failed exits by command reset attempts and allow check.fix', async () => {
+test('failed exits by command reset attempts and keep fix_rounds', async () => {
   const f: Fixture = await fixture();
   try {
     const path: string = leaf(f, 'stuck', 'failed', {
@@ -830,11 +831,11 @@ test('failed exits by command reset attempts and allow check.fix', async () => {
       done: ['A'],
     });
     expect((await cli(f, ['phase', 'stuck', 'plan.synthesis'])).code).toBe(0);
-    expect(readState(path)).toMatchObject({ attempts: { A: 0, B: 0 }, done: [], fix_rounds: 0 });
-    const second: string = leaf(f, 'still-stuck', 'failed');
+    expect(readState(path)).toMatchObject({ attempts: { A: 0, B: 0 }, done: [], fix_rounds: 3 });
+    const second: string = leaf(f, 'still-stuck', 'failed', { fix_rounds: 2 });
     const result: Result = await cli(f, ['phase', 'still-stuck', 'check.fix']);
     expect(result.stdout).toBe('moved check.fix');
-    expect(readState(second)).toMatchObject({ phase: 'check.fix', fix_rounds: 0 });
+    expect(readState(second)).toMatchObject({ phase: 'check.fix', fix_rounds: 2 });
   } finally {
     f.clean();
   }
