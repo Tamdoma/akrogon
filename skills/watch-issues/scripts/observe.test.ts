@@ -1,7 +1,8 @@
 import { expect, test } from 'bun:test';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { herdrListSchema } from './observe';
 
 const observe: string = join(import.meta.dir, 'observe.ts');
 
@@ -33,7 +34,15 @@ function akrogonOk(dir: string, repo: string = 'testrepo'): string {
   return stub(join(dir, 'akrogon-stub'), '#!/usr/bin/env bun\nconsole.log(' + JSON.stringify('repo: ' + repo) + ');\n');
 }
 
-function herdrOk(dir: string, agents: Array<{ pane_id: string; agent_status: string }>): string {
+type AgentStub = {
+  pane_id: string;
+  agent_status: string;
+  agent?: string;
+  cwd?: string;
+  agent_session?: { kind: 'id' | 'path'; value: string } | null;
+};
+
+function herdrOk(dir: string, agents: AgentStub[]): string {
   const payload: string = JSON.stringify({ result: { agents } });
   return stub(join(dir, 'herdr-stub'), '#!/usr/bin/env bun\nconsole.log(' + JSON.stringify(payload) + ');\n');
 }
@@ -70,6 +79,12 @@ function lines(stdout: string): string[] {
   return t === '' ? [] : t.split('\n');
 }
 
+function touch(path: string): string {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, '');
+  return path;
+}
+
 test('waiting leaf produces one documented line', async (): Promise<void> => {
   const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
   try {
@@ -98,7 +113,7 @@ test('mixed A working and B idle', async (): Promise<void> => {
     ]);
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
     expect(r.code, r.stderr).toBe(0);
-    expect(lines(r.stdout)).toEqual(['slug=mix-leaf phase=plan.positions attempts=A1,B2 blocked= A=pane-a/working B=pane-b/idle notified=']);
+    expect(lines(r.stdout)).toEqual(['slug=mix-leaf phase=plan.positions attempts=A1,B2 blocked= A=pane-a/working logA=- B=pane-b/idle notified=']);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -125,8 +140,8 @@ test('busy with and without busy_notified', async (): Promise<void> => {
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
     expect(r.code, r.stderr).toBe(0);
     expect(lines(r.stdout)).toEqual([
-      'slug=busy-notified phase=implement attempts=A0,B0 blocked= A=pane-n/working busy=0h00m B=-/- notified=A',
-      'slug=busy-plain phase=implement attempts=A0,B0 blocked= A=pane-p/working busy=0h00m B=-/- notified=',
+      'slug=busy-notified phase=implement attempts=A0,B0 blocked= A=pane-n/working busy=0h00m logA=- B=-/- notified=A',
+      'slug=busy-plain phase=implement attempts=A0,B0 blocked= A=pane-p/working busy=0h00m logA=- B=-/- notified=',
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -147,7 +162,7 @@ test('unparsable busy_since prints no suffix', async (): Promise<void> => {
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
     expect(r.code, r.stderr).toBe(0);
     expect(lines(r.stdout)).toEqual([
-      'slug=busy-garbage phase=implement attempts=A0,B0 blocked= A=pane-g/working B=-/- notified=',
+      'slug=busy-garbage phase=implement attempts=A0,B0 blocked= A=pane-g/working logA=- B=-/- notified=',
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -169,7 +184,7 @@ test('future busy_since prints busy=0h00m', async (): Promise<void> => {
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
     expect(r.code, r.stderr).toBe(0);
     expect(lines(r.stdout)).toEqual([
-      'slug=busy-future phase=implement attempts=A0,B0 blocked= A=pane-f/working busy=0h00m B=-/- notified=',
+      'slug=busy-future phase=implement attempts=A0,B0 blocked= A=pane-f/working busy=0h00m logA=- B=-/- notified=',
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -452,5 +467,170 @@ test('akrogon config with repo none exits non-zero naming the cause', async (): 
     expect(r.stderr).toContain('akrogon config');
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('recorded herdr agent list parses against the schema', (): void => {
+  // Fixture: verbatim `herdr agent list` output, herdr 0.9.3, captured 2026-10-02 via
+  // `herdr agent list > skills/watch-issues/scripts/fixtures/herdr-agent-list.json`.
+  const raw: string = readFileSync(join(import.meta.dir, 'fixtures/herdr-agent-list.json'), 'utf8');
+  expect(herdrListSchema.safeParse(JSON.parse(raw)).success).toBe(true);
+});
+
+test('working claude seat resolves its session jsonl under HOME', async (): Promise<void> => {
+  const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
+  const home: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-home-'));
+  try {
+    writeLeaf(root, 'owner', 'log-claude', baseState('log-claude', 'implement', { pane: { A: 'pane-c' } }));
+    const log: string = touch(join(home, '.claude/projects/-tmp-My-Dir/sess-1.jsonl'));
+    const akrogon: string = akrogonOk(root);
+    const herdr: string = herdrOk(root, [
+      {
+        pane_id: 'pane-c',
+        agent_status: 'working',
+        agent: 'claude',
+        cwd: '/tmp/My.Dir',
+        agent_session: { kind: 'id', value: 'sess-1' },
+      },
+    ]);
+    const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr, HOME: home });
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual([
+      `slug=log-claude phase=implement attempts=A0,B0 blocked= A=pane-c/working logA=${log} B=-/- notified=`,
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('working codex seat resolves a unique depth-3 rollout under HOME', async (): Promise<void> => {
+  const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
+  const home: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-home-'));
+  try {
+    writeLeaf(root, 'owner', 'log-codex', baseState('log-codex', 'implement', { pane: { A: 'pane-x' } }));
+    const log: string = touch(join(home, '.codex/sessions/2026/10/02/rollout-2026-10-02T14-41-39-sess-2.jsonl'));
+    const akrogon: string = akrogonOk(root);
+    const herdr: string = herdrOk(root, [
+      { pane_id: 'pane-x', agent_status: 'working', agent: 'codex', agent_session: { kind: 'id', value: 'sess-2' } },
+    ]);
+    const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr, HOME: home });
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual([
+      `slug=log-codex phase=implement attempts=A0,B0 blocked= A=pane-x/working logA=${log} B=-/- notified=`,
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('working pi seat prints its path-kind session verbatim', async (): Promise<void> => {
+  const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
+  const home: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-home-'));
+  try {
+    writeLeaf(root, 'owner', 'log-pi', baseState('log-pi', 'implement', { pane: { A: 'pane-p' } }));
+    const log: string = touch(join(home, '.pi/agent/sessions/test/sess-3.jsonl'));
+    const akrogon: string = akrogonOk(root);
+    const herdr: string = herdrOk(root, [
+      { pane_id: 'pane-p', agent_status: 'working', agent: 'pi', agent_session: { kind: 'path', value: log } },
+    ]);
+    const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr, HOME: home });
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual([
+      `slug=log-pi phase=implement attempts=A0,B0 blocked= A=pane-p/working logA=${log} B=-/- notified=`,
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('working seat without agent_session prints logA=-', async (): Promise<void> => {
+  const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
+  const home: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-home-'));
+  try {
+    writeLeaf(root, 'owner', 'log-none', baseState('log-none', 'implement', { pane: { A: 'pane-n' } }));
+    const akrogon: string = akrogonOk(root);
+    const herdr: string = herdrOk(root, [
+      { pane_id: 'pane-n', agent_status: 'working', agent: 'claude', cwd: '/tmp/work' },
+    ]);
+    const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr, HOME: home });
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual([
+      'slug=log-none phase=implement attempts=A0,B0 blocked= A=pane-n/working logA=- B=-/- notified=',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('working seat whose resolved log file is absent prints logA=-', async (): Promise<void> => {
+  const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
+  const home: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-home-'));
+  try {
+    writeLeaf(root, 'owner', 'log-missing', baseState('log-missing', 'implement', { pane: { A: 'pane-m' } }));
+    const akrogon: string = akrogonOk(root);
+    const herdr: string = herdrOk(root, [
+      {
+        pane_id: 'pane-m',
+        agent_status: 'working',
+        agent: 'claude',
+        cwd: '/tmp/work',
+        agent_session: { kind: 'id', value: 'sess-9' },
+      },
+    ]);
+    const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr, HOME: home });
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual([
+      'slug=log-missing phase=implement attempts=A0,B0 blocked= A=pane-m/working logA=- B=-/- notified=',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('ambiguous codex rollout matches exit non-zero naming pane and both paths', async (): Promise<void> => {
+  const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
+  const home: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-home-'));
+  try {
+    writeLeaf(root, 'owner', 'log-dup', baseState('log-dup', 'implement', { pane: { A: 'pane-d' } }));
+    const first: string = touch(join(home, '.codex/sessions/2026/10/02/rollout-a-sess-4.jsonl'));
+    const second: string = touch(join(home, '.codex/sessions/2026/10/03/rollout-b-sess-4.jsonl'));
+    const akrogon: string = akrogonOk(root);
+    const herdr: string = herdrOk(root, [
+      { pane_id: 'pane-d', agent_status: 'working', agent: 'codex', agent_session: { kind: 'id', value: 'sess-4' } },
+    ]);
+    const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr, HOME: home });
+    expect(r.code).not.toBe(0);
+    expect(r.stderr).toContain('pane-d');
+    expect(r.stderr).toContain(first);
+    expect(r.stderr).toContain(second);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('idle seat with agent_session prints no log field', async (): Promise<void> => {
+  const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
+  const home: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-home-'));
+  try {
+    writeLeaf(root, 'owner', 'log-idle', baseState('log-idle', 'implement', { pane: { A: 'pane-i' } }));
+    const log: string = touch(join(home, '.pi/agent/sessions/test/sess-5.jsonl'));
+    const akrogon: string = akrogonOk(root);
+    const herdr: string = herdrOk(root, [
+      { pane_id: 'pane-i', agent_status: 'idle', agent: 'pi', agent_session: { kind: 'path', value: log } },
+    ]);
+    const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr, HOME: home });
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual([
+      'slug=log-idle phase=implement attempts=A0,B0 blocked= A=pane-i/idle B=-/- notified=',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
   }
 });
