@@ -15,5 +15,8 @@ test('watch-issues scripts test and typecheck pass', async (): Promise<void> => 
   const detail: string = JSON.stringify(
     commands.map((argv: string[], i: number): object => ({ command: argv, cwd, ...results[i] })),
   );
-  expect(results.map((r: Result): number => r.code), detail).toEqual([0, 0]);
+  expect(
+    results.map((r: Result): number => r.code),
+    detail,
+  ).toEqual([0, 0]);
 });
