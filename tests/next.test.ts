@@ -3607,7 +3607,16 @@ test('fixture temp root isolates every TMPDIR and envs carry override', async ()
 function readinessInput(leafPath: string, input: object): void {
   yaml(resolve(leafPath, 'readiness.yaml'), { inputs: [input], produces: [], grants: [], retained: [], proofs: [] });
 }
-const envFoo: object = { kind: 'env', name: 'FOO', holder: 'repo', purpose: 'p', consumers: ['x'], steps: 's', source: 't', done: 'd' };
+const envFoo: object = {
+  kind: 'env',
+  name: 'FOO',
+  holder: 'repo',
+  purpose: 'p',
+  consumers: ['x'],
+  steps: 's',
+  source: 't',
+  done: 'd',
+};
 async function undispatched(f: DispatchFixture, slug: string): Promise<void> {
   expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
   expect((await run(['git', 'branch', '--list', slug], f.root)).stdout).toBe('');
@@ -3706,7 +3715,13 @@ test('an invalid readiness.yaml skips the leaf and names the file path', async (
     expect(skips(result)[0].error).toContain(resolve(malformed, 'readiness.yaml'));
     await undispatched(f, 'malformed');
     const invalid: string = leaf(f, 'invalid', 'plan.synthesis');
-    yaml(resolve(invalid, 'readiness.yaml'), { inputs: [{ kind: 'env' }], produces: [], grants: [], retained: [], proofs: [] });
+    yaml(resolve(invalid, 'readiness.yaml'), {
+      inputs: [{ kind: 'env' }],
+      produces: [],
+      grants: [],
+      retained: [],
+      proofs: [],
+    });
     const second: Result = await next(f, ['invalid']);
     expect(second.code).not.toBe(0);
     expect(skips(second)[0].error).toContain(resolve(invalid, 'readiness.yaml'));

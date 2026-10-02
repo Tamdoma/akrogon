@@ -585,7 +585,9 @@ async function dispatchLeaf(
     const missing = readiness === null ? [] : gaps(global, readiness);
     if (missing.length > 0) {
       if (explicit)
-        throw new Error(`Leaf inputs are missing: ${slug}: ${missing.map((g) => `${g.kind} ${g.name} in ${g.holder}`).join(', ')}`);
+        throw new Error(
+          `Leaf inputs are missing: ${slug}: ${missing.map((g) => `${g.kind} ${g.name} in ${g.holder}`).join(', ')}`,
+        );
       return 'waiting';
     }
     seats(global, repo);

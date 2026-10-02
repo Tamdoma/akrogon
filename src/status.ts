@@ -336,7 +336,9 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     if (scan.ok) {
       for (const leaf of scan.leaves) {
         for (const gap of leaf.missing)
-          console.log(`Missing: ${scan.repo.name}/${leaf.state.slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`);
+          console.log(
+            `Missing: ${scan.repo.name}/${leaf.state.slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`,
+          );
       }
     }
   }
