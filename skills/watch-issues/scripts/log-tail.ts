@@ -221,7 +221,7 @@ function scanExecSource(src: string): { target: string; allLiteral: boolean } {
       if (arg === null) { parts.push('session <expr>'); allLiteral = false; } else parts.push('session ' + arg);
     }
   }
-  return { target: parts.join(' ; '), allLiteral };
+  return { target: parts.join(' ; '), allLiteral: parts.length > 0 && allLiteral };
 }
 
 function genericTarget(obj: Record<string, unknown> | undefined): string {
