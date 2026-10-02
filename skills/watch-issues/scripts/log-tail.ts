@@ -188,7 +188,11 @@ function readArg(src: string, openBrace: number, key: string): string | null {
       if (word === key && src[after] === ':') {
         const v: number = skipWs(src, after + 1);
         const vc: string | undefined = src[v];
-        if (vc === "'" || vc === '"' || vc === BT) return readString(src, v).value;
+        if (vc === "'" || vc === '"' || vc === BT) {
+          const literal: { value: string | null; next: number } = readString(src, v);
+          const end: string = src[skipWs(src, literal.next)];
+          return end === ',' || end === '}' ? literal.value : null;
+        }
         const num: RegExpMatchArray | null = /^-?\d+(\.\d+)?/.exec(src.slice(v));
         if (num !== null) return num[0];
         return null;
