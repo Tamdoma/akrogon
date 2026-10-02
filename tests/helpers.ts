@@ -19,6 +19,7 @@ export async function fixture(): Promise<Fixture> {
   await command(['git', 'config', 'user.email', 'test@example.invalid'], root);
   await command(['git', 'config', 'user.name', 'Test'], root);
   writeFileSync(resolve(root, 'file'), 'initial\n');
+  writeFileSync(resolve(root, '.gitignore'), '.env\n');
   await command(['git', 'add', '.'], root);
   await command(['git', 'commit', '-m', 'initial'], root);
   await command(['git', 'init', '--bare', '-b', 'main', resolve(home, 'remote.git')]);

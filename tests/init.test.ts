@@ -10,7 +10,7 @@ test('init writes proposal, registration and toolkit and preserves repeated user
     const proposal: string = resolve(f.home, 'proposal.yaml');
     yaml(proposal, { checks: { test: 'bun test' }, implement: 'inline', grounding: 'none' });
     expect((await cli(f, ['init', '--from', proposal, '--toolkit', 'typescript=bun:test'])).code).toBe(0);
-    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe('issues/worktrees/\nissues/seeds/\n.lock\n');
+    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe('.env\nissues/worktrees/\nissues/seeds/\n.lock\n');
     expect(Bun.YAML.parse(readFileSync(resolve(f.root, 'issues/config.yaml'), 'utf8'))).toMatchObject({
       implement: 'inline',
       remote: 'origin',
@@ -84,7 +84,7 @@ test.each(rootCases)('init resolves %s worktree root from nested cwd', async (_,
     const proposal: string = resolve(f.home, 'proposal.yaml');
     yaml(proposal, { worktree_root: worktreeRoot(f), grounding: 'none' });
     expect((await cli(f, ['init', '--from', proposal], resolve(f.root, 'issues/open'))).code).toBe(0);
-    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe(`${expected}issues/seeds/\n.lock\n`);
+    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe(`.env\n${expected}issues/seeds/\n.lock\n`);
   } finally {
     f.clean();
   }
