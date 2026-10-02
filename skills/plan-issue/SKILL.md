@@ -26,9 +26,13 @@ Read the configured `grounding.index` top file, relevant linked areas and `learn
 
 A missing resource is reported as a gap, not invented content; lessons describe what happened, not rules to obey, and history is opened only to verify a cited lesson's evidence.
 
-This seat puts no questions to anyone and pauses for no reply: it plans from the brief, the design, and live surfaces only. When a step physically requires the operator (a permission this seat cannot grant, an env value it cannot obtain), the seat writes the blocker and the exact operator action into its current pass artifact, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot <its seat from the dispatch prompt>`, and ends the pass.
+This seat puts no questions to anyone and pauses for no reply: it plans from the brief, the design, and live surfaces only. When a step physically requires the operator (a permission this seat cannot grant, an env value it cannot obtain), the seat writes the blocker and the exact operator action into its current pass artifact recording the name or ID, attempted operation, identity reference, error, owner and next action, never a value, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot <its seat from the dispatch prompt>`, and ends the pass.
 
-This seat never opens, prints, appends to, or writes `.env` or `.env.*` with any tool, instead running any script that needs values as `bun --env-file=<file> <script>` to print only results, never values, and checking presence by name with such a script printing `present`/`absent` per name, ending the pass with the stop above when a required value is absent.
+This seat never opens, prints, appends to, or writes `.env` or `.env.*` with any tool: declared checks and live operations consume values only inside a run process such as `bun --env-file=<file> <script>` printing only results, never values, and presence is checked with the `Missing:` lines of `akrogon status <slug>`, where absent or empty counts as missing, ending the pass with the stop above when a required value is absent.
+
+A producer's key is saved only through the operation recorded in `produces[].save` (entry point, inspected revision, non-secret `args`, key `name`, the `holder` repo's real file and the private `value_source`): the value passes privately to it, writes the holder repo's real `.env` file and never the worktree link, never returns through seat arguments, output or artifacts, and the new key is revoked when saving fails.
+
+A seat reuses `grants[]` for probes, implementation, repairs, reruns, merge checks and cleanup without asking again: before mutating, it compares operation, target and identity with the grant, records the grant reference, results and created IDs in its pass artifact, never widens it, and treats anything outside it as an operator blocker under the stop rule.
 
 When the brief and the locked design disagree, the design wins: the conflict is written into the plan as a note for review, and planning continues.
 
@@ -60,7 +64,7 @@ A plan proves the brief's done-criteria with the leaf's own tests and `checks` c
 
 The synthesis resolves implementation choices without reopening locked scope; it contains acceptance criteria before implementation derives tests, preserves a real open limitation, and names a dependency only when execution actually requires ordering.
 
-Every credential the design names by variable name is checked by name with `bun --env-file=.env -e 'console.log(["VAR_A","VAR_B"].map(k => k + ": " + (process.env[k] === undefined ? "absent" : "present")).join("\n"))'` with the design names in the list, printing `present`/`absent` per name; each one absent there and unobtainable by this seat is a human-only blocker recorded in `plan.md` with the `add <VAR> to .env` action, what the value is, and where the operator obtains it, then the seat runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see plan.md>" --slot A` and ends the pass instead of finishing with `implement`.
+Every credential the design names by variable name is checked by name against the `Missing:` lines of `akrogon status <slug>`; each name in those `Missing:` lines and unobtainable by this seat is a human-only blocker recorded in `plan.md` with the `add <VAR>` action, what the value is, where the operator obtains it, the attempted operation, identity reference, error, owner and next action, never a value, then the seat runs `akrogon phase <slug> failed --reason "<missing <VAR> blocks <criterion>; see plan.md>" --slot A` and ends the pass instead of finishing with `implement`.
 
 Finish with `akrogon phase <slug> implement --slot A`, then print the footer and stop.
 
