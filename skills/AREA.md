@@ -12,7 +12,7 @@
 - `skills/implement-issue/SKILL.md` runs implementation and repair passes.
 - `skills/implement-issue/worker-protocol.md` defines worker scope and returns.
 - `skills/check-issue/SKILL.md` defines review evidence and Fix/Nit verdicts.
-- `skills/watch-issues/SKILL.md` runs the operator-started cron watch; `scripts/observe.ts` is its read-only inventory.
+- `skills/watch-issues/SKILL.md` runs the operator-started cron watch; `scripts/observe.ts` is its read-only inventory and `scripts/log-tail.ts` summarizes a seat's session log.
 
 ## Non-obvious patterns
 
