@@ -15,6 +15,7 @@
 - `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file.
 - `src/phase.ts` aggregates slot completion and enforces handoff guards.
 - `src/shell.ts` wraps subprocesses, retries, YAML writes and Herdr responses.
+- `src/readiness.ts` owns the readiness contract schema and gap computation.
 
 ## Non-obvious patterns
 
