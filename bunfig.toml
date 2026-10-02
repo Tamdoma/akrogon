@@ -1,2 +1,4 @@
 [test]
 root = "tests"
+concurrentTestGlob = "**/*.test.ts"
+preload = ["./tests/setup.ts"]

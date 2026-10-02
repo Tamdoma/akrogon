@@ -7,7 +7,7 @@ import { fixture, type Fixture } from './helpers';
 import { CommandError, herdrError, paneSchema, retryable, retryCommand, run, type Result } from '../src/shell';
 
 for (const firstFailure of [false, true]) {
-  test(`deadline kills sleeping attempt after ${firstFailure ? 'one failure' : 'no failures'}`, async () => {
+  test.serial(`deadline kills sleeping attempt after ${firstFailure ? 'one failure' : 'no failures'}`, async () => {
     const cwd: string = mkdtempSync(resolve(tmpdir(), 'deadline-'));
     const argv: string[] = [
       'sh',
@@ -39,7 +39,7 @@ for (const firstFailure of [false, true]) {
   });
 }
 
-test('ordinary retry preserves warning and second result with optional deadlines', async () => {
+test.serial('ordinary retry preserves warning and second result with optional deadlines', async () => {
   const cwd: string = mkdtempSync(resolve(tmpdir(), 'retry-'));
   const warning = spyOn(console, 'warn').mockImplementation(() => {});
   try {
