@@ -34,7 +34,7 @@ At open, name each skipped GitHub identity that is still open on GitHub and offe
 
 ## Drain
 
-Show a proportional territory map before grilling, including material forks, practitioner questions and pitfalls grounded in inspected surfaces; when peers are named, A and each named peer map independently before A merges with attribution, using the blind file exchange in questions.
+Show a proportional territory map before grilling, including material forks, practitioner questions and pitfalls grounded in inspected surfaces; when peers are named, A and each named peer map independently before A merges with attribution, using the blind file exchange in questions; waits on a peer follow the peer-wait script rule in questions.
 
 A round takes one fork, the next answerable fork first, preferring the one whose answer reshapes the most remaining forks; a destination with one fork costs one round.
 
@@ -46,7 +46,7 @@ Write one chart folder per destination. When every chart still holds an open for
 
 Research precedes every question and is redone when an answer reshapes one. Before a round, gather for each question the strongest source available in the tier order in questions: operator-placed material, a named practitioner, primary documentation or code, and the model's own knowledge only together with the searches that found nothing stronger. A question about this repository's own mechanism cites the inspected file and line and the documentation of the tool it calls; a question about anything outside it names an outside source or the recorded failure to find one. Research decides which questions are asked, which pitfalls they name and which option is recommended, never the answer, and a recommendation that contradicts a practitioner source shows the contradiction in the question.
 
-With named peers, A owns interviewing and recording, sends only intake, current Question and carries, related fork paths, locks and verbatim operator corrections while developing its own view, then merges the completed independent rounds with agreeing-slot tags such as `(A)`, `(B,C)`, `(A,B,C)` and obtains one disagreement-only rebuttal from each peer before presenting the complete operator round with challenge check; each peer answers direct operator requests in its own pane and checks the final shape once before recording a late mechanism or contract change, with restatements exempt.
+With named peers, A owns interviewing and recording, sends only intake, current Question and carries, related fork paths, locks and verbatim operator corrections while developing its own view, then merges the completed independent rounds with agreeing-slot tags such as `(A)`, `(B,C)`, `(A,B,C)` and obtains one disagreement-only rebuttal from each peer before presenting the complete operator round with challenge check; each peer answers direct operator requests in its own pane and checks the final shape once before recording a late mechanism or contract change, with restatements exempt; waits on a peer follow the peer-wait script rule in questions.
 
 Record operator answers and their reasons in fork files. After each answer, re-read Fog and move newly sharp material questions into their own fork files, removing only that material from Fog. Reshape the remaining forks and update CHART.md's ordered Open forks list before selecting and researching the next fork; handoff becomes ready only when no material question or fog requires the implementer to guess, with small optional prototypes explicitly chosen as measurements whose scratch code is discarded.
 
@@ -88,3 +88,5 @@ End each door pass with the actual result and reason no automatic pass follows, 
 Last operation: <what this pass wrote or observed>
 Next: none <awaiting operator answer, chart selection, dispatch, or named blocker>
 ```
+
+The footer is printed only when the turn ends, and never while a prompted peer's turn is open.
