@@ -9,6 +9,10 @@ const scriptEntrySchema = z.object({
   stderr: z.string().optional(),
   append: z.string().optional(),
 });
+const waitEntrySchema = scriptEntrySchema.extend({
+  status: paneSchema.shape.agent_status.optional(),
+  sleepMs: z.number().optional(),
+});
 const databaseSchema = z.object({
   panes: z.array(paneSchema),
   tabs: z.array(tabSchema),
@@ -29,6 +33,7 @@ const databaseSchema = z.object({
   startScript: z.array(scriptEntrySchema).default([]),
   promptScript: z.array(scriptEntrySchema).default([]),
   renameScript: z.array(scriptEntrySchema).default([]),
+  waitScript: z.array(waitEntrySchema).default([]),
 });
 export type Database = z.infer<typeof databaseSchema>;
 const path: string = z.string().parse(process.env.FAKE_HERDR);
@@ -162,6 +167,22 @@ if (args[0] === 'agent' && args[1] === 'prompt') {
   db.prompts.push({ pane: target.pane_id, text: args[3] });
   if (db.failPrompts) failure('agent_prompt_stalled');
   target.agent_status = 'working';
+  result({ agent: target });
+}
+if (args[0] === 'agent' && args[1] === 'wait') {
+  const target: Pane = pane(args[2]);
+  if (Number.isNaN(Number(flag('--timeout')))) failure('invalid_timeout');
+  const entry: z.infer<typeof waitEntrySchema> | undefined = db.waitScript.shift();
+  const sleepMs: number = entry?.sleepMs ?? (entry === undefined && target.agent_status === 'working' ? 50 : 0);
+  if (sleepMs > 0) Bun.sleepSync(sleepMs);
+  if (entry?.append !== undefined) appendFileSync(entry.append, `${target.pane_id}\n`);
+  scriptedFailure(entry);
+  if (entry?.status !== undefined) result({ agent: { ...target, agent_status: entry.status } });
+  if (target.agent_status === 'working') {
+    save();
+    console.error('{"error":{"code":"timeout","message":"timed out waiting for agent status"},"id":"cli:agent:wait"}');
+    process.exit(1);
+  }
   result({ agent: target });
 }
 if (args[0] === 'tab' && args[1] === 'close') {
