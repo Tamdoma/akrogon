@@ -297,6 +297,7 @@ export async function requireTestChangeCitations(repo: Repo, worktree: string): 
   const cited: Set<string> = new Set(
     log
       .split('\n')
+      .map((value) => value.trim())
       .filter((value) => /^\S+\s+\S/.test(value))
       .map((value) => value.split(/\s/, 1)[0]),
   );
