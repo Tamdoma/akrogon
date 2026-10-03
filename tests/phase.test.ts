@@ -1375,7 +1375,15 @@ for (const { slug, phase, args, failNotification, code, calls, delivery } of [
     ],
     delivery: 'error',
   },
-] as { slug: string; phase: string; args: string[]; failNotification?: boolean; code: number; calls: string[][]; delivery?: string }[]) {
+] as {
+  slug: string;
+  phase: string;
+  args: string[];
+  failNotification?: boolean;
+  code: number;
+  calls: string[][];
+  delivery?: string;
+}[]) {
   test(`rename on a missing tab warns once and continues (${slug} ${failNotification === true ? 'notification error' : 'clean'})`, async () => {
     const f: Fixture = await fixture();
     try {
@@ -1388,11 +1396,17 @@ for (const { slug, phase, args, failNotification, code, calls, delivery } of [
       const result: Result = await cli(f, [...args], f.root, herdr.env);
       expect(result.code).toBe(code);
       if (failNotification === true) expect(result.stderr).toContain('fixture_notification_failed');
-      const warnings: { warning: string; slug: string; command: string[]; code: string; message: string; stderr: string }[] =
-        result.stderr
-          .split('\n')
-          .filter((line) => line.startsWith('{'))
-          .map((line) => JSON.parse(line));
+      const warnings: {
+        warning: string;
+        slug: string;
+        command: string[];
+        code: string;
+        message: string;
+        stderr: string;
+      }[] = result.stderr
+        .split('\n')
+        .filter((line) => line.startsWith('{'))
+        .map((line) => JSON.parse(line));
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toMatchObject({
         slug,

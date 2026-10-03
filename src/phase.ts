@@ -129,8 +129,7 @@ export async function commitMove(
   let announced: State = after;
   try {
     if (to === 'failed') announced = await announceFailed(repo, leaf, after);
-    else if (recorded.phase === 'failed' && after.tab !== undefined)
-      await renameTab(after.tab, after.slug, after.slug);
+    else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(after.tab, after.slug, after.slug);
     if (to === 'merged') await completeOwner(repo, leaf, true);
   } finally {
     try {
