@@ -50,7 +50,7 @@ function setup(agentStatus: string, waitScript: (file: string) => WaitEntry[] = 
         new Response(child.stderr).text(),
         child.exited,
       ]);
-      return { code, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
+      return { code, stdout, stderr };
     },
     clean: (): void => rmSync(dir, { recursive: true, force: true }),
   };
