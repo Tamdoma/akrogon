@@ -1,5 +1,5 @@
 slug: test-change-check
-phase: check.review
+phase: merged
 created: 2026-10-03
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   []
 busy_since: 
-  A: 2026-10-03T10:20:32.183Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -25,8 +25,8 @@ pane:
   A: w8:pGM
   B: w8:pGN
 prompted: 
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-test-change-check--/2026-10-03T09-57-34-291Z_01a10132-93d3-716c-bf4d-134f5681c0b9.jsonl
+  {}
 prompted_at: 
-  A: 2026-10-03T10:20:32.183Z
+  {}
 delivery_error: 
   {}
