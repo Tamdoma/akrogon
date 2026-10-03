@@ -28,6 +28,7 @@ const databaseSchema = z.object({
   starts: z.array(z.array(z.string())).default([]),
   startScript: z.array(scriptEntrySchema).default([]),
   promptScript: z.array(scriptEntrySchema).default([]),
+  renameScript: z.array(scriptEntrySchema).default([]),
 });
 export type Database = z.infer<typeof databaseSchema>;
 const path: string = z.string().parse(process.env.FAKE_HERDR);
@@ -171,6 +172,7 @@ if (args[0] === 'tab' && args[1] === 'close') {
 if (args[0] === 'tab' && args[1] === 'rename') {
   const found: Tab | undefined = db.tabs.find((t) => t.tab_id === args[2]);
   if (found === undefined) failure('tab_not_found');
+  scriptedFailure(db.renameScript.shift());
   if (db.failRename) failure('timeout');
   found.label = args[3];
   result({ tab: found });

@@ -1344,6 +1344,98 @@ test('failed announce renames tabs, tolerates missing tabs, and retries herdr ca
   }
 });
 
+for (const { slug, phase, args, failNotification, code, calls, delivery } of [
+  {
+    slug: 'stale-resume',
+    phase: 'failed',
+    args: ['phase', 'stale-resume', 'implement'],
+    code: 0,
+    calls: [['tab', 'rename', 'tab-1', 'stale-resume']],
+  },
+  {
+    slug: 'stale-fail',
+    phase: 'implement',
+    args: ['phase', 'stale-fail', 'failed', '--slot', 'A', '--reason', 'x'],
+    code: 0,
+    calls: [
+      ['notification', 'show', 'repo/stale-fail failed', '--body', 'blocked: x', '--sound', 'request'],
+      ['tab', 'rename', 'tab-1', 'stale-fail failed'],
+    ],
+    delivery: 'shown',
+  },
+  {
+    slug: 'stale-fail',
+    phase: 'implement',
+    args: ['phase', 'stale-fail', 'failed', '--slot', 'A', '--reason', 'x'],
+    failNotification: true,
+    code: 1,
+    calls: [
+      ['notification', 'show', 'repo/stale-fail failed', '--body', 'blocked: x', '--sound', 'request'],
+      ['tab', 'rename', 'tab-1', 'stale-fail failed'],
+    ],
+    delivery: 'error',
+  },
+] as { slug: string; phase: string; args: string[]; failNotification?: boolean; code: number; calls: string[][]; delivery?: string }[]) {
+  test(`rename on a missing tab warns once and continues (${slug} ${failNotification === true ? 'notification error' : 'clean'})`, async () => {
+    const f: Fixture = await fixture();
+    try {
+      const herdr: HerdrFixture = fakeHerdr(f);
+      writeFileSync(
+        herdr.db,
+        JSON.stringify({ panes: [], tabs: [], serial: 0, failNotification: failNotification === true }),
+      );
+      const path: string = leaf(f, slug, phase, { tab: 'tab-1' });
+      const result: Result = await cli(f, [...args], f.root, herdr.env);
+      expect(result.code).toBe(code);
+      if (failNotification === true) expect(result.stderr).toContain('fixture_notification_failed');
+      const warnings: { warning: string; slug: string; command: string[]; code: string; message: string; stderr: string }[] =
+        result.stderr
+          .split('\n')
+          .filter((line) => line.startsWith('{'))
+          .map((line) => JSON.parse(line));
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toMatchObject({
+        slug,
+        command: ['herdr', ...calls[calls.length - 1]],
+        code: 'tab_not_found',
+        message: 'fixture failure',
+      });
+      expect(warnings[0].stderr).toContain('tab_not_found');
+      expect(herdrCalls(herdr.db)).toEqual(calls);
+      const state: { phase: string; tab?: string; failure?: { delivery?: string } } = readState(path);
+      expect(state.phase).toBe(args[2]);
+      expect(state.tab).toBe('tab-1');
+      if (delivery !== undefined) expect(state.failure?.delivery).toBe(delivery);
+      expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+test('rename failure other than tab_not_found keeps existing handling', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const herdr: HerdrFixture = fakeHerdr(f);
+    writeFileSync(
+      herdr.db,
+      JSON.stringify({
+        panes: [],
+        tabs: [{ tab_id: 'tab-1', label: 'back failed' }],
+        serial: 0,
+        renameScript: [{ code: 'fixture_rename_denied', message: 'denied' }],
+      }),
+    );
+    leaf(f, 'denied', 'failed', { tab: 'tab-1' });
+    const result: Result = await cli(f, ['phase', 'denied', 'implement'], f.root, herdr.env);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('fixture_rename_denied');
+    expect(herdrCalls(herdr.db)).toEqual([['tab', 'rename', 'tab-1', 'denied']]);
+  } finally {
+    f.clean();
+  }
+});
+
 test('phase move clears delivery_error', async () => {
   const f: Fixture = await fixture();
   try {

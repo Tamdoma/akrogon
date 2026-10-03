@@ -23,7 +23,7 @@ import {
   type Slot,
   type Verdict,
 } from './routing';
-import { command, herdr, retryable, CommandError } from './shell';
+import { command, herdr, herdrError, retryable, CommandError } from './shell';
 import { logMove } from './log';
 import { closeSources } from './pull';
 
@@ -42,6 +42,27 @@ async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string):
       }),
     );
     return await herdr(args, schema);
+  }
+}
+
+async function renameTab(tab: string, label: string, slug: string): Promise<void> {
+  const args: string[] = ['tab', 'rename', tab, label];
+  try {
+    await herdrCall(args, z.object({ tab: z.object({ label: z.string() }) }), slug);
+  } catch (error) {
+    if (!(error instanceof CommandError)) throw error;
+    const parsed: { code: string; message: string } = herdrError(error.result);
+    if (parsed.code !== 'tab_not_found') throw error;
+    console.warn(
+      JSON.stringify({
+        warning: 'tab missing, skipping rename',
+        slug,
+        command: ['herdr', ...args],
+        code: parsed.code,
+        message: parsed.message,
+        stderr: error.result.stderr,
+      }),
+    );
   }
 }
 
@@ -71,11 +92,7 @@ async function announceFailed(repo: Repo, leaf: Leaf, state: State): Promise<Sta
   saveState(leaf.path, announced);
   if (state.tab !== undefined) {
     try {
-      await herdrCall(
-        ['tab', 'rename', state.tab, `${state.slug} failed`],
-        z.object({ tab: z.object({ label: z.string() }) }),
-        state.slug,
-      );
+      await renameTab(state.tab, `${state.slug} failed`, state.slug);
     } catch (error) {
       lastError = error;
     }
@@ -113,11 +130,7 @@ export async function commitMove(
   try {
     if (to === 'failed') announced = await announceFailed(repo, leaf, after);
     else if (recorded.phase === 'failed' && after.tab !== undefined)
-      await herdrCall(
-        ['tab', 'rename', after.tab, after.slug],
-        z.object({ tab: z.object({ label: z.string() }) }),
-        after.slug,
-      );
+      await renameTab(after.tab, after.slug, after.slug);
     if (to === 'merged') await completeOwner(repo, leaf, true);
   } finally {
     try {
