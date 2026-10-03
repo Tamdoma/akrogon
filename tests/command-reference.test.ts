@@ -12,7 +12,7 @@ const contracts: Record<string, string> = {
   init: '[--from <proposal.yaml>] [--toolkit <lang>=<runner>]',
   config: '',
   preflight: '',
-  phase: '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>]',
+  phase: '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check]',
   next: '[<slug>|<path>|--all|--resume]',
   pull: '[--all]',
   close: '<owner/repo#n> --by <text>',

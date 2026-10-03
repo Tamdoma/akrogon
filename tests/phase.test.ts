@@ -1,6 +1,15 @@
 import { test, expect } from 'bun:test';
 import { resolve } from 'node:path';
-import { readFileSync, existsSync, mkdirSync, rmSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import {
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+  readdirSync,
+  statSync,
+} from 'node:fs';
 import {
   fixture,
   cli,
@@ -1575,6 +1584,204 @@ test('in-flight seat move after stop stays failed', async () => {
     expect(bytes(path)).toBe(before);
     expect(readState(path)).toMatchObject({ phase: 'failed', fix_rounds: 1 });
     expect(herdrCalls(herdr.db)).toHaveLength(calls);
+  } finally {
+    f.clean();
+  }
+});
+
+async function oldFileBranch(f: Fixture, name: string): Promise<string> {
+  if (!existsSync(resolve(f.root, 'x.test.ts'))) {
+    writeFileSync(resolve(f.root, 'x.test.ts'), 'old test\n');
+    mkdirSync(resolve(f.root, 'src'), { recursive: true });
+    writeFileSync(resolve(f.root, 'src/x.spec.ts'), 'old spec\n');
+    await command(['git', 'add', 'x.test.ts', 'src/x.spec.ts'], f.root);
+    await command(['git', 'commit', '-m', 'old test files'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+  }
+  const worktree: string = resolve(f.home, `wt-${name}`);
+  await command(['git', 'worktree', 'add', '-b', name, worktree], f.root);
+  return worktree;
+}
+
+async function commitAll(worktree: string, messages: string[]): Promise<void> {
+  await command(['git', 'add', '-A'], worktree);
+  await command(['git', 'commit', ...messages.flatMap((m) => ['-m', m])], worktree);
+}
+
+test('modified old test files need a Test-Change trailer on every guarded move', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = await oldFileBranch(f, 'cite');
+    const path: string = leaf(f, 'cite', 'implement', { worktree });
+    const before: string = bytes(path);
+    writeFileSync(resolve(worktree, 'x.test.ts'), 'edited\n');
+    await commitAll(worktree, ['edit test', 'Test-Change: x.test.ts']);
+    const bare: Result = await cli(f, ['phase', 'cite', 'check.review', '--slot', 'A']);
+    expect(bare.code).not.toBe(0);
+    expect(bare.stderr).toContain('x.test.ts');
+    expect(bare.stderr).toContain('Test-Change: x.test.ts <source and reason>');
+    expect(bare.stderr).toContain('final trailer block');
+    expect(bare.stderr).toContain('empty commit');
+    expect(bytes(path)).toBe(before);
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: x.test.ts src change edited the test'],
+      worktree,
+    );
+    const moved: Result = await cli(f, ['phase', 'cite', 'check.review', '--slot', 'A']);
+    expect(moved.code).toBe(0);
+    expect(moved.stdout).toBe('moved check.review');
+    expect(readState(path).phase).toBe('check.review');
+  } finally {
+    f.clean();
+  }
+});
+
+test('deleted and typechanged old test files need one trailer each naming the file', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = await oldFileBranch(f, 'cite-both');
+    const path: string = leaf(f, 'cite-both', 'implement', { worktree });
+    const before: string = bytes(path);
+    await command(['git', 'rm', 'src/x.spec.ts'], worktree);
+    await command(['git', 'rm', 'x.test.ts'], worktree);
+    symlinkSync('file', resolve(worktree, 'x.test.ts'));
+    await commitAll(worktree, ['delete spec, link test']);
+    const refused: Result = await cli(f, ['phase', 'cite-both', 'check.review', '--slot', 'A']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('src/x.spec.ts');
+    expect(refused.stderr).toContain('Test-Change: src/x.spec.ts <source and reason>');
+    expect(refused.stderr).toContain('x.test.ts');
+    expect(refused.stderr).toContain('Test-Change: x.test.ts <source and reason>');
+    expect(bytes(path)).toBe(before);
+    await command(
+      [
+        'git',
+        'commit',
+        '--allow-empty',
+        '-m',
+        'cite\n\nTest-Change: src/x.spec.ts removed\nTest-Change: x.test.ts retyped',
+      ],
+      worktree,
+    );
+    const moved: Result = await cli(f, ['phase', 'cite-both', 'check.review', '--slot', 'A']);
+    expect(moved.stdout).toBe('moved check.review');
+    expect(readState(path).phase).toBe('check.review');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a trailer naming a different path does not cite and the old path of a rename is the citation', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const wrong: string = await oldFileBranch(f, 'cite-wrong');
+    const wrongPath: string = leaf(f, 'cite-wrong', 'implement', { worktree: wrong });
+    writeFileSync(resolve(wrong, 'x.test.ts'), 'edited\n');
+    await commitAll(wrong, ['edit test', 'Test-Change: src/x.spec.ts cited the untouched spec']);
+    const refused: Result = await cli(f, ['phase', 'cite-wrong', 'check.review', '--slot', 'A']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('x.test.ts');
+    expect(readState(wrongPath).phase).toBe('implement');
+    const renamed: string = await oldFileBranch(f, 'cite-rename');
+    const renamedPath: string = leaf(f, 'cite-rename', 'implement', { worktree: renamed });
+    await command(['git', 'mv', 'x.test.ts', 'y.test.ts'], renamed);
+    await commitAll(renamed, ['rename test', 'Test-Change: y.test.ts cited the new name']);
+    const oldRefused: Result = await cli(f, ['phase', 'cite-rename', 'check.review', '--slot', 'A']);
+    expect(oldRefused.code).not.toBe(0);
+    expect(oldRefused.stderr).toContain('Test-Change: x.test.ts <source and reason>');
+    expect(readState(renamedPath).phase).toBe('implement');
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: x.test.ts renamed to y.test.ts'],
+      renamed,
+    );
+    const moved: Result = await cli(f, ['phase', 'cite-rename', 'check.review', '--slot', 'A']);
+    expect(moved.stdout).toBe('moved check.review');
+    expect(readState(renamedPath).phase).toBe('check.review');
+  } finally {
+    f.clean();
+  }
+});
+
+test('added-only test files and non-test diffs move without a trailer, and recovery re-runs the guard', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = await oldFileBranch(f, 'cite-add');
+    const addPath: string = leaf(f, 'cite-add', 'implement', { worktree });
+    writeFileSync(resolve(worktree, 'new.test.ts'), 'new\n');
+    writeFileSync(resolve(worktree, 'file'), 'edited\n');
+    await commitAll(worktree, ['add test, edit file']);
+    const added: Result = await cli(f, ['phase', 'cite-add', 'check.review', '--slot', 'A']);
+    expect(added.stdout).toBe('moved check.review');
+    expect(readState(addPath).phase).toBe('check.review');
+    const recover: string = await oldFileBranch(f, 'cite-recover');
+    const recoverPath: string = leaf(f, 'cite-recover', 'failed', {
+      worktree: recover,
+      failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'x' },
+    });
+    const recoverBefore: string = bytes(recoverPath);
+    writeFileSync(resolve(recover, 'x.test.ts'), 'edited\n');
+    await commitAll(recover, ['edit test']);
+    const refused: Result = await cli(f, ['phase', 'cite-recover', 'implement']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('x.test.ts');
+    expect(readState(recoverPath).phase).toBe('failed');
+    expect(bytes(recoverPath)).toBe(recoverBefore);
+    await command(['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: x.test.ts fixed the test'], recover);
+    const moved: Result = await cli(f, ['phase', 'cite-recover', 'implement']);
+    expect(moved.stdout).toBe('moved implement');
+    expect(readState(recoverPath).phase).toBe('implement');
+  } finally {
+    f.clean();
+  }
+});
+
+test('phase --check runs the move guards without recording, moving or closing the owner', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = await oldFileBranch(f, 'check');
+    const path: string = leaf(f, 'check', 'implement', { worktree });
+    const before: string = bytes(path);
+    writeFileSync(resolve(worktree, 'src/new.ts'), 'code\n');
+    await commitAll(worktree, ['code change']);
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    const ok: Result = await cli(f, ['phase', 'check', 'check.review', '--slot', 'A', '--check']);
+    expect(ok.code).toBe(0);
+    expect(ok.stdout).toBe('ok');
+    expect(bytes(path)).toBe(before);
+    expect(readState(path).phase).toBe('implement');
+    expect(await command(['git', 'rev-parse', 'HEAD'], worktree)).toBe(head);
+    expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
+    writeFileSync(resolve(worktree, 'x.test.ts'), 'edited\n');
+    await commitAll(worktree, ['edit test']);
+    const checkedRefused: Result = await cli(f, ['phase', 'check', 'check.review', '--slot', 'A', '--check']);
+    expect(checkedRefused.code).not.toBe(0);
+    expect(checkedRefused.stderr).toContain('x.test.ts');
+    expect(bytes(path)).toBe(before);
+    expect(await command(['git', 'rev-parse', 'HEAD'], worktree)).not.toBe(head);
+    await command(['git', 'reset', '--hard', head], worktree);
+    const dirtyWt: string = await oldFileBranch(f, 'check-dirty');
+    const dirtyPath: string = leaf(f, 'check-dirty', 'implement', { worktree: dirtyWt });
+    writeFileSync(resolve(dirtyWt, 'unstaged'), 'x\n');
+    const dirtyBefore: string = bytes(dirtyPath);
+    const dirty: Result = await cli(f, ['phase', 'check-dirty', 'check.review', '--slot', 'A', '--check']);
+    expect(dirty.code).not.toBe(0);
+    expect(dirty.stderr).toContain('Uncommitted work');
+    expect(bytes(dirtyPath)).toBe(dirtyBefore);
+    expect(readState(dirtyPath).phase).toBe('implement');
+    const failed: Result = await cli(
+      f,
+      ['phase', 'check-dirty', 'failed', '--reason', 'x', '--check'],
+      f.root,
+      fakeHerdr(f).env,
+    );
+    expect(failed.code).not.toBe(0);
+    expect(bytes(dirtyPath)).toBe(dirtyBefore);
+    expect(readState(dirtyPath).phase).toBe('implement');
+    leaf(f, 'check-merged', 'merged', {}, 'epic/final');
+    const merged: Result = await cli(f, ['phase', 'check-merged', 'merged', '--check']);
+    expect(merged.code).not.toBe(0);
+    expect(existsSync(resolve(f.root, 'issues/open/epic'))).toBe(true);
+    expect(existsSync(resolve(f.root, 'issues/closed/epic'))).toBe(false);
   } finally {
     f.clean();
   }
