@@ -4,6 +4,14 @@ Seat B merges reviewed work. It fetches the configured remote, rebases onto the 
 
 For CSV export, those checks should cover quoting, empty input and the existing JSON export.
 
+Every phase move also checks that the branch's changed old test files each carry a `Test-Change: <path> <source and reason>` trailer in a commit's final trailer block. `src/test-files.ts` defines which paths count as test files. Right before the push B runs the move in check-only mode:
+
+```sh
+akrogon phase export-csv merged --slot B --check
+```
+
+It prints ok when the move's guards pass. A refusal names each uncited file and the trailer line to add; a later commit, including an empty one, may carry it.
+
 The push must be fast-forward. If another leaf lands first, B fetches, rebases and checks again. It does not force-push over the other change.
 
 If rebase conflicts occur, B resolves them and records evidence of what changed. If checks fail, the leaf returns to repair. Other push errors are reported with their cause.

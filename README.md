@@ -133,7 +133,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon init [--from <proposal.yaml>] [--toolkit <lang>=<runner>]` | Initialize or update repository setup. |
 | `akrogon config` | Print effective configuration. |
 | `akrogon preflight` | Verify the configured base remote branch and local tracking ref. |
-| `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>]` | Record a pass or declare a failure with its reason. |
+| `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>] [--check]` | Record a pass or declare a failure with its reason. --check runs the move's guards without recording or moving and prints ok on success. |
 | `akrogon next [<slug>\|<path>\|--all\|--resume]` | Dispatch eligible work. |
 | `akrogon pull [--all]` | Import open GitHub issues as seeds. With --all, pull every registered repository from any directory. |
 | `akrogon close <owner/repo#n> --by <text>` | Close one unowned GitHub issue with a delivered-by note. |
