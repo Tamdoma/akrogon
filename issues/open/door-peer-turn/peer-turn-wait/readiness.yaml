@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr agent wait timeout on a working agent
+    command: herdr agent wait w8:pCT --timeout 1500
+    identity: operator's local herdr session (no credential)
+    target: herdr pane w8:pCT (slot A, working)
+    version: herdr 0.9.3
+    date: '2026-10-03'
+    result: 'exit 1, stderr {"error":{"code":"timeout","message":"timed out waiting for agent status"},"id":"cli:agent:wait"}'
+    cleanup: none, read-only
+    limits: does not show a blocked or done status
+    record: issues/chart/door-turn-and-stale-tab/forks/peer-turn.md
+  - operation: herdr agent wait on an idle agent
+    command: herdr agent wait w8:pG8 --timeout 1500
+    identity: operator's local herdr session (no credential)
+    target: herdr pane w8:pG8 (slot B, idle)
+    version: herdr 0.9.3
+    date: '2026-10-03'
+    result: 'exit 0, stdout {"id":"cli:agent:wait","result":{"agent":{...,"agent_status":"idle",...}}}'
+    cleanup: none, read-only
+    limits: does not show a blocked or done status
+    record: issues/chart/door-turn-and-stale-tab/forks/peer-turn.md

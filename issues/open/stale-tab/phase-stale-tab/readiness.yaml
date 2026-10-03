@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr tab rename on a missing tab
+    command: herdr tab rename wA:zzzz probe
+    identity: operator's local herdr session (no credential)
+    target: nonexistent tab wA:zzzz
+    version: herdr 0.9.3
+    date: '2026-10-03'
+    result: 'exit 1, stderr {"error":{"code":"tab_not_found","message":"tab wA:zzzz not found"},"id":"cli:tab:rename"}'
+    cleanup: none, no tab existed or was changed
+    limits: does not prove a rename on a live tab, which is unchanged behavior
+    record: issues/chart/door-turn-and-stale-tab/INTAKE.md
