@@ -10,7 +10,7 @@ The outcome and plan decision IDs; standalone assigns its brief's own decision I
 
 ## 2. Numbered acceptance criteria
 
-Observable outcomes written before code; write the smallest test set proving every done-criterion, one test may prove several criteria, with one before and after proof per real bug fixed; extra negative or edge cases need a named concrete consequence on a realistic path (a broken required outcome, a security boundary, data loss or an unsafe mutation); extend existing tests before adding files; trivial one-liners need no test.
+Observable outcomes written before code; write the smallest test set proving every done-criterion, one test may prove several criteria, with one before and after proof per real bug fixed; extra negative or edge cases need a named concrete consequence on a realistic path (a broken required outcome, a security boundary, data loss or an unsafe mutation); extend existing tests before adding files; trivial one-liners need no test. An existing assertion, fixture or recorded output changes or is deleted only with a cited brief outcome or real source that the old expectation contradicts. A new test needs no cited source. Default to the smallest test at the real boundary (CLI, HTTP, browser, DB), with unit or property tests only for logic that matters where they catch bugs more cheaply and E2E only where smaller tests miss browser, runtime or wiring bugs. Delete a false or outdated expectation with its reason, a duplicate only after naming the test that still catches the same bug, batches judged as batches, keeping tests guarding real past regressions. A bug fix shows fail-before/pass-after and new behavior shows one deliberate break turning its test red, with no mutation score.
 
 ## 3. Read-first list
 

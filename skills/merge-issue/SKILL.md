@@ -42,7 +42,7 @@ On a rebase conflict, resolve it in the worktree keeping both true sides, comple
 
 On red checks, append the failing output, the rebase target commit and the rebased head to `review-B.md` under the `leaf=` folder, call `akrogon phase <slug> check.fix --slot B`, and finish with the actual result and repair footer.
 
-Same-line index conflicts retain both true entries and recheck pointers; a broken default branch discovered by this leaf is fixed forward with failing tests as criteria.
+Same-line index conflicts retain both true entries and recheck pointers. An existing assertion, fixture or recorded output changes or is deleted only with a cited brief outcome or real source (a real build, user action or content, integration or attacker-reachable input) that the old expectation contradicts. A new test needs no cited source. A wrong test exposed by the rebase, its expectation contradicting a brief outcome or a real source, is fixed in its own commit with the reason and the merge continues; a broken default branch discovered by this leaf is fixed forward with failing tests as criteria.
 
 After green checks, push `HEAD:<default_branch>` to the configured remote fast-forward only, repeating fetch/rebase/checks after a non-fast-forward rejection; for a lost reply, fetch and use `git merge-base --is-ancestor <pushed-head> <remote>/<default_branch>` to establish whether the intended commit landed before trying again.
 
