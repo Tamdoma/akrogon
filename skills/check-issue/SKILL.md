@@ -44,6 +44,8 @@ Start from the changed behavior and open the doc page describing it even when th
 
 B's earlier arguments focus attention but are not additional acceptance criteria; missing debate artifacts on a `debate: no` leaf are expected, and `learnings/LESSONS.md` is not review input.
 
+B also lists the `Test-Change:` trailers in `<target>..HEAD` in `review-B.md` and judges each against its cited source; the changed-file path rule lives in `src/test-files.ts`.
+
 Write your findings to `review-<slot>.md` under the `leaf=` folder, recording the base and reviewed head, verification evidence and a verdict of `ready`, `nits` or `fix`, with each Fix naming its actual realistic source, its consequence today, and the criterion, check or gap it hits, and each Nit stating the reproduction or concern, why it is deferred, and what evidence would promote it to a Fix.
 
 A Fix is wrong behavior, a broken contract or a maintainability defect with a concrete consequence today, naming its actual realistic source (which build, which user action or content, which integration, or which attacker-reachable entry point), its consequence today, and the criterion, check or gap it hits; a realistic source is a real build, a real user action or content, a real integration, or untrusted input an attacker can send, shown by tracing the input from that source to the defect or by representative real output of an input from that source, with no production incident needed, while pointers to the defect location alone and real test machinery running a handcrafted input establish no source, so a handcrafted reproduction alone is a Nit with the missing evidence stated, and rarity never downgrades a reachable security, data-loss or concurrency defect, including a ponytail concern when it is also a defect; an argument grounded only in B's position is a Nit and cannot open repair.
@@ -75,6 +77,8 @@ Operator-only items follow the operator-only rule in Shared context and are neve
 Each behavior Fix gets its own commits, never shared with another Fix. First comes a commit adding a test that reproduces the recorded source, run and shown failing, then the fix commit, with the failing and passing output in `review-B.md`. B changes or deletes an existing assertion, fixture or recorded output only with a cited brief outcome or real source that the old expectation contradicts; a new test needs no cited source.
 
 Each docs or command Fix is its own commit, with before and after evidence (quoted text or command output) in `review-B.md`.
+
+A repair commit of B's own that changes an existing file matched by the path rule in `src/test-files.ts` ends its message with a `Test-Change: <exact path> <source and reason>` trailer in the final trailer block, one per changed old test file.
 
 A red test or check with no cause in the leaf's diff takes the same base-run disposition as the check.review paragraph beginning "During check.review, a red test or check".
 

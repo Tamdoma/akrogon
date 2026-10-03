@@ -34,7 +34,7 @@ The merge seat reuses `grants[]` for probes, implementation, repairs, reruns, me
 
 Turn a Nit B still holds and finds reusable into one line naming mechanism/date/history in the registered checkout's `learnings/LESSONS.md` and a history file with case, evidence and learning, left for the operator to commit, without reading the active list as pass input or adding another turn.
 
-Before pushing, commit scoped outstanding changes, fetch the configured remote, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` after rebase, and run every `checks` command, then every `merge_checks` command, in the worktree, recording evidence in `review-B.md` under the `leaf=` folder and advisory failures as Nits.
+Before pushing, commit scoped outstanding changes (each scoped commit that changes an existing file matched by the path rule in `src/test-files.ts` ends its message with a `Test-Change: <exact path> <source and reason>` trailer in the final trailer block, one per changed old test file, and a commit adding a case to an existing test file names what was added and that no existing expectation changed, citing no source), fetch the configured remote, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` after rebase, and run every `checks` command, then every `merge_checks` command, in the worktree, recording evidence in `review-B.md` under the `leaf=` folder and advisory failures as Nits.
 
 A local default branch is unnecessary; ordinary git non-fast-forward refusal serializes competing pushes.
 
@@ -43,6 +43,8 @@ On a rebase conflict, resolve it in the worktree keeping both true sides, comple
 On red checks, append the failing output, the rebase target commit and the rebased head to `review-B.md` under the `leaf=` folder, call `akrogon phase <slug> check.fix --slot B`, and finish with the actual result and repair footer.
 
 Same-line index conflicts retain both true entries and recheck pointers. An existing assertion, fixture or recorded output changes or is deleted only with a cited brief outcome or real source (a real build, user action or content, integration or attacker-reachable input) that the old expectation contradicts. A new test needs no cited source. A wrong test exposed by the rebase, its expectation contradicting a brief outcome or a real source, is fixed in its own commit with the reason and the merge continues; a broken default branch discovered by this leaf is fixed forward with failing tests as criteria.
+
+After green checks and before the push, B runs `akrogon phase <slug> merged --slot B --check`, which verifies the `Test-Change:` trailers on the changed files matched by the path rule in `src/test-files.ts`; on a refusal B adds a commit carrying the missing trailer when the change has a real source, a trailer-only empty commit when the change sits inside a rebased commit, or reverts the change, then reruns the checks and `--check` before pushing.
 
 After green checks, push `HEAD:<default_branch>` to the configured remote fast-forward only, repeating fetch/rebase/checks after a non-fast-forward rejection; for a lost reply, fetch and use `git merge-base --is-ancestor <pushed-head> <remote>/<default_branch>` to establish whether the intended commit landed before trying again.
 

@@ -42,6 +42,8 @@ If the checkout has no changed-test runner, name the actual targeted check deriv
 
 Acceptance outcomes and pasted command results; the report links each done-criterion and each real bug fix to its test or evidence, with a path to any required end-to-end artifact; limitations and unverified criteria remain explicit.
 
+A worker commit that changes an existing file matched by the path rule in `src/test-files.ts` ends its message with a `Test-Change: <exact path> <source and reason>` trailer in the final trailer block, one per changed old test file, a later trailer-only empty commit is the allowed exception to the no-empty-commit rule, and a commit adding a case to an existing test file carries the same trailer naming what was added and that no existing expectation changed, citing no source; delegated commits survive cherry-pick, so the trailer lands on the lane.
+
 For akrogon command work, scenarios use temporary repositories, real files/processes and herdr/gh replaced at one boundary, with no real panes, install roots, GitHub or herdr socket; tests need an observable contract or observed defect, not coverage or wording except literal commands, numbers and fixed references.
 
 End to end evidence with an artifact is required only when browser or runtime behavior or cross-component wiring cannot be shown by a smaller check or when a criterion asks for it; then a user-visible flow uses a real invocation or request with evidence, and browser flows use headless Playwright Chromium with trace on and video off, recorded as a consumer dev dependency when first needed.
