@@ -4,7 +4,7 @@ Seat B merges reviewed work. It fetches the configured remote, rebases onto the 
 
 For CSV export, those checks should cover quoting, empty input and the existing JSON export.
 
-Every phase move also checks that the branch's changed old test files each carry a `Test-Change: <path> <source and reason>` trailer in a commit's final trailer block. `src/test-files.ts` defines which paths count as test files. Right before the push B runs the move in check-only mode:
+Every phase move except a move to `failed` also checks that the branch's changed old test files each carry a `Test-Change: <path> <source and reason>` trailer in a commit's final trailer block. `src/test-files.ts` defines which paths count as test files. Right before the push B runs the move in check-only mode:
 
 ```sh
 akrogon phase export-csv merged --slot B --check
