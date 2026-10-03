@@ -5,7 +5,7 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write src tests"
+    "format": "prettier --write src tests skills/chart-issues/scripts"
   },
   "dependencies": {
     "shell-quote": "^1.10.0",

@@ -3,5 +3,5 @@
     "target": "ESNext", "module": "Preserve", "moduleResolution": "bundler",
     "strict": true, "noEmit": true, "types": ["bun"], "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts", "skills/chart-issues/scripts/**/*.ts"]
 }

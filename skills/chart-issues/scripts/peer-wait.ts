@@ -24,9 +24,7 @@ function parseJson(text: string): unknown {
 }
 
 function isTimeoutError(stderr: string): boolean {
-  const parsed: z.ZodSafeParseResult<z.infer<typeof herdrErrorSchema>> = herdrErrorSchema.safeParse(
-    parseJson(stderr),
-  );
+  const parsed: z.ZodSafeParseResult<z.infer<typeof herdrErrorSchema>> = herdrErrorSchema.safeParse(parseJson(stderr));
   return parsed.success && parsed.data.error.code === 'timeout';
 }
 
