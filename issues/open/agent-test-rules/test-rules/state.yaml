@@ -1,0 +1,32 @@
+slug: test-rules
+phase: merged
+created: 2026-10-03
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t8S
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/test-rules
+pane: 
+  A: w8:pGJ
+  B: w8:pGK
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

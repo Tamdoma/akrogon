@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: read old test files and Test-Change trailers on a leaf branch
+    command: git diff --no-renames --name-status main...HEAD; git log --format='%(trailers:key=Test-Change,valueonly,unfold)' main..HEAD
+    identity: local git, no outside identity
+    target: throwaway repo in the charting session scratchpad
+    version: git 2.56.0
+    date: '2026-10-03'
+    result: diff listed A, M and D lines; trailers returned for a changing commit and a later empty commit, a wrapped value joined on one line
+    cleanup: repo deleted and confirmed
+    limits: a Test-Change line outside the final trailer block is not returned; without unfold a wrapped value splits
+    record: issues/chart/agent-test-rules/forks/test-change-check.md

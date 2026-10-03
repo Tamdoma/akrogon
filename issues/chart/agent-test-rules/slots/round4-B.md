@@ -1,0 +1,51 @@
+# Round 4 · B · remove proof recipes from locked scope
+
+The simplest fix is to stop treating tests as the requirement. Keep the operator's observable outcomes fixed, let planning choose proof, and make B judge the original outcomes rather than whether A fulfilled a prescribed test recipe. There is then no bad proof criterion to send back, amend or waive. A second change is necessary for the concrete TMPDIR case: bad baseline tests must reach automatic review/repair instead of stopping before B can assess them.
+
+Read 2026-10-03: round4-intake.md and intake.md only among the supplied round4 exchange inputs. No other round4-* file read. Investigation only, no repository edits, commits or transitions. All paths below are relative to `/home/ivan/Work/infra/akrogon`.
+
+## Diagnosis
+
+- **F1 · The brief currently locks proof mechanics.** `skills/chart-issues/assets/shapes.md:128,133-134,252` has a useful observable What, but defines done-criteria as tests or blocking commands. `skills/plan-issue/SKILL.md:61,63,65` turns those recipes into mandatory, locked proof obligations. Replace the recipe-shaped criterion template with observable outcomes. This removes testing from the door rather than adding a test-quality audit there.
+- **F2 · The reviewer cannot reject an invented recipe once it is named.** `skills/check-issue/SKILL.md:49,53` requires a realistic source for ordinary Fixes, but line 55 exempts named criterion scenarios from that justification. That exception lets “the criterion says so” override the actual outcome. Delete that bypass. A contractual outcome remains required, while claims that a particular assertion is necessary need the same source/consequence reasoning as other findings.
+- **F3 · Failing machinery is currently terminal before independent judgment.** `skills/implement-issue/SKILL.md:36,38` stops on unmet criteria/out-of-scope repairs and base-red checks. check-issue:59 has the corresponding base-red stop. `src/phase.ts:180-183` prevents a seat resuming failed. Outcome-only briefs alone will not unblock already committed bad assertions. Test-validity defects need an ordinary automatic repair route, while merge still requires green checks (`skills/merge-issue/SKILL.md:37,43`).
+- **F4 · The TMPDIR example was more specific than “private temp dir.”** `issues/closed/leaf-temp/leaf-temp-dir/brief.md:10-17` includes env placement, short paths, cleanup and fixture isolation. Worker `implementation/brief-2.md:14,40` asks for containment beneath the fixture root and no default-root allocation. `tests/helpers.ts:8-9,14-16` places that fixture beneath inherited tmpdir. Commit `175b862` additionally banned the whole `/var/tmp/akrogon-` prefix, confusing isolation from the default allocation target with ancestor location. `2dd1106` removed only that assertion. Do not discard the genuine isolation requirement to repair this.
+- **F5 · No semantic gate exists in the command.** `src/phase.ts:210-215,254-264` checks a clean branch, no issue-file diff and nonempty implementation, not whether a criterion is meaningful or a test detects its failure. `src/routing.ts:30-35` already has A implementation, independent review, B repair and A repair routes. A regex or AST check cannot decide whether a filesystem expectation follows from the consumer contract.
+
+## Practitioner grounding
+
+- **S1 · practitioner · Paul Stack / Swamp · 2026-04-21**, [release-binary UAT gate](https://stack72.dev/the-gate-between-our-agent-code-and-our-users/): a separate consumer suite caught real wiring and recovery failures while units passed. It tests what users download. Supports original consumer outcomes and independent acceptance judgment. Does not prove that all test authoring must move to a new phase or all units must disappear.
+- **S2 · practitioner · Paul Stack · 2026-09-23**, [agent-written tests](https://stack72.dev/your-agent-written-tests-arent-real-tests/): changing the test and code together can preserve the same misunderstanding. Independently owned constraints matter. Merely renaming the author or enforcing commit order does not create independence. Keep the operator's outcome as B's authority, not A's tests or B's own finding.
+- **S3 · practitioner · Bill Echlin / Test Management Systems · 2026-08-11**, [known-broken build evaluation](https://www.testmanagement.com/blog/2026/08/ai-written-tests-evidence/): detector quality appears when fixed and genuinely broken behavior produce the intended difference. A setup failure is not that evidence. This supports the already taken fail-before/pass-after and deliberate-break rule without a score gate.
+
+## Proposed operator round
+
+This choice removes the mutable test target from the contract instead of adding a process for correcting it. The original outcomes, exclusions and grants remain fixed. Existing plan, review and repair phases handle proof automatically.
+
+### 1 · Should we lock outcomes and leave proof selection to the lifecycle?
+
+A brief says what must happen, for example “dispatch uses an isolated fixture allocation and keeps its folder private.” It does not prescribe a prefix assertion, test count or proof command. The plan chooses how to demonstrate the outcome, and B verifies the outcome against the original brief/design, not only against A's plan or green tests.
+
+Research: operator · round4-intake.md, read 2026-10-03 · rejects test-rule additions to charting and manual returns. Better-than-training · shapes:134/252, plan:61-65, check:49-55 and implement:38, inspected 2026-10-03 · locking recipes and stopping before review are separate causes. Practitioner · Stack's April/September 2026 accounts above · independent consumer constraints are the useful authority.
+
+- **1a (recommended) · Outcome contract, automatic proof repair.** Freeze the original outcomes/design after handoff; plan evidence remains replaceable implementation work, not a new contract. A supplies evidence using the taken boundary/minimal-test rules. B independently decides whether each original outcome is actually met and justified tests detect its failure. An unsupported test demand is a test defect, not a scope dispute. Deletes recipe-shaped criteria, the named-scenario realism bypass and the manual proof-correction ledger. Adds no phase or dependency, only the existing repair route for test defects and a direct original-contract read in review.
+- **1b · B owns durable acceptance tests.** Combine outcome-only contracts with moving acceptance-test authoring/expectation edits to B. A can run them and produce disposable diagnostics but cannot alter their expected behavior. Move final acceptance proof to B's review/repair; keep repairs serialized so initial blind review sees one stable head. Deletes A's compulsory durable-test-before-code requirement. Adds an explicit test-ownership boundary and enforcement at A handoff. Stronger separation, but B also fixes code today, so ownership alone does not make its expectations independent, and protected-test maintenance adds work.
+- **1c · Mechanical test-edit restrictions.** Preserve today's criterion structure and reject test changes by the code-writing seat using declared path ownership/diffs. Deletes little, adds test-path classification and exceptions for legitimate fixtures/refactors. This prevents some edits but neither identifies a bad assertion nor lets a baseline bad test recover automatically. As a standalone solution it fails the current task.
+
+Pitfalls: outcome-only is not vague acceptance. Preserve literal command/API values, security constraints and measured runtime limits when they are real requirements. A cannot rewrite or drop an outcome to justify a smaller test set. B must inspect the original contract and actual behavior independently. A green suite or a change to plan.md cannot change what counts as delivered.
+
+### Automatic route required by 1a
+
+A plans and implements against the fixed outcome contract. It selects/replaces proof freely within scope, reusing existing protection and supplying cited sources for expectation changes. This is not permission to rewrite the contract, and it creates no original/replacement criterion approval ledger.
+
+For an unresolved failing assertion, A records the failure and base comparison and hands the committed implementation to check.review instead of entering failed merely because the test is red on base. Change implement:38 and check:59 accordingly. This is an explicit proposal to revise the baseline-stop lock for automated triage, not a claim that current instructions allow it or that red checks permit merge.
+
+B diagnoses the test against the original outcome and cited contract. A false assertion takes check.repair: B removes/repairs the assertion, preserves relevant regression/isolation checks, and runs all affected checks. That narrow test/fixture repair must be authorized even when its file was not in A's original code change list, or the TMPDIR example still stops outside ownership. A real implementation defect takes existing B/A repair; missing external access remains a different blocker. Unsupported input alone does not justify deleting a real regression.
+
+Only after every required outcome has valid proof and every blocking check passes may merge proceed. B's test expectation changes use the same cited-source rule as A's, and fail-first/deliberate-break evidence remains required where taken. No seat gets authority to ignore exit codes, change outcomes, expand live grants or resume failed as the operator.
+
+Reply `1a`, `1b` or `1c`, or a free-text answer.
+
+### Challenge check
+
+1a separates immutable requirements from replaceable proof and relies on existing independent review rather than claiming physical sandbox isolation. If “must not be able” means mechanically denying all test edits to the implementation author, choose 1b with an enforced ownership boundary, accepting its added machinery. Neither approach makes an independently wrong operator outcome correct. This pass proposes no new test audit at charting and no fresh test-count/coverage quota. The necessary base-red and narrow test-repair authority changes must be explicit because they reopen existing stop/ownership behavior; omitting them makes an elegant-looking proposal leave the actual blocker intact.
