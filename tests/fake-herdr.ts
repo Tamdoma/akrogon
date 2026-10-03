@@ -173,7 +173,8 @@ if (args[0] === 'agent' && args[1] === 'wait') {
   const target: Pane = pane(args[2]);
   if (Number.isNaN(Number(flag('--timeout')))) failure('invalid_timeout');
   const entry: z.infer<typeof waitEntrySchema> | undefined = db.waitScript.shift();
-  const sleepMs: number = entry?.sleepMs ?? (entry === undefined && target.agent_status === 'working' ? 50 : 0);
+  const sleepMs: number =
+    entry?.sleepMs ?? (entry === undefined && target.agent_status === 'working' ? Number(flag('--timeout')) : 0);
   if (sleepMs > 0) Bun.sleepSync(sleepMs);
   if (entry?.append !== undefined) appendFileSync(entry.append, `${target.pane_id}\n`);
   scriptedFailure(entry);
