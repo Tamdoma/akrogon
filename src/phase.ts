@@ -26,6 +26,7 @@ import {
 import { command, herdr, herdrError, retryable, CommandError } from './shell';
 import { logMove } from './log';
 import { closeSources } from './pull';
+import { testFile } from './test-files';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
   try {
@@ -186,8 +187,10 @@ export async function transition(
   explicitSlot: Slot | undefined,
   verdict: Verdict | undefined,
   reason: string | undefined,
+  checkOnly: boolean,
 ): Promise<void> {
   const state: State = readState(leaf.path);
+  if (checkOnly && requested === 'failed') throw new Error('--check cannot move to failed');
   if (state.phase === 'merged') throw new Error(`Merged is terminal: ${state.slug}`);
   if (state.phase === 'failed' && explicitSlot !== undefined)
     throw new Error(
@@ -222,9 +225,14 @@ export async function transition(
   if (state.worktree !== undefined && !(state.phase === 'failed' && state.failure?.cause === 'blocked'))
     await requireClean(state.worktree);
   if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path);
+  if (state.worktree !== undefined) await requireTestChangeCitations(repo, state.worktree);
   if (requested === 'check.review' && state.worktree !== undefined) await requireNonEmpty(repo, state.worktree);
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
+  if (checkOnly) {
+    console.log('ok');
+    return;
+  }
   const recorded: State = {
     ...state,
     done: slot === undefined ? state.done : [...state.done, slot],
@@ -271,6 +279,34 @@ export async function requireNoIssueFiles(repo: Repo, worktree: string, leafPath
   if (files !== '') throw new Error(`Issue files on leaf branch belong in ${leafPath}:\n${files}`);
 }
 
+export async function requireTestChangeCitations(repo: Repo, worktree: string): Promise<void> {
+  const status: string = await command(
+    ['git', 'diff', '--no-renames', '--name-status', `${target(repo)}...HEAD`],
+    worktree,
+  );
+  const changed: string[] = status
+    .split('\n')
+    .filter((line) => line.startsWith('M\t') || line.startsWith('D\t') || line.startsWith('T\t'))
+    .map((line) => line.slice(line.indexOf('\t') + 1))
+    .filter((path) => testFile(path));
+  if (changed.length === 0) return;
+  const log: string = await command(
+    ['git', 'log', '--format=%(trailers:key=Test-Change,valueonly,unfold)', `${target(repo)}..HEAD`],
+    worktree,
+  );
+  const cited: Set<string> = new Set(
+    log
+      .split('\n')
+      .filter((value) => /^\S+\s+\S/.test(value))
+      .map((value) => value.split(/\s/, 1)[0]),
+  );
+  const missing: string[] = changed.filter((path) => !cited.has(path));
+  if (missing.length === 0) return;
+  throw new Error(
+    `Changed test files need a citation:\n${missing.map((path) => `Test-Change: ${path} <source and reason>`).join('\n')}\nAdd each line to the final trailer block of a commit on this branch; a later empty commit may carry it.`,
+  );
+}
+
 export async function requireNonEmpty(repo: Repo, worktree: string): Promise<void> {
   const changes: string = await command(['git', 'diff', '--name-only', `${target(repo)}...HEAD`], worktree);
   if (changes === '') throw new Error(`Empty leaf branch: no changes against ${target(repo)}`);
@@ -282,15 +318,17 @@ export async function phaseCommand(
   rawSlot: string | boolean | undefined,
   rawVerdict: string | boolean | undefined,
   rawReason: string | boolean | undefined,
+  rawCheck: string | boolean | undefined,
 ): Promise<void> {
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
   const verdict: Verdict | undefined = verdictSchema.optional().parse(rawVerdict);
   const reason: string | undefined = z.string().trim().min(1).optional().parse(rawReason);
+  const check: boolean = z.literal(true).optional().parse(rawCheck) === true;
   const repo: Repo = await requireRepo(readGlobal(), process.cwd());
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
-    if (leaf.state.phase === 'merged') await completeOwner(repo, leaf, false);
-    await transition(repo, leaf, requested, slot, verdict, reason);
+    if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
+    await transition(repo, leaf, requested, slot, verdict, reason, check);
   });
 }
