@@ -61,7 +61,8 @@ function expectOutcome(
   expected: { outcome: string; pane: string; file: string; status: string | null },
 ): void {
   expect(result.code).toBe(0);
-  expect(result.stdout).not.toContain('\n');
+  expect(result.stdout.split('\n')).toHaveLength(2);
+  expect(result.stdout.endsWith('\n')).toBe(true);
   expect(JSON.parse(result.stdout)).toEqual(expected);
 }
 
@@ -69,7 +70,7 @@ test('passes a non-timeout herdr failure through unchanged', async (): Promise<v
   const s: Setup = setup('working', () => [{ stderr: 'raw failure text' }]);
   try {
     const result: RunResult = await s.run(pane, s.file, '10');
-    expect(result).toEqual({ code: 1, stdout: '', stderr: 'raw failure text' });
+    expect(result).toEqual({ code: 1, stdout: '', stderr: 'raw failure text\n' });
   } finally {
     s.clean();
   }
