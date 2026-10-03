@@ -1,5 +1,5 @@
 slug: phase-stale-tab
-phase: plan.synthesis
+phase: merged
 created: 2026-10-03
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#55"
 busy_since: 
-  A: 2026-10-03T06:59:58.122Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -25,8 +25,8 @@ pane:
   A: w8:pGG
   B: w8:pGH
 prompted: 
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-phase-stale-tab--/2026-10-03T06-59-54-834Z_01a1008f-ed52-7027-99f3-d7951fe5f1d2.jsonl
+  {}
 prompted_at: 
-  A: 2026-10-03T06:59:58.123Z
+  {}
 delivery_error: 
   {}

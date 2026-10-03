@@ -1,5 +1,5 @@
 slug: peer-turn-wait
-phase: plan.synthesis
+phase: merged
 created: 2026-10-03
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#54"
 busy_since: 
-  A: 2026-10-03T06:59:54.010Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -25,8 +25,8 @@ pane:
   A: w8:pGE
   B: w8:pGF
 prompted: 
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-peer-turn-wait--/2026-10-03T06-59-50-717Z_01a1008f-dd3d-7045-b106-8a43caa6843f.jsonl
+  {}
 prompted_at: 
-  A: 2026-10-03T06:59:54.011Z
+  {}
 delivery_error: 
   {}
