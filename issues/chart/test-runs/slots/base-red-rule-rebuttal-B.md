@@ -1,0 +1,7 @@
+# Disagreement-only rebuttal B
+
+A's harness-maximum line does not remove the kill class. Even if the asserted maximum is 7200000 ms, a two-hour execution cutoff can still kill a base or slow run. `skills/implement-issue/SKILL.md:40` explicitly includes proofs sized hours or unknown. Maximizing a finite deadline reduces premature kills but cannot establish completion. Present it as mitigation, not elimination, and keep the incomplete-result branch authoritative.
+
+M1 also overstates agreement. B verified the selected `timeout:1500000` at transcript adc47027 line 2335 and the kill at line 2395. That notification allows restarting with a longer timeout unless the longest allowed timeout was already used. It supplies no numeric maximum. B did not verify 7200000 ms. Attribute that figure to A with A's inspected harness source/version and its applicability to background Bash, rather than tagging it `(A,B)` or treating it as a portable limit.
+
+Smallest correction: retain Q1/Q2 and status preservation, remove the claim that the proposed maximum line eliminates kills. If the operator wants launcher guidance, say: “Avoid a preventable launcher cutoff using the active harness's documented execution mode. A finite harness limit does not guarantee completion. Any run terminated before its terminal check result remains incomplete.” Applying a new maximum-deadline rule to every slow run also broadens beyond the two base-run paragraphs and should be an explicit operator choice.

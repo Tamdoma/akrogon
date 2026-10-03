@@ -5,6 +5,7 @@ Destination framework: each leaf runs only the tests its change affects plus che
 
 ## Provenance
 - Operator: 2026-10-02 split of Tamdoma/akrogon#53; source text and GitHub provenance live in [test-runs INTAKE](../test-runs/INTAKE.md), which owns that identity.
+- Completion owner of Tamdoma/akrogon#53: this chart's handoff (operator 2026-10-02, test-runs handoff Q1 1a). Its leaves carry `Tamdoma/akrogon#53` in `sources`; test-runs leaf base-red-complete carries none.
 
 ## Source: operator 2026-10-02
 I pulled another issue, let's chart it as well right now. It's about timing the tests, and the problems I'm having with that.

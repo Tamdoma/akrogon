@@ -1,0 +1,32 @@
+slug: base-red-complete
+phase: merged
+created: 2026-10-03
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t8P
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/base-red-complete
+pane: 
+  A: w8:pGB
+  B: w8:pGC
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

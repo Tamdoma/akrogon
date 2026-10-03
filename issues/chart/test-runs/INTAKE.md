@@ -6,6 +6,7 @@ Destination akrogon: heavy test runs on one host take turns through one machine-
 ## Provenance
 - GitHub: Tamdoma/akrogon#53
 - Operator: 2026-10-02 chart-issues pass
+- Completion owner: chart framework-test-scope (operator 2026-10-02, handoff Q1 1a). Leaf base-red-complete has empty `sources`, so #53 stays open until the framework half delivers.
 
 ## Source: Tamdoma/akrogon#53
 # Whole-repo merge_checks run per leaf time out under concurrent seat load and stop leaves as red on base
