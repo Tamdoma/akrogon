@@ -124,7 +124,8 @@ Remember: capacity counts leaves across repositories. Failed can resume at any a
 | Land reviewed work | merge-issue | Checked code pushed to the default branch. |
 | Announce completion | broadcast-issue | A factual update for a completed issue or epic. |
 | Check while away | watch-issues | Optional Claude Code cron inspection. |
+| Triage stale lessons | learn-issues | Guarded lines removed, checkable ones seeded. |
 
-Invoke setup, intake, charting and watching when you need them. Dispatch selects the execution skills from the leaf's phase. You do not need to run every skill by hand.
+Invoke setup, intake, charting, watching and lesson triage when you need them. Dispatch selects the execution skills from the leaf's phase. You do not need to run every skill by hand.
 
 Previous: [Learn](learn.md) · Next: [README](../../README.md) · [Home](../../README.md)

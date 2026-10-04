@@ -15,7 +15,7 @@ learnings/history/
 
 For example, a lesson could record how a tested CSV library handled embedded newlines that an earlier implementation missed. Include the evidence so later agents can check whether it applies.
 
-Plans read the lesson list. Lessons are observations to verify, not permanent rules. Charting can propose removing stale entries.
+Plans read the lesson list. Lessons are observations to verify, not permanent rules. /learn-issues removes a lesson once a running guard covers it and offers a seed when a check could.
 
 **A seed** records work to investigate later. If large exports need streaming, file that as a separate observation rather than expanding the current leaf during review:
 

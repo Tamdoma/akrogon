@@ -188,3 +188,4 @@ That report destination does not redirect pull.
 | [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a completed-issue-or-epic update to Discord. |
 | [init-akrogon](skills/init-akrogon/SKILL.md) | Inspect a repository and set up its lifecycle. |
 | [watch-issues](skills/watch-issues/SKILL.md) | Watch open leaves on an optional 20-minute Claude Code cron. |
+| [learn-issues](skills/learn-issues/SKILL.md) | Sort lessons into guarded, checkable or staying. |
