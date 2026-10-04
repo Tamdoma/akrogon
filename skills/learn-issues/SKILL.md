@@ -1,43 +1,40 @@
 ---
 name: learn-issues
-description: Triage the registered repo's active lessons into already guarded, checkable or stays, removing covered lines and offering seed lines for the rest. Operator-invoked only.
+description: Sort the registered repo's active lessons into guarded, checkable or stays; remove guarded lines, print seed lines for checkable ones. Operator-invoked only.
 ---
 
-Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
+Re-read this file and its references only after compaction; never re-read an unchanged file already read in this thread.
 
 # Learn issues
 
-Dependency: the installed `akrogon` command. This is an operator-invoked pass, not a lifecycle phase: it runs only when the operator starts it, writes no chart, territory map or handoff, runs no `akrogon pull`, and leaves its edits for the operator to commit.
+Needs the installed `akrogon` command. Runs only when the operator starts it: no lifecycle phase, chart, map, handoff, `akrogon pull` or commit.
 
-## Target
+## Scope
 
-Run `akrogon config` and read the `repo` key; `repos.<name>` is the registered repo's root. The triage target is `<registered root>/learnings/LESSONS.md` — the real file at the registered root, never a worktree copy. When `akrogon config` reports `repo: none`, stop and tell the operator the current checkout is unregistered.
+`akrogon config` names the target. `repo: none`: report the checkout as unregistered and stop. Otherwise the target is `learnings/LESSONS.md` under the registered root `repos.<repo>`, never a worktree copy, and its `checks` and `merge_checks` are the blocking checks. Inspect and edit only active lesson lines and the evidence that sorts them.
 
-Read the repo's `checks` and `merge_checks` from the same `akrogon config` output; they are the blocking-check surface.
+## Sort
 
-## Evidence
+Per active line: read its history file for the failure and its mechanism, trace that mechanism through current code and checks, then pick one outcome.
 
-Before sorting any active line, read the line's linked history file for the observed failure, then check that mechanism against current code on the relevant path and against `checks` and `merge_checks`.
+- **Guarded**: command code, an `akrogon phase` guard or a blocking check runs on the relevant path and covers the mechanism everywhere it can recur. An uncalled guard, or one fixed site with the pattern reachable elsewhere, is not guarded.
+- **Checkable**: a command could detect the mechanism as a fixed pattern (banned call, schema shape, path rule, required state before a step), and no running guard covers every reachable case.
+- **Stays**: default; judgment calls, unproved coverage, missing evidence.
 
-## Outcomes
+## Apply
 
-Each active line sorts into exactly one outcome.
+Print the list grouped by outcome with file:line evidence per line, then act without asking:
 
-- **Already guarded**: a guard in command code, an `akrogon phase` guard or a blocking `checks` command is called on the relevant path and covers the lesson's whole mechanism everywhere it can recur. Remove the active line and date the line's history file with the guard's file:line, without rewriting the historical case.
-- **Checkable**: the mechanism is a fixed pattern a command can detect — a banned call or schema shape, a path or file-location rule, a required state before a step — and no running guard covers every reachable case yet. A check that exists but is not reached from blocking `checks` or the command path counts as not covering. Print one ready-to-run `/seed-issue` line naming the lesson and the reachable case, never the check to build. The operator runs it or not; the skill files nothing itself.
-- **Stays**: the default, for judgment calls, unproved coverage and missing evidence.
+- Guarded: delete the line; append `Applied <YYYY-MM-DD> by <guard file:line>: <what it enforces>` to its history file, case untouched.
+- Checkable: print one runnable `/seed-issue` line naming the lesson and the reachable case, never the fix; the operator decides whether to run it. File nothing.
 
-The skill works only from active lessons and the evidence needed to sort them; it audits no other instructions, tooling or docs.
-
-## Apply and report
-
-Show the sorted list grouped as already guarded, checkable and stays, each entry with its file:line evidence, then remove the already-guarded lines without a further question. The uncommitted diff is the operator's review.
+Leave all edits uncommitted; the diff is the operator's review.
 
 ## Printed footer
 
-End each pass with the actual result, printed rather than saved:
+End every pass with this, printed, not saved:
 
 ```text
-Last operation: <removed <n> already-guarded lines, offered <n> seed lines, <n> stay>
-Next: none <awaiting operator review of the uncommitted diff>
+Last operation: removed <n> guarded lines, printed <n> seed lines, <n> stay
+Next: none, awaiting operator review of the uncommitted diff
 ```
