@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: akrogon config (registered root resolution)
+    command: akrogon config
+    identity: local user ivan
+    target: akrogon registered checkout, subdirectory src/, worktree issues/worktrees/test-change-check, and /tmp
+    version: akrogon 7bac4c1
+    date: '2026-10-05'
+    result: 'repo: akrogon with repos.akrogon /home/ivan/Work/infra/akrogon from root, subdirectory and worktree; repo: none from /tmp'
+    cleanup: none, read-only
+    limits: does not prove other registered repos or harnesses
+    record: issues/chart/retro-concepts/forks/adopt.md
