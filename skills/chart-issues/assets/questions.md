@@ -1,6 +1,6 @@
 # Operator questions and peer exchange
 
-Read before presenting an operator round. A short opening paragraph explains what the round settles and why now. Each question settles one thing, with inspected evidence, plain context and a concrete example where needed. The territory map covers the forks that change the outcome, questions a practitioner would ask and likely pitfalls, proportional to the work.
+Read before presenting an operator round. A short opening paragraph explains what the round settles and why now. Each question settles one thing, with inspected evidence, plain context and a concrete example where needed. The territory map covers the forks that change the outcome, questions a practitioner would ask and pitfalls over the work's lifetime, what each option could break or invite later and not only now, proportional to the work.
 
 ```markdown
 <one plain paragraph: what this round settles and why now>
@@ -11,10 +11,10 @@ Read before presenting an operator round. A short opening paragraph explains wha
 
 Research: <tier · source with URL or path and the date read · one-sentence finding · what it changed in this question>
 
-- **1a (recommended)** <what happens if you pick this, and the one reason it wins>
+- **1a (recommended)** <what happens if you pick this, the one reason it wins, and its cost if it carries one>
 - **1b** <what happens if you pick this, and its cost>
 
-Pitfalls: <the traps behind this choice, one or two sentences>
+Pitfalls avoided: <each trap behind this choice and what removes it: a part of the option, a probe the door runs before handoff, a done-criterion of the leaf, or a named operator step with its owner; one or two sentences>
 
 ### 2 · ...
 
@@ -24,7 +24,7 @@ Challenge check
 <what an experienced practitioner could challenge in these recommendations, including each named peer's remaining disagreements, or why none was found>
 ```
 
-Every round uses this shape, on every harness and at every effort level: the opening paragraph, the sentences under each question, the research line, the labelled recommendation with its reason, the pitfalls line, the reply key and the challenge check. A small round keeps the parts that carry the decision, the reply key and the challenge check. Number questions continuously within a round and restart at 1 in the next round. Label questions `1`, `2` and options `1a`, `1b`, `2a`, and use no other code scheme in a round.
+Every round uses this shape, on every harness and at every effort level: the opening paragraph, the sentences under each question, the research line, the labelled recommendation with its reason, the pitfalls-avoided line, the reply key and the challenge check. Known traps are designed out of the options before the round is shown, so the line says how each is avoided and never warns. A needed real call to an external operation is a required probe under the Take operation-proof rule, a test of behavior the leaf builds is a done-criterion, and a needed operator action is a human-only prerequisite with its owner, each named as the step that removes the trap and said to be pending until it is done. The fork records the chosen option's avoidance mechanisms as binding decisions, carried into each affected leaf. A trap that nothing removes is the cost of the option that carries it, stated in that option's bullet, and a material trap that no option avoids becomes its own question. A small round keeps the parts that carry the decision, the reply key and the challenge check. Number questions continuously within a round and restart at 1 in the next round. Label questions `1`, `2` and options `1a`, `1b`, `2a`, and use no other code scheme in a round.
 
 Present the current fork's material questions in one complete round and wait for the operator's answer; the next fork is researched and presented after that answer. Plain free text is a valid answer and is preserved verbatim. A question asking for explanation does not itself settle the choice; an explicit choice accompanied by a question does. An omitted material answer stays open. Recommendations and silence cannot supply an operator answer. A challenge exposing another material fork belongs in the next round.
 

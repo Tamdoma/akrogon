@@ -119,7 +119,7 @@ For export-csv, your requirements and inspected code anchor the options, with ou
 
 A fork is a question precise enough to answer. For example: should CSV include all rows or only the current filter?
 
-The round gives options, a recommendation with its reason and the pitfalls of the choice. You can pick an option or answer in your own words.
+The round gives options, a recommendation with its reason and how each option avoids its known pitfalls. A trap that needs a real test or an action from you is named as that step, with its owner, not as a warning. You can pick an option or answer in your own words.
 
 Forks are taken one per round. After you answer, the next fork is researched and asked.
 
