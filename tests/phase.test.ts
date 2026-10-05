@@ -238,12 +238,15 @@ test('handoff to review refuses a dirty worktree at every move and issue files o
 test('completion prints only when the owner finishes, stays silent on inner issues and retries', async () => {
   const f: Fixture = await fixture();
   try {
-    leaf(f, 'one', 'merge', {}, 'epic/first');
-    leaf(f, 'two', 'merge', {}, 'epic/first');
-    leaf(f, 'three', 'merge', {}, 'epic/second');
+    // merge_stamp fixes the queue order the dropped Promise.all race relied on; the
+    // one-holder-per-repo rule requires sequential merges.
+    leaf(f, 'one', 'merge', { merge_stamp: '2026-10-05T20:00:00Z' }, 'epic/first');
+    leaf(f, 'two', 'merge', { merge_stamp: '2026-10-05T20:00:01Z' }, 'epic/first');
+    leaf(f, 'three', 'merge', { merge_stamp: '2026-10-05T20:00:02Z' }, 'epic/second');
     mkdirSync(resolve(f.root, 'issues/chart/epic'), { recursive: true });
     writeFileSync(resolve(f.root, 'issues/chart/epic/CHART.md'), '# Chart: epic\n');
-    const race: Result[] = await Promise.all(['one', 'two'].map((slug) => cli(f, ['phase', slug, 'merged'])));
+    const race: Result[] = [];
+    for (const slug of ['one', 'two']) race.push(await cli(f, ['phase', slug, 'merged']));
     expect(race.every((r) => r.code === 0)).toBe(true);
     for (const r of race) {
       expect(r.stdout).not.toContain('issue complete');
@@ -260,11 +263,10 @@ test('completion prints only when the owner finishes, stays silent on inner issu
     const repeated: Result = await cli(f, ['phase', 'three', 'merged']);
     expect(repeated.code).not.toBe(0);
     expect(repeated.stdout).not.toContain('complete');
-    leaf(f, 'penultimate', 'merge', {}, 'standalone');
-    leaf(f, 'last', 'merge', {}, 'standalone');
-    const standalone: Result[] = await Promise.all(
-      ['penultimate', 'last'].map((slug) => cli(f, ['phase', slug, 'merged'])),
-    );
+    leaf(f, 'penultimate', 'merge', { merge_stamp: '2026-10-05T20:00:03Z' }, 'standalone');
+    leaf(f, 'last', 'merge', { merge_stamp: '2026-10-05T20:00:04Z' }, 'standalone');
+    const standalone: Result[] = [];
+    for (const slug of ['penultimate', 'last']) standalone.push(await cli(f, ['phase', slug, 'merged']));
     expect(standalone.every((r) => r.code === 0)).toBe(true);
     expect(standalone.flatMap((r) => r.stdout.split('\n')).filter((line) => line.includes('complete'))).toEqual([
       'issue complete standalone',
@@ -1782,6 +1784,87 @@ test('phase --check runs the move guards without recording, moving or closing th
     expect(merged.code).not.toBe(0);
     expect(existsSync(resolve(f.root, 'issues/open/epic'))).toBe(true);
     expect(existsSync(resolve(f.root, 'issues/closed/epic'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('merge turn refusal names the holder for merged and check.fix while failed is never refused', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const holderPath: string = leaf(f, 'aa', 'merge');
+    const nonHolderPath: string = leaf(f, 'bb', 'merge');
+    // Unstamped merge leaves take turns in slug order, so aa holds the queue.
+    const refuses: Result[] = [
+      await cli(f, ['phase', 'bb', 'merged']),
+      await cli(f, ['phase', 'bb', 'merged', '--check']),
+      await cli(f, ['phase', 'bb', 'check.fix']),
+    ];
+    for (const result of refuses) {
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('aa');
+    }
+    expect(readState(nonHolderPath).phase).toBe('merge');
+    const failed: Result = await cli(f, ['phase', 'bb', 'failed', '--reason', 'x'], f.root, herdr.env);
+    expect(failed.code).toBe(0);
+    expect(readState(nonHolderPath).phase).toBe('failed');
+    expect((await cli(f, ['phase', 'aa', 'merged', '--check'])).stdout).toBe('ok');
+    const moved: Result = await cli(f, ['phase', 'aa', 'merged']);
+    expect(moved.code).toBe(0);
+    expect(readState(holderPath).phase).toBe('merged');
+  } finally {
+    f.clean();
+  }
+});
+
+test('merge turn refusal fires before worktree guards on a missing worktree', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'aa', 'merge');
+    leaf(f, 'bb', 'merge', { worktree: resolve(f.home, 'gone') });
+    const refuses: Result[] = [await cli(f, ['phase', 'bb', 'merged']), await cli(f, ['phase', 'bb', 'check.fix'])];
+    for (const result of refuses) {
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('aa');
+      expect(result.stderr).not.toContain('Missing worktree');
+      expect(result.stderr).not.toContain('Uncommitted work');
+    }
+  } finally {
+    f.clean();
+  }
+});
+
+test('an earlier merge_stamp takes the turn over slug order', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'aa', 'merge', { merge_stamp: '2026-10-05T20:00:02Z' }, 'epic/first');
+    leaf(f, 'bb', 'merge', { merge_stamp: '2026-10-05T20:00:01Z' }, 'epic/second');
+    const refused: Result = await cli(f, ['phase', 'aa', 'merged']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('bb');
+    expect((await cli(f, ['phase', 'bb', 'merged'])).code).toBe(0);
+    expect((await cli(f, ['phase', 'aa', 'merged'])).code).toBe(0);
+  } finally {
+    f.clean();
+  }
+});
+
+test('moving into merge writes merge_stamp and re-entering refreshes it', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const path: string = leaf(f, 'stamper', 'check.repair');
+    expect((await cli(f, ['phase', 'stamper', 'merge', '--slot', 'B'])).stdout).toBe('moved merge');
+    const first: string | undefined = readState(path).merge_stamp;
+    expect(Date.parse(first ?? '')).not.toBeNaN();
+    expect((await cli(f, ['phase', 'stamper', 'failed', '--reason', 'x'], f.root, herdr.env)).stdout).toBe(
+      'moved failed',
+    );
+    expect((await cli(f, ['phase', 'stamper', 'merge'])).stdout).toBe('moved merge');
+    const second: string | undefined = readState(path).merge_stamp;
+    expect(Date.parse(second ?? '')).not.toBeNaN();
+    expect(second).not.toBe(first);
   } finally {
     f.clean();
   }
