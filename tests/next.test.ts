@@ -4105,3 +4105,58 @@ test('an idle hook advances past a capped holder after visiting its waiter', asy
     f.clean();
   }
 }, 15000);
+
+test('a saved holder failure wakes the stamped queue when the log is a directory', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    mkdirSync(resolve(f.root, 'issues/log.jsonl'));
+    const result: Result = await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop', '--slot', 'B'], f.root, f.env);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('log append failed');
+    expect(readState(aa.path).phase).toBe('failed');
+    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: `merge-issue bb slot=B phase=merge leaf=${bb.path}` }]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('unstamped merge dispatch uses log order and refuses unreadable history', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    for (const queued of [aa, bb]) saveState(queued.path, { ...readState(queued.path), phase: 'merge' });
+    const log: string = resolve(f.root, 'issues/log.jsonl');
+    mkdirSync(log);
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, ['--all'])).code).not.toBe(0);
+    expect(mergePrompts(f)).toHaveLength(0);
+    rmSync(log, { recursive: true });
+    const records: string[] = ['bb', 'aa'].map((slug, index) =>
+      JSON.stringify({
+        ts: `2026-09-1${index + 1}T00:00:00.000Z`,
+        repo: 'repo',
+        slug,
+        from: 'check.review',
+        to: 'merge',
+        slot: 'B',
+        attempts: { A: 0, B: 0 },
+        fix_rounds: 0,
+        verdict: {},
+        head: '',
+        diff: '',
+        session: null,
+      }),
+    );
+    writeFileSync(log, records.join('\n') + '\n');
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: `merge-issue bb slot=B phase=merge leaf=${bb.path}` }]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
