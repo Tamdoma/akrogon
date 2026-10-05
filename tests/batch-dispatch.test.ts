@@ -597,3 +597,63 @@ test('a solo leaf leaving merge and returning joins the next holder batch', asyn
     f.clean();
   }
 });
+
+test('a dirty member worktree is soloed out of the apply and keeps its uncommitted files', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    await commitFile(f, aa.path, 'aa-file', 'aa\n');
+    await commitFile(f, bb.path, 'bb-file', 'bb\n');
+    const bbHead: string = await head(f, 'bb');
+    writeFileSync(resolve(z.string().parse(readState(bb.path).worktree), 'file'), 'uncommitted\n');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const bbState: State = readState(bb.path);
+    expect(bbState.solo).toBe(true);
+    expect(await head(f, 'bb')).toBe(bbHead);
+    const bbWorktree: string = z.string().parse(bbState.worktree);
+    expect(readFileSync(resolve(bbWorktree, 'file'), 'utf8')).toBe('uncommitted\n');
+    expect(await command(['git', 'status', '--porcelain'], bbWorktree)).toContain('file');
+    const batch = readState(aa.path).batch;
+    expect(batch?.applied).toBe(true);
+    expect(batch?.members).toEqual([]);
+    expect(await head(f, 'aa')).toBe(z.string().parse(batch?.top));
+    expect((await run(['git', 'cat-file', '-e', z.string().parse(batch?.top) + ':bb-file'], f.root)).code).not.toBe(0);
+    expect(database(f).prompts).toEqual([expectedPrompt(aa.path, aa.b)]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a dirty holder worktree drops the batch to solo and restores carried members', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    await commitFile(f, aa.path, 'aa-file', 'aa\n');
+    await commitFile(f, bb.path, 'bb-file', 'bb\n');
+    const aaHead: string = await head(f, 'aa');
+    const bbHead: string = await head(f, 'bb');
+    const aaWorktree: string = z.string().parse(readState(aa.path).worktree);
+    writeFileSync(resolve(aaWorktree, 'file'), 'holder dirty\n');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(readFileSync(resolve(aaWorktree, 'file'), 'utf8')).toBe('holder dirty\n');
+    expect(await head(f, 'aa')).toBe(aaHead);
+    expect(await head(f, 'bb')).toBe(bbHead);
+    const batch = readState(aa.path).batch;
+    expect(batch?.applied).toBe(true);
+    expect(batch?.solo).toBe(true);
+    expect(batch?.members).toEqual([]);
+    expect(readState(bb.path).solo).toBeUndefined();
+    expect(mergePrompts(f).at(-1)?.text).toContain('solo');
+    expect(mergePrompts(f).at(-1)?.pane).toBe(aa.b);
+  } finally {
+    f.clean();
+  }
+}, 15000);

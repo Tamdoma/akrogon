@@ -22,6 +22,7 @@ type BatchFixture = {
   holder: Leaf;
   members: Leaf[];
   record: Batch;
+  branches: Map<string, Branch>;
 };
 
 async function branchAt(f: Fixture, slug: string, base: string, file: string): Promise<Branch> {
@@ -96,7 +97,7 @@ async function batchFixture(
     record.members.map((member) => ({ ...member, leaf: members.find((l) => l.state.slug === member.slug)! })),
     holder,
   );
-  return { repo, herdr: fakeHerdr(f), builtOn, holder, members, record };
+  return { repo, herdr: fakeHerdr(f), builtOn, holder, members, record, branches };
 }
 
 async function soloFixture(f: Fixture): Promise<BatchFixture> {
@@ -117,6 +118,7 @@ async function soloFixture(f: Fixture): Promise<BatchFixture> {
     holder: { path: holderPath, state: readState(holderPath) },
     members: [],
     record,
+    branches: new Map([['hold', branch]]),
   };
 }
 
@@ -174,7 +176,7 @@ test('a green batch checks once, pushes once, moves members before the holder an
 test('a member leaving merge before merged refuses the push and dissolves the batch without solo marks', async () => {
   const f: Fixture = await fixture();
   try {
-    const { record, holder, members, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { record, holder, members, herdr, branches } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
     const remoteBefore: string = await remoteTip(f);
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
@@ -192,6 +194,8 @@ test('a member leaving merge before merged refuses the push and dissolves the ba
     const holderState: State = readState(holder.path);
     expect(holderState.phase).toBe('merge');
     expect(holderState.batch).toBeUndefined();
+    expect(await command(['git', 'rev-parse', 'refs/heads/hold'], f.root)).toBe(branches.get('hold')!.head);
+    expect(await command(['git', 'rev-parse', 'HEAD'], holder.state.worktree!)).toBe(branches.get('hold')!.head);
     const stayed: State = readState(members[1].path);
     expect(stayed.phase).toBe('merge');
     expect(stayed.solo).toBeUndefined();
@@ -516,6 +520,115 @@ exec '${git}' "$@"
     expect(await command(['git', 'rev-parse', 'mem-a'], f.root)).toBe(record.members[0].tip);
     expect(await remoteTip(f)).toBe(before);
     expect(readState(holder.path).batch).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
+test('a dissolved batch restores the holder to its own range and the solo push carries no member commits', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, branches, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+    expect(await command(['git', 'rev-parse', 'refs/heads/hold'], f.root)).toBe(record.top!);
+    const red: Result = await cli(
+      f,
+      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(red.code).toBe(0);
+    expect(red.stdout).toBe('batch dissolved, merge solo');
+    const holderHead: string = branches.get('hold')!.head;
+    expect(await command(['git', 'rev-parse', 'refs/heads/hold'], f.root)).toBe(holderHead);
+    expect(await command(['git', 'rev-parse', 'HEAD'], holder.state.worktree!)).toBe(holderHead);
+    expect(
+      (
+        await command(
+          ['git', 'rev-list', '--format=%s', '--no-commit-header', holderHead + '..refs/heads/hold'],
+          f.root,
+        )
+      ).trim(),
+    ).toBe('hold');
+    const solo: State = readState(holder.path);
+    const attempt: string = z.string().parse(solo.batch?.attempt);
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', attempt, '--check'], f.root, herdr.env))
+        .code,
+    ).toBe(0);
+    const merged: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', attempt],
+      f.root,
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    expect(await remoteSubjects(f, 1)).toEqual(['hold']);
+    expect((await run(['git', 'show', 'refs/heads/main:file-mem-a'], remoteDir(f))).code).not.toBe(0);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a member conflict during restack drops the member and keeps its commits out of the rebuilt stack', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(
+      f,
+      ['hold', 'mem-a', 'mem-b'],
+      {},
+      { 'mem-a': 'conflict-file', 'mem-b': 'file-mem-b' },
+    );
+    const droppedTip: string = record.members[0].tip;
+    const advance: string = resolve(f.home, 'advance');
+    await command(['git', 'worktree', 'add', '--detach', advance, 'origin/main'], f.root);
+    writeFileSync(resolve(advance, 'conflict-file'), 'from-main\n');
+    await command(['git', 'add', '.'], advance);
+    await command(['git', 'commit', '-m', 'adv'], advance);
+    await command(['git', 'push', 'origin', 'HEAD:main'], advance);
+    await command(['git', 'worktree', 'remove', '--force', advance], f.root);
+    const merged: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    expect(merged.stdout).toMatch(/^fresh checks required [0-9a-f]{40}$/);
+    const newTop: string = merged.stdout.split(' ').pop()!;
+    const batch: Batch = readState(holder.path).batch!;
+    expect(batch.top).toBe(newTop);
+    expect(batch.members.map((member) => member.slug)).toEqual(['mem-b']);
+    const dropped: State = readState(resolve(f.root, 'issues/open/issue/mem-a'));
+    expect(dropped.solo).toBe(true);
+    expect(await command(['git', 'rev-parse', 'refs/heads/mem-a'], f.root)).toBe(record.members[0].head);
+    expect((await run(['git', 'merge-base', '--is-ancestor', droppedTip, newTop], f.root)).code).toBe(1);
+    expect((await run(['git', 'cat-file', '-e', newTop + ':file-mem-a'], f.root)).code).not.toBe(0);
+    expect(await command(['git', 'show', newTop + ':conflict-file'], f.root)).toBe('from-main');
+    expect(await command(['git', 'log', '--format=%s', '-1', newTop], f.root)).toBe('hold');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a dirty member worktree keeps its files and branch at head when the batch dissolves', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, members, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+    const dirty: string = resolve(members[0].state.worktree!, 'file');
+    writeFileSync(dirty, 'uncommitted\n');
+    const red: Result = await cli(
+      f,
+      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(red.code).toBe(0);
+    expect(red.stdout).toBe('batch dissolved, merge solo');
+    expect(readFileSync(dirty, 'utf8')).toBe('uncommitted\n');
+    expect(await command(['git', 'status', '--porcelain'], members[0].state.worktree!)).toContain('file');
+    expect(await command(['git', 'rev-parse', 'refs/heads/mem-a'], f.root)).toBe(record.members[0].head);
+    expect(readState(members[0].path).solo).toBe(true);
+    expect(readState(holder.path).batch?.members).toEqual([]);
   } finally {
     f.clean();
   }
