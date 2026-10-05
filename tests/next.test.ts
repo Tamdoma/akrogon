@@ -867,10 +867,11 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)).toMatchObject({
       pane: state.pane.B,
-      text: `merge-issue landed slot=B phase=merge leaf=${path}`,
+      text: mergeText(path),
     });
-    expect(database(f).prompts.at(-1)?.text?.endsWith(` leaf=${f.root}/issues/open/landing/landed`)).toBe(true);
-    expect(database(f).prompts.at(-1)?.text?.split(' leaf=')[1]).not.toContain('issues/worktrees');
+    expect(database(f).prompts.at(-1)?.text?.split(' leaf=')[1]?.split(' ')[0]).toBe(
+      `${f.root}/issues/open/landing/landed`,
+    );
     const completed: Result = await cli(f, ['phase', 'landed', 'merged', '--slot', 'B'], worktree, f.env);
     expect(completed.code).toBe(0);
     expect(completed.stdout).toContain('issue complete landing');
@@ -962,7 +963,7 @@ test('uncommitted work in a merge worktree is left to the merge seat', async () 
     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)).toMatchObject({
       pane: state.pane.B,
-      text: `merge-issue dirty slot=B phase=merge leaf=${path}`,
+      text: mergeText(path),
     });
     expect(existsSync(resolve(worktree, 'forgotten'))).toBe(true);
   } finally {
@@ -1720,7 +1721,6 @@ for (const seat of ['B'] as const) {
       const observedAt: number = Date.now();
       const result: Result = await next(f, ['blocked-merge'], { REAL_GIT: realGit, GIT_CALL_LOG: gitLog });
       const gitCalls: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');
-      expect(gitCalls.some((args) => args.startsWith('fetch '))).toBe(false);
       expect(gitCalls).not.toContain('status --porcelain');
       expect(result.code).toBe(0);
       const after: State = readState(path);
@@ -1728,7 +1728,10 @@ for (const seat of ['B'] as const) {
       expect(before.busy_since.B).toBeUndefined();
       expect(Date.parse(since)).toBeGreaterThanOrEqual(observedAt);
       expect(Date.parse(since)).toBeLessThanOrEqual(Date.now());
-      expect(after).toEqual({ ...before, busy_since: { [seat]: since }, busy_notified: {} });
+      // The batch pass built and applied a member-less record without touching the seat.
+      expect(after.batch?.applied).toBe(true);
+      const { batch, ...rest }: State = after;
+      expect(rest).toEqual({ ...before, busy_since: { [seat]: since }, busy_notified: {} });
       expect(database(f).prompts).toEqual(db.prompts);
       expect(database(f).starts).toEqual(db.starts);
       expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
@@ -1762,7 +1765,7 @@ test('a blocked non-merge seat does not stall a merge leaf', async () => {
     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)).toMatchObject({
       pane: state.pane.B,
-      text: `merge-issue blocked-merge slot=B phase=merge leaf=${path}`,
+      text: mergeText(path),
     });
     expect(readState(path).busy_since.A).toBeDefined();
     expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
@@ -1787,7 +1790,7 @@ test('merge, check.fix, check.repair and post-repair review dispatch to their sw
     expect((await next(f, ['post-repair'])).code).toBe(0);
     expect(database(f).prompts.at(-1)).toEqual({
       pane: state.pane.B!,
-      text: `merge-issue post-repair slot=B phase=merge leaf=${path}`,
+      text: mergeText(path),
     });
     saveState(path, { ...readState(path), phase: 'check.fix', prompted: {} });
     saveDatabase(f, { ...database(f), panes: database(f).panes.map((p) => ({ ...p, agent_status: 'idle' })) });
@@ -2207,7 +2210,7 @@ test('next --resume re-prompts allocated idle leaves in every registered repo wi
   }
 }, 15000);
 
-test('next --resume completes and cleans a merged leaf while its unallocated dependent stays untouched', async () => {
+test('next --resume completes and cleans a merged leaf and starts its dependent', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const done: string = leaf(f, 'done', 'plan.synthesis', {}, 'solo');
@@ -2223,10 +2226,15 @@ test('next --resume completes and cleans a merged leaf while its unallocated dep
     expect(existsSync(resolve(f.root, 'issues/closed/solo'))).toBe(true);
     expect(existsSync(worktree)).toBe(false);
     expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/done'], f.root)).code).toBe(1);
-    expect(database(f).tabs).toHaveLength(0);
-    expect(database(f).prompts).toHaveLength(0);
-    expect(readState(dependent).tab).toBeUndefined();
-    expect(readState(dependent).worktree).toBeUndefined();
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['dependent']);
+    expect(database(f).prompts).toEqual([
+      {
+        pane: readState(dependent).pane.A!,
+        text: `plan-issue dependent slot=A phase=plan.synthesis leaf=${dependent}`,
+      },
+    ]);
+    expect(readState(dependent).tab).toBeDefined();
+    expect(readState(dependent).worktree).toBeDefined();
     expect(readState(dependent).attempts).toEqual({ A: 0, B: 0 });
   } finally {
     f.clean();
@@ -2369,7 +2377,7 @@ test('merge leaf with landed branch re-prompts its idle seat instead of auto-rec
     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)).toMatchObject({
       pane: state.pane.B,
-      text: `merge-issue landed-merge slot=B phase=merge leaf=${path}`,
+      text: mergeText(path),
     });
     expect(readState(path).phase).toBe('merge');
   } finally {
@@ -3895,6 +3903,15 @@ function mergePrompts(f: DispatchFixture): Database['prompts'] {
   return database(f).prompts.filter((prompt) => prompt.text.startsWith('merge-issue'));
 }
 
+function mergeText(path: string): string {
+  const state: State = readState(path);
+  const batch = state.batch;
+  expect(batch).toBeDefined();
+  const context: string =
+    batch!.solo === true ? `attempt=${batch!.attempt} solo` : `attempt=${batch!.attempt} top=${batch!.top}`;
+  return `merge-issue ${state.slug} slot=B phase=merge leaf=${path} ${context}`;
+}
+
 test('only the earlier-stamped merge leaf is prompted while the waiting leaf keeps its tab and panes', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -3904,7 +3921,7 @@ test('only the earlier-stamped merge leaf is prompted while the waiting leaf kee
     const before: State = toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, [])).code).toBe(0);
-    expect(database(f).prompts).toEqual([{ pane: aa.b, text: `merge-issue aa slot=B phase=merge leaf=${aa.path}` }]);
+    expect(database(f).prompts).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
     expect(readState(bb.path)).toEqual(before);
     expect(database(f).tabs.map((tab) => tab.label)).toEqual(['aa', 'bb']);
     for (const paneId of Object.values(before.pane))
@@ -3932,9 +3949,7 @@ for (const blocker of ['hand_built', 'blocked-by'] as const) {
       const held: { slug: string; path: string; b: string } =
         blocker === 'hand_built' ? { slug: 'bb', ...bb } : { slug: 'aa', ...aa };
       const waiting: { path: string; b: string } = blocker === 'hand_built' ? aa : bb;
-      expect(mergePrompts(f)).toEqual([
-        { pane: held.b, text: `merge-issue ${held.slug} slot=B phase=merge leaf=${held.path}` },
-      ]);
+      expect(mergePrompts(f)).toEqual([{ pane: held.b, text: mergeText(held.path) }]);
       expect(database(f).prompts).toHaveLength(1);
       expect(readState(waiting.path).prompted.B).toBeUndefined();
     } finally {
@@ -3967,6 +3982,8 @@ for (const exit of [
         for (let pass = 0; pass < 3; pass++) expect((await next(f, ['--all'])).code).toBe(0);
         expect(readState(aa.path).failure?.cause).toBe('attempts');
         expect(readState(aa.path).failure?.reason).toContain('after 3 passes');
+        // The capped holder failed inside the pass; the next pass hands the turn to bb.
+        expect((await next(f, ['--all'])).code).toBe(0);
       } else {
         const args: string[] =
           exit === 'seat merged'
@@ -3985,7 +4002,7 @@ for (const exit of [
             ? 'merged'
             : 'failed',
       );
-      expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: `merge-issue bb slot=B phase=merge leaf=${bb.path}` }]);
+      expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
       expect((await next(f, ['--all'])).code).toBe(0);
       expect(mergePrompts(f).filter((prompt) => prompt.pane === bb.b)).toHaveLength(1);
     } finally {
@@ -4011,7 +4028,7 @@ test('a committed merge whose log append fails still wakes the next leaf', async
     expect(result.stderr).toContain('log append failed');
     chmodSync(log, 0o644);
     expect(readState(aa.path).phase).toBe('merged');
-    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: `merge-issue bb slot=B phase=merge leaf=${bb.path}` }]);
+    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
   } finally {
     f.clean();
   }
@@ -4096,9 +4113,9 @@ test('an idle hook advances past a capped holder after visiting its waiter', asy
     };
     expect((await next(f, [], env)).code).toBe(0);
     expect(readState(holder.path).phase).toBe('failed');
-    expect(mergePrompts(f)).toEqual([
-      { pane: waiter.b, text: `merge-issue ${order[0]} slot=B phase=merge leaf=${waiter.path}` },
-    ]);
+    // The holder capped inside the pass; the waiter takes the turn on the next pass.
+    expect((await next(f, [], env)).code).toBe(0);
+    expect(mergePrompts(f)).toEqual([{ pane: waiter.b, text: mergeText(waiter.path) }]);
     expect((await next(f, [], env)).code).toBe(0);
     expect(mergePrompts(f)).toHaveLength(1);
   } finally {
@@ -4119,7 +4136,7 @@ test('a saved holder failure wakes the stamped queue when the log is a directory
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('log append failed');
     expect(readState(aa.path).phase).toBe('failed');
-    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: `merge-issue bb slot=B phase=merge leaf=${bb.path}` }]);
+    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
   } finally {
     f.clean();
   }
@@ -4155,7 +4172,7 @@ test('unstamped merge dispatch uses log order and refuses unreadable history', a
     );
     writeFileSync(log, records.join('\n') + '\n');
     expect((await next(f, ['--all'])).code).toBe(0);
-    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: `merge-issue bb slot=B phase=merge leaf=${bb.path}` }]);
+    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
   } finally {
     f.clean();
   }
