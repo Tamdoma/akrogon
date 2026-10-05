@@ -78,5 +78,5 @@ Print the actual outcome, the created issue URL or the failure's exit status and
 
 ```text
 Last operation: <created issue URL, or failure and reason>
-Next: none <intake submitted, or stopped with reason, naming any printed root report line>
+Next: none <intake submitted, or stopped with reason; the reason names a printed root-report line and any lookup failure>
 ```
