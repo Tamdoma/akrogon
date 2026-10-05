@@ -504,3 +504,27 @@ test('a leaf entering merge after the record was written is excluded and becomes
     f.clean();
   }
 }, 20000);
+
+test('a red-batch member holds its next turn solo despite an unmarked waiter', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa = await allocatedLeaf(f, 'aa');
+    const bb = await allocatedLeaf(f, 'bb');
+    const cc = await allocatedLeaf(f, 'cc');
+    await commitFile(f, aa.path, 'aa-file', 'a');
+    await commitFile(f, bb.path, 'bb-file', 'b');
+    toMerge(aa.path, '2026-09-11T00:00:00Z');
+    toMerge(bb.path, '2026-09-12T00:00:00Z');
+    idleAll(f);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const attempt: string = readState(aa.path).batch!.attempt;
+    expect((await cli(f, ['phase', 'aa', 'check.fix', '--slot', 'B', '--attempt', attempt], f.root, f.env)).code).toBe(0);
+    expect(readState(bb.path).solo).toBe(true);
+    toMerge(cc.path, '2026-09-13T00:00:00Z');
+    expect((await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop'], f.root, f.env)).code).toBe(0);
+    expect(readState(bb.path).batch!.members).toEqual([]);
+    expect(readState(bb.path).batch!.solo).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
