@@ -3876,3 +3876,176 @@ test('merged leaf cleanup removes the worktree and leaves the registered .env un
     f.clean();
   }
 }, 15000);
+
+async function allocatedLeaf(f: DispatchFixture, slug: string): Promise<{ path: string; b: string }> {
+  const path: string = leaf(f, slug, 'plan.synthesis');
+  expect((await next(f, [slug])).code).toBe(0);
+  const allocated: State = readState(path);
+  return { path, b: allocated.pane.B! };
+}
+
+function toMerge(path: string, mergeStamp: string, extra: object = {}): State {
+  const moved: State = { ...readState(path), phase: 'merge', merge_stamp: mergeStamp, ...extra };
+  saveState(path, moved);
+  return moved;
+}
+
+function mergePrompts(f: DispatchFixture): Database['prompts'] {
+  return database(f).prompts.filter((prompt) => prompt.text.startsWith('merge-issue'));
+}
+
+test('only the earlier-stamped merge leaf is prompted while the waiting leaf keeps its tab and panes', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    const before: State = toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, [])).code).toBe(0);
+    expect(database(f).prompts).toEqual([{ pane: aa.b, text: `merge-issue aa slot=B phase=merge leaf=${aa.path}` }]);
+    expect(readState(bb.path)).toEqual(before);
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['aa', 'bb']);
+    for (const paneId of Object.values(before.pane))
+      expect(database(f).panes.some((pane) => pane.pane_id === paneId)).toBe(true);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+for (const blocker of ['hand_built', 'blocked-by'] as const) {
+  test(`an ineligible merge leaf never holds the turn (${blocker})`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+      const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+      toMerge(aa.path, '2026-09-11T00:00:00.000Z', blocker === 'hand_built' ? { hand_built: true } : {});
+      toMerge(bb.path, '2026-09-12T00:00:00.000Z', blocker === 'blocked-by' ? { 'blocked-by': ['cc'] } : {});
+      if (blocker === 'blocked-by') leaf(f, 'cc', 'failed');
+      saveDatabase(f, {
+        ...database(f),
+        prompts: [],
+        panes: database(f).panes.map((pane) => ({ ...pane, agent_status: 'idle' })),
+      });
+      expect((await next(f, ['--all'])).code).toBe(0);
+      const held: { slug: string; path: string; b: string } =
+        blocker === 'hand_built' ? { slug: 'bb', ...bb } : { slug: 'aa', ...aa };
+      const waiting: { path: string; b: string } = blocker === 'hand_built' ? aa : bb;
+      expect(mergePrompts(f)).toEqual([
+        { pane: held.b, text: `merge-issue ${held.slug} slot=B phase=merge leaf=${held.path}` },
+      ]);
+      expect(database(f).prompts).toHaveLength(1);
+      expect(readState(waiting.path).prompted.B).toBeUndefined();
+    } finally {
+      f.clean();
+    }
+  }, 15000);
+}
+
+for (const exit of [
+  'seat merged',
+  'seat check.fix',
+  'seat failed',
+  'capped prompt failure',
+  'operator merged',
+] as const) {
+  test(`the ${exit} holder exit wakes the next merge leaf without a manual next`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+      const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+      toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+      toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+      const stalled: { code: string; message: string } = { code: 'agent_prompt_stalled', message: 'stalled' };
+      saveDatabase(f, {
+        ...database(f),
+        prompts: [],
+        promptScript: exit === 'capped prompt failure' ? [stalled, stalled, stalled] : [],
+      });
+      if (exit === 'capped prompt failure') {
+        for (let pass = 0; pass < 3; pass++) expect((await next(f, ['--all'])).code).toBe(0);
+        expect(readState(aa.path).failure?.cause).toBe('attempts');
+        expect(readState(aa.path).failure?.reason).toContain('after 3 passes');
+      } else {
+        const args: string[] =
+          exit === 'seat merged'
+            ? ['phase', 'aa', 'merged', '--slot', 'B']
+            : exit === 'seat check.fix'
+              ? ['phase', 'aa', 'check.fix', '--slot', 'B']
+              : exit === 'seat failed'
+                ? ['phase', 'aa', 'failed', '--reason', 'stop', '--slot', 'B']
+                : ['phase', 'aa', 'merged'];
+        expect((await cli(f, args, f.root, f.env)).code).toBe(0);
+      }
+      expect(readState(aa.path).phase).toBe(
+        exit === 'seat check.fix'
+          ? 'check.fix'
+          : exit === 'seat merged' || exit === 'operator merged'
+            ? 'merged'
+            : 'failed',
+      );
+      expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: `merge-issue bb slot=B phase=merge leaf=${bb.path}` }]);
+      expect((await next(f, ['--all'])).code).toBe(0);
+      expect(mergePrompts(f).filter((prompt) => prompt.pane === bb.b)).toHaveLength(1);
+    } finally {
+      f.clean();
+    }
+  }, 15000);
+}
+
+test('a committed merge whose log append fails still wakes the next leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    const log: string = resolve(f.root, 'issues/log.jsonl');
+    writeFileSync(log, '');
+    chmodSync(log, 0o444);
+    const result: Result = await cli(f, ['phase', 'aa', 'merged', '--slot', 'B'], f.root, f.env);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('committed');
+    expect(result.stderr).toContain('log append failed');
+    chmodSync(log, 0o644);
+    expect(readState(aa.path).phase).toBe('merged');
+    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: `merge-issue bb slot=B phase=merge leaf=${bb.path}` }]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a leaf re-entering merge queues behind the two leaves stamped earlier', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    const cc: { path: string; b: string } = await allocatedLeaf(f, 'cc');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    toMerge(cc.path, '2026-09-13T00:00:00.000Z');
+    saveDatabase(f, {
+      ...database(f),
+      prompts: [],
+      panes: database(f).panes.map((pane) => ({ ...pane, agent_status: 'idle' })),
+    });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b]);
+    expect((await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop', '--slot', 'B'], f.root, f.env)).code).toBe(0);
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b]);
+    expect((await cli(f, ['phase', 'aa', 'merge'], f.root, f.env)).code).toBe(0);
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b]);
+    const idle: Database = database(f);
+    saveDatabase(f, {
+      ...idle,
+      panes: idle.panes.map((pane) => (pane.pane_id === aa.b ? { ...pane, agent_status: 'idle' } : pane)),
+    });
+    expect((await cli(f, ['phase', 'bb', 'merged', '--slot', 'B'], f.root, f.env)).code).toBe(0);
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, cc.b]);
+    expect((await cli(f, ['phase', 'cc', 'merged', '--slot', 'B'], f.root, f.env)).code).toBe(0);
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, cc.b, aa.b]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
