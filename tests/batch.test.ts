@@ -157,8 +157,16 @@ test('empty member and holder ranges produce their heads without a rebase', asyn
     );
     if (!result.ok) throw new Error(JSON.stringify(result));
     expect(result.tips.get('mem-empty')).toBe(builtOn);
-    expect(result.top).toBe(builtOn);
+    expect(result.top).toBe(result.tips.get('mem-c')!);
+    expect(await isAncestor(f.root, result.tips.get('mem-c')!, result.top)).toBe(true);
     const holder = await branch(f, 'holder', { 'file-h': 'h\n' }, false);
+    const emptyLast = await buildStack(repo, builtOn, [
+      { slug: 'mem-c', base: builtOn, head: c.sha },
+      { slug: 'mem-empty', base: builtOn, head: builtOn },
+    ], holder.sha);
+    if (!emptyLast.ok) throw new Error(JSON.stringify(emptyLast));
+    expect(await isAncestor(f.root, emptyLast.tips.get('mem-c')!, emptyLast.top)).toBe(true);
+    expect(emptyLast.tips.get('mem-empty')).toBe(emptyLast.tips.get('mem-c'));
     const withHolder = await buildStack(
       repo,
       builtOn,
