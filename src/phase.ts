@@ -554,12 +554,37 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
           const tip: string = staged.tips.get(member.slug)!;
           return { member: { ...member, tip }, leaf: findLeaf(repo, member.slug) };
         });
-        await applyStack(
+        const moved: { dirty: string[] } = await applyStack(
           repo,
           staged.top,
           appliedMembers.map((entry) => ({ slug: entry.member.slug, tip: entry.member.tip, leaf: entry.leaf })),
           current,
         );
+        if (moved.dirty.length > 0) {
+          const restored: { dirty: string[] } = await restoreMembers(repo, [
+            ...staying.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
+            { slug: current.state.slug, head: holderHead, leaf: current },
+          ]);
+          const lateDirty: Set<string> = new Set([...moved.dirty, ...restored.dirty]);
+          for (const entry of staying.filter((item) => lateDirty.has(item.member.slug)))
+            saveState(entry.leaf.path, { ...readState(entry.leaf.path), solo: true });
+          members = batch.members.filter((member) => !lateDirty.has(member.slug));
+          const solo: boolean = lateDirty.has(current.state.slug);
+          saveState(current.path, {
+            ...readState(current.path),
+            batch: {
+              ...batch,
+              holder: { base: builtOn, head: holderHead },
+              members: solo ? [] : members,
+              applied: solo,
+              solo: solo ? true : batch.solo,
+              top: undefined,
+              tested_top: undefined,
+              candidate: undefined,
+            },
+          });
+          return solo ? 'dirty-holder' : 'rebuild';
+        }
         saveState(current.path, {
           ...current.state,
           batch: {

@@ -1036,8 +1036,30 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
           saveState(fresh.path, { ...fresh.state, batch: prompt });
           return 'applied';
         }
-        if (staged.top !== holderHead || members.length > 0)
-          await applyStack(repo, staged.top, members, { path: fresh.path, state: fresh.state });
+        const applied: { dirty: string[] } = await applyStack(repo, staged.top, members, fresh);
+        if (applied.dirty.length > 0) {
+          const restored: { dirty: string[] } = await restoreMembers(repo, [
+            ...members.map((member) => ({
+              slug: member.slug,
+              head: current.members.find((entry) => entry.slug === member.slug)!.head,
+              leaf: member.leaf,
+            })),
+            { slug: fresh.state.slug, head: holderHead, leaf: fresh },
+          ]);
+          const lateDirty: Set<string> = new Set([...applied.dirty, ...restored.dirty]);
+          for (const member of current.members.filter((entry) => lateDirty.has(entry.slug))) {
+            const leaf: Leaf = findLeaf(repo, member.slug);
+            saveState(leaf.path, { ...leaf.state, solo: true });
+          }
+          current = { ...current, members: current.members.filter((entry) => !lateDirty.has(entry.slug)) };
+          if (lateDirty.has(fresh.state.slug)) {
+            prompt = { ...current, applied: true, solo: true, members: [] };
+            saveState(fresh.path, { ...readState(fresh.path), batch: prompt });
+            return 'applied';
+          }
+          saveState(fresh.path, { ...readState(fresh.path), batch: current });
+          return 'rebuild';
+        }
         prompt = {
           ...fresh.state.batch,
           applied: true,

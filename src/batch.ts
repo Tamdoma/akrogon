@@ -68,8 +68,9 @@ async function move(repo: Repo, slug: string, target: string, leaf?: Leaf): Prom
       await command(['git', 'update-ref', 'refs/heads/' + slug, target], repo.root);
       return { moved: 'dirty-ref' };
     }
-    await command(['git', '-C', leaf.state.worktree, 'reset', '--hard', target], repo.root);
-    return { moved: 'worktree' };
+    await command(['git', '-C', leaf.state.worktree, 'reset', '--keep', target], repo.root);
+    const remaining: string = await command(['git', '-C', leaf.state.worktree, 'status', '--porcelain'], repo.root);
+    return { moved: remaining === '' ? 'worktree' : 'dirty-ref' };
   }
   await command(['git', 'update-ref', 'refs/heads/' + slug, target], repo.root);
   return { moved: 'ref' };
