@@ -493,6 +493,12 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
           !members.every((m) => batch.members.some((b) => b.slug === m.slug))
         )
           return false;
+        const staying: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
+        if (staying.length !== batch.members.length) {
+          await restoreMembers(repo, staying.map((entry) => ({ ...entry.member, leaf: entry.leaf })));
+          saveState(current.path, { ...current.state, batch: undefined });
+          throw new Error('Member left merge during restack, batch dissolved');
+        }
         const appliedMembers: { member: BatchMember; leaf: Leaf }[] = members.map((member) => {
           const tip: string = staged.tips.get(member.slug)!;
           return { member: { ...member, tip }, leaf: findLeaf(repo, member.slug) };
