@@ -557,3 +557,22 @@ test('cleanup retains a closed carried worktree while publication recovery is bl
     f.clean();
   }
 });
+
+test('a failed published holder receives one recovery notice across repeated passes', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder = await allocatedLeaf(f, 'holder');
+    await commitFile(f, holder.path, 'holder-file', 'h');
+    toMerge(holder.path, '2026-09-11T00:00:00Z');
+    idleAll(f);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const state: State = readState(holder.path);
+    await command(['git', 'push', 'origin', state.batch!.top! + ':main'], f.root);
+    saveState(holder.path, { ...state, phase: 'failed', batch: { ...state.batch!, candidate: state.batch!.top } });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(calls(f).filter((args) => args[0] === 'notification' && args[1] === 'show')).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+});
