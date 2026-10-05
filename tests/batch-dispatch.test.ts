@@ -660,3 +660,28 @@ test('a dirty holder worktree drops the batch to solo and restores carried membe
     f.clean();
   }
 }, 15000);
+
+for (const ending of ['check.fix', 'failed'] as const) {
+  test(`solo-seat commits survive the ${ending} handoff`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+      await commitFile(f, holder.path, 'original', 'original');
+      toMerge(holder.path, '2026-09-11T00:00:00Z', { solo: true });
+      idleAll(f);
+      expect((await next(f, ['--all'])).code).toBe(0);
+      const attempt: string = readState(holder.path).batch!.attempt;
+      await commitFile(f, holder.path, 'solo-fix', 'committed solo repair');
+      const repaired: string = await head(f, 'holder');
+      const args: string[] = ending === 'check.fix'
+        ? ['phase', 'holder', ending, '--slot', 'B', '--attempt', attempt]
+        : ['phase', 'holder', ending, '--slot', 'B', '--reason', 'stop'];
+      expect((await cli(f, args, f.root, f.env)).code).toBe(0);
+      expect(readState(holder.path).phase).toBe(ending);
+      expect(await head(f, 'holder')).toBe(repaired);
+      expect(readFileSync(resolve(readState(holder.path).worktree!, 'solo-fix'), 'utf8')).toBe('committed solo repair');
+    } finally {
+      f.clean();
+    }
+  });
+}

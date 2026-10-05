@@ -712,3 +712,26 @@ test('a carried package installs on the batch top and the restored member resolv
     f.clean();
   }
 }, 30000);
+
+test('a solo restack conflict preserves commits made during the solo pass', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, herdr } = await soloFixture(f);
+    writeFileSync(resolve(holder.state.worktree!, 'solo-fix'), 'committed solo repair');
+    await command(['git', 'add', '.'], holder.state.worktree!);
+    await command(['git', 'commit', '-m', 'solo repair'], holder.state.worktree!);
+    const repaired: string = await command(['git', 'rev-parse', 'hold'], f.root);
+    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env)).code).toBe(0);
+    writeFileSync(resolve(f.root, 'file-hold'), 'main conflict');
+    await command(['git', 'add', 'file-hold'], f.root);
+    await command(['git', 'commit', '-m', 'advance'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const result: Result = await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, herdr.env);
+    expect(result.code).toBe(0);
+    expect(readState(holder.path).batch!.solo).toBe(true);
+    expect(await command(['git', 'rev-parse', 'hold'], f.root)).toBe(repaired);
+    expect(readFileSync(resolve(holder.state.worktree!, 'solo-fix'), 'utf8')).toBe('committed solo repair');
+  } finally {
+    f.clean();
+  }
+});
