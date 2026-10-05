@@ -26,8 +26,7 @@ export type QueueEntry = { leaf: Leaf; place: number; noRecord: boolean };
 
 export function mergeQueue(global: GlobalConfig, leaves: Leaf[], log: LogRecord[]): QueueEntry[] {
   const stamp: Map<string, string> = new Map();
-  for (const entry of log)
-    if (entry.record.to === 'merge') stamp.set(entry.record.slug, entry.record.ts);
+  for (const entry of log) if (entry.record.to === 'merge') stamp.set(entry.record.slug, entry.record.ts);
   return leaves
     .filter((leaf) => leaf.state.phase === 'merge' && eligibility(global, leaf, leaves) === null)
     .map((leaf) => ({ leaf, time: leaf.state.merge_stamp ?? stamp.get(leaf.state.slug) }))

@@ -615,7 +615,10 @@ async function dispatchLeaf(
         );
       return 'waiting';
     }
-    if (state.phase === 'merge' && mergeQueue(global, inventory.leaves, readLog(repo.root))[0]?.leaf.state.slug !== slug)
+    if (
+      state.phase === 'merge' &&
+      mergeQueue(global, inventory.leaves, readLog(repo.root))[0]?.leaf.state.slug !== slug
+    )
       return 'waiting';
     seats(global, repo);
     // Mirrors ensureWorktree's path: a missing worktree needs remote proof, an existing one only local.

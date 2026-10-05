@@ -136,9 +136,7 @@ function cells(leaf: Leaf, log: LogRecord[], now: number, indent: string, queue:
 }
 
 function rows(scan: Scan & { ok: true }, now: number): string[][] {
-  const queue: Map<string, QueueEntry> = new Map(
-    scan.queue.map((entry) => [entry.leaf.state.slug, entry]),
-  );
+  const queue: Map<string, QueueEntry> = new Map(scan.queue.map((entry) => [entry.leaf.state.slug, entry]));
   let previous: string[] = [];
   return scan.leaves.flatMap((leaf) => {
     const groups: string[] = relative(resolve(scan.repo.root, 'issues/open'), leaf.path).split(sep).slice(0, -1);
