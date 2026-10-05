@@ -23,7 +23,7 @@ Require nonempty GitHub owner and repository names without whitespace, query/fra
 
 ## Report
 
-Use the reporter's statement and only nearby context needed to understand it to author one title describing what was seen, naming a cause only when the reporter's statement is itself a cause and marking it suspected, and the six body sections below, identifying the report as unverified intake, preserving useful supplied facts, paths and commands, stating missing details as “Not provided” rather than inventing them or blocking thin intake, with urgency describing impact and any known workaround, and adding no recommended fixes or planning metadata.
+Use the reporter's statement and only nearby context needed to understand it to author one title describing what was seen, naming a cause only when the reporter's statement is itself a cause and marking it suspected, and the six body sections below, keeping Observation to what was seen and placing supplied or inferred cause reasoning in Suspected cause, identifying the report as unverified intake, preserving useful supplied facts, paths and commands, stating missing details as “Not provided” rather than inventing them or blocking thin intake, with urgency describing impact and any known workaround, and adding no recommended fixes or planning metadata.
 
 ```markdown
 Unverified intake.
