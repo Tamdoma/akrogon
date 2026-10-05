@@ -1,4 +1,5 @@
 import { test, expect, afterEach } from 'bun:test';
+import { z } from 'zod';
 import { dirname, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { cli, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture, type HerdrFixture } from './helpers';
@@ -305,7 +306,12 @@ test('a red check.fix restores members, marks them solo, keeps the holder in mer
     expect(red.stdout).toBe('batch dissolved, merge solo');
     const holderState: State = readState(holder.path);
     expect(holderState.phase).toBe('merge');
-    expect(holderState.batch).toBeUndefined();
+    // The post-call mergeWake immediately writes a fresh memberless record for the
+    // still-in-merge holder: the dissolved batch is gone, the fresh solo pass owns it.
+    expect(holderState.batch?.members).toEqual([]);
+    expect(holderState.batch?.attempt).not.toBe(record.attempt);
+    expect(holderState.batch?.attempt).toBeTruthy();
+    expect(holderState.batch?.applied).toBe(true);
     for (const [index, member] of members.entries()) {
       const state: State = readState(member.path);
       expect(state.phase).toBe('merge');
@@ -315,7 +321,13 @@ test('a red check.fix restores members, marks them solo, keeps the holder in mer
       );
     }
     expect(await remoteTip(f)).toBe(remoteBefore);
-    const solo: Result = await cli(f, ['phase', 'hold', 'check.fix', '--slot', 'B'], f.root, herdr.env);
+    const soloAttempt: string = z.string().parse(holderState.batch?.attempt);
+    const solo: Result = await cli(
+      f,
+      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', soloAttempt],
+      f.root,
+      herdr.env,
+    );
     expect(solo.code).toBe(0);
     expect(solo.stdout).toBe('moved check.fix');
     expect(readState(holder.path).phase).toBe('check.fix');

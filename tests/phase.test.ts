@@ -240,9 +240,9 @@ test('completion prints only when the owner finishes, stays silent on inner issu
   try {
     // merge_stamp fixes the queue order the dropped Promise.all race relied on; the
     // one-holder-per-repo rule requires sequential merges.
-    leaf(f, 'one', 'merge', { merge_stamp: '2026-10-05T20:00:00Z' }, 'epic/first');
-    leaf(f, 'two', 'merge', { merge_stamp: '2026-10-05T20:00:01Z' }, 'epic/first');
-    leaf(f, 'three', 'merge', { merge_stamp: '2026-10-05T20:00:02Z' }, 'epic/second');
+    leaf(f, 'one', 'merge', { merge_stamp: '2026-10-05T20:00:00Z', solo: true }, 'epic/first');
+    leaf(f, 'two', 'merge', { merge_stamp: '2026-10-05T20:00:01Z', solo: true }, 'epic/first');
+    leaf(f, 'three', 'merge', { merge_stamp: '2026-10-05T20:00:02Z', solo: true }, 'epic/second');
     mkdirSync(resolve(f.root, 'issues/chart/epic'), { recursive: true });
     writeFileSync(resolve(f.root, 'issues/chart/epic/CHART.md'), '# Chart: epic\n');
     const race: Result[] = [];
@@ -263,8 +263,8 @@ test('completion prints only when the owner finishes, stays silent on inner issu
     const repeated: Result = await cli(f, ['phase', 'three', 'merged']);
     expect(repeated.code).not.toBe(0);
     expect(repeated.stdout).not.toContain('complete');
-    leaf(f, 'penultimate', 'merge', { merge_stamp: '2026-10-05T20:00:03Z' }, 'standalone');
-    leaf(f, 'last', 'merge', { merge_stamp: '2026-10-05T20:00:04Z' }, 'standalone');
+    leaf(f, 'penultimate', 'merge', { merge_stamp: '2026-10-05T20:00:03Z', solo: true }, 'standalone');
+    leaf(f, 'last', 'merge', { merge_stamp: '2026-10-05T20:00:04Z', solo: true }, 'standalone');
     const standalone: Result[] = [];
     for (const slug of ['penultimate', 'last']) standalone.push(await cli(f, ['phase', slug, 'merged']));
     expect(standalone.every((r) => r.code === 0)).toBe(true);
@@ -290,8 +290,8 @@ function snapshot(dir: string, prefix: string = ''): Map<string, Buffer> {
 test('completion leaves a chart holding a same-slug draft in place and keeps the inventory readable', async () => {
   const f: Fixture = await fixture();
   try {
-    const alpha: string = leaf(f, 'alpha', 'merge', {}, 'epic/one');
-    leaf(f, 'beta', 'merge', {}, 'epic/two');
+    const alpha: string = leaf(f, 'alpha', 'merge', { solo: true }, 'epic/one');
+    leaf(f, 'beta', 'merge', { solo: true }, 'epic/two');
     const chart: string = resolve(f.root, 'issues/chart/epic');
     const slot: string = resolve(chart, 'slots/leaf-draft/alpha');
     mkdirSync(slot, { recursive: true });
@@ -384,9 +384,9 @@ test('asymmetric and empty leaf sources defer until epic completion under open l
     const head: string = await command(['git', 'rev-parse', 'HEAD'], last);
     expect(head).not.toBe(await command(['git', 'rev-parse', 'HEAD'], f.root));
     expect(head).not.toBe(await command(['git', 'rev-parse', 'HEAD'], first));
-    leaf(f, 'one', 'merge', { worktree: first, sources: ['team/project#1', 'team/project#2'] }, 'epic/first');
+    leaf(f, 'one', 'merge', { worktree: first, sources: ['team/project#1', 'team/project#2'], solo: true }, 'epic/first');
     leaf(f, 'empty', 'merged', {}, 'epic/first');
-    leaf(f, 'two', 'merge', { worktree: last, sources: ['team/project#2', 'team/project#3'] }, 'epic/second');
+    leaf(f, 'two', 'merge', { worktree: last, sources: ['team/project#2', 'team/project#3'], solo: true }, 'epic/second');
     expect((await cli(f, ['phase', 'one', 'merged'], f.root, gh.env)).code).toBe(0);
     expect(existsSync(gh.db + '.calls')).toBe(false);
     const probe: NonNullable<GhStep['probe']> = {
@@ -1838,8 +1838,8 @@ test('merge turn refusal fires before worktree guards on a missing worktree', as
 test('an earlier merge_stamp takes the turn over slug order', async () => {
   const f: Fixture = await fixture();
   try {
-    leaf(f, 'aa', 'merge', { merge_stamp: '2026-10-05T20:00:02Z' }, 'epic/first');
-    leaf(f, 'bb', 'merge', { merge_stamp: '2026-10-05T20:00:01Z' }, 'epic/second');
+    leaf(f, 'aa', 'merge', { merge_stamp: '2026-10-05T20:00:02Z', solo: true }, 'epic/first');
+    leaf(f, 'bb', 'merge', { merge_stamp: '2026-10-05T20:00:01Z', solo: true }, 'epic/second');
     const refused: Result = await cli(f, ['phase', 'aa', 'merged']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('bb');

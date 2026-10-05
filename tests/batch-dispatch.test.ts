@@ -143,19 +143,42 @@ test('a member conflict marks it solo, rewrites the record without it and leaves
     expect(database(f).prompts).toEqual([expectedPrompt(aa.path, aa.b)]);
     // The solo leaf becomes a holder under a fresh record once the batch finishes.
     idleAll(f);
-    expect((await cli(f, ['phase', 'aa', 'merged', '--slot', 'B'], f.root, f.env)).code).toBe(0);
-    // bb waited as a member; restored by aa's merge it becomes the next holder and is prompted.
+    const aaAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
+    expect(
+      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', aaAttempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code,
+    ).toBe(0);
+    // bb stayed carried and landed with aa's push; the solo-conflicted cc holds the
+    // next turn under a fresh memberless solo record and is prompted (criterion 3).
     expect(await head(f, 'bb')).toBe(bbHead);
-    expect(readState(bb.path).batch?.applied).toBe(true);
-    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b]);
+    expect(readState(bb.path).phase).toBe('merged');
+    expect(readState(cc.path).batch?.applied).toBe(true);
+    expect(readState(cc.path).batch?.members).toEqual([]);
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, cc.b]);
     idleAll(f);
-    expect((await cli(f, ['phase', 'bb', 'merged', '--slot', 'B'], f.root, f.env)).code).toBe(0);
+    const ccAttempt: string = z.string().parse(readState(cc.path).batch?.attempt);
+    expect(
+      (await cli(f, ['phase', 'cc', 'merged', '--slot', 'B', '--check', '--attempt', ccAttempt], f.root, f.env)).code,
+    ).toBe(0);
+    // cc's range still conflicts on the new main: the push is refused and the restack
+    // drops it back to a solo record for its own B to resolve (design step 4).
+    const restack: Result = await cli(
+      f,
+      ['phase', 'cc', 'merged', '--slot', 'B', '--attempt', ccAttempt],
+      f.root,
+      f.env,
+    );
+    expect(restack.code).toBe(0);
+    expect(restack.stdout).toContain('fresh checks required');
     expect((await next(f, ['--all'])).code).toBe(0);
     const ccState: State = leafState(cc.path);
     expect(ccState.batch?.applied).toBe(true);
+    expect(ccState.batch?.solo).toBe(true);
     expect(ccState.batch?.members).toEqual([]);
-    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, cc.b]);
-    expect(mergePrompts(f).at(-1)).toEqual(expectedPrompt(cc.path, cc.b));
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, cc.b]);
+    expect(mergePrompts(f).at(-1)?.text).toContain('solo');
   } finally {
     f.clean();
   }
@@ -326,7 +349,13 @@ test('a leaf entering merge after the record was written is excluded and becomes
     expect(mergePrompts(f)).toHaveLength(1);
     expect(mergePrompts(f)[0].text).toContain('aa');
     idleAll(f);
-    expect((await cli(f, ['phase', 'aa', 'merged', '--slot', 'B'], f.root, f.env)).code).toBe(0);
+    const aaAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
+    expect(
+      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', aaAttempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code,
+    ).toBe(0);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(readState(bb.path).batch?.applied).toBe(true);
     expect(mergePrompts(f).at(-1)).toEqual(expectedPrompt(bb.path, bb.b));

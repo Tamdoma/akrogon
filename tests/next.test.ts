@@ -872,7 +872,17 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     expect(database(f).prompts.at(-1)?.text?.split(' leaf=')[1]?.split(' ')[0]).toBe(
       `${f.root}/issues/open/landing/landed`,
     );
-    const completed: Result = await cli(f, ['phase', 'landed', 'merged', '--slot', 'B'], worktree, f.env);
+    const landedAttempt: string = z.string().parse(readState(path).batch?.attempt);
+    expect(
+      (await cli(f, ['phase', 'landed', 'merged', '--slot', 'B', '--check', '--attempt', landedAttempt], worktree, f.env))
+        .code,
+    ).toBe(0);
+    const completed: Result = await cli(
+      f,
+      ['phase', 'landed', 'merged', '--slot', 'B', '--attempt', landedAttempt],
+      worktree,
+      f.env,
+    );
     expect(completed.code).toBe(0);
     expect(completed.stdout).toContain('issue complete landing');
     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
@@ -1035,7 +1045,23 @@ test('a live merge retains its completion call after pushing, including a peer r
         .filter((args) => args[0] === 'notification')
         .at(-1)![2],
     ).toContain('seat B');
-    const completed: Result = await cli(f, ['phase', 'active-merge', 'merged', '--slot', 'B'], worktree, f.env);
+    const mergeAttempt: string = z.string().parse(readState(path).batch?.attempt);
+    expect(
+      (
+        await cli(
+          f,
+          ['phase', 'active-merge', 'merged', '--slot', 'B', '--check', '--attempt', mergeAttempt],
+          worktree,
+          f.env,
+        )
+      ).code,
+    ).toBe(0);
+    const completed: Result = await cli(
+      f,
+      ['phase', 'active-merge', 'merged', '--slot', 'B', '--attempt', mergeAttempt],
+      worktree,
+      f.env,
+    );
     expect(completed.code).toBe(0);
     expect(completed.stdout).toContain('issue complete issue');
     expect(database(f).tabs).toHaveLength(1);
@@ -4059,10 +4085,27 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
       ...idle,
       panes: idle.panes.map((pane) => (pane.pane_id === aa.b ? { ...pane, agent_status: 'idle' } : pane)),
     });
-    expect((await cli(f, ['phase', 'bb', 'merged', '--slot', 'B'], f.root, f.env)).code).toBe(0);
-    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, cc.b]);
-    expect((await cli(f, ['phase', 'cc', 'merged', '--slot', 'B'], f.root, f.env)).code).toBe(0);
-    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, cc.b, aa.b]);
+    const bbAttempt: string = z.string().parse(readState(bb.path).batch?.attempt);
+    expect(
+      (await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--check', '--attempt', bbAttempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--attempt', bbAttempt], f.root, f.env)).code,
+    ).toBe(0);
+    // cc was already carried as a member of bb's batch (recorded while aa sat failed):
+    // carried members are not re-prompted (merge-order Q2, brief criterion 12), so the
+    // third merge prompt goes to the re-entered aa, which queued behind bb and cc.
+    expect(readState(cc.path).phase).toBe('merged');
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, aa.b]);
+    const aaAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
+    expect(
+      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', aaAttempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect(readState(resolve(f.root, 'issues/closed/issue/aa')).phase).toBe('merged');
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, aa.b]);
   } finally {
     f.clean();
   }
