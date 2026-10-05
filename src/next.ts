@@ -53,8 +53,9 @@ import {
 } from './shell';
 import { checkBase, trackingRef } from './preflight';
 import { commitMove, completeOwner } from './phase';
-import { readReadiness, gaps } from './readiness';
 import { sessionFile, deliveredAfter } from './session-file';
+import { readLog } from './log';
+import { eligibility, mergeQueue, type Block } from './turn';
 
 const hookEventSchema = z.discriminatedUnion('event', [
   z.object({
@@ -170,12 +171,6 @@ function registeredRepos(global: GlobalConfig, invocation: Invocation): { repos:
     }
   }
   return { repos, unknown };
-}
-
-function lookup(inventory: Inventory, slug: string): Leaf {
-  const leaf: Leaf | undefined = inventory.leaves.find((leaf) => leaf.state.slug === slug);
-  if (leaf === undefined) throw new Error(`Missing or unreadable leaf: ${slug}`);
-  return leaf;
 }
 
 function inWorktree(cwd: string | null, leaf: Leaf): boolean {
@@ -604,20 +599,24 @@ async function dispatchLeaf(
       !['positions-A.md', 'positions-B.md'].every((n) => existsSync(resolve(leaf.path, n)))
     )
       throw new Error(`Debate leaf skipped its debate: ${slug}; set phase: plan.positions`);
-    const dependencies: Leaf[] = state['blocked-by'].map((dependency) => lookup(inventory, dependency));
-    if (!dependencies.every((dependency) => dependency.state.phase === 'merged')) {
+    const missing: string | undefined = state['blocked-by'].find(
+      (dependency) => inventory.leaves.find((leaf) => leaf.state.slug === dependency) === undefined,
+    );
+    if (missing !== undefined && !explicit) throw new Error(`Missing or unreadable leaf: ${missing}`);
+    const block: Block | null = eligibility(global, { path: leaf.path, state }, inventory.leaves);
+    if (block?.kind === 'deps') {
       if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
       return 'waiting';
     }
-    const readiness = readReadiness(leaf.path); // throws naming the file when invalid → caught by report → leaf skipped
-    const missing = readiness === null ? [] : gaps(global, readiness);
-    if (missing.length > 0) {
+    if (block?.kind === 'inputs') {
       if (explicit)
         throw new Error(
-          `Leaf inputs are missing: ${slug}: ${missing.map((g) => `${g.kind} ${g.name} in ${g.holder}`).join(', ')}`,
+          `Leaf inputs are missing: ${slug}: ${block.missing.map((g) => `${g.kind} ${g.name} in ${g.holder}`).join(', ')}`,
         );
       return 'waiting';
     }
+    if (state.phase === 'merge' && mergeQueue(global, inventory.leaves, readLog(repo.root))[0]?.leaf.state.slug !== slug)
+      return 'waiting';
     seats(global, repo);
     // Mirrors ensureWorktree's path: a missing worktree needs remote proof, an existing one only local.
     const mustCreate: boolean = !existsSync(resolve(worktreeStore(repo), slug));
@@ -676,6 +675,23 @@ async function sweep(global: GlobalConfig, repo: Repo, leaves: Leaf[], invocatio
     (a, b) => Number(b.state.phase === 'merged') - Number(a.state.phase === 'merged'),
   );
   for (const leaf of ordered) await dispatchLeaf(global, repo, leaf, false, invocation);
+}
+
+export async function mergeWake(global: GlobalConfig, repo: Repo): Promise<void> {
+  const invocation: Invocation = { skipped: new Set() };
+  try {
+    await withLock(resolve(globalHome(), '.lock'), async () => {
+      await sweep(
+        global,
+        repo,
+        discover(repo, invocation).leaves.filter((leaf) => leaf.state.phase === 'merge'),
+        invocation,
+      );
+    });
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    report(invocation, repo.name, repo.root, error);
+  }
 }
 
 async function dispatchDependents(
@@ -772,6 +788,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
       : undefined;
   if (selection === undefined || selection.leaves.length > 0)
     await withLock(resolve(globalHome(), '.lock'), async () => {
+      const touched: Map<string, Repo> = new Map();
       if (selection !== undefined) {
         if (selection.leaves.length === 1) {
           const completedSlug: string = selection.leaves[0].state.slug;
@@ -784,22 +801,23 @@ export async function nextCommand(input: string | undefined): Promise<void> {
           );
           if (outcome === 'completed') await dispatchDependents(global, selection.repo, completedSlug, invocation);
         } else await sweep(global, selection.repo, selection.leaves, invocation);
+        touched.set(selection.repo.name, selection.repo);
         if (input === undefined) await cleanupRepos([selection.repo], invocation);
-        return;
-      }
-      if (input === '--all') {
+      } else if (input === '--all') {
         const current: Repo | null = await currentRepo(global, process.cwd());
         if (current === null) {
           await sweepAll(global, invocation);
-          await cleanupRepos(registeredRepos(global, invocation).repos, invocation);
+          const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
+          for (const repo of registered.repos) touched.set(repo.name, repo);
+          await cleanupRepos(registered.repos, invocation);
         } else {
           await sweep(global, current, discover(current, invocation).leaves, invocation);
+          touched.set(current.name, current);
           await cleanupRepos([current], invocation);
         }
-        return;
-      }
-      if (input === '--resume') {
-        for (const repo of registeredRepos(global, invocation).repos)
+      } else if (input === '--resume') {
+        const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
+        for (const repo of registered.repos)
           await sweep(
             global,
             repo,
@@ -809,10 +827,9 @@ export async function nextCommand(input: string | undefined): Promise<void> {
             ),
             invocation,
           );
-        await cleanupRepos(registeredRepos(global, invocation).repos, invocation);
-        return;
-      }
-      if (event?.event === 'tab_closed') {
+        for (const repo of registered.repos) touched.set(repo.name, repo);
+        await cleanupRepos(registered.repos, invocation);
+      } else if (event?.event === 'tab_closed') {
         const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
           discover(repo, invocation)
             .leaves.filter((leaf) => leaf.state.tab === event.data.tab_id)
@@ -830,9 +847,8 @@ export async function nextCommand(input: string | undefined): Promise<void> {
           }
         const outcome: DispatchOutcome = await dispatchLeaf(global, owners[0].repo, owners[0].leaf, false, invocation);
         if (outcome === 'completed') await dispatchDependents(global, owners[0].repo, completedSlug, invocation);
-        return;
-      }
-      if (input === undefined && hookPane !== undefined) {
+        touched.set(owners[0].repo.name, owners[0].repo);
+      } else if (input === undefined && hookPane !== undefined) {
         const owners: { repo: Repo; leaf: Leaf }[] = await paneOwners(global, invocation, hookPane);
         if (owners.length > 1) throw new Error(`Multiple leaves own hook pane: ${hookPane}`);
         if (owners.length === 0) return;
@@ -856,8 +872,15 @@ export async function nextCommand(input: string | undefined): Promise<void> {
           if (!(error instanceof Error)) throw error;
           report(invocation, owner.repo.name, rediscovered?.path ?? owner.leaf.path, error, completedSlug);
         }
-        return;
+        touched.set(owner.repo.name, owner.repo);
       }
+      for (const repo of touched.values())
+        await sweep(
+          global,
+          repo,
+          discover(repo, invocation).leaves.filter((leaf) => leaf.state.phase === 'merge'),
+          invocation,
+        );
     });
   if (invocation.skipped.size > 0) process.exitCode = 1;
 }

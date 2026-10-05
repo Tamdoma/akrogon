@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { effectiveConfig } from './config';
+import { effectiveConfig, readGlobal, type Repo } from './config';
 import { initialize } from './init';
 import { sourcePattern } from './state';
 
@@ -53,7 +53,25 @@ switch (verb) {
     break;
   case 'phase': {
     const [slug, phase]: [string, string] = z.tuple([z.string(), z.string()]).parse(positionals);
-    await (await import('./phase')).phaseCommand(slug, phase, values.slot, values.verdict, values.reason, values.check);
+    const { phaseCommand, MoveCommittedError } = await import('./phase');
+    const { mergeWake } = await import('./next');
+    let committed: { repo: Repo } | undefined;
+    try {
+      const result: { repo: Repo; committed: boolean } = await phaseCommand(
+        slug,
+        phase,
+        values.slot,
+        values.verdict,
+        values.reason,
+        values.check,
+      );
+      if (result.committed) committed = result;
+    } catch (error) {
+      if (error instanceof MoveCommittedError) committed = error;
+      throw error;
+    } finally {
+      if (committed !== undefined) await mergeWake(readGlobal(), committed.repo);
+    }
     break;
   }
   case 'next':
