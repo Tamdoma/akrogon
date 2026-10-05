@@ -445,6 +445,8 @@ async function batchPush(
   const worktree: string = state.worktree ?? repo.root;
   const head: string = await mergeHead(repo, state, record);
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
+  if (record.solo !== true && head !== record.top)
+    throw new Error(`HEAD must equal the recorded batch top ${record.top}, found ${head}`);
   if (slot !== undefined && head !== record.tested_top)
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);
   await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
