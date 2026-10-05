@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { readGlobal, requireRepo, target, globalHome, type Repo, within } from './config';
+import { readGlobal, requireRepo, target, globalHome, type GlobalConfig, type Repo, within } from './config';
 import {
+  allLeaves,
   readState,
   saveState,
   findLeaf,
@@ -24,7 +25,8 @@ import {
   type Verdict,
 } from './routing';
 import { command, herdr, herdrError, retryable, CommandError } from './shell';
-import { logMove } from './log';
+import { logMove, readLog } from './log';
+import { mergeQueue, type QueueEntry } from './turn';
 import { closeSources } from './pull';
 import { testFile } from './test-files';
 
@@ -102,6 +104,17 @@ async function announceFailed(repo: Repo, leaf: Leaf, state: State): Promise<Sta
   return announced;
 }
 
+export class MoveCommittedError extends Error {
+  constructor(
+    public readonly repo: Repo,
+    public readonly to: Phase,
+    message: string,
+    options?: { cause?: unknown },
+  ) {
+    super(message, options);
+  }
+}
+
 export async function commitMove(
   repo: Repo,
   leaf: Leaf,
@@ -109,6 +122,7 @@ export async function commitMove(
   to: Phase,
   slot: Slot | null,
   failure?: Failure,
+  onCommitted?: () => void,
 ): Promise<State> {
   const after: State = {
     ...recorded,
@@ -123,21 +137,33 @@ export async function commitMove(
     busy_since: to === 'failed' || to === 'merged' ? {} : recorded.busy_since,
     busy_notified: to === 'failed' || to === 'merged' ? {} : recorded.busy_notified,
     fix_rounds: to === 'check.fix' && recorded.phase === 'check.repair' ? recorded.fix_rounds + 1 : recorded.fix_rounds,
+    merge_stamp: to === 'merge' ? new Date().toISOString() : recorded.merge_stamp,
   };
   saveState(leaf.path, after);
   console.log(`moved ${to}`);
+  onCommitted?.();
   // The transition is committed even if diagnostic collection or append fails.
   let announced: State = after;
   try {
     if (to === 'failed') announced = await announceFailed(repo, leaf, after);
     else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(after.tab, after.slug, after.slug);
     if (to === 'merged') await completeOwner(repo, leaf, true);
+  } catch (error) {
+    if (error instanceof MoveCommittedError) throw error;
+    throw new MoveCommittedError(
+      repo,
+      to,
+      `Move to ${to} is committed, but follow-up work failed: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
   } finally {
     try {
       await logMove(repo, recorded, to === 'failed' ? readState(leaf.path) : announced, slot);
     } catch (error) {
-      if (!(error instanceof Error)) throw error;
-      throw new Error(`Move to ${to} is committed, but log append failed: ${error.message}`, { cause: error });
+      const cause: Error = error instanceof Error ? error : new Error(String(error), { cause: error });
+      throw new MoveCommittedError(repo, to, `Move to ${to} is committed, but log append failed: ${cause.message}`, {
+        cause,
+      });
     }
   }
   return announced;
@@ -188,6 +214,7 @@ export async function transition(
   verdict: Verdict | undefined,
   reason: string | undefined,
   checkOnly: boolean,
+  onCommitted?: () => void,
 ): Promise<void> {
   const state: State = readState(leaf.path);
   if (checkOnly && requested === 'failed') throw new Error('--check cannot move to failed');
@@ -214,12 +241,20 @@ export async function transition(
     throw new Error('A required --slot is missing or invalid');
   if (slot !== undefined && state.done.includes(slot)) throw new Error(`Slot already recorded: ${slot}`);
   if (requested === 'failed') {
-    await commitMove(repo, leaf, state, 'failed', slot ?? null, {
-      cause: 'blocked',
-      phase: state.phase,
-      slot: slot ?? required[0],
-      reason: reason as string,
-    });
+    await commitMove(
+      repo,
+      leaf,
+      state,
+      'failed',
+      slot ?? null,
+      {
+        cause: 'blocked',
+        phase: state.phase,
+        slot: slot ?? required[0],
+        reason: reason as string,
+      },
+      onCommitted,
+    );
     return;
   }
   if (state.worktree !== undefined && !(state.phase === 'failed' && state.failure?.cause === 'blocked'))
@@ -262,6 +297,7 @@ export async function transition(
     capped === 'failed'
       ? { cause: 'attempts', phase: 'check.repair', slot: slot ?? required[0], reason: 'fix rounds exhausted' }
       : undefined,
+    onCommitted,
   );
 }
 
@@ -320,16 +356,30 @@ export async function phaseCommand(
   rawVerdict: string | boolean | undefined,
   rawReason: string | boolean | undefined,
   rawCheck: string | boolean | undefined,
-): Promise<void> {
+): Promise<{ repo: Repo; committed: boolean }> {
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
   const verdict: Verdict | undefined = verdictSchema.optional().parse(rawVerdict);
   const reason: string | undefined = z.string().trim().min(1).optional().parse(rawReason);
   const check: boolean = z.literal(true).optional().parse(rawCheck) === true;
-  const repo: Repo = await requireRepo(readGlobal(), process.cwd());
+  const global: GlobalConfig = readGlobal();
+  const repo: Repo = await requireRepo(global, process.cwd());
+  let committed: boolean = false;
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
     if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
-    await transition(repo, leaf, requested, slot, verdict, reason, check);
+    if (leaf.state.phase === 'merge' && (requested === 'merged' || requested === 'check.fix')) {
+      const holder: QueueEntry | undefined = mergeQueue(global, allLeaves(repo), readLog(repo.root))[0];
+      if (holder === undefined || holder.leaf.state.slug !== leaf.state.slug)
+        throw new Error(
+          holder === undefined
+            ? `Merge turn refused: ${slug} is not eligible and no merge leaf in ${repo.name} is`
+            : `Merge turn refused for ${slug}: holder is ${holder.leaf.state.slug}`,
+        );
+    }
+    await transition(repo, leaf, requested, slot, verdict, reason, check, () => {
+      committed = true;
+    });
   });
+  return { repo, committed };
 }
