@@ -2,7 +2,7 @@ import { test, expect, afterEach } from 'bun:test';
 import { z } from 'zod';
 import { dirname, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
-import { cli, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture, type HerdrFixture } from './helpers';
+import { cli, fakeHerdr, fixture, leaf, leafTempRoot, yaml, editOnSecondStatus, type Fixture, type HerdrFixture } from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
@@ -735,3 +735,33 @@ test('a solo restack conflict preserves commits made during the solo pass', asyn
     f.clean();
   }
 });
+
+for (const edited of ['holder', 'member'] as const) {
+  test(`late ${edited} dirt during restack is isolated`, async () => {
+    const f: Fixture = await fixture();
+    try {
+      const { holder, members, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+      expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env)).code).toBe(0);
+      writeFileSync(resolve(f.root, 'advance'), 'advance');
+      await command(['git', 'add', 'advance'], f.root);
+      await command(['git', 'commit', '-m', 'advance'], f.root);
+      await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+      const selected: Leaf = edited === 'holder' ? holder : members[0];
+      const created: string = await editOnSecondStatus(f, selected.state.worktree!);
+      const result: Result = await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, herdr.env);
+      expect(result.code).toBe(0);
+      expect(existsSync(created)).toBe(true);
+      const batch: Batch = readState(holder.path).batch!;
+      expect(batch.members).toEqual([]);
+      expect(await command(['git', 'rev-parse', 'mem-a'], f.root)).toBe(record.members[0].head);
+      if (edited === 'holder') expect(batch.solo).toBe(true);
+      else {
+        expect(readState(members[0].path).solo).toBe(true);
+        expect((await run(['git', 'cat-file', '-e', batch.top! + ':file-mem-a'], f.root)).code).not.toBe(0);
+      }
+      expect(readFileSync(resolve(selected.state.worktree!, 'uncommitted'), 'utf8')).toBe('operator edit\n');
+    } finally {
+      f.clean();
+    }
+  });
+}

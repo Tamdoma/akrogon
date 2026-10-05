@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { command, type Result } from '../src/shell';
@@ -96,4 +96,23 @@ export function fakeGh(f: Fixture): GhFixture {
   const db: string = resolve(f.home, 'gh.json');
   writeFileSync(db, '[]');
   return { db, env: { PATH: `${bin}:${process.env.PATH}`, FAKE_GH: db } };
+}
+
+export async function editOnSecondStatus(f: Fixture, worktree: string): Promise<string> {
+  const seen: string = resolve(f.home, 'status-seen');
+  const created: string = resolve(f.home, 'edit-created');
+  const git: string = await command(['sh', '-c', 'command -v git']);
+  const wrapper: string = resolve(f.home, 'bin/git');
+  writeFileSync(wrapper, `#!/bin/sh
+if [ "$1" = -C ] && [ "$2" = '${worktree}' ] && [ "$3" = status ]; then
+  if [ -e '${seen}' ] && [ ! -e '${created}' ]; then
+    printf 'operator edit\n' > '${worktree}/uncommitted'
+    touch '${created}'
+  fi
+  touch '${seen}'
+fi
+exec '${git}' "$@"
+`);
+  chmodSync(wrapper, 0o755);
+  return created;
 }
