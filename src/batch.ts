@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { leafTemp, type Repo } from './config';
-import { allLeaves, type Leaf } from './state';
+import { allLeaves, type Batch, type Leaf } from './state';
 import { command, run, CommandError, type Result } from './shell';
 
 export function attemptId(): string {
@@ -103,6 +103,6 @@ export async function restoreMembers(
   return { dirty };
 }
 
-export async function restoreHolder(repo: Repo, leaf: Leaf, head: string): Promise<MoveResult> {
-  return move(repo, leaf.state.slug, head, leaf);
+export async function restoreHolder(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
+  if (record.solo !== true) await move(repo, leaf.state.slug, record.holder.head, leaf);
 }

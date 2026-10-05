@@ -870,7 +870,7 @@ async function reconcileBatch(global: GlobalConfig, repo: Repo, holder: Leaf, in
       ),
       leaves,
     );
-    if (fresh !== undefined) await restoreHolder(repo, fresh, batch.holder.head);
+    if (fresh !== undefined) await restoreHolder(repo, fresh, batch);
     if (fresh !== undefined) saveState(fresh.path, { ...fresh.state, batch: undefined });
   });
   if (error !== null) {
@@ -911,7 +911,7 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
   }
   if (recorded !== undefined) {
     await restoreDrifted(repo, recorded.members, inventory.leaves);
-    await restoreHolder(repo, holder, recorded.holder.head);
+    await restoreHolder(repo, holder, recorded);
     await withLock(resolve(globalHome(), '.lock'), async () => {
       const fresh: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
       if (fresh?.state.batch?.attempt === recorded.attempt) saveState(fresh.path, { ...fresh.state, batch: undefined });
@@ -988,7 +988,7 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
           return 'superseded';
         if (fresh.state.batch.applied === true || fresh.state.batch.attempt !== current.attempt) {
           await restoreDrifted(repo, fresh.state.batch.members, leaves);
-          await restoreHolder(repo, fresh, fresh.state.batch.holder.head);
+          await restoreHolder(repo, fresh, fresh.state.batch);
           saveState(fresh.path, { ...fresh.state, batch: undefined });
           return 'superseded';
         }
