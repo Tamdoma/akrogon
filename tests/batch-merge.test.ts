@@ -450,3 +450,20 @@ test('check.fix on a memberless record moves the holder to check.fix', async () 
     f.clean();
   }
 });
+
+test('operator completion refuses a holder commit outside the applied stack', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+    writeFileSync(resolve(holder.state.worktree!, 'unchecked'), 'unchecked');
+    await command(['git', 'add', '.'], holder.state.worktree!);
+    await command(['git', 'commit', '-m', 'unchecked'], holder.state.worktree!);
+    const before: string = await remoteTip(f);
+    const result: Result = await cli(f, ['phase', 'hold', 'merged'], f.root, herdr.env);
+    expect(result.code).not.toBe(0);
+    expect(await remoteTip(f)).toBe(before);
+    expect(readState(holder.path).batch!.top).toBe(record.top!);
+  } finally {
+    f.clean();
+  }
+});
