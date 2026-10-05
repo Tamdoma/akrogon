@@ -32,6 +32,27 @@ export type DeliveryError = z.infer<typeof deliveryErrorSchema>;
 
 export const sourcePattern = /^([a-zA-Z0-9-]+\/(?!\.{1,2}#)[a-zA-Z0-9._-]+)#([1-9][0-9]*)$/;
 
+export const batchMemberSchema = z.strictObject({
+  slug: z.string(),
+  base: z.string(),
+  head: z.string(),
+  tip: z.string(),
+});
+
+export const batchSchema = z.strictObject({
+  attempt: z.string().min(1),
+  built_on: z.string(),
+  members: z.array(batchMemberSchema),
+  top: z.string().optional(),
+  tested_top: z.string().optional(),
+  candidate: z.string().optional(),
+  applied: z.boolean(),
+  solo: z.boolean().optional(),
+});
+
+export type Batch = z.infer<typeof batchSchema>;
+export type BatchMember = z.infer<typeof batchMemberSchema>;
+
 export const stateSchema = z
   .strictObject({
     slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -56,6 +77,8 @@ export const stateSchema = z
     delivery_error: z.object({ A: deliveryErrorSchema.optional(), B: deliveryErrorSchema.optional() }).default({}),
     failure: failureSchema.optional(),
     merge_stamp: z.string().optional(),
+    batch: batchSchema.optional(),
+    solo: z.boolean().optional(),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
 
