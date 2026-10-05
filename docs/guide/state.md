@@ -61,7 +61,7 @@ That prevents later dispatch. It does not stop an agent already working.
 
 ## The fields Akrogon owns
 
-Akrogon records the worktree, Herdr tab, completed seats, review verdicts and prompt delivery attempts. It also records failure details.
+Akrogon records the worktree, Herdr tab, completed seats, review verdicts, prompt delivery attempts and the `merge_stamp` ordering the merge turn. It also records failure details.
 
 Leave those fields to the commands. Editing them by hand can make the file disagree with the running agents.
 

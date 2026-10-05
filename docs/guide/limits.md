@@ -8,7 +8,7 @@ Keep these boundaries in mind when deciding what to dispatch.
 - **There is no priority field.** Old priority values are ignored. Use dependencies for actual prerequisites and parking to keep work out of the queue.
 - **Folder targeting is temporary.** It limits that dispatch pass. Later manual `akrogon next` passes can consider other open leaves.
 - **Cleanup is separate from idle events.** A normal hook pass closes the tab of a merged seat; the closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only manual repository sweeps and startup cleanup delete completed worktrees and branches.
-- **A completion starts only its dependents.** A merged leaf dispatches same-repo leaves that name it in `blocked-by`. Other open leaves start only through a manual `akrogon next`.
+- **A completion starts only its dependents.** A merged leaf dispatches same-repo leaves that name it in `blocked-by` and a freed merge turn prompts the next waiting leaf in `merge`. Other open leaves start only through a manual `akrogon next`.
 - **Failed leaves do not restart themselves.** Read the reason and resume an appropriate active phase.
 
 For example, start CSV export without dispatching another folder in that pass:

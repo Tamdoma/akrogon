@@ -11,7 +11,7 @@ A phase is one step in a leaf's workflow. Seats report completion through Akrogo
 | check.review | A and B initially | Review verdicts. After a repair, B reviews the fix. |
 | check.repair | B | Repairs for most review findings. Hands the rest to A. |
 | check.fix | A | Repairs B handed to A, or red merge checks. |
-| merge | B | Checks, rebase and push. |
+| merge | B | One leaf per repo holds the merge turn; checks, rebase and push. |
 | merged | Nobody | Completed leaf. |
 | failed | Nobody | Stopped work that needs a decision or recovery. |
 

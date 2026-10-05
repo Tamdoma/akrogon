@@ -2,6 +2,8 @@
 
 Seat B merges reviewed work. It fetches the configured remote, rebases onto the default branch and runs every `checks` command, then every `merge_checks` command.
 
+Each registered repo has one merge turn, held by the earliest eligible leaf in `merge` (merge stamp, then the last `to: merge` log record, then slug; a leaf with neither sorts last). Only the holder's seat B is prompted; a waiting leaf keeps its tab, panes and `max_active` slot, and `akrogon status` names the holder and each place. For a waiting leaf, `akrogon phase <slug> merged` (with or without `--check`) and `check.fix` are refused naming the holder; `failed` is never refused. When the turn frees, the next holder is prompted without a manual `akrogon next`.
+
 For CSV export, those checks should cover quoting, empty input and the existing JSON export.
 
 Every phase move except a move to `failed` also checks that the branch's changed old test files each carry a `Test-Change: <path> <source and reason>` trailer in a commit's final trailer block. `src/test-files.ts` defines which paths count as test files. Right before the push B runs the move in check-only mode:
