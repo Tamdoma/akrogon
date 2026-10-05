@@ -26,7 +26,7 @@ worktree_root: issues/worktrees
 rebuttal: true
 fix_rounds: 3
 implement: subagents
-# setup: bun install --frozen-lockfile — proposed only when git ls-files names a committed lockfile
+# setup: bun install --frozen-lockfile — proposed only when a lockfile is committed in HEAD
 checks: {}
 merge_checks: {}
 advisory: []
@@ -40,7 +40,7 @@ broadcast:
 
 Use existing broadcast routing when present and propose environment-variable names, not secret values, keeping global-only and retired settings out of the repo proposal. On repeat setup preserve a stored `slots` override, and never write the effective merged seats from `akrogon config` into the proposal — `slots` is proposed only when the repo needs a different seat.
 
-Propose `setup` only when `git ls-files` names a committed lockfile: `bun.lock` maps to `bun install --frozen-lockfile`, `package-lock.json` to `npm ci`, `pnpm-lock.yaml` to `pnpm install --frozen-lockfile`, `yarn.lock` to `yarn install --immutable`. No committed lockfile, no `setup` key.
+Propose `setup` only when `git ls-tree --name-only HEAD` lists a lockfile (`git ls-files` sees the index, not the commit): `bun.lock` maps to `bun install --frozen-lockfile`, `package-lock.json` to `npm ci`, `pnpm-lock.yaml` to `pnpm install --frozen-lockfile`, `yarn.lock` to `yarn install --immutable`. No committed lockfile — including a repo with no HEAD yet — means no `setup` key.
 
 ## Tests and grounding
 
