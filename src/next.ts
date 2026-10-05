@@ -681,7 +681,11 @@ async function sweep(global: GlobalConfig, repo: Repo, leaves: Leaf[], invocatio
   const ordered: Leaf[] = [...leaves].sort(
     (a, b) => Number(b.state.phase === 'merged') - Number(a.state.phase === 'merged'),
   );
-  for (const leaf of ordered) await dispatchLeaf(global, repo, leaf, false, invocation);
+  for (const leaf of ordered) {
+    await dispatchLeaf(global, repo, leaf, false, invocation);
+    if (leaf.state.phase === 'merge' && readState(leaf.path).phase === 'failed')
+      ordered.push(...discover(repo, invocation).leaves.filter((candidate) => candidate.state.phase === 'merge'));
+  }
 }
 
 export async function mergeWake(global: GlobalConfig, repo: Repo): Promise<void> {
