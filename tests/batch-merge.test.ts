@@ -2,7 +2,17 @@ import { test, expect, afterEach } from 'bun:test';
 import { z } from 'zod';
 import { dirname, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
-import { cli, fakeHerdr, fixture, leaf, leafTempRoot, yaml, editOnSecondStatus, type Fixture, type HerdrFixture } from './helpers';
+import {
+  cli,
+  fakeHerdr,
+  fixture,
+  leaf,
+  leafTempRoot,
+  yaml,
+  editOnSecondStatus,
+  type Fixture,
+  type HerdrFixture,
+} from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
@@ -721,12 +731,19 @@ test('a solo restack conflict preserves commits made during the solo pass', asyn
     await command(['git', 'add', '.'], holder.state.worktree!);
     await command(['git', 'commit', '-m', 'solo repair'], holder.state.worktree!);
     const repaired: string = await command(['git', 'rev-parse', 'hold'], f.root);
-    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env)).code).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env)).code,
+    ).toBe(0);
     writeFileSync(resolve(f.root, 'file-hold'), 'main conflict');
     await command(['git', 'add', 'file-hold'], f.root);
     await command(['git', 'commit', '-m', 'advance'], f.root);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
-    const result: Result = await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, herdr.env);
+    const result: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
     expect(result.code).toBe(0);
     expect(readState(holder.path).batch!.solo).toBe(true);
     expect(await command(['git', 'rev-parse', 'hold'], f.root)).toBe(repaired);
@@ -741,14 +758,22 @@ for (const edited of ['holder', 'member'] as const) {
     const f: Fixture = await fixture();
     try {
       const { holder, members, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
-      expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env)).code).toBe(0);
+      expect(
+        (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env))
+          .code,
+      ).toBe(0);
       writeFileSync(resolve(f.root, 'advance'), 'advance');
       await command(['git', 'add', 'advance'], f.root);
       await command(['git', 'commit', '-m', 'advance'], f.root);
       await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
       const selected: Leaf = edited === 'holder' ? holder : members[0];
       const created: string = await editOnSecondStatus(f, selected.state.worktree!);
-      const result: Result = await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, herdr.env);
+      const result: Result = await cli(
+        f,
+        ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+        f.root,
+        herdr.env,
+      );
       expect(result.code).toBe(0);
       expect(existsSync(created)).toBe(true);
       const batch: Batch = readState(holder.path).batch!;

@@ -673,9 +673,10 @@ for (const ending of ['check.fix', 'failed'] as const) {
       const attempt: string = readState(holder.path).batch!.attempt;
       await commitFile(f, holder.path, 'solo-fix', 'committed solo repair');
       const repaired: string = await head(f, 'holder');
-      const args: string[] = ending === 'check.fix'
-        ? ['phase', 'holder', ending, '--slot', 'B', '--attempt', attempt]
-        : ['phase', 'holder', ending, '--slot', 'B', '--reason', 'stop'];
+      const args: string[] =
+        ending === 'check.fix'
+          ? ['phase', 'holder', ending, '--slot', 'B', '--attempt', attempt]
+          : ['phase', 'holder', ending, '--slot', 'B', '--reason', 'stop'];
       expect((await cli(f, args, f.root, f.env)).code).toBe(0);
       expect(readState(holder.path).phase).toBe(ending);
       expect(await head(f, 'holder')).toBe(repaired);
@@ -711,8 +712,19 @@ for (const edited of ['holder', 'member'] as const) {
       } else {
         expect(readState(member.path).solo).toBe(true);
         expect((await run(['git', 'cat-file', '-e', batch.top! + ':member-file'], f.root)).code).not.toBe(0);
-        expect((await cli(f, ['phase', 'holder', 'merged', '--slot', 'B', '--check', '--attempt', batch.attempt], f.root, f.env)).code).toBe(0);
-        expect((await cli(f, ['phase', 'holder', 'merged', '--slot', 'B', '--attempt', batch.attempt], f.root, f.env)).code).toBe(0);
+        expect(
+          (
+            await cli(
+              f,
+              ['phase', 'holder', 'merged', '--slot', 'B', '--check', '--attempt', batch.attempt],
+              f.root,
+              f.env,
+            )
+          ).code,
+        ).toBe(0);
+        expect(
+          (await cli(f, ['phase', 'holder', 'merged', '--slot', 'B', '--attempt', batch.attempt], f.root, f.env)).code,
+        ).toBe(0);
       }
       expect((await next(f, ['--all'])).code).toBe(0);
       expect(readFileSync(resolve(worktree, 'uncommitted'), 'utf8')).toBe('operator edit\n');
@@ -736,13 +748,16 @@ test('an edit arriving after the move status read survives the Git reset', async
     const git: string = await command(['sh', '-c', 'command -v git']);
     const created: string = resolve(f.home, 'edit-before-reset');
     const wrapper: string = resolve(f.home, 'bin/git');
-    writeFileSync(wrapper, `#!/bin/sh
+    writeFileSync(
+      wrapper,
+      `#!/bin/sh
 if [ "$1" = -C ] && [ "$2" = '${worktree}' ] && [ "$3" = reset ] && [ ! -e '${created}' ]; then
   printf 'operator tracked edit\n' > '${worktree}/file'
   touch '${created}'
 fi
 exec '${git}' "$@"
-`);
+`,
+    );
     chmodSync(wrapper, 0o755);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(created)).toBe(true);
@@ -767,7 +782,9 @@ test('a memberless applied holder retains its checked integration head on red', 
     expect(batch.members).toEqual([]);
     const checked: string = await head(f, 'holder');
     expect(checked).not.toBe(batch.holder.head);
-    expect((await cli(f, ['phase', 'holder', 'check.fix', '--slot', 'B', '--attempt', batch.attempt], f.root, f.env)).code).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'holder', 'check.fix', '--slot', 'B', '--attempt', batch.attempt], f.root, f.env)).code,
+    ).toBe(0);
     expect(await head(f, 'holder')).toBe(checked);
   } finally {
     f.clean();

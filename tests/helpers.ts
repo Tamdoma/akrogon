@@ -103,7 +103,9 @@ export async function editOnSecondStatus(f: Fixture, worktree: string): Promise<
   const created: string = resolve(f.home, 'edit-created');
   const git: string = await command(['sh', '-c', 'command -v git']);
   const wrapper: string = resolve(f.home, 'bin/git');
-  writeFileSync(wrapper, `#!/bin/sh
+  writeFileSync(
+    wrapper,
+    `#!/bin/sh
 if [ "$1" = -C ] && [ "$2" = '${worktree}' ] && [ "$3" = status ]; then
   if [ -e '${seen}' ] && [ ! -e '${created}' ]; then
     printf 'operator edit\n' > '${worktree}/uncommitted'
@@ -112,7 +114,8 @@ if [ "$1" = -C ] && [ "$2" = '${worktree}' ] && [ "$3" = status ]; then
   touch '${seen}'
 fi
 exec '${git}' "$@"
-`);
+`,
+  );
   chmodSync(wrapper, 0o755);
   return created;
 }
