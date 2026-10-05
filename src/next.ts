@@ -37,6 +37,7 @@ import {
   allLeaves,
   validateLeafDepth,
   missingLeafMessage,
+  findLeaf,
   withLock,
   type Batch,
   type BatchMember,
@@ -63,7 +64,16 @@ import {
   type Workspace,
 } from './shell';
 import { checkBase, localBase, trackingRef } from './preflight';
-import { attemptId, applyStack, batchMemberSlugs, buildStack, isAncestor, memberBase, restoreMembers } from './batch';
+import {
+  attemptId,
+  applyStack,
+  batchMemberSlugs,
+  buildStack,
+  isAncestor,
+  memberBase,
+  restoreHolder,
+  restoreMembers,
+} from './batch';
 import { commitMove, completeOwner } from './phase';
 import { sessionFile, deliveredAfter } from './session-file';
 import { readLog } from './log';
@@ -733,7 +743,16 @@ async function restoreDrifted(repo: Repo, members: BatchMember[], leaves: Leaf[]
     const leaf: Leaf | undefined = leaves.find((item) => item.state.slug === member.slug);
     drifted.push({ ...member, leaf: worktreeLeaf(leaf) });
   }
-  await restoreMembers(repo, drifted);
+  const dirty: string[] = (await restoreMembers(repo, drifted)).dirty;
+  for (const slug of dirty) {
+    const leaf: Leaf | undefined = leaves.find((item) => item.state.slug === slug);
+    if (leaf !== undefined) saveState(leaf.path, { ...readState(leaf.path), solo: true });
+  }
+}
+
+async function worktreeDirty(repo: Repo, worktree: string | undefined): Promise<boolean> {
+  if (worktree === undefined || !existsSync(worktree)) return false;
+  return (await command(['git', '-C', worktree, 'status', '--porcelain'], repo.root)) !== '';
 }
 
 function closableMembers(repo: Repo, members: BatchMember[], moved: Leaf[]): Leaf[] {
@@ -851,6 +870,7 @@ async function reconcileBatch(global: GlobalConfig, repo: Repo, holder: Leaf, in
       ),
       leaves,
     );
+    if (fresh !== undefined) await restoreHolder(repo, fresh, batch.holder.head);
     if (fresh !== undefined) saveState(fresh.path, { ...fresh.state, batch: undefined });
   });
   if (error !== null) {
@@ -891,6 +911,7 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
   }
   if (recorded !== undefined) {
     await restoreDrifted(repo, recorded.members, inventory.leaves);
+    await restoreHolder(repo, holder, recorded.holder.head);
     await withLock(resolve(globalHome(), '.lock'), async () => {
       const fresh: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
       if (fresh?.state.batch?.attempt === recorded.attempt) saveState(fresh.path, { ...fresh.state, batch: undefined });
@@ -927,9 +948,12 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
         tip: head,
       });
     }
+    const holderSha: string | undefined = await branchSha(repo, holder.state.slug);
+    const holderHead: string = holderSha ?? builtOn;
     const next: Batch = {
       attempt: attemptId(),
       built_on: builtOn,
+      holder: { base: await memberBase(repo, builtOn, holderHead), head: holderHead },
       members,
       applied: fresh.state.solo === true,
       solo: fresh.state.solo,
@@ -949,12 +973,87 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
     );
     return;
   }
-  const holderHead: string = (await branchSha(repo, holder.state.slug)) ?? batch.built_on;
+  const holderHead: string = batch.holder.head;
   let current: Batch = batch;
   let built: Awaited<ReturnType<typeof buildStack>>;
-  for (;;) {
+  let prompt: Batch | undefined;
+  build: for (;;) {
     built = await buildStack(repo, current.built_on, current.members, holderHead);
-    if (built.ok === true) break;
+    if (built.ok === true) {
+      const staged: Extract<Awaited<ReturnType<typeof buildStack>>, { ok: true }> = built;
+      const outcome: 'superseded' | 'rebuild' | 'applied' = await withLock(resolve(globalHome(), '.lock'), async () => {
+        const leaves: Leaf[] = allLeaves(repo);
+        const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
+        if (fresh === undefined || fresh.state.phase !== 'merge' || fresh.state.batch === undefined)
+          return 'superseded';
+        if (fresh.state.batch.applied === true || fresh.state.batch.attempt !== current.attempt) {
+          await restoreDrifted(repo, fresh.state.batch.members, leaves);
+          await restoreHolder(repo, fresh, fresh.state.batch.holder.head);
+          saveState(fresh.path, { ...fresh.state, batch: undefined });
+          return 'superseded';
+        }
+        const dirty: string[] = [];
+        const members: { slug: string; tip: string; leaf?: Leaf }[] = [];
+        for (const member of current.members) {
+          const leaf: Leaf | undefined = leaves.find(
+            (item) => item.state.slug === member.slug && item.state.phase === 'merge',
+          );
+          if (leaf === undefined) continue;
+          if (await worktreeDirty(repo, leaf.state.worktree)) {
+            dirty.push(member.slug);
+            continue;
+          }
+          members.push({
+            slug: member.slug,
+            tip: z.string().parse(staged.tips.get(member.slug)),
+            leaf: worktreeLeaf(leaf),
+          });
+        }
+        for (const slug of dirty) {
+          const leaf: Leaf = findLeaf(repo, slug);
+          saveState(leaf.path, { ...leaf.state, solo: true });
+        }
+        for (const member of current.members.filter((member) => dirty.includes(member.slug)))
+          await command(['git', 'update-ref', 'refs/heads/' + member.slug, member.head], repo.root);
+        if (dirty.length > 0) {
+          current = { ...current, members: current.members.filter((member) => !dirty.includes(member.slug)) };
+          return 'rebuild';
+        }
+        if (await worktreeDirty(repo, fresh.state.worktree)) {
+          await restoreMembers(
+            repo,
+            members.map((member) => ({
+              slug: member.slug,
+              head: current.members.find((entry) => entry.slug === member.slug)!.head,
+              leaf: member.leaf,
+            })),
+          );
+          await command(
+            ['git', 'update-ref', 'refs/heads/' + fresh.state.slug, fresh.state.batch.holder.head],
+            repo.root,
+          );
+          prompt = { ...fresh.state.batch, applied: true, solo: true, members: [] };
+          saveState(fresh.path, { ...fresh.state, batch: prompt });
+          return 'applied';
+        }
+        if (staged.top !== holderHead || members.length > 0)
+          await applyStack(repo, staged.top, members, { path: fresh.path, state: fresh.state });
+        prompt = {
+          ...fresh.state.batch,
+          applied: true,
+          top: staged.top,
+          members: current.members.map((member) => ({
+            ...member,
+            tip: z.string().parse(staged.tips.get(member.slug)),
+          })),
+        };
+        saveState(fresh.path, { ...fresh.state, batch: prompt });
+        return 'applied';
+      });
+      if (outcome === 'superseded') return;
+      if (outcome === 'rebuild') continue build;
+      break;
+    }
     if (built.conflict === holderHead) {
       await restoreDrifted(repo, current.members, discover(repo, invocation).leaves);
       let solo: Batch | undefined;
@@ -994,41 +1093,6 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
     if (rewrite === undefined) return;
     current = rewrite;
   }
-  let prompt: Batch | undefined;
-  await withLock(resolve(globalHome(), '.lock'), async () => {
-    const leaves: Leaf[] = allLeaves(repo);
-    const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
-    if (fresh === undefined || fresh.state.phase !== 'merge' || fresh.state.batch === undefined) return;
-    if (fresh.state.batch.applied === true || fresh.state.batch.attempt !== current.attempt) {
-      await restoreDrifted(repo, fresh.state.batch.members, leaves);
-      saveState(fresh.path, { ...fresh.state, batch: undefined });
-      return;
-    }
-    const members: { slug: string; tip: string; leaf?: Leaf }[] = [];
-    for (const member of current.members) {
-      const leaf: Leaf | undefined = leaves.find(
-        (item) => item.state.slug === member.slug && item.state.phase === 'merge',
-      );
-      if (leaf !== undefined)
-        members.push({
-          slug: member.slug,
-          tip: z.string().parse(built.tips.get(member.slug)),
-          leaf: worktreeLeaf(leaf),
-        });
-    }
-    if (built.top !== holderHead || members.length > 0)
-      await applyStack(repo, built.top, members, { path: fresh.path, state: fresh.state });
-    prompt = {
-      ...fresh.state.batch,
-      applied: true,
-      top: built.top,
-      members: current.members.map((member) => ({
-        ...member,
-        tip: z.string().parse(built.tips.get(member.slug)),
-      })),
-    };
-    saveState(fresh.path, { ...fresh.state, batch: prompt });
-  });
   if (prompt !== undefined)
     await dispatchLeaf(
       global,
@@ -1036,7 +1100,7 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
       { path: holder.path, state: readState(holder.path) },
       false,
       invocation,
-      `attempt=${prompt.attempt} top=${prompt.top}`,
+      prompt.solo === true ? `attempt=${prompt.attempt} solo` : `attempt=${prompt.attempt} top=${prompt.top}`,
     );
 }
 

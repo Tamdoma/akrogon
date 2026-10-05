@@ -194,6 +194,7 @@ test('an interrupted build restores drifted members and rebuilds under a new att
     await commitFile(f, bb.path, 'bb-file', 'bb\n');
     const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
     const savedHead: string = await head(f, 'bb');
+    const aaHead: string = await head(f, 'aa');
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     saveState(aa.path, {
@@ -201,6 +202,7 @@ test('an interrupted build restores drifted members and rebuilds under a new att
       batch: {
         attempt: 'interrupted-attempt',
         built_on: builtOn,
+        holder: { base: builtOn, head: aaHead },
         members: [{ slug: 'bb', base: builtOn, head: savedHead, tip: savedHead }],
         applied: false,
       },
@@ -427,6 +429,7 @@ test('a merged holder keeps the record while a member is still in merge, then fi
       batch: {
         attempt: 'interrupted-attempt',
         built_on: landed,
+        holder: { base: landed, head: landed },
         members: [{ slug: 'm1', base: landed, head: m1Head, tip: m1Head }],
         top: landed,
         candidate: landed,

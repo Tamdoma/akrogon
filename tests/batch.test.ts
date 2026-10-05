@@ -27,6 +27,7 @@ const baseState: object = {
 const record: object = {
   attempt: 'attempt-1',
   built_on: 'sha0',
+  holder: { base: 'sha0', head: 'shaH' },
   members: [{ slug: 'mem-a', base: 'sha0', head: 'sha1', tip: 'sha2' }],
   applied: false,
 };
@@ -47,6 +48,18 @@ test('stateSchema accepts a state with batch and solo', () => {
 test('stateSchema rejects unknown or missing-required batch fields', () => {
   expect(() => stateSchema.parse({ ...baseState, batch: { ...record, extra: 1 } })).toThrow();
   expect(() => stateSchema.parse({ ...baseState, batch: { built_on: 'x', members: [], applied: true } })).toThrow();
+  expect(() =>
+    stateSchema.parse({
+      ...baseState,
+      batch: { attempt: 'attempt-1', built_on: 'x', members: [], applied: true },
+    }),
+  ).toThrow();
+  expect(() =>
+    stateSchema.parse({
+      ...baseState,
+      batch: { ...record, holder: { base: 'sha0' } },
+    }),
+  ).toThrow();
   expect(() => stateSchema.parse({ ...baseState, batch: { ...record, attempt: '' } })).toThrow();
   expect(() =>
     stateSchema.parse({ ...baseState, batch: { ...record, members: [{ slug: 'm', base: 'b', head: 'h' }] } }),
@@ -302,6 +315,7 @@ test('batchMemberSlugs returns member slugs across every leaf carrying a batch r
       batch: {
         attempt: 'a1',
         built_on: 'b',
+        holder: { base: 'b', head: 'h' },
         members: [
           { slug: 'm1', base: 'b', head: 'h', tip: 't' },
           { slug: 'm2', base: 'b', head: 'h', tip: 't' },
@@ -317,6 +331,7 @@ test('batchMemberSlugs returns member slugs across every leaf carrying a batch r
         batch: {
           attempt: 'a2',
           built_on: 'b',
+          holder: { base: 'b', head: 'h' },
           members: [{ slug: 'm1', base: 'b', head: 'h', tip: 't' }],
           applied: true,
         },

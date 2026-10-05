@@ -32,7 +32,7 @@ import { mergeQueue, type QueueEntry } from './turn';
 import { closeSources } from './pull';
 import { testFile } from './test-files';
 import { trackingRef } from './preflight';
-import { applyStack, buildStack, isAncestor, restoreMembers } from './batch';
+import { applyStack, buildStack, isAncestor, restoreHolder, restoreMembers } from './batch';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
   try {
@@ -435,6 +435,7 @@ async function batchPush(
       repo,
       members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
     );
+    await restoreHolder(repo, leaf, record.holder.head);
     saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
     const departed: string[] = record.members
       .filter((member) => !members.some((entry) => entry.member.slug === member.slug))
@@ -472,9 +473,21 @@ async function batchPush(
   return { kind: 'error', record, candidate: head, result: pushed };
 }
 
+async function worktreeDirty(repo: Repo, worktree: string | undefined): Promise<boolean> {
+  if (worktree === undefined || !existsSync(worktree)) return false;
+  return (await command(['git', '-C', worktree, 'status', '--porcelain'], repo.root)) !== '';
+}
+
+function memberHead(record: Batch, slug: string): string {
+  return record.members.find((member) => member.slug === slug)!.head;
+}
+
 async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
   const builtOn: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
-  const holderHead: string = await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root);
+  const holderHead: string =
+    record.solo === true
+      ? await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root)
+      : record.holder.head;
   let members: BatchMember[] = record.members;
   for (;;) {
     const items: { slug: string; base: string; head: string }[] = members.map((member) => ({
@@ -484,7 +497,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
     }));
     const staged: Awaited<ReturnType<typeof buildStack>> = await buildStack(repo, builtOn, items, holderHead);
     if (staged.ok) {
-      const applied: boolean = await withLock(resolve(globalHome(), '.lock'), async () => {
+      const applied: boolean | 'rebuild' | 'dirty-holder' = await withLock(resolve(globalHome(), '.lock'), async () => {
         const current: Leaf = findLeaf(repo, leaf.state.slug);
         const batch: Batch | undefined = current.state.batch;
         if (batch?.attempt !== record.attempt || current.state.phase !== 'merge') return false;
@@ -499,8 +512,43 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
             repo,
             staying.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
           );
+          await restoreHolder(repo, current, batch.holder.head);
           saveState(current.path, { ...current.state, batch: undefined });
           throw new Error('Member left merge during restack, batch dissolved');
+        }
+        const dirty: string[] = [];
+        for (const entry of staying)
+          if (await worktreeDirty(repo, entry.leaf.state.worktree)) dirty.push(entry.member.slug);
+        for (const slug of dirty) {
+          const entry: Leaf = findLeaf(repo, slug);
+          saveState(entry.path, { ...entry.state, solo: true });
+          await command(['git', 'update-ref', 'refs/heads/' + slug, memberHead(batch, slug)], repo.root);
+        }
+        if (dirty.length > 0) {
+          members = batch.members.filter((member) => !dirty.includes(member.slug));
+          saveState(current.path, {
+            ...current.state,
+            batch: { ...batch, holder: { base: builtOn, head: batch.holder.head }, members },
+          });
+          return 'rebuild';
+        }
+        if (await worktreeDirty(repo, current.state.worktree)) {
+          await restoreMembers(
+            repo,
+            staying.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
+          );
+          await command(['git', 'update-ref', 'refs/heads/' + current.state.slug, batch.holder.head], repo.root);
+          saveState(current.path, {
+            ...current.state,
+            batch: {
+              ...batch,
+              holder: { base: builtOn, head: batch.holder.head },
+              applied: true,
+              solo: true,
+              members: [],
+            },
+          });
+          return 'dirty-holder';
         }
         const appliedMembers: { member: BatchMember; leaf: Leaf }[] = members.map((member) => {
           const tip: string = staged.tips.get(member.slug)!;
@@ -517,6 +565,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
           batch: {
             ...batch,
             built_on: builtOn,
+            holder: { base: builtOn, head: holderHead },
             applied: true,
             top: staged.top,
             members: appliedMembers.map((entry) => entry.member),
@@ -525,6 +574,11 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
         });
         return true;
       });
+      if (applied === 'rebuild') continue;
+      if (applied === 'dirty-holder') {
+        console.log(`fresh checks required rebase ${leaf.state.slug} onto ${builtOn}`);
+        return;
+      }
       if (!applied) throw new Error('Batch attempt superseded during restack; record left for the next pass');
       console.log(`fresh checks required ${staged.top}`);
       return;
@@ -540,7 +594,17 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
           repo,
           staying.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
         );
-        saveState(current.path, { ...current.state, batch: { ...batch, applied: true, solo: true, members: [] } });
+        await restoreHolder(repo, current, batch.holder.head);
+        saveState(current.path, {
+          ...current.state,
+          batch: {
+            ...batch,
+            holder: { base: builtOn, head: batch.holder.head },
+            applied: true,
+            solo: true,
+            members: [],
+          },
+        });
       });
       console.log(`fresh checks required rebase ${leaf.state.slug} onto ${builtOn}`);
       return;
@@ -551,15 +615,21 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
       const batch: Batch | undefined = current.state.batch;
       if (batch?.attempt !== record.attempt || current.state.phase !== 'merge')
         throw new Error('Batch attempt superseded during restack');
-      const entry: { member: BatchMember; leaf: Leaf } | undefined = memberEntries(repo, batch).find(
+      const entries: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
+      const entry: { member: BatchMember; leaf: Leaf } | undefined = entries.find(
         (item) => item.member.slug === conflicted,
       );
-      if (entry !== undefined) {
-        await restoreMembers(repo, [{ ...entry.member, leaf: entry.leaf }]);
-        saveState(entry.leaf.path, { ...entry.leaf.state, solo: true });
-      }
+      await restoreMembers(
+        repo,
+        entries.map((item) => ({ ...item.member, leaf: item.leaf })),
+      );
+      await restoreHolder(repo, current, batch.holder.head);
+      if (entry !== undefined) saveState(entry.leaf.path, { ...entry.leaf.state, solo: true });
       members = batch.members.filter((member) => member.slug !== conflicted);
-      saveState(current.path, { ...current.state, batch: { ...batch, members } });
+      saveState(current.path, {
+        ...current.state,
+        batch: { ...batch, holder: { base: builtOn, head: batch.holder.head }, members },
+      });
     });
   }
 }
@@ -649,6 +719,7 @@ export async function phaseCommand(
           repo,
           members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
         );
+        await restoreHolder(repo, leaf, record.holder.head);
         for (const entry of members) saveState(entry.leaf.path, { ...entry.leaf.state, solo: true });
         saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
         console.log('batch dissolved, merge solo');

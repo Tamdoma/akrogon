@@ -1,7 +1,7 @@
 import { test, expect, afterEach } from 'bun:test';
 import { z } from 'zod';
 import { dirname, resolve } from 'node:path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { cli, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture, type HerdrFixture } from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State } from '../src/state';
@@ -25,11 +25,18 @@ type BatchFixture = {
   branches: Map<string, Branch>;
 };
 
-async function branchAt(f: Fixture, slug: string, base: string, file: string): Promise<Branch> {
+async function branchAt(
+  f: Fixture,
+  slug: string,
+  base: string,
+  file: string,
+  prepare?: (worktree: string) => Promise<void>,
+): Promise<Branch> {
   const worktree: string = resolve(f.home, 'wt-' + slug);
   await command(['git', 'worktree', 'add', '-b', slug, worktree, base], f.root);
   mkdirSync(dirname(resolve(worktree, file)), { recursive: true });
   writeFileSync(resolve(worktree, file), slug + '\n');
+  if (prepare !== undefined) await prepare(worktree);
   await command(['git', 'add', '.'], worktree);
   await command(['git', 'commit', '-m', slug], worktree);
   return { slug, head: await command(['git', 'rev-parse', 'HEAD'], worktree), worktree };
@@ -40,13 +47,15 @@ async function batchFixture(
   slugs: string[],
   containers: Record<string, string> = {},
   files: Record<string, string> = {},
+  prepare: Record<string, (worktree: string) => Promise<void>> = {},
 ): Promise<BatchFixture> {
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
   const repo: Repo = readRepo('repo', f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
   const [holderSlug, ...memberSlugs] = slugs;
   const branches: Map<string, Branch> = new Map();
-  for (const slug of slugs) branches.set(slug, await branchAt(f, slug, builtOn, files[slug] ?? 'file-' + slug));
+  for (const slug of slugs)
+    branches.set(slug, await branchAt(f, slug, builtOn, files[slug] ?? 'file-' + slug, prepare[slug]));
   const holderPath: string = leaf(
     f,
     holderSlug,
@@ -79,6 +88,7 @@ async function batchFixture(
   const record: Batch = {
     attempt: 'a1',
     built_on: builtOn,
+    holder: { base: builtOn, head: branches.get(holderSlug)!.head },
     applied: true,
     top: built.top,
     members: memberSlugs.map((slug) => ({
@@ -109,7 +119,14 @@ async function soloFixture(f: Fixture): Promise<BatchFixture> {
     worktree: branch.worktree,
     merge_stamp: '2026-10-05T00:00:00.000Z',
   });
-  const record: Batch = { attempt: 'a1', built_on: builtOn, applied: true, solo: true, members: [] };
+  const record: Batch = {
+    attempt: 'a1',
+    built_on: builtOn,
+    holder: { base: builtOn, head: branch.head },
+    applied: true,
+    solo: true,
+    members: [],
+  };
   saveState(holderPath, { ...readState(holderPath), batch: record });
   return {
     repo,
@@ -543,10 +560,7 @@ test('a dissolved batch restores the holder to its own range and the solo push c
     expect(await command(['git', 'rev-parse', 'HEAD'], holder.state.worktree!)).toBe(holderHead);
     expect(
       (
-        await command(
-          ['git', 'rev-list', '--format=%s', '--no-commit-header', holderHead + '..refs/heads/hold'],
-          f.root,
-        )
+        await command(['git', 'rev-list', '--format=%s', '--no-commit-header', 'origin/main..refs/heads/hold'], f.root)
       ).trim(),
     ).toBe('hold');
     const solo: State = readState(holder.path);
@@ -578,6 +592,9 @@ test('a member conflict during restack drops the member and keeps its commits ou
       {},
       { 'mem-a': 'conflict-file', 'mem-b': 'file-mem-b' },
     );
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
+    ).toBe(0);
     const droppedTip: string = record.members[0].tip;
     const advance: string = resolve(f.home, 'advance');
     await command(['git', 'worktree', 'add', '--detach', advance, 'origin/main'], f.root);
@@ -633,3 +650,65 @@ test('a dirty member worktree keeps its files and branch at head when the batch 
     f.clean();
   }
 });
+
+test('a carried package installs on the batch top and the restored member resolves its own lockfile', async () => {
+  const f: Fixture = await fixture();
+  try {
+    writeFileSync(resolve(f.root, '.gitignore'), '.env\nnode_modules/\n');
+    mkdirSync(resolve(f.root, 'pkg-marker'));
+    writeFileSync(resolve(f.root, 'pkg-marker/package.json'), '{"name":"marker","version":"1.0.0"}');
+    writeFileSync(resolve(f.root, 'package.json'), '{"name":"app","dependencies":{"marker":"file:./pkg-marker"}}');
+    await command(['git', 'add', '.'], f.root);
+    await command(['git', 'commit', '-m', 'packages'], f.root);
+    await command(['bun', 'install'], f.root);
+    await command(['git', 'add', 'bun.lock'], f.root);
+    await command(['git', 'commit', '-m', 'lockfile'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      setup: 'bun install --frozen-lockfile',
+      checks: {
+        versions:
+          "bun -e \"console.log(require('marker/package.json').version);console.log(require('extra/package.json').version)\"",
+      },
+    });
+    const addExtra = async (worktree: string): Promise<void> => {
+      mkdirSync(resolve(worktree, 'pkg-extra'));
+      writeFileSync(resolve(worktree, 'pkg-extra/package.json'), '{"name":"extra","version":"2.0.0"}');
+      writeFileSync(
+        resolve(worktree, 'package.json'),
+        '{"name":"app","dependencies":{"marker":"file:./pkg-marker","extra":"file:./pkg-extra"}}',
+      );
+      await command(['bun', 'install'], worktree);
+    };
+    const { holder, members, herdr } = await batchFixture(f, ['hold', 'mem-a'], {}, {}, { 'mem-a': addExtra });
+    const config: Result = await cli(f, ['config'], holder.state.worktree!, herdr.env);
+    expect(config.code).toBe(0);
+    const composed: string = z.object({ checks: z.record(z.string(), z.string()) }).parse(Bun.YAML.parse(config.stdout))
+      .checks.versions;
+    const onTop: Result = await run(['sh', '-c', composed], holder.state.worktree!);
+    expect(onTop.stdout.split('\n').slice(-2)).toEqual(['1.0.0', '2.0.0']);
+    expect(onTop.code).toBe(0);
+    const red: Result = await cli(
+      f,
+      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(red.code).toBe(0);
+    expect(red.stdout).toBe('batch dissolved, merge solo');
+    const memberWorktree: string = z.string().parse(readState(members[0].path).worktree);
+    rmSync(resolve(memberWorktree, 'node_modules'), { recursive: true, force: true });
+    const onMember: Result = await run(['sh', '-c', composed], memberWorktree);
+    expect(onMember.stdout.split('\n').slice(-2)).toEqual(['1.0.0', '2.0.0']);
+    expect(onMember.code).toBe(0);
+    // The restored holder carries the base lockfile only: extra is absent from it and
+    // cannot be resolved once the stale install is gone.
+    rmSync(resolve(holder.state.worktree!, 'node_modules'), { recursive: true, force: true });
+    expect(readFileSync(resolve(holder.state.worktree!, 'bun.lock'), 'utf8')).not.toContain('extra');
+    const onHolder: Result = await run(['sh', '-c', composed], holder.state.worktree!);
+    expect(onHolder.code).not.toBe(0);
+  } finally {
+    f.clean();
+  }
+}, 30000);

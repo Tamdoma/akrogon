@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { leafTemp, type Repo } from './config';
 import { allLeaves, type Leaf } from './state';
@@ -58,9 +59,20 @@ export async function buildStack(
   }
 }
 
-async function move(repo: Repo, slug: string, target: string, leaf?: Leaf): Promise<void> {
-  if (leaf?.state.worktree !== undefined) await command(['git', '-C', leaf.state.worktree, 'reset', '--hard', target]);
-  else await command(['git', 'update-ref', 'refs/heads/' + slug, target], repo.root);
+export type MoveResult = { moved: 'worktree' | 'ref' | 'dirty-ref' };
+
+async function move(repo: Repo, slug: string, target: string, leaf?: Leaf): Promise<MoveResult> {
+  if (leaf?.state.worktree !== undefined && existsSync(leaf.state.worktree)) {
+    const status: string = await command(['git', '-C', leaf.state.worktree, 'status', '--porcelain'], repo.root);
+    if (status !== '') {
+      await command(['git', 'update-ref', 'refs/heads/' + slug, target], repo.root);
+      return { moved: 'dirty-ref' };
+    }
+    await command(['git', '-C', leaf.state.worktree, 'reset', '--hard', target], repo.root);
+    return { moved: 'worktree' };
+  }
+  await command(['git', 'update-ref', 'refs/heads/' + slug, target], repo.root);
+  return { moved: 'ref' };
 }
 
 export async function applyStack(
@@ -68,14 +80,29 @@ export async function applyStack(
   top: string,
   members: { slug: string; tip: string; leaf?: Leaf }[],
   holder: Leaf,
-): Promise<void> {
-  for (const member of members) await move(repo, member.slug, member.tip, member.leaf);
-  await move(repo, holder.state.slug, top, holder);
+): Promise<{ dirty: string[] }> {
+  const dirty: string[] = [];
+  for (const member of members) {
+    const result: MoveResult = await move(repo, member.slug, member.tip, member.leaf);
+    if (result.moved === 'dirty-ref') dirty.push(member.slug);
+  }
+  const held: MoveResult = await move(repo, holder.state.slug, top, holder);
+  if (held.moved === 'dirty-ref') dirty.push(holder.state.slug);
+  return { dirty };
 }
 
 export async function restoreMembers(
   repo: Repo,
   members: { slug: string; head: string; leaf?: Leaf }[],
-): Promise<void> {
-  for (const member of members) await move(repo, member.slug, member.head, member.leaf);
+): Promise<{ dirty: string[] }> {
+  const dirty: string[] = [];
+  for (const member of members) {
+    const result: MoveResult = await move(repo, member.slug, member.head, member.leaf);
+    if (result.moved === 'dirty-ref') dirty.push(member.slug);
+  }
+  return { dirty };
+}
+
+export async function restoreHolder(repo: Repo, leaf: Leaf, head: string): Promise<MoveResult> {
+  return move(repo, leaf.state.slug, head, leaf);
 }
