@@ -520,7 +520,9 @@ test('a red-batch member holds its next turn solo despite an unmarked waiter', a
     idleAll(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     const attempt: string = readState(aa.path).batch!.attempt;
-    expect((await cli(f, ['phase', 'aa', 'check.fix', '--slot', 'B', '--attempt', attempt], f.root, f.env)).code).toBe(0);
+    expect((await cli(f, ['phase', 'aa', 'check.fix', '--slot', 'B', '--attempt', attempt], f.root, f.env)).code).toBe(
+      0,
+    );
     expect(readState(bb.path).solo).toBe(true);
     toMerge(cc.path, '2026-09-13T00:00:00Z');
     expect((await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop'], f.root, f.env)).code).toBe(0);

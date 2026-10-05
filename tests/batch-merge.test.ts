@@ -472,32 +472,45 @@ test('a member failing during restack is not reset by the locked apply', async (
   const f: Fixture = await fixture();
   try {
     const { holder, record, members, herdr } = await batchFixture(f, ['hold', 'mem-a']);
-    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env)).code).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env)).code,
+    ).toBe(0);
     writeFileSync(resolve(f.root, 'advance'), 'advance');
     await command(['git', 'add', 'advance'], f.root);
     await command(['git', 'commit', '-m', 'advance'], f.root);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     const before: string = await remoteTip(f);
     const script: string = resolve(f.home, 'fail-member.ts');
-    writeFileSync(script, `import { readState } from '${resolve(import.meta.dir, '../src/state')}';
+    writeFileSync(
+      script,
+      `import { readState } from '${resolve(import.meta.dir, '../src/state')}';
 import { readRepo } from '${resolve(import.meta.dir, '../src/config')}';
 import { commitMove } from '${resolve(import.meta.dir, '../src/phase')}';
 const path = '${members[0].path}';
 const state = readState(path);
 await commitMove(readRepo('repo', '${f.root}'), { path, state }, state, 'failed', null, { cause: 'blocked', phase: 'merge', slot: 'B', reason: 'operator stop' });
-`);
+`,
+    );
     const marker: string = resolve(f.home, 'failed-once');
     const git: string = await command(['sh', '-c', 'command -v git']);
     const wrapper: string = resolve(f.home, 'bin/git');
-    writeFileSync(wrapper, `#!/bin/sh
+    writeFileSync(
+      wrapper,
+      `#!/bin/sh
 if [ "$1" = rebase ] && [ ! -e '${marker}' ]; then
   touch '${marker}'
   '${process.execPath}' '${script}' || exit "$?"
 fi
 exec '${git}' "$@"
-`);
+`,
+    );
     chmodSync(wrapper, 0o755);
-    const result: Result = await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, herdr.env);
+    const result: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
     expect(result.code).not.toBe(0);
     expect(readState(members[0].path).phase).toBe('failed');
     expect(await command(['git', 'rev-parse', 'mem-a'], f.root)).toBe(record.members[0].tip);
