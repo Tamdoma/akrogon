@@ -16,6 +16,7 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
           verdict: { type: 'string' },
           reason: { type: 'string' },
           check: { type: 'boolean' },
+          attempt: { type: 'string' },
         }
       : verb === 'next'
         ? { all: { type: 'boolean' }, resume: { type: 'boolean' } }
@@ -64,6 +65,7 @@ switch (verb) {
         values.verdict,
         values.reason,
         values.check,
+        values.attempt,
       );
       if (result.committed) committed = result;
     } catch (error) {
