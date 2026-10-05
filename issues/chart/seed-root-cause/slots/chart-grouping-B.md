@@ -1,0 +1,36 @@
+This round settles how charting groups related reports and whether links can expand a one-symptom intake. Verification and operator approval are already locked. A shared cause suggests work to inspect. It does not prove that one fix completes every linked report.
+
+### 1 · Should reports be grouped by the verified condition or by the whole workflow they affect?
+
+`skills/chart-issues/SKILL.md:41` splits work by independently checkable outcomes and actual dependencies. `assets/shapes.md:244-246` gives each GitHub report one completion owner and keeps partially covered reports open. That means grouping must account for every part of a report before putting its identity into an owner's `sources`.
+
+Research: operator · discovery-role Taken and `INTAKE.md`, read 2026-10-05 · Charting must verify suspected causes against live code and ask before assigning one owner · This makes grouping a proposal, never a consequence of a related link. Practitioner · Chris Jones, Google SRE, [Effective Troubleshooting](https://sre.google/sre-book/effective-troubleshooting/), Theory/Common Pitfalls, read during this chart on 2026-10-05 · Correlated failures can have different causes · This argues against treating all mockup failures as one mechanism. Better-than-training · `skills/chart-issues/SKILL.md:41,47,69` and `skills/chart-issues/assets/shapes.md:244-246`, read 2026-10-05 · The existing rules already separate evidence, operator choice and completion ownership · This favors extending the intake comparison rather than adding new lifecycle machinery.
+
+- **1a (recommended)** Propose groups around verified conditions and independently checkable outcomes. Show which parts of each report the proposed work covers and ask the operator to confirm. Put an identity into `sources` only when one owner will deliver the whole report. This preserves focused work and prevents premature closure. Cost: a report spanning several conditions may remain open until a complete owner is agreed.
+- **1b** Propose one epic for the affected workflow, with separate leaves for the verified conditions. Confirm that it covers every sourced report before handoff. This can give a broad report one complete owner, but completion waits for all included work and the epic may be larger than the initial symptom needs.
+
+Walk-through, if destination-code inspection supports the reports: #124 points to dropped variants still blocking progress. The abandoned-variant repair part of #127 may share that condition. #125 describes run-history gates, #126 describes parser and interaction-analysis failures, and the photo-serving part of #127 needs its own outcome. #128 references these different problems. Under 1a, show those groups and mark #127 and #128 as partial until an owner covers their full contents. Do not put the same identity into separate unrelated owners. If the operator chooses one epic that covers every part, 1b can own and eventually close those reports together. The grouping is provisional until the live source supports it.
+
+Pitfalls avoided: Done-criteria replay #124–#128 and check that fixing variant choice alone cannot close reports with uncovered parser, gate or photo work. Existing ownership conflicts remain visible and are never reassigned silently (`shapes.md:62,246`). Source text stays verbatim, with new findings recorded separately (`:41-59`). No root report is required before the door can investigate the symptoms.
+
+### 2 · If the operator starts with #124, should its related links bring other reports into intake?
+
+`skills/chart-issues/SKILL.md:31` currently imports mirrored reports only when there is no operator note or the note asks for them. A related link is evidence to inspect, but it is not automatically permission to add all of that report's work. `:69` already shows candidate matches and acts only after operator confirmation.
+
+Research: operator · related-search Taken and discovery-role Taken, read 2026-10-05 · Filing links related reports with reasons, while charting confirms grouping · This supports using links as candidates rather than automatic scope. Better-than-training · `skills/chart-issues/SKILL.md:27,31,69` and `skills/chart-issues/assets/shapes.md:62,246`, read 2026-10-05 · Freshness, exact-identity dedupe and partial matches already govern intake · This preserves those rules when a link is followed.
+
+- **2a (recommended)** Read directly linked reports as context and show which ones could change #124's cause or scope. Ask the operator before adding their work to intake. For newly found links, show another candidate list rather than recursively importing them. This finds the shared problem without silently expanding the task. Cost: a scope decision before more reports are imported.
+- **2b** Automatically import directly linked open reports, then ask about grouping and scope. This makes the shared evidence available immediately, but can add unrelated work to intake and conflicts that the operator must unwind.
+- **2c** Import only the report explicitly named. Show related identities as pointers without reading their bodies until the operator asks. This minimizes intake reading, but can miss the evidence needed to understand #124's shared condition.
+
+For 2a, a note naming #124 first brings in #124. If its body points to #125 or #128, read those as context and show their distinct conditions. If it has no links, use the existing destination comparison at `:69` to surface candidates. Offer #125–#128 for intake only where the inspection supports relevance. An old report does not need the new Suspected cause heading to be compared. A closed report is precedent, not unfinished work. An identity already owned elsewhere is a conflict, not a fresh import.
+
+Pitfalls avoided: Operator confirmation removes accidental scope growth, and direct-link inspection avoids an unbounded walk through the backlog. Done-criteria cover a one-symptom note, an unrelated linked report, a closed precedent, an existing ownership conflict and failed refresh. A failed refresh cannot authorize draining stale mirrors (`SKILL.md:27`; `shapes.md:62`). Missing or unreadable evidence stays a named gap rather than a guessed connection.
+
+Reply `1a 2a`, or a numbered free-text answer.
+
+Challenge check
+
+The discovery-role lock already settles verification and approval, so neither option reopens them. Reports can span several independently deliverable outcomes. The current one-owner rule then requires a fully covering issue or epic, or leaving the identity open as a partial match. Choosing a broad epic is an operator scope decision, not proof of one root cause.
+
+Charting has its own recorded cap: under 300 lines, 4,000 tokens and 20 substantive rules (`issues/closed/akrogon-loop/doors/chart-issues/implementation/brief.md:9`; `plan.md:26`). Rules are judged semantically, including steps. The plan forbids hiding a duplicate workflow in references. This differs from seed's rule-sentence cap. The current main skill is 92 lines and 2,331 words, which does not establish its token count or remaining rule budget. Recount before handoff. Fold cause comparison into Open/Drain and coverage handling into the existing shapes ownership rules. Do not add a grouping script, tracker or prose-matching check. No other slot's round was read.

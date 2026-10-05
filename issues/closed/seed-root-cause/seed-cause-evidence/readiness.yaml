@@ -1,0 +1,85 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: list the filing account's recent reports, open and closed
+    command: gh issue list -R Tamdoma/tamdoma-framework --state all --author @me --search "created:>=2026-10-04" --limit 20 --json number,title,state
+    identity: gh keyring login, github.com account ivanjuras (scopes gist, read:org, repo)
+    target: Tamdoma/tamdoma-framework (private)
+    version: gh 2.102.0
+    date: '2026-10-05'
+    result: exit 0, returned open #122-#128
+    cleanup: none, read-only
+    limits: one repo and account; no rate-limit or large-repo recall proof
+    record: issues/chart/seed-root-cause/forks/related-search.md
+  - operation: keyword search, open and closed
+    command: gh issue list -R Tamdoma/tamdoma-framework --state all --search "mockup variant" --limit 10 --json number,state
+    identity: gh keyring login, github.com account ivanjuras (scopes gist, read:org, repo)
+    target: Tamdoma/tamdoma-framework (private)
+    version: gh 2.102.0
+    date: '2026-10-05'
+    result: exit 0, returned open #123-#128 and closed #84, #38
+    cleanup: none, read-only
+    limits: lexical match only; recall depends on chosen words
+    record: issues/chart/seed-root-cause/forks/related-search.md
+  - operation: read a reporter-supplied issue link
+    command: gh issue view 128 -R Tamdoma/tamdoma-framework --json number,state,title
+    identity: gh keyring login, github.com account ivanjuras (scopes gist, read:org, repo)
+    target: Tamdoma/tamdoma-framework#128
+    version: gh 2.102.0
+    date: '2026-10-05'
+    result: exit 0, #128 OPEN
+    cleanup: none, read-only
+    limits: same-org link only; no other-org link tested
+    record: issues/chart/seed-root-cause/forks/related-search.md
+  - operation: lookup failure on an unreadable repo
+    command: gh issue list -R Tamdoma/no-such-repo-xyz --state all --limit 5 --json number
+    identity: gh keyring login, github.com account ivanjuras (scopes gist, read:org, repo)
+    target: Tamdoma/no-such-repo-xyz (absent)
+    version: gh 2.102.0
+    date: '2026-10-05'
+    result: 'exit 1, GraphQL: Could not resolve to a Repository'
+    cleanup: none, read-only
+    limits: no network-failure or rate-limit case
+    record: issues/chart/seed-root-cause/forks/related-search.md
+  - operation: empty lookup result
+    command: gh issue list -R Tamdoma/tamdoma-framework --state all --search "zzqxnonexistentterm" --limit 5 --json number
+    identity: gh keyring login, github.com account ivanjuras (scopes gist, read:org, repo)
+    target: Tamdoma/tamdoma-framework (private)
+    version: gh 2.102.0
+    date: '2026-10-05'
+    result: exit 0, []
+    cleanup: none, read-only
+    limits: shows only that empty and failed differ by exit code
+    record: issues/chart/seed-root-cause/forks/related-search.md
+  - operation: body links survive the seed mirror
+    command: akrogon pull (cwd /home/ivan/Work/infra/tamdoma/framework)
+    identity: gh keyring login, github.com account ivanjuras (scopes gist, read:org, repo)
+    target: Tamdoma/tamdoma-framework open issues into gitignored issues/seeds/
+    version: installed akrogon at 2026-10-05, gh 2.102.0
+    date: '2026-10-05'
+    result: exit 0, 9 open issues pulled; #127 body text "(related #124, #125)" unchanged in issues/seeds/127-mockup-photo-path-rule-conflicts-with.md
+    cleanup: none, mirror folder is gitignored
+    limits: does not exercise a body written by the new skill
+    record: issues/chart/seed-root-cause/forks/related-search.md
+  - operation: lookups returning issue bodies for content judgment
+    command: gh issue list -R Tamdoma/tamdoma-framework --state all --search "mockup variant" --limit 10 --json number,title,state,body; gh issue list -R Tamdoma/tamdoma-framework --state all --author @me --search "created:>=2026-10-04" --limit 20 --json number,title,state,body
+    identity: gh keyring login, github.com account ivanjuras (scopes gist, read:org, repo)
+    target: Tamdoma/tamdoma-framework (private)
+    version: gh 2.102.0
+    date: '2026-10-05'
+    result: exit 0 both; 8 and 7 results, every one with a non-empty body (#124 body 2,333 chars)
+    cleanup: none, read-only
+    limits: as the plain list proofs; no rate-limit or large-repo recall proof
+    record: issues/chart/seed-root-cause/forks/related-search.md
+  - operation: issue creation (unchanged command)
+    command: gh issue create -R "$repo" --title "$title" --body-file -
+    identity: gh keyring login, github.com account ivanjuras (scopes gist, read:org, repo)
+    target: Tamdoma/akrogon (observed issue #56)
+    version: gh 2.102.0
+    date: '2026-10-05'
+    result: Tamdoma/akrogon#56 created by ivanjuras at 2026-10-05T09:09:17Z through the current skill
+    cleanup: none, the issue is this leaf's source
+    limits: observed real call with the leaf's identity, not re-run by the door to avoid a new public issue; the leaf substitutes creation and makes no live create call
+    record: issues/chart/seed-root-cause/forks/related-search.md

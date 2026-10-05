@@ -1,0 +1,12 @@
+## Observation
+The mockup photo-path rule conflicts with the rendered variant review, so every compliant mockup fails the `mockups-impeccable-audit` gate.
+
+- **Mockup rule.** `design-create-mockup` requires photo `src` paths that resolve under `media_path` (`.spec/shared/business/media/photos/`). See `subroutines/build/page-builder.md:165`, `subroutines/finalize/variant-assembler.md:146` ("Photo path correctness"), and the variant briefs. Stopsol mockups use `../../../../../../shared/business/media/photos/<file>`.
+- **Review behavior.** `test-audit-design-impeccable` route `rendered-variants` runs `kit/scripts/review-variants.mjs`, which serves only `variants_dir` (`serveStatic(variantsDir, ...)`, line 203). Inside that served root, the photo paths resolve to `/shared/business/media/photos/<file>` and return 404.
+
+Results: `failed_requests` of 18, 19 and 18 for variant-01, variant-02 and variant-03. All three fail P1, and `repairs.json` lists 3 repair units.
+
+The photos are also missing from `files[]`, the bundle that publish hash-checks, so a published mockup would show alt text instead of photos. Repairing only the HTML fails the same check again. The review log says the fix needs a framework decision: copy the photos into `assets/`, or change the served root.
+
+Also seen: the gate requires exactly 3 variants (`check-review-summary.ts:76`) and is accepted only when every variant passes. So variants the operator abandoned get repair units too (related #124, #125).
+

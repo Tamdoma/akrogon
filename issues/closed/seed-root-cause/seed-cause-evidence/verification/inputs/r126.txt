@@ -1,0 +1,27 @@
+## Observation
+The mockup motion coverage CLI (`node .claude/skills/_shared/libraries/motion-vocabulary/scripts/run-mockup-coverage.js`) fails on compliant mockups. `finalize/variant-assembler` requires the CLI to exit 0 for every variant, so finalize is blocked.
+
+**1. Parser bug.** `extractMarkupSourceRecords` in `.claude/skills/_shared/libraries/motion-vocabulary/index.js:76` matches every `<script>` with `/<(style|script)(?:\s[^>]*)?>/` and parses each one as JS. That includes the `<script type="application/json" id="font-delivery">` note the font-delivery contract requires. Babel fails, and the CLI exits 1 before any motion rule runs:
+
+```
+MOTION_JS_PARSE_ERROR ... final.html:8:66: babel: Missing semicolon. (1:14)
+```
+
+Patched locally in Stopsol to skip `<script>` elements whose `type` is not `module`, `text/javascript` or `application/javascript`.
+
+**2. False positives on interactive UI, after the parser patch.** On Stopsol `final.html` the CLI reports:
+
+```
+MOTION_HIDE_WITHOUT_DRIVER      final.html:140 .drawer
+MOTION_TERMINAL_STATE_MISSING   final.html:142 .drawer-backdrop
+MOTION_TERMINAL_STATE_MISSING   final.html:143 .drawer-panel
+MOTION_HIDE_WITHOUT_DRIVER      final.html:169 .js .acc-panel
+```
+
+The drawer and accordions work in the browser.
+
+- Drivers are recognized only inside `forEach` or `for...of` over a resolved collection (`collectRecordDrivers`, `index.js:614-669`). Single-element click toggles (a `classList` change on one element) are not seen.
+- Terminal classes are recognized only on the target compound selector, after the last combinator (`terminalClassesFor`, `index.js:695-721`). A parent-state rule like `.drawer.is-open .drawer-panel` does not count.
+
+The analyzer fits scroll-reveal patterns, not click-driven parts such as drawers and accordions.
+

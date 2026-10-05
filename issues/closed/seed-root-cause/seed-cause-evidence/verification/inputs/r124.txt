@@ -1,0 +1,13 @@
+## Observation
+The number of mockup variants blocks phase progression. In Stopsol, the operator picked variant-01 and promoted it to `final.html`. variant-02 and variant-03 were abandoned.
+
+`bun .claude/workflow/scripts/advance-phase.ts --from mockups --manifest .spec/workspaces/website/deliverables/design/mockups/stopsol/manifest.yaml` refuses with:
+
+```
+advance-phase: refused: unfinished dispatch records for phase mockups: .spec/workspaces/website/orchestrator/handoffs/2026-10-04-mockups-r2-b2.json
+```
+
+The same check (`checkManifestRule`, `.claude/workflow/scripts/advance-phase.ts:259-278`) also requires the killed round-1 records for variant-02 and variant-03 to be superseded by a completed record with no failure. Those records carry `failure_evidence: "killed run: no log on disk"`. The variant HTML files exist on disk, so the manifest's file-presence check passes. Only the dispatch records block the close.
+
+After choosing a variant, the operator still has to finish the unused variants, or hand-edit `.hook-state.json`, before the blueprint can reach `mockups-content-verify`, `mockups-impeccable-audit`, `lens-client-review` and `mockups-refine`. No operator control skips a non-checkpoint phase. `CHECKPOINT OVERRIDE: SKIP` covers only checkpoint phases.
+

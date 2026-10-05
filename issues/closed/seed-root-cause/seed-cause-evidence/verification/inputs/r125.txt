@@ -1,0 +1,15 @@
+## Observation
+A blueprint phase closes only when its dispatch records are complete. Phase progress is judged by run history, not by checked results.
+
+- `checkManifestRule` (`.claude/workflow/scripts/advance-phase.ts:224-280`) refuses while any record for the phase is unfinished. It also requires every failure-marked record to be superseded by a later completed, failure-free record covering the same `unit_id`s.
+- `blueprintPhaseRecords` (`advance-phase.ts:92-111`) counts only handoffs with `mode: blueprint` and a matching `blueprint` and `phase`.
+- Blueprint records for the current phase never expire (`pruneSkillDispatches`, `.claude/hooks/infrastructure/hook-state-tracking.ts:126-149`).
+- An unfinished record also blocks re-dispatch of the same handoff (`hook-state-tracking.ts:61-67`, "Blueprint dispatch admission refused").
+
+Seen in Stopsol on 2026-10-05:
+
+1. **Abandoned runs blocked progress.** The operator chose variant-01 and promoted it to `final.html`. A killed variant-02 batch (`2026-10-04-mockups-r2-b2.json`, no `completed_at`) blocked the `mockups` close. So did the round-1 variant-02 and variant-03 records (`failure_evidence: "killed run: no log on disk"`). All variant files existed on disk, and the manifest file-presence check passed.
+2. **Real work done in direct mode did not count.** Eight direct-mode runs did the actual homepage work: cut-art visibility, timed draw, mega menu tabs, panel heights, promote to `final.html`, content verify (55/55 PASS), impeccable audit (VALIDATION_OK), and the M1 accessibility fix. None of them advanced the blueprint.
+3. **The only ways forward were faking.** The options were: re-run unwanted variant batches just to create completion records, hand-edit `.hook-state.json`, or flip the stale handoffs' `mode` to `direct` so `advance-phase.ts` ignores them. The mode flip was done temporarily and reverted after `mockups` advanced to `mockups-finalize`.
+4. **"Has a phase" cannot stand in for "is a blueprint run".** `test-audit-design-impeccable` requires a top-level `phase` string even in direct mode.
+
