@@ -680,6 +680,7 @@ async function closeMergedTab(repo: Repo, leaf: Leaf): Promise<boolean> {
 }
 
 async function cleanupMerged(repo: Repo, leaf: Leaf): Promise<void> {
+  if ((await batchMemberSlugs(repo)).has(leaf.state.slug)) return;
   const hadLive: boolean = await closeMergedTab(repo, leaf);
   if (!hadLive) await removeLeafTemp(repo, leaf.state.slug);
   if (within(leaf.path, resolve(repo.root, 'issues/open'))) return;
