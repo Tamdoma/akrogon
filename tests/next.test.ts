@@ -4014,8 +4014,6 @@ for (const exit of [
         for (let pass = 0; pass < 3; pass++) expect((await next(f, ['--all'])).code).toBe(0);
         expect(readState(aa.path).failure?.cause).toBe('attempts');
         expect(readState(aa.path).failure?.reason).toContain('after 3 passes');
-        // The capped holder failed inside the pass; the next pass hands the turn to bb.
-        expect((await next(f, ['--all'])).code).toBe(0);
       } else {
         const args: string[] =
           exit === 'seat merged'
@@ -4162,8 +4160,6 @@ test('an idle hook advances past a capped holder after visiting its waiter', asy
     };
     expect((await next(f, [], env)).code).toBe(0);
     expect(readState(holder.path).phase).toBe('failed');
-    // The holder capped inside the pass; the waiter takes the turn on the next pass.
-    expect((await next(f, [], env)).code).toBe(0);
     expect(mergePrompts(f)).toEqual([{ pane: waiter.b, text: mergeText(waiter.path) }]);
     expect((await next(f, [], env)).code).toBe(0);
     expect(mergePrompts(f)).toHaveLength(1);
