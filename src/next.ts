@@ -870,7 +870,7 @@ async function reconcileBatch(global: GlobalConfig, repo: Repo, holder: Leaf, in
       ),
       leaves,
     );
-    if (fresh !== undefined) await restoreHolder(repo, fresh, batch);
+    if (fresh !== undefined && batch.members.length > 0) await restoreHolder(repo, fresh, batch);
     if (fresh !== undefined) saveState(fresh.path, { ...fresh.state, batch: undefined });
   });
   if (error !== null) {
