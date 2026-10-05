@@ -23,9 +23,7 @@ Require nonempty GitHub owner and repository names without whitespace, query/fra
 
 ## Report
 
-Use the reporter's statement and only nearby context needed to understand it to author one descriptive title and the five body sections below, identifying the report as unverified intake and preserving useful supplied facts, paths and commands without diagnosis, recommended fixes or planning metadata.
-
-State missing details as “Not provided” rather than inventing them or blocking thin intake, with urgency describing impact and any known workaround.
+Use the reporter's statement and only nearby context needed to understand it to author one title describing what was seen, naming a cause only when the reporter's statement is itself a cause and marking it suspected, and the six body sections below, identifying the report as unverified intake, preserving useful supplied facts, paths and commands, stating missing details as “Not provided” rather than inventing them or blocking thin intake, with urgency describing impact and any known workaround, and adding no recommended fixes or planning metadata.
 
 ```markdown
 Unverified intake.
@@ -44,6 +42,22 @@ Unverified intake.
 
 ## Urgency
 <Impact and known workaround, or Not provided>
+
+## Suspected cause
+<Supported hypothesis naming the main and contributing conditions or pattern that allowed it, no wider than the evidence shows, or “no supported hypothesis” plus the evidence needed next; a reporter suspicion contradicted by inspected evidence is stated as contradicted with the evidence>
+<Whose view: reporter, agent or both>
+<Files read; installed or vendored copies flagged as not the destination source by inspected provenance, with unverified links to it named>
+<Not inspected or would disprove>
+<Related reports: owner/repo#n each with a reason, or “none found”, or “search failed” with the error, plus the repo, query, states and limit searched>
+```
+
+Before authoring, open the files the failure names and follow them one hop to the caller or shared contract, reading files only with no project commands, installs or edits, then stop at a supported hypothesis or a named evidence gap and post whichever was reached, with the filing standing alone and no later verification pass assumed.
+
+Before authoring, also run two read-only lookups on the routed repo, the filing account's reports from the last two days and a 2-3 word keyword search on a file, command or component this failure names, retrying a failed call once with a visible warning, judging candidates by body, using `gh issue view <n> -R <repo> --json number,title,state,body` only on reporter-supplied links including cross-repo without searching other repos, and never commenting, labeling or changing state on a linked issue. Exit 0 with `[]` means none found and non-zero means search failed. A failed lookup still posts with the related line and the final outcome stating “search failed” plus the command and error:
+
+```bash
+gh issue list -R <repo> --state all --author @me --search "created:>=<YYYY-MM-DD two days back>" --limit <n> --json number,title,state,body
+gh issue list -R <repo> --state all --search "<2-3 words>" --limit <small n> --json number,title,state,body
 ```
 
 ## Submit and finish
@@ -58,11 +72,11 @@ SEED_ISSUE_BODY
 
 Create one report without persistent local staging, interactive selection, labels, templates, import comments or lifecycle operations.
 
-Return the actual URL from a successful command, or expose the exit status and useful error context without claiming creation, switching targets or blindly retrying an ambiguous creation failure that could duplicate the issue.
+After successful creation only, when all five hold — this report's Suspected cause is a supported hypothesis, at least one other open linked report shares that condition, no found report open or closed already covers that shared condition and its cases, the lookup did not fail, and this report is not itself a cause statement — print `/seed-issue Suspected root cause: <condition>. Seen in <owner/repo#n>, … <evidence limit>.` naming the condition, the report identities and the evidence limit but never a fix, before the final two lines.
 
-Print the actual outcome using these final two lines, including failures, then stop:
+Print the actual outcome, the created issue URL or the failure's exit status and useful error context without claiming creation, switching targets or blindly retrying an ambiguous creation failure that could duplicate the issue, using these final two lines including failures, then stop:
 
 ```text
 Last operation: <created issue URL, or failure and reason>
-Next: none <intake submitted, or stopped with reason>
+Next: none <intake submitted, or stopped with reason, naming any printed root report line>
 ```
