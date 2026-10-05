@@ -15,7 +15,7 @@ import { command, type Result } from '../src/shell';
 import { z } from 'zod';
 import { readState, saveState, stateSchema, type State } from '../src/state';
 
-const columns: string[] = ['LEAF', 'PHASE', 'AGE', 'BLOCKED BY', 'NOTE'];
+const columns: string[] = ['LEAF', 'PHASE', 'AGE', 'BLOCKED BY', 'NOTE', 'TURN'];
 function cell(output: string, row: string, name: string): string {
   const lines: string[] = output.split('\n');
   const header: string = lines
@@ -46,6 +46,22 @@ function event(slug: string, to: string, minutes: number, marker: string = ''): 
     fix_rounds: 0,
     verdict: {},
     head: marker,
+    diff: '',
+    session: null,
+  });
+}
+function mergeRecord(slug: string, minutes: number): string {
+  return JSON.stringify({
+    ts: new Date(Date.now() - minutes * 60000).toISOString(),
+    repo: 'repo',
+    slug,
+    from: 'check.review',
+    to: 'merge',
+    slot: 'B',
+    attempts: { A: 0, B: 0 },
+    fix_rounds: 0,
+    verdict: {},
+    head: '0123456789abcdef0123456789abcdef01234567',
     diff: '',
     session: null,
   });
@@ -731,6 +747,51 @@ test('invalid readiness.yaml reports its path in overview and detail', async () 
     const stillBad: Result = await cli(f, ['status']);
     expect(stillBad.code).toBe(1);
     expect(stillBad.stdout.split('\n')[0]).toContain(file);
+  } finally {
+    f.clean();
+  }
+});
+
+test('TURN names the holder and later stamp places', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'aa', 'merge', { merge_stamp: new Date(Date.now() - 20 * 60000).toISOString() });
+    leaf(f, 'bb', 'merge', { merge_stamp: new Date(Date.now() - 10 * 60000).toISOString() });
+    const result: Result = await cli(f, ['status']);
+    expect(result.code).toBe(0);
+    expect(cell(result.stdout, leafRow(result.stdout, 'aa'), 'TURN')).toBe('holder');
+    expect(cell(result.stdout, leafRow(result.stdout, 'bb'), 'TURN')).toBe('2');
+  } finally {
+    f.clean();
+  }
+});
+
+test('TURN orders unstamped merge leaves by last to: merge record and marks no record last', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'queued', 'merge');
+    leaf(f, 'waiting', 'merge');
+    leaf(f, 'unmarked', 'merge');
+    log(f, [mergeRecord('queued', 15), mergeRecord('waiting', 10), mergeRecord('queued', 5)]);
+    const result: Result = await cli(f, ['status']);
+    expect(result.code).toBe(0);
+    expect(cell(result.stdout, leafRow(result.stdout, 'waiting'), 'TURN')).toBe('holder');
+    expect(cell(result.stdout, leafRow(result.stdout, 'queued'), 'TURN')).toBe('2');
+    expect(cell(result.stdout, leafRow(result.stdout, 'unmarked'), 'TURN')).toBe('3 no merge record');
+  } finally {
+    f.clean();
+  }
+});
+
+test('TURN is empty for ineligible merge leaves and non-merge leaves', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'manual', 'merge', { hand_built: true });
+    leaf(f, 'building', 'implement');
+    const result: Result = await cli(f, ['status']);
+    expect(result.code).toBe(0);
+    expect(cell(result.stdout, leafRow(result.stdout, 'manual'), 'TURN')).toBe('');
+    expect(cell(result.stdout, leafRow(result.stdout, 'building'), 'TURN')).toBe('');
   } finally {
     f.clean();
   }
