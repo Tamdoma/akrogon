@@ -35,7 +35,6 @@ export async function buildStack(
     const tips: Map<string, string> = new Map();
     for (const item of items) {
       if (item.base === item.head) {
-        tip = item.head;
         tips.set(item.slug, tip);
         continue;
       }
@@ -47,7 +46,7 @@ export async function buildStack(
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
       tips.set(item.slug, tip);
     }
-    if (await isAncestor(dir, holderHead, tip)) return { ok: true, tips, top: holderHead };
+    if (await isAncestor(dir, holderHead, tip)) return { ok: true, tips, top: tip };
     const held: Result = await run(['git', 'rebase', '--onto', tip, tip, holderHead], dir);
     if (held.code !== 0) {
       await command(['git', 'rebase', '--abort'], dir);
