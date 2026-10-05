@@ -749,6 +749,17 @@ async function restoreDrifted(
   await restoreMembers(repo, drifted);
 }
 
+function closableMembers(repo: Repo, members: BatchMember[], moved: Leaf[]): Leaf[] {
+  const movedSlugs: Set<string> = new Set(moved.map((leaf) => leaf.state.slug));
+  return allLeaves(repo).filter(
+    (leaf) =>
+      leaf.state.phase === 'merged' &&
+      leaf.state.tab !== undefined &&
+      !movedSlugs.has(leaf.state.slug) &&
+      members.some((member) => member.slug === leaf.state.slug),
+  );
+}
+
 async function mergeNotice(repo: Repo, slug: string): Promise<void> {
   const args: string[] = [
     'notification',
@@ -803,6 +814,7 @@ async function reconcileBatch(
   if (fetched.code !== 0)
     error = new CommandError(['git', 'fetch', repo.config.remote], repo.root, fetched);
   const moved: Leaf[] = [];
+  const closable: Leaf[] = [];
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaves: Leaf[] = allLeaves(repo);
     const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
@@ -831,18 +843,24 @@ async function reconcileBatch(
         (item) => item.state.slug === holder.state.slug,
       );
       if (holderNow === undefined) return;
+      const inFlight: boolean = batch.members.some((member) =>
+        allLeaves(repo).some((item) => item.state.slug === member.slug && item.state.phase === 'merge'),
+      );
       if (holderNow.state.phase === 'merge') {
         await commitMove(repo, holderNow, holderNow.state, 'merged', null);
-        const remaining: Leaf | undefined = allLeaves(repo).find(
-          (item) => item.state.slug === holder.state.slug,
-        );
-        if (
-          remaining !== undefined &&
-          !(remaining.state.batch?.members ?? []).some((member) =>
-            allLeaves(repo).some((item) => item.state.slug === member.slug && item.state.phase === 'merge'),
-          )
-        )
+        if (!inFlight) {
+          const remaining: Leaf | undefined = allLeaves(repo).find(
+            (item) => item.state.slug === holder.state.slug,
+          );
+          if (remaining === undefined) return;
+          closable.push(...closableMembers(repo, batch.members, moved));
           saveState(remaining.path, { ...remaining.state, batch: undefined });
+        }
+      } else if (holderNow.state.phase !== 'failed') {
+        if (!inFlight) {
+          closable.push(...closableMembers(repo, batch.members, moved));
+          saveState(holderNow.path, { ...holderNow.state, batch: undefined });
+        }
       } else if (holderNow.state.phase === 'failed' && holderNow.state.batch !== undefined) {
         const survivors: BatchMember[] = holderNow.state.batch.members.filter((member) =>
           allLeaves(repo).some((item) => item.state.slug === member.slug && item.state.phase === 'merge'),
@@ -869,6 +887,7 @@ async function reconcileBatch(
     await closeMergedTab(repo, leaf);
     await dispatchDependents(global, repo, leaf.state.slug, invocation);
   }
+  for (const leaf of closable) await closeMergedTab(repo, leaf);
 }
 
 export async function mergePass(

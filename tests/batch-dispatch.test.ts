@@ -263,7 +263,62 @@ test('a failed holder with a landed candidate is told to move back, then reconci
   }
 }, 20000);
 
-test('a landed batch moves member and holder once, keeps tabs while the record lives, and wakes dependents', async () => {
+test('a failed holder keeps carried members, and the move-back clears the record and member tabs', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const m1: { path: string; b: string } = await allocatedLeaf(f, 'm1');
+    const m2: { path: string; b: string } = await allocatedLeaf(f, 'm2');
+    await commitFile(f, holder.path, 'h-file', 'h\n');
+    await commitFile(f, m1.path, 'm1-file', 'm1\n');
+    await commitFile(f, m2.path, 'm2-file', 'm2\n');
+    const m1Tab: string = z.string().parse(readState(m1.path).tab);
+    const m2Tab: string = z.string().parse(readState(m2.path).tab);
+    toMerge(holder.path, '2026-09-11T00:00:00.000Z');
+    toMerge(m1.path, '2026-09-12T00:00:00.000Z');
+    toMerge(m2.path, '2026-09-13T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const record = readState(holder.path).batch;
+    const top: string = z.string().parse(record?.top);
+    await command(['git', 'push', 'origin', 'refs/heads/holder:main'], f.root);
+    // The holder failed after its push; both carried members are still in merge.
+    saveState(holder.path, { ...readState(holder.path), phase: 'failed', batch: { ...record!, candidate: top } });
+    const callsBefore: number = calls(f).length;
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const notice: string[][] = calls(f)
+      .slice(callsBefore)
+      .filter((args) => args[0] === 'notification' && args[1] === 'show');
+    expect(notice).toHaveLength(1);
+    expect(notice[0][2]).toBe('repo/holder merged, move it back');
+    // The pass still lands carried members by ancestry and closes their tabs; the
+    // record stays with no surviving members so the operator can move it back.
+    expect(leafState(m1.path).phase).toBe('merged');
+    expect(leafState(m2.path).phase).toBe('merged');
+    expect(readState(holder.path).phase).toBe('failed');
+    expect(readState(holder.path).batch?.members).toEqual([]);
+    expect(
+      calls(f)
+        .filter((args) => args[0] === 'tab' && args[1] === 'close')
+        .map((args) => args[2])
+        .sort(),
+    ).toEqual([m1Tab, m2Tab].sort());
+    const promptCallsBefore: number = calls(f).filter(
+      (args) => args[0] === 'agent' && args[1] === 'prompt',
+    ).length;
+    expect((await cli(f, ['phase', 'holder', 'merge'], f.root, f.env)).code).toBe(0);
+    expect(leafState(holder.path).phase).toBe('merged');
+    expect(leafState(holder.path).batch).toBeUndefined();
+    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(
+      promptCallsBefore,
+    );
+    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(2);
+  } finally {
+    f.clean();
+  }
+}, 25000);
+
+test('a landed batch moves member and holder once, closes member tabs with the record, and wakes dependents', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
@@ -290,8 +345,10 @@ test('a landed batch moves member and holder once, keeps tabs while the record l
     expect(leafState(holder.path).phase).toBe('merged');
     expect(leafState(holder.path).batch).toBeUndefined();
     expect(leafState(m1.path).phase).toBe('merged');
-    // m1's tab survived cleanup while the record still named it; it closes once the record is gone.
-    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['holder', 'm1', 'dep']);
+    // The record clears with the holder's move, so carried member tabs close in the same
+    // pass even though m1 merged earlier; the holder's own tab still waits for the
+    // pane-idle path.
+    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['holder', 'dep']);
     expect(database(f).prompts).toEqual([
       { pane: readState(dependent).pane.A!, text: `plan-issue dep slot=A phase=plan.synthesis leaf=${dependent}` },
     ]);
@@ -302,6 +359,100 @@ test('a landed batch moves member and holder once, keeps tabs while the record l
     expect((await run(['git', 'rev-parse', '--verify', '--quiet', 'refs/heads/m1'], f.root)).code).not.toBe(0);
     expect((await run(['git', 'merge-base', '--is-ancestor', m1Tip, 'origin/main'], f.root)).code).toBe(0);
     expect((await run(['git', 'merge-base', '--is-ancestor', m2Tip, 'origin/main'], f.root)).code).toBe(0);
+  } finally {
+    f.clean();
+  }
+}, 25000);
+
+test('a green batch clears the record and closes member tabs once the holder lands', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const m1: { path: string; b: string } = await allocatedLeaf(f, 'm1');
+    const m2: { path: string; b: string } = await allocatedLeaf(f, 'm2');
+    await commitFile(f, holder.path, 'h-file', 'h\n');
+    await commitFile(f, m1.path, 'm1-file', 'm1\n');
+    await commitFile(f, m2.path, 'm2-file', 'm2\n');
+    const holderTab: string = z.string().parse(readState(holder.path).tab);
+    const memberTabs: string[] = [m1, m2].map((leafRef) => z.string().parse(readState(leafRef.path).tab));
+    toMerge(holder.path, '2026-09-11T00:00:00.000Z');
+    toMerge(m1.path, '2026-09-12T00:00:00.000Z');
+    toMerge(m2.path, '2026-09-13T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const attempt: string = z.string().parse(readState(holder.path).batch?.attempt);
+    const closes = (): string[] =>
+      calls(f)
+        .filter((args) => args[0] === 'tab' && args[1] === 'close')
+        .map((args) => args[2]);
+    expect(closes()).toEqual([]);
+    idleAll(f);
+    expect(
+      (await cli(f, ['phase', 'holder', 'merged', '--slot', 'B', '--check', '--attempt', attempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'holder', 'merged', '--slot', 'B', '--attempt', attempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect(leafState(holder.path).phase).toBe('merged');
+    expect(leafState(holder.path).batch).toBeUndefined();
+    expect(leafState(m1.path).phase).toBe('merged');
+    expect(leafState(m2.path).phase).toBe('merged');
+    // The reconcile inside the merged call closes every carried member's tab; the
+    // holder's own tab still belongs to the pane-idle sweep path.
+    expect(closes().sort()).toEqual([...memberTabs].sort());
+    expect(database(f).tabs.map((tab) => tab.tab_id)).toEqual([holderTab]);
+    // With the record gone no pass fetches for it again: rename the remote and the
+    // next pass stays clean.
+    await command(['git', 'remote', 'rename', 'origin', 'elsewhere'], f.root);
+    const after: Result = await next(f, ['--all']);
+    expect(after.code).toBe(0);
+    expect(after.stderr).not.toContain('fetch');
+  } finally {
+    f.clean();
+  }
+}, 25000);
+
+test('a merged holder keeps the record while a member is still in merge, then finishes it', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const m1: { path: string; b: string } = await allocatedLeaf(f, 'm1');
+    await commitFile(f, m1.path, 'm1-file', 'm1\n');
+    const m1Head: string = await head(f, 'm1');
+    const m1Tab: string = z.string().parse(readState(m1.path).tab);
+    toMerge(holder.path, '2026-09-11T00:00:00.000Z');
+    toMerge(m1.path, '2026-09-12T00:00:00.000Z', { 'blocked-by': ['zz'] });
+    leaf(f, 'zz', 'merge', { hand_built: true }, 'other');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    // A move that died before the member commits: the holder is merged, the record
+    // still names m1, and m1's applied tip is not yet on the remote.
+    const landed: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
+    saveState(holder.path, {
+      ...readState(holder.path),
+      phase: 'merged',
+      batch: {
+        attempt: 'interrupted-attempt',
+        built_on: landed,
+        members: [{ slug: 'm1', base: landed, head: m1Head, tip: m1Head }],
+        top: landed,
+        candidate: landed,
+        applied: true,
+      },
+    });
+    const promptsBefore: number = database(f).prompts.length;
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(readState(m1.path).phase).toBe('merge');
+    expect(readState(holder.path).batch?.attempt).toBe('interrupted-attempt');
+    expect(database(f).tabs.some((tab) => tab.tab_id === m1Tab)).toBe(true);
+    expect(database(f).prompts).toHaveLength(promptsBefore);
+    await command(['git', 'push', 'origin', 'refs/heads/m1:main'], f.root);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(leafState(m1.path).phase).toBe('merged');
+    expect(leafState(holder.path).batch).toBeUndefined();
+    expect(
+      calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close' && args[2] === m1Tab),
+    ).toHaveLength(1);
+    expect(database(f).tabs.some((tab) => tab.tab_id === m1Tab)).toBe(false);
   } finally {
     f.clean();
   }
