@@ -75,7 +75,7 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     const closed: Leaf[] = existsSync(closedRoot) ? leavesUnder(closedRoot, closedRoot) : [];
     path = resolve(repo.root, 'issues/log.jsonl');
     const log: LogRecord[] = readLog(repo.root);
-    const queue: QueueEntry[] = mergeQueue(global, [...leaves, ...closed], log);
+    const queue: QueueEntry[] = mergeQueue(global, [...leaves, ...closed], () => log);
     return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log, queue };
   } catch (error) {
     if (

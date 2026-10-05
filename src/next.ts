@@ -617,7 +617,7 @@ async function dispatchLeaf(
     }
     if (
       state.phase === 'merge' &&
-      mergeQueue(global, inventory.leaves, readLog(repo.root))[0]?.leaf.state.slug !== slug
+      mergeQueue(global, inventory.leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== slug
     )
       return 'waiting';
     seats(global, repo);

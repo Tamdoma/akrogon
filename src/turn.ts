@@ -24,11 +24,14 @@ export function eligibility(global: GlobalConfig, leaf: Leaf, leaves: Leaf[]): B
 
 export type QueueEntry = { leaf: Leaf; place: number; noRecord: boolean };
 
-export function mergeQueue(global: GlobalConfig, leaves: Leaf[], log: LogRecord[]): QueueEntry[] {
+export function mergeQueue(global: GlobalConfig, leaves: Leaf[], log: () => LogRecord[]): QueueEntry[] {
+  const eligible: Leaf[] = leaves.filter(
+    (leaf) => leaf.state.phase === 'merge' && eligibility(global, leaf, leaves) === null,
+  );
   const stamp: Map<string, string> = new Map();
-  for (const entry of log) if (entry.record.to === 'merge') stamp.set(entry.record.slug, entry.record.ts);
-  return leaves
-    .filter((leaf) => leaf.state.phase === 'merge' && eligibility(global, leaf, leaves) === null)
+  if (eligible.some((leaf) => leaf.state.merge_stamp === undefined))
+    for (const entry of log()) if (entry.record.to === 'merge') stamp.set(entry.record.slug, entry.record.ts);
+  return eligible
     .map((leaf) => ({ leaf, time: leaf.state.merge_stamp ?? stamp.get(leaf.state.slug) }))
     .sort((a, b) =>
       a.time === undefined && b.time === undefined

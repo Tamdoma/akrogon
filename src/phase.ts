@@ -369,7 +369,7 @@ export async function phaseCommand(
     const leaf: Leaf = findLeaf(repo, slug);
     if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
     if (leaf.state.phase === 'merge' && (requested === 'merged' || requested === 'check.fix')) {
-      const holder: QueueEntry | undefined = mergeQueue(global, allLeaves(repo), readLog(repo.root))[0];
+      const holder: QueueEntry | undefined = mergeQueue(global, allLeaves(repo), () => readLog(repo.root))[0];
       if (holder === undefined || holder.leaf.state.slug !== leaf.state.slug)
         throw new Error(
           holder === undefined
