@@ -32,7 +32,7 @@ const record: object = {
   applied: false,
 };
 
-test('stateSchema accepts a state with batch and solo', () => {
+test.serial('stateSchema accepts a state with batch and solo', () => {
   const parsed: ReturnType<typeof stateSchema.parse> = stateSchema.parse({
     ...baseState,
     batch: { ...record, top: 'sha3', tested_top: 'sha3', candidate: 'sha3', solo: true },
@@ -45,7 +45,7 @@ test('stateSchema accepts a state with batch and solo', () => {
   expect(minimal.batch?.applied).toBe(false);
 });
 
-test('stateSchema rejects unknown or missing-required batch fields', () => {
+test.serial('stateSchema rejects unknown or missing-required batch fields', () => {
   expect(() => stateSchema.parse({ ...baseState, batch: { ...record, extra: 1 } })).toThrow();
   expect(() => stateSchema.parse({ ...baseState, batch: { built_on: 'x', members: [], applied: true } })).toThrow();
   expect(() =>
@@ -74,7 +74,7 @@ test('stateSchema rejects unknown or missing-required batch fields', () => {
   expect(() => stateSchema.parse({ ...baseState, solo: 'yes' })).toThrow();
 });
 
-test('attemptId returns unique nonempty strings', () => {
+test.serial('attemptId returns unique nonempty strings', () => {
   const ids: Set<string> = new Set(Array.from({ length: 100 }, () => attemptId()));
   expect(ids.size).toBe(100);
   for (const id of ids) expect(id.length).toBeGreaterThan(0);
@@ -123,7 +123,7 @@ async function batchFixture(): Promise<{ f: Fixture; repo: Repo; builtOn: string
   return { f, repo, builtOn };
 }
 
-test('buildStack rebases member ranges in order then the holder range', async () => {
+test.serial('buildStack rebases member ranges in order then the holder range', async () => {
   const { f, repo, builtOn } = await batchFixture();
   try {
     const a = await branch(f, 'mem-a', { 'file-a': 'a\n' }, false);
@@ -155,7 +155,7 @@ test('buildStack rebases member ranges in order then the holder range', async ()
   }
 });
 
-test('empty member and holder ranges produce their heads without a rebase', async () => {
+test.serial('empty member and holder ranges produce their heads without a rebase', async () => {
   const { f, repo, builtOn } = await batchFixture();
   try {
     const c = await branch(f, 'mem-c', { 'file-c': 'c\n' }, false);
@@ -203,7 +203,7 @@ test('empty member and holder ranges produce their heads without a rebase', asyn
   }
 });
 
-test('a member conflict reports the slug and leaves no live branch changed', async () => {
+test.serial('a member conflict reports the slug and leaves no live branch changed', async () => {
   const { f, repo, builtOn } = await batchFixture();
   try {
     const a = await branch(f, 'mem-a', { file: 'from-a\n' }, false);
@@ -227,7 +227,7 @@ test('a member conflict reports the slug and leaves no live branch changed', asy
   }
 });
 
-test('a holder conflict reports the holder and leaves member branches unchanged', async () => {
+test.serial('a holder conflict reports the holder and leaves member branches unchanged', async () => {
   const { f, repo, builtOn } = await batchFixture();
   try {
     const a = await branch(f, 'mem-a', { file: 'from-a\n' }, false);
@@ -242,7 +242,7 @@ test('a holder conflict reports the holder and leaves member branches unchanged'
   }
 });
 
-test('applyStack resets worktrees and bare branches, restoreMembers reverts both', async () => {
+test.serial('applyStack resets worktrees and bare branches, restoreMembers reverts both', async () => {
   const { f, repo, builtOn } = await batchFixture();
   try {
     const a = await branch(f, 'mem-a', { 'file-a': 'a\n' }, true);
@@ -294,7 +294,7 @@ test('applyStack resets worktrees and bare branches, restoreMembers reverts both
   }
 });
 
-test('isAncestor returns the merge-base verdict and throws on other codes', async () => {
+test.serial('isAncestor returns the merge-base verdict and throws on other codes', async () => {
   const { f, repo, builtOn } = await batchFixture();
   try {
     const a = await branch(f, 'mem-a', { 'file-a': 'a\n' }, false);
@@ -308,7 +308,7 @@ test('isAncestor returns the merge-base verdict and throws on other codes', asyn
   }
 });
 
-test('batchMemberSlugs returns member slugs across every leaf carrying a batch record', async () => {
+test.serial('batchMemberSlugs returns member slugs across every leaf carrying a batch record', async () => {
   const { f, repo } = await batchFixture();
   try {
     leaf(f, 'holder-one', 'merge', {
