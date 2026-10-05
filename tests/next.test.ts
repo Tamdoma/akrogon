@@ -1,6 +1,7 @@
 import { test, expect } from 'bun:test';
 import {
   existsSync,
+  readdirSync,
   mkdirSync,
   writeFileSync,
   readFileSync,
@@ -4064,6 +4065,42 @@ test('a merge seat consumes only one failed delivery attempt per next pass', asy
     }
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(readState(holder.path).phase).toBe('failed');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('an idle hook advances past a capped holder after visiting its waiter', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    const cc: { path: string; b: string } = await allocatedLeaf(f, 'cc');
+    const order: string[] = readdirSync(resolve(aa.path, '..')).filter((slug) => slug !== 'cc');
+    const waiter: { path: string; b: string } = order[0] === 'aa' ? aa : bb;
+    const holder: { path: string; b: string } = order[1] === 'aa' ? aa : bb;
+    toMerge(waiter.path, '2026-09-12T00:00:00.000Z');
+    toMerge(holder.path, '2026-09-11T00:00:00.000Z', { attempts: { A: 0, B: 2 } });
+    saveDatabase(f, {
+      ...database(f),
+      prompts: [],
+      promptScript: [{ code: 'agent_prompt_stalled', message: 'stalled' }],
+    });
+    const pane: string = readState(cc.path).pane.A!;
+    const env: NodeJS.ProcessEnv = {
+      HERDR_PANE_ID: pane,
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'pane_agent_status_changed',
+        data: { type: 'pane_agent_status_changed', pane_id: pane, agent_status: 'idle' },
+      }),
+    };
+    expect((await next(f, [], env)).code).toBe(0);
+    expect(readState(holder.path).phase).toBe('failed');
+    expect(mergePrompts(f)).toEqual([
+      { pane: waiter.b, text: `merge-issue ${order[0]} slot=B phase=merge leaf=${waiter.path}` },
+    ]);
+    expect((await next(f, [], env)).code).toBe(0);
+    expect(mergePrompts(f)).toHaveLength(1);
   } finally {
     f.clean();
   }
