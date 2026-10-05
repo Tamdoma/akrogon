@@ -372,6 +372,16 @@ function memberEntries(repo: Repo, record: Batch): { member: BatchMember; leaf: 
   });
 }
 
+async function mergeHead(repo: Repo, state: State, record: Batch): Promise<string> {
+  if (state.worktree !== undefined)
+    return command(['git', 'rev-parse', 'HEAD'], state.worktree);
+  const ref: Result = await run(['git', 'rev-parse', `refs/heads/${state.slug}`], repo.root);
+  if (ref.code === 0) return ref.stdout;
+  if (record.top === undefined)
+    throw new CommandError(['git', 'rev-parse', `refs/heads/${state.slug}`], repo.root, ref);
+  return record.top;
+}
+
 async function batchCheck(
   repo: Repo,
   leaf: Leaf,
@@ -383,10 +393,7 @@ async function batchCheck(
 ): Promise<void> {
   const state: State = readState(leaf.path);
   const worktree: string = state.worktree ?? repo.root;
-  const head: string = await command(
-    ['git', 'rev-parse', state.worktree === undefined ? `refs/heads/${state.slug}` : 'HEAD'],
-    worktree,
-  );
+  const head: string = await mergeHead(repo, state, record);
   if (record.solo === true) {
     await requireNonEmpty(repo, worktree);
   } else {
@@ -394,9 +401,11 @@ async function batchCheck(
       throw new Error(`HEAD must equal the recorded batch top ${record.top}, found ${head}`);
     let predecessor: string = record.built_on;
     for (const member of record.members) {
-      await requireNoIssueFiles(repo, repo.root, findLeaf(repo, member.slug).path, predecessor, member.tip);
-      await requireTestChangeCitations(repo, repo.root, predecessor, member.tip);
-      await requireNonEmpty(repo, repo.root, predecessor, member.tip);
+      if (predecessor !== member.tip) {
+        await requireNoIssueFiles(repo, repo.root, findLeaf(repo, member.slug).path, predecessor, member.tip);
+        await requireTestChangeCitations(repo, repo.root, predecessor, member.tip);
+        await requireNonEmpty(repo, repo.root, predecessor, member.tip);
+      }
       predecessor = member.tip;
     }
     await requireNoIssueFiles(repo, repo.root, leaf.path, record.built_on, head);
@@ -435,10 +444,7 @@ async function batchPush(
   }
   const state: State = readState(leaf.path);
   const worktree: string = state.worktree ?? repo.root;
-  const head: string = await command(
-    ['git', 'rev-parse', state.worktree === undefined ? `refs/heads/${state.slug}` : 'HEAD'],
-    worktree,
-  );
+  const head: string = await mergeHead(repo, state, record);
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
   if (slot !== undefined && head !== record.tested_top)
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);

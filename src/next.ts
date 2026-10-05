@@ -939,11 +939,11 @@ export async function mergePass(
     for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root))
       .slice(1)
       .filter((entry) => entry.leaf.state.solo !== true)) {
-      const head: string | undefined = await branchSha(repo, candidate.leaf.state.slug);
-      if (head === undefined) continue;
+      const sha: string | undefined = await branchSha(repo, candidate.leaf.state.slug);
+      const head: string = sha ?? builtOn;
       members.push({
         slug: candidate.leaf.state.slug,
-        base: await memberBase(repo, builtOn, head),
+        base: sha === undefined || head === builtOn ? head : await memberBase(repo, builtOn, head),
         head,
         tip: head,
       });
@@ -953,17 +953,7 @@ export async function mergePass(
     batch = next;
   });
   if (batch === undefined) return;
-  const holderHead: string | undefined = await branchSha(repo, holder.state.slug);
-  if (holderHead === undefined) {
-    report(
-      invocation,
-      repo.name,
-      holder.path,
-      new Error(`Missing branch for merge holder: ${holder.state.slug}`),
-      holder.state.slug,
-    );
-    return;
-  }
+  const holderHead: string = (await branchSha(repo, holder.state.slug)) ?? batch.built_on;
   let current: Batch = batch;
   let built: Awaited<ReturnType<typeof buildStack>>;
   for (;;) {
