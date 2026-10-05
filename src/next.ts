@@ -35,6 +35,7 @@ import {
   readState,
   saveState,
   allLeaves,
+  findLeaf,
   validateLeafDepth,
   missingLeafMessage,
   withLock,
@@ -863,7 +864,7 @@ async function reconcileBatch(global: GlobalConfig, repo: Repo, holder: Leaf, in
   for (const leaf of closable) await closeMergedTab(repo, leaf);
 }
 
-export async function mergePass(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<void> {
+async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<void> {
   const inventory: Inventory = discover(repo, invocation);
   for (const leaf of inventory.leaves.filter((item) => item.state.batch !== undefined)) {
     try {
@@ -1020,6 +1021,14 @@ export async function mergePass(global: GlobalConfig, repo: Repo, invocation: In
       invocation,
       `attempt=${prompt.attempt} top=${prompt.top}`,
     );
+}
+
+export async function mergePass(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<void> {
+  for (;;) {
+    const holder: Leaf | undefined = mergeQueue(global, allLeaves(repo), () => readLog(repo.root))[0]?.leaf;
+    await mergeTurn(global, repo, invocation);
+    if (holder === undefined || findLeaf(repo, holder.state.slug).state.phase === 'merge') return;
+  }
 }
 
 export async function mergeWake(global: GlobalConfig, repo: Repo): Promise<void> {
