@@ -13,6 +13,7 @@ import {
 } from './config';
 import {
   findLeaf,
+  leavesUnder,
   readState,
   stateSchema,
   RepoMismatchError,
@@ -22,12 +23,13 @@ import {
   type State,
 } from './state';
 import { readLog, type LogRecord } from './log';
+import { mergeQueue, type QueueEntry } from './turn';
 import { issueFolders } from './park';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 
 type ScannedLeaf = Leaf & { missing: Gap[] };
 type Scan =
-  | { ok: true; repo: Repo; leaves: ScannedLeaf[]; parked: string[]; log: LogRecord[] }
+  | { ok: true; repo: Repo; leaves: ScannedLeaf[]; parked: string[]; log: LogRecord[]; queue: QueueEntry[] }
   | { ok: false; repo: string; path: string; error: string };
 
 class ReadinessError extends Error {}
@@ -68,8 +70,13 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     }
     const open: string = resolve(repo.root, 'issues/open');
     const leaves: ScannedLeaf[] = existsSync(open) ? walk(open) : [];
+    const closedRoot: string = resolve(repo.root, 'issues/closed');
+    path = closedRoot;
+    const closed: Leaf[] = existsSync(closedRoot) ? leavesUnder(closedRoot, closedRoot) : [];
     path = resolve(repo.root, 'issues/log.jsonl');
-    return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log: readLog(repo.root) };
+    const log: LogRecord[] = readLog(repo.root);
+    const queue: QueueEntry[] = mergeQueue(global, [...leaves, ...closed], log);
+    return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log, queue };
   } catch (error) {
     if (
       error instanceof RepoMismatchError ||
@@ -84,7 +91,7 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
   }
 }
 
-const header: string[] = ['LEAF', 'PHASE', 'AGE', 'BLOCKED BY', 'NOTE'];
+const header: string[] = ['LEAF', 'PHASE', 'AGE', 'BLOCKED BY', 'NOTE', 'TURN'];
 
 function note(state: State, now: number): string {
   const busy: string[] =
@@ -113,28 +120,36 @@ function note(state: State, now: number): string {
   return [...failed, ...done, ...prompt, ...attempts, ...fixes, ...verdict, ...busy].join(' · ');
 }
 
-function cells(leaf: Leaf, log: LogRecord[], now: number, indent: string): string[] {
+function cells(leaf: Leaf, log: LogRecord[], now: number, indent: string, queue: Map<string, QueueEntry>): string[] {
   const state: State = leaf.state;
   const last: LogRecord | undefined = log.findLast(
     ({ record }) => record.slug === state.slug && record.to === state.phase,
   );
   const elapsed: number | undefined = last === undefined ? undefined : now - Date.parse(last.record.ts);
   const age: string = elapsed === undefined || elapsed < 0 ? '-' : `${Math.floor(elapsed / 60000)}m`;
-  return [`${indent}${state.slug}`, state.phase, age, state['blocked-by'].join(' '), note(state, now)];
+  const entry: QueueEntry | undefined = queue.get(state.slug);
+  const turn: string =
+    entry === undefined
+      ? ''
+      : `${entry.place === 1 ? 'holder' : entry.place}${entry.noRecord ? ' no merge record' : ''}`;
+  return [`${indent}${state.slug}`, state.phase, age, state['blocked-by'].join(' '), note(state, now), turn];
 }
 
 function rows(scan: Scan & { ok: true }, now: number): string[][] {
+  const queue: Map<string, QueueEntry> = new Map(
+    scan.queue.map((entry) => [entry.leaf.state.slug, entry]),
+  );
   let previous: string[] = [];
   return scan.leaves.flatMap((leaf) => {
     const groups: string[] = relative(resolve(scan.repo.root, 'issues/open'), leaf.path).split(sep).slice(0, -1);
     let shared: number = 0;
     while (shared < groups.length && shared < previous.length && groups[shared] === previous[shared]) shared++;
-    const separator: string[][] = previous.length > 0 && shared < groups.length ? [['', '', '', '', '']] : [];
+    const separator: string[][] = previous.length > 0 && shared < groups.length ? [['', '', '', '', '', '']] : [];
     previous = groups;
     return [
       ...separator,
-      ...groups.slice(shared).map((group, offset) => [`${indent(shared + offset)}${group}`, '', '', '', '']),
-      cells(leaf, scan.log, now, indent(groups.length)),
+      ...groups.slice(shared).map((group, offset) => [`${indent(shared + offset)}${group}`, '', '', '', '', '']),
+      cells(leaf, scan.log, now, indent(groups.length), queue),
     ];
   });
 }
@@ -180,11 +195,11 @@ function widths(titles: string[], lines: string[][]): number[] {
   );
   const columns: number | undefined = process.stdout.isTTY === true ? process.stdout.columns : undefined;
   if (columns === undefined || titles !== header) return natural;
-  const budget: number = columns - natural[0] - natural[1] - natural[2] - 8;
+  const budget: number = columns - natural[0] - natural[1] - natural[2] - natural[5] - 10;
   const half: number = Math.floor(budget / 2);
   if (natural[3] + natural[4] <= budget || half < 16) return natural;
   const blocked: number = natural[3] <= half ? natural[3] : Math.max(half, budget - natural[4]);
-  return [natural[0], natural[1], natural[2], blocked, budget - blocked];
+  return [natural[0], natural[1], natural[2], blocked, budget - blocked, natural[5]];
 }
 
 function stacked(titles: string[], lines: string[][]): string[] {
