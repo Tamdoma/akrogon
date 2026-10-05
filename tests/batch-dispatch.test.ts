@@ -576,3 +576,22 @@ test('a failed published holder receives one recovery notice across repeated pas
     f.clean();
   }
 });
+
+test('a solo leaf leaving merge and returning joins the next holder batch', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder = await allocatedLeaf(f, 'holder');
+    const member = await allocatedLeaf(f, 'member');
+    await commitFile(f, holder.path, 'holder-file', 'h');
+    await commitFile(f, member.path, 'member-file', 'm');
+    toMerge(member.path, '2026-09-11T00:00:00Z', { solo: true });
+    expect((await cli(f, ['phase', 'member', 'failed', '--reason', 'stop'], f.root, f.env)).code).toBe(0);
+    expect(readState(member.path).solo).toBeUndefined();
+    toMerge(holder.path, '2026-09-12T00:00:00Z');
+    idleAll(f);
+    expect((await cli(f, ['phase', 'member', 'merge'], f.root, f.env)).code).toBe(0);
+    expect(readState(holder.path).batch!.members.map((entry) => entry.slug)).toEqual(['member']);
+  } finally {
+    f.clean();
+  }
+});
