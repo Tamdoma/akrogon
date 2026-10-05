@@ -6,7 +6,7 @@ A review can reveal something useful beyond the current fix. Keep that knowledge
 
 **A nit** does not block merge. It stays in the review record with the reproduction or concern, why it is deferred, and what evidence would promote it to a fix. Repair works fixes only, so a nit gets no separate work or test.
 
-**A lesson** records a reusable finding from a nit that stayed in the review record. The merge skill can turn that nit into a short entry and a supporting history file:
+**A lesson** records a reusable finding from a nit that stayed in the review record. The check skill can turn that nit into a short entry and a supporting history file before moving the leaf to merge:
 
 ```text
 learnings/LESSONS.md
