@@ -35,7 +35,6 @@ import {
   readState,
   saveState,
   allLeaves,
-  findLeaf,
   validateLeafDepth,
   missingLeafMessage,
   withLock,
@@ -840,7 +839,7 @@ async function reconcileBatch(global: GlobalConfig, repo: Repo, holder: Leaf, in
         const survivors: BatchMember[] = holderNow.state.batch.members.filter((member) =>
           allLeaves(repo).some((item) => item.state.slug === member.slug && item.state.phase === 'merge'),
         );
-        const notified: boolean = batch.notified === true || await mergeNotice(repo, holderNow.state.slug);
+        const notified: boolean = batch.notified === true || (await mergeNotice(repo, holderNow.state.slug));
         saveState(holderNow.path, { ...holderNow.state, batch: { ...batch, members: survivors, notified } });
       }
       return;
@@ -928,13 +927,26 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
         tip: head,
       });
     }
-    const next: Batch = { attempt: attemptId(), built_on: builtOn, members, applied: fresh.state.solo === true, solo: fresh.state.solo };
+    const next: Batch = {
+      attempt: attemptId(),
+      built_on: builtOn,
+      members,
+      applied: fresh.state.solo === true,
+      solo: fresh.state.solo,
+    };
     saveState(fresh.path, { ...fresh.state, batch: next });
     batch = next;
   });
   if (batch === undefined) return;
   if (batch.solo === true) {
-    await dispatchLeaf(global, repo, { path: holder.path, state: readState(holder.path) }, false, invocation, `attempt=${batch.attempt} solo`);
+    await dispatchLeaf(
+      global,
+      repo,
+      { path: holder.path, state: readState(holder.path) },
+      false,
+      invocation,
+      `attempt=${batch.attempt} solo`,
+    );
     return;
   }
   const holderHead: string = (await branchSha(repo, holder.state.slug)) ?? batch.built_on;
@@ -1030,9 +1042,16 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
 
 export async function mergePass(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<void> {
   for (;;) {
-    const holder: Leaf | undefined = mergeQueue(global, allLeaves(repo), () => readLog(repo.root))[0]?.leaf;
+    const holder: Leaf | undefined = mergeQueue(global, discover(repo, invocation).leaves, () => readLog(repo.root))[0]
+      ?.leaf;
     await mergeTurn(global, repo, invocation);
-    if (holder === undefined || findLeaf(repo, holder.state.slug).state.phase === 'merge') return;
+    if (
+      holder === undefined ||
+      discover(repo, invocation).leaves.some(
+        (leaf) => leaf.state.slug === holder.state.slug && leaf.state.phase === 'merge',
+      )
+    )
+      return;
   }
 }
 
