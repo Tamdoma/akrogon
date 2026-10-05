@@ -4049,3 +4049,22 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
     f.clean();
   }
 }, 15000);
+
+test('a merge seat consumes only one failed delivery attempt per next pass', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    toMerge(holder.path, '2026-09-11T00:00:00.000Z');
+    const stalled: { code: string; message: string } = { code: 'agent_prompt_stalled', message: 'stalled' };
+    saveDatabase(f, { ...database(f), prompts: [], promptScript: [stalled, stalled, stalled] });
+    for (const attempts of [1, 2]) {
+      expect((await next(f, ['--all'])).code).toBe(0);
+      expect(readState(holder.path).attempts.B).toBe(attempts);
+      expect(readState(holder.path).phase).toBe('merge');
+    }
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(readState(holder.path).phase).toBe('failed');
+  } finally {
+    f.clean();
+  }
+}, 15000);
