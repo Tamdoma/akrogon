@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, fakeHerdr, leaf, editOnSecondStatus, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
@@ -721,3 +721,35 @@ for (const edited of ['holder', 'member'] as const) {
     }
   });
 }
+
+test('an edit arriving after the move status read survives the Git reset', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const member: { path: string; b: string } = await allocatedLeaf(f, 'member');
+    await commitFile(f, holder.path, 'holder-file', 'h');
+    await commitFile(f, member.path, 'member-file', 'm');
+    toMerge(holder.path, '2026-09-11T00:00:00Z');
+    toMerge(member.path, '2026-09-12T00:00:00Z');
+    idleAll(f);
+    const worktree: string = readState(member.path).worktree!;
+    const git: string = await command(['sh', '-c', 'command -v git']);
+    const created: string = resolve(f.home, 'edit-before-reset');
+    const wrapper: string = resolve(f.home, 'bin/git');
+    writeFileSync(wrapper, `#!/bin/sh
+if [ "$1" = -C ] && [ "$2" = '${worktree}' ] && [ "$3" = reset ] && [ ! -e '${created}' ]; then
+  printf 'operator tracked edit\n' > '${worktree}/file'
+  touch '${created}'
+fi
+exec '${git}' "$@"
+`);
+    chmodSync(wrapper, 0o755);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(created)).toBe(true);
+    expect(readFileSync(resolve(worktree, 'file'), 'utf8')).toBe('operator tracked edit\n');
+    expect(readState(member.path).solo).toBe(true);
+    expect(readState(holder.path).batch!.members).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
