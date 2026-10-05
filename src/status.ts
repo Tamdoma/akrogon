@@ -21,25 +21,10 @@ import {
   type Leaf,
   type State,
 } from './state';
-import { phaseSchema, slotSchema, verdictSchema } from './routing';
+import { readLog, type LogRecord } from './log';
 import { issueFolders } from './park';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 
-const logSchema = z.object({
-  ts: z.iso.datetime(),
-  repo: z.string(),
-  slug: z.string(),
-  from: phaseSchema,
-  to: phaseSchema,
-  slot: slotSchema.nullable(),
-  attempts: z.object({ A: z.number().int().nonnegative(), B: z.number().int().nonnegative() }),
-  fix_rounds: z.number().int().nonnegative(),
-  verdict: z.object({ A: verdictSchema.optional(), B: verdictSchema.optional() }),
-  head: z.string(),
-  diff: z.string(),
-  session: z.string().nullable(),
-});
-type LogRecord = { record: z.infer<typeof logSchema>; text: string };
 type ScannedLeaf = Leaf & { missing: Gap[] };
 type Scan =
   | { ok: true; repo: Repo; leaves: ScannedLeaf[]; parked: string[]; log: LogRecord[] }
@@ -54,13 +39,6 @@ function leafGaps(global: GlobalConfig, leaf: Leaf): Gap[] {
   } catch (error) {
     throw new ReadinessError(error instanceof Error ? error.message : String(error));
   }
-}
-
-function readLog(root: string): LogRecord[] {
-  const issues: string = resolve(root, 'issues');
-  if (!readdirSync(issues).includes('log.jsonl')) return [];
-  const content: string = readFileSync(resolve(issues, 'log.jsonl'), 'utf8').replace(/(?:\r?\n)+$/, '');
-  return content === '' ? [] : content.split('\n').map((text) => ({ record: logSchema.parse(JSON.parse(text)), text }));
 }
 
 function scanRepo(name: string, registeredPath: string, global: GlobalConfig): Scan {

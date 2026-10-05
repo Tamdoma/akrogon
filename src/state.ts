@@ -55,6 +55,7 @@ export const stateSchema = z
     prompted_at: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     delivery_error: z.object({ A: deliveryErrorSchema.optional(), B: deliveryErrorSchema.optional() }).default({}),
     failure: failureSchema.optional(),
+    merge_stamp: z.string().optional(),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
 
