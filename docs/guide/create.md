@@ -83,9 +83,13 @@ Do not use dependencies as a priority list. Independent leaves can run in either
 
 ## seed-issue: capture an observation without inventing a fix
 
-The seed skill files one GitHub issue with the observation, location, reproduction, expected behavior and impact. It marks the report as unverified.
+The seed skill files one GitHub issue with six sections: the observation, location, reproduction, expected behavior and impact, plus a last `## Suspected cause`. That section carries a hypothesis labeled unverified, or "no supported hypothesis" and the evidence needed next. The report marks itself as unverified intake.
 
-You can capture a problem while its details are still incomplete. The skill records missing details instead of guessing the cause.
+To form that hypothesis, the agent reads the files the failure names and follows them one hop, reading only. It stops at a hypothesis or a named evidence gap.
+
+It also runs two read-only `gh` searches on the destination repo: the account's reports from the last two days, and a 2-3 word keyword search. Linked reports are listed with a reason each; "none found" or "search failed" is recorded instead.
+
+You can capture a problem while its details are still incomplete. The skill records missing details and unsupported causes instead of guessing.
 
 For example:
 
@@ -93,7 +97,9 @@ For example:
 /seed-issue CSV export drops the last row when the list has 500 rows
 ```
 
-The result is a report URL, not an implementation plan. Pull imports reports into the seed store:
+The result is a report URL, not an implementation plan. After filing, when several reports share one suspected condition, the skill may print one `/seed-issue` line you can run to file a root report. The report itself stays one issue per run.
+
+Pull imports reports into the seed store:
 
 ```sh
 cd ~/Work/widgets
