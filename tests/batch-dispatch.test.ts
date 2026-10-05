@@ -6,6 +6,8 @@ import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { Database } from './fake-herdr';
 import { z } from 'zod';
+import { commitMove } from '../src/phase';
+import { readRepo } from '../src/config';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 async function dispatchFixture(): Promise<DispatchFixture> {
@@ -524,6 +526,33 @@ test('a red-batch member holds its next turn solo despite an unmarked waiter', a
     expect((await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop'], f.root, f.env)).code).toBe(0);
     expect(readState(bb.path).batch!.members).toEqual([]);
     expect(readState(bb.path).batch!.solo).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+test('cleanup retains a closed carried worktree while publication recovery is blocked', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder = await allocatedLeaf(f, 'holder');
+    const member: string = leaf(f, 'member', 'plan.synthesis', {}, 'member-issue');
+    expect((await next(f, ['member'])).code).toBe(0);
+    await commitFile(f, holder.path, 'holder-file', 'h');
+    await commitFile(f, member, 'member-file', 'm');
+    toMerge(holder.path, '2026-09-11T00:00:00Z');
+    toMerge(member, '2026-09-12T00:00:00Z');
+    idleAll(f);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const state: State = readState(holder.path);
+    await command(['git', 'push', 'origin', state.batch!.top! + ':main'], f.root);
+    saveState(holder.path, { ...state, batch: { ...state.batch!, candidate: state.batch!.top } });
+    const memberState: State = readState(member);
+    await commitMove(readRepo('repo', f.root), { path: member, state: memberState }, memberState, 'merged', null);
+    await command(['git', 'remote', 'rename', 'origin', 'elsewhere'], f.root);
+    expect((await next(f, ['--all'])).code).toBe(1);
+    expect(readState(holder.path).phase).toBe('merge');
+    expect(existsSync(memberState.worktree!)).toBe(true);
+    expect((await run(['git', 'rev-parse', '--verify', 'refs/heads/member'], f.root)).code).toBe(0);
   } finally {
     f.clean();
   }
