@@ -82,7 +82,7 @@ const hookEventSchema = z.discriminatedUnion('event', [
 
 type HookEvent = z.infer<typeof hookEventSchema>;
 
-type Invocation = { skipped: Set<string> };
+type Invocation = { skipped: Set<string>; dispatched: Set<string> };
 type Inventory = { leaves: Leaf[]; unreadable: number; unknown: boolean; foreign: { path: string; stored: string }[] };
 type DispatchOutcome = 'completed' | 'waiting' | 'skipped';
 
@@ -626,8 +626,12 @@ async function dispatchLeaf(
     await checkBase(repo, mustCreate);
     const allocated: State | null = await allocate(global, repo, { path: leaf.path, state }, invocation);
     if (allocated === null) return 'waiting';
-    for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds))
+    for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds)) {
+      const delivery: string = `${repo.name}/${slug}/${allocated.phase}/${slot}`;
+      if (invocation.dispatched.has(delivery)) continue;
+      invocation.dispatched.add(delivery);
       await dispatchSlot(global, repo, { path: leaf.path, state: allocated }, slot);
+    }
     return 'waiting';
   } catch (error) {
     if (!(error instanceof Error)) throw error;
@@ -681,7 +685,7 @@ async function sweep(global: GlobalConfig, repo: Repo, leaves: Leaf[], invocatio
 }
 
 export async function mergeWake(global: GlobalConfig, repo: Repo): Promise<void> {
-  const invocation: Invocation = { skipped: new Set() };
+  const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
   try {
     await withLock(resolve(globalHome(), '.lock'), async () => {
       await sweep(
@@ -782,7 +786,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
   const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
   if (event?.event === 'pane_agent_status_changed' && event.data.agent_status === 'working') return;
   const global: GlobalConfig = readGlobal();
-  const invocation: Invocation = { skipped: new Set() };
+  const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
   const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
   const hooked: boolean = event !== undefined;
   const selection: Selection | undefined =
