@@ -147,9 +147,9 @@ test('a member conflict marks it solo, rewrites the record without it and leaves
     expect(
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', aaAttempt], f.root, f.env)).code,
     ).toBe(0);
-    expect(
-      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code,
-    ).toBe(0);
+    expect((await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code).toBe(
+      0,
+    );
     // bb stayed carried and landed with aa's push; the solo-conflicted cc holds the
     // next turn under a fresh memberless solo record and is prompted (criterion 3).
     expect(await head(f, 'bb')).toBe(bbHead);
@@ -249,15 +249,11 @@ test('a failed holder with a landed candidate is told to move back, then reconci
     expect(readState(aa.path).batch?.candidate).toBe(top);
     idleAll(f);
     const promptsBefore: number = database(f).prompts.length;
-    const promptCallsBefore: number = calls(f).filter(
-      (args) => args[0] === 'agent' && args[1] === 'prompt',
-    ).length;
+    const promptCallsBefore: number = calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt').length;
     expect((await cli(f, ['phase', 'aa', 'merge'], f.root, f.env)).code).toBe(0);
     expect(leafState(aa.path).phase).toBe('merged');
     expect(database(f).prompts).toHaveLength(promptsBefore);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(
-      promptCallsBefore,
-    );
+    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(promptCallsBefore);
   } finally {
     f.clean();
   }
@@ -303,15 +299,11 @@ test('a failed holder keeps carried members, and the move-back clears the record
         .map((args) => args[2])
         .sort(),
     ).toEqual([m1Tab, m2Tab].sort());
-    const promptCallsBefore: number = calls(f).filter(
-      (args) => args[0] === 'agent' && args[1] === 'prompt',
-    ).length;
+    const promptCallsBefore: number = calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt').length;
     expect((await cli(f, ['phase', 'holder', 'merge'], f.root, f.env)).code).toBe(0);
     expect(leafState(holder.path).phase).toBe('merged');
     expect(leafState(holder.path).batch).toBeUndefined();
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(
-      promptCallsBefore,
-    );
+    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(promptCallsBefore);
     expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(2);
   } finally {
     f.clean();
@@ -390,9 +382,9 @@ test('a green batch clears the record and closes member tabs once the holder lan
     expect(
       (await cli(f, ['phase', 'holder', 'merged', '--slot', 'B', '--check', '--attempt', attempt], f.root, f.env)).code,
     ).toBe(0);
-    expect(
-      (await cli(f, ['phase', 'holder', 'merged', '--slot', 'B', '--attempt', attempt], f.root, f.env)).code,
-    ).toBe(0);
+    expect((await cli(f, ['phase', 'holder', 'merged', '--slot', 'B', '--attempt', attempt], f.root, f.env)).code).toBe(
+      0,
+    );
     expect(leafState(holder.path).phase).toBe('merged');
     expect(leafState(holder.path).batch).toBeUndefined();
     expect(leafState(m1.path).phase).toBe('merged');
@@ -449,9 +441,7 @@ test('a merged holder keeps the record while a member is still in merge, then fi
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(leafState(m1.path).phase).toBe('merged');
     expect(leafState(holder.path).batch).toBeUndefined();
-    expect(
-      calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close' && args[2] === m1Tab),
-    ).toHaveLength(1);
+    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close' && args[2] === m1Tab)).toHaveLength(1);
     expect(database(f).tabs.some((tab) => tab.tab_id === m1Tab)).toBe(false);
   } finally {
     f.clean();
@@ -504,9 +494,9 @@ test('a leaf entering merge after the record was written is excluded and becomes
     expect(
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', aaAttempt], f.root, f.env)).code,
     ).toBe(0);
-    expect(
-      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code,
-    ).toBe(0);
+    expect((await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code).toBe(
+      0,
+    );
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(readState(bb.path).batch?.applied).toBe(true);
     expect(mergePrompts(f).at(-1)).toEqual(expectedPrompt(bb.path, bb.b));

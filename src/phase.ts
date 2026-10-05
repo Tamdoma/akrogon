@@ -373,8 +373,7 @@ function memberEntries(repo: Repo, record: Batch): { member: BatchMember; leaf: 
 }
 
 async function mergeHead(repo: Repo, state: State, record: Batch): Promise<string> {
-  if (state.worktree !== undefined)
-    return command(['git', 'rev-parse', 'HEAD'], state.worktree);
+  if (state.worktree !== undefined) return command(['git', 'rev-parse', 'HEAD'], state.worktree);
   const ref: Result = await run(['git', 'rev-parse', `refs/heads/${state.slug}`], repo.root);
   if (ref.code === 0) return ref.stdout;
   if (record.top === undefined)

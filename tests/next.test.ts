@@ -874,8 +874,14 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     );
     const landedAttempt: string = z.string().parse(readState(path).batch?.attempt);
     expect(
-      (await cli(f, ['phase', 'landed', 'merged', '--slot', 'B', '--check', '--attempt', landedAttempt], worktree, f.env))
-        .code,
+      (
+        await cli(
+          f,
+          ['phase', 'landed', 'merged', '--slot', 'B', '--check', '--attempt', landedAttempt],
+          worktree,
+          f.env,
+        )
+      ).code,
     ).toBe(0);
     const completed: Result = await cli(
       f,
@@ -4089,9 +4095,9 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
     expect(
       (await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--check', '--attempt', bbAttempt], f.root, f.env)).code,
     ).toBe(0);
-    expect(
-      (await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--attempt', bbAttempt], f.root, f.env)).code,
-    ).toBe(0);
+    expect((await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--attempt', bbAttempt], f.root, f.env)).code).toBe(
+      0,
+    );
     // cc was already carried as a member of bb's batch (recorded while aa sat failed):
     // carried members are not re-prompted (merge-order Q2, brief criterion 12), so the
     // third merge prompt goes to the re-entered aa, which queued behind bb and cc.
@@ -4101,9 +4107,9 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
     expect(
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', aaAttempt], f.root, f.env)).code,
     ).toBe(0);
-    expect(
-      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code,
-    ).toBe(0);
+    expect((await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code).toBe(
+      0,
+    );
     expect(readState(resolve(f.root, 'issues/closed/issue/aa')).phase).toBe('merged');
     expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, aa.b]);
   } finally {
