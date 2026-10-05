@@ -917,7 +917,7 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
     const members: BatchMember[] = [];
     for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root))
       .slice(1)
-      .filter((entry) => entry.leaf.state.solo !== true)) {
+      .filter((entry) => fresh.state.solo !== true && entry.leaf.state.solo !== true)) {
       const sha: string | undefined = await branchSha(repo, candidate.leaf.state.slug);
       const head: string = sha ?? builtOn;
       members.push({
@@ -927,11 +927,15 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
         tip: head,
       });
     }
-    const next: Batch = { attempt: attemptId(), built_on: builtOn, members, applied: false };
+    const next: Batch = { attempt: attemptId(), built_on: builtOn, members, applied: fresh.state.solo === true, solo: fresh.state.solo };
     saveState(fresh.path, { ...fresh.state, batch: next });
     batch = next;
   });
   if (batch === undefined) return;
+  if (batch.solo === true) {
+    await dispatchLeaf(global, repo, { path: holder.path, state: readState(holder.path) }, false, invocation, `attempt=${batch.attempt} solo`);
+    return;
+  }
   const holderHead: string = (await branchSha(repo, holder.state.slug)) ?? batch.built_on;
   let current: Batch = batch;
   let built: Awaited<ReturnType<typeof buildStack>>;
