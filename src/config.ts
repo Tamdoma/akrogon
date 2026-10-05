@@ -3,7 +3,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { command, run, type Result } from './shell';
+import { command, quote, run, type Result } from './shell';
 import { trackingRef } from './preflight';
 
 const text = z.string().min(1);
@@ -32,6 +32,7 @@ export const repoSchema = z.strictObject({
   rebuttal: z.boolean().default(true),
   fix_rounds: z.number().int().positive().default(3),
   implement: z.enum(['subagents', 'inline']).default('subagents'),
+  setup: text.optional(),
   checks: z.record(text, text).default({}),
   merge_checks: z.record(text, text).default({}),
   advisory: z.array(text).default([]),
@@ -149,6 +150,21 @@ export async function base(repo: Repo, cwd: string): Promise<string> {
   return command(['git', 'merge-base', 'HEAD', trackingRef(repo)], cwd);
 }
 
+export function withSetup(config: RepoConfig): RepoConfig {
+  if (config.setup === undefined) return config;
+  const setup: string = config.setup;
+  const wrap = (cmd: string): string =>
+    `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(setup)} && sh -c ${quote(cmd)}`;
+  const map = (record: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(Object.entries(record).map(([k, v]): [string, string] => [k, wrap(v)]));
+  return {
+    ...config,
+    checks: map(config.checks),
+    merge_checks: map(config.merge_checks),
+    advisory: config.advisory.map(wrap),
+  };
+}
+
 export async function effectiveConfig(cwd: string): Promise<string> {
   const global: GlobalConfig = readGlobal();
   const repo: Repo | null = await currentRepo(global, cwd);
@@ -157,7 +173,7 @@ export async function effectiveConfig(cwd: string): Promise<string> {
   return Bun.YAML.stringify(
     {
       ...global,
-      ...repoConfig,
+      ...withSetup(repoConfig),
       slots: repo === null ? global.slots : seats(global, repo),
       repo: repo === null ? 'none' : repo.name,
       ...(repo !== null ? { worktree_store: worktreeStore(repo) } : {}),

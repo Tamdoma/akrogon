@@ -26,6 +26,7 @@
 - Foreign leaves are summarized once per repo and excluded from capacity and dispatch.
 - Prompt delivery is one attempt per pass per seat; a timeout settles against the seat session file on the next pass.
 - Init refuses a declared grounding index that is not a readable non-empty file without changing files.
+- `akrogon config` composes a repo's `setup` key into every printed `checks`, `merge_checks` and `advisory` command as a `flock`ed `sh -c <setup> && sh -c <command>`.
 - A leaf worktree's `.env` is a symlink to the registered checkout's file; dispatch refuses a real file, tracked path, foreign link or missing ignore rule.
 
 ## See also

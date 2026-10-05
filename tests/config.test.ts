@@ -1,8 +1,8 @@
 import { test, expect } from 'bun:test';
 import { isAbsolute, resolve } from 'node:path';
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fixture, cli, yaml, type Fixture } from './helpers';
-import { command } from '../src/shell';
+import { command, run, type Result } from '../src/shell';
 
 test('config combines defaults and repo values, reports none, and recalculates worktree base', async () => {
   const f: Fixture = await fixture();
@@ -277,6 +277,197 @@ test('config requires explicit grounding', async () => {
     const result = await cli(f, ['config']);
     expect(result.code).toBe(0);
     expect(Bun.YAML.parse(result.stdout)).toMatchObject({ grounding: 'none' });
+  } finally {
+    f.clean();
+  }
+});
+
+async function installFixture(f: Fixture, config: object): Promise<void> {
+  mkdirSync(resolve(f.root, 'vendor/widget'), { recursive: true });
+  writeFileSync(resolve(f.root, 'vendor/widget/package.json'), JSON.stringify({ name: 'widget', version: '1.0.0' }));
+  writeFileSync(resolve(f.root, 'vendor/widget/index.js'), 'module.exports = 1;\n');
+  writeFileSync(
+    resolve(f.root, 'package.json'),
+    JSON.stringify({ name: 'repo', dependencies: { widget: 'file:vendor/widget' } }),
+  );
+  writeFileSync(resolve(f.root, '.gitignore'), '.env\nnode_modules/\n');
+  await command(['bun', 'install'], f.root);
+  await command(['git', 'add', '.'], f.root);
+  await command(['git', 'commit', '-m', 'fixture install'], f.root);
+  yaml(resolve(f.root, 'issues/config.yaml'), config);
+}
+
+test('config composes setup into printed checks, merge_checks and advisory identically from worktree', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'bun install --frozen-lockfile',
+      checks: { t: 'bun test' },
+      merge_checks: { m: 'bun run verify' },
+      advisory: ['bun run lint'],
+      grounding: 'none',
+    });
+    const composed = (cmd: string): string =>
+      `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c 'bun install --frozen-lockfile' && sh -c '${cmd}'`;
+    type Printed = { checks: Record<string, string>; merge_checks: Record<string, string>; advisory: string[] };
+    const atRoot = Bun.YAML.parse((await cli(f, ['config'])).stdout) as Printed;
+    expect(atRoot).toMatchObject({
+      setup: 'bun install --frozen-lockfile',
+      checks: { t: composed('bun test') },
+      merge_checks: { m: composed('bun run verify') },
+      advisory: [composed('bun run lint')],
+    });
+    const worktree: string = resolve(f.home, 'wt');
+    await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    const atWorktree = Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as Printed;
+    expect(atWorktree.checks).toEqual(atRoot.checks);
+    expect(atWorktree.merge_checks).toEqual(atRoot.merge_checks);
+    expect(atWorktree.advisory).toEqual(atRoot.advisory);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { t: 'bun test' },
+      merge_checks: { m: 'bun run verify' },
+      advisory: ['bun run lint'],
+      grounding: 'none',
+    });
+    expect(Bun.YAML.parse((await cli(f, ['config'])).stdout)).toMatchObject({
+      checks: { t: 'bun test' },
+      merge_checks: { m: 'bun run verify' },
+      advisory: ['bun run lint'],
+    });
+  } finally {
+    f.clean();
+  }
+});
+
+test('config printed check installs into a fresh worktree without a separate install step', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await installFixture(f, {
+      setup: 'bun install --frozen-lockfile',
+      checks: { resolve: `bun -e 'console.log(require.resolve("widget"))'` },
+      grounding: 'none',
+    });
+    const worktree: string = resolve(f.home, 'wt');
+    await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    const printed: string = (
+      Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
+    ).checks.resolve;
+    const result: Result = await run(['sh', '-c', printed], worktree);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain(`${worktree}/node_modules/widget/`);
+  } finally {
+    f.clean();
+  }
+});
+
+test('config printed check resolves the worktree lockfile version over the root install', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await installFixture(f, {
+      setup: 'bun install --frozen-lockfile',
+      checks: {
+        version: `bun -e 'console.log(require("widget/package.json").version); console.log(require.resolve("widget"))'`,
+      },
+      grounding: 'none',
+    });
+    mkdirSync(resolve(f.root, 'vendor/widget2'), { recursive: true });
+    writeFileSync(resolve(f.root, 'vendor/widget2/package.json'), JSON.stringify({ name: 'widget', version: '2.0.0' }));
+    writeFileSync(resolve(f.root, 'vendor/widget2/index.js'), 'module.exports = 2;\n');
+    writeFileSync(
+      resolve(f.root, 'package.json'),
+      JSON.stringify({ name: 'repo', dependencies: { widget: 'file:vendor/widget2' } }),
+    );
+    await command(['bun', 'install', '--lockfile-only'], f.root);
+    await command(['git', 'add', '.'], f.root);
+    await command(['git', 'commit', '-m', 'widget2'], f.root);
+    expect(JSON.parse(readFileSync(resolve(f.root, 'node_modules/widget/package.json'), 'utf8')).version).toBe('1.0.0');
+    const worktree: string = resolve(f.home, 'wt');
+    await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    const printed: string = (
+      Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
+    ).checks.version;
+    const result: Result = await run(['sh', '-c', printed], worktree);
+    expect(result.code).toBe(0);
+    expect(result.stdout.split('\n')).toContain('2.0.0');
+    expect(result.stdout).toContain(`${worktree}/node_modules/`);
+    expect(result.stdout).not.toContain(`${f.root}/node_modules/`);
+  } finally {
+    f.clean();
+  }
+});
+
+test('config printed checks run concurrently in one worktree and leave it clean', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await installFixture(f, {
+      setup: 'bun install --frozen-lockfile',
+      checks: { a: 'true', b: 'true', c: 'true', d: 'true' },
+      grounding: 'none',
+    });
+    const worktree: string = resolve(f.home, 'wt');
+    await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    const checks: Record<string, string> = (
+      Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
+    ).checks;
+    const results: Result[] = await Promise.all(
+      Object.values(checks).map((printed: string) => run(['sh', '-c', printed], worktree)),
+    );
+    expect(results.map((result: Result) => result.code)).toEqual([0, 0, 0, 0]);
+    expect(await command(['git', 'status', '--porcelain'], worktree)).toBe('');
+  } finally {
+    f.clean();
+  }
+});
+
+test('config printed check skips both sides of a || b when the frozen lockfile mismatches', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await installFixture(f, {
+      setup: 'bun install --frozen-lockfile',
+      checks: { either: `touch ${f.home}/a || touch ${f.home}/b` },
+      grounding: 'none',
+    });
+    const worktree: string = resolve(f.home, 'wt');
+    await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    mkdirSync(resolve(worktree, 'vendor/widget2'), { recursive: true });
+    writeFileSync(
+      resolve(worktree, 'vendor/widget2/package.json'),
+      JSON.stringify({ name: 'widget', version: '2.0.0' }),
+    );
+    writeFileSync(
+      resolve(worktree, 'package.json'),
+      JSON.stringify({ name: 'repo', dependencies: { widget: 'file:vendor/widget2' } }),
+    );
+    const printed: string = (
+      Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
+    ).checks.either;
+    const result: Result = await run(['sh', '-c', printed], worktree);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr.toLowerCase()).toContain('lockfile');
+    expect(existsSync(resolve(f.home, 'a'))).toBe(false);
+    expect(existsSync(resolve(f.home, 'b'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('config runs all of setup inside the install lock', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const marker: string = resolve(f.home, 'setup-marker');
+    await installFixture(f, {
+      setup: `touch ${marker} && ! flock -n "$(git rev-parse --git-path akrogon-install.lock)" true`,
+      checks: { ok: 'true' },
+      grounding: 'none',
+    });
+    const worktree: string = resolve(f.home, 'wt');
+    await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    const printed: string = (
+      Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
+    ).checks.ok;
+    const result: Result = await run(['sh', '-c', printed], worktree);
+    expect(result.code).toBe(0);
+    expect(existsSync(marker)).toBe(true);
   } finally {
     f.clean();
   }
