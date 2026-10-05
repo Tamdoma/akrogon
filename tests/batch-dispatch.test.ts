@@ -753,3 +753,23 @@ exec '${git}' "$@"
     f.clean();
   }
 });
+
+test('a memberless applied holder retains its checked integration head on red', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    await commitFile(f, holder.path, 'holder-file', 'h');
+    await pushMain(f, 'advance');
+    toMerge(holder.path, '2026-09-11T00:00:00Z');
+    idleAll(f);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const batch = readState(holder.path).batch!;
+    expect(batch.members).toEqual([]);
+    const checked: string = await head(f, 'holder');
+    expect(checked).not.toBe(batch.holder.head);
+    expect((await cli(f, ['phase', 'holder', 'check.fix', '--slot', 'B', '--attempt', batch.attempt], f.root, f.env)).code).toBe(0);
+    expect(await head(f, 'holder')).toBe(checked);
+  } finally {
+    f.clean();
+  }
+});
