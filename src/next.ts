@@ -748,7 +748,7 @@ function closableMembers(repo: Repo, members: BatchMember[], moved: Leaf[]): Lea
   );
 }
 
-async function mergeNotice(repo: Repo, slug: string): Promise<void> {
+async function mergeNotice(repo: Repo, slug: string): Promise<boolean> {
   const args: string[] = [
     'notification',
     'show',
@@ -760,8 +760,7 @@ async function mergeNotice(repo: Repo, slug: string): Promise<void> {
   ];
   const schema = z.object({ shown: z.boolean(), reason: z.string() });
   try {
-    await herdr(args, schema);
-    return;
+    return (await herdr(args, schema)).shown;
   } catch (error) {
     if (!(error instanceof CommandError) || !retryable(error.result)) {
       console.warn(
@@ -771,11 +770,11 @@ async function mergeNotice(repo: Repo, slug: string): Promise<void> {
           error: error instanceof Error ? error.message : String(error),
         }),
       );
-      return;
+      return false;
     }
   }
   try {
-    await herdr(args, schema);
+    return (await herdr(args, schema)).shown;
   } catch (error) {
     console.warn(
       JSON.stringify({
@@ -784,6 +783,7 @@ async function mergeNotice(repo: Repo, slug: string): Promise<void> {
         error: error instanceof Error ? error.message : String(error),
       }),
     );
+    return false;
   }
 }
 
@@ -840,8 +840,8 @@ async function reconcileBatch(global: GlobalConfig, repo: Repo, holder: Leaf, in
         const survivors: BatchMember[] = holderNow.state.batch.members.filter((member) =>
           allLeaves(repo).some((item) => item.state.slug === member.slug && item.state.phase === 'merge'),
         );
-        await mergeNotice(repo, holderNow.state.slug);
-        saveState(holderNow.path, { ...holderNow.state, batch: { ...batch, members: survivors } });
+        const notified: boolean = batch.notified === true || await mergeNotice(repo, holderNow.state.slug);
+        saveState(holderNow.path, { ...holderNow.state, batch: { ...batch, members: survivors, notified } });
       }
       return;
     }

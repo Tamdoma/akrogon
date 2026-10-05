@@ -46,6 +46,7 @@ export const batchSchema = z.strictObject({
   top: z.string().optional(),
   tested_top: z.string().optional(),
   candidate: z.string().optional(),
+  notified: z.boolean().optional(),
   applied: z.boolean(),
   solo: z.boolean().optional(),
 });
