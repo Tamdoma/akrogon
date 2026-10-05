@@ -1,27 +1,35 @@
 # Merge
 
-Seat B merges reviewed work. It fetches the configured remote, rebases onto the default branch and runs every `checks` command, then every `merge_checks` command.
+Seat B merges reviewed work. It runs every `checks` command, then every `merge_checks` command, on the code that will land.
 
 Each registered repo has one merge turn, held by the earliest eligible leaf in `merge` (merge stamp, then the last `to: merge` log record, then slug; a leaf with neither sorts last). Only the holder's seat B is prompted; a waiting leaf keeps its tab, panes and `max_active` slot, and `akrogon status` names the holder and each place. For a waiting leaf, `akrogon phase <slug> merged` (with or without `--check`) and `check.fix` are refused naming the holder; `failed` is never refused. When the turn frees, the next holder is prompted without a manual `akrogon next`.
 
+The command batches waiting leaves into the holder's merge. It records a batch on the holder, then outside the global lock builds one stack — every member branch in turn order, then the holder's, onto the fetched default branch — moves each live branch to its built tip and prompts the holder's B with the attempt id and the stack top. Carried members are never prompted and never run their own checks: one check run on the top and one push land every member with the holder. While the batch is in flight a member keeps its tab, panes and worktree; after it lands, sweeps remove its worktree and branch like any merged leaf, while a holder record that still names it keeps its tab open. A leaf entering `merge` after the record is written is not carried and waits for a later batch. A member whose branch cannot be stacked mechanically is restored to its saved head, marked `solo` and merges alone when its own turn comes; if the holder's own branch is the one that conflicts, every member is restored and the holder is prompted `solo` so its B resolves the rebase by hand.
+
 For CSV export, those checks should cover quoting, empty input and the existing JSON export.
 
-Every phase move except a move to `failed` also checks that the branch's changed old test files each carry a `Test-Change: <path> <source and reason>` trailer in a commit's final trailer block. `src/test-files.ts` defines which paths count as test files. Right before the push B runs the move in check-only mode:
+Every phase move except a move to `failed` also checks that the branch's changed old test files each carry a `Test-Change: <path> <source and reason>` trailer in a commit's final trailer block. `src/test-files.ts` defines which paths count as test files. After its one check run on the stack top, B runs the move in check-only mode with the attempt id from its prompt:
 
 ```sh
-akrogon phase export-csv merged --slot B --check
+akrogon phase export-csv merged --slot B --check --attempt <id>
 ```
 
-It prints ok when the move's guards pass. A refusal names each uncited file and the trailer line to add; a later commit, including an empty one, may carry it.
+It prints ok when the move's guards pass — HEAD equal to the recorded top and the trailer rule over each carried member's range and the whole stack — and records the tested top. A refusal names each uncited file and the trailer line to add; a later commit, including an empty one, may carry it. Every `merged`, `merged --check` and `check.fix` call carries `--attempt <id>`; a stale or missing id is refused and changes nothing.
 
-The push must be fast-forward. If another leaf lands first, B fetches, rebases and checks again. It does not force-push over the other change.
+The command owns the push. `akrogon phase <slug> merged --attempt <id>` pushes the tested top fast-forward and moves every carried member to `merged` before the holder; seats never run `git push`. A non-fast-forward refusal restacks the batch onto the new remote tip and prints:
 
-If rebase conflicts occur, B resolves them and records evidence of what changed. If checks fail, the leaf returns to repair. Other push errors are reported with their cause.
+```text
+fresh checks required <sha>
+```
 
-After confirming that the push landed, B records completion:
+The worktree then already sits at `<sha>`, so B reruns its checks, `--check` and `merged` under the same attempt. A member that conflicted during the restack is restored and dropped to merge solo, and if the holder's branch itself no longer fits the new base the line reads `fresh checks required rebase <slug> onto <sha>` and B rebases by hand first.
+
+If checks fail, B reports `check.fix --attempt <id>`: with carried members this prints `batch dissolved, merge solo` — each member is restored to its saved head and marked to merge solo while the holder keeps the turn — and with none the leaf moves to `check.fix` as before. Other push errors are reported with their cause.
+
+Once the checks are green and the completion owners' briefs are gathered, B lands the batch:
 
 ```sh
-akrogon phase export-csv merged --slot B
+akrogon phase export-csv merged --slot B --attempt <id>
 ```
 
 Do not run that command just to make a blocked leaf disappear. It means the code has landed.
@@ -38,7 +46,9 @@ When the last leaf of an epic merges, it reports:
 epic complete <epic>
 ```
 
-Completed records move to the closed store. An issue inside an epic prints no completion line and waits for the whole epic before the top-level folder moves.
+Completed records move to the closed store. An issue inside an epic prints no completion line and waits for the whole epic before the top-level folder moves. One batch can print several completion lines, one per standalone issue or epic whose last open leaf it lands.
+
+If the holder leaves `merge` mid-run, the next pass reconciles the record instead of rebuilding: it fetches the remote, then either finishes the moves by ancestry — a carried member whose applied tip is already on the remote, and the holder itself when its pushed top landed, merges without another run — or restores every member still in `merge` to its saved head and clears the record, with no solo marks. A failed fetch restores nothing and reports only the error. A holder failed after its push landed gets a notification naming `akrogon phase <slug> merge`; moving it back to `merge` lands it by ancestry with no prompt and no check run.
 
 Once the merge seat goes idle or exits after `merged`, the command closes its tab, and a manual repository sweep or startup cleanup closes any tab left behind. The closed-tab hook deletes the merged leaf's temp folder when its tab closes, with sweep or startup catch-up when the tab already has no live panes; only those sweeps remove completed worktrees and branches, after the issue folder has moved:
 
@@ -62,7 +72,7 @@ Now:
 - Values containing commas and quotes stay in their fields.
 ```
 
-That is an example, not a measured claim about your project. The actual message must match the completed briefs.
+That is an example, not a measured claim about your project. The actual message must match the completed briefs. Before `merged`, B gathers the briefs of every completion owner the batch can close — the batch may complete more than the holder's own issue — and one broadcast runs per printed completion line.
 
 Webhook variable names belong in repository configuration. Their values are read from:
 

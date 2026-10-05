@@ -133,7 +133,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon init [--from <proposal.yaml>] [--toolkit <lang>=<runner>]` | Initialize or update repository setup. |
 | `akrogon config` | Print effective configuration. |
 | `akrogon preflight` | Verify the configured base remote branch and local tracking ref. |
-| `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>] [--check]` | Record a pass or declare a failure with its reason. Moves except failed refuse changed old test files without Test-Change trailers; src/test-files.ts defines the path rule. --check runs the move's guards without recording or moving and prints ok on success. |
+| `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>] [--check]` | Record a pass or declare a failure with its reason. Moves except failed refuse changed old test files without Test-Change trailers; src/test-files.ts defines the path rule. --check runs the move's guards without recording or moving and prints ok on success. Merge batch calls carry `--attempt <id>` from the prompt; stale ids are refused. |
 | `akrogon next [<slug>\|<path>\|--all\|--resume]` | Dispatch eligible work. |
 | `akrogon pull [--all]` | Import open GitHub issues as seeds. With --all, pull every registered repository from any directory. |
 | `akrogon close <owner/repo#n> --by <text>` | Close one unowned GitHub issue with a delivered-by note. |
@@ -183,7 +183,7 @@ That report destination does not redirect pull.
 | [plan-issue](skills/plan-issue/SKILL.md) | Plan how to implement a leaf. |
 | [implement-issue](skills/implement-issue/SKILL.md) | Build the plan or repair review findings. |
 | [check-issue](skills/check-issue/SKILL.md) | Review defects and verify repairs. |
-| [merge-issue](skills/merge-issue/SKILL.md) | Rebase, check and push reviewed work. |
+| [merge-issue](skills/merge-issue/SKILL.md) | Check and land the merge batch. |
 | [seed-issue](skills/seed-issue/SKILL.md) | File an observation for investigation. |
 | [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a completed-issue-or-epic update to Discord. |
 | [init-akrogon](skills/init-akrogon/SKILL.md) | Inspect a repository and set up its lifecycle. |

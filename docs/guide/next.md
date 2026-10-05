@@ -89,7 +89,7 @@ A leaf must have valid state and satisfied dependencies. Handbuilt and failed le
 
 The global max_active setting limits new leaf allocations across repositories. Existing tabs can keep progressing at the limit. Each leaf normally has two seats, so this is not a count of agent processes.
 
-Leaves in `merge` take their repository's single merge turn: only the holder's seat B is prompted and the rest wait. Every committed `phase` move and the end of each pass re-sweep `merge` leaves, so the next holder is prompted as soon as the turn frees.
+Leaves in `merge` take their repository's single merge turn: the merge pass writes a batch record on the holder, builds and applies the stacked branches outside the global lock, and prompts only the holder's B while the rest wait. Every committed `phase` move and the end of each pass re-sweep `merge` leaves, so the next holder is prompted as soon as the turn frees.
 
 A working, blocked or unknown seat is not treated as idle. A recently delivered prompt also gets a grace period.
 
