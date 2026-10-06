@@ -181,7 +181,8 @@ test('second run replaces USAGE.md and prints sibling first lines sorted', async
     const lines1: string[] = r1.stdout.trimEnd().split('\n');
     expect(lines1[1]).toBe('sib-a summary line');
     expect(lines1[2]).toBe('sib-z summary line');
-    expect(lines1[3]).toBe('outcome done');
+    expect(lines1[3]).toBe('outcome partial');
+    expect(readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8')).toContain('usage unmeasured');
     writeFileSync(resolve(w.chart, 'USAGE.md'), 'stale content\n');
     const r2: RunResult = await w.run(w.chart);
     expect(r2.code).toBe(0);
