@@ -1,0 +1,7 @@
+Pick **z**. I withdraw my install-prefix recommendation and accept revised 1c. The probe found failures even with an unchanged install (`dependency-setup-merged.md:40-44`). Preparing at checkout changes removes concurrent installation from ordinary checks, rather than adding a lock to every check.
+
+**Reused:** worktree creation, command-owned batch integration and attempt ownership, the repository's package manager, and normal seat installation when adding dependencies. Prepare after every command-owned integration that requires fresh checks, including a solo rebase or restoration before solo checks. Worker and detached base checkouts still need their own initial preparation (`skills/implement-issue/SKILL.md:38,53-55`).
+
+**New:** one setup key, preparation calls at creation and integration, and a completion gate before dispatch or checks. Run setup outside the global lock (`src/next.ts:338,774`). The gate must also cover interrupted preparation and prevent another invocation from dispatching an existing but unfinished checkout (`src/next.ts:251-259,625-628`). Cancellation must wait for preparation to stop before restoring that worktree. Those are real additions, not zero new machinery.
+
+Cost: akrogon now owns preparation failures and completion. Seats must finish any dependency-changing install before parallel checks begin. No per-check install prefixes, install stamps based on file hashes, watchers or polling.

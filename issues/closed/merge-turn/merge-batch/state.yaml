@@ -1,0 +1,34 @@
+slug: merge-batch
+phase: merged
+created: 2026-10-05
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - check-setup
+  - nits-before-merge
+  - merge-turn-order
+sources: 
+  - "Tamdoma/akrogon#57"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 1
+verdict: 
+  {}
+tab: w8:t95
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/merge-batch
+pane: 
+  A: w8:pHA
+  B: w8:pHB
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

@@ -1,0 +1,32 @@
+slug: record-only-reuse
+phase: merged
+created: 2026-10-05
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - merge-batch
+sources: 
+  - "Tamdoma/akrogon#57"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t96
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/record-only-reuse
+pane: 
+  A: w8:pHC
+  B: w8:pHD
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

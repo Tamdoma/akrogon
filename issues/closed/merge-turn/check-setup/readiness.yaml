@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: bun install --frozen-lockfile under flock, four checks at once in one worktree
+    command: flock "$(git rev-parse --git-path akrogon-install.lock)" bun install --frozen-lockfile && <each akrogon check>
+    identity: operator local shell
+    target: disposable worktree issues/worktrees/probe-setup at 923c6c9
+    version: Bun 1.4.2
+    date: '2026-10-05'
+    result: four checks exit 0, git status clean, worktree zod 4.1.5 shadows root 4.6.1
+    cleanup: worktree removed and pruned, logs deleted
+    limits: one machine, one Bun version, four runners, framework merge_checks not run
+    record: issues/chart/merge-turn/forks/dependency-setup.md

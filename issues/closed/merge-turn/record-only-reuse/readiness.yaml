@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: git push fast-forward and non-fast-forward refusal
+    command: git push origin 923c6c98:refs/heads/akrogon-probe-merge-turn; git push origin 4bf7af8b:refs/heads/akrogon-probe-merge-turn; git push origin --delete akrogon-probe-merge-turn
+    identity: operator GitHub credentials via git
+    target: Tamdoma/akrogon origin, branch akrogon-probe-merge-turn
+    version: git 2.56.0
+    date: '2026-10-05'
+    result: first push exit 0 new branch; unrelated commit rejected non-fast-forward exit 1, branch unchanged; delete exit 0
+    cleanup: branch deleted, git ls-remote returned 0 lines
+    limits: non-default branch without protection rules; no push to main, no lost-reply case
+    record: issues/chart/merge-turn/forks/turn-release.md
+  - operation: git fetch
+    command: git fetch origin
+    identity: operator GitHub credentials via git
+    target: Tamdoma/akrogon origin
+    version: git 2.56.0
+    date: '2026-10-05'
+    result: exit 0, origin/main 923c6c98
+    cleanup: none, read only
+    limits: does not prove push
+    record: issues/chart/merge-turn/forks/turn-release.md

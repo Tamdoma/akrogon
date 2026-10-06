@@ -1,0 +1,32 @@
+slug: merge-turn-order
+phase: merged
+created: 2026-10-05
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#57"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t94
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/merge-turn-order
+pane: 
+  A: w8:pH8
+  B: w8:pH9
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}

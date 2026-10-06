@@ -1,0 +1,55 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: git push fast-forward and non-fast-forward refusal
+    command: git push origin 923c6c98:refs/heads/akrogon-probe-merge-turn; git push origin 4bf7af8b:refs/heads/akrogon-probe-merge-turn; git push origin --delete akrogon-probe-merge-turn
+    identity: operator GitHub credentials via git
+    target: Tamdoma/akrogon origin, branch akrogon-probe-merge-turn
+    version: git 2.56.0
+    date: '2026-10-05'
+    result: first push exit 0 new branch; unrelated commit rejected non-fast-forward exit 1, branch unchanged; delete exit 0
+    cleanup: branch deleted, git ls-remote returned 0 lines
+    limits: non-default branch without protection rules; no push to main, no lost-reply case
+    record: issues/chart/merge-turn/forks/turn-release.md
+  - operation: git fetch
+    command: git fetch origin
+    identity: operator GitHub credentials via git
+    target: Tamdoma/akrogon origin
+    version: git 2.56.0
+    date: '2026-10-05'
+    result: exit 0, origin/main 923c6c98
+    cleanup: none, read only
+    limits: does not prove push
+    record: issues/chart/merge-turn/forks/turn-release.md
+  - operation: herdr agent prompt
+    command: herdr agent prompt <pane> "<text>" --wait --until working --timeout 5000
+    identity: operator local herdr session
+    target: peer panes w8:pGY, w8:pGZ
+    version: herdr 0.9.3
+    date: '2026-10-05'
+    result: each prompt turned the peer to working
+    cleanup: none needed
+    limits: pane agents not started by akrogon
+    record: issues/chart/merge-turn/forks/turn-release.md
+  - operation: herdr tab create and close
+    command: herdr tab create --label akrogon-probe-tab; herdr tab close w8:t91
+    identity: operator local herdr session
+    target: throwaway tab w8:t91
+    version: herdr 0.9.3
+    date: '2026-10-05'
+    result: create returned w8:t91, close returned ok, tab list shows none
+    cleanup: tab closed, absence read back from herdr tab list
+    limits: tab had no running agent
+    record: issues/chart/merge-turn/forks/turn-release.md
+  - operation: bun install --frozen-lockfile under flock, four checks at once in one worktree
+    command: flock "$(git rev-parse --git-path akrogon-install.lock)" bun install --frozen-lockfile && <each akrogon check>
+    identity: operator local shell
+    target: disposable worktree issues/worktrees/probe-setup at 923c6c9
+    version: Bun 1.4.2
+    date: '2026-10-05'
+    result: four checks exit 0, git status clean, worktree zod 4.1.5 shadows root 4.6.1
+    cleanup: worktree removed and pruned, logs deleted
+    limits: one machine, one Bun version, four runners, framework merge_checks not run
+    record: issues/chart/merge-turn/forks/dependency-setup.md

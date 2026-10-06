@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr agent prompt
+    command: herdr agent prompt <pane> "<text>" --wait --until working --timeout 5000
+    identity: operator local herdr session
+    target: peer panes w8:pGY, w8:pGZ
+    version: herdr 0.9.3
+    date: '2026-10-05'
+    result: each prompt turned the peer to working
+    cleanup: none needed
+    limits: pane agents not started by akrogon
+    record: issues/chart/merge-turn/forks/turn-release.md

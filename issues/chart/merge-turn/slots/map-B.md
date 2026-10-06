@@ -1,0 +1,156 @@
+# Independent opening territory map, slot B
+
+Read date: 2026-10-05. Akrogon inspected HEAD: `923c6c98fac3f051a54ac27168ea024215652602`. No other slot's map was opened. Only this scratchpad map was written. This is research and an opening map, not settled operator answers, a handoff or an implementation.
+
+## Intake and limits
+
+Source: `issues/seeds/57-leaves-merging-at-the-same-time-each.md:3`, Tamdoma/akrogon#57, https://github.com/Tamdoma/akrogon/issues/57.
+
+Verbatim operator ask: “merges are causing other leaves that are in the merge process to redo the testing because the main had changed. Come up with an elegant solution to avoid that completely, while making sure everything merges correctly, no conflicts”.
+
+The target is to eliminate avoidable successful merge-check reruns caused by concurrent integration, including `issues/` commits, and make fresh worktrees able to run configured checks without a repair/review round just to install existing dependencies. It is not a request to redesign testing, deploy applications, fix historical SIGTERM causes, introduce flaky-test forgiveness, or migrate every repository to hosted CI.
+
+“Completely” needs one precise boundary: a queue can prevent competing managed merges from changing a candidate's base during testing. It cannot prevent arbitrary remote writers without controlling those writers. Nor can it make independently authored conflicting patches conflict-free. Correct integration means resolving or refusing those conflicts before checks and publication, never publishing an unchecked resolution. A genuine changed integration, red test, interrupted test, or changed dependency still requires new verification.
+
+Existing locks:
+
+- L1: `issues/chart/check-reruns/forks/check-scheduling.md:22-24` chose scheduling only, placed `merge_checks` only at merge, and retained the hard gate before every push on the final rebased integration. A generic check-record runner was excluded because safe reuse needs declared inputs. Do not silently reopen that choice through a fingerprint cache.
+- L2: `issues/chart/leaf-run-stalls/forks/red-criterion.md:35-38`, with the supersession in L1, protects green main by the merge gate. Red criteria and checks are not waived as pre-existing. Its `:10` also carries no clocks, watchdogs or polling. Queue recovery must not smuggle in a timer-based lease expiry.
+- L3: `skills/AREA.md:20-23` assigns state/dispatch to the command and artifacts to the registered checkout, with source edits in worktrees. This favors a command-owned admission mechanism over agents agreeing informally who goes first.
+
+## Inspected findings
+
+- E1: `skills/merge-issue/SKILL.md:37-51` fetches/rebases, runs all checks and merge checks, then pushes. Its `:39` explicitly relies on non-fast-forward refusal to serialize pushes. Serialization happens after the expensive work. It preserves Git safety while creating waste. `src/routing.ts:32-35` allows every reviewed leaf to enter merge with B independently.
+- E2: Live proof is stronger than the seed's original uncertainty. Framework `issues/open/skill-rewrite-tooling/spec-mutation-anchors/review-B.md:105-113` records successful roughly 30-minute core runs followed by explicit rejected pushes and new bases. `lane-orphan-check/review-B.md:89,102,115,128` records four actual rejected pushes. Equal range-diff patches do not mean equal integrated code after another source leaf lands.
+- E3: Framework `issues/log.jsonl:1578-1579` puts lane-orphan-check and spec-mutation-anchors into merge within 16 seconds at 13:57-13:58Z. `:1590` records spec-mutation-anchors merged at 16:28:44Z. `:1608` records lane-orphan-check merged at 17:08:39Z, about 3h11m after entry. This is later evidence than the seed's still-merging snapshot. Lane's `implementation/merge-evidence/rebased-5/results.txt:1-6` has exit 0 for all six required commands.
+- E4: Issues-only reuse already occurred late in the live incident. `spec-mutation-anchors/review-B.md:113` and `lane-orphan-check/review-B.md:139-147` show an issues-only remote update, clean rebase, comparison outside `issues/`, unchanged patch, reused completed evidence and successful push. This narrows the original report: some seats eventually avoided the final rerun. It does not prove that every future `issues/` change is harmless.
+- E5: `src/config.ts:28-49` has checks and merge_checks but no setup command. `src/next.ts:245-277` creates or validates a worktree, links `.env`, saves its path, and performs no dependency installation. `linkEnv` at `:280-302` is an existing provisioning precedent, not evidence that dependencies are provisioned.
+- E6: Framework `lane-orphan-check/review-B.md:67-77` establishes no node_modules, dependencies already in package.json and bun.lock, then frozen install with identical reviewed HEAD and empty repair diff. `render-ready-loud/review-B.md:117-139,147-155` and `size-fixture-boundary/review-B.md:87-99` corroborate absent-package failures resolved by installation. Do not attribute every secondary failure to the missing package without evidence. The intake's context-acceptance review was absent at the named live path when inspected.
+- E7: Framework `issues/config.yaml:7-14` has small normal checks and slow framework:verify in merge_checks. Akrogon `issues/config.yaml:7-11` has its own different checks. A framework-specific Bun install cannot be assumed correct for all consumers.
+- E8: `src/next.ts:305-317,334-338` counts allocated live leaves globally against max_active. It is neither a per-branch merge limit nor a test-process limit. `src/next.ts:627-628` dispatches all required seats after allocation. Lowering max_active to one would serialize planning, implementation and review too.
+- E9: `src/next.ts:774` and `src/phase.ts:330-334` hold the global state flock during short command operations, not throughout an agent's rebase/check/push. `src/state.ts:139-158` is the actual flock wrapper. Holding that global lock through a 40-minute suite would block unrelated repos and could deadlock a seat calling phase while holding it.
+- E10: `src/next.ts:674-691` sweeps leaves but a completion explicitly dispatches only blocked-by dependents. A waiting merge sibling is not necessarily a dependent. `docs/guide/next.md:3-5,38-40` describes one-pass, event-driven dispatch and targeted completion. Any queue must supply a concrete wakeup for the next unrelated waiting merger.
+- E11: `src/phase.ts:225-234` checks clean worktree, issue files and changed-test citations. `merged --check` is not a tool-executed test gate or remote-landed proof. `src/phase.ts:105-142` commits state before diagnostics may fail; `:146-180` closes sources and moves the completion owner only when all its leaves are merged. Queue ownership cannot depend on a moved folder remaining at its former path.
+- E12: `src/config.ts:86-92` reads effective config from the registered root's `issues/config.yaml`, not the rebased worktree. `:100-119` resolves identity through the shared Git directory. Ignoring the entire issues tree excludes the very file declaring required checks, and identical code can still be tested under changed commands/config or a changed AKROGON_BASE (`:148-164`).
+- E13: `src/phase.ts:274-279` refuses issues changes on leaf branches. Operator lifecycle commits currently travel outside the source-leaf merge route. Deferring or queuing them requires a defined route that does not pretend ordinary leaves can already carry them.
+- E14: `slice-boundary-anchors/review-B.md:91-104` and `spec-mutation-anchors/review-B.md:67-86` establish interrupted required verification and explicitly unestablished SIGTERM origin. Queueing may reduce contention, but these signals are not proven caused by merge concurrency.
+
+Unless prefixed otherwise, code and guide paths are under `/home/ivan/Work/infra/akrogon`; the framework evidence paths are under `/home/ivan/Work/infra/tamdoma/framework`. Line references describe the inspected snapshot, not immutable remote content.
+
+## Outside practice, strongest usable sources
+
+All sources below were read on 2026-10-05. Practitioner sources were sought first. Official docs supplement their mechanics, not substitute for available firsthand experience.
+
+- S1, practitioner: Yaron Minsky, Jane Street, [Making “never break the build” scale](https://blog.janestreet.com/making-never-break-the-build-scale/), published 2014-07-06. Firsthand build-bot experience with expensive verification. Discusses Graydon Hoare's NRS rule, sequential integration cost, wasted independent speculation, batch speculation and reliable incremental builds. This directly rejects testing separate branches once and assuming their combination is safe.
+- S2, practitioner: Will Smythe and Lawrence Gripper, GitHub engineering, [How GitHub uses merge queue to ship hundreds of changes every day](https://github.blog/engineering/engineering-principles/how-github-uses-merge-queue-to-ship-hundreds-of-changes-every-day/), published 2024-03-06. Firsthand rollout at GitHub. Their system makes the queue the integration entry point, protects main, and removes/reforms problematic groups. Their earlier human-managed trains caused lengthy waits and conflict fallout. This favors automatic ownership and release rather than asking seats to coordinate manually.
+- S3, better-than-training: GitHub, [Managing a merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue). Temporary groups include changes ahead, merge_group CI wiring is required, build concurrency differs from merge batch limits, and reordering can rebuild in-flight work. Current availability and permissions must be verified before proposing adoption. A provider queue is not a zero-rerun promise.
+- S4, better-than-training: GitLab engineering's maintained [Merge trains](https://docs.gitlab.com/ci/pipelines/merge_trains/) documentation. Parallel pipelines test cumulative prefixes. Removing/failing a predecessor or bypassing the train rebuilds downstream work. The experimental bypass without restarts explicitly risks unverified combinations. This rules out “skip updates but preserve the safety guarantee” without an actual independence proof.
+- S5, better-than-training: Zuul maintainers, [Project Gating](https://zuul-ci.org/docs/zuul/latest/gating.html). Cumulative speculative integration preserves ordered test correctness, with discarded/restarted downstream results after failures. Its resource window addresses waste and contention. Useful when reliable isolated CI capacity and high pass rates make speculation worthwhile.
+- S6, supplementary vendor-team practice: Aviator, Shantanu Das, [Merge Queues for Large Monorepos](https://www.aviator.co/blog/merge-queues-for-large-monorepos/). Describes batching and affected-target queues. The page identifies the author but does not establish his personal production track record, so it is not stronger than S1/S2. Its optimization advice presumes reliable dependency boundaries. Its optimistic-flake approach is not imported into this locked green-gate workflow.
+- S7, better-than-training: Nx team, [Run Only Tasks Affected by a PR](https://nx.dev/docs/features/ci-features/affected). Changed files plus a project graph determine affected work. Lockfile changes default to affecting all projects, with graph-aware refinement available. This is an input-model technique, not proof from nonoverlapping changed files.
+- S8, better-than-training: Bazel maintainers, [Remote Caching](https://bazel.build/remote/caching). Cache correctness depends on action inputs and environment. Concurrent mutation and untracked external tool versions can invalidate apparent equivalence. A raw Git path exclusion is much weaker than an action cache.
+- S9, better-than-training: Bun maintainers, [bun install](https://bun.sh/docs/pm/cli/install) and [Lockfile](https://bun.sh/docs/pm/lockfile). Frozen installation uses the committed dependency specification rather than silently updating its lockfile. Repository install still has runtime, lifecycle-script and registry prerequisites. This supports local reproducible materialization, not sharing a mutable node_modules tree across branches.
+
+Synthesis: S1 and S2 agree that the final integrated candidate must pass before publication, and independent successful branches cannot simply be combined. S3-S5 gain throughput by cumulative speculation, accepting rebuilds when assumptions change. S6-S8 reduce work only with credible input/dependency models. Here slow suites share one machine and rerun each other, so a single active integration per target is the strongest starting recommendation. This differs from high-throughput speculative queues because this incident lacks their isolated capacity and input model. It still needs all-writer authority to guarantee a stable base. Reproducible worktree setup is a separate prerequisite, supported directly by the live evidence and S9.
+
+## Material forks, ordered by effect on remaining choices
+
+### F1. Who may advance the target while merge verification runs?
+
+Grounding: E1, E4, E12-E13. Research: S1-S4. This question comes before choosing a lock because a local lock cannot govern an operator's plain git push or another machine.
+
+- O1a, recommended if “avoid completely” means all base-motion reruns: make every target update enter one integration authority, including operator source and lifecycle-only updates. While a candidate is checked and pushed, unrelated updates wait. Enforce remotely if multiple machines/identities can write. Cost: operator publication follows the queue, and existing lifecycle-only publication needs a compatible route. It invites a real coordination service only if multi-host writers exist, not by default.
+- O1b: serialize akrogon merge seats only, retain external pushes. This removes managed leaf races with little change, but outside pushes can still trigger real rebase/check work. Cannot claim complete avoidance. Issues-only updates then require F4 or voluntary deferral.
+- O1c: separate frequently published lifecycle artifacts from the source target. This removes that cause of target motion structurally, but changes storage/history/remote workflow and does not handle external source commits. Scope is much wider than a per-target admission fix.
+
+Q1: Are all target writers on one host under akrogon's control, or must remote enforcement cover people and other machines? Q2: May operator issues-only commits be queued/deferred, or must they publish immediately during a check? Pitfall: presenting a local advisory mutex as a repository-wide guarantee. Avoid through an explicit writer boundary and, if needed, proven remote rules before handoff. No such grant or enforcement is established by this opening map.
+
+### F2. What integration execution removes the race with the least machinery?
+
+Grounding: E1-E3, E7-E9. Research: S1-S5.
+
+- O2a, recommended for this incident: admit one active merge per target before final fetch/rebase and verification. Other reviewed leaves remain eligible/waiting. The owner completes its integrated check and fast-forward push before the next starts. Ordinary leaf work stays parallel. Cost: target throughput is at most one candidate per suite duration, and a slow candidate occupies that integration lane.
+- O2b: cumulative speculative train. Test base+A, base+A+B, etc., then publish in order. Successful predecessors do not invalidate later work. Cost: predecessor failures, corrections, removal, reordering and outside updates invalidate downstream candidates. More simultaneous suites worsen the observed machine contention. It cannot meet a literal “no reruns ever”.
+- O2c: batch reviewed leaves into one integration candidate and run once. Cost: attribution/repair when a batch fails, changed ownership of pushed heads and completion, and difficulty preserving the locked per-final-candidate gate if intermediate prefixes are separately pushed without checking. A tested final batch does not prove every intermediate prefix green.
+- O2d: delegate to a hosted PR merge queue. Cost: PR creation, CI/reporting, permissions, account eligibility, merge method and completion reconciliation are new contracts. E1's direct fast-forward push workflow cannot merely be relabeled as a provider queue. Valuable if remote enforcement and distributed execution are wanted, oversized otherwise.
+
+Q3: Is one 30-40 minute merge at a time acceptable, or is the desired result higher publication throughput as well as no wasted runs? Pitfalls: a push-only mutex still wastes tests, and testing independent branches in parallel still misses interactions. Admission must cover integration plus checks through confirmed push. Retain normal Git refusal as the last safety barrier, never force-push to make a queue appear successful.
+
+### F3. How is ownership acquired, released and recovered without making stalled queues?
+
+Grounding: E9-E11, L2-L3. Research: S2-S5.
+
+- O3a, recommended direction for event-driven dispatch: the command admits one owner, bound to the target and actual merge attempt, while other leaves remain in existing merge state waiting for admission. It releases/redispatches on confirmed landing, check.fix, failed, cancellation or authoritative termination. Existing phase and hook events drive reconsideration, including unrelated waiting siblings. Cost: recovery must distinguish a working owner, a lost prompt reply and a landed-but-unrecorded push. A small reservation can be justified, but inferred folder order alone is not durable FIFO.
+- O3b: execute the whole integration operation under a dedicated per-target OS flock. Process-scoped release is simple if one process owns checks/push. Cost: today's operation is an agent's series of commands, so the lifetime would require a wrapper or larger command-owned runner. A lock held by a wrapper must not be released while an orphan child can still push. It works only inside its OS-lock boundary and does not establish FIFO by itself.
+- O3c: skill-only admission instructions. Smallest textual change, but manual prompts, competing reads and forgotten release can violate exclusion. This is an advisory workflow, inadequate for a command-owned operational guarantee.
+
+Q4: Does a red check yield admission immediately for unrelated leaves while its repair runs? Recommended yes after confirming no integration process remains. Q5: What exact observed event proves an interrupted attempt can no longer publish? Q6: On a lost successful push reply, does ancestry reconciliation happen before releasing/retrying? Preserve E1's lost-reply rule.
+
+Pitfalls removed by explicit criteria: no global .lock held during tests; no timer expires a still-working owner; no duplicate ownership after restart; queue advances after unrelated leaf completion; manual merge cannot bypass the chosen admission boundary; two remotes that name the same target do not receive independent authority. Identity should follow canonical repository/target, not worktree pathname. Recovery after publication must reconcile Git before rerunning checks or completion side effects. Release need not wait for Discord, which `merge-issue:53-55` already treats as post-merge and nonblocking.
+
+### F4. Do issues-only updates wait, or can checked results survive them?
+
+Grounding: E4, E12-E13, L1. Research: S4, S7-S8. This fork may vanish if F1 queues all updates, but is material if immediate lifecycle publication is required.
+
+- O4a, recommended with O1a: issues-only target updates use the same writer authority and wait outside the verification window. The tested commit is exactly the pushed commit. No special exclusion list, semantic cache or exception to L1 is required. Cost: delayed publication of those records and a defined way to publish them despite the leaf issues-file guard.
+- O4b: explicit check-specific equivalence permits evidence reuse after a clean issues-only rebase. Require unchanged actual check inputs, required command/config snapshot, dependency environment and relevant Git/base-sensitive inputs. Cost: that input contract and evidence mechanism approach the runner deliberately excluded by L1 and need a new operator decision. Broad `issues/**` exclusion is not enough because issues/config.yaml changes checks and scripts can inspect issue records or Git history.
+- O4c: accept a new full run for every external update. Correct with the hard gate, but leaves the operator's issues-only rerun problem unsolved if external updates continue.
+
+Q7: Are ordinary issue records proven outside every configured command's inputs, or is that only inferred from their paths? Q8: If config changes in the registered checkout while testing, which snapshot is binding? Pitfall: `git range-diff` equality proves patch preservation, not integrated equivalence. Live outside-issues comparison proves one snapshot property, not universal cache validity. Even full-tree equality does not by itself cover commands that depend on commit IDs, AKROGON_BASE, mutable env or external services. No passing result from an interrupted run is reusable.
+
+### F5. Does waiting integration consume the existing active-leaf budget?
+
+Grounding: E8-E10, `docs/guide/next.md:38-40`. Research: S3/S5 distinguish execution concurrency from queued items.
+
+- O5a, recommended minimal scope: retain existing allocated leaf tabs and capacity accounting, but only the admitted B starts merge work. No waiting seat is prompted just to sit idle. Cost: already allocated waiting leaves can fill max_active and prevent new implementations until integration completes. That cost must be disclosed, not hidden as an unrelated capacity fix.
+- O5b: park/release waiting merge resources and resume them on admission. Better capacity use, but recreating sessions/worktrees and excluding still-live panes safely changes allocation semantics. This is a distinct feature and should be selected explicitly.
+- O5c: lower global max_active to one. No new queue mechanism, but serializes all phases and repos, and still does not stop external writers. It sacrifices more parallelism than the problem requires.
+
+Q9: Is bounded leaf capacity while merges wait acceptable? Q10: Must heavy checks across different repositories also be serialized on this host? A per-target queue fixes integration races but cannot ensure one heavy process system-wide. Machine-wide suite admission is separate scope unless selected. Do not add a generic scheduler based on the intake's unverified “nine processes” observation.
+
+### F6. Who prepares dependencies, and when do they match the candidate?
+
+Grounding: E5-E7, L3. Research: operator evidence first, S9 for the install operation.
+
+- O6a, recommended: one explicit repository-owned preparation operation, used in the leaf worktree before its first code/check use and again before candidate verification when integrated inputs may have changed. The repository chooses its package manager and exact operation, e.g. frozen Bun install for these two repos if selected. Reusing one operation avoids guessing from package files. Cost: defined setup semantics and failure ownership, plus small repeated installer work if invoked idempotently at use boundaries.
+- O6b: provision only once at worktree creation. Fixes the fresh-checkout incident cheaply but goes stale after dependency changes made by A or pulled in by rebase. A remembered “setup completed” flag is not proof of current dependency availability.
+- O6c: put preparation into repo check commands/scripts. Keeps akrogon schema smaller and ensures each check entry point provisions what it needs, including detached base probes. Cost: repetition or repository-specific wrappers and more per-repo discipline. It does not make worktrees ready before implementation unless the implementation entry point uses it too.
+- O6d: share registered-root node_modules by symlink/copy. Attractive for speed, but mutable trees, branch-specific dependency changes, native builds and lifecycle scripts can contaminate another worktree. Root dependencies may not match the rebased candidate. Reject a shared mutable dependency directory as the default solution.
+
+Q11: Is a general explicit repo setup command wanted, or should consumer check entry points own installation? Q12: Must the same operation cover worker and detached baseline worktrees as well as command-created leaf worktrees? Scope needs names, not “all fresh worktrees” when ensureWorktree covers only the leaf route. Q13: Is preparation rerun at every use boundary, or keyed on declared installation inputs? The latter needs a complete input model, not just bun.lock, and adds machinery.
+
+Pitfalls removed by criteria: frozen install cannot silently regenerate the lockfile; mismatched manifest/lockfile fails visibly; install error is never success-shaped; lifecycle scripts cannot dirty tracked files unnoticed; rebase changes to dependency manifests are prepared before checks; deleting node_modules on an existing worktree cannot leave a stale success flag. Preparation should not run a slow network installer while holding the global dispatch lock. Decide subprocess placement before selecting an ensureWorktree hook. Installing dependencies is an operation that can execute repo scripts, so it must follow existing grants and configured identity rather than manufacture new permission.
+
+### F7. How are environment preparation failures distinguished from source failures?
+
+Grounding: E6, E11, E14, `skills/merge-issue/SKILL.md:27,43`. Research: operator evidence and S9.
+
+- O7a, recommended: prepare the environment before evaluating the check result. Successful installation of already-declared dependencies continues the same merge attempt, with no empty code repair/review cycle. A true check failure still routes to check.fix. A setup failure reports the specific command, exit, cause and owning action, stopping publication. Existing failed semantics can cover a human-only blocker; transient/tool-managed setup failure recovery must be specified, not automatically mislabeled code repair.
+- O7b: keep every preparation failure on the code repair route. Simpler state reuse but repeats the identical-head, empty-diff repair/review shown in E6. Does not meet the second condition's intended outcome.
+
+Q14: What existing state/event retries a failed setup after its cause is cleared, without consuming a code repair round or creating an infinite hook retry? No automatic fallback installer, unbounded retry or new watchdog. An interrupted suite is incomplete evidence. Queue release on termination needs process ownership proof, not a speculative assertion that contention caused SIGTERM.
+
+## Practitioner lifetime questions and verification shape
+
+These are outcome probes for a later leaf design, not extra features or tests written in this map.
+
+- A1: With three eligible leaves on the same target, only one runs final integration checks at a time. Each starts from the prior confirmed landed head. On all-green runs each suite completes once, and all reviewed changes survive in main. Competing targeted dispatch and hooks cannot admit another owner.
+- A2: Two leaves edit the same lines. The later leaf resolves/refuses the conflict before its own checks, records old/new heads and range-diff as `merge-issue:41` requires, and never publishes an unchecked resolution. Verify semantic composition as well as Git ancestry. A queue does not guarantee no conflicts exist.
+- A3: The owner fails a check and enters repair. No source is pushed, admission is released safely, and an unrelated waiting leaf proceeds without blocked-by. The repaired leaf can later reenter admission on its then-current integration.
+- A4: Terminate/restart the owner before push, during push, and after successful push but before phase recording. There is never a second live publisher for the target. Lost replies use fetched ancestry; confirmed landed work is recorded once without needless reruns. Unknown ownership stops admission until reconciled, with an exact next action.
+- A5: Attempt an operator issues-only update during verification. Under O1a/O4a it waits and cannot invalidate the candidate. Under O4b prove the declared equivalence, and demonstrate a changed issues/config.yaml, Git-sensitive command or relevant issue record cannot reuse stale green results. Under O1b show the remaining external-write limitation explicitly.
+- A6: Use a fresh worktree with existing committed dependencies but no local installation. Preparation succeeds, package imports work, and the initial merge neither enters check.fix nor creates a fake source patch. Change the lockfile through integration and remove installed deps on an existing worktree to verify refresh semantics.
+- A7: Registry outage, missing private registry identity, manifest/lock mismatch and install-script failure preserve cause and nonzero result. No code merge or silently rewritten lockfile occurs. Human-only access is recorded with the existing blocker pattern.
+- A8: A different target/repository keeps its allowed parallelism. Waiting queue entries do not cause duplicate prompts or capacity miscounts. Last-leaf completion, folder move, pane closure and broadcast failure do not strand admission.
+
+## Destination and possible split
+
+Destination is akrogon. Integration authority/admission and its merge skill/guide contract form one observable outcome. Worktree preparation is independently checkable and can be a parallel leaf of the same issue, sharing Tamdoma/akrogon#57 under one completion owner. File overlap in config/next is not a dependency. If setup is selected for all worktree kinds, its boundary must be inspected further before writing that contract. If remote enforcement or moving lifecycle storage is selected, human-owned permissions and workflow change become real prerequisites, not implied authorization to mutate framework now.
+
+## Remaining fog and challenge check
+
+The strongest open choice is F1: a local merge queue alone cannot honor a complete all-writer guarantee. The next consequential choice is F2: this incident favors serial integration, but high sustained arrival rate can make its queue grow without bound, as S1 explains. If that throughput is unacceptable, cumulative speculation or batching is a deliberate tradeoff with rebuilds, not an equivalent zero-rerun fix.
+
+A seasoned reviewer should challenge broad issues exclusions, one-time setup stamps, unrelated-sibling wakeups, a global lock around tests, process death without child fencing, and a promise of conflict-free independent development. Those are mechanism defects, not wording disagreements. Recommended starting shape is per-target admission before final integration, all relevant writers sharing it, reproducible local preparation, and unchanged green-gate/conflict handling. Which writer boundary and setup owner the operator chooses remains open.
+
+No external mutation or implementation probe was run. Research does not prove permissions, provider eligibility, branch enforcement, setup runtime or live queue behavior. Required operation proofs belong after the forks settle and before handoff. No repository file, source intake, chart lock, live state, log or config was changed.
