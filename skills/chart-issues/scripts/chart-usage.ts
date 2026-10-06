@@ -344,7 +344,10 @@ function main(): void {
   }
   const openMs: number = Date.parse(seats.opened);
 
-  const errors: SeatError[] = [];
+  const errors: SeatError[] =
+    seats.seats.length === 0
+      ? [{ seat: 'A', session: '', detail: `${seatsFile}: field seats has no recorded sessions` }]
+      : [];
   const measured: { seat: string; sessions: SessionResult[] }[] = [];
   const seatLetters: string[] = [...new Set(seats.seats.map((s) => s.seat))];
   for (const letter of seatLetters) {
