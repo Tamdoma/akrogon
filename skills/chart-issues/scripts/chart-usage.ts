@@ -15,6 +15,10 @@ const seatsSchema = z.strictObject({
   restatements: z.int().nonnegative(),
   seats: z.array(seatSchema),
 });
+const codexOperatorMetadataSchema = z.object({
+  user_input_order: z.int(),
+  retained_source: z.object({ id: z.object({ turn_id: z.string() }) }),
+});
 type Seats = z.infer<typeof seatsSchema>;
 type SeatEntry = z.infer<typeof seatSchema>;
 
@@ -302,12 +306,21 @@ function codexSession(session: string, file: string, openMs: number, untilMs: nu
       r.type === 'response_item' &&
       (r.payload as Rec | undefined)?.type === 'message' &&
       (r.payload as Rec).role === 'user' &&
+      (r.metadata as Rec | undefined)?.user_input_order !== undefined &&
       timed(r) >= openMs &&
       timed(r) <= untilMs,
   );
-  const operatorTurns = userMsgs
-    .map((r) => ({ startMs: timed(r), replyEndMs: null as number | null }))
-    .sort((x, y) => x.startMs - y.startMs);
+  const operatorTurns: { startMs: number; replyEndMs: number | null }[] = [];
+  for (const [i, r] of userMsgs.entries()) {
+    const metadata = codexOperatorMetadataSchema.safeParse(r.metadata);
+    if (!metadata.success) return `${file}: field metadata.${metadata.error.issues[0].path.join('.')} missing`;
+    const completion: Rec | undefined = completed.get(metadata.data.retained_source.id.turn_id);
+    const nextMs: number = i + 1 < userMsgs.length ? timed(userMsgs[i + 1]) : untilMs;
+    const replyEndMs: number | null =
+      completion !== undefined && timed(completion) <= nextMs ? timed(completion) : null;
+    operatorTurns.push({ startMs: timed(r), replyEndMs });
+  }
+  operatorTurns.sort((x, y) => x.startMs - y.startMs);
   return {
     session,
     harness: 'codex',
