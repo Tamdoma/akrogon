@@ -293,6 +293,23 @@ test('a codex counter reset marks the seat usage unmeasured and partial', async 
   }
 });
 
+test('a counter reset wholly inside the window is reported instead of losing earlier usage', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    w.putSeats(w.chart, [{ seat: 'A', harness: 'codex', session: 'codex-reset' }], 0, '2026-10-06T10:00:00Z');
+    w.putTranscript('codex', 'codex-reset', 'codex/codex-reset.jsonl');
+    const r: RunResult = await w.run(w.chart, until);
+    expect(r.code).toBe(0);
+    expect(r.stdout.trimEnd().split('\n').at(-1)).toBe('outcome partial');
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    expect(md).toContain('usage unmeasured');
+    expect(md).toContain('counter reset');
+    expect(md).not.toContain('output_tokens 50');
+  } finally {
+    w.clean();
+  }
+});
+
 test('unmeasured seats name the file or field; other seats still measure', async (): Promise<void> => {
   const w: World = setup();
   try {
