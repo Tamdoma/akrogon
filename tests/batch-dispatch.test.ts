@@ -173,7 +173,7 @@ test('a member conflict marks it solo, rewrites the record without it and leaves
       f.env,
     );
     expect(restack.code).toBe(0);
-    expect(restack.stdout).toContain('fresh checks required');
+    expect(restack.stdout).toMatch(/^rerun rebase cc onto [0-9a-f]{40}$/);
     expect((await next(f, ['--all'])).code).toBe(0);
     const ccState: State = leafState(cc.path);
     expect(ccState.batch?.applied).toBe(true);

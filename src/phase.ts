@@ -32,7 +32,15 @@ import { mergeQueue, type QueueEntry } from './turn';
 import { closeSources } from './pull';
 import { testFile } from './test-files';
 import { trackingRef } from './preflight';
-import { applyStack, buildStack, isAncestor, restoreHolder, restoreMembers } from './batch';
+import {
+  applyStack,
+  buildStack,
+  equalOutsideRecordFolders,
+  isAncestor,
+  recordConfigEqual,
+  restoreHolder,
+  restoreMembers,
+} from './batch';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
   try {
@@ -411,7 +419,13 @@ async function batchCheck(
     await requireTestChangeCitations(repo, repo.root, record.built_on, head);
   }
   await transition(repo, leaf, requested, slot, verdict, reason, true);
-  saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, tested_top: head } });
+  if (record.decision !== 'reuse') {
+    const testedMain: string = await command(['git', 'merge-base', head, trackingRef(repo)], repo.root);
+    saveState(leaf.path, {
+      ...readState(leaf.path),
+      batch: { ...record, tested_top: head, tested_main: testedMain },
+    });
+  }
 }
 
 type BatchPending =
@@ -448,7 +462,7 @@ async function batchPush(
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
   if (record.solo !== true && head !== record.top)
     throw new Error(`HEAD must equal the recorded batch top ${record.top}, found ${head}`);
-  if (slot !== undefined && head !== record.tested_top)
+  if (slot !== undefined && head !== record.tested_top && !(record.decision === 'reuse' && head === record.top))
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);
   await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
   saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head } });
@@ -465,7 +479,14 @@ async function batchPush(
   if (pushed.stderr.includes('non-fast-forward') || pushed.stderr.includes('[rejected]')) {
     saveState(leaf.path, {
       ...readState(leaf.path),
-      batch: { ...record, candidate: head, applied: false, tested_top: undefined },
+      batch: {
+        ...record,
+        candidate: head,
+        applied: false,
+        tested_top: undefined,
+        tested_main: undefined,
+        decision: undefined,
+      },
     });
     return { kind: 'refused', record, candidate: head };
   }
@@ -489,6 +510,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
       ? await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root)
       : record.holder.head;
   let members: BatchMember[] = record.members;
+  let conflicted: boolean = false;
   for (;;) {
     const items: { slug: string; base: string; head: string }[] = members.map((member) => ({
       slug: member.slug,
@@ -497,6 +519,16 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
     }));
     const staged: Awaited<ReturnType<typeof buildStack>> = await buildStack(repo, builtOn, items, holderHead);
     if (staged.ok) {
+      const tested: { main: string; top: string } | undefined =
+        record.tested_main !== undefined && record.tested_top !== undefined
+          ? { main: record.tested_main, top: record.tested_top }
+          : undefined;
+      const reuse: boolean =
+        !conflicted &&
+        tested !== undefined &&
+        (await equalOutsideRecordFolders(repo, tested.main, builtOn)) &&
+        (await equalOutsideRecordFolders(repo, tested.top, staged.top)) &&
+        (await recordConfigEqual(repo, tested.main, builtOn));
       const applied: boolean | 'rebuild' | 'dirty-holder' = await withLock(resolve(globalHome(), '.lock'), async () => {
         const current: Leaf = findLeaf(repo, leaf.state.slug);
         const batch: Batch | undefined = current.state.batch;
@@ -580,6 +612,8 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
               solo: solo ? true : batch.solo,
               top: undefined,
               tested_top: undefined,
+              tested_main: undefined,
+              decision: 'rerun',
               candidate: undefined,
             },
           });
@@ -595,19 +629,23 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
             top: staged.top,
             members: appliedMembers.map((entry) => entry.member),
             candidate: undefined,
+            tested_top: reuse ? tested!.top : undefined,
+            tested_main: reuse ? tested!.main : undefined,
+            decision: reuse ? 'reuse' : 'rerun',
           },
         });
         return true;
       });
       if (applied === 'rebuild') continue;
       if (applied === 'dirty-holder') {
-        console.log(`fresh checks required rebase ${leaf.state.slug} onto ${builtOn}`);
+        console.log(`rerun rebase ${leaf.state.slug} onto ${builtOn}`);
         return;
       }
       if (!applied) throw new Error('Batch attempt superseded during restack; record left for the next pass');
-      console.log(`fresh checks required ${staged.top}`);
+      console.log(`${reuse ? 'reuse' : 'rerun'} tested=${record.tested_top ?? 'none'} pushed=${staged.top}`);
       return;
     }
+    conflicted = true;
     if (staged.conflict === holderHead) {
       await withLock(resolve(globalHome(), '.lock'), async () => {
         const current: Leaf = findLeaf(repo, leaf.state.slug);
@@ -628,13 +666,16 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
             applied: true,
             solo: true,
             members: [],
+            tested_top: undefined,
+            tested_main: undefined,
+            decision: 'rerun',
           },
         });
       });
-      console.log(`fresh checks required rebase ${leaf.state.slug} onto ${builtOn}`);
+      console.log(`rerun rebase ${leaf.state.slug} onto ${builtOn}`);
       return;
     }
-    const conflicted: string = staged.conflict;
+    const conflictedSlug: string = staged.conflict;
     await withLock(resolve(globalHome(), '.lock'), async () => {
       const current: Leaf = findLeaf(repo, leaf.state.slug);
       const batch: Batch | undefined = current.state.batch;
@@ -642,7 +683,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
         throw new Error('Batch attempt superseded during restack');
       const entries: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
       const entry: { member: BatchMember; leaf: Leaf } | undefined = entries.find(
-        (item) => item.member.slug === conflicted,
+        (item) => item.member.slug === conflictedSlug,
       );
       await restoreMembers(
         repo,
@@ -650,10 +691,17 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
       );
       await restoreHolder(repo, current, batch);
       if (entry !== undefined) saveState(entry.leaf.path, { ...entry.leaf.state, solo: true });
-      members = batch.members.filter((member) => member.slug !== conflicted);
+      members = batch.members.filter((member) => member.slug !== conflictedSlug);
       saveState(current.path, {
         ...current.state,
-        batch: { ...batch, holder: { base: builtOn, head: holderHead }, members },
+        batch: {
+          ...batch,
+          holder: { base: builtOn, head: holderHead },
+          members,
+          tested_top: undefined,
+          tested_main: undefined,
+          decision: 'rerun',
+        },
       });
     });
   }

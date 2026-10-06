@@ -12,6 +12,22 @@ export async function memberBase(repo: Repo, builtOn: string, head: string): Pro
   return command(['git', 'merge-base', builtOn, head], repo.root);
 }
 
+async function diffQuiet(repo: Repo, a: string, b: string, pathspecs: string[]): Promise<boolean> {
+  const argv: string[] = ['git', 'diff', '--quiet', a, b, '--', ...pathspecs];
+  const result: Result = await run(argv, repo.root);
+  if (result.code === 0) return true;
+  if (result.code === 1) return false;
+  throw new CommandError(argv, repo.root, result);
+}
+
+export async function equalOutsideRecordFolders(repo: Repo, a: string, b: string): Promise<boolean> {
+  return diffQuiet(repo, a, b, [':(top)', ':(top,exclude)issues', ':(top,exclude)learnings']);
+}
+
+export async function recordConfigEqual(repo: Repo, a: string, b: string): Promise<boolean> {
+  return diffQuiet(repo, a, b, [':(top)issues/config.yaml']);
+}
+
 export async function isAncestor(cwd: string, a: string, b: string): Promise<boolean> {
   const result: Result = await run(['git', 'merge-base', '--is-ancestor', a, b], cwd);
   if (result.code === 0) return true;

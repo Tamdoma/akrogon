@@ -46,6 +46,8 @@ export const batchSchema = z.strictObject({
   members: z.array(batchMemberSchema),
   top: z.string().optional(),
   tested_top: z.string().optional(),
+  tested_main: z.string().optional(),
+  decision: z.enum(['reuse', 'rerun']).optional(),
   candidate: z.string().optional(),
   notified: z.boolean().optional(),
   applied: z.boolean(),
