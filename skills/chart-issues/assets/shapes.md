@@ -8,6 +8,8 @@ Read before creating a chart or handing off. Paths below are relative to the aut
 issues/chart/<chart-slug>/
   CHART.md
   INTAKE.md
+  seats.yaml                    # open time and seat session ids, per the door
+  USAGE.md                      # last measured usage table; a rerun replaces it
   forks/<fork-slug>.md
   slots/<pass>.md                 # only for peer exchanges
 ```
@@ -118,6 +120,22 @@ EPIC.md lists immediate issues, ISSUE.md lists immediate leaves, each one line p
 ```
 
 Container indexes hold no lifecycle state or global order. Slugs are lowercase hyphenated words without ordering markers. Leaf slugs are unique across the proposed handoff and existing open/closed leaves in the destination repo. Independently checkable outcomes can run in parallel, even when files overlap; only actual prerequisites enter blocked-by.
+
+### seats.yaml
+
+The door writes one `seats.yaml` per chart holding the open time, the restatements count and one entry per seat session:
+
+```yaml
+opened: '2026-10-06T16:34:47Z'
+restatements: 0
+seats:
+  - seat: A
+    pane: w8:pCT
+    harness: claude
+    session: 1ce71920-4c64-414b-ac1c-af56890a1c4b
+```
+
+`opened` is the time the door began its first pass on the chart and is never reset by folder creation or session replacement. `restatements` is a non-negative integer the door adds to each time it answers a restatement request on a round that records a fork answer. `pane`, `harness` and `session` are the `pane_id`, `agent` and `agent_session.value` values `herdr agent list` prints. A replaced session is a second entry with the same seat letter. Outside herdr `seats` is empty.
 
 ## Leaf files
 

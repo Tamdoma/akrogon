@@ -152,10 +152,16 @@ The records look like this:
 issues/chart/export-csv/
   CHART.md
   INTAKE.md
+  seats.yaml
+  USAGE.md
   forks/row-selection.md
 ```
 
 Intake keeps the original report separate from agent findings. Fork files keep evidence and your recorded answers. The chart points to what remains open. CHART.md lists open forks in the order they will be taken.
+
+`seats.yaml` records when the door began charting and each seat's session id. `USAGE.md` is the usage table the door generates from those transcripts before handoff and after the chart closes, covering the tokens and minutes each seat used since the chart opened. Its `first turn in window` rows and `operator turns` section break the time down further. A transcript that cannot be measured is marked `usage unmeasured`.
+
+Read the table with care. The tokens and minutes show that usage and elapsed time changed in the window, not that dollar cost fell; a whole-session dollar total can include other charts and is not this chart's cost, and subagent usage is not counted. A turn is one seat's work between two of your messages or a `task_started`→`task_complete` pair, and your waiting time is the sum of the minutes from each of your messages until that seat's reply ended.
 
 ## Independent views when you name a peer seat
 
