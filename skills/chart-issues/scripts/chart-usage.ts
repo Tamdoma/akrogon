@@ -385,9 +385,8 @@ function main(): void {
     if (sessions.length > 0) measured.push({ seat: letter, sessions });
   }
 
-  const firstSeatSessions: SessionResult[] =
-    seatLetters.length > 0 ? (measured.find((m) => m.seat === seatLetters[0])?.sessions ?? []) : [];
-  const ops: { startMs: number; replyEndMs: number | null }[] = firstSeatSessions
+  const doorSessions: SessionResult[] = measured.find((m) => m.seat === 'A')?.sessions ?? [];
+  const ops: { startMs: number; replyEndMs: number | null }[] = doorSessions
     .flatMap((s) => s.operatorTurns)
     .sort((a, b) => a.startMs - b.startMs);
   const opRows: { startMs: number; replyEndMs: number | null; endMs: number; outputs: [string, number][] }[] = ops.map(
