@@ -63,7 +63,7 @@ That prevents later dispatch. It does not stop an agent already working.
 
 Akrogon records the worktree, Herdr tab, completed seats, review verdicts, prompt delivery attempts and the `merge_stamp` ordering the merge turn. It also records failure details.
 
-The merge holder's state carries `batch`, the record the command wrote for its merge pass, kept after the push for reconciliation: `attempt` (the id every batched phase call must repeat), `built_on` (the remote base the stack was built on), `members` (each carried leaf as `{ slug, base, head, tip }`, its saved merge-base, pre-batch head and applied tip), then `top` (the applied stack head), `tested_top` (the head the merge seat checked), `candidate` (the head submitted for the push), `applied` and `solo` (the holder rebases itself instead of using a recorded top).
+The merge holder's state carries `batch`, the record the command wrote for its merge pass, kept after the push for reconciliation: `attempt` (the id every batched phase call must repeat), `built_on` (the remote base the stack was built on), `members` (each carried leaf as `{ slug, base, head, tip }`, its saved merge-base, pre-batch head and applied tip), then `top` (the applied stack head), `tested_top` (the head the merge seat checked), `tested_main` (the remote base that head stood on), `candidate` (the head submitted for the push), `decision` (`reuse` or `rerun` after a refused push), `applied` and `solo` (the holder rebases itself instead of using a recorded top).
 
 A merge leaf can also carry `solo: true`, set when it drops out of a batch over a conflict or a red run: it is excluded from later batches until it leaves `merge`, where the flag clears on any move out of the phase.
 

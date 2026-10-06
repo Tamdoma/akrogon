@@ -16,13 +16,15 @@ akrogon phase export-csv merged --slot B --check --attempt <id>
 
 It prints ok when the move's guards pass — HEAD equal to the recorded top and the trailer rule over each carried member's range and the whole stack — and records the tested top. A refusal names each uncited file and the trailer line to add; a later commit, including an empty one, may carry it. Every `merged`, `merged --check` and `check.fix` call carries `--attempt <id>`; a stale or missing id is refused and changes nothing.
 
-The command owns the push. `akrogon phase <slug> merged --attempt <id>` pushes the tested top fast-forward and moves every carried member to `merged` before the holder; seats never run `git push`. A non-fast-forward refusal restacks the batch onto the new remote tip and prints:
+The command owns the push. `akrogon phase <slug> merged --attempt <id>` pushes the tested top fast-forward and moves every carried member to `merged` before the holder; seats never run `git push`. A non-fast-forward refusal restacks the batch onto the new remote tip and prints exactly one line:
 
 ```text
-fresh checks required <sha>
+reuse tested=<T1-sha> pushed=<T2-sha>
+rerun tested=<T1-sha|none> pushed=<T2-sha>
+rerun rebase <slug> onto <sha>
 ```
 
-The worktree then already sits at `<sha>`, so B reruns its checks, `--check` and `merged` under the same attempt. A member that conflicted during the restack is restored and dropped to merge solo, and if the holder's branch itself no longer fits the new base the line reads `fresh checks required rebase <slug> onto <sha>` and B rebases by hand first.
+`reuse` means old and new main are equal outside `issues/` and `learnings/`, the tested top and the restacked top are equal outside them too, `issues/config.yaml` is unchanged and the restack had no conflict, so the earlier green check run stays valid: B copies the line into `review-B.md`, then runs `--check`, the briefs and `merged` under the same attempt without rerunning the checks. `rerun` means the worktree already sits at `<T2-sha>` and fresh checks are required, so B reruns its checks, `--check` and `merged` under the same attempt; `none` means no `--check` ran before the refusal. A member that conflicted during the restack is restored and dropped to merge solo, and `rerun rebase` means the holder's branch itself no longer fits the new base, so B rebases by hand first.
 
 If checks fail, B reports `check.fix --attempt <id>`: with carried members this prints `batch dissolved, merge solo` — each member is restored to its saved head and marked to merge solo while the holder keeps the turn — and with none the leaf moves to `check.fix` as before. Other push errors are reported with their cause.
 

@@ -44,7 +44,7 @@ On green checks run `akrogon phase <slug> merged --slot B --check --attempt <id>
 
 Gather the briefs of every completion owner the batch can close — every issue or epic whose last open leaf the batch lands, not only the holder's own — then run `akrogon phase <slug> merged --slot B --attempt <id>`. The command pushes the tested top fast-forward, moves every carried member to `merged` before the holder, and prints `issue complete <issue>` or `epic complete <epic>` once per owner the batch finishes.
 
-`fresh checks required <sha>` means the push was refused as non-fast-forward, the stack was restacked onto the new remote tip and the worktree already sits at `<sha>`: rerun the checks, `--check`, briefs and `merged` under the same `--attempt <id>`; a member that conflicted during the restack was restored to its saved head and dropped to merge solo. `fresh checks required rebase <slug> onto <sha>` means the holder's own branch no longer fits the new base: fetch, rebase onto `<remote>/<default_branch>` resolving conflicts as in the solo form, then rerun checks, `--check` and `merged`. Any other push error fails the call with its cause; report it rather than retrying.
+A non-fast-forward refusal restacks the stack onto the new remote tip and prints exactly one line. `reuse tested=<T1-sha> pushed=<T2-sha>` means old and new main are equal outside `issues/` and `learnings/`, the restacked top is equal to the tested top outside them, `issues/config.yaml` is unchanged and the restack had no conflict, so the earlier green run stays valid: copy the printed line into `review-B.md` under the `leaf=` folder, then run `--check`, briefs and `merged` under the same `--attempt <id>` without rerunning the checks. `rerun tested=<T1-sha|none> pushed=<T2-sha>` means the worktree already sits at `<T2-sha>` and fresh checks are required (`none` when no `--check` ran before the refusal): rerun the checks, `--check`, briefs and `merged` under the same `--attempt <id>`; a member that conflicted during the restack was restored to its saved head and dropped to merge solo. `rerun rebase <slug> onto <sha>` means the holder's own branch no longer fits the new base: fetch, rebase onto `<remote>/<default_branch>` resolving conflicts as in the solo form, then rerun checks, `--check` and `merged`. Any other push error fails the call with its cause; report it rather than retrying.
 
 ### attempt solo: B rebases its own leaf
 
@@ -56,7 +56,7 @@ Same-line index conflicts retain both true entries and recheck pointers. An exis
 
 On green checks run `akrogon phase <slug> merged --slot B --check --attempt <id>`; on a trailer refusal B adds a commit carrying the missing trailer when the change has a real source, a trailer-only empty commit when the change sits inside a rebased commit, or reverts the change, then reruns the checks and `--check`.
 
-Then gather the completion owner's briefs (the issue's, or every leaf brief under the epic when the leaf has one) and run `akrogon phase <slug> merged --slot B --attempt <id>`; the command pushes the tested head fast-forward and moves the leaf. `fresh checks required <sha>` and `fresh checks required rebase <slug> onto <sha>` mean the same as in the applied form.
+Then gather the completion owner's briefs (the issue's, or every leaf brief under the epic when the leaf has one) and run `akrogon phase <slug> merged --slot B --attempt <id>`; the command pushes the tested head fast-forward and moves the leaf. `reuse`, `rerun` and `rerun rebase` lines mean the same as in the applied form.
 
 ### Shared endings
 
