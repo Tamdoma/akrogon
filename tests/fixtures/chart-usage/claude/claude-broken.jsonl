@@ -1,0 +1,2 @@
+{"parentUuid":null,"isSidechain":false,"type":"user","uuid":"u-b1","timestamp":"2026-10-06T17:00:00.000Z","sessionId":"claude-broken","version":"2.1.291","message":{"role":"user","content":"USAGE_LEAK_MARKER"}}
+{"parentUuid":"u-b1","isSidechain":false,"type":"assistant","uuid":"a-b1","timestamp":"2026-10-06T17:01:00.000Z","sessionId":"claude-broken","version":"2.1.291","requestId":"req-b1","effort":"high","message":{"id":"msg_b1","model":"fixture-model-9","role":"assistant","type":"message","content":[{"type":"text","text":"USAGE_LEAK_MARKER"}]}}
