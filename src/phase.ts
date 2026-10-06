@@ -578,6 +578,9 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
               applied: true,
               solo: true,
               members: [],
+              tested_top: undefined,
+              tested_main: undefined,
+              decision: 'rerun',
             },
           });
           return 'dirty-holder';
