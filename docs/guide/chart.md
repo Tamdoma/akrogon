@@ -159,7 +159,7 @@ Intake keeps the original report separate from agent findings. Fork files keep e
 
 ## Independent views when you name a peer seat
 
-Charting can run in one slot. If you name a B pane, A and B first map and research independently. C is named only with B and holds the same role, blind to both A's and B's work. A then merges their findings with attribution. Each named peer gets one disagreement-only rebuttal before the operator round.
+Charting can run in one slot. If you name a B pane, A and B first map and research independently. C is named only with B and holds the same role, blind to both A's and B's work. The peers return blind notes on the questions, A merges their notes with attribution and writes the operator round alone. Each named peer gets one disagreement-only rebuttal before the round reaches you.
 
 This gives you independent views before the interview settles the scope. Naming a charting peer does not automatically enable implementation debate.
 
@@ -198,7 +198,7 @@ For CSV export, the contract can specify:
 
 Cross-leaf promises need matching owners. Human-only prerequisites need an owner and completion before handoff. Required credentials are named, not pasted into the contract.
 
-When peer panes are part of charting, each named peer also reads the draft contracts as an implementer before they are written to the open tree.
+When peer panes are part of charting, each named peer also reads the draft contracts as an implementer before they reach the open tree; A corrects the drafts and moves the reviewed files in, rather than writing them a second time.
 
 Before handoff the door also checks the source repo and each selected destination by running `akrogon pull` in each checked repo's registered root. It does this when a destination is selected and again right before the handoff review. A report already in a destination repo that describes the handed-off work becomes visible this way, so it can enter the leaf's `sources` and close when the delivering issue completes. If a destination refresh fails, only that destination's handoff waits.
 
