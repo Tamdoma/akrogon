@@ -1124,6 +1124,36 @@ test.serial('a second refusal after reuse still compares against the original te
   }
 });
 
+test.serial('a dirty holder during restack records rerun and preserves the operator edit', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
+    ).toBe(0);
+    const main: string = await advanceRemote(f, { 'issues/open/x/state.yaml': 'x\n' });
+    const edit: string = resolve(holder.state.worktree!, 'operator-edit');
+    writeFileSync(edit, 'edit\n');
+    const merged: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    expect(merged.stdout).toBe(`rerun rebase hold onto ${main}`);
+    const batch: Batch = readState(holder.path).batch!;
+    expect(batch.decision).toBe('rerun');
+    expect(batch.tested_top).toBeUndefined();
+    expect(batch.tested_main).toBeUndefined();
+    expect(batch.solo).toBe(true);
+    expect(readFileSync(edit, 'utf8')).toBe('edit\n');
+    expect(await remoteTip(f)).toBe(main);
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('the reuse decision is identical when the command runs from a subdirectory', async () => {
   const f: Fixture = await fixture();
   try {
