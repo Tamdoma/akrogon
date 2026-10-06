@@ -186,6 +186,27 @@ test('Codex door associates operator messages with completed turns and excludes 
   }
 });
 
+test('operator rows use seat A when the peer is recorded first', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    w.putSeats(w.chart, [
+      { seat: 'B', harness: 'codex', session: 'codex-B' },
+      { seat: 'A', harness: 'claude', session: 'claude-A' },
+    ]);
+    w.putTranscript('claude', 'claude-A', 'claude/claude-A.jsonl');
+    w.putTranscript('codex', 'codex-B', 'codex/rollout-B.jsonl');
+    const r: RunResult = await w.run(w.chart, until);
+    expect(r.code).toBe(0);
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    expect(md).toContain('operator wait 99.4 min');
+    expect(md).toContain('operator turns 20');
+    expect(md).toContain('A=270787');
+    expect(md).toContain('B=49427');
+  } finally {
+    w.clean();
+  }
+});
+
 test('second run replaces USAGE.md and prints sibling first lines sorted', async (): Promise<void> => {
   const w: World = setup();
   try {
