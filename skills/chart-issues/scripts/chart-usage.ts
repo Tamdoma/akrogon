@@ -280,11 +280,15 @@ function codexSession(session: string, file: string, openMs: number, untilMs: nu
   const before: { ts: number; u: Rec }[] = counts.filter((c) => c.ts < openMs);
   const zero: Rec = Object.fromEntries(CODEX_KEYS.map((k) => [k, 0]));
   const base: Rec = before.length > 0 ? before[before.length - 1].u : zero;
+  if (
+    inWindow.some((c, i) =>
+      CODEX_KEYS.some((k) => (c.u[k] as number) < ((i === 0 ? base : inWindow[i - 1].u)[k] as number)),
+    )
+  )
+    return `${basename(file)}: token_count cumulative counters decreased (counter reset)`;
   const last: Rec = inWindow.length > 0 ? inWindow[inWindow.length - 1].u : base;
   const tokens: Tokens = {};
   for (const k of CODEX_KEYS) tokens[k] = (last[k] as number) - (base[k] as number);
-  if (Object.values(tokens).some((v) => v < 0))
-    return `${basename(file)}: token_count cumulative counters decreased (counter reset)`;
   const turns: Span[] = [];
   let splitOpen: boolean = false;
   for (const [id, s] of started) {
