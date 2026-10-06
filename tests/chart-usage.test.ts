@@ -166,6 +166,26 @@ test('USAGE.md states the required limits', async (): Promise<void> => {
   }
 });
 
+test('Codex door associates operator messages with completed turns and excludes injected context', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    w.putSeats(w.chart, [{ seat: 'A', harness: 'codex', session: 'codex-B' }]);
+    w.putTranscript('codex', 'codex-B', 'codex/rollout-B.jsonl');
+    const r: RunResult = await w.run(w.chart, '2026-10-06T16:49:30Z');
+    expect(r.code).toBe(0);
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    expect(md).toContain('operator turns 2');
+    expect(md).toContain('operator wait 8.5 min');
+    const rows: string[] = md.split('\n').filter((line: string) => line.startsWith('  2026'));
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain('2026-10-06T16:35:54.647Z 8.5 min');
+    expect(rows[1]).toContain('2026-10-06T16:49:09.345Z incomplete');
+    expect(md).not.toContain('USAGE_LEAK_MARKER');
+  } finally {
+    w.clean();
+  }
+});
+
 test('second run replaces USAGE.md and prints sibling first lines sorted', async (): Promise<void> => {
   const w: World = setup();
   try {
