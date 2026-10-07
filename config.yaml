@@ -9,7 +9,7 @@ slots:
     model: gpt-6.1-sol
     effort: medium
 harnesses: 
-  claude: 'claude --model {model} --effort {effort} --settings ''{"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"sonnet","CLAUDE_CODE_SUBAGENT_MODEL_FORCE":"1"}}'' --dangerously-skip-permissions'
+  claude: 'claude --model {model} --effort {effort} --settings ''{"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"{model}","CLAUDE_CODE_SUBAGENT_MODEL_FORCE":"1"}}'' --dangerously-skip-permissions'
   codex: "codex -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access"
   pi: "pi --model {model} --thinking {effort} -a --exclude-tools request_user_input"
 toolkits: 
