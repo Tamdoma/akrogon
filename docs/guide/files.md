@@ -16,7 +16,20 @@ Later passes add planning and review artifacts inside the leaf folder. Keep thos
 
 ## What each artifact is
 
-- **ISSUE.md** explains the overall goal and related leaves.
+- **ISSUE.md** explains the overall goal and related leaves. It and **EPIC.md** may open with a `slots` front matter block that replaces a machine seat for that issue or epic:
+
+  ```markdown
+  ---
+  slots:
+    b:
+      harness: codex
+      model: gpt-5
+      effort: high
+  ---
+  # Issue: my-issue
+  ```
+
+  Seats are `a` or `b` with a full {harness, model, effort}. The nearest set seat wins: issue `ISSUE.md`, then epic `EPIC.md`, then repo `issues/config.yaml`, then machine `config.yaml`. It applies at the next agent start.
 - **brief.md** is the leaf contract: scope, ownership, constraints and completion criteria.
 - **design.md**, when present, records decisions needed to implement the brief.
 - **state.yaml** records lifecycle progress.

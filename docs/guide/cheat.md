@@ -35,6 +35,21 @@ slots:
     effort: high
 ```
 
+The same block in `ISSUE.md` or `EPIC.md` front matter overrides a seat for that issue or epic, again at the next agent start:
+
+```markdown
+---
+slots:
+  b:
+    harness: codex
+    model: gpt-5
+    effort: high
+---
+# Issue: my-issue
+```
+
+Seats are `a` or `b` with a full {harness, model, effort}. The nearest set seat wins: issue `ISSUE.md`, then epic `EPIC.md`, then repo `issues/config.yaml`, then machine `config.yaml`.
+
 Create or investigate work in your agent session:
 
 ```text
