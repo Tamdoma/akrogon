@@ -1,8 +1,9 @@
 import { test, expect } from 'bun:test';
 import { isAbsolute, resolve } from 'node:path';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { fixture, cli, yaml, type Fixture } from './helpers';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
 import { command, run, type Result } from '../src/shell';
+import { SeatIndexError, readGlobal, readRepo, seats, type GlobalConfig, type Repo } from '../src/config';
 
 test('config combines defaults and repo values, reports none, and recalculates worktree base', async () => {
   const f: Fixture = await fixture();
@@ -144,6 +145,40 @@ test('config rejects invalid slots shapes and accepts empty slots', async () => 
     expect((await cli(f, ['config'])).code).not.toBe(0);
     yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', slots: {} });
     expect((await cli(f, ['config'])).code).toBe(0);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { a: { harness: 'fake', model: 'x"y', effort: 'low' } },
+    });
+    expect((await cli(f, ['config'])).code).not.toBe(0);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { a: { harness: 'fake', model: "x'y", effort: 'low' } },
+    });
+    expect((await cli(f, ['config'])).code).not.toBe(0);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { a: { harness: 'fake', model: '   ', effort: 'low' } },
+    });
+    expect((await cli(f, ['config'])).code).not.toBe(0);
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none' });
+    yaml(resolve(f.home, 'config.yaml'), {
+      slots: {
+        a: { harness: 'fake', model: 'x"y', effort: 'high' },
+        b: { harness: 'fake', model: 'strong-b', effort: 'medium' },
+      },
+      harnesses: { fake: 'fake --model {model} --effort {effort}' },
+      repos: { repo: f.root },
+    });
+    expect((await cli(f, ['config'])).code).not.toBe(0);
+    yaml(resolve(f.home, 'config.yaml'), {
+      slots: {
+        a: { harness: 'fake', model: 'strong-a', effort: 'high' },
+        b: { harness: 'fake', model: ' ', effort: 'medium' },
+      },
+      harnesses: { fake: 'fake --model {model} --effort {effort}' },
+      repos: { repo: f.root },
+    });
+    expect((await cli(f, ['config'])).code).not.toBe(0);
   } finally {
     f.clean();
   }
@@ -468,6 +503,166 @@ test('config runs all of setup inside the install lock', async () => {
     const result: Result = await run(['sh', '-c', printed], worktree);
     expect(result.code).toBe(0);
     expect(existsSync(marker)).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+test('seats resolves index seats nearest-first and reports each seat source', async () => {
+  const f: Fixture = await fixture();
+  const previous: string | undefined = process.env.AKROGON_HOME;
+  process.env.AKROGON_HOME = f.home;
+  try {
+    const root: string = realpathSync(f.root);
+    yaml(resolve(root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { b: { harness: 'fake', model: 'repo-b', effort: 'low' } },
+    });
+    const global: GlobalConfig = readGlobal();
+    const repo: Repo = readRepo('repo', root);
+    const repoConfig: string = resolve(root, 'issues/config.yaml');
+    const machineConfig: string = resolve(f.home, 'config.yaml');
+    const owner: string = resolve(root, 'issues/open/issue');
+    mkdirSync(resolve(owner, 'depth2'), { recursive: true });
+    const issueFile: string = resolve(owner, 'ISSUE.md');
+    writeFileSync(
+      issueFile,
+      '---\nslots:\n  a:\n    harness: fake\n    model: index-a\n    effort: low\n---\n# Title\n',
+    );
+    const two = seats(global, repo, resolve(owner, 'depth2'));
+    expect(two.a).toEqual({ harness: 'fake', model: 'index-a', effort: 'low' });
+    expect(two.b).toEqual({ harness: 'fake', model: 'repo-b', effort: 'low' });
+    expect(two.source).toEqual({ a: issueFile, b: repoConfig });
+    mkdirSync(resolve(root, 'issues/closed/done/leaf3'), { recursive: true });
+    const closedFile: string = resolve(root, 'issues/closed/done/ISSUE.md');
+    writeFileSync(
+      closedFile,
+      '---\nslots:\n  b:\n    harness: fake\n    model: closed-b\n    effort: low\n---\n# Done\n',
+    );
+    const closed = seats(global, repo, resolve(root, 'issues/closed/done/leaf3'));
+    expect(closed.b).toEqual({ harness: 'fake', model: 'closed-b', effort: 'low' });
+    expect(closed.source).toEqual({ a: machineConfig, b: closedFile });
+    const epic: string = resolve(root, 'issues/open/epic');
+    mkdirSync(resolve(epic, 'thing/leaf3'), { recursive: true });
+    const epicFile: string = resolve(epic, 'EPIC.md');
+    writeFileSync(
+      epicFile,
+      '---\nslots:\n  a:\n    harness: fake\n    model: epic-a\n    effort: low\n  b:\n    harness: fake\n    model: epic-b\n    effort: high\n---\n# Epic\n',
+    );
+    const issue3File: string = resolve(epic, 'thing/ISSUE.md');
+    writeFileSync(
+      issue3File,
+      '---\nslots:\n  a:\n    harness: fake\n    model: issue-a\n    effort: high\n---\n# Issue\n',
+    );
+    const three = seats(global, repo, resolve(epic, 'thing/leaf3'));
+    expect(three.a).toEqual({ harness: 'fake', model: 'issue-a', effort: 'high' });
+    expect(three.b).toEqual({ harness: 'fake', model: 'epic-b', effort: 'high' });
+    expect(three.source).toEqual({ a: issue3File, b: epicFile });
+    writeFileSync(resolve(owner, 'ISSUE.md'), '# No front matter\n');
+    const plain = seats(global, repo, resolve(owner, 'depth2'));
+    expect(plain.source).toEqual({ a: machineConfig, b: repoConfig });
+    expect(plain.a.model).toBe('strong-a');
+    const stray = seats(global, repo, resolve(root, 'elsewhere/leaf'));
+    expect(stray.source).toEqual({ a: machineConfig, b: repoConfig });
+  } finally {
+    if (previous === undefined) delete process.env.AKROGON_HOME;
+    else process.env.AKROGON_HOME = previous;
+    f.clean();
+  }
+});
+
+test('seats throws SeatIndexError naming the file and seat for malformed indexes', async () => {
+  const f: Fixture = await fixture();
+  const previous: string | undefined = process.env.AKROGON_HOME;
+  process.env.AKROGON_HOME = f.home;
+  try {
+    const root: string = realpathSync(f.root);
+    yaml(resolve(root, 'issues/config.yaml'), { grounding: 'none' });
+    const global: GlobalConfig = readGlobal();
+    const repo: Repo = readRepo('repo', root);
+    const owner: string = resolve(root, 'issues/open/issue');
+    const leafPath: string = resolve(owner, 'bad');
+    mkdirSync(leafPath, { recursive: true });
+    const file: string = resolve(owner, 'ISSUE.md');
+    const failure = (body: string, needles: string[]): void => {
+      writeFileSync(file, body);
+      try {
+        seats(global, repo, leafPath);
+        throw new Error('seats did not throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SeatIndexError);
+        expect((error as SeatIndexError).file).toBe(file);
+        for (const needle of needles) expect((error as Error).message).toContain(needle);
+      }
+    };
+    failure('---\nslots:\n\t- x\n---\n# t\n', [file]);
+    failure('---\nslots:\n  a:\n    harness: fake\n    model: a\n    effort: low\n', [file]);
+    failure('---\nfoo: 1\n---\n# t\n', [file, 'foo']);
+    failure('---\nslots:\n  c:\n    harness: fake\n    model: a\n    effort: low\n---\n# t\n', [file, 'c']);
+    failure('---\nslots:\n  a:\n    harness: fake\n    model: a\n---\n# t\n', [file, 'slots.a']);
+    failure('---\nslots:\n  a:\n    harness: fake\n    model: "   "\n    effort: low\n---\n# t\n', [file, 'slots.a']);
+    failure('---\nslots:\n  a:\n    harness: fake\n    model: "x\'y"\n    effort: low\n---\n# t\n', [file, 'slots.a']);
+    failure('---\nslots:\n  a:\n    harness: absent\n    model: a\n    effort: low\n---\n# t\n', [file, 'a', 'absent']);
+    rmSync(file);
+    expect(seats(global, repo, leafPath).source.a).toBe(resolve(f.home, 'config.yaml'));
+  } finally {
+    if (previous === undefined) delete process.env.AKROGON_HOME;
+    else process.env.AKROGON_HOME = previous;
+    f.clean();
+  }
+});
+
+test('config prints leaf-resolved slots in a managed leaf worktree only', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none' });
+    const worktree: string = resolve(f.root, 'issues/worktrees/managed-leaf');
+    await command(['git', 'worktree', 'add', '-b', 'managed-leaf', worktree], f.root);
+    leaf(f, 'managed-leaf', 'implement', { worktree }, 'issue');
+    const indexFile: string = resolve(f.root, 'issues/open/issue/ISSUE.md');
+    writeFileSync(
+      indexFile,
+      '---\nslots:\n  a:\n    harness: fake\n    model: index-a\n    effort: low\n---\n# Title\n',
+    );
+    const atWorktree = await cli(f, ['config'], worktree);
+    expect(atWorktree.code).toBe(0);
+    const parsed = Bun.YAML.parse(atWorktree.stdout) as { slots: Record<string, unknown> };
+    expect(parsed.slots).toEqual({
+      a: { harness: 'fake', model: 'index-a', effort: 'low' },
+      b: { harness: 'fake', model: 'strong-b', effort: 'medium' },
+    });
+    expect(parsed.slots).not.toHaveProperty('source');
+    mkdirSync(resolve(worktree, 'sub/dir'), { recursive: true });
+    const atSubdir = await cli(f, ['config'], resolve(worktree, 'sub/dir'));
+    expect(atSubdir.code).toBe(0);
+    expect(Bun.YAML.parse(atSubdir.stdout)).toMatchObject({ slots: { a: { model: 'index-a' } } });
+    const atRoot = await cli(f, ['config']);
+    expect(Bun.YAML.parse(atRoot.stdout)).toMatchObject({
+      slots: { a: { model: 'strong-a' }, b: { model: 'strong-b' } },
+    });
+    const linked: string = resolve(f.home, 'linked-leaf');
+    await command(['git', 'worktree', 'add', '-b', 'linked-leaf', linked], f.root);
+    const atLinked = await cli(f, ['config'], linked);
+    expect(Bun.YAML.parse(atLinked.stdout)).toMatchObject({ slots: { a: { model: 'strong-a' } } });
+    const outside = await cli(f, ['config'], f.home);
+    expect(Bun.YAML.parse(outside.stdout)).toMatchObject({ repo: 'none', slots: { a: { model: 'strong-a' } } });
+    writeFileSync(indexFile, '# No front matter\n');
+    const plain = await cli(f, ['config'], worktree);
+    expect(plain.code).toBe(0);
+    expect(Bun.YAML.parse(plain.stdout)).toMatchObject({ slots: { a: { model: 'strong-a' } } });
+    writeFileSync(indexFile, '---\nfoo: 1\n---\n# t\n');
+    const extra = await cli(f, ['config'], worktree);
+    expect(extra.code).not.toBe(0);
+    expect(extra.stderr).toContain(indexFile);
+    writeFileSync(indexFile, '---\nslots: {a: {harness: fake, model: "x"}}\n---\n# t\n');
+    const garbage = await cli(f, ['config'], worktree);
+    expect(garbage.code).not.toBe(0);
+    expect(garbage.stderr).toContain(indexFile);
+    writeFileSync(indexFile, '---\nslots:\n  a:\n    harness: absent\n    model: a\n    effort: low\n---\n# t\n');
+    const missing = await cli(f, ['config'], worktree);
+    expect(missing.code).not.toBe(0);
+    expect(missing.stderr).toContain(indexFile);
+    expect(missing.stderr).toContain('absent');
   } finally {
     f.clean();
   }

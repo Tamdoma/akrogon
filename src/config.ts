@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -8,7 +8,17 @@ import { trackingRef } from './preflight';
 
 const text = z.string().min(1);
 
-const slotConfigSchema = z.strictObject({ harness: text, model: text, effort: text });
+const seat: z.ZodString = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(/^[^'"]*$/);
+
+const slotConfigSchema = z.strictObject({ harness: seat, model: seat, effort: seat });
+
+const indexSchema = z.strictObject({
+  slots: z.strictObject({ a: slotConfigSchema.optional(), b: slotConfigSchema.optional() }).default({}),
+});
 
 export const globalSchema = z
   .strictObject({
@@ -57,17 +67,85 @@ export type RepoConfig = z.infer<typeof repoSchema>;
 
 export type Repo = { name: string; root: string; config: RepoConfig };
 
-export function seats(global: GlobalConfig, repo: Repo): { a: SlotConfig; b: SlotConfig } {
+export class SeatIndexError extends Error {
+  constructor(
+    readonly file: string,
+    reason: string,
+  ) {
+    super(`Invalid slots front matter in ${file}: ${reason}`);
+  }
+}
+
+function indexSeats(file: string): { a?: SlotConfig; b?: SlotConfig } {
+  const lines: string[] = readFileSync(file, 'utf8').split('\n');
+  if (lines[0] !== '---') return {};
+  const end: number = lines.indexOf('---', 1);
+  if (end === -1) throw new SeatIndexError(file, 'missing closing ---');
+  try {
+    return indexSchema.parse(Bun.YAML.parse(lines.slice(1, end).join('\n'))).slots;
+  } catch (error) {
+    const reason: string =
+      error instanceof z.ZodError
+        ? error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    throw new SeatIndexError(file, reason);
+  }
+}
+
+type IndexedSeat = { seat: SlotConfig; file: string };
+
+function indexSlots(leafPath: string | undefined, repo: Repo): { a?: IndexedSeat; b?: IndexedSeat } {
+  const found: { a?: IndexedSeat; b?: IndexedSeat } = {};
+  if (leafPath === undefined) return found;
+  const files: string[] = ['open', 'closed'].flatMap((area) => {
+    const areaRoot: string = resolve(repo.root, 'issues', area);
+    if (!within(leafPath, areaRoot)) return [];
+    const parts: string[] = relative(areaRoot, leafPath).split(sep).filter(Boolean);
+    if (parts.length === 2) return [resolve(areaRoot, parts[0], 'ISSUE.md')];
+    if (parts.length === 3)
+      return [resolve(areaRoot, parts[0], parts[1], 'ISSUE.md'), resolve(areaRoot, parts[0], 'EPIC.md')];
+    return [];
+  });
+  for (const file of files) {
+    if (!existsSync(file)) continue;
+    const slots: { a?: SlotConfig; b?: SlotConfig } = indexSeats(file);
+    for (const key of ['a', 'b'] as const) {
+      if (found[key] === undefined && slots[key] !== undefined) found[key] = { seat: slots[key], file };
+    }
+    if (found.a !== undefined && found.b !== undefined) break;
+  }
+  return found;
+}
+
+export function seats(
+  global: GlobalConfig,
+  repo: Repo,
+  leafPath?: string,
+): { a: SlotConfig; b: SlotConfig; source: { a: string; b: string } } {
+  const index: { a?: IndexedSeat; b?: IndexedSeat } = indexSlots(leafPath, repo);
+  const fallback = (key: 'a' | 'b'): string =>
+    repo.config.slots?.[key] === undefined
+      ? resolve(globalHome(), 'config.yaml')
+      : resolve(repo.root, 'issues/config.yaml');
+  const source: { a: string; b: string } = {
+    a: index.a?.file ?? fallback('a'),
+    b: index.b?.file ?? fallback('b'),
+  };
   const resolved: { a: SlotConfig; b: SlotConfig } = {
-    a: repo.config.slots?.a ?? global.slots.a,
-    b: repo.config.slots?.b ?? global.slots.b,
+    a: index.a?.seat ?? repo.config.slots?.a ?? global.slots.a,
+    b: index.b?.seat ?? repo.config.slots?.b ?? global.slots.b,
   };
   for (const seat of ['a', 'b'] as const) {
     const harness: string = resolved[seat].harness;
-    if (!Object.hasOwn(global.harnesses, harness))
+    if (!Object.hasOwn(global.harnesses, harness)) {
+      if (index[seat] !== undefined)
+        throw new SeatIndexError(source[seat], `Missing harness template "${harness}" for seat ${seat}`);
       throw new Error(`Missing harness template "${harness}" for seat ${seat} in repo ${repo.name}`);
+    }
   }
-  return resolved;
+  return { ...resolved, source };
 }
 
 export const toolRoot: string = resolve(import.meta.dir, '..');
@@ -170,11 +248,24 @@ export async function effectiveConfig(cwd: string): Promise<string> {
   const repo: Repo | null = await currentRepo(global, cwd);
   const top: string | null = repo === null ? null : await command(['git', 'rev-parse', '--show-toplevel'], cwd);
   const repoConfig: RepoConfig = repo === null ? repoSchema.parse({ grounding: 'none' }) : repo.config;
+  let leafPath: string | undefined;
+  if (repo !== null && top !== null) {
+    const { allLeaves } = await import('./state');
+    const realTop: string = realpathSync(top);
+    leafPath = allLeaves(repo).find(
+      (leaf) =>
+        leaf.state.worktree !== undefined &&
+        existsSync(leaf.state.worktree) &&
+        realpathSync(leaf.state.worktree) === realTop,
+    )?.path;
+  }
+  const resolved: { a: SlotConfig; b: SlotConfig; source: { a: string; b: string } } | null =
+    repo === null ? null : seats(global, repo, leafPath);
   return Bun.YAML.stringify(
     {
       ...global,
       ...withSetup(repoConfig),
-      slots: repo === null ? global.slots : seats(global, repo),
+      slots: resolved === null ? global.slots : { a: resolved.a, b: resolved.b },
       repo: repo === null ? 'none' : repo.name,
       ...(repo !== null ? { worktree_store: worktreeStore(repo) } : {}),
       ...(repo !== null && top !== repo.root ? { AKROGON_BASE: await base(repo, cwd) } : {}),
