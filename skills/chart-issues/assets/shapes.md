@@ -13,9 +13,7 @@ issues/chart/<chart-slug>/
   forks/<fork-slug>.md
   slots/<pass>.md                 # only for peer exchanges
 ```
-
 Charts stay here after handoff. They have no state.yaml or lifecycle phase. Create forks/ even for a fully settled direct item. On resume, CHART.md points to the selected fork and its context rather than requiring a full chart reread.
-
 ```markdown
 # Chart: <destination>
 
@@ -34,9 +32,7 @@ Charts stay here after handoff. They have no state.yaml or lifecycle phase. Crea
 ## Off route
 <excluded work and reasons>
 ```
-
 Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts.
-
 ```markdown
 # Intake: <chart-slug>
 
@@ -60,9 +56,7 @@ Preserve useful territory-map findings under the relevant chart section or fork.
 ## Agent findings
 <inspected evidence and interpretation, not attributed to the reporter>
 ```
-
 GitHub identity comes from the mirror's `Source: owner/repo#n` line. Compare exact identities against parsed `sources` in all open/closed leaf states and GitHub provenance entries in all chart intakes, including handed-off charts. Compare legacy repo-relative paths against legacy provenance entries, not substrings in report bodies. Deduplicate repeated identities in the current intake too. A local path never enters leaf `sources`. Keep source files unchanged and preserve copied report bytes beneath the source headings. An unsuccessful GitHub refresh supplies no permission to drain a stale mirror.
-
 ```markdown
 # <fork title>
 
@@ -78,13 +72,11 @@ GitHub identity comes from the mirror's `Source: owner/repo#n` line. Compare exa
 ## Taken
 <operator answer verbatim, reason and foreclosed alternatives>
 ```
-
 One fork file holds one or more questions that are always presented together on one screen. A fork is taken when every material question in it is taken; partial answers stay under `## Findings` and `## Taken` is written only then. Append each explicit operator correction with its date, preserve earlier answers, and treat the last appended correction as binding only for the answer it changes. Unresolved questions have no invented Taken. A question sharp enough to travel alone gets its own fork file even while blocked. Work whose question is not sharp stays in Fog. Ruling work out records the reason in Off route instead of pretending a fork was taken. Reshape the remaining questions after each answer. A fork file with no operator answer under `## Taken` is open and appears in CHART.md's Open forks list in the order it will be taken, next first.
 
 ## Handoff tree
 
 One issue uses `issues/open/<issue>/<leaf>/`. Two or more grouped issues use:
-
 ```text
 issues/open/<epic>/
   EPIC.md
@@ -103,23 +95,31 @@ issues/open/<epic>/
       readiness.yaml
       state.yaml
 ```
-
 EPIC.md lists immediate issues, ISSUE.md lists immediate leaves, each one line per child with purpose:
 
 ```markdown
+---
+slots:
+  a: {harness: claude, model: opus, effort: high}
+  b: {harness: codex, model: gpt-6.1-sol, effort: medium}
+---
 # Epic: <epic>
 
 - [<issue>](<issue>/ISSUE.md): <purpose>
 - [<other-issue>](<other-issue>/ISSUE.md): <purpose>
 ```
-
 ```markdown
+---
+slots:
+  a: {harness: claude, model: opus, effort: high}
+  b: {harness: codex, model: gpt-6.1-sol, effort: medium}
+---
 # Issue: <issue>
 
 - [<leaf>](<leaf>/brief.md): <purpose>
 ```
 
-Container indexes hold no lifecycle state or global order. Slugs are lowercase hyphenated words without ordering markers. Leaf slugs are unique across the proposed handoff and existing open/closed leaves in the destination repo. Independently checkable outcomes can run in parallel, even when files overlap; only actual prerequisites enter blocked-by.
+Container indexes hold no lifecycle state or global order; their optional `slots:` front matter is seat configuration. An index may open with a front matter block holding `slots:` and no other key. Detection is literal: the file's first line must be `---` and a later `---` must close the block, so the door places it at the very top. `slots:` accepts only keys `a` and `b`, each optional, and each present seat is exactly `{harness, model, effort}`. Every value must be nonblank after trim and its decoded value must contain no `'` or `"` character, so YAML delimiters are fine: `model: 'opus'` decodes to `opus`. The `harness` value names a template in the machine `config.yaml` `harnesses:` map. The nearest set seat wins per seat: `ISSUE.md`, then `EPIC.md`, then repo `issues/config.yaml`, then machine `config.yaml`. An issue inside an epic may carry its own block for its leaves. The door writes the block into the chosen owner's index before any leaf `state.yaml` is written, and `state.yaml` carries no seat field. Slugs are lowercase hyphenated words without ordering markers. Leaf slugs are unique across the proposed handoff and existing open/closed leaves in the destination repo. Independently checkable outcomes can run in parallel, even when files overlap; only actual prerequisites enter blocked-by.
 
 ### seats.yaml
 
