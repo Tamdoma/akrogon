@@ -1,0 +1,26 @@
+# Slot B: handoff script
+
+1. Pick: no new handoff script. Finalize the reviewed contracts in the scratchpad, apply the actual peer corrections there, then transfer those finalized files with ordinary file operations instead of generating their full contents again. A still prepares indexes and state, performs the audits, and follows the existing publication order and validation. Reason: the measured duplication is in contract writing, while the obvious command wrapper covers little visible text. Cost: this leaves judgment, proof planning and publication coordination with A, with no proven token or time saving. It also requires care that the transferred draft is the final consensus version.
+
+The presence-check share is too small to justify a new helper on these measurements alone: 1.7% and 6.9% of visible characters, not of tokens, dollars or time. The whole handoff's 13-20% of A's chart bill is material enough to examine, but that is not a measured scriptable share.
+
+2. Rejected:
+- Extract only the presence command into a script. It is already a fixed call into the existing readiness parser and gap checker. A wrapper could shorten invocation text, but no measured thinking, latency or dollar saving supports it here.
+- Script the whole handoff or add a generic publication engine. That adds an input contract, error/recovery behavior and another place to maintain collision, dependency and write-order rules, without an isolated measured saving. Ordinary transfer of approved files does not require that layer.
+- Generate contracts, infer grants or replace proof/ownership review mechanically. These decisions remain chart-specific and are explicitly locked. A script cannot establish that a credential has sufficient authority or that a criterion belongs to the leaf by checking text presence.
+- Leave full contract regeneration as the required publication method. The current instructions require merged contracts to reach the destination, not a second model-authored serialization of those contracts.
+
+3. Evidence: operator-placed measurements, read 2026-10-06, `forks/handoff-script.md:12-18`. A's merge-turn handoff cost about $2.40 across 13 minutes and seed-root-cause about $1.34 across six minutes. Merge-turn wrote 13.5k characters of briefs before review and 22.7k afterward. That establishes substantial writing twice, not that all second-pass content was unchanged or avoidable. More than half of output tokens were thinking, whose allocation between proofs and drafts was not measured. Presence-check visible-character shares therefore cannot predict whole-handoff savings.
+
+Primary local code and instructions, read 2026-10-06: `skills/chart-issues/SKILL.md:67` requires reviewed consensus contracts, `:73-79` supplies the existing presence call. `src/readiness.ts:87-94` parses the readiness file and `:103-120` checks nonempty inputs, without proving permission or operation success. `skills/chart-issues/assets/shapes.md:250,252,256` requires collision/dependency checks, substantive implementer audit, contracts before state, prerequisites before dependents, then status validation. These remain in force during file transfer.
+
+Practitioner: Erik S. and Barry Zhang, Anthropic, [Building effective agents](https://www.anthropic.com/engineering/building-effective-agents), read 2026-10-06. Their own agent implementations and work with dozens of teams favor simple components and added complexity only with demonstrated benefit. They distinguish predictable fixed workflows from tasks requiring flexible judgment. Applied here: file transfer is deterministic, contract and proof decisions require judgment, and neither distinction establishes a chart-specific saving.
+
+4. Pitfalls:
+- Transfer an early draft and lose corrections or held dissent. Finalize one canonical scratchpad version after the exchange, retaining the changed-line attribution and held disagreement required by SKILL.md:67. Transfer that version rather than reconstructing it.
+- Copy the whole draft folder and expose a premature state. Transfer contract files explicitly. Keep state last and emit prerequisites before dependents under shapes.md:256.
+- Overwrite an occupied destination or leave a partial handoff looking complete. Preserve the occupancy/preflight refusals before writes. On failed writes or validation, repair the unfinished handoff and do not append the handoff marker. Existing rules at shapes.md:250,256 apply.
+- Treat a clean presence result as proof of working grants or operations. Retain every real proof, grant and attended/peer review under the fork's lock (`forks/handoff-script.md:10`). Presence answers whether named inputs exist, not whether the intended operation succeeds.
+- Claim all duplicate writing or handoff thinking disappeared. Only content already finalized is transferred. Needed corrections still require writing and judgment. Any saving must be measured across the complete handoff, including peer reviews and validation, in proof-of-saving.
+
+5. Missing question: none needed to choose against a new script now. The unmeasured issue for proof-of-saving is how much final writing is unchanged transfer versus substantive correction, and whether transferring finalized drafts reduces total handoff usage and time while preserving contracts.

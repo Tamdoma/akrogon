@@ -1,0 +1,2 @@
+# Brief for slots B and C: rebuttal, fork peer-packet
+Read only /home/ivan/Work/infra/akrogon/issues/chart/chart-cost/slots/peer-packet-merged.md. Return disagreements only, each with evidence: a line that misstates your position, a wrong number, or a pick you still oppose and why. Write "No disagreement." when you have none. Write to slots/peer-packet-rebuttal-<your slot letter>.md in that chart folder. Reply only "done".

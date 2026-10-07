@@ -1,0 +1,33 @@
+slug: peer-notes-single-writing
+phase: merged
+created: 2026-10-06
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t97
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/peer-notes-single-writing
+pane: 
+  A: w8:pHE
+  B: w8:pHF
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-06T20:44:43.575Z

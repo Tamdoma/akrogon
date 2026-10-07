@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: read each seat's harness kind and session id
+    command: herdr agent list
+    identity: the operator's local user, no credential
+    target: the herdr session holding panes w8:pCT, w8:pGY and w8:pGZ
+    version: herdr 0.9.3
+    date: '2026-10-06'
+    result: JSON with one record per pane carrying pane_id, agent, agent_status, name and agent_session.value, present for the two claude seats and the codex seat
+    cleanup: none, read-only
+    limits: does not prove the field names on another herdr version, a pane with no agent started, or a harness other than claude and codex
+    record: issues/chart/chart-cost/forks/proof-of-saving.md

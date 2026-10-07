@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: start a peer task from a brief file with a one-line prompt
+    command: herdr agent prompt <pane> "Slot <letter>. Read <absolute brief path> and follow it exactly. Your slot letter is <letter>." --wait --until working --timeout 5000
+    identity: the operator's local user, no credential
+    target: herdr panes w8:pGY (codex) and w8:pGZ (claude)
+    version: herdr 0.9.3
+    date: '2026-10-06'
+    result: exit 0 on all 16 calls, and each peer wrote the return file named in its brief
+    cleanup: none, the brief files stay in the chart's slots folder
+    limits: does not prove delivery to a pane that is not idle, a harness other than claude and codex, or a brief outside the chart folder
+    record: issues/chart/chart-cost/forks/peer-packet.md

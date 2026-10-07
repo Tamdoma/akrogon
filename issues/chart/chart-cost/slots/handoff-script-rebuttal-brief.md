@@ -1,0 +1,2 @@
+# Brief for slots B and C: rebuttal, fork handoff-script
+Read only /home/ivan/Work/infra/akrogon/issues/chart/chart-cost/slots/handoff-script-merged.md. Return disagreements only, each with evidence: a line that misstates your position, a wrong number, or a pick you still oppose and why. Write "No disagreement." when you have none. Write to /home/ivan/Work/infra/akrogon/issues/chart/chart-cost/slots/handoff-script-rebuttal-<your slot letter>.md. Reply only "done".

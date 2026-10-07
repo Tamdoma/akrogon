@@ -1,0 +1,33 @@
+slug: chart-usage-table
+phase: merged
+created: 2026-10-06
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t98
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/chart-usage-table
+pane: 
+  A: w8:pHG
+  B: w8:pHH
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-06T21:23:00.101Z
