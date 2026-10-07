@@ -3202,8 +3202,8 @@ const malformedIndex: [string, string][] = [
   ['a key other than slots', '---\nseats: {}\n---\n# Issue\n'],
   ['a seat other than a or b', '---\nslots:\n  c:\n    harness: fake\n    model: m\n    effort: e\n---\n# Issue\n'],
   ['a missing seat field', '---\nslots:\n  a:\n    harness: fake\n    model: m\n---\n# Issue\n'],
-  ['a blank seat value', '---\nslots:\n  a:\n    harness: fake\n    model: \' \'\n    effort: e\n---\n# Issue\n'],
-  ['a quoted seat value', '---\nslots:\n  a:\n    harness: fake\n    model: m\'x\n    effort: e\n---\n# Issue\n'],
+  ['a blank seat value', "---\nslots:\n  a:\n    harness: fake\n    model: ' '\n    effort: e\n---\n# Issue\n"],
+  ['a quoted seat value', "---\nslots:\n  a:\n    harness: fake\n    model: m'x\n    effort: e\n---\n# Issue\n"],
 ];
 
 for (const [name, content] of malformedIndex) {
