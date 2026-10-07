@@ -28,9 +28,7 @@ test('claude template carries no literal subagent model inside --settings', () =
 
 for (const model of ['opus', 'claude-opus-5-5']) {
   test(`claude template substitutes ${model} into the subagent model env`, () => {
-    const line: string = claudeTemplate()
-      .replaceAll('{model}', quote(model))
-      .replaceAll('{effort}', quote('low'));
+    const line: string = claudeTemplate().replaceAll('{model}', quote(model)).replaceAll('{effort}', quote('low'));
     const argv: string[] = z.array(z.string()).min(1).parse(parse(line));
     const settings: { env: Record<string, string> } = JSON.parse(settingsWord(argv));
     expect(settings.env.CLAUDE_CODE_SUBAGENT_MODEL).toBe(model);
