@@ -861,6 +861,31 @@ const malformedIndexes: Record<string, string> = {
   'unparseable front matter': '---\nslots: [\n---\n# Issue\n',
   'missing seat field': '---\nslots:\n  a: {harness: fake, model: index-a}\n---\n# Issue\n',
 };
+
+test('status rejects malformed epic front matter when the issue overrides both seats', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'shadowed', 'implement', {}, 'epic/issue');
+    writeFileSync(
+      resolve(f.root, 'issues/open/epic/issue/ISSUE.md'),
+      '---\nslots:\n  a: {harness: fake, model: issue-a, effort: high}\n  b: {harness: fake, model: issue-b, effort: medium}\n---\n# Issue\n',
+    );
+    const epic: string = resolve(f.root, 'issues/open/epic/EPIC.md');
+    writeFileSync(epic, '---\nslots: [\n---\n# Epic\n');
+    const detail: Result = await cli(f, ['status', 'shadowed']);
+    expect(detail.code).not.toBe(0);
+    expect(detail.stderr).toContain(epic);
+    const overview: Result = await cli(f, ['status']);
+    expect(overview.code).toBe(1);
+    const diagnostic: { unreadable: string; path: string; error: string } = z
+      .object({ unreadable: z.string(), path: z.string(), error: z.string() })
+      .parse(JSON.parse(overview.stdout.split('\n')[0]));
+    expect(diagnostic.path).toBe(epic);
+  } finally {
+    f.clean();
+  }
+});
+
 for (const [name, content] of Object.entries(malformedIndexes)) {
   test(`malformed index (${name}) reports unreadable in overview and fails detail naming the file`, async () => {
     const f: Fixture = await fixture();
