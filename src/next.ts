@@ -249,8 +249,8 @@ async function currentPane(id: string): Promise<Pane> {
   return (await herdr(['pane', 'get', id], z.object({ pane: paneSchema }))).pane;
 }
 
-function launch(global: GlobalConfig, repo: Repo, slot: Slot): { kind: string; args: string[] } {
-  const config: SlotConfig = seats(global, repo)[slot === 'A' ? 'a' : 'b'];
+function launch(global: GlobalConfig, repo: Repo, slot: Slot, leafPath?: string): { kind: string; args: string[] } {
+  const config: SlotConfig = seats(global, repo, leafPath)[slot === 'A' ? 'a' : 'b'];
   const line: string = global.harnesses[config.harness]
     .replaceAll('{model}', quote(config.model))
     .replaceAll('{effort}', quote(config.effort));
@@ -525,7 +525,7 @@ async function dispatchSlot(
     }
   }
   if (pane.agent === null) {
-    const harness: { kind: string; args: string[] } = launch(global, repo, slot);
+    const harness: { kind: string; args: string[] } = launch(global, repo, slot, leaf.path);
     const name: string = `akrogon-${createHash('sha256').update(pane.pane_id).digest('hex').slice(0, 24)}`;
     const startArgv: string[] = [
       'herdr',
@@ -652,7 +652,7 @@ async function dispatchLeaf(
         mergeContext === undefined)
     )
       return 'waiting';
-    seats(global, repo);
+    seats(global, repo, leaf.path);
     // Mirrors ensureWorktree's path: a missing worktree needs remote proof, an existing one only local.
     const mustCreate: boolean = !existsSync(resolve(worktreeStore(repo), slug));
     await checkBase(repo, mustCreate);

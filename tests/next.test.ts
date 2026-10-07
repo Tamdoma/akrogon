@@ -3125,6 +3125,128 @@ test('next refuses unknown harness override before allocation', async () => {
   }
 }, 15000);
 
+const seatByPane = (db: Database, state: State, slot: 'A' | 'B'): string[] => {
+  const found: string[] | undefined = db.starts.find((args) => args[args.indexOf('--pane') + 1] === state.pane[slot]);
+  if (found === undefined) throw new Error(`Missing start for seat ${slot}`);
+  return found;
+};
+
+test('next resolves seats from EPIC.md front matter and falls back per seat', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'epic-seats', 'plan.positions', {}, 'epic/issue');
+    writeFileSync(
+      resolve(f.root, 'issues/open/epic/EPIC.md'),
+      '---\nslots:\n  a:\n    harness: fake\n    model: epic-a\n    effort: low\n---\n# Epic\n',
+    );
+    expect((await next(f, ['epic-seats'])).code).toBe(0);
+    const state: State = readState(path);
+    const db: Database = database(f);
+    expect(db.starts).toHaveLength(2);
+    const startA: string[] = seatByPane(db, state, 'A');
+    const startB: string[] = seatByPane(db, state, 'B');
+    expect(startA).toContain('epic-a');
+    expect(startA).toContain('low');
+    expect(startA).not.toContain('strong-a');
+    expect(startB).toContain('strong-b');
+    expect(startB).toContain('medium');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next prefers ISSUE.md seats over EPIC.md and applies a standalone issue block', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'nested', 'plan.positions', {}, 'epic/issue');
+    writeFileSync(
+      resolve(f.root, 'issues/open/epic/EPIC.md'),
+      '---\nslots:\n  b:\n    harness: fake\n    model: epic-b\n    effort: low\n---\n# Epic\n',
+    );
+    writeFileSync(
+      resolve(f.root, 'issues/open/epic/issue/ISSUE.md'),
+      '---\nslots:\n  b:\n    harness: fake\n    model: issue-b\n    effort: medium\n---\n# Issue\n',
+    );
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { b: { harness: 'fake', model: 'repo-b', effort: 'low' } },
+    });
+    expect((await next(f, ['nested'])).code).toBe(0);
+    const state: State = readState(path);
+    const db: Database = database(f);
+    const startA: string[] = seatByPane(db, state, 'A');
+    const startB: string[] = seatByPane(db, state, 'B');
+    expect(startA).toContain('strong-a');
+    expect(startB).toContain('issue-b');
+    expect(startB).toContain('medium');
+    expect(startB).not.toContain('epic-b');
+    expect(startB).not.toContain('repo-b');
+
+    const alone: string = leaf(f, 'standalone', 'plan.positions');
+    writeFileSync(
+      resolve(f.root, 'issues/open/issue/ISSUE.md'),
+      '---\nslots:\n  a:\n    harness: fake\n    model: issue-a\n    effort: low\n---\n# Issue\n',
+    );
+    expect((await next(f, ['standalone'])).code).toBe(0);
+    const standalone: State = readState(alone);
+    const startAlone: string[] = seatByPane(database(f), standalone, 'A');
+    expect(startAlone).toContain('issue-a');
+    expect(startAlone).toContain('low');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+const malformedIndex: [string, string][] = [
+  ['unparseable front matter', '---\nslots: [\n---\n# Issue\n'],
+  ['a key other than slots', '---\nseats: {}\n---\n# Issue\n'],
+  ['a seat other than a or b', '---\nslots:\n  c:\n    harness: fake\n    model: m\n    effort: e\n---\n# Issue\n'],
+  ['a missing seat field', '---\nslots:\n  a:\n    harness: fake\n    model: m\n---\n# Issue\n'],
+  ['a blank seat value', '---\nslots:\n  a:\n    harness: fake\n    model: \' \'\n    effort: e\n---\n# Issue\n'],
+  ['a quoted seat value', '---\nslots:\n  a:\n    harness: fake\n    model: m\'x\n    effort: e\n---\n# Issue\n'],
+];
+
+for (const [name, content] of malformedIndex) {
+  test(`next refuses an ISSUE.md index with ${name} before any allocation`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      leaf(f, 'malformed', 'plan.synthesis');
+      const index: string = resolve(f.root, 'issues/open/issue/ISSUE.md');
+      writeFileSync(index, content);
+      const result: Result = await next(f, ['malformed']);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain(index);
+      expect(result.stderr).toContain('Invalid slots front matter');
+      expect(database(f).tabs).toHaveLength(0);
+      expect(database(f).panes).toHaveLength(0);
+      expect(database(f).starts).toHaveLength(0);
+      expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+    } finally {
+      f.clean();
+    }
+  }, 15000);
+}
+
+test('next refuses an ISSUE.md index whose harness has no template before any allocation', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'ghost', 'plan.synthesis');
+    const index: string = resolve(f.root, 'issues/open/issue/ISSUE.md');
+    writeFileSync(index, '---\nslots:\n  a:\n    harness: ghost\n    model: m\n    effort: e\n---\n# Issue\n');
+    const result: Result = await next(f, ['ghost']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain(index);
+    expect(result.stderr).toContain('ghost');
+    expect(result.stderr).toContain('a');
+    expect(database(f).tabs).toHaveLength(0);
+    expect(database(f).panes).toHaveLength(0);
+    expect(database(f).starts).toHaveLength(0);
+    expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 type Refusal = z.infer<typeof skipSchema>;
 async function refusal(f: DispatchFixture, slug: string, path: string): Promise<Refusal> {
   const result: Result = await next(f, [slug]);
