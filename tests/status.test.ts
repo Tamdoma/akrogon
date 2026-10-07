@@ -796,3 +796,91 @@ test('TURN is empty for ineligible merge leaves and non-merge leaves', async () 
     f.clean();
   }
 });
+test('status detail prints the seats the next agent start uses with the file each came from', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'seated', 'implement');
+    const index: string = resolve(f.root, 'issues/open/issue/ISSUE.md');
+    writeFileSync(index, '---\nslots:\n  a: {harness: fake, model: index-a, effort: low}\n---\n# Issue\n');
+    const repoConfig: object = Bun.YAML.parse(readFileSync(resolve(f.root, 'issues/config.yaml'), 'utf8')) as object;
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      ...repoConfig,
+      slots: { b: { harness: 'fake', model: 'repo-b', effort: 'medium' } },
+    });
+    const result: Result = await cli(f, ['status', 'seated']);
+    expect(result.code).toBe(0);
+    const lines: string[] = result.stdout.split('\n');
+    const label: number = lines.findIndex((line) => /seats/i.test(line) && /next agent start/i.test(line));
+    expect(label).toBeGreaterThan(lines.findIndex((line) => line.startsWith('phase:')));
+    expect(label).toBeGreaterThan(lines.findIndex((line) => line === 'History:'));
+    const block: Record<string, { harness: string; model: string; effort: string; source: string }> = z
+      .record(
+        z.string(),
+        z.strictObject({ harness: z.string(), model: z.string(), effort: z.string(), source: z.string() }),
+      )
+      .parse(Bun.YAML.parse(lines.slice(label + 1).join('\n')));
+    expect(block.a).toEqual({ harness: 'fake', model: 'index-a', effort: 'low', source: index });
+    expect(block.b).toEqual({
+      harness: 'fake',
+      model: 'repo-b',
+      effort: 'medium',
+      source: resolve(f.root, 'issues/config.yaml'),
+    });
+  } finally {
+    f.clean();
+  }
+});
+
+test('overview NOTE marks only leaves whose seat comes from an index', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'seated', 'implement');
+    const index: string = resolve(f.root, 'issues/open/issue/ISSUE.md');
+    writeFileSync(
+      index,
+      '---\nslots:\n  a: {harness: fake, model: index-a, effort: low}\n  b: {harness: fake, model: index-b, effort: low}\n---\n# Issue\n',
+    );
+    leaf(f, 'plain', 'implement', {}, 'other');
+    writeFileSync(resolve(f.root, 'issues/open/other/ISSUE.md'), '# Other\nno front matter\n');
+    leaf(f, 'deep', 'implement', {}, 'epic/child');
+    const epic: string = resolve(f.root, 'issues/open/epic/EPIC.md');
+    writeFileSync(epic, '---\nslots:\n  a: {harness: fake, model: epic-a, effort: low}\n---\n# Epic\n');
+    writeFileSync(resolve(f.root, 'issues/open/epic/child/ISSUE.md'), '# Child\n');
+    const result: Result = await cli(f, ['status']);
+    expect(result.code).toBe(0);
+    const note: string = cell(result.stdout, leafRow(result.stdout, 'seated'), 'NOTE');
+    expect(note.match(/seats ISSUE\.md/g)).toHaveLength(1);
+    expect(cell(result.stdout, leafRow(result.stdout, 'plain'), 'NOTE')).toBe('');
+    expect(cell(result.stdout, leafRow(result.stdout, 'deep'), 'NOTE')).toBe('seats EPIC.md');
+  } finally {
+    f.clean();
+  }
+});
+
+const malformedIndexes: Record<string, string> = {
+  'unparseable front matter': '---\nslots: [\n---\n# Issue\n',
+  'missing seat field': '---\nslots:\n  a: {harness: fake, model: index-a}\n---\n# Issue\n',
+};
+for (const [name, content] of Object.entries(malformedIndexes)) {
+  test(`malformed index (${name}) reports unreadable in overview and fails detail naming the file`, async () => {
+    const f: Fixture = await fixture();
+    try {
+      leaf(f, 'indexed', 'implement');
+      const index: string = resolve(f.root, 'issues/open/issue/ISSUE.md');
+      writeFileSync(index, content);
+      const overview: Result = await cli(f, ['status']);
+      expect(overview.code).toBe(1);
+      const diagnostic: { unreadable: string; path: string; error: string } = z
+        .object({ unreadable: z.string(), path: z.string(), error: z.string() })
+        .parse(JSON.parse(overview.stdout.split('\n')[0]));
+      expect(diagnostic.unreadable).toBe('repo');
+      expect(diagnostic.path).toBe(index);
+      expect(diagnostic.error).toContain(index);
+      const detail: Result = await cli(f, ['status', 'indexed']);
+      expect(detail.code).not.toBe(0);
+      expect(detail.stderr).toContain(index);
+    } finally {
+      f.clean();
+    }
+  });
+}

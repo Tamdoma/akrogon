@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync, type Dirent } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+import { basename, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import {
   currentRepo,
@@ -8,8 +8,11 @@ import {
   readGlobal,
   readRepo,
   requireRepo,
+  seats,
+  SeatIndexError,
   type GlobalConfig,
   type Repo,
+  type SlotConfig,
 } from './config';
 import {
   findLeaf,
@@ -27,7 +30,7 @@ import { mergeQueue, type QueueEntry } from './turn';
 import { issueFolders } from './park';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 
-type ScannedLeaf = Leaf & { missing: Gap[] };
+type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
 type Scan =
   | { ok: true; repo: Repo; leaves: ScannedLeaf[]; parked: string[]; log: LogRecord[]; queue: QueueEntry[] }
   | { ok: false; repo: string; path: string; error: string };
@@ -61,7 +64,8 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
         stateSchema.shape.slug.refine((slug) => !slugs.has(slug), 'Duplicate leaf slug').parse(state.slug);
         slugs.add(state.slug);
         path = resolve(folder, 'readiness.yaml');
-        return [{ path: folder, state, missing: leafGaps(global, { path: folder, state }) }];
+        const missing: Gap[] = leafGaps(global, { path: folder, state });
+        return [{ path: folder, state, missing, seatSources: seats(global, repo, folder).source }];
       }
       return entries
         .filter((entry) => entry.isDirectory())
@@ -78,7 +82,9 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     const queue: QueueEntry[] = mergeQueue(global, [...leaves, ...closed], () => log);
     return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log, queue };
   } catch (error) {
+    if (error instanceof SeatIndexError) path = error.file;
     if (
+      error instanceof SeatIndexError ||
       error instanceof RepoMismatchError ||
       error instanceof ReadinessError ||
       error instanceof z.ZodError ||
@@ -93,7 +99,7 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
 
 const header: string[] = ['LEAF', 'PHASE', 'AGE', 'BLOCKED BY', 'NOTE', 'TURN'];
 
-function note(state: State, now: number): string {
+function note(state: State, now: number, seatSources: { a: string; b: string }): string {
   const busy: string[] =
     state.phase === 'failed' || state.phase === 'merged'
       ? []
@@ -117,10 +123,29 @@ function note(state: State, now: number): string {
     state.phase === 'failed'
       ? [state.failure === undefined ? 'failed' : `failed ${state.failure.cause} ${state.failure.reason}`]
       : [];
-  return [...failed, ...done, ...prompt, ...attempts, ...fixes, ...verdict, ...busy].join(' · ');
+  const indexNames: string[] = [seatSources.a, seatSources.b]
+    .map((file) => basename(file))
+    .filter((name) => name === 'ISSUE.md' || name === 'EPIC.md')
+    .filter((name, index, all) => all.indexOf(name) === index);
+  return [
+    ...failed,
+    ...done,
+    ...prompt,
+    ...attempts,
+    ...fixes,
+    ...verdict,
+    ...busy,
+    ...indexNames.map((name) => 'seats ' + name),
+  ].join(' · ');
 }
 
-function cells(leaf: Leaf, log: LogRecord[], now: number, indent: string, queue: Map<string, QueueEntry>): string[] {
+function cells(
+  leaf: ScannedLeaf,
+  log: LogRecord[],
+  now: number,
+  indent: string,
+  queue: Map<string, QueueEntry>,
+): string[] {
   const state: State = leaf.state;
   const last: LogRecord | undefined = log.findLast(
     ({ record }) => record.slug === state.slug && record.to === state.phase,
@@ -132,7 +157,14 @@ function cells(leaf: Leaf, log: LogRecord[], now: number, indent: string, queue:
     entry === undefined
       ? ''
       : `${entry.place === 1 ? 'holder' : entry.place}${entry.noRecord ? ' no merge record' : ''}`;
-  return [`${indent}${state.slug}`, state.phase, age, state['blocked-by'].join(' '), note(state, now), turn];
+  return [
+    `${indent}${state.slug}`,
+    state.phase,
+    age,
+    state['blocked-by'].join(' '),
+    note(state, now, leaf.seatSources),
+    turn,
+  ];
 }
 
 function rows(scan: Scan & { ok: true }, now: number): string[][] {
@@ -306,6 +338,15 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     console.log('History:');
     console.log(log.length === 0 ? 'unavailable' : log.map((entry) => entry.text).join('\n'));
     console.log(resolve(leaf.path, 'plan.md'));
+    const resolved: { a: SlotConfig; b: SlotConfig; source: { a: string; b: string } } = seats(global, repo, leaf.path);
+    console.log('Seats for the next agent start:');
+    console.log(
+      Bun.YAML.stringify(
+        { a: { ...resolved.a, source: resolved.source.a }, b: { ...resolved.b, source: resolved.source.b } },
+        null,
+        2,
+      ).trimEnd(),
+    );
     return;
   }
   const now: number = Date.now();
