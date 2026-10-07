@@ -114,7 +114,6 @@ function indexSlots(leafPath: string | undefined, repo: Repo): { a?: IndexedSeat
     for (const key of ['a', 'b'] as const) {
       if (found[key] === undefined && slots[key] !== undefined) found[key] = { seat: slots[key], file };
     }
-    if (found.a !== undefined && found.b !== undefined) break;
   }
   return found;
 }
