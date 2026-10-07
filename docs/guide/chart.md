@@ -206,7 +206,7 @@ Cross-leaf promises need matching owners. Human-only prerequisites need an owner
 
 When peer panes are part of charting, each named peer also reads the draft contracts as an implementer before they reach the open tree; A corrects the drafts and moves the reviewed files in, rather than writing them a second time.
 
-Before handoff the door also checks the source repo and each selected destination by running `akrogon pull` in each checked repo's registered root. It does this when a destination is selected and again right before the handoff review. A report already in a destination repo that describes the handed-off work becomes visible this way, so it can enter the leaf's `sources` and close when the delivering issue completes. If a destination refresh fails, only that destination's handoff waits.
+Before handoff the door also checks the source repo and each selected destination by running `akrogon pull` in each checked repo's registered root. It does this when a destination is selected and again right before the handoff review. A report already in a destination repo that describes the handed-off work becomes visible this way, so it can enter the leaf's `sources` and close when the delivering issue completes. If a destination refresh fails, only that destination's handoff waits. When the work names model-sensitive work, such as a leaf calling for a different model or harness, the door can also ask about setting different execution seats for the issue or epic.
 
 You get work that can be dispatched without reopening product decisions in the middle of a coding pass.
 
