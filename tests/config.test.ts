@@ -598,6 +598,8 @@ test('seats throws SeatIndexError naming the file and seat for malformed indexes
     failure('---\nslots:\n\t- x\n---\n# t\n', [file]);
     failure('---\nslots:\n  a:\n    harness: fake\n    model: a\n    effort: low\n', [file]);
     failure('---\nfoo: 1\n---\n# t\n', [file, 'foo']);
+    failure('---\n---\n# t\n', [file]);
+    failure('---\nslots: 5\n---\n# t\n', [file, 'slots']);
     failure('---\nslots:\n  c:\n    harness: fake\n    model: a\n    effort: low\n---\n# t\n', [file, 'c']);
     failure('---\nslots:\n  a:\n    harness: fake\n    model: a\n---\n# t\n', [file, 'slots.a']);
     failure('---\nslots:\n  a:\n    harness: fake\n    model: "   "\n    effort: low\n---\n# t\n', [file, 'slots.a']);

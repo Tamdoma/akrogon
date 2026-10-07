@@ -17,7 +17,7 @@ const seat: z.ZodString = z
 const slotConfigSchema = z.strictObject({ harness: seat, model: seat, effort: seat });
 
 const indexSchema = z.strictObject({
-  slots: z.strictObject({ a: slotConfigSchema.optional(), b: slotConfigSchema.optional() }).default({}),
+  slots: z.strictObject({ a: slotConfigSchema.optional(), b: slotConfigSchema.optional() }),
 });
 
 export const globalSchema = z
