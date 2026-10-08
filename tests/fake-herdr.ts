@@ -1,7 +1,17 @@
 #!/usr/bin/env bun
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { z } from 'zod';
-import { paneSchema, tabSchema, workspaceSchema, type Pane, type Tab } from '../src/shell';
+import { paneSchema, tabSchema, workspaceSchema } from '../src/shell';
+
+const rectSchema = z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() });
+type Rect = z.infer<typeof rectSchema>;
+const ROOT_RECT: Rect = { x: 0, y: 0, width: 120, height: 40 };
+const fakePaneSchema = paneSchema.extend({ rect: rectSchema.optional(), focused: z.boolean().optional() });
+type FakePane = z.infer<typeof fakePaneSchema>;
+const fakeTabSchema = tabSchema.extend({
+  focused: z.boolean().optional(),
+  workspace_id: z.string().optional(),
+});
 
 const scriptEntrySchema = z.object({
   code: z.string().optional(),
@@ -14,8 +24,8 @@ const waitEntrySchema = scriptEntrySchema.extend({
   sleepMs: z.number().optional(),
 });
 const databaseSchema = z.object({
-  panes: z.array(paneSchema),
-  tabs: z.array(tabSchema),
+  panes: z.array(fakePaneSchema),
+  tabs: z.array(fakeTabSchema),
   workspaces: z.array(workspaceSchema).default([
     { workspace_id: 'w1', label: 'repo' },
     { workspace_id: 'w3', label: 'other' },
@@ -25,6 +35,7 @@ const databaseSchema = z.object({
   failPrompts: z.boolean().default(false),
   blockOnStart: z.boolean().default(false),
   failSplitOnce: z.boolean().default(false),
+  failSwapOnce: z.boolean().default(false),
   failNotification: z.boolean().default(false),
   failNotificationOnce: z.boolean().default(false),
   failRename: z.boolean().default(false),
@@ -70,8 +81,8 @@ function flag(name: string): string {
   if (index === -1) throw new Error(`Missing flag ${name}`);
   return args[index + 1];
 }
-function pane(id: string): Pane {
-  const found: Pane | undefined = db.panes.find((p) => p.pane_id === id);
+function pane(id: string): FakePane {
+  const found: FakePane | undefined = db.panes.find((p) => p.pane_id === id);
   if (found === undefined) throw new Error(`Missing pane ${id}`);
   return found;
 }
@@ -108,13 +119,17 @@ if (args[0] === 'tab' && args[1] === 'list') result({ tabs: db.tabs });
 if (args[0] === 'workspace' && args[1] === 'list') result({ workspaces: db.workspaces });
 if (args[0] === 'tab' && args[1] === 'create') {
   const workspace: string = args.includes('--workspace') ? flag('--workspace') : 'w1';
-  const tab: Tab = { tab_id: `${workspace}:t${++db.serial}`, label: flag('--label') };
-  const root: Pane = {
+  const focused: boolean = db.tabs.every((t) => !t.focused) || !args.includes('--no-focus');
+  if (focused) for (const t of db.tabs) t.focused = false;
+  const tab = { tab_id: `${workspace}:t${++db.serial}`, label: flag('--label'), workspace_id: workspace, focused };
+  const root: FakePane = {
     pane_id: `w1:p${++db.serial}`,
     tab_id: tab.tab_id,
     cwd: flag('--cwd'),
     agent: null,
     agent_status: 'unknown',
+    rect: { ...ROOT_RECT },
+    focused: true,
   };
   db.tabs.push(tab);
   db.panes.push(root);
@@ -126,18 +141,54 @@ if (args[0] === 'pane' && args[1] === 'split') {
     db.failSplitOnce = false;
     failure('fixture_split_failed');
   }
-  const sibling: Pane = {
+  const source: FakePane = pane(args[2]);
+  const parent: Rect = source.rect ?? { ...ROOT_RECT };
+  const left: number = Math.floor(parent.width / 2);
+  source.rect = { ...parent, width: left };
+  const sibling: FakePane = {
     pane_id: `w1:p${++db.serial}`,
-    tab_id: pane(args[2]).tab_id,
+    tab_id: source.tab_id,
     cwd: flag('--cwd'),
     agent: null,
     agent_status: 'unknown',
+    rect: { x: parent.x + left, y: parent.y, width: parent.width - left, height: parent.height },
+    focused: false,
   };
   db.panes.push(sibling);
   result({ pane: sibling });
 }
+if (args[0] === 'pane' && args[1] === 'swap') {
+  if (db.failSwapOnce) {
+    db.failSwapOnce = false;
+    failure('fixture_swap_failed');
+  }
+  const source: FakePane = pane(flag('--source-pane'));
+  const target: FakePane = pane(flag('--target-pane'));
+  const rect: Rect | undefined = source.rect;
+  source.rect = target.rect;
+  target.rect = rect;
+  for (const p of db.panes) if (p.tab_id === source.tab_id) p.focused = p.pane_id === source.pane_id;
+  for (const t of db.tabs) t.focused = t.tab_id === source.tab_id;
+  result({ changed: true });
+}
+if (args[0] === 'pane' && args[1] === 'layout') {
+  const current: FakePane = pane(flag('--pane'));
+  const members: FakePane[] = db.panes.filter((p) => p.tab_id === current.tab_id);
+  const focusedPane: FakePane = members.find((p) => p.focused) ?? members[0];
+  result({
+    layout: {
+      tab_id: current.tab_id,
+      focused_pane_id: focusedPane.pane_id,
+      panes: members.map((p) => ({
+        pane_id: p.pane_id,
+        rect: p.rect ?? { ...ROOT_RECT },
+        focused: p.focused ?? false,
+      })),
+    },
+  });
+}
 if (args[0] === 'agent' && args[1] === 'start') {
-  const target: Pane = pane(flag('--pane'));
+  const target: FakePane = pane(flag('--pane'));
   if (!/^[a-z][a-z0-9_-]{0,31}$/.test(args[2])) failure('invalid_agent_name');
   if (
     db.starts.some(
@@ -155,7 +206,7 @@ if (args[0] === 'agent' && args[1] === 'start') {
   result({ agent: target });
 }
 if (args[0] === 'agent' && args[1] === 'prompt') {
-  const target: Pane = pane(args[2]);
+  const target: FakePane = pane(args[2]);
   if (!['idle', 'done'].includes(target.agent_status)) throw new Error('Prompt sent to non-idle fixture');
   if (flag('--until') !== 'working' || !args.includes('--wait') || flag('--timeout') !== '5000')
     throw new Error('Wrong prompt wait contract');
@@ -170,7 +221,7 @@ if (args[0] === 'agent' && args[1] === 'prompt') {
   result({ agent: target });
 }
 if (args[0] === 'agent' && args[1] === 'wait') {
-  const target: Pane = pane(args[2]);
+  const target: FakePane = pane(args[2]);
   if (Number.isNaN(Number(flag('--timeout')))) failure('invalid_timeout');
   const entry: z.infer<typeof waitEntrySchema> | undefined = db.waitScript.shift();
   const sleepMs: number =
@@ -192,11 +243,17 @@ if (args[0] === 'tab' && args[1] === 'close') {
   result({});
 }
 if (args[0] === 'tab' && args[1] === 'rename') {
-  const found: Tab | undefined = db.tabs.find((t) => t.tab_id === args[2]);
+  const found = db.tabs.find((t) => t.tab_id === args[2]);
   if (found === undefined) failure('tab_not_found');
   scriptedFailure(db.renameScript.shift());
   if (db.failRename) failure('timeout');
   found.label = args[3];
+  result({ tab: found });
+}
+if (args[0] === 'tab' && args[1] === 'focus') {
+  const found = db.tabs.find((t) => t.tab_id === args[2]);
+  if (found === undefined) failure('tab_not_found');
+  for (const t of db.tabs) t.focused = t.tab_id === args[2];
   result({ tab: found });
 }
 throw new Error(`Unexpected fixture invocation: ${JSON.stringify(args)}`);
