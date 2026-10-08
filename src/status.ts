@@ -29,6 +29,7 @@ import { readLog, type LogRecord } from './log';
 import { mergeQueue, type QueueEntry } from './turn';
 import { issueFolders } from './park';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
+import { readPaused } from './pause';
 
 type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
 type Scan =
@@ -325,6 +326,7 @@ function chartRows(root: string, now: number): string[][] {
 
 export async function statusCommand(slug: string | undefined, charts: boolean = false): Promise<void> {
   const global: GlobalConfig = readGlobal();
+  const paused: Set<string> = readPaused();
   if (slug !== undefined) {
     const repo: Repo = await requireRepo(global, process.cwd());
     const leaf: Leaf = findLeaf(repo, slug);
@@ -333,6 +335,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
       .slice(-10);
     const missing: Gap[] = leafGaps(global, leaf);
     console.log(Bun.YAML.stringify(leaf.state, null, 2).trimEnd());
+    if (paused.has(repo.name)) console.log(`paused: ${repo.name}`);
     for (const gap of missing)
       console.log(`Missing: ${repo.name}/${slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`);
     console.log('History:');
@@ -376,7 +379,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   }
   for (const scan of scans) {
     if (!scan.ok) continue;
-    console.log(paint('1;4', scan.repo.name));
+    console.log(paint('1;4', paused.has(scan.repo.name) ? `${scan.repo.name} (paused)` : scan.repo.name));
     if (charts) {
       const lines: string[][] = chartRows(scan.repo.root, now);
       if (lines.length > 0)
