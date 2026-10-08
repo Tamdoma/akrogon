@@ -55,6 +55,7 @@ Check these choices:
 - **grounding** points agents to the project's reference index, or disables that lookup.
 - **worktree_root** says where leaf checkouts go.
 - **rebuttal** controls the paired planning rebuttal.
+- **direct** (default false) lets the chart door offer the direct route at the handoff review. The operator still chooses per chart.
 - **fix_rounds** limits review repair handoffs to A.
 - **slots** optionally replaces a machine seat for this repo — a full {harness, model, effort} per seat (a or b); it applies at the next agent start.
 - **setup** optionally runs before your checks, usually to install dependencies.
