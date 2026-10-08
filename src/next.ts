@@ -1288,8 +1288,8 @@ async function paneOwners(
 export async function nextCommand(input: string | undefined): Promise<void> {
   const rawEvent: string | undefined = input === undefined ? process.env.HERDR_PLUGIN_EVENT_JSON : undefined;
   const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
-  if (event?.event === 'pane_agent_status_changed' && event.data.agent_status === 'working') return;
   readPaused();
+  if (event?.event === 'pane_agent_status_changed' && event.data.agent_status === 'working') return;
   const global: GlobalConfig = readGlobal();
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
   const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
