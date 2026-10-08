@@ -15,11 +15,26 @@ cd ~/Work/widgets
 akrogon next export-csv
 ```
 
+Start or continue every leaf of an issue or epic by name:
+
+```sh
+akrogon next csv
+akrogon next data-exports
+```
+
 Consider leaves under a path:
 
 ```sh
 akrogon next issues/open/export-csv
 ```
+
+A bare name must match exactly one candidate. A name matching two or more is refused before anything starts, with each match listed by kind and path. When an issue and its leaf share a name, select by folder path:
+
+```sh
+akrogon next issues/open/export-csv/export-csv
+```
+
+An input that exists as a folder from the current directory keeps path meaning, even if an owner or leaf elsewhere shares the name.
 
 Sweep the current repository:
 
