@@ -252,7 +252,9 @@ test('incomplete repositories report exact paths before readable trees and exit 
       const empty: Result = await cli(f, ['status'], f.home);
       expect(empty.code).toBe(0);
       expect(empty.stdout).not.toContain('unreadable');
-      expect(empty.stdout.split('\n').slice(0, 4)).toEqual(['bad', '  no open leaves', '  parked  resting', 'good']);
+      expect(empty.stdout.split('\n')[0]).toBe('bad');
+      expect(cell(empty.stdout, leafRow(empty.stdout, 'resting'), 'PHASE')).toBe('parked');
+      expect(empty.stdout).not.toContain('no open leaves');
       expect(cell(empty.stdout, leafRow(empty.stdout, 'visible'), 'PHASE')).toBe('implement');
     }
     rmSync(open, { recursive: true });

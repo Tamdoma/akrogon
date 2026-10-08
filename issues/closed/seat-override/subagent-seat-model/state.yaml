@@ -1,0 +1,33 @@
+slug: subagent-seat-model
+phase: merged
+created: 2026-10-07
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t9A
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/subagent-seat-model
+pane: 
+  A: w8:pHM
+  B: w8:pHN
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-07T21:18:51.617Z

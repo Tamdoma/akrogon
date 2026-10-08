@@ -123,11 +123,10 @@ Container indexes hold no lifecycle state or global order; their optional `slots
 
 ### seats.yaml
 
-The door writes one `seats.yaml` per chart holding the open time, the restatements count and one entry per seat session:
+The door writes one `seats.yaml` per chart holding the open time and one entry per seat session:
 
 ```yaml
 opened: '2026-10-06T16:34:47Z'
-restatements: 0
 seats:
   - seat: A
     pane: w8:pCT
@@ -135,7 +134,7 @@ seats:
     session: 1ce71920-4c64-414b-ac1c-af56890a1c4b
 ```
 
-`opened` is the time the door began its first pass on the chart and is never reset by folder creation or session replacement. `restatements` is a non-negative integer the door adds to each time it answers a restatement request on a round that records a fork answer. `pane`, `harness` and `session` are the `pane_id`, `agent` and `agent_session.value` values `herdr agent list` prints. A replaced session is a second entry with the same seat letter. Outside herdr `seats` is empty.
+`opened` is the time the door began its first pass on the chart and is never reset by folder creation or session replacement. `pane`, `harness` and `session` are the `pane_id`, `agent` and `agent_session.value` values `herdr agent list` prints. A replaced session is a second entry with the same seat letter. Outside herdr `seats` is empty.
 
 ## Leaf files
 

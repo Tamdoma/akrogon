@@ -10,9 +10,8 @@ const seatSchema = z.strictObject({
   harness: z.string().min(1),
   session: z.string().min(1),
 });
-const seatsSchema = z.strictObject({
+const seatsSchema = z.object({
   opened: z.iso.datetime(),
-  restatements: z.int().nonnegative(),
   seats: z.array(seatSchema),
 });
 const codexOperatorMetadataSchema = z.object({
@@ -408,7 +407,7 @@ function main(): void {
     .filter((l) => !measured.some((m) => m.seat === l))
     .map((l) => `${l}=unmeasured`);
   const summary: string =
-    `chart ${basename(chart)} - operator wait ${mins(0, waitMs)} min, operator turns ${opRows.length}, restatements ${seats.restatements}` +
+    `chart ${basename(chart)} - operator wait ${mins(0, waitMs)} min, operator turns ${opRows.length}` +
     (parts.length + unmeasuredParts.length > 0 ? `; ${[...parts, ...unmeasuredParts].join(', ')} output` : '');
 
   const lines: string[] = [summary, '', `window ${iso(openMs)} to ${iso(untilMs)}`, ''];
@@ -422,7 +421,6 @@ function main(): void {
   lines.push(
     '- a turn runs from an operator message to the end of the reply before the next operator message; a codex turn runs from task_started to task_complete; operator wait is the sum of completed operator-turn spans.',
   );
-  lines.push('- restatement requests on rounds that record no fork answer are not counted.');
   lines.push('');
   for (const m of measured) {
     const sessions: string = m.sessions.map((s) => s.session).join(' + ');
@@ -467,7 +465,6 @@ function main(): void {
     else lines.push(`  ${iso(o.startMs)} ${mins(o.startMs, o.replyEndMs)} min${outputs ? `, output ${outputs}` : ''}`);
   }
   lines.push(`  total operator wait ${mins(0, waitMs)} min`);
-  lines.push(`restatements ${seats.restatements}`);
   lines.push('');
   writeFileSync(join(chart, 'USAGE.md'), lines.join('\n'));
 

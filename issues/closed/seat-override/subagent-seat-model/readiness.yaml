@@ -1,0 +1,31 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-10-07'
+      answer: '1a - make sure to remove teh hardcoded Sonnet, and make it a variable.'
+    principal: seat A agent on this machine
+    account: Claude Max login of ops@mdconsultingny.com (claude auth status)
+    credential:
+      name: Claude Code OAuth login in the Claude Code configuration directory
+      holder: machine
+    targets: [Anthropic API through the claude CLI]
+    fixtures: []
+    operations:
+      - 'claude -p with the launch argv from config.yaml, --output-format stream-json --forward-subagent-text --max-turns 6 --max-budget-usd 1'
+    effects: API spend only, at most $1 per run, no data written outside local transcripts
+    bounds: at most 5 runs for this leaf including repairs; no --bare; no interactive session; no settings file written
+    stop_line: any other account, provider or model family, or any run without the budget cap
+retained: []
+proofs:
+  - operation: claude -p run with the changed template argv, subagent model read from stream-json
+    command: bun probe.ts (parse(template with {model}=opus, {effort}=low) + -p "Use the Agent tool once ..." --output-format stream-json --verbose --forward-subagent-text --max-turns 6 --max-budget-usd 1)
+    identity: operator Claude Max login on this machine
+    target: Anthropic API via claude CLI 2.1.292
+    version: 2.1.292
+    date: '2026-10-07'
+    result: exit 0; assistant rows with parent_tool_use_id report claude-opus-5-5; control with the sonnet template reports claude-sonnet-5-5; cost $0.23 plus $0.2 control
+    cleanup: none required; only local -p transcripts
+    limits: --bare reports not logged in; proves routing of one general-purpose subagent, not writing quality or every subagent kind
+    record: issues/chart/leaf-seat-override/forks/worker-model.md

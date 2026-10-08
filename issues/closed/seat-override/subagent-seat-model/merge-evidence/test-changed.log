@@ -1,0 +1,12 @@
+bun test v1.4.2 (744846f84)
+--changed: 2 changed files, running 1/25 test files
+
+tests/harness-template.test.ts:
+(pass) claude template carries no literal subagent model inside --settings [2.12ms]
+(pass) claude template substitutes opus into the subagent model env [0.22ms]
+(pass) claude template substitutes claude-opus-5-5 into the subagent model env [0.12ms]
+
+ 3 pass
+ 0 fail
+ 7 expect() calls
+Ran 3 tests across 1 file. [31.00ms]

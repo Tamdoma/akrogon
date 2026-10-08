@@ -29,7 +29,13 @@ test('park and unpark move whole issues by name, refuse running ones, and keep t
     const status: Result = await cli(f, ['status']);
     expect(status.code).toBe(0);
     expect(status.stdout).not.toContain('docs-a');
-    expect(status.stdout).toContain('parked  docs, small-issue');
+    const lines: string[] = status.stdout.split('\n');
+    const busy: number = lines.findIndex((line) => /^\s*busy-issue\s*$/.test(line));
+    expect(lines.slice(busy + 2).map((line) => line.split(/\s+/).filter(Boolean))).toEqual([
+      [],
+      ['docs', 'parked'],
+      ['small-issue', 'parked'],
+    ]);
     expect((await cli(f, ['next', '--all'], f.root, fakeHerdr(f))).stdout).not.toContain('docs-a');
     expect(existsSync(resolve(f.root, 'issues/parked/docs/docs-a/state.yaml'))).toBe(true);
     const refused: Result = await cli(f, ['park', 'busy-issue']);
@@ -65,7 +71,7 @@ test('park --all skips running issues and unpark --all restores everything', asy
     expect(restored.code).toBe(0);
     expect(readdirSync(resolve(f.root, 'issues/open')).sort()).toEqual(['busy-issue', 'first', 'second']);
     expect(readdirSync(resolve(f.root, 'issues/parked'))).toEqual([]);
-    expect((await cli(f, ['status'])).stdout).not.toContain('parked  ');
+    expect((await cli(f, ['status'])).stdout).not.toMatch(/\sparked\b/);
   } finally {
     f.clean();
   }

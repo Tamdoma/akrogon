@@ -1,0 +1,33 @@
+slug: index-seats
+phase: merged
+created: 2026-10-07
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t99
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/index-seats
+pane: 
+  A: w8:pHJ
+  B: w8:pHK
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-07T22:03:59.689Z

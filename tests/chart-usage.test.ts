@@ -16,7 +16,7 @@ type World = {
   chart: string;
   parent: string;
   chartDir: (name: string) => string;
-  putSeats: (chart: string, seats: Seat[], restatements?: number, openedAt?: string) => void;
+  putSeats: (chart: string, seats: Seat[], openedAt?: string) => void;
   putTranscript: (harness: string, session: string, file: string, extraDir?: string) => void;
   run: (...args: string[]) => Promise<RunResult>;
   clean: () => void;
@@ -39,8 +39,8 @@ function setup(): World {
       mkdirSync(d, { recursive: true });
       return d;
     },
-    putSeats: (c: string, seats: Seat[], restatements: number = 0, openedAt: string = opened): void => {
-      const lines: string[] = [`opened: '${openedAt}'`, `restatements: ${restatements}`];
+    putSeats: (c: string, seats: Seat[], openedAt: string = opened): void => {
+      const lines: string[] = [`opened: '${openedAt}'`];
       if (seats.length === 0) lines.push('seats: []');
       else lines.push('seats:');
       for (const s of seats)
@@ -98,7 +98,6 @@ test('writes USAGE.md, counts transcripts exactly, prints summary and outcome do
     const summary: string = lines[0];
     expect(summary).toContain('operator wait 99.4 min');
     expect(summary).toContain('operator turns 20');
-    expect(summary).toContain('restatements 0');
     expect(summary).toMatch(/A=\d+/);
     expect(summary).toMatch(/B=\d+/);
     expect(lines[1]).toBe('outcome done');
@@ -149,13 +148,7 @@ test('USAGE.md states the required limits', async (): Promise<void> => {
     const r: RunResult = await w.run(w.chart, until);
     expect(r.code).toBe(0);
     const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
-    for (const fragment of [
-      /tokens|token/,
-      /not.*(dollar|cost)/i,
-      /whole-session|whole session/i,
-      /subagent/i,
-      /restatement/i,
-    ]) {
+    for (const fragment of [/tokens|token/, /not.*(dollar|cost)/i, /whole-session|whole session/i, /subagent/i]) {
       expect(md).toMatch(fragment);
     }
     // opening reply was split by compaction -> not-whole-map note on the first-turn row
@@ -216,7 +209,7 @@ test('second run replaces USAGE.md and prints sibling first lines sorted', async
     writeFileSync(resolve(sibZ, 'USAGE.md'), 'sib-z summary line\nrest\n');
     w.chartDir('no-usage');
     writeFileSync(resolve(w.parent, 'stray-file'), 'x');
-    w.putSeats(w.chart, [], 0);
+    w.putSeats(w.chart, []);
     const r1: RunResult = await w.run(w.chart);
     expect(r1.code).toBe(0);
     const lines1: string[] = r1.stdout.trimEnd().split('\n');
@@ -270,7 +263,7 @@ test('two sessions of one seat are added and an ended session shows whole-sessio
 test('records outside the window are excluded on both sides', async (): Promise<void> => {
   const w: World = setup();
   try {
-    w.putSeats(w.chart, [{ seat: 'B', harness: 'codex', session: 'codex-diff' }], 0, '2026-10-06T10:30:00Z');
+    w.putSeats(w.chart, [{ seat: 'B', harness: 'codex', session: 'codex-diff' }], '2026-10-06T10:30:00Z');
     w.putTranscript('codex', 'codex-diff', 'codex/codex-diff.jsonl');
     const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
     expect(r.code).toBe(0);
@@ -317,7 +310,7 @@ test('a codex counter reset marks the seat usage unmeasured and partial', async 
 test('a counter reset wholly inside the window is reported instead of losing earlier usage', async (): Promise<void> => {
   const w: World = setup();
   try {
-    w.putSeats(w.chart, [{ seat: 'A', harness: 'codex', session: 'codex-reset' }], 0, '2026-10-06T10:00:00Z');
+    w.putSeats(w.chart, [{ seat: 'A', harness: 'codex', session: 'codex-reset' }], '2026-10-06T10:00:00Z');
     w.putTranscript('codex', 'codex-reset', 'codex/codex-reset.jsonl');
     const r: RunResult = await w.run(w.chart, until);
     expect(r.code).toBe(0);
@@ -365,7 +358,7 @@ test('unmeasured seats name the file or field; other seats still measure', async
 test('non-operator user records start no turn and an unfinished turn is incomplete', async (): Promise<void> => {
   const w: World = setup();
   try {
-    w.putSeats(w.chart, [{ seat: 'A', harness: 'claude', session: 'claude-ops' }], 0, '2026-10-06T10:00:00Z');
+    w.putSeats(w.chart, [{ seat: 'A', harness: 'claude', session: 'claude-ops' }], '2026-10-06T10:00:00Z');
     w.putTranscript('claude', 'claude-ops', 'claude/claude-ops.jsonl');
     const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
     expect(r.code).toBe(0);
@@ -406,10 +399,10 @@ test('missing chart folder or bad seats.yaml exit non-zero with no USAGE.md', as
     const r3: RunResult = await w.run(w.chart);
     expect(r3.code).toBe(1);
     expect(readdirSync(w.chart)).toEqual(['seats.yaml']);
-    writeFileSync(resolve(w.chart, 'seats.yaml'), "opened: '2026-10-06T16:34:47Z'\nrestatements: many\nseats: []\n");
+    writeFileSync(resolve(w.chart, 'seats.yaml'), "opened: '2026-10-06T16:34:47Z'\nseats: many\n");
     const r4: RunResult = await w.run(w.chart);
     expect(r4.code).toBe(1);
-    expect(r4.stderr).toMatch(/restatements/);
+    expect(r4.stderr).toMatch(/seats/);
     expect(readdirSync(w.chart)).toEqual(['seats.yaml']);
   } finally {
     w.clean();

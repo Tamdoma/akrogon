@@ -2,74 +2,7 @@
 import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
-
-const phaseSchema = z.enum([
-  'plan.positions',
-  'plan.rebuttal',
-  'plan.synthesis',
-  'implement',
-  'check.review',
-  'check.repair',
-  'check.fix',
-  'merge',
-  'merged',
-  'failed',
-]);
-
-const slotSchema = z.enum(['A', 'B']);
-
-const verdictSchema = z.enum(['ready', 'nits', 'fix']);
-
-const failureSchema = z.strictObject({
-  cause: z.enum(['blocked', 'attempts']),
-  phase: phaseSchema,
-  slot: slotSchema,
-  reason: z.string().trim().min(1),
-  delivery: z.string().optional(),
-});
-
-const deliveryErrorSchema = z.strictObject({
-  command: z.array(z.string()),
-  code: z.string(),
-  message: z.string(),
-  pane: z.string(),
-  session: z.string().nullable(),
-  at: z.string(),
-  offset: z.number().int().nonnegative().optional(),
-});
-
-const sourcePattern: RegExp = /^([a-zA-Z0-9-]+\/(?!\.{1,2}#)[a-zA-Z0-9._-]+)#([1-9][0-9]*)$/;
-
-const counts = z.object({ A: z.number().int().nonnegative().default(0), B: z.number().int().nonnegative().default(0) });
-
-const stateSchema = z
-  .strictObject({
-    slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-    phase: phaseSchema,
-    created: z.string(),
-    repo: z.string(),
-    debate: z.enum(['yes', 'no']),
-    'blocked-by': z.array(z.string()),
-    sources: z.array(z.string().regex(sourcePattern)).optional(),
-    hand_built: z.boolean().optional(),
-    busy_since: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
-    busy_notified: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
-    attempts: counts.prefault({}),
-    done: z.array(slotSchema).default([]),
-    fix_rounds: z.number().int().nonnegative().default(0),
-    verdict: z.object({ A: verdictSchema.optional(), B: verdictSchema.optional() }).default({}),
-    tab: z.string().min(1).optional(),
-    worktree: z.string().min(1).optional(),
-    pane: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
-    prompted: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
-    prompted_at: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
-    delivery_error: z.object({ A: deliveryErrorSchema.optional(), B: deliveryErrorSchema.optional() }).default({}),
-    failure: failureSchema.optional(),
-  })
-  .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
-
-type State = z.infer<typeof stateSchema>;
-type Leaf = { path: string; state: State };
+import { stateSchema, type Leaf, type State } from '../../../src/state';
 
 const agentStatusSchema = z.enum(['idle', 'done', 'working', 'blocked', 'unknown']);
 

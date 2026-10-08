@@ -195,7 +195,7 @@ function paint(code: string, text: string): string {
   return colorEnabled && code !== '' && text !== '' ? `\x1b[${code}m${text}\x1b[0m` : text;
 }
 
-const phaseColor: Record<string, string> = { plan: '34', implement: '33', check: '35', merge: '32', failed: '31' };
+const phaseColor: Record<string, string> = { plan: '34', implement: '33', check: '35', merge: '32', failed: '31', parked: '2' };
 
 const stageColor: Record<string, string> = { 'handed off': '32', charting: '33', empty: '2' };
 
@@ -384,10 +384,11 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
       else console.log('  no charts');
       continue;
     }
-    if (scan.leaves.length > 0)
-      console.log(render(header, [['  LEAF', ...header.slice(1)], ...rows(scan, now)]).join('\n'));
+    const parked: string[][] = scan.parked.map((name) => [`${indent(0)}${name}`, 'parked', '', '', '', '']);
+    const separator: string[][] = scan.leaves.length > 0 && parked.length > 0 ? [['', '', '', '', '', '']] : [];
+    const lines: string[][] = [...rows(scan, now), ...separator, ...parked];
+    if (lines.length > 0) console.log(render(header, [['  LEAF', ...header.slice(1)], ...lines]).join('\n'));
     else console.log('  no open leaves');
-    if (scan.parked.length > 0) console.log(`  parked  ${scan.parked.join(', ')}`);
   }
   if (scans.some((scan) => !scan.ok)) process.exitCode = 1;
 }
