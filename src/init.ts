@@ -28,17 +28,24 @@ export async function initialize(
 ): Promise<void> {
   const root: string = await command(['git', 'rev-parse', '--show-toplevel'], cwd);
   const repoPath: string = resolve(root, 'issues/config.yaml');
-  const config: RepoConfig = repoSchema.parse(
-    proposal !== undefined
-      ? Bun.YAML.parse(readFileSync(resolve(cwd, proposal), 'utf8'))
-      : existsSync(repoPath)
-        ? Bun.YAML.parse(readFileSync(repoPath, 'utf8'))
-        : { grounding: 'none' },
-  );
+  const repoName: string = basename(root);
+  let config: RepoConfig;
+  try {
+    config = repoSchema.parse(
+      proposal !== undefined
+        ? Bun.YAML.parse(readFileSync(resolve(cwd, proposal), 'utf8'))
+        : existsSync(repoPath)
+          ? Bun.YAML.parse(readFileSync(repoPath, 'utf8'))
+          : { grounding: 'none' },
+    );
+  } catch (error) {
+    if (!(error instanceof Error)) throw new Error(`repo ${repoName}: ${String(error)}`, { cause: error });
+    error.message = `repo ${repoName}: ${error.message}`;
+    throw error;
+  }
   const global: GlobalConfig = readGlobal();
   const toolkitPair: RegExpMatchArray | null = toolkit === undefined ? null : toolkit.match(/^([^=\s]+)=(.+)$/);
   if (toolkit !== undefined && toolkitPair === null) throw new Error('Expected --toolkit <lang>=<runner>');
-  const repoName: string = basename(root);
   if (Object.hasOwn(global.repos, repoName) && resolve(globalHome(), global.repos[repoName]) !== root)
     throw new Error(`Repo name already registered: ${repoName}`);
   seats(global, { name: repoName, root, config });

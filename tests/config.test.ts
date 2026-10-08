@@ -692,3 +692,74 @@ test('config prints leaf-resolved slots in a managed leaf worktree only', async 
     f.clean();
   }
 });
+
+test('config defaults merge_covers to empty and prints it', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none' });
+    const result = await cli(f, ['config']);
+    expect(result.code).toBe(0);
+    expect(Bun.YAML.parse(result.stdout)).toMatchObject({ merge_covers: [] });
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { keep: 'true', drop: 'true' },
+      merge_checks: { full: 'true' },
+      merge_covers: ['drop'],
+      grounding: 'none',
+    });
+    const set = await cli(f, ['config']);
+    expect(set.code).toBe(0);
+    expect(Bun.YAML.parse(set.stdout)).toMatchObject({ merge_covers: ['drop'] });
+  } finally {
+    f.clean();
+  }
+});
+
+test('config refuses unknown merge_covers names and empty merge_checks with covers', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { keep: 'true' },
+      merge_checks: { full: 'true' },
+      merge_covers: ['nope'],
+      grounding: 'none',
+    });
+    const unknown = await cli(f, ['config']);
+    expect(unknown.code).not.toBe(0);
+    expect(unknown.stderr).toContain('repo');
+    expect(unknown.stderr).toContain('nope');
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { keep: 'true' },
+      merge_covers: ['keep'],
+      grounding: 'none',
+    });
+    const empty = await cli(f, ['config']);
+    expect(empty.code).not.toBe(0);
+    expect(empty.stderr).toContain('repo');
+    expect(empty.stderr).toContain('keep');
+  } finally {
+    f.clean();
+  }
+});
+
+test('config leaves merge_covers unwrapped when setup is set', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'bun install --frozen-lockfile',
+      checks: { keep: 'true', drop: 'true' },
+      merge_checks: { full: 'true' },
+      merge_covers: ['drop'],
+      grounding: 'none',
+    });
+    const result = await cli(f, ['config']);
+    expect(result.code).toBe(0);
+    const parsed = Bun.YAML.parse(result.stdout) as {
+      checks: Record<string, string>;
+      merge_covers: string[];
+    };
+    expect(parsed.merge_covers).toEqual(['drop']);
+    expect(parsed.checks.keep).toContain('flock');
+  } finally {
+    f.clean();
+  }
+});

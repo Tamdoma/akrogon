@@ -35,30 +35,48 @@ export const globalSchema = z
     }
   });
 
-export const repoSchema = z.strictObject({
-  remote: text.default('origin'),
-  default_branch: text.default('main'),
-  worktree_root: text.default('issues/worktrees'),
-  rebuttal: z.boolean().default(true),
-  direct: z.boolean().default(false),
-  fix_rounds: z.number().int().positive().default(3),
-  implement: z.enum(['subagents', 'inline']).default('subagents'),
-  setup: text.optional(),
-  checks: z.record(text, text).default({}),
-  merge_checks: z.record(text, text).default({}),
-  advisory: z.array(text).default([]),
-  grounding: z.union([
-    z.literal('none'),
-    z.object({
-      index: text.optional(),
-      docs: z.array(text).optional(),
-      surfaces: z.array(text).optional(),
-      indexed_scopes: z.array(text).optional(),
-    }),
-  ]),
-  broadcast: z.object({ discord: z.object({ webhook_env: z.array(text) }) }).optional(),
-  slots: z.strictObject({ a: slotConfigSchema.optional(), b: slotConfigSchema.optional() }).optional(),
-});
+export const repoSchema = z
+  .strictObject({
+    remote: text.default('origin'),
+    default_branch: text.default('main'),
+    worktree_root: text.default('issues/worktrees'),
+    rebuttal: z.boolean().default(true),
+    direct: z.boolean().default(false),
+    fix_rounds: z.number().int().positive().default(3),
+    implement: z.enum(['subagents', 'inline']).default('subagents'),
+    setup: text.optional(),
+    checks: z.record(text, text).default({}),
+    merge_checks: z.record(text, text).default({}),
+    merge_covers: z.array(text).default([]),
+    advisory: z.array(text).default([]),
+    grounding: z.union([
+      z.literal('none'),
+      z.object({
+        index: text.optional(),
+        docs: z.array(text).optional(),
+        surfaces: z.array(text).optional(),
+        indexed_scopes: z.array(text).optional(),
+      }),
+    ]),
+    broadcast: z.object({ discord: z.object({ webhook_env: z.array(text) }) }).optional(),
+    slots: z.strictObject({ a: slotConfigSchema.optional(), b: slotConfigSchema.optional() }).optional(),
+  })
+  .superRefine((config, ctx) => {
+    for (const name of config.merge_covers) {
+      if (!Object.hasOwn(config.checks, name))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['merge_covers'],
+          message: `Unknown checks name in merge_covers: ${name}`,
+        });
+    }
+    if (config.merge_covers.length > 0 && Object.keys(config.merge_checks).length === 0)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['merge_covers'],
+        message: `merge_covers [${config.merge_covers.join(', ')}] requires non-empty merge_checks`,
+      });
+  });
 
 export type SlotConfig = z.infer<typeof slotConfigSchema>;
 
@@ -164,11 +182,17 @@ export function readGlobal(): GlobalConfig {
 
 export function readRepo(name: string, path: string): Repo {
   const root: string = realpathSync(expandPath(path, globalHome()));
-  return {
-    name,
-    root,
-    config: repoSchema.parse(Bun.YAML.parse(readFileSync(resolve(root, 'issues/config.yaml'), 'utf8'))),
-  };
+  try {
+    return {
+      name,
+      root,
+      config: repoSchema.parse(Bun.YAML.parse(readFileSync(resolve(root, 'issues/config.yaml'), 'utf8'))),
+    };
+  } catch (error) {
+    if (!(error instanceof Error)) throw new Error(`repo ${name}: ${String(error)}`, { cause: error });
+    error.message = `repo ${name}: ${error.message}`;
+    throw error;
+  }
 }
 
 export function within(path: string, parent: string): boolean {
