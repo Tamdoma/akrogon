@@ -575,7 +575,7 @@ test('race: pause waits for landed-batch dependent dispatch, later automatic wor
     const dependent: string = leaf(f, 'dep', 'plan.synthesis', { 'blocked-by': ['member'] }, 'dep-issue');
     saveState(holder, { ...readState(holder), phase: 'merge', merge_stamp: '2026-09-11' });
     saveState(member, { ...readState(member), phase: 'merge', merge_stamp: '2026-09-12' });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
     const batch: NonNullable<State['batch']> = readState(holder).batch as NonNullable<State['batch']>;
     await command(['git', 'push', 'origin', 'refs/heads/holder:main'], f.root);
     saveState(holder, { ...readState(holder), batch: { ...batch, candidate: batch.top as string } });
