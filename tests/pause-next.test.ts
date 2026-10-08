@@ -371,6 +371,22 @@ test('invalid pause file fails automatic and manual next naming the file', async
   }
 });
 
+test('invalid pause file fails an automatic working event naming the file', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const file: string = resolve(f.home, 'paused.yaml');
+    writeFileSync(file, '[invalid]\n');
+    const run: Result = await next(f, [], {
+      HERDR_PLUGIN_EVENT_JSON: paneEvent('pane_agent_status_changed', 'p1', 'working'),
+    });
+    expect(run.code).not.toBe(0);
+    expect(run.stderr).toContain(file);
+    expect(mutating(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
 function barrierGit(bin: string, barrier: string, realGit: string): void {
   mkdirSync(bin, { recursive: true });
   writeFileSync(
