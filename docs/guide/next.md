@@ -83,6 +83,24 @@ Park export-csv when you want it out of future sweeps. Unparking restores queue 
 akrogon park --all
 ```
 
+## Pausing automatic dispatch for a repository
+
+Pause stops automatic dispatch for the current repository without moving any files:
+
+```sh
+akrogon pause
+```
+
+While paused, the Herdr hooks, startup resume, the merge wake after a phase move, and the dependent starts, merge pass and cleanup inside those runs do nothing for that repo. Operator-typed `akrogon next <target>`, bare `akrogon next` and `akrogon next --all` still run in full, and the repo stays paused afterwards.
+
+Resume with one pass that relaunches closed seats and runs deferred cleanup:
+
+```sh
+akrogon unpause
+```
+
+Pause differs from park: park removes whole unallocated issues from the open queue until unparked, while pause freezes automatic work for the entire repo including allocated leaves, and unpause dispatches again right away. `akrogon status` marks paused repos.
+
 ## How order is decided
 
 A leaf must have valid state and satisfied dependencies. Failed leaves are skipped.

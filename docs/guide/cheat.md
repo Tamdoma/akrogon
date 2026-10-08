@@ -107,6 +107,13 @@ akrogon park export-csv
 akrogon unpark export-csv
 ```
 
+Pause automatic dispatch for the current repository, then resume with one pass:
+
+```sh
+akrogon pause
+akrogon unpause
+```
+
 Start or stop the optional watcher in Claude Code only:
 
 ```text

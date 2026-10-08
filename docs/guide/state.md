@@ -43,7 +43,7 @@ blocked-by:
 sources: []
 ```
 
-To keep work away from agents, park its issue with `akrogon park <issue>`. Parking removes the whole issue from the open queue (see [next.md](next.md)).
+To keep work away from agents, park its issue with `akrogon park <issue>`. Parking removes the whole issue from the open queue (see [next.md](next.md)). To freeze automatic work for the whole repo including allocated leaves instead, pause it with `akrogon pause` (see [next.md](next.md)).
 
 ## The fields Akrogon owns
 
