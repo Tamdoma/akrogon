@@ -317,6 +317,29 @@ test('config requires explicit grounding', async () => {
   }
 });
 
+test('config prints direct, defaults it to false, and rejects non-boolean values', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = resolve(f.root, 'issues/config.yaml');
+    yaml(path, { grounding: 'none', direct: true });
+    const direct = await cli(f, ['config']);
+    expect(direct.code).toBe(0);
+    expect(Bun.YAML.parse(direct.stdout)).toMatchObject({ direct: true });
+    expect((await cli(f, ['status'])).code).toBe(0);
+    yaml(path, { grounding: 'none' });
+    expect(Bun.YAML.parse((await cli(f, ['config'])).stdout)).toMatchObject({ direct: false });
+    expect(Bun.YAML.parse((await cli(f, ['config'], f.home)).stdout)).toMatchObject({ repo: 'none', direct: false });
+    for (const value of ['yes', '1']) {
+      writeFileSync(path, `grounding: none\ndirect: ${value}\n`);
+      const bad = await cli(f, ['config']);
+      expect(bad.code).not.toBe(0);
+      expect(bad.stderr).toContain('direct');
+    }
+  } finally {
+    f.clean();
+  }
+});
+
 async function installFixture(f: Fixture, config: object): Promise<void> {
   mkdirSync(resolve(f.root, 'vendor/widget'), { recursive: true });
   writeFileSync(resolve(f.root, 'vendor/widget/package.json'), JSON.stringify({ name: 'widget', version: '1.0.0' }));

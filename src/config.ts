@@ -40,6 +40,7 @@ export const repoSchema = z.strictObject({
   default_branch: text.default('main'),
   worktree_root: text.default('issues/worktrees'),
   rebuttal: z.boolean().default(true),
+  direct: z.boolean().default(false),
   fix_rounds: z.number().int().positive().default(3),
   implement: z.enum(['subagents', 'inline']).default('subagents'),
   setup: text.optional(),
