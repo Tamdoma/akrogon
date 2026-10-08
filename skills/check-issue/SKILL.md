@@ -1,13 +1,13 @@
 ---
 name: check-issue
-description: Review a leaf implementation with concrete-defect verdicts, repair most Fixes as slot B in check.repair, or re-check A's repair diff as slot B.
+description: Review a leaf implementation with concrete-defect verdicts, repair most Fixes as slot B in check.repair, or re-check A's repair diff as slot B; also review a chart's direct-route implementation as slot B.
 ---
 
 Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
 
 # Check issue
 
-The prompt is `check-issue <slug> slot=<A|B> phase=check.review leaf=<folder>` or `check-issue <slug> slot=B phase=check.repair leaf=<folder>`, where `phase=check.repair` belongs only to B; initial review has both slots, while a review after repair belongs only to B.
+The prompt is `check-issue <slug> slot=<A|B> phase=check.review leaf=<folder>` or `check-issue <slug> slot=B phase=check.repair leaf=<folder>`, where `phase=check.repair` belongs only to B; initial review has both slots, while a review after repair belongs only to B. With no leaf, the chart door prompts B with `check-issue direct slot=B chart=<chart-folder> worktree=<path> base=<sha> head=<sha> out=<chart>/slots/<file>`, followed as in Standalone review.
 
 ## Shared context
 
@@ -87,6 +87,12 @@ After repairs, B runs proof for every done-criterion in `plan.md` and every `che
 B appends a dated `check.repair` entry to `review-B.md` naming each Fix repaired, its commits and its evidence, plus any `Handed to A` list.
 
 Before its move to `merge`, B records each reusable Nit it still holds, skipping Nits already written for this leaf in `review-B.md`, as one line naming mechanism/date/history in the registered checkout's `learnings/LESSONS.md` plus a `learnings/history/` file with case, evidence and learning, left for the operator to commit. Finish with `akrogon phase <slug> merge --slot B` when nothing is handed to A and no operator action is open, or `akrogon phase <slug> check.fix --slot B` when any `Handed to A` item remains; the command counts that handoff and answers `moved failed` at the repair cap. Then print the footer and stop.
+
+## Standalone review
+
+B follows this section, not the leaf sections, when the door prompts the direct form with no leaf. Inputs are the chart's draft brief and design in `chart=`, the code in `worktree=`, and the diff `base=..head=`. Judge them by the check.review Fix/Nit bar, the base-run rule and verdicts, and for a repeat round by the re-check scope on the repair diff, all as written above. Where those rules name `plan.md`, `report.md` or `AKROGON_BASE`, use the chart's brief and design, `<chart>/direct/report.md` and `base=`.
+
+B reads no `akrogon config` leaf state, writes only the file named by `out=` (recording base, reviewed head, evidence and verdict `ready`, `nits` or `fix`), runs no `akrogon phase`, commits nothing and returns to the door.
 
 ## Printed footer
 

@@ -1,13 +1,13 @@
 ---
 name: implement-issue
-description: Implement a leaf plan or repair its review findings, using eight-section worker sub-briefs and waves of up to 3 independent workers or configured inline execution; without a leaf, implement the prompt task standalone.
+description: Implement a leaf plan or repair its review findings, using eight-section worker sub-briefs and waves of up to 3 independent workers or configured inline execution; without a leaf, implement the prompt task standalone or, for the chart door's direct route, a charted task in a named worktree.
 ---
 
 Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt. After compaction, standalone re-reads its task brief instead of a leaf.
 
 # Implement issue
 
-Leaf prompts are `implement-issue <slug> slot=A phase=implement leaf=<folder>` or `phase=check.fix` with the same `leaf=`; a prompt without a leaf is a standalone task in the current checkout with this session as A.
+Leaf prompts are `implement-issue <slug> slot=A phase=implement leaf=<folder>` or `phase=check.fix` with the same `leaf=`; a prompt without a leaf is a standalone task in the current checkout with this session as A, or the direct form `implement-issue direct chart=<chart-folder> worktree=<path>` run by the chart door.
 
 ## Shared context
 
@@ -20,7 +20,7 @@ Check the live surface.
 
 For leaf work, read `akrogon config` once, locate the unique slug in the registered repo's authoritative `issues/open/`, and use its `plan.md`, `design.md` and current review findings while editing only the leaf worktree and its worker worktrees.
 
-Pass artifacts are written under the `leaf=` folder while code is read and edited only in the leaf worktree and its worker worktrees, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`. Standalone keeps its no-config, local-artifact behavior.
+Pass artifacts are written under the `leaf=` folder while code is read and edited only in the leaf worktree and its worker worktrees, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`. Standalone keeps its no-config, local-artifact behavior except in the direct form below.
 
 Temp files, logs, and base copies go under `$TMPDIR`, never a fixed `/tmp/<name>`; anything needed later goes in the leaf folder.
 
@@ -87,7 +87,13 @@ Do required work for Fixes only; Nits get no separate work or test and may only 
 
 Use the prompt as the task, plan briefly in `implementation/brief.md`, derive changed-test commands from the checkout, delegate through the same template/protocol, check the report and changed-test evidence, and repair yourself before returning.
 
-Standalone has no config or leaf reads, lifecycle state/log writes, phase call or checker; its template and protocol are entirely skill-local, and its footer reports completion or the concrete unresolved task limitation. Standalone takes the prompt and the checkout as its full input and sends no questions back.
+Except for the direct form, standalone has no config or leaf reads, lifecycle state/log writes, phase call or checker; its template and protocol are entirely skill-local, and its footer reports completion or the concrete unresolved task limitation. Standalone takes the prompt and the checkout as its full input and sends no questions back.
+
+### Direct form
+
+The prompt `implement-issue direct chart=<chart-folder> worktree=<path>` is the chart-issues direct route's implementation step, run by the chart door as A. The task is the chart's draft brief and design, read in place and not rewritten as a new brief. The checkout is `worktree=<path>`, where all code is read and edited. Run `akrogon config` there once for `checks` and the base. The plan goes in `<chart-folder>/direct/plan.md` and the report in `<chart-folder>/direct/report.md`, not in `implementation/`.
+
+Delegation, checking and self-repair work as in Standalone, with A owning the result. A makes no phase call and does not finish: it returns to the door, which sends the result to B for review and back to A for repair rounds under the chart-issues direct route.
 
 ## Printed footer
 

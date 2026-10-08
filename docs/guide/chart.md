@@ -236,4 +236,12 @@ You get work that can be dispatched without reopening product decisions in the m
 
 For export-csv, handoff is the moment the map becomes a contract: chosen rows, owned files and checks become the leaf's instructions. Handoff writes that contract; you still decide when to dispatch.
 
+## Direct route
+
+A repo opts in with the `direct` setting in [Setup](setup.md). For a small, fully charted, code-only single item with a B pane named, the door can offer to skip the leaf. You choose at the handoff review.
+
+If you choose it, A implements in a branch worktree and B reviews. The door then lands the tested commit on the default branch, closes the delivered sources, broadcasts when configured, removes the branch and worktree, and closes the chart. The chart-issues skill ([chart-issues](../../skills/chart-issues/SKILL.md)) owns the eligibility and landing rules.
+
+If the work grows or repairs run out, the door stops and saves the work in a `Direct attempt` record. You then hand it to the lifecycle or abandon it.
+
 Previous: [Create](create.md) · Next: [Next](next.md) · [Home](../../README.md)
