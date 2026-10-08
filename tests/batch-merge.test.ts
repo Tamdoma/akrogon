@@ -352,7 +352,7 @@ test.serial('a refused push restacks onto the new remote, prints rerun and the r
 });
 
 test.serial(
-  'a red check.fix restores members, marks them solo, keeps the holder in merge and the solo red moves it',
+  'a red check.fix halves the batch without solo marks until the holder alone moves to check.fix',
   async () => {
     const f: Fixture = await fixture();
     try {
@@ -365,34 +365,43 @@ test.serial(
         herdr.env,
       );
       expect(red.code).toBe(0);
-      expect(red.stdout).toBe('batch dissolved, merge solo');
-      const holderState: State = readState(holder.path);
-      expect(holderState.phase).toBe('merge');
-      // The post-call mergeWake immediately writes a fresh memberless record for the
-      // still-in-merge holder: the dissolved batch is gone, the fresh solo pass owns it.
-      expect(holderState.batch?.members).toEqual([]);
-      expect(holderState.batch?.attempt).not.toBe(record.attempt);
-      expect(holderState.batch?.attempt).toBeTruthy();
-      expect(holderState.batch?.applied).toBe(true);
+      expect(red.stdout).toBe('batch split, holder keeps 1 of 2 members');
+      const halved: State = readState(holder.path);
+      expect(halved.phase).toBe('merge');
+      expect(halved.batch_limit).toBe(1);
+      // The post-call mergeWake immediately rebuilds the holder's batch with the first half.
+      expect(halved.batch?.members.map((member) => member.slug)).toEqual(['mem-a']);
+      expect(halved.batch?.attempt).not.toBe(record.attempt);
+      for (const member of members) expect(readState(member.path).solo).toBeUndefined();
+      expect(await command(['git', 'rev-parse', 'refs/heads/mem-b'], f.root)).toBe(record.members[1].head);
+      const halvedRed: Result = await cli(
+        f,
+        ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', z.string().parse(halved.batch?.attempt)],
+        f.root,
+        herdr.env,
+      );
+      expect(halvedRed.stdout).toBe('batch split, holder keeps 0 of 1 members');
+      const alone: State = readState(holder.path);
+      expect(alone.batch?.members).toEqual([]);
       for (const [index, member] of members.entries()) {
         const state: State = readState(member.path);
         expect(state.phase).toBe('merge');
-        expect(state.solo).toBe(true);
+        expect(state.solo).toBeUndefined();
         expect(await command(['git', 'rev-parse', 'refs/heads/' + member.state.slug], f.root)).toBe(
           record.members[index].head,
         );
       }
       expect(await remoteTip(f)).toBe(remoteBefore);
-      const soloAttempt: string = z.string().parse(holderState.batch?.attempt);
       const solo: Result = await cli(
         f,
-        ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', soloAttempt],
+        ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', z.string().parse(alone.batch?.attempt)],
         f.root,
         herdr.env,
       );
       expect(solo.code).toBe(0);
       expect(solo.stdout).toBe('moved check.fix');
       expect(readState(holder.path).phase).toBe('check.fix');
+      expect(readState(holder.path).batch_limit).toBeUndefined();
     } finally {
       f.clean();
     }
@@ -605,7 +614,7 @@ test.serial(
         herdr.env,
       );
       expect(red.code).toBe(0);
-      expect(red.stdout).toBe('batch dissolved, merge solo');
+      expect(red.stdout).toBe('batch split, holder keeps 0 of 1 members');
       const holderHead: string = branches.get('hold')!.head;
       expect(await command(['git', 'rev-parse', 'refs/heads/hold'], f.root)).toBe(holderHead);
       expect(await command(['git', 'rev-parse', 'HEAD'], holder.state.worktree!)).toBe(holderHead);
@@ -699,7 +708,7 @@ test.serial('a dirty member worktree keeps its files and branch at head when the
       herdr.env,
     );
     expect(red.code).toBe(0);
-    expect(red.stdout).toBe('batch dissolved, merge solo');
+    expect(red.stdout).toBe('batch split, holder keeps 0 of 1 members');
     expect(readFileSync(dirty, 'utf8')).toBe('uncommitted\n');
     expect(await command(['git', 'status', '--porcelain'], members[0].state.worktree!)).toContain('file');
     expect(await command(['git', 'rev-parse', 'refs/heads/mem-a'], f.root)).toBe(record.members[0].head);
@@ -758,7 +767,7 @@ test.serial(
         herdr.env,
       );
       expect(red.code).toBe(0);
-      expect(red.stdout).toBe('batch dissolved, merge solo');
+      expect(red.stdout).toBe('batch split, holder keeps 0 of 1 members');
       const memberWorktree: string = z.string().parse(readState(members[0].path).worktree);
       rmSync(resolve(memberWorktree, 'node_modules'), { recursive: true, force: true });
       const onMember: Result = await run(['sh', '-c', composed], memberWorktree);

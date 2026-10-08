@@ -151,6 +151,7 @@ export async function commitMove(
     fix_rounds: to === 'check.fix' && recorded.phase === 'check.repair' ? recorded.fix_rounds + 1 : recorded.fix_rounds,
     merge_stamp: to === 'merge' ? new Date().toISOString() : recorded.merge_stamp,
     solo: to === 'merge' ? recorded.solo : undefined,
+    batch_limit: to === 'merge' ? recorded.batch_limit : undefined,
   };
   saveState(leaf.path, after);
   console.log(`moved ${to}`);
@@ -791,14 +792,18 @@ export async function phaseCommand(
         pending = await batchPush(repo, leaf, requested, slot, verdict, reason, record, onCommitted);
       else if (record.members.length > 0) {
         const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
-        await restoreMembers(
-          repo,
-          members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-        );
+        const dirty: string[] = (
+          await restoreMembers(
+            repo,
+            members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
+          )
+        ).dirty;
         await restoreHolder(repo, leaf, record);
-        for (const entry of members) saveState(entry.leaf.path, { ...entry.leaf.state, solo: true });
-        saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
-        console.log('batch dissolved, merge solo');
+        for (const entry of members.filter((item) => dirty.includes(item.member.slug)))
+          saveState(entry.leaf.path, { ...entry.leaf.state, solo: true });
+        const limit: number = Math.floor(record.members.length / 2);
+        saveState(leaf.path, { ...readState(leaf.path), batch: undefined, batch_limit: limit });
+        console.log(`batch split, holder keeps ${limit} of ${record.members.length} members`);
         committed = true;
       } else await transition(repo, leaf, requested, slot, verdict, reason, check, onCommitted);
     } else {

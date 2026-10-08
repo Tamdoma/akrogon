@@ -938,7 +938,8 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
     const members: BatchMember[] = [];
     for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root))
       .slice(1)
-      .filter((entry) => fresh.state.solo !== true && entry.leaf.state.solo !== true)) {
+      .filter((entry) => fresh.state.solo !== true && entry.leaf.state.solo !== true)
+      .slice(0, fresh.state.batch_limit)) {
       const sha: string | undefined = await branchSha(repo, candidate.leaf.state.slug);
       const head: string = sha ?? builtOn;
       members.push({

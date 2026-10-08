@@ -83,6 +83,7 @@ export const stateSchema = z
     merge_stamp: z.string().optional(),
     batch: batchSchema.optional(),
     solo: z.boolean().optional(),
+    batch_limit: z.number().int().nonnegative().optional(),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
 

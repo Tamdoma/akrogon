@@ -26,7 +26,7 @@ rerun rebase <slug> onto <sha>
 
 `reuse` means old and new main are equal outside `issues/` and `learnings/`, the tested top and the restacked top are equal outside them too, `issues/config.yaml` is unchanged and the restack had no conflict, so the earlier green check run stays valid: B copies the line into `review-B.md`, then runs `--check`, the briefs and `merged` under the same attempt without rerunning the checks. `rerun` means the worktree already sits at `<T2-sha>` and fresh checks are required, so B reruns its checks, `--check` and `merged` under the same attempt; `none` means no `--check` ran before the refusal. A member that conflicted during the restack is restored and dropped to merge solo, and `rerun rebase` means the holder's branch itself no longer fits the new base, so B rebases by hand first.
 
-If checks fail, B reports `check.fix --attempt <id>`: with carried members this prints `batch dissolved, merge solo` — each member is restored to its saved head and marked to merge solo while the holder keeps the turn — and with none the leaf moves to `check.fix` as before. Other push errors are reported with their cause.
+If checks fail, B reports `check.fix --attempt <id>`: with carried members this prints `batch split, holder keeps <n> of <m> members` — each member is restored to its saved head and the holder keeps the turn with at most the first half of them, so repeated red runs narrow to the leaf that breaks the checks while the others land in batches — and with none the leaf moves to `check.fix` as before. Other push errors are reported with their cause.
 
 Once the checks are green and the completion owners' briefs are gathered, B lands the batch:
 
