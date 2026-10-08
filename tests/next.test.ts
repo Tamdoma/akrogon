@@ -4706,7 +4706,9 @@ test('blocked-report no line for busy seats', async () => {
   }
 }, 15000);
 function dispatchedSlugs(f: DispatchFixture): string[] {
-  return database(f).prompts.map((prompt) => prompt.text.split(' ')[1]).sort();
+  return database(f)
+    .prompts.map((prompt) => prompt.text.split(' ')[1])
+    .sort();
 }
 
 async function namedTargetRepo(): Promise<DispatchFixture> {

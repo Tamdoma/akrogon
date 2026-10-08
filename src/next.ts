@@ -1253,9 +1253,7 @@ function resolveName(repo: Repo, inventory: Inventory, input: string): Leaf[] | 
   if (input.includes('/') || input.includes('\\')) return undefined;
   const openRoot: string = resolve(repo.root, 'issues/open');
   const openLeaves: Leaf[] = inventory.leaves.filter((leaf) => within(leaf.path, openRoot));
-  const owners: OwnerCandidate[] = ownerCandidates(openLeaves, repo.root).filter(
-    (owner) => owner.name === input,
-  );
+  const owners: OwnerCandidate[] = ownerCandidates(openLeaves, repo.root).filter((owner) => owner.name === input);
   const leaves: Leaf[] = inventory.leaves.filter((leaf) => leaf.state.slug === input);
   const matches: { kind: string; path: string; leaves: Leaf[] }[] = [
     ...owners.map((owner) => ({
