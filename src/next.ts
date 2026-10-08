@@ -1006,10 +1006,6 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
             leaf: worktreeLeaf(leaf),
           });
         }
-        for (const slug of dirty) {
-          const leaf: Leaf = findLeaf(repo, slug);
-          saveState(leaf.path, { ...leaf.state, solo: true });
-        }
         for (const member of current.members.filter((member) => dirty.includes(member.slug)))
           await command(['git', 'update-ref', 'refs/heads/' + member.slug, member.head], repo.root);
         if (dirty.length > 0) {
@@ -1044,10 +1040,6 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
             { slug: fresh.state.slug, head: holderHead, leaf: fresh },
           ]);
           const lateDirty: Set<string> = new Set([...applied.dirty, ...restored.dirty]);
-          for (const member of current.members.filter((entry) => lateDirty.has(entry.slug))) {
-            const leaf: Leaf = findLeaf(repo, member.slug);
-            saveState(leaf.path, { ...leaf.state, solo: true });
-          }
           current = { ...current, members: current.members.filter((entry) => !lateDirty.has(entry.slug)) };
           if (lateDirty.has(fresh.state.slug)) {
             prompt = { ...current, applied: true, solo: true, members: [] };

@@ -601,7 +601,7 @@ test('a solo leaf leaving merge and returning joins the next holder batch', asyn
   }
 });
 
-test('a dirty member worktree is soloed out of the apply and keeps its uncommitted files', async () => {
+test('a dirty member worktree is dropped from the apply unmarked and keeps its uncommitted files', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
@@ -615,7 +615,7 @@ test('a dirty member worktree is soloed out of the apply and keeps its uncommitt
     saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, ['--all'])).code).toBe(0);
     const bbState: State = readState(bb.path);
-    expect(bbState.solo).toBe(true);
+    expect(bbState.solo).toBeUndefined();
     expect(await head(f, 'bb')).toBe(bbHead);
     const bbWorktree: string = z.string().parse(bbState.worktree);
     expect(readFileSync(resolve(bbWorktree, 'file'), 'utf8')).toBe('uncommitted\n');
@@ -710,7 +710,7 @@ for (const edited of ['holder', 'member'] as const) {
       if (edited === 'holder') {
         expect(batch.solo).toBe(true);
       } else {
-        expect(readState(member.path).solo).toBe(true);
+        expect(readState(member.path).solo).toBeUndefined();
         expect((await run(['git', 'cat-file', '-e', batch.top! + ':member-file'], f.root)).code).not.toBe(0);
         expect(
           (
@@ -762,7 +762,7 @@ exec '${git}' "$@"
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(created)).toBe(true);
     expect(readFileSync(resolve(worktree, 'file'), 'utf8')).toBe('operator tracked edit\n');
-    expect(readState(member.path).solo).toBe(true);
+    expect(readState(member.path).solo).toBeUndefined();
     expect(readState(holder.path).batch!.members).toEqual([]);
   } finally {
     f.clean();
