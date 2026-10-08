@@ -52,6 +52,7 @@ Check these choices:
 - **remote** selects the Git remote used for integration.
 - **checks** lists the commands that must pass before merge.
 - **merge_checks** lists slow commands that run only at merge, on the rebased leaf before push.
+- **merge_covers** lists `checks` names skipped at merge because `merge_checks` covers them. Empty by default.
 - **grounding** points agents to the project's reference index, or disables that lookup.
 - **worktree_root** says where leaf checkouts go.
 - **rebuttal** controls the paired planning rebuttal.

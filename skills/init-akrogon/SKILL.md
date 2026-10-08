@@ -29,6 +29,7 @@ implement: subagents
 # setup: bun install --frozen-lockfile — proposed only when a lockfile is committed in HEAD
 checks: {}
 merge_checks: {}
+merge_covers: [] # checks names covered by merge_checks, skipped at merge
 advisory: []
 grounding:
   index: docs/reference-index.md
