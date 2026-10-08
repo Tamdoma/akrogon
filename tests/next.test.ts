@@ -1946,6 +1946,354 @@ for (const edge of ['interrupted', 'empty', 'recreated'] as const) {
   });
 }
 
+const seatLayoutSchema = z.object({
+  layout: z.object({
+    tab_id: z.string(),
+    focused_pane_id: z.string(),
+    panes: z.array(
+      z.object({
+        pane_id: z.string(),
+        rect: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
+        focused: z.boolean(),
+      }),
+    ),
+  }),
+});
+
+async function herdrOut(f: DispatchFixture, args: string[]): Promise<unknown> {
+  const child = Bun.spawn(['herdr', ...args], {
+    env: { ...process.env, ...f.env },
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const [stdout, code]: [string, number] = await Promise.all([new Response(child.stdout).text(), child.exited]);
+  expect(code).toBe(0);
+  return JSON.parse(stdout).result;
+}
+
+async function seatLayout(f: DispatchFixture, paneId: string): Promise<z.infer<typeof seatLayoutSchema>['layout']> {
+  return seatLayoutSchema.parse(await herdrOut(f, ['pane', 'layout', '--pane', paneId])).layout;
+}
+
+async function operatorTab(f: DispatchFixture): Promise<string> {
+  const created = (await herdrOut(f, [
+    'tab',
+    'create',
+    '--label',
+    'operator',
+    '--cwd',
+    f.root,
+    '--workspace',
+    'w3',
+  ])) as { tab: { tab_id: string } };
+  return created.tab.tab_id;
+}
+
+function rectOf(f: DispatchFixture, paneId: string): { x: number; y: number; width: number; height: number } {
+  const rect = database(f).panes.find((pane) => pane.pane_id === paneId)?.rect;
+  expect(rect).toBeDefined();
+  return rect!;
+}
+
+function dropSeatA(f: DispatchFixture, path: string): State {
+  const state: State = readState(path);
+  const db: Database = database(f);
+  saveDatabase(f, {
+    ...db,
+    panes: db.panes
+      .map((pane) =>
+        pane.pane_id === state.pane.B
+          ? {
+              ...pane,
+              agent: 'fake',
+              agent_status: 'idle' as const,
+              agent_session: { kind: 'id', value: 'session-b' } as const,
+            }
+          : pane,
+      )
+      .filter((pane) => pane.pane_id !== state.pane.A),
+  });
+  return state;
+}
+
+test('missing A beside surviving B puts A left of B', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'seat-a-left', 'plan.synthesis');
+    expect((await next(f, ['seat-a-left'])).code).toBe(0);
+    resetPrompts(f, path);
+    const state: State = dropSeatA(f, path);
+    const before: number = calls(f).length;
+    expect((await next(f, ['seat-a-left'])).code).toBe(0);
+    const allocated: State = readState(path);
+    expect(allocated.pane.B).toBe(state.pane.B);
+    expect(allocated.pane.A).not.toBe(state.pane.A);
+    const invoked: string[][] = calls(f).slice(before);
+    const splits: string[][] = invoked.filter((args) => args[0] === 'pane' && args[1] === 'split');
+    expect(splits).toHaveLength(1);
+    expect(splits[0][2]).toBe(state.pane.B!);
+    expect(invoked.filter((args) => args[0] === 'pane' && args[1] === 'swap')).toEqual([
+      ['pane', 'swap', '--source-pane', state.pane.B!, '--target-pane', allocated.pane.A!],
+    ]);
+    const layout = await seatLayout(f, allocated.pane.A!);
+    const a = layout.panes.find((pane) => pane.pane_id === allocated.pane.A)!;
+    const b = layout.panes.find((pane) => pane.pane_id === allocated.pane.B)!;
+    expect(a.rect.x + a.rect.width).toBeLessThanOrEqual(b.rect.x);
+    const kept = database(f).panes.find((pane) => pane.pane_id === state.pane.B)!;
+    expect(kept.agent).toBe('fake');
+    expect(kept.agent_session).toEqual({ kind: 'id', value: 'session-b' });
+  } finally {
+    f.clean();
+  }
+});
+
+test('restores operator tab focus from another workspace', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'seat-a-focus', 'plan.synthesis');
+    expect((await next(f, ['seat-a-focus'])).code).toBe(0);
+    resetPrompts(f, path);
+    const operator: string = await operatorTab(f);
+    expect(database(f).tabs.find((tab) => tab.tab_id === operator)?.focused).toBe(true);
+    const state: State = dropSeatA(f, path);
+    const before: number = calls(f).length;
+    expect((await next(f, ['seat-a-focus'])).code).toBe(0);
+    const invoked: string[][] = calls(f).slice(before);
+    expect(invoked.filter((args) => args[0] === 'pane' && args[1] === 'swap')).toHaveLength(1);
+    expect(invoked).toContainEqual(['tab', 'focus', operator]);
+    expect(database(f).tabs.find((tab) => tab.tab_id === operator)?.focused).toBe(true);
+    expect(database(f).tabs.find((tab) => tab.tab_id === state.tab)?.focused).toBe(false);
+    expect(readState(path).pane.B).toBe(state.pane.B);
+  } finally {
+    f.clean();
+  }
+});
+
+test('restores operator tab focus within the leaf tab', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'seat-a-stay', 'plan.synthesis');
+    expect((await next(f, ['seat-a-stay'])).code).toBe(0);
+    resetPrompts(f, path);
+    const state: State = readState(path);
+    expect(database(f).tabs.find((tab) => tab.tab_id === state.tab)?.focused).toBe(true);
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      panes: db.panes.map((pane) => ({ ...pane, focused: pane.pane_id === state.pane.B })),
+    });
+    dropSeatA(f, path);
+    const before: number = calls(f).length;
+    expect((await next(f, ['seat-a-stay'])).code).toBe(0);
+    const invoked: string[][] = calls(f).slice(before);
+    expect(invoked.filter((args) => args[0] === 'pane' && args[1] === 'swap')).toHaveLength(1);
+    expect(invoked.some((args) => args[0] === 'tab' && args[1] === 'focus')).toBe(false);
+    const allocated: State = readState(path);
+    expect(database(f).tabs.find((tab) => tab.tab_id === allocated.tab)?.focused).toBe(true);
+    expect((await seatLayout(f, allocated.pane.A!)).focused_pane_id).toBe(allocated.pane.B!);
+  } finally {
+    f.clean();
+  }
+});
+
+test('swap failure keeps A recorded and reports the leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'seat-a-fail', 'plan.synthesis');
+    expect((await next(f, ['seat-a-fail'])).code).toBe(0);
+    resetPrompts(f, path);
+    const operator: string = await operatorTab(f);
+    const state: State = dropSeatA(f, path);
+    saveDatabase(f, { ...database(f), failSwapOnce: true });
+    const before: number = calls(f).length;
+    const result: Result = await next(f, ['seat-a-fail']);
+    expect(result.code).not.toBe(0);
+    const skip = skips(result)[0];
+    expect(skip.slug).toBe('seat-a-fail');
+    expect(skip.error).toContain('seat-a-fail');
+    expect(skip.error).toContain('fixture_swap_failed');
+    const invoked: string[][] = calls(f).slice(before);
+    expect(invoked.filter((args) => args[0] === 'pane' && args[1] === 'swap')).toHaveLength(1);
+    expect(invoked.some((args) => args[0] === 'pane' && args[1] === 'close')).toBe(false);
+    expect(invoked.some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
+    expect(invoked).toContainEqual(['tab', 'focus', operator]);
+    const kept: State = readState(path);
+    expect(kept.pane.B).toBe(state.pane.B);
+    expect(kept.pane.A).not.toBe(state.pane.A);
+    expect(database(f).panes.some((pane) => pane.pane_id === kept.pane.A)).toBe(true);
+    expect(database(f).tabs.find((tab) => tab.tab_id === operator)?.focused).toBe(true);
+    resetPrompts(f, path);
+    const panesBefore: number = database(f).panes.length;
+    expect((await next(f, ['seat-a-fail'])).code).toBe(0);
+    expect(readState(path).pane.A).toBe(kept.pane.A);
+    expect(database(f).panes).toHaveLength(panesBefore);
+  } finally {
+    f.clean();
+  }
+});
+
+test('allocation paths unchanged: new tab keeps A left with no swap or focus', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'seat-a-new', 'plan.synthesis');
+    expect((await next(f, ['seat-a-new'])).code).toBe(0);
+    const allocated: State = readState(path);
+    const a = rectOf(f, allocated.pane.A!);
+    const b = rectOf(f, allocated.pane.B!);
+    expect(a.x + a.width).toBeLessThanOrEqual(b.x);
+    expect(calls(f).some((args) => args[0] === 'pane' && args[1] === 'swap')).toBe(false);
+    expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'focus')).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('allocation paths unchanged: bootstrap and B-only keep A left with no swap or focus', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'seat-a-boot', 'plan.synthesis');
+    expect((await next(f, ['seat-a-boot'])).code).toBe(0);
+    resetPrompts(f, path);
+    saveState(path, { ...readState(path), pane: {} });
+    const before: number = calls(f).length;
+    expect((await next(f, ['seat-a-boot'])).code).toBe(0);
+    const boot: State = readState(path);
+    const a = rectOf(f, boot.pane.A!);
+    const b = rectOf(f, boot.pane.B!);
+    expect(a.x + a.width).toBeLessThanOrEqual(b.x);
+    const invoked: string[][] = calls(f).slice(before);
+    expect(invoked.some((args) => args[0] === 'pane' && args[1] === 'swap')).toBe(false);
+    expect(invoked.some((args) => args[0] === 'tab' && args[1] === 'focus')).toBe(false);
+  } finally {
+    f.clean();
+  }
+  const g: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(g, 'seat-a-bonly', 'plan.synthesis');
+    expect((await next(g, ['seat-a-bonly'])).code).toBe(0);
+    resetPrompts(g, path);
+    const state: State = readState(path);
+    const db: Database = database(g);
+    saveDatabase(g, { ...db, panes: db.panes.filter((pane) => pane.pane_id !== state.pane.B) });
+    const before: number = calls(g).length;
+    expect((await next(g, ['seat-a-bonly'])).code).toBe(0);
+    const allocated: State = readState(path);
+    expect(allocated.pane.A).toBe(state.pane.A);
+    const a = rectOf(g, allocated.pane.A!);
+    const b = rectOf(g, allocated.pane.B!);
+    expect(a.x + a.width).toBeLessThanOrEqual(b.x);
+    const invoked: string[][] = calls(g).slice(before);
+    const splits: string[][] = invoked.filter((args) => args[0] === 'pane' && args[1] === 'split');
+    expect(splits).toHaveLength(1);
+    expect(splits[0][2]).toBe(state.pane.A!);
+    expect(invoked.some((args) => args[0] === 'pane' && args[1] === 'swap')).toBe(false);
+    expect(invoked.some((args) => args[0] === 'tab' && args[1] === 'focus')).toBe(false);
+  } finally {
+    g.clean();
+  }
+});
+
+test('allocation paths unchanged: present and reversed seats keep IDs and positions', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'seat-a-present', 'plan.synthesis');
+    expect((await next(f, ['seat-a-present'])).code).toBe(0);
+    resetPrompts(f, path);
+    const state: State = readState(path);
+    const before: number = calls(f).length;
+    expect((await next(f, ['seat-a-present'])).code).toBe(0);
+    const kept: State = readState(path);
+    expect(kept.pane.A).toBe(state.pane.A);
+    expect(kept.pane.B).toBe(state.pane.B);
+    const invoked: string[][] = calls(f).slice(before);
+    expect(invoked.some((args) => args[0] === 'pane' && args[1] === 'split')).toBe(false);
+    expect(invoked.some((args) => args[0] === 'pane' && args[1] === 'swap')).toBe(false);
+    expect(invoked.some((args) => args[0] === 'tab' && args[1] === 'focus')).toBe(false);
+  } finally {
+    f.clean();
+  }
+  const g: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(g, 'seat-a-reversed', 'plan.synthesis');
+    expect((await next(g, ['seat-a-reversed'])).code).toBe(0);
+    resetPrompts(g, path);
+    const state: State = readState(path);
+    const db: Database = database(g);
+    const rectA = db.panes.find((pane) => pane.pane_id === state.pane.A)?.rect;
+    const rectB = db.panes.find((pane) => pane.pane_id === state.pane.B)?.rect;
+    saveDatabase(g, {
+      ...db,
+      panes: db.panes.map((pane) =>
+        pane.pane_id === state.pane.A
+          ? { ...pane, rect: rectB }
+          : pane.pane_id === state.pane.B
+            ? { ...pane, rect: rectA }
+            : pane,
+      ),
+    });
+    const ra = rectOf(g, state.pane.A!);
+    const rb = rectOf(g, state.pane.B!);
+    expect(ra.x).toBeGreaterThan(rb.x);
+    const reversed: string = JSON.stringify(database(g).panes.map((pane) => [pane.pane_id, pane.rect]));
+    const before: number = calls(g).length;
+    expect((await next(g, ['seat-a-reversed'])).code).toBe(0);
+    expect(readState(path).pane.A).toBe(state.pane.A);
+    expect(readState(path).pane.B).toBe(state.pane.B);
+    expect(JSON.stringify(database(g).panes.map((pane) => [pane.pane_id, pane.rect]))).toBe(reversed);
+    const invoked: string[][] = calls(g).slice(before);
+    expect(invoked.some((args) => args[0] === 'pane' && args[1] === 'split')).toBe(false);
+    expect(invoked.some((args) => args[0] === 'pane' && args[1] === 'swap')).toBe(false);
+    expect(invoked.some((args) => args[0] === 'tab' && args[1] === 'focus')).toBe(false);
+  } finally {
+    g.clean();
+  }
+});
+
+test('allocation paths unchanged: extra panes keep position while missing A still repairs', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'seat-a-extra', 'plan.synthesis');
+    expect((await next(f, ['seat-a-extra'])).code).toBe(0);
+    resetPrompts(f, path);
+    const state: State = readState(path);
+    const extra: Database['panes'][number] = {
+      pane_id: 'operator',
+      tab_id: state.tab!,
+      cwd: f.root,
+      agent: null,
+      agent_status: 'unknown',
+      rect: { x: 200, y: 0, width: 50, height: 40 },
+      focused: false,
+    };
+    saveDatabase(f, { ...database(f), panes: [...database(f).panes, extra] });
+    const before: number = calls(f).length;
+    expect((await next(f, ['seat-a-extra'])).code).toBe(0);
+    expect(database(f).panes.find((pane) => pane.pane_id === 'operator')).toEqual(extra);
+    const invoked: string[][] = calls(f).slice(before);
+    expect(invoked.some((args) => args[0] === 'pane' && args[1] === 'split')).toBe(false);
+    expect(invoked.some((args) => args[0] === 'pane' && args[1] === 'swap')).toBe(false);
+    expect(invoked.some((args) => args[0] === 'tab' && args[1] === 'focus')).toBe(false);
+    resetPrompts(f, path);
+    dropSeatA(f, path);
+    const beforeRepair: number = calls(f).length;
+    expect((await next(f, ['seat-a-extra'])).code).toBe(0);
+    const allocated: State = readState(path);
+    expect(allocated.pane.B).toBe(state.pane.B);
+    const a = rectOf(f, allocated.pane.A!);
+    const b = rectOf(f, allocated.pane.B!);
+    expect(a.x + a.width).toBeLessThanOrEqual(b.x);
+    expect(database(f).panes.find((pane) => pane.pane_id === 'operator')).toEqual({
+      ...extra,
+      agent_status: 'idle',
+    });
+    const repaired: string[][] = calls(f).slice(beforeRepair);
+    expect(repaired.filter((args) => args[0] === 'pane' && args[1] === 'swap')).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+});
+
 test('agent start allows 30 seconds while prompt wait remains 5 seconds', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
