@@ -374,7 +374,8 @@ test('unpause starts tab-less leaves only through the dependent cascade', async 
 test('unpause failure exits non-zero with the pause cleared', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    leaf(f, 'z', 'plan.synthesis', { 'blocked-by': ['ghost'], worktree: '/nonexistent-z' });
+    const path: string = leaf(f, 'z', 'plan.synthesis', { worktree: '/nonexistent-z' });
+    writeFileSync(resolve(path, 'state.yaml'), 'slug: [');
     expect((await cli(f, ['pause'])).code).toBe(0);
     const run: Result = await cli(f, ['unpause'], f.root, f.env);
     expect(run.code).not.toBe(0);
