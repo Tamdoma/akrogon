@@ -352,7 +352,7 @@ test('next resumes interrupted tab creation, fails after three failing passes', 
     expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8')).toContain('"to":"failed"');
     const before: number = calls(f).length;
     const stateBefore: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
-    expect((await next(f, ['retry'])).code).toBe(0);
+    expect((await next(f, ['retry'])).code).toBe(1);
     const notified: string[][] = calls(f)
       .slice(before)
       .filter((args) => args[0] === 'notification');
@@ -372,13 +372,13 @@ test('failed leaves never notify on dispatch', async () => {
     expect(readState(path)).toMatchObject({ busy_since: {}, busy_notified: {} });
     saveDatabase(f, { ...database(f), failNotification: true });
     const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
-    for (let sweep: number = 0; sweep < 3; sweep++) expect((await next(f, ['broken'])).code).toBe(0);
+    for (let sweep: number = 0; sweep < 3; sweep++) expect((await next(f, ['broken'])).code).toBe(1);
     expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(0);
     expect(database(f)).toMatchObject({ prompts: [], starts: [], tabs: [], panes: [] });
     expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
     saveDatabase(f, { ...database(f), failNotification: false });
-    expect((await next(f, ['broken'])).code).toBe(0);
+    expect((await next(f, ['broken'])).code).toBe(1);
     expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(0);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
   } finally {
@@ -538,7 +538,7 @@ test('next refuses unmerged dependencies, respects capacity, and waits on unknow
     saveState(missing, { ...readState(missing), 'blocked-by': ['first'] });
     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
     yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 1 });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
     expect(database(f).tabs).toHaveLength(1);
     expect(readState(dependent).worktree).toBeUndefined();
     const db: Database = database(f);
@@ -1209,9 +1209,14 @@ test('missing dependencies skip their leaf while readable unmet dependencies wai
     leaf(f, 'healthy', 'plan.synthesis');
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(1);
-    expect(skips(result)).toHaveLength(1);
-    expect(skips(result)[0].slug).toBe('broken');
-    expect(skips(result)[0].error).toContain('nonexistent');
+    expect(skips(result)).toHaveLength(2);
+    expect(
+      skips(result)
+        .map((s) => s.slug)
+        .sort(),
+    ).toEqual(['broken', 'waiting']);
+    expect(skips(result).find((s) => s.slug === 'broken')!.error).toContain('nonexistent');
+    expect(skips(result).find((s) => s.slug === 'waiting')!.error).toContain('healthy');
     expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
       `plan-issue healthy slot=A phase=plan.synthesis leaf=${f.root}/issues/open/issue/healthy`,
     ]);
@@ -2014,7 +2019,7 @@ for (const mode of ['--resume', '--all'] as const) {
       const worktree: string = readState(path).worktree!;
       saveState(path, { ...readState(path), phase: 'merge' });
       expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
-      expect((await next(f, [mode], {}, f.home)).code).toBe(0);
+      expect((await next(f, [mode], {}, f.home)).code).toBe(mode === '--all' ? 1 : 0);
       expect(readState(path).phase).toBe('merged');
       expect(database(f).tabs).toHaveLength(0);
       expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(1);
@@ -2556,8 +2561,8 @@ test('a failed leaf with a blocked pane is not seat-observed', async () => {
     });
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => (p.pane_id === a ? { ...p, agent_status: 'blocked' } : p)) });
-    expect((await next(f, ['stuck'])).code).toBe(0);
-    expect((await next(f, ['stuck'])).code).toBe(0);
+    expect((await next(f, ['stuck'])).code).toBe(1);
+    expect((await next(f, ['stuck'])).code).toBe(1);
     expect(readState(path).busy_since).toEqual({});
     expect(readState(path).busy_notified).toEqual({});
     expect(database(f).prompts).toHaveLength(promptsBefore);
@@ -2619,7 +2624,7 @@ test('three consecutive prompt failures fail the leaf during the third pass', as
     );
     expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(3);
     const before: number = calls(f).length;
-    expect((await next(f, ['three-fails'])).code).toBe(0);
+    expect((await next(f, ['three-fails'])).code).toBe(1);
     expect(calls(f).length).toBe(before);
   } finally {
     f.clean();
@@ -3660,7 +3665,7 @@ test('sweep scratch catch-up deletes open and closed folders with no live panes'
       panes: db.panes.filter((pane) => pane.tab_id !== openTab && pane.tab_id !== soloTab),
     });
     const closesBefore: number = calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close').length;
-    expect((await next(f, [])).code).toBe(0);
+    expect((await next(f, [])).code).toBe(1);
     expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(closesBefore);
     expect(existsSync(openScratch)).toBe(false);
     expect(existsSync(soloScratch)).toBe(false);
@@ -3690,13 +3695,13 @@ test('sweep scratch catch-up keeps sentinel with live panes then deletes on late
     expect((await cli(f, ['phase', 'live-done', 'merged'], f.root, f.env)).code).toBe(0);
     expect(existsSync(donePath)).toBe(true);
     expect(database(f).tabs.some((item) => item.tab_id === tab)).toBe(true);
-    expect((await next(f, [])).code).toBe(0);
+    expect((await next(f, [])).code).toBe(1);
     expect(database(f).tabs).toHaveLength(0);
     expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(1);
     expect(existsSync(scratch)).toBe(true);
     expect(readFileSync(sentinel, 'utf8')).toBe('live\n');
     expect(existsSync(donePath)).toBe(true);
-    expect((await next(f, [])).code).toBe(0);
+    expect((await next(f, [])).code).toBe(1);
     expect(existsSync(scratch)).toBe(false);
     expect(existsSync(sentinel)).toBe(false);
   } finally {
@@ -3843,7 +3848,7 @@ test('next --all leaves a gapped leaf undispatched while its ungapped sibling di
     const gapped: string = leaf(f, 'gapped', 'plan.synthesis');
     readinessInput(gapped, envFoo);
     leaf(f, 'ready', 'plan.synthesis');
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
     expect(readState(gapped).worktree).toBeUndefined();
     expect((await run(['git', 'branch', '--list', 'gapped'], f.root)).stdout).toBe('');
     expect(database(f).tabs.map((tab) => tab.label)).toEqual(['ready']);
@@ -4101,7 +4106,7 @@ test('an ineligible merge leaf never holds the turn (blocked-by)', async () => {
       prompts: [],
       panes: database(f).panes.map((pane) => ({ ...pane, agent_status: 'idle' })),
     });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
     expect(mergePrompts(f)).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
     expect(database(f).prompts).toHaveLength(1);
     expect(readState(bb.path).prompted.B).toBeUndefined();
@@ -4153,7 +4158,7 @@ for (const exit of [
             : 'failed',
       );
       expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
-      expect((await next(f, ['--all'])).code).toBe(0);
+      expect((await next(f, ['--all'])).code).toBe(exit === 'seat failed' || exit === 'capped prompt failure' ? 1 : 0);
       expect(mergePrompts(f).filter((prompt) => prompt.pane === bb.b)).toHaveLength(1);
     } finally {
       f.clean();
@@ -4338,6 +4343,364 @@ test('unstamped merge dispatch uses log order and refuses unreadable history', a
     writeFileSync(log, records.join('\n') + '\n');
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+// blocked-report
+test('blocked-report epic folder starts ready and reports dep, input, failed', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'ready', 'plan.synthesis', {}, 'epic');
+    leaf(f, 'depblocked', 'plan.synthesis', { 'blocked-by': ['outside'] }, 'epic');
+    const inputPath: string = leaf(f, 'inputblocked', 'plan.synthesis', {}, 'epic');
+    readinessInput(inputPath, envFoo);
+    leaf(f, 'failedleaf', 'failed', {}, 'epic');
+    leaf(f, 'outside', 'plan.synthesis', {}, 'other');
+    const result: Result = await next(f, [resolve(f.root, 'issues/open/epic')]);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(3);
+    expect(
+      skips(result)
+        .map((s) => s.slug)
+        .sort(),
+    ).toEqual(['depblocked', 'failedleaf', 'inputblocked']);
+    expect(skips(result).find((s) => s.slug === 'depblocked')!.error).toContain('outside');
+    expect(skips(result).find((s) => s.slug === 'inputblocked')!.error).toContain('FOO');
+    expect(skips(result).find((s) => s.slug === 'failedleaf')!.error).toContain('phase recovery');
+    expect(database(f).prompts.map((p) => p.text)).toEqual([
+      `plan-issue ready slot=A phase=plan.synthesis leaf=${f.root}/issues/open/epic/ready`,
+    ]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report dep detail labels parked, missing, unreadable and skips merged', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'phased', 'implement', {}, 'deps');
+    leaf(f, 'merged-open', 'merged', {}, 'deps');
+    const closedSrc: string = leaf(f, 'merged-closed', 'merged', {}, 'tmpmove');
+    mkdirSync(resolve(f.root, 'issues/closed/issue'), { recursive: true });
+    renameSync(closedSrc, resolve(f.root, 'issues/closed/issue/merged-closed'));
+    const parkedDir: string = resolve(f.root, 'issues/parked/myepic/parked-dep');
+    mkdirSync(parkedDir, { recursive: true });
+    yaml(resolve(parkedDir, 'state.yaml'), {
+      slug: 'parked-dep',
+      phase: 'plan.synthesis',
+      created: '2026-10-08',
+      repo: 'repo',
+      debate: 'no',
+      'blocked-by': [],
+    });
+    const brokenPath: string = leaf(f, 'unreadable-dep', 'plan.synthesis', {}, 'deps');
+    writeFileSync(resolve(brokenPath, 'state.yaml'), 'slug: [');
+    leaf(f, 'main', 'plan.synthesis', {
+      'blocked-by': ['phased', 'merged-open', 'merged-closed', 'parked-dep', 'missing-dep', 'unreadable-dep'],
+    });
+    const result: Result = await next(f, ['main']);
+    expect(result.code).toBe(1);
+    const mainSkip: z.infer<typeof skipSchema> = skips(result).find((s) => s.slug === 'main')!;
+    expect(mainSkip.error).toContain('phased');
+    expect(mainSkip.error).toContain('(implement)');
+    expect(mainSkip.error).toContain('parked-dep');
+    expect(mainSkip.error).toContain('(parked)');
+    expect(mainSkip.error).toContain('missing-dep');
+    expect(mainSkip.error).toContain('(missing)');
+    expect(mainSkip.error).toContain('unreadable-dep');
+    expect(mainSkip.error).toContain('(unreadable)');
+    expect(mainSkip.error).not.toContain('merged-open');
+    expect(mainSkip.error).not.toContain('merged-closed');
+    expect(database(f).prompts).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report input detail names gaps without values and defers to deps', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    writeFileSync(resolve(f.root, '.env'), 'PRESENT=s3cr3t-value-xyz\n');
+    const inputPath: string = leaf(f, 'inputblocked', 'plan.synthesis');
+    yaml(resolve(inputPath, 'readiness.yaml'), {
+      inputs: [
+        {
+          kind: 'env',
+          name: 'FOO',
+          holder: 'repo',
+          purpose: 'p',
+          consumers: ['x'],
+          steps: 's',
+          source: 't',
+          done: 'd',
+        },
+        {
+          kind: 'file',
+          name: 'need.txt',
+          holder: 'repo',
+          purpose: 'p',
+          consumers: ['x'],
+          steps: 's',
+          source: 't',
+          done: 'd',
+        },
+        {
+          kind: 'env',
+          name: 'PRESENT',
+          holder: 'repo',
+          purpose: 'p',
+          consumers: ['x'],
+          steps: 's',
+          source: 't',
+          done: 'd',
+        },
+      ],
+      produces: [],
+      grants: [],
+      retained: [],
+      proofs: [],
+    });
+    leaf(f, 'unmerged2', 'plan.synthesis');
+    const bothPath: string = leaf(f, 'bothblocked', 'plan.synthesis', { 'blocked-by': ['unmerged2'] });
+    readinessInput(bothPath, {
+      kind: 'env',
+      name: 'BAR',
+      holder: 'repo',
+      purpose: 'p',
+      consumers: ['x'],
+      steps: 's',
+      source: 't',
+      done: 'd',
+    });
+    const inputResult: Result = await next(f, ['inputblocked']);
+    expect(inputResult.code).toBe(1);
+    const inputSkip: z.infer<typeof skipSchema> = skips(inputResult).find((s) => s.slug === 'inputblocked')!;
+    expect(inputSkip.error).toContain('env');
+    expect(inputSkip.error).toContain('FOO');
+    expect(inputSkip.error).toContain('file');
+    expect(inputSkip.error).toContain('need.txt');
+    expect(inputSkip.error).toContain('repo');
+    expect(inputSkip.error).not.toContain('PRESENT');
+    expect(inputSkip.error).not.toContain('s3cr3t-value-xyz');
+    const bothResult: Result = await next(f, ['bothblocked']);
+    expect(bothResult.code).toBe(1);
+    const bothSkip: z.infer<typeof skipSchema> = skips(bothResult).find((s) => s.slug === 'bothblocked')!;
+    expect(bothSkip.error).toContain('unmerged2');
+    expect(bothSkip.error).not.toContain('BAR');
+    expect(database(f).prompts).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report failed and merged share a folder without a merged line', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'failedleaf', 'failed', {}, 'mixed');
+    leaf(f, 'mergedleaf', 'merged', {}, 'mixed');
+    const result: Result = await next(f, [resolve(f.root, 'issues/open/mixed')]);
+    expect(result.code).toBe(1);
+    expect(skips(result)).toHaveLength(1);
+    const failedSkip: z.infer<typeof skipSchema> = skips(result)[0];
+    expect(failedSkip.slug).toBe('failedleaf');
+    expect(failedSkip.error).toContain('failed');
+    expect(failedSkip.error).toContain('phase recovery');
+    expect(database(f).prompts).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report same line by slug, leaf path, and epic path', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'ready', 'plan.synthesis', {}, 'epic');
+    const blockedPath: string = leaf(f, 'blocked', 'plan.synthesis', { 'blocked-by': ['outside'] }, 'epic');
+    leaf(f, 'outside', 'plan.synthesis', {}, 'other');
+    const bySlug: Result = await next(f, ['blocked']);
+    const byLeafPath: Result = await next(f, [blockedPath]);
+    const byEpicPath: Result = await next(f, [resolve(f.root, 'issues/open/epic')]);
+    expect(bySlug.code).toBe(1);
+    expect(byLeafPath.code).toBe(1);
+    expect(byEpicPath.code).toBe(1);
+    const errSlug: string = skips(bySlug).find((s) => s.slug === 'blocked')!.error;
+    const errLeaf: string = skips(byLeafPath).find((s) => s.slug === 'blocked')!.error;
+    const errEpic: string = skips(byEpicPath).find((s) => s.slug === 'blocked')!.error;
+    expect(errLeaf).toBe(errSlug);
+    expect(errEpic).toBe(errSlug);
+    expect(database(f).prompts.map((p) => p.text)).toEqual([
+      `plan-issue ready slot=A phase=plan.synthesis leaf=${f.root}/issues/open/epic/ready`,
+    ]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report manual forms bare, all inside, all outside match', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'ready', 'plan.synthesis');
+    leaf(f, 'blocked', 'plan.synthesis', { 'blocked-by': ['ready'] });
+    const bare: Result = await next(f, []);
+    const inside: Result = await next(f, ['--all']);
+    const outside: Result = await next(f, ['--all'], {}, f.home);
+    for (const r of [bare, inside, outside]) expect(r.code).toBe(1);
+    const errs: string[] = [bare, inside, outside].map((r) => skips(r).find((s) => s.slug === 'blocked')!.error);
+    expect(errs[1]).toBe(errs[0]);
+    expect(errs[2]).toBe(errs[0]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report manual forms stay manual with pane and event set', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'ready', 'plan.synthesis');
+    leaf(f, 'blocked', 'plan.synthesis', { 'blocked-by': ['ready'] });
+    const event: string = JSON.stringify({
+      event: 'pane_agent_status_changed',
+      data: { type: 'pane_agent_status_changed', pane_id: 'p1', agent_status: 'idle' },
+    });
+    const tPane: Result = await next(f, ['blocked'], { HERDR_PANE_ID: 'operator' });
+    const tEvent: Result = await next(f, ['blocked'], { HERDR_PLUGIN_EVENT_JSON: event });
+    const aPane: Result = await next(f, ['--all'], { HERDR_PANE_ID: 'operator' });
+    const aEvent: Result = await next(f, ['--all'], { HERDR_PLUGIN_EVENT_JSON: event });
+    for (const r of [tPane, tEvent, aPane, aEvent]) expect(r.code).toBe(1);
+    const errs: string[] = [tPane, tEvent, aPane, aEvent].map((r) => skips(r).find((s) => s.slug === 'blocked')!.error);
+    for (const e of errs.slice(1)) expect(e).toBe(errs[0]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report automatic silence on hook, resume, and merge wake', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const readyPath: string = leaf(f, 'ready', 'plan.synthesis');
+    leaf(f, 'blocked', 'plan.synthesis', { 'blocked-by': ['ready'] });
+    leaf(f, 'failedleaf', 'failed');
+    expect((await next(f, ['ready'])).code).toBe(0);
+    const paneA: string = readState(readyPath).pane.A!;
+    const hook: Result = await next(f, [], {
+      HERDR_PANE_ID: paneA,
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'pane_agent_status_changed',
+        data: { type: 'pane_agent_status_changed', pane_id: paneA, agent_status: 'idle' },
+      }),
+    });
+    expect(hook.code).toBe(0);
+    expect(hook.stderr).toBe('');
+    saveState(readyPath, { ...readState(readyPath), 'blocked-by': ['ghost'] });
+    const resumed: Result = await next(f, ['--resume'], {}, f.home);
+    expect(resumed.code).toBe(0);
+    expect(resumed.stderr).toBe('');
+    leaf(f, 'mover', 'plan.synthesis');
+    const phased: Result = await cli(f, ['phase', 'mover', 'implement'], f.root, f.env);
+    expect(phased.code).toBe(0);
+    expect(phased.stderr).not.toContain('blocked');
+    expect(phased.stderr).not.toContain('failedleaf');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report dependent not picked when started by completion', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'first', 'merged', {}, 'first-issue');
+    leaf(f, 'other', 'plan.synthesis', {}, 'other-issue');
+    const second: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first', 'other'] }, 'second-issue');
+    const result: Result = await next(f, ['first']);
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(readState(second).tab).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report real errors still report on automatic paths', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
+    writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
+    const healthyPath: string = leaf(f, 'healthy', 'plan.synthesis');
+    expect((await next(f, ['healthy'])).code).toBe(1);
+    const paneA: string = readState(healthyPath).pane.A!;
+    const hook: Result = await next(f, [], {
+      HERDR_PANE_ID: paneA,
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'pane_agent_status_changed',
+        data: { type: 'pane_agent_status_changed', pane_id: paneA, agent_status: 'idle' },
+      }),
+    });
+    expect(hook.code).toBe(1);
+    expect(hook.stderr).toContain(malformed);
+    const resumed: Result = await next(f, ['--resume'], {}, f.home);
+    expect(resumed.code).toBe(1);
+    expect(resumed.stderr).toContain(malformed);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report no line for capacity waits', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'first', 'plan.synthesis');
+    leaf(f, 'second', 'plan.synthesis');
+    configure(f, { max_active: 1 });
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(database(f).tabs).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report no line for merge turn waits', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    saveDatabase(f, {
+      ...database(f),
+      prompts: [],
+      panes: database(f).panes.map((p) => ({ ...p, agent_status: 'idle' })),
+    });
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(mergePrompts(f)).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('blocked-report no line for busy seats', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const busyPath: string = leaf(f, 'busy', 'plan.synthesis', {}, 'epic');
+    leaf(f, 'ready', 'plan.synthesis', {}, 'epic');
+    expect((await next(f, ['busy'])).code).toBe(0);
+    const paneA: string = readState(busyPath).pane.A!;
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      panes: db.panes.map((p) => (p.pane_id === paneA ? { ...p, agent_status: 'blocked' } : p)),
+    });
+    const promptsBefore: number = database(f).prompts.length;
+    const result: Result = await next(f, [resolve(f.root, 'issues/open/epic')]);
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(database(f).prompts).toHaveLength(promptsBefore + 1);
+    expect(database(f).prompts.at(-1)!.text).toContain('ready');
   } finally {
     f.clean();
   }

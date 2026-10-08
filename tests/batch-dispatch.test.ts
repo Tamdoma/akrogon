@@ -242,7 +242,7 @@ test('a failed holder with a landed candidate is told to move back, then reconci
     saveState(aa.path, { ...applied, phase: 'failed', batch: { ...applied.batch!, candidate: top } });
     saveDatabase(f, { ...database(f), prompts: [] });
     const callsBefore: number = calls(f).length;
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
     const notice: string[][] = calls(f)
       .slice(callsBefore)
       .filter((args) => args[0] === 'notification' && args[1] === 'show');
@@ -285,7 +285,7 @@ test('a failed holder keeps carried members, and the move-back clears the record
     // The holder failed after its push; both carried members are still in merge.
     saveState(holder.path, { ...readState(holder.path), phase: 'failed', batch: { ...record!, candidate: top } });
     const callsBefore: number = calls(f).length;
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
     const notice: string[][] = calls(f)
       .slice(callsBefore)
       .filter((args) => args[0] === 'notification' && args[1] === 'show');
@@ -326,7 +326,7 @@ test('a landed batch moves member and holder once, closes member tabs with the r
     toMerge(m1.path, '2026-09-12T00:00:00.000Z');
     toMerge(m2.path, '2026-09-13T00:00:00.000Z');
     saveDatabase(f, { ...database(f), prompts: [] });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
     const record = readState(holder.path).batch;
     const m1Tip: string = z.string().parse(record?.members.find((member) => member.slug === 'm1')?.tip);
     const m2Tip: string = z.string().parse(record?.members.find((member) => member.slug === 'm2')?.tip);
@@ -336,7 +336,7 @@ test('a landed batch moves member and holder once, closes member tabs with the r
     saveState(m1.path, { ...readState(m1.path), phase: 'merged' });
     saveState(holder.path, { ...readState(holder.path), batch: { ...record!, candidate: top } });
     saveDatabase(f, { ...database(f), prompts: [] });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
     expect(leafState(m2.path).phase).toBe('merged');
     expect(leafState(holder.path).phase).toBe('merged');
     expect(leafState(holder.path).batch).toBeUndefined();
@@ -437,13 +437,13 @@ test('a merged holder keeps the record while a member is still in merge, then fi
       },
     });
     const promptsBefore: number = database(f).prompts.length;
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
     expect(readState(m1.path).phase).toBe('merge');
     expect(readState(holder.path).batch?.attempt).toBe('interrupted-attempt');
     expect(database(f).tabs.some((tab) => tab.tab_id === m1Tab)).toBe(true);
     expect(database(f).prompts).toHaveLength(promptsBefore);
     await command(['git', 'push', 'origin', 'refs/heads/m1:main'], f.root);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
     expect(leafState(m1.path).phase).toBe('merged');
     expect(leafState(holder.path).batch).toBeUndefined();
     expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close' && args[2] === m1Tab)).toHaveLength(1);
@@ -574,8 +574,8 @@ test('a failed published holder receives one recovery notice across repeated pas
     const state: State = readState(holder.path);
     await command(['git', 'push', 'origin', state.batch!.top! + ':main'], f.root);
     saveState(holder.path, { ...state, phase: 'failed', batch: { ...state.batch!, candidate: state.batch!.top } });
-    expect((await next(f, ['--all'])).code).toBe(0);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(1);
+    expect((await next(f, ['--all'])).code).toBe(1);
     expect(calls(f).filter((args) => args[0] === 'notification' && args[1] === 'show')).toHaveLength(1);
   } finally {
     f.clean();
