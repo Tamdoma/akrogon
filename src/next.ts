@@ -11,7 +11,7 @@ import {
   symlinkSync,
   type Dirent,
 } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { parse } from 'shell-quote';
@@ -1229,6 +1229,53 @@ async function dispatchDependents(
 
 type Selection = { repo: Repo; leaves: Leaf[] };
 
+type OwnerCandidate = { name: string; kind: 'epic' | 'issue'; path: string };
+
+function ownerCandidates(openLeaves: Leaf[], repoRoot: string): OwnerCandidate[] {
+  const openRoot: string = resolve(repoRoot, 'issues/open');
+  const found: Map<string, OwnerCandidate> = new Map();
+  for (const leaf of openLeaves) {
+    const parts: string[] = relative(openRoot, leaf.path).split(sep).filter(Boolean);
+    if (parts.length === 2) {
+      const path: string = resolve(openRoot, parts[0]);
+      if (!found.has(path)) found.set(path, { name: parts[0], kind: 'issue', path });
+    } else if (parts.length === 3) {
+      const epic: string = resolve(openRoot, parts[0]);
+      const issue: string = resolve(epic, parts[1]);
+      if (!found.has(epic)) found.set(epic, { name: parts[0], kind: 'epic', path: epic });
+      if (!found.has(issue)) found.set(issue, { name: parts[1], kind: 'issue', path: issue });
+    }
+  }
+  return [...found.values()];
+}
+
+function resolveName(repo: Repo, inventory: Inventory, input: string): Leaf[] | undefined {
+  if (input.includes('/') || input.includes('\\')) return undefined;
+  const openRoot: string = resolve(repo.root, 'issues/open');
+  const openLeaves: Leaf[] = inventory.leaves.filter((leaf) => within(leaf.path, openRoot));
+  const owners: OwnerCandidate[] = ownerCandidates(openLeaves, repo.root).filter(
+    (owner) => owner.name === input,
+  );
+  const leaves: Leaf[] = inventory.leaves.filter((leaf) => leaf.state.slug === input);
+  const matches: { kind: string; path: string; leaves: Leaf[] }[] = [
+    ...owners.map((owner) => ({
+      kind: owner.kind,
+      path: owner.path,
+      leaves: openLeaves.filter((leaf) => within(leaf.path, owner.path)),
+    })),
+    ...leaves.map((leaf) => ({ kind: 'leaf', path: leaf.path, leaves: [leaf] })),
+  ];
+  if (matches.length === 1) return matches[0].leaves;
+  if (matches.length > 1) {
+    const lines: string[] = matches
+      .map((match) => ({ kind: match.kind, rel: relative(repo.root, match.path) }))
+      .sort((a, b) => a.rel.localeCompare(b.rel))
+      .map((match) => `${match.kind} ${match.rel}`);
+    throw new Error(`Ambiguous target "${input}":\n${lines.join('\n')}`);
+  }
+  return undefined;
+}
+
 async function selectLeaves(
   global: GlobalConfig,
   invocation: Invocation,
@@ -1255,7 +1302,7 @@ async function selectLeaves(
   const inventory: Inventory = discover(repo, invocation);
   const selected: Leaf[] =
     input !== undefined && !existsSync(folder)
-      ? inventory.leaves.filter((leaf) => leaf.state.slug === input)
+      ? (resolveName(repo, inventory, input) ?? inventory.leaves.filter((leaf) => leaf.state.slug === input))
       : inventory.leaves.filter(
           (leaf) => within(leaf.path, folder) || within(folder, leaf.path) || inWorktree(folder, leaf),
         );
