@@ -109,6 +109,14 @@ type Invocation = { skipped: Set<string>; dispatched: Set<string> };
 type Inventory = { leaves: Leaf[]; unreadable: number; unknown: boolean; foreign: { path: string; stored: string }[] };
 type DispatchOutcome = 'completed' | 'waiting' | 'skipped';
 
+function herdrDetail(error: unknown): string {
+  if (error instanceof CommandError) {
+    const { code, message } = herdrError(error.result);
+    return message === '' ? code : `${code} ${message}`;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
 function report(invocation: Invocation, repo: string, path: string, error: Error, slug?: string): void {
   const key: string = `${repo}/${path}`;
   const identity: string = `${repo}/slug:${slug}`;
@@ -415,6 +423,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   const recordedA: Pane | undefined = members.find((pane) => pane.pane_id === state.pane.A);
   const recordedB: Pane | undefined = members.find((pane) => pane.pane_id === state.pane.B);
   const bootstrap: boolean = matches.length === 0 || (state.pane.A === undefined && state.pane.B === undefined);
+  const repairB: Pane | undefined = !bootstrap && recordedA === undefined ? recordedB : undefined;
   const first: Pane =
     recordedA ??
     (bootstrap
@@ -425,6 +434,39 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
             z.object({ pane: paneSchema }),
           )
         ).pane);
+  if (repairB !== undefined) {
+    saveState(leaf.path, { ...tabState, pane: { A: first.pane_id, B: repairB.pane_id } });
+    const prev: string | undefined = (await tabs()).find((tab) => tab.focused === true)?.tab_id;
+    async function restoreFocus(): Promise<void> {
+      if (prev !== undefined && prev !== tab.tab_id) await herdr(['tab', 'focus', prev], z.object({}));
+    }
+    try {
+      const swapped = await herdr(
+        ['pane', 'swap', '--source-pane', repairB.pane_id, '--target-pane', first.pane_id],
+        z.object({ changed: z.boolean() }),
+      );
+      if (swapped.changed !== true) throw new Error('herdr pane swap returned changed:false');
+    } catch (error) {
+      try {
+        await restoreFocus();
+      } catch (restoreError) {
+        console.warn(
+          JSON.stringify({
+            warning: 'tab focus restore failed',
+            slug: state.slug,
+            prev,
+            error: herdrDetail(restoreError),
+          }),
+        );
+      }
+      throw new Error(`seat A swap failed for leaf ${state.slug}: ${herdrDetail(error)}`, { cause: error });
+    }
+    try {
+      await restoreFocus();
+    } catch (error) {
+      throw new Error(`tab focus restore failed for leaf ${state.slug}: ${herdrDetail(error)}`, { cause: error });
+    }
+  }
   const second: Pane =
     recordedB ??
     (

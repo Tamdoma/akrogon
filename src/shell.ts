@@ -85,7 +85,12 @@ export const paneSchema = z.object({
 
 export type Pane = z.infer<typeof paneSchema>;
 
-export const tabSchema = z.object({ tab_id: z.string(), label: z.string() });
+export const tabSchema = z.object({
+  tab_id: z.string(),
+  label: z.string(),
+  focused: z.boolean().optional(),
+  workspace_id: z.string().optional(),
+});
 
 export type Tab = z.infer<typeof tabSchema>;
 
