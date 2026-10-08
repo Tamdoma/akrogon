@@ -11,7 +11,8 @@ issues/chart/<chart-slug>/
   seats.yaml                    # open time and seat session ids, per the door
   USAGE.md                      # last measured usage table; a rerun replaces it
   forks/<fork-slug>.md
-  slots/<pass>.md                 # only for peer exchanges
+  slots/<pass>.md                 # peer exchanges, and direct review returns (review-B-<n>.md)
+  direct/plan.md, report.md     # only on the direct route
 ```
 Charts stay here after handoff. They have no state.yaml or lifecycle phase. Create forks/ even for a fully settled direct item. On resume, CHART.md points to the selected fork and its context rather than requiring a full chart reread.
 ```markdown
@@ -19,6 +20,8 @@ Charts stay here after handoff. They have no state.yaml or lifecycle phase. Crea
 
 ## Destination
 <observable outcome>
+
+Route: <lifecycle (debate no|yes) | direct>
 
 ## Forks taken
 - [<fork>](forks/<fork-slug>.md): <settled answer>
@@ -31,6 +34,20 @@ Charts stay here after handoff. They have no state.yaml or lifecycle phase. Crea
 
 ## Off route
 <excluded work and reasons>
+
+## Direct attempt
+<only on the direct route, written at attempt start and updated through landing; the route is fixed by the approved handoff review and a later `direct` setting change does not alter it>
+- branch: <slug, also the worktree directory name under worktree_root>
+- worktree: <path>
+- base: <sha the attempt started from, then the sha after each rebase>
+- head: <sha of the latest committed head>
+- rounds used / fix_rounds: <n / limit>
+- push attempts: <n / 2>
+- done: <criteria passing>
+- not done: <criteria open, or none>
+- trigger: <growth stop trigger, or none>
+- review files: <slots/review-B-<n>.md paths>
+- landed SHA: <sha pushed, after landing>
 ```
 Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts.
 ```markdown
@@ -256,7 +273,7 @@ blocked-by: []
 sources: []
 ```
 
-Replace sample values with the chosen slug, creation date and registered repo key. `debate: 'no'` starts at `plan.synthesis`; `debate: 'yes'` starts at `plan.positions`. Debate is one door election, default no, with very small issues using no without a question. Every leaf gets `sources`, empty when unsourced. Attempts, done, fix_rounds, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
+Replace sample values with the chosen slug, creation date and registered repo key. `debate: 'no'` starts at `plan.synthesis`; `debate: 'yes'` starts at `plan.positions`. Debate is one door election, default no, with very small issues using no without a question. A direct-route chart writes no leaf files or state.yaml. Every leaf gets `sources`, empty when unsourced. Attempts, done, fix_rounds, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
 
 A GitHub report has exactly one completion owner, an issue or an epic: every leaf beneath that owner carries its exact identity in sources. For an epic owner, that includes leaves of every child issue. Do not distribute one identity across unrelated completion owners. Legacy source paths stay in intake provenance, not sources.
 
