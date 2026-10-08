@@ -85,7 +85,7 @@ akrogon park --all
 
 ## How order is decided
 
-A leaf must have valid state and satisfied dependencies. Handbuilt and failed leaves are skipped.
+A leaf must have valid state and satisfied dependencies. Failed leaves are skipped.
 
 The global max_active setting limits new leaf allocations across repositories. Existing tabs can keep progressing at the limit. Each leaf normally has two seats, so this is not a count of agent processes.
 
