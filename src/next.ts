@@ -632,7 +632,12 @@ async function dispatchLeaf(
       !['positions-A.md', 'positions-B.md'].every((n) => existsSync(resolve(leaf.path, n)))
     )
       throw new Error(`Debate leaf skipped its debate: ${slug}; set phase: plan.positions`);
-    const detail: ReturnType<typeof blockDetail> = blockDetail(global, repo, { path: leaf.path, state }, inventory.leaves);
+    const detail: ReturnType<typeof blockDetail> = blockDetail(
+      global,
+      repo,
+      { path: leaf.path, state },
+      inventory.leaves,
+    );
     if (detail?.kind === 'deps') {
       if (picked)
         throw new Error(
