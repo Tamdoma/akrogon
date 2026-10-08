@@ -1,9 +1,38 @@
-import { type GlobalConfig } from './config';
+import { type GlobalConfig, type Repo } from './config';
 import { type LogRecord } from './log';
 import { type Gap, gaps, readReadiness, type Readiness } from './readiness';
-import { type Leaf } from './state';
+import { hasLeafFolder, isParked, type Leaf } from './state';
 
 export type Block = { kind: 'deps' } | { kind: 'inputs'; missing: Gap[] };
+
+export type DepDetail = { slug: string; label: string };
+
+export function unmergedDeps(repo: Repo, leaf: Leaf, leaves: Leaf[]): DepDetail[] {
+  return leaf.state['blocked-by'].flatMap((slug: string): DepDetail[] => {
+    const dependency: Leaf | undefined = leaves.find((item) => item.state.slug === slug);
+    if (dependency !== undefined && dependency.state.phase === 'merged') return [];
+    if (dependency !== undefined) return [{ slug, label: dependency.state.phase }];
+    if (isParked(repo, slug)) return [{ slug, label: 'parked' }];
+    if (hasLeafFolder(repo, slug)) return [{ slug, label: 'unreadable' }];
+    return [{ slug, label: 'missing' }];
+  });
+}
+
+export function blockDetail(
+  global: GlobalConfig,
+  repo: Repo,
+  leaf: Leaf,
+  leaves: Leaf[],
+): { kind: 'deps'; deps: DepDetail[] } | { kind: 'inputs'; missing: Gap[] } | null {
+  const deps: DepDetail[] = unmergedDeps(repo, leaf, leaves);
+  if (deps.length > 0) return { kind: 'deps', deps };
+  const readiness: Readiness | null = readReadiness(leaf.path);
+  if (readiness !== null) {
+    const missing: Gap[] = gaps(global, readiness);
+    if (missing.length > 0) return { kind: 'inputs', missing };
+  }
+  return null;
+}
 
 export function eligibility(global: GlobalConfig, leaf: Leaf, leaves: Leaf[]): Block | null {
   if (

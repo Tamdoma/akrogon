@@ -143,9 +143,9 @@ export function allLeaves(repo: Repo): Leaf[] {
   return leaves;
 }
 
-export function missingLeafMessage(repo: Repo, slug: string): string {
+export function isParked(repo: Repo, slug: string): boolean {
   const parkedRoot: string = resolve(repo.root, 'issues/parked');
-  const parked: boolean = issueFolders(repo.root, 'issues/parked').some((owner) => {
+  return issueFolders(repo.root, 'issues/parked').some((owner) => {
     const ownerPath: string = resolve(parkedRoot, owner);
     return issueFolders(ownerPath, '.').some((child) => {
       const childPath: string = resolve(ownerPath, child);
@@ -155,7 +155,22 @@ export function missingLeafMessage(repo: Repo, slug: string): string {
       );
     });
   });
-  return `Missing leaf: ${slug}${parked ? ' (parked)' : ''}`;
+}
+
+function hasSlugFolder(path: string, slug: string): boolean {
+  if (!existsSync(path)) return false;
+  if (existsSync(resolve(path, 'state.yaml'))) return path.split(sep).pop() === slug;
+  return readdirSync(path, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .some((entry) => hasSlugFolder(resolve(path, entry.name), slug));
+}
+
+export function hasLeafFolder(repo: Repo, slug: string): boolean {
+  return ['open', 'closed'].some((area) => hasSlugFolder(resolve(repo.root, 'issues', area), slug));
+}
+
+export function missingLeafMessage(repo: Repo, slug: string): string {
+  return `Missing leaf: ${slug}${isParked(repo, slug) ? ' (parked)' : ''}`;
 }
 
 export function findLeaf(repo: Repo, slug: string): Leaf {
