@@ -3,5 +3,6 @@ issues/worktrees/
 node_modules/
 issues/seeds/
 .lock
+paused.yaml
 .pi-command-logs/
 .env

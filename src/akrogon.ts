@@ -103,6 +103,11 @@ switch (verb) {
     if (values.all !== true && positionals.length === 0) throw new Error('Name at least one issue or pass --all');
     await (await import('./park')).parkCommand(verb, positionals, values.all === true, process.cwd());
     break;
+  case 'pause':
+  case 'unpause':
+    z.tuple([]).parse(positionals);
+    await (await import('./pause')).pauseCommand(verb, process.cwd());
+    break;
   case 'status':
     if (values.charts === true && positionals.length !== 0) throw new Error('Use a slug or --charts, not both');
     z.array(z.string()).max(1).parse(positionals);
@@ -113,5 +118,7 @@ switch (verb) {
     await (await import('./install')).install();
     break;
   default:
-    throw new Error('Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|sync|status>');
+    throw new Error(
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|sync|status>',
+    );
 }

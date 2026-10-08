@@ -19,6 +19,8 @@ const contracts: Record<string, string> = {
   sync: '',
   park: '<issue>... | --all',
   unpark: '<issue>... | --all',
+  pause: '',
+  unpause: '',
   status: '[<slug>|--charts]',
 };
 

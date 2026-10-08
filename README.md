@@ -141,6 +141,8 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon sync` | Commit eligible issue records, rebase and push. |
 | `akrogon park <issue>... \| --all` | Set aside whole eligible issues. |
 | `akrogon unpark <issue>... \| --all` | Restore whole issues to the open queue. |
+| `akrogon pause` | Pause automatic dispatch for the current repository. |
+| `akrogon unpause` | Resume automatic dispatch with one pass for the current repository. |
 ```
 
 A normal starting point for CSV export is:
