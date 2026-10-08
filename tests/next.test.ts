@@ -4705,3 +4705,258 @@ test('blocked-report no line for busy seats', async () => {
     f.clean();
   }
 }, 15000);
+function dispatchedSlugs(f: DispatchFixture): string[] {
+  return database(f).prompts.map((prompt) => prompt.text.split(' ')[1]).sort();
+}
+
+async function namedTargetRepo(): Promise<DispatchFixture> {
+  const f: DispatchFixture = await dispatchFixture();
+  configure(f, { max_active: 8 });
+  leaf(f, 'e1-l1', 'plan.synthesis', {}, 'epic-e/n1');
+  leaf(f, 'e1-l2', 'plan.synthesis', {}, 'epic-e/n1');
+  leaf(f, 'e2-l1', 'plan.synthesis', {}, 'epic-e/n2');
+  leaf(f, 't-l1', 'plan.synthesis', {}, 'top-t');
+  leaf(f, 't-l2', 'plan.synthesis', {}, 'top-t');
+  leaf(f, 'side', 'plan.synthesis', {}, 'side-issue');
+  mkdirSync(resolve(f.root, 'sub'));
+  return f;
+}
+
+function stateSnapshot(paths: string[]): string[] {
+  return paths.map((path) => readFileSync(resolve(path, 'state.yaml'), 'utf8'));
+}
+
+function expectNoLaunch(f: DispatchFixture, paths: string[], before: string[]): void {
+  expect(paths.map((path) => readFileSync(resolve(path, 'state.yaml'), 'utf8'))).toEqual(before);
+  expect(calls(f)).toEqual([]);
+  expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+  expect(existsSync(resolve(f.home, '.lock'))).toBe(false);
+  expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
+}
+
+test('named target equivalence: owner name matches folder path from root, subfolder and worktree', async () => {
+  const owners: { name: string; path: string; slugs: string[] }[] = [
+    { name: 'epic-e', path: 'issues/open/epic-e', slugs: ['e1-l1', 'e1-l2', 'e2-l1'] },
+    { name: 'n1', path: 'issues/open/epic-e/n1', slugs: ['e1-l1', 'e1-l2'] },
+    { name: 'top-t', path: 'issues/open/top-t', slugs: ['t-l1', 't-l2'] },
+  ];
+  for (const owner of owners) {
+    for (const cwd of ['root', 'sub', 'worktree'] as const) {
+      const named: DispatchFixture = await namedTargetRepo();
+      const pathed: DispatchFixture = await namedTargetRepo();
+      try {
+        let from: string = named.root;
+        if (cwd === 'sub') from = resolve(named.root, 'sub');
+        if (cwd === 'worktree') {
+          const side: string = resolve(named.root, 'issues/open/side-issue/side');
+          expect((await next(named, ['side'])).code).toBe(0);
+          from = readState(side).worktree!;
+          saveDatabase(named, { ...database(named), prompts: [] });
+        }
+        const byName: Result = await next(named, [owner.name], {}, from);
+        const byPath: Result = await next(pathed, [owner.path]);
+        expect(byName.code).toBe(0);
+        expect(byPath.code).toBe(0);
+        expect(dispatchedSlugs(named)).toEqual(owner.slugs);
+        expect(dispatchedSlugs(pathed)).toEqual(owner.slugs);
+        expect(dispatchedSlugs(named)).toEqual(dispatchedSlugs(pathed));
+      } finally {
+        named.clean();
+        pathed.clean();
+      }
+    }
+  }
+}, 60000);
+
+test('leaf slug selection keeps open and closed behavior', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'staying', 'plan.synthesis');
+    expect((await next(f, ['staying'])).code).toBe(0);
+    expect(dispatchedSlugs(f)).toEqual(['staying']);
+  } finally {
+    f.clean();
+  }
+  const g: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(g, 'moved', 'plan.synthesis');
+    const closed: string = resolve(g.root, 'issues/closed/issue');
+    mkdirSync(closed, { recursive: true });
+    renameSync(path, resolve(closed, 'moved'));
+    expect((await next(g, ['moved'])).code).toBe(0);
+    expect(dispatchedSlugs(g)).toEqual(['moved']);
+  } finally {
+    g.clean();
+  }
+});
+
+test('existing folder shadows a same-named owner or leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    configure(f, { max_active: 8 });
+    leaf(f, 'a1', 'plan.synthesis', {}, 'epic-a/dup');
+    leaf(f, 'b1', 'plan.synthesis', {}, 'epic-b/dup');
+    const result: Result = await next(f, ['dup'], {}, resolve(f.root, 'issues/open/epic-a'));
+    expect(result.code).toBe(0);
+    expect(dispatchedSlugs(f)).toEqual(['a1']);
+  } finally {
+    f.clean();
+  }
+  const g: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(g, 'ghost', 'plan.synthesis');
+    mkdirSync(resolve(g.root, 'sub/ghost'), { recursive: true });
+    const result: Result = await next(g, ['ghost'], {}, resolve(g.root, 'sub'));
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('No leaves match');
+    expect(database(g).prompts).toHaveLength(0);
+    expect(calls(g)).toEqual([]);
+  } finally {
+    g.clean();
+  }
+});
+
+test('ambiguous name refuses two same-name issues under different epics', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const a: string = leaf(f, 'a1', 'plan.synthesis', {}, 'ep-a/dup');
+    const b: string = leaf(f, 'b1', 'plan.synthesis', {}, 'ep-b/dup');
+    const before: string[] = stateSnapshot([a, b]);
+    const result: Result = await next(f, ['dup']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('issue issues/open/ep-a/dup');
+    expect(result.stderr).toContain('issue issues/open/ep-b/dup');
+    expectNoLaunch(f, [a, b], before);
+  } finally {
+    f.clean();
+  }
+});
+
+test('ambiguous name refuses an epic and its same-name issue', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const a: string = leaf(f, 'l1', 'plan.synthesis', {}, 'same/same');
+    const b: string = leaf(f, 'l2', 'plan.synthesis', {}, 'same/other');
+    const before: string[] = stateSnapshot([a, b]);
+    const result: Result = await next(f, ['same']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('epic issues/open/same');
+    expect(result.stderr).toContain('issue issues/open/same/same');
+    expectNoLaunch(f, [a, b], before);
+  } finally {
+    f.clean();
+  }
+});
+
+test('ambiguous name refuses an issue and its same-name leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const a: string = leaf(f, 'exp', 'plan.synthesis', {}, 'exp');
+    const before: string[] = stateSnapshot([a]);
+    const result: Result = await next(f, ['exp']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('issue issues/open/exp');
+    expect(result.stderr).toContain('leaf issues/open/exp/exp');
+    expectNoLaunch(f, [a], before);
+  } finally {
+    f.clean();
+  }
+});
+
+test('ambiguous name refuses an owner and an unrelated leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const a: string = leaf(f, 'l1', 'plan.synthesis', {}, 'own');
+    const b: string = leaf(f, 'own', 'plan.synthesis', {}, 'misc');
+    const before: string[] = stateSnapshot([a, b]);
+    const result: Result = await next(f, ['own']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('issue issues/open/own');
+    expect(result.stderr).toContain('leaf issues/open/misc/own');
+    expectNoLaunch(f, [a, b], before);
+  } finally {
+    f.clean();
+  }
+});
+
+test('closed owner name does not block an open same-name owner', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    configure(f, { max_active: 8 });
+    leaf(f, 'c1', 'plan.synthesis', {}, 'old');
+    mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
+    renameSync(resolve(f.root, 'issues/open/old'), resolve(f.root, 'issues/closed/old'));
+    leaf(f, 'o1', 'plan.synthesis', {}, 'old');
+    const byName: Result = await next(f, ['old']);
+    expect(byName.code).toBe(0);
+    expect(dispatchedSlugs(f)).toEqual(['o1']);
+    const promptsBefore: number = database(f).prompts.length;
+    const byPath: Result = await next(f, ['issues/closed/old']);
+    expect(byPath.code).toBe(0);
+    expect(database(f).prompts.length).toBe(promptsBefore + 1);
+    expect(database(f).prompts.at(-1)!.text.split(' ')[1]).toBe('c1');
+  } finally {
+    f.clean();
+  }
+});
+
+test('empty folder and unknown names give the missing-leaf message', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    mkdirSync(resolve(f.root, 'issues/open/emptybox'), { recursive: true });
+    const parked: string = resolve(f.root, 'issues/parked/issue/rest');
+    mkdirSync(parked, { recursive: true });
+    writeFileSync(resolve(parked, 'state.yaml'), 'slug: [');
+    const cases: [string, string][] = [
+      ['emptybox', 'Missing leaf: emptybox'],
+      ['nope', 'Missing leaf: nope'],
+      ['rest', 'Missing leaf: rest (parked)'],
+    ];
+    for (const [input, message] of cases) {
+      const result: Result = await next(f, [input]);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain(message);
+    }
+    expect(calls(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('unreadable leaf under a named issue reports its read error', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'b1', 'plan.synthesis', {}, 'brok');
+    writeFileSync(resolve(path, 'state.yaml'), 'slug: [');
+    const result: Result = await next(f, ['brok']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(path);
+    expect(result.stderr).not.toContain('Missing leaf: brok');
+    expect(database(f).prompts).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+});
+
+test('owners resolve without ISSUE.md or EPIC.md', async () => {
+  const cases: [string, string[]][] = [
+    ['ei', ['x1', 'y1']],
+    ['ni', ['x1']],
+  ];
+  for (const [input, slugs] of cases) {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      configure(f, { max_active: 8 });
+      leaf(f, 'x1', 'plan.synthesis', {}, 'ei/ni');
+      leaf(f, 'y1', 'plan.synthesis', {}, 'ei/mi');
+      expect(existsSync(resolve(f.root, 'issues/open/ei/ISSUE.md'))).toBe(false);
+      expect(existsSync(resolve(f.root, 'issues/open/ei/EPIC.md'))).toBe(false);
+      expect(existsSync(resolve(f.root, 'issues/open/ei/ni/ISSUE.md'))).toBe(false);
+      const result: Result = await next(f, [input]);
+      expect(result.code).toBe(0);
+      expect(dispatchedSlugs(f)).toEqual(slugs);
+    } finally {
+      f.clean();
+    }
+  }
+});
