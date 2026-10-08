@@ -1,4 +1,4 @@
-max_active: 16
+max_active: 20
 slots: 
   a: 
     harness: pi

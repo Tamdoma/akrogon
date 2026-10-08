@@ -1,0 +1,50 @@
+bun test v1.4.2 (744846f84)
+
+tests/harness-template.test.ts:
+21 | }
+22 | 
+23 | test('claude template carries no literal subagent model inside --settings', () => {
+24 |   const argv: string[] = z.array(z.string()).min(1).parse(parse(claudeTemplate()));
+25 |   const settings: string = settingsWord(argv);
+26 |   for (const model of ['sonnet', 'opus', 'haiku']) expect(settings).not.toContain(model);
+                                                                             ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "sonnet"
+Received: "{\"env\":{\"CLAUDE_CODE_SUBAGENT_MODEL\":\"claude-sonnet-5-5\",\"CLAUDE_CODE_SUBAGENT_MODEL_FORCE\":\"1\"}}"
+
+      at <anonymous> (/tmp/akrogon-1000/merge-covers-key-855d887fe3d0/tmp.mffWVexB6Q/tests/harness-template.test.ts:26:73)
+(fail) claude template carries no literal subagent model inside --settings [2.34ms]
+29 | for (const model of ['opus', 'claude-opus-5-5']) {
+30 |   test(`claude template substitutes ${model} into the subagent model env`, () => {
+31 |     const line: string = claudeTemplate().replaceAll('{model}', quote(model)).replaceAll('{effort}', quote('low'));
+32 |     const argv: string[] = z.array(z.string()).min(1).parse(parse(line));
+33 |     const settings: { env: Record<string, string> } = JSON.parse(settingsWord(argv));
+34 |     expect(settings.env.CLAUDE_CODE_SUBAGENT_MODEL).toBe(model);
+                                                         ^
+error: expect(received).toBe(expected)
+
+Expected: "opus"
+Received: "claude-sonnet-5-5"
+
+      at <anonymous> (/tmp/akrogon-1000/merge-covers-key-855d887fe3d0/tmp.mffWVexB6Q/tests/harness-template.test.ts:34:53)
+(fail) claude template substitutes opus into the subagent model env [0.30ms]
+29 | for (const model of ['opus', 'claude-opus-5-5']) {
+30 |   test(`claude template substitutes ${model} into the subagent model env`, () => {
+31 |     const line: string = claudeTemplate().replaceAll('{model}', quote(model)).replaceAll('{effort}', quote('low'));
+32 |     const argv: string[] = z.array(z.string()).min(1).parse(parse(line));
+33 |     const settings: { env: Record<string, string> } = JSON.parse(settingsWord(argv));
+34 |     expect(settings.env.CLAUDE_CODE_SUBAGENT_MODEL).toBe(model);
+                                                         ^
+error: expect(received).toBe(expected)
+
+Expected: "claude-opus-5-5"
+Received: "claude-sonnet-5-5"
+
+      at <anonymous> (/tmp/akrogon-1000/merge-covers-key-855d887fe3d0/tmp.mffWVexB6Q/tests/harness-template.test.ts:34:53)
+(fail) claude template substitutes claude-opus-5-5 into the subagent model env [0.17ms]
+
+ 0 pass
+ 3 fail
+ 3 expect() calls
+Ran 3 tests across 1 file. [23.00ms]

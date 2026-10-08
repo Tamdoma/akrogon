@@ -1,0 +1,38 @@
+slug: merge-covers-key
+phase: failed
+created: 2026-10-08
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t9V
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/merge-covers-key
+pane: 
+  A: w8:pJT
+  B: w8:pJV
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+failure: 
+  cause: blocked
+  phase: implement
+  slot: A
+  reason: bun test tests/harness-template.test.ts red on base 3e034dee43f0853446c2ba8f97bb72668ab213dc; see implementation/report.md
+  delivery: shown

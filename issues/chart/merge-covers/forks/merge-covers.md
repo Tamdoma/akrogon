@@ -1,0 +1,7 @@
+# Fork: merge covers
+
+Decided in the framework repo chart `issues/chart/verify-speed/forks/verify-shape.md`, Taken round 4, operator 2026-10-08, verbatim: "1b | 2a | 3 - fix it now immediately | 4a"
+
+## Taken
+- 3: akrogon leaf in this handoff (destination akrogon) plus one operator config step on framework main. New optional repo key `merge_covers: [<checks names>]`: at merge B runs every `checks` command not named there, then every `merge_checks`; a zod refine in `src/config.ts` refuses a name not in `checks` and refuses a non-empty `merge_covers` with empty `merge_checks`; prose change in `merge-issue/SKILL.md:41,51` (stack, solo, red, `rerun`), `check-issue` and implement passes unchanged (C). Coverage is declared, never inferred from command strings (B; C accepted). Done covers default (empty) behavior, invalid names, empty `merge_checks`, mixed covered and uncovered checks, and red and rerun on stack and solo (B). Operator step after it lands: `merge_covers: [parity, contracts, test, test_changed, selftest]` in framework `issues/config.yaml`; each runs inside `framework:verify:fast` (`package.json:154`); `test_changed`'s `AKROGON_BASE` assertion is no longer evaluated at merge, harmless because merge refreshes the base (`merge-issue/SKILL.md:41`) (C). Saves about 106 s per merge run. Rejected: "merge_checks replaces checks whenever defined" (silent meaning change for future repos).
+- Final-shape check: slots/round4-final-shape.md, slots/round4-final-check-B.md, slots/round4-final-check-C.md.

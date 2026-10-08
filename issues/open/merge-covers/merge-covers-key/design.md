@@ -1,0 +1,13 @@
+# Design: merge-covers-key
+
+## Binding decisions, verbatim
+From the framework chart `issues/chart/verify-speed/forks/verify-shape.md` (Tamdoma framework repo), Taken round 4, operator 2026-10-08: "1b | 2a | 3 - fix it now immediately | 4a"
+- 3: akrogon leaf in this handoff. New optional repo key `merge_covers: [<checks names>]`; at merge, run every `checks` command not named in it, then `merge_checks`. A zod refine in `src/config.ts` refuses unknown names and refuses a non-empty `merge_covers` when `merge_checks` is empty. Prose changes in `skills/merge-issue/SKILL.md:41,51` cover the stack, solo, red and rerun paths; check-issue and implement passes unchanged. Done covers the default case, invalid names, empty `merge_checks`, a mix of covered and uncovered checks, and red and rerun on both stack and solo. Rejected: "merge_checks replaces checks whenever defined" (changes behaviour for every repo that sets `merge_checks`).
+Chart for this issue: `issues/chart/merge-covers/` in this repo, written at handoff and pointing to the framework chart (C).
+
+Standing design: `/home/ivan/.claude/skills/chart-issues/assets/standing-design.md`. Interpretation: criteria 1 and 3 are proven in `tests/config.test.ts` with a fail-first break each; criteria 2 and 4 are proven by execution, not text (B): a throwaway fixture repo whose `checks` and `merge_checks` each write a marker file, some covered; the implementer follows the merge prose on the stack and solo paths, green, red and rerun, and records which markers each run wrote. No live push.
+
+## Leaf architecture
+- Owned: `src/config.ts` (`merge_covers: z.array(text).default([])` beside `merge_checks` at line 48, and a refine on the repo schema); `withSetup` (231-243) wraps `checks`, `merge_checks` and `advisory` commands in the setup lock and must pass `merge_covers` through unwrapped, because it holds names, not commands (C). No other `src/` file reads `checks` or `merge_checks`: the merge pass reads them from `akrogon config` output and runs them per skill prose, so the skip is applied in `skills/merge-issue/SKILL.md:41,47,51` ("every `checks` command not named in `merge_covers`") and `merge_covers` must appear in the config output. Also `docs/guide/setup.md:54`, `docs/guide/merge.md:3`, `skills/init-akrogon/SKILL.md:20-31`, `tests/config.test.ts`.
+- After it lands (operator step on framework main, not a leaf): add `merge_covers: [parity, contracts, test, test_changed, selftest]` to framework `issues/config.yaml`. test_changed's `AKROGON_BASE` assertion is then no longer evaluated at merge.
+- Exclusions: no change to check-issue or implement passes, no new ordering or parallel run of checks.

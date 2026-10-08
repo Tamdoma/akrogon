@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr pane split <B> --direction right, then herdr pane swap --source-pane <B> --target-pane <new A>, read with herdr pane layout --pane
+    command: herdr tab create --label probe-seat-a-left-N --no-focus --workspace w8|wG; herdr pane split; herdr pane close; herdr pane split; herdr pane swap; herdr pane layout --pane
+    identity: operator herdr session (local herdr server socket)
+    target: disposable probe tabs in workspaces w8 and wG
+    version: herdr 0.9.3
+    date: '2026-10-08'
+    result: defect reproduced (new A x=60 right of B x=0); swap put A at x=0 with pane IDs kept, for source=new A and source=B
+    cleanup: herdr tab close on each probe tab; tab list shows no probe tab and the probe pane IDs absent
+    limits: seats had no running agent; no extra operator pane or vertical split in the probe tab
+    record: issues/chart/seat-a-left/forks/layout-scope-probe.md
+  - operation: herdr tab list focused tab, herdr tab focus <prev> after herdr pane swap
+    command: herdr tab list; herdr pane swap; herdr tab focus <prev>; herdr pane layout --pane (focused_pane_id)
+    identity: operator herdr session (local herdr server socket)
+    target: disposable probe tabs in workspaces w8 and wG
+    version: herdr 0.9.3
+    date: '2026-10-08'
+    result: swap moved operator tab and workspace focus to the probe tab; tab focus restored both; with the operator in the probe tab and B focused, swap source=B kept B focused
+    cleanup: herdr tab close on each probe tab; operator focus restored
+    limits: does not cover an operator switching tabs during the swap-to-restore window, or an extra operator pane focused in the leaf tab
+    record: issues/chart/seat-a-left/forks/layout-scope-probe.md

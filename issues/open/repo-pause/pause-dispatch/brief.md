@@ -1,0 +1,18 @@
+# Brief: pause-dispatch
+
+## What
+Add `akrogon pause` and `akrogon unpause`. With no argument they act on the registered repo of the current folder (root, subfolder or worktree). While a repo is paused, automatic dispatch does nothing for it: the four herdr plugin events, startup `next --resume`, the merge wake after `akrogon phase`, and the dependent starts, merge pass and cleanup inside those runs. Operator-typed `akrogon next <target>`, bare `akrogon next` and `akrogon next --all` still run in full. `akrogon unpause` clears the pause and runs one resume pass for that repo. `akrogon status` shows paused repos.
+
+## Why
+Tamdoma/akrogon#61: closing a running leaf's seats to change its model relaunches them within seconds on the old config, and `akrogon park` refuses an issue with a running leaf. The only stop today is `herdr plugin disable akrogon`, which pauses every registered repo.
+
+## Done-criteria
+1. `akrogon pause` run from a registered repo's root, a subfolder or one of its leaf worktrees records that repo key as paused in a gitignored state file under the akrogon home and prints the repo and its resulting state; repeating it succeeds and prints the same state; a folder outside every registered repo is refused with an error. `akrogon unpause` mirrors this.
+2. While repo X is paused, an `akrogon next` run with a herdr plugin event (`pane_agent_status_changed`, `pane_exited`, `pane_closed`, `tab_closed`) for a leaf of X, and `akrogon next --resume`, create no tab or pane, start no agent, send no prompt, close no tab, remove no temp or worktree and complete no owner for X, and exit 0; in the same `--resume` run an unpaused repo Y still dispatches.
+3. An `akrogon phase` move in a paused repo commits its phase change, and its merge wake prompts no seat.
+4. In a paused repo, `akrogon next <target>` and `akrogon next --all` (including with an inherited `HERDR_PLUGIN_EVENT_JSON`), and bare `akrogon next` without a plugin event (including with `HERDR_PANE_ID` set), dispatch as they do unpaused, including dependent starts and the merge pass, and the repo stays paused afterwards. (A,B)
+5. Each automatic start or prompt re-reads the pause state inside the global-lock section that performs it, and the pause write takes the same lock: an automatic pass that reaches a launch or prompt after the pause was recorded launches and prompts nothing.
+6. `akrogon unpause` clears the pause, prints that, then runs one pass for that repo only, selecting the leaves startup `--resume` selects (merged, or with a tab or worktree): an allocated leaf whose seats were closed gets new seats started with the current effective seat config, deferred merged-leaf cleanup runs, and a leaf with no tab, worktree or merged phase starts only through the existing dependent cascade. A failure in that pass is reported as its own error, exits non-zero, and leaves the pause cleared.
+7. `akrogon status` prints a paused marker beside each paused repo's heading, including a repo with no open leaves and under `--charts`, and targeted `akrogon status <slug>` names the pause for a leaf of a paused repo; repos that are not paused print as before, and leaf phases, blockers, merge queue and capacity are unchanged.
+8. A missing state file means no repo is paused; a state file that does not parse against its schema makes pause, unpause, status and every automatic `next` run fail with an error naming the file, never treating the repo as unpaused.
+9. The operator guide documents `akrogon pause` and `akrogon unpause`, what they stop, that typed `next` commands still run, what unpause does, and how they differ from `akrogon park`.
