@@ -56,7 +56,6 @@ for (const area of ['open', 'closed', 'parked']) {
         const supported: State = {
           ...canonical,
           sources: ['team/project#1'],
-          hand_built: true,
           busy_since: { A: '2026-09-10T10:00:00Z' },
           busy_notified: { A: '2026-09-10T10:00:00Z' },
           attempts: { A: 1, B: 2 },

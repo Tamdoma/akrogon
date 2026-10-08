@@ -418,7 +418,7 @@ test('a merged holder keeps the record while a member is still in merge, then fi
     const m1Tab: string = z.string().parse(readState(m1.path).tab);
     toMerge(holder.path, '2026-09-11T00:00:00.000Z');
     toMerge(m1.path, '2026-09-12T00:00:00.000Z', { 'blocked-by': ['zz'] });
-    leaf(f, 'zz', 'merge', { hand_built: true }, 'other');
+    leaf(f, 'zz', 'failed', {}, 'other');
     saveDatabase(f, { ...database(f), prompts: [] });
     // A move that died before the member commits: the holder is merged, the record
     // still names m1, and m1's applied tip is not yet on the remote.

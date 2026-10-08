@@ -66,7 +66,6 @@ export const stateSchema = z
     debate: z.enum(['yes', 'no']),
     'blocked-by': z.array(z.string()),
     sources: z.array(z.string().regex(sourcePattern)).optional(),
-    hand_built: z.boolean().optional(),
     busy_since: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     busy_notified: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     attempts: counts.prefault({}),

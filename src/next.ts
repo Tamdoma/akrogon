@@ -608,10 +608,6 @@ async function dispatchLeaf(
   try {
     let state: State = readState(leaf.path);
     if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
-    if (state.hand_built) {
-      if (explicit) throw new Error(`Hand-built leaf cannot be dispatched: ${slug}`);
-      return 'waiting';
-    }
     if (state.phase !== 'merged' && state.phase !== 'failed' && Object.values(state.pane).length > 0) {
       const live: Pane[] = await panes();
       for (const seat of ['A', 'B'] as const) {

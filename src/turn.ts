@@ -3,10 +3,9 @@ import { type LogRecord } from './log';
 import { type Gap, gaps, readReadiness, type Readiness } from './readiness';
 import { type Leaf } from './state';
 
-export type Block = { kind: 'hand-built' } | { kind: 'deps' } | { kind: 'inputs'; missing: Gap[] };
+export type Block = { kind: 'deps' } | { kind: 'inputs'; missing: Gap[] };
 
 export function eligibility(global: GlobalConfig, leaf: Leaf, leaves: Leaf[]): Block | null {
-  if (leaf.state.hand_built === true) return { kind: 'hand-built' };
   if (
     leaf.state['blocked-by'].some((slug) => {
       const dependency: Leaf | undefined = leaves.find((leaf) => leaf.state.slug === slug);

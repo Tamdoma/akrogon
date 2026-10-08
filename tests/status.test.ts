@@ -96,7 +96,6 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
         verdict: { A: 'fix', B: 'nits' },
         tab: 'w1:t9',
         'blocked-by': ['missing'],
-        hand_built: true,
       },
       'epic/job',
     );
@@ -142,7 +141,6 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     expect(row.search(/\S/)).toBeGreaterThan(rows[job].search(/\S/));
     expect(result.stdout).toContain('remote-leaf');
     expect(result.stdout).not.toContain('closed-leaf');
-    expect(result.stdout).not.toContain('hand_built');
     expect(result.stdout).not.toContain('no open leaves');
     expect(rows.filter((line) => /^\s*\S+\s+failed\b/.test(line))).toHaveLength(1);
     const ordinary: string = leafRow(result.stdout, 'ordinary');
@@ -299,6 +297,27 @@ test('repo mismatch identifies both keys in overview and detail while healthy re
       expect(error).toMatch(/registered[^\n]*repo/i);
     }
     expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
+  } finally {
+    f.clean();
+    g.clean();
+  }
+});
+
+test('a leaf with the removed hand_built key is unreadable while healthy repos remain visible', async () => {
+  const f: Fixture = await fixture();
+  const g: Fixture = await fixture();
+  try {
+    const legacyPath: string = leaf(f, 'legacy', 'implement', { hand_built: true });
+    leaf(g, 'visible', 'implement', { repo: 'healthy' });
+    register(f, { repo: f.root, healthy: g.root });
+    const result: Result = await cli(f, ['status'], f.home);
+    expect(result.code).not.toBe(0);
+    const diagnostic: { unreadable: string; path: string; error: string } = z
+      .object({ unreadable: z.string(), path: z.string(), error: z.string() })
+      .parse(JSON.parse(result.stdout.split('\n')[0]));
+    expect(diagnostic.path).toBe(resolve(legacyPath, 'state.yaml'));
+    expect(diagnostic.error).toContain('hand_built');
+    expect(result.stdout).toContain('visible');
   } finally {
     f.clean();
     g.clean();
@@ -788,7 +807,8 @@ test('TURN orders unstamped merge leaves by last to: merge record and marks no r
 test('TURN is empty for ineligible merge leaves and non-merge leaves', async () => {
   const f: Fixture = await fixture();
   try {
-    leaf(f, 'manual', 'merge', { hand_built: true });
+    leaf(f, 'hold', 'failed');
+    leaf(f, 'manual', 'merge', { 'blocked-by': ['hold'] });
     leaf(f, 'building', 'implement');
     const result: Result = await cli(f, ['status']);
     expect(result.code).toBe(0);

@@ -527,14 +527,12 @@ test('unknown panes wait, warn after an hour and keep busy observations', async 
   }
 }, 15000);
 
-test('next refuses hand-built and dependencies, respects capacity, and waits on unknown panes', async () => {
+test('next refuses unmerged dependencies, respects capacity, and waits on unknown panes', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis');
     const dependent: string = leaf(f, 'dependent', 'plan.synthesis', { 'blocked-by': ['first'] });
-    leaf(f, 'manual', 'implement', { hand_built: true });
     const missing: string = leaf(f, 'missing', 'plan.synthesis', { 'blocked-by': ['absent'] });
-    expect((await next(f, ['manual'])).code).not.toBe(0);
     expect((await next(f, ['dependent'])).code).not.toBe(0);
     expect((await next(f, ['missing'])).code).not.toBe(0);
     saveState(missing, { ...readState(missing), 'blocked-by': ['first'] });
@@ -2010,7 +2008,8 @@ for (const mode of ['--resume', '--all'] as const) {
     const f: DispatchFixture = await dispatchFixture();
     try {
       const path: string = leaf(f, 'done', 'plan.synthesis', {}, 'epic/first');
-      leaf(f, 'waiting', 'plan.synthesis', { hand_built: true }, 'epic/second');
+      leaf(f, 'hold', 'failed', {}, 'other');
+      leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['hold'] }, 'epic/second');
       expect((await next(f, ['done'])).code).toBe(0);
       const worktree: string = readState(path).worktree!;
       saveState(path, { ...readState(path), phase: 'merge' });
@@ -2032,7 +2031,8 @@ for (const kind of ['seat-B blocked', 'seat-B unknown', 'seat-A idle', 'seat-A e
     const f: DispatchFixture = await dispatchFixture();
     try {
       const path: string = leaf(f, 'done', 'plan.synthesis', {}, 'epic/first');
-      leaf(f, 'waiting', 'plan.synthesis', { hand_built: true }, 'epic/second');
+      leaf(f, 'hold', 'failed', {}, 'other');
+      leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['hold'] }, 'epic/second');
       expect((await next(f, ['done'])).code).toBe(0);
       const seat: 'A' | 'B' = kind.startsWith('seat-A') ? 'A' : 'B';
       const pane: string = readState(path).pane[seat]!;
@@ -2176,7 +2176,8 @@ test('a seat-B idle hook closes the merged leaf tab while the worktree and branc
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'done', 'plan.synthesis', {}, 'epic/first');
-    leaf(f, 'waiting', 'plan.synthesis', { hand_built: true }, 'epic/second');
+    leaf(f, 'hold', 'failed', {}, 'other');
+    leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['hold'] }, 'epic/second');
     expect((await next(f, ['done'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
     saveState(path, { ...readState(path), phase: 'merge' });
@@ -3626,7 +3627,8 @@ test('sweep scratch catch-up deletes open and closed folders with no live panes'
   const f: DispatchFixture = await dispatchFixture();
   try {
     const openPath: string = leaf(f, 'open-done', 'plan.synthesis', {}, 'epic/first');
-    leaf(f, 'waiting', 'plan.synthesis', { hand_built: true }, 'epic/second');
+    leaf(f, 'hold', 'failed', {}, 'other');
+    leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['hold'] }, 'epic/second');
     const soloPath: string = leaf(f, 'solo-done', 'plan.synthesis', {}, 'solo-issue');
     expect((await next(f, ['open-done'])).code).toBe(0);
     expect((await next(f, ['solo-done'])).code).toBe(0);
@@ -3677,7 +3679,8 @@ test('sweep scratch catch-up keeps sentinel with live panes then deletes on late
   const f: DispatchFixture = await dispatchFixture();
   try {
     const donePath: string = leaf(f, 'live-done', 'plan.synthesis', {}, 'epic/first');
-    leaf(f, 'waiting', 'plan.synthesis', { hand_built: true }, 'epic/second');
+    leaf(f, 'hold', 'failed', {}, 'other');
+    leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['hold'] }, 'epic/second');
     expect((await next(f, ['live-done'])).code).toBe(0);
     const tab: string = readState(donePath).tab!;
     const scratch: string = tmpdirOf(calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!);
@@ -4085,32 +4088,27 @@ test('only the earlier-stamped merge leaf is prompted while the waiting leaf kee
   }
 }, 15000);
 
-for (const blocker of ['hand_built', 'blocked-by'] as const) {
-  test(`an ineligible merge leaf never holds the turn (${blocker})`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
-    try {
-      const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
-      const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
-      toMerge(aa.path, '2026-09-11T00:00:00.000Z', blocker === 'hand_built' ? { hand_built: true } : {});
-      toMerge(bb.path, '2026-09-12T00:00:00.000Z', blocker === 'blocked-by' ? { 'blocked-by': ['cc'] } : {});
-      if (blocker === 'blocked-by') leaf(f, 'cc', 'failed');
-      saveDatabase(f, {
-        ...database(f),
-        prompts: [],
-        panes: database(f).panes.map((pane) => ({ ...pane, agent_status: 'idle' })),
-      });
-      expect((await next(f, ['--all'])).code).toBe(0);
-      const held: { slug: string; path: string; b: string } =
-        blocker === 'hand_built' ? { slug: 'bb', ...bb } : { slug: 'aa', ...aa };
-      const waiting: { path: string; b: string } = blocker === 'hand_built' ? aa : bb;
-      expect(mergePrompts(f)).toEqual([{ pane: held.b, text: mergeText(held.path) }]);
-      expect(database(f).prompts).toHaveLength(1);
-      expect(readState(waiting.path).prompted.B).toBeUndefined();
-    } finally {
-      f.clean();
-    }
-  }, 15000);
-}
+test('an ineligible merge leaf never holds the turn (blocked-by)', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z', {});
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z', { 'blocked-by': ['cc'] });
+    leaf(f, 'cc', 'failed');
+    saveDatabase(f, {
+      ...database(f),
+      prompts: [],
+      panes: database(f).panes.map((pane) => ({ ...pane, agent_status: 'idle' })),
+    });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(mergePrompts(f)).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
+    expect(database(f).prompts).toHaveLength(1);
+    expect(readState(bb.path).prompted.B).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+}, 15000);
 
 for (const exit of [
   'seat merged',
