@@ -266,6 +266,36 @@ test('bare manual next with a pane id dispatches a paused repo and stays paused'
   }
 });
 
+test('manual next target completes a leaf and dispatches its dependent while paused', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'done', 'merged', {}, 'done-issue');
+    const dependent: string = leaf(f, 'dep', 'plan.synthesis', { 'blocked-by': ['done'] }, 'dep-issue');
+    expect((await cli(f, ['pause'])).code).toBe(0);
+    const run: Result = await next(f, ['done']);
+    expect(run.code).toBe(0);
+    expect(database(f).prompts.some((prompt) => prompt.pane === readState(dependent).pane.A)).toBe(true);
+    expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8'))).toEqual({ repo: true });
+  } finally {
+    f.clean();
+  }
+});
+
+test('manual next target prompts the waiting merge holder while paused', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'build', 'plan.synthesis', {}, 'build-issue');
+    const holder: string = leaf(f, 'holder', 'merge', { batch: appliedBatch }, 'merge-issue');
+    expect((await cli(f, ['pause'])).code).toBe(0);
+    const run: Result = await next(f, ['build']);
+    expect(run.code).toBe(0);
+    expect(database(f).prompts.some((prompt) => prompt.pane === readState(holder).pane.B)).toBe(true);
+    expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8'))).toEqual({ repo: true });
+  } finally {
+    f.clean();
+  }
+});
+
 test('unpause relaunches closed seats with the current seat config', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
