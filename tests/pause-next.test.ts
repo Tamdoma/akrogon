@@ -513,3 +513,75 @@ test('race B: pause waits for a held launch lock, later automatic work is suppre
     f.clean();
   }
 });
+
+test('race: pause waits for landed-batch dependent dispatch, later automatic work is suppressed', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const procs: Bun.Subprocess<'ignore', 'pipe', 'pipe'>[] = [];
+  try {
+    const holder: string = leaf(f, 'holder', 'plan.synthesis');
+    const member: string = leaf(f, 'member', 'plan.synthesis');
+    for (const slug of ['holder', 'member']) expect((await next(f, [slug])).code).toBe(0);
+    const worktree: string = readState(holder).worktree as string;
+    writeFileSync(resolve(worktree, 'change'), 'landed\n');
+    await command(['git', 'add', 'change'], worktree);
+    await command(['git', 'commit', '-m', 'change'], worktree);
+    const dependent: string = leaf(f, 'dep', 'plan.synthesis', { 'blocked-by': ['member'] }, 'dep-issue');
+    saveState(holder, { ...readState(holder), phase: 'merge', merge_stamp: '2026-09-11' });
+    saveState(member, { ...readState(member), phase: 'merge', merge_stamp: '2026-09-12' });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const batch: NonNullable<State['batch']> = readState(holder).batch as NonNullable<State['batch']>;
+    await command(['git', 'push', 'origin', 'refs/heads/holder:main'], f.root);
+    saveState(holder, { ...readState(holder), batch: { ...batch, candidate: batch.top as string } });
+    resetHerdrEvidence(f);
+    const barrier: string = resolve(f.home, 'barrier');
+    mkdirSync(barrier);
+    const wrapper: string = resolve(f.home, 'herdrbin');
+    mkdirSync(wrapper);
+    writeFileSync(
+      resolve(wrapper, 'herdr'),
+      `#!/bin/sh\nif [ "$1" = tab ] && [ "$2" = create ] && [ "$4" = dep ]; then\n  touch '${barrier}/entered'\n  while [ ! -e '${barrier}/release' ]; do sleep 0.05; done\nfi\nexec '${resolve(f.home, 'bin/herdr')}' "$@"\n`,
+    );
+    chmodSync(resolve(wrapper, 'herdr'), 0o755);
+    const pass: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, entry, 'next', '--resume'], {
+      cwd: f.root,
+      env: cliEnv(f, { ...f.env, PATH: `${wrapper}:${f.env.PATH}` }),
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    procs.push(pass);
+    await waitFor(resolve(barrier, 'entered'), 15000);
+    const pausing: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, entry, 'pause'], {
+      cwd: f.root,
+      env: cliEnv(f, {}),
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    procs.push(pausing);
+    await Bun.sleep(500);
+    expect(pausing.exitCode).toBe(null);
+    expect(existsSync(resolve(f.home, 'paused.yaml'))).toBe(false);
+    writeFileSync(resolve(barrier, 'release'), '');
+    expect(await pass.exited).toBe(0);
+    expect(await pausing.exited).toBe(0);
+    expect(database(f).prompts.some((prompt) => prompt.pane === readState(dependent).pane.A)).toBe(true);
+    expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8'))).toEqual({ repo: true });
+    const db: Database = database(f);
+    for (const pane of db.panes) pane.agent_status = 'idle';
+    saveDatabase(f, db);
+    const state: State = readState(dependent);
+    saveState(dependent, { ...state, prompted_at: { ...state.prompted_at, A: '2020-01-01T00:00:00.000Z' } });
+    resetHerdrEvidence(f);
+    expect((await next(f, ['--resume'])).code).toBe(0);
+    expect(mutating(f)).toEqual([]);
+  } finally {
+    for (const proc of procs) {
+      if (proc.exitCode === null) {
+        proc.kill();
+        await proc.exited;
+      }
+    }
+    f.clean();
+  }
+});
