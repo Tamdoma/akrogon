@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { effectiveConfig, readGlobal, type Repo } from './config';
+import { effectiveConfig, readGlobal, requireRepo, type Repo } from './config';
 import { initialize } from './init';
 import { sourcePattern } from './state';
 
@@ -104,10 +104,16 @@ switch (verb) {
     await (await import('./park')).parkCommand(verb, positionals, values.all === true, process.cwd());
     break;
   case 'pause':
-  case 'unpause':
     z.tuple([]).parse(positionals);
     await (await import('./pause')).pauseCommand(verb, process.cwd());
     break;
+  case 'unpause': {
+    z.tuple([]).parse(positionals);
+    await (await import('./pause')).pauseCommand(verb, process.cwd());
+    const { unpausePass } = await import('./next');
+    await unpausePass(await requireRepo(readGlobal(), process.cwd()));
+    break;
+  }
   case 'status':
     if (values.charts === true && positionals.length !== 0) throw new Error('Use a slug or --charts, not both');
     z.array(z.string()).max(1).parse(positionals);

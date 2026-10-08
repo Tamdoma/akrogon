@@ -77,6 +77,7 @@ import {
 import { commitMove, completeOwner } from './phase';
 import { sessionFile, deliveredAfter } from './session-file';
 import { readLog } from './log';
+import { isPaused, readPaused } from './pause';
 import { eligibility, mergeQueue, type Block, type QueueEntry } from './turn';
 
 const hookEventSchema = z.discriminatedUnion('event', [
@@ -596,7 +597,8 @@ async function dispatchLeaf(
   identity: Leaf,
   explicit: boolean,
   invocation: Invocation,
-  mergeContext?: string,
+  mergeContext: string | undefined,
+  isAutomatic: boolean,
 ): Promise<DispatchOutcome> {
   const slug: string = identity.state.slug;
   const inventory: Inventory = discover(repo, invocation);
@@ -605,6 +607,7 @@ async function dispatchLeaf(
     report(invocation, repo.name, identity.path, new Error(`Missing or unreadable leaf: ${slug}`), slug);
     return 'skipped';
   }
+  if (isAutomatic && isPaused(repo.name)) return 'waiting';
   try {
     let state: State = readState(leaf.path);
     if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
@@ -695,7 +698,7 @@ async function cleanupMerged(repo: Repo, leaf: Leaf): Promise<void> {
   }
 }
 
-async function sweepAll(global: GlobalConfig, invocation: Invocation): Promise<void> {
+async function sweepAll(global: GlobalConfig, invocation: Invocation, isAutomatic: boolean): Promise<void> {
   const { repos } = registeredRepos(global, invocation);
   for (const merged of [true, false])
     for (const repo of repos)
@@ -704,16 +707,24 @@ async function sweepAll(global: GlobalConfig, invocation: Invocation): Promise<v
         repo,
         discover(repo, invocation).leaves.filter((leaf) => (leaf.state.phase === 'merged') === merged),
         invocation,
+        isAutomatic,
       );
 }
 
-async function sweep(global: GlobalConfig, repo: Repo, leaves: Leaf[], invocation: Invocation): Promise<void> {
+async function sweep(
+  global: GlobalConfig,
+  repo: Repo,
+  leaves: Leaf[],
+  invocation: Invocation,
+  isAutomatic: boolean,
+): Promise<void> {
+  if (isAutomatic && isPaused(repo.name)) return;
   const ordered: Leaf[] = [...leaves].sort(
     (a, b) => Number(b.state.phase === 'merged') - Number(a.state.phase === 'merged'),
   );
   for (const leaf of ordered) {
-    const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, false, invocation);
-    if (outcome === 'completed') await dispatchDependents(global, repo, leaf.state.slug, invocation);
+    const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, false, invocation, undefined, isAutomatic);
+    if (outcome === 'completed') await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
   }
 }
 
@@ -801,9 +812,16 @@ async function mergeNotice(repo: Repo, slug: string): Promise<boolean> {
   }
 }
 
-async function reconcileBatch(global: GlobalConfig, repo: Repo, holder: Leaf, invocation: Invocation): Promise<void> {
+async function reconcileBatch(
+  global: GlobalConfig,
+  repo: Repo,
+  holder: Leaf,
+  invocation: Invocation,
+  isAutomatic: boolean,
+): Promise<void> {
   const record: Batch | undefined = holder.state.batch;
   if (record === undefined) return;
+  if (isAutomatic && isPaused(repo.name)) return;
   const inMerge: boolean = holder.state.phase === 'merge';
   if (inMerge && !(record.applied === true && record.candidate !== undefined)) return;
   let error: CommandError | null = null;
@@ -812,6 +830,7 @@ async function reconcileBatch(global: GlobalConfig, repo: Repo, holder: Leaf, in
   const moved: Leaf[] = [];
   const closable: Leaf[] = [];
   await withLock(resolve(globalHome(), '.lock'), async () => {
+    if (isAutomatic && isPaused(repo.name)) return;
     const leaves: Leaf[] = allLeaves(repo);
     const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
     const batch: Batch | undefined = fresh?.state.batch;
@@ -873,18 +892,25 @@ async function reconcileBatch(global: GlobalConfig, repo: Repo, holder: Leaf, in
     report(invocation, repo.name, holder.path, error, holder.state.slug);
     return;
   }
+  if (isAutomatic && isPaused(repo.name)) return;
   for (const leaf of moved) {
     await closeMergedTab(repo, leaf);
-    await dispatchDependents(global, repo, leaf.state.slug, invocation);
+    await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
   }
   for (const leaf of closable) await closeMergedTab(repo, leaf);
 }
 
-async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<void> {
+async function mergeTurn(
+  global: GlobalConfig,
+  repo: Repo,
+  invocation: Invocation,
+  isAutomatic: boolean,
+): Promise<void> {
+  if (isAutomatic && isPaused(repo.name)) return;
   const inventory: Inventory = discover(repo, invocation);
   for (const leaf of inventory.leaves.filter((item) => item.state.batch !== undefined)) {
     try {
-      await reconcileBatch(global, repo, leaf, invocation);
+      await reconcileBatch(global, repo, leaf, invocation, isAutomatic);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       report(invocation, repo.name, leaf.path, error, leaf.state.slug);
@@ -895,13 +921,13 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
   if (holder === undefined) return;
   const recorded: Batch | undefined = holder.state.batch;
   if (recorded !== undefined && recorded.applied === true) {
-    await dispatchLeaf(
+    await dispatchMergeLeaf(
       global,
       repo,
       holder,
-      false,
       invocation,
       recorded.solo === true ? `attempt=${recorded.attempt} solo` : `attempt=${recorded.attempt} top=${recorded.top}`,
+      isAutomatic,
     );
     return;
   }
@@ -909,11 +935,13 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
     await restoreDrifted(repo, recorded.members, inventory.leaves);
     await restoreHolder(repo, holder, recorded);
     await withLock(resolve(globalHome(), '.lock'), async () => {
+      if (isAutomatic && isPaused(repo.name)) return;
       const fresh: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
       if (fresh?.state.batch?.attempt === recorded.attempt) saveState(fresh.path, { ...fresh.state, batch: undefined });
     });
   }
   const fetched: Result = await run(['git', 'fetch', repo.config.remote], repo.root);
+  if (isAutomatic && isPaused(repo.name)) return;
   if (fetched.code !== 0)
     console.warn(
       JSON.stringify({
@@ -926,6 +954,7 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
     );
   let batch: Batch | undefined;
   await withLock(resolve(globalHome(), '.lock'), async () => {
+    if (isAutomatic && isPaused(repo.name)) return;
     const leaves: Leaf[] = allLeaves(repo);
     const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
     if (fresh?.state.phase !== 'merge' || fresh.state.batch !== undefined) return;
@@ -960,13 +989,13 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
   });
   if (batch === undefined) return;
   if (batch.solo === true) {
-    await dispatchLeaf(
+    await dispatchMergeLeaf(
       global,
       repo,
       { path: holder.path, state: readState(holder.path) },
-      false,
       invocation,
       `attempt=${batch.attempt} solo`,
+      isAutomatic,
     );
     return;
   }
@@ -975,10 +1004,12 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
   let built: Awaited<ReturnType<typeof buildStack>>;
   let prompt: Batch | undefined;
   build: for (;;) {
+    if (isAutomatic && isPaused(repo.name)) return;
     built = await buildStack(repo, current.built_on, current.members, holderHead);
     if (built.ok === true) {
       const staged: Extract<Awaited<ReturnType<typeof buildStack>>, { ok: true }> = built;
       const outcome: 'superseded' | 'rebuild' | 'applied' = await withLock(resolve(globalHome(), '.lock'), async () => {
+        if (isAutomatic && isPaused(repo.name)) return 'superseded';
         const leaves: Leaf[] = allLeaves(repo);
         const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
         if (fresh === undefined || fresh.state.phase !== 'merge' || fresh.state.batch === undefined)
@@ -1069,24 +1100,26 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
       await restoreDrifted(repo, current.members, discover(repo, invocation).leaves);
       let solo: Batch | undefined;
       await withLock(resolve(globalHome(), '.lock'), async () => {
+        if (isAutomatic && isPaused(repo.name)) return;
         const fresh: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
         if (fresh === undefined || fresh.state.batch?.attempt !== current.attempt) return;
         solo = { ...fresh.state.batch, applied: true, solo: true, members: [] };
         saveState(fresh.path, { ...fresh.state, batch: solo });
       });
       if (solo !== undefined)
-        await dispatchLeaf(
+        await dispatchMergeLeaf(
           global,
           repo,
           { path: holder.path, state: readState(holder.path) },
-          false,
           invocation,
           `attempt=${solo.attempt} solo`,
+          isAutomatic,
         );
       return;
     }
     const conflicted: string = built.conflict;
     const rewrite: Batch | undefined = await withLock(resolve(globalHome(), '.lock'), async () => {
+      if (isAutomatic && isPaused(repo.name)) return undefined;
       const leaves: Leaf[] = allLeaves(repo);
       const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
       if (fresh?.state.batch?.attempt !== current.attempt) return undefined;
@@ -1105,21 +1138,45 @@ async function mergeTurn(global: GlobalConfig, repo: Repo, invocation: Invocatio
     current = rewrite;
   }
   if (prompt !== undefined)
-    await dispatchLeaf(
+    await dispatchMergeLeaf(
       global,
       repo,
       { path: holder.path, state: readState(holder.path) },
-      false,
       invocation,
       prompt.solo === true ? `attempt=${prompt.attempt} solo` : `attempt=${prompt.attempt} top=${prompt.top}`,
+      isAutomatic,
     );
 }
 
-export async function mergePass(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<void> {
+async function dispatchMergeLeaf(
+  global: GlobalConfig,
+  repo: Repo,
+  leaf: Leaf,
+  invocation: Invocation,
+  mergeContext: string,
+  isAutomatic: boolean,
+): Promise<void> {
+  if (!isAutomatic) {
+    await dispatchLeaf(global, repo, leaf, false, invocation, mergeContext, false);
+    return;
+  }
+  await withLock(resolve(globalHome(), '.lock'), async () => {
+    if (isPaused(repo.name)) return;
+    await dispatchLeaf(global, repo, leaf, false, invocation, mergeContext, true);
+  });
+}
+
+export async function mergePass(
+  global: GlobalConfig,
+  repo: Repo,
+  invocation: Invocation,
+  isAutomatic: boolean,
+): Promise<void> {
   for (;;) {
+    if (isAutomatic && isPaused(repo.name)) return;
     const holder: Leaf | undefined = mergeQueue(global, discover(repo, invocation).leaves, () => readLog(repo.root))[0]
       ?.leaf;
-    await mergeTurn(global, repo, invocation);
+    await mergeTurn(global, repo, invocation, isAutomatic);
     if (
       holder === undefined ||
       discover(repo, invocation).leaves.some(
@@ -1133,7 +1190,9 @@ export async function mergePass(global: GlobalConfig, repo: Repo, invocation: In
 export async function mergeWake(global: GlobalConfig, repo: Repo): Promise<void> {
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
   try {
-    await mergePass(global, repo, invocation);
+    const paused: boolean = await withLock(resolve(globalHome(), '.lock'), async () => isPaused(repo.name));
+    if (paused) return;
+    await mergePass(global, repo, invocation, true);
   } catch (error) {
     if (!(error instanceof Error)) throw error;
     report(invocation, repo.name, repo.root, error);
@@ -1145,12 +1204,14 @@ async function dispatchDependents(
   repo: Repo,
   completedSlug: string,
   invocation: Invocation,
+  isAutomatic: boolean,
 ): Promise<void> {
   await sweep(
     global,
     repo,
     discover(repo, invocation).leaves.filter((leaf) => leaf.state['blocked-by'].includes(completedSlug)),
     invocation,
+    isAutomatic,
   );
 }
 
@@ -1195,8 +1256,9 @@ async function selectLeaves(
   return { repo, leaves: selected };
 }
 
-async function cleanupRepos(repos: Repo[], invocation: Invocation): Promise<void> {
-  for (const repo of repos)
+async function cleanupRepos(repos: Repo[], invocation: Invocation, isAutomatic: boolean): Promise<void> {
+  for (const repo of repos) {
+    if (isAutomatic && isPaused(repo.name)) continue;
     for (const leaf of discover(repo, invocation).leaves.filter((leaf) => leaf.state.phase === 'merged')) {
       try {
         await cleanupMerged(repo, leaf);
@@ -1205,6 +1267,7 @@ async function cleanupRepos(repos: Repo[], invocation: Invocation): Promise<void
         report(invocation, repo.name, leaf.path, error, leaf.state.slug);
       }
     }
+  }
 }
 
 async function paneOwners(
@@ -1224,6 +1287,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
   const rawEvent: string | undefined = input === undefined ? process.env.HERDR_PLUGIN_EVENT_JSON : undefined;
   const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
   if (event?.event === 'pane_agent_status_changed' && event.data.agent_status === 'working') return;
+  readPaused();
   const global: GlobalConfig = readGlobal();
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
   const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
@@ -1233,7 +1297,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
       ? await selectLeaves(global, invocation, input)
       : undefined;
   if (selection === undefined || selection.leaves.length > 0) {
-    const touched: Map<string, Repo> = new Map();
+    const touched: Map<string, { repo: Repo; isAutomatic: boolean }> = new Map();
     await withLock(resolve(globalHome(), '.lock'), async () => {
       if (selection !== undefined) {
         if (selection.leaves.length === 1) {
@@ -1244,26 +1308,30 @@ export async function nextCommand(input: string | undefined): Promise<void> {
             selection.leaves[0],
             true,
             invocation,
+            undefined,
+            false,
           );
-          if (outcome === 'completed') await dispatchDependents(global, selection.repo, completedSlug, invocation);
-        } else await sweep(global, selection.repo, selection.leaves, invocation);
-        touched.set(selection.repo.name, selection.repo);
-        if (input === undefined) await cleanupRepos([selection.repo], invocation);
+          if (outcome === 'completed')
+            await dispatchDependents(global, selection.repo, completedSlug, invocation, false);
+        } else await sweep(global, selection.repo, selection.leaves, invocation, false);
+        touched.set(selection.repo.name, { repo: selection.repo, isAutomatic: false });
+        if (input === undefined) await cleanupRepos([selection.repo], invocation, false);
       } else if (input === '--all') {
         const current: Repo | null = await currentRepo(global, process.cwd());
         if (current === null) {
-          await sweepAll(global, invocation);
+          await sweepAll(global, invocation, false);
           const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
-          for (const repo of registered.repos) touched.set(repo.name, repo);
-          await cleanupRepos(registered.repos, invocation);
+          for (const repo of registered.repos) touched.set(repo.name, { repo, isAutomatic: false });
+          await cleanupRepos(registered.repos, invocation, false);
         } else {
-          await sweep(global, current, discover(current, invocation).leaves, invocation);
-          touched.set(current.name, current);
-          await cleanupRepos([current], invocation);
+          await sweep(global, current, discover(current, invocation).leaves, invocation, false);
+          touched.set(current.name, { repo: current, isAutomatic: false });
+          await cleanupRepos([current], invocation, false);
         }
       } else if (input === '--resume') {
         const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
-        for (const repo of registered.repos)
+        const active: Repo[] = registered.repos.filter((repo) => !isPaused(repo.name));
+        for (const repo of active)
           await sweep(
             global,
             repo,
@@ -1272,9 +1340,10 @@ export async function nextCommand(input: string | undefined): Promise<void> {
                 leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined,
             ),
             invocation,
+            true,
           );
-        for (const repo of registered.repos) touched.set(repo.name, repo);
-        await cleanupRepos(registered.repos, invocation);
+        for (const repo of active) touched.set(repo.name, { repo, isAutomatic: true });
+        await cleanupRepos(active, invocation, true);
       } else if (event?.event === 'tab_closed') {
         const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
           discover(repo, invocation)
@@ -1283,6 +1352,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
         );
         if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
         if (owners.length === 0) return;
+        if (isPaused(owners[0].repo.name)) return;
         const completedSlug: string = owners[0].leaf.state.slug;
         if (owners[0].leaf.state.phase === 'merged')
           try {
@@ -1291,17 +1361,34 @@ export async function nextCommand(input: string | undefined): Promise<void> {
             if (!(error instanceof Error)) throw error;
             report(invocation, owners[0].repo.name, owners[0].leaf.path, error, completedSlug);
           }
-        const outcome: DispatchOutcome = await dispatchLeaf(global, owners[0].repo, owners[0].leaf, false, invocation);
-        if (outcome === 'completed') await dispatchDependents(global, owners[0].repo, completedSlug, invocation);
-        touched.set(owners[0].repo.name, owners[0].repo);
+        const outcome: DispatchOutcome = await dispatchLeaf(
+          global,
+          owners[0].repo,
+          owners[0].leaf,
+          false,
+          invocation,
+          undefined,
+          true,
+        );
+        if (outcome === 'completed') await dispatchDependents(global, owners[0].repo, completedSlug, invocation, true);
+        touched.set(owners[0].repo.name, { repo: owners[0].repo, isAutomatic: true });
       } else if (input === undefined && hookPane !== undefined) {
         const owners: { repo: Repo; leaf: Leaf }[] = await paneOwners(global, invocation, hookPane);
         if (owners.length > 1) throw new Error(`Multiple leaves own hook pane: ${hookPane}`);
         if (owners.length === 0) return;
         const owner: { repo: Repo; leaf: Leaf } = owners[0];
+        if (isPaused(owner.repo.name)) return;
         const completedSlug: string = owner.leaf.state.slug;
-        const outcome: DispatchOutcome = await dispatchLeaf(global, owner.repo, owner.leaf, false, invocation);
-        if (outcome === 'completed') await dispatchDependents(global, owner.repo, completedSlug, invocation);
+        const outcome: DispatchOutcome = await dispatchLeaf(
+          global,
+          owner.repo,
+          owner.leaf,
+          false,
+          invocation,
+          undefined,
+          true,
+        );
+        if (outcome === 'completed') await dispatchDependents(global, owner.repo, completedSlug, invocation, true);
         let rediscovered: Leaf | undefined;
         try {
           rediscovered = discover(owner.repo, invocation).leaves.find((leaf) => leaf.state.slug === completedSlug);
@@ -1318,12 +1405,12 @@ export async function nextCommand(input: string | undefined): Promise<void> {
           if (!(error instanceof Error)) throw error;
           report(invocation, owner.repo.name, rediscovered?.path ?? owner.leaf.path, error, completedSlug);
         }
-        touched.set(owner.repo.name, owner.repo);
+        touched.set(owner.repo.name, { repo: owner.repo, isAutomatic: true });
       }
     });
-    for (const repo of touched.values()) {
+    for (const { repo, isAutomatic } of touched.values()) {
       try {
-        await mergePass(global, repo, invocation);
+        await mergePass(global, repo, invocation, isAutomatic);
       } catch (error) {
         if (!(error instanceof Error)) throw error;
         report(invocation, repo.name, repo.root, error);
@@ -1331,4 +1418,24 @@ export async function nextCommand(input: string | undefined): Promise<void> {
     }
   }
   if (invocation.skipped.size > 0) process.exitCode = 1;
+}
+
+export async function unpausePass(repo: Repo): Promise<void> {
+  const global: GlobalConfig = readGlobal();
+  const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
+  await withLock(resolve(globalHome(), '.lock'), async () => {
+    await sweep(
+      global,
+      repo,
+      discover(repo, invocation).leaves.filter(
+        (leaf) => leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined,
+      ),
+      invocation,
+      false,
+    );
+    await cleanupRepos([repo], invocation, false);
+  });
+  await mergePass(global, repo, invocation, false);
+  if (invocation.skipped.size > 0)
+    throw new Error(`Unpause pass incomplete for ${repo.name}: ${invocation.skipped.size} skipped`);
 }
