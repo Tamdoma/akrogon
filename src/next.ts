@@ -892,12 +892,14 @@ async function reconcileBatch(
     report(invocation, repo.name, holder.path, error, holder.state.slug);
     return;
   }
-  if (isAutomatic && isPaused(repo.name)) return;
-  for (const leaf of moved) {
-    await closeMergedTab(repo, leaf);
-    await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
-  }
-  for (const leaf of closable) await closeMergedTab(repo, leaf);
+  await withLock(resolve(globalHome(), '.lock'), async () => {
+    if (isAutomatic && isPaused(repo.name)) return;
+    for (const leaf of moved) {
+      await closeMergedTab(repo, leaf);
+      await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
+    }
+    for (const leaf of closable) await closeMergedTab(repo, leaf);
+  });
 }
 
 async function mergeTurn(
