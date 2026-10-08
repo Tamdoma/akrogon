@@ -78,7 +78,7 @@ import { commitMove, completeOwner } from './phase';
 import { sessionFile, deliveredAfter } from './session-file';
 import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
-import { eligibility, mergeQueue, type Block, type QueueEntry } from './turn';
+import { blockDetail, mergeQueue, type QueueEntry } from './turn';
 
 const hookEventSchema = z.discriminatedUnion('event', [
   z.object({
@@ -595,7 +595,7 @@ async function dispatchLeaf(
   global: GlobalConfig,
   repo: Repo,
   identity: Leaf,
-  explicit: boolean,
+  picked: boolean,
   invocation: Invocation,
   mergeContext: string | undefined,
   isAutomatic: boolean,
@@ -622,26 +622,28 @@ async function dispatchLeaf(
       await completeOwner(repo, { path: leaf.path, state }, false);
       return 'completed';
     }
-    if (state.phase === 'failed') return 'waiting';
+    if (state.phase === 'failed') {
+      if (picked) throw new Error(`Leaf is failed and needs phase recovery: ${slug}`);
+      return 'waiting';
+    }
     if (
       state.debate === 'yes' &&
       state.phase === 'plan.synthesis' &&
       !['positions-A.md', 'positions-B.md'].every((n) => existsSync(resolve(leaf.path, n)))
     )
       throw new Error(`Debate leaf skipped its debate: ${slug}; set phase: plan.positions`);
-    const missing: string | undefined = state['blocked-by'].find(
-      (dependency) => inventory.leaves.find((leaf) => leaf.state.slug === dependency) === undefined,
-    );
-    if (missing !== undefined && !explicit) throw new Error(`Missing or unreadable leaf: ${missing}`);
-    const block: Block | null = eligibility(global, { path: leaf.path, state }, inventory.leaves);
-    if (block?.kind === 'deps') {
-      if (explicit) throw new Error(`Leaf dependencies are not merged: ${slug}`);
+    const detail: ReturnType<typeof blockDetail> = blockDetail(global, repo, { path: leaf.path, state }, inventory.leaves);
+    if (detail?.kind === 'deps') {
+      if (picked)
+        throw new Error(
+          `Leaf dependencies are not merged: ${slug}: ${detail.deps.map((d) => `${d.slug} (${d.label})`).join(', ')}`,
+        );
       return 'waiting';
     }
-    if (block?.kind === 'inputs') {
-      if (explicit)
+    if (detail?.kind === 'inputs') {
+      if (picked)
         throw new Error(
-          `Leaf inputs are missing: ${slug}: ${block.missing.map((g) => `${g.kind} ${g.name} in ${g.holder}`).join(', ')}`,
+          `Leaf inputs are missing: ${slug}: ${detail.missing.map((g) => `${g.kind} ${g.name} in ${g.holder}`).join(', ')}`,
         );
       return 'waiting';
     }
@@ -707,6 +709,7 @@ async function sweepAll(global: GlobalConfig, invocation: Invocation, isAutomati
         repo,
         discover(repo, invocation).leaves.filter((leaf) => (leaf.state.phase === 'merged') === merged),
         invocation,
+        true,
         isAutomatic,
       );
 }
@@ -716,6 +719,7 @@ async function sweep(
   repo: Repo,
   leaves: Leaf[],
   invocation: Invocation,
+  picked: boolean,
   isAutomatic: boolean,
 ): Promise<void> {
   if (isAutomatic && isPaused(repo.name)) return;
@@ -723,7 +727,7 @@ async function sweep(
     (a, b) => Number(b.state.phase === 'merged') - Number(a.state.phase === 'merged'),
   );
   for (const leaf of ordered) {
-    const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, false, invocation, undefined, isAutomatic);
+    const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, picked, invocation, undefined, isAutomatic);
     if (outcome === 'completed') await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
   }
 }
@@ -1213,6 +1217,7 @@ async function dispatchDependents(
     repo,
     discover(repo, invocation).leaves.filter((leaf) => leaf.state['blocked-by'].includes(completedSlug)),
     invocation,
+    false,
     isAutomatic,
   );
 }
@@ -1315,7 +1320,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
           );
           if (outcome === 'completed')
             await dispatchDependents(global, selection.repo, completedSlug, invocation, false);
-        } else await sweep(global, selection.repo, selection.leaves, invocation, false);
+        } else await sweep(global, selection.repo, selection.leaves, invocation, true, false);
         touched.set(selection.repo.name, { repo: selection.repo, isAutomatic: false });
         if (input === undefined) await cleanupRepos([selection.repo], invocation, false);
       } else if (input === '--all') {
@@ -1326,7 +1331,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
           for (const repo of registered.repos) touched.set(repo.name, { repo, isAutomatic: false });
           await cleanupRepos(registered.repos, invocation, false);
         } else {
-          await sweep(global, current, discover(current, invocation).leaves, invocation, false);
+          await sweep(global, current, discover(current, invocation).leaves, invocation, true, false);
           touched.set(current.name, { repo: current, isAutomatic: false });
           await cleanupRepos([current], invocation, false);
         }
@@ -1342,6 +1347,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
                 leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined,
             ),
             invocation,
+            false,
             true,
           );
         for (const repo of active) touched.set(repo.name, { repo, isAutomatic: true });
@@ -1433,6 +1439,7 @@ export async function unpausePass(repo: Repo): Promise<void> {
         (leaf) => leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined,
       ),
       invocation,
+      false,
       false,
     );
     await cleanupRepos([repo], invocation, false);
