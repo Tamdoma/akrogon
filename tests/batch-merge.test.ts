@@ -712,7 +712,7 @@ test.serial('a dirty member worktree keeps its files and branch at head when the
     expect(readFileSync(dirty, 'utf8')).toBe('uncommitted\n');
     expect(await command(['git', 'status', '--porcelain'], members[0].state.worktree!)).toContain('file');
     expect(await command(['git', 'rev-parse', 'refs/heads/mem-a'], f.root)).toBe(record.members[0].head);
-    expect(readState(members[0].path).solo).toBe(true);
+    expect(readState(members[0].path).solo).toBeUndefined();
     expect(readState(holder.path).batch?.members).toEqual([]);
   } finally {
     f.clean();
@@ -844,7 +844,7 @@ for (const edited of ['holder', 'member'] as const) {
       expect(await command(['git', 'rev-parse', 'mem-a'], f.root)).toBe(record.members[0].head);
       if (edited === 'holder') expect(batch.solo).toBe(true);
       else {
-        expect(readState(members[0].path).solo).toBe(true);
+        expect(readState(members[0].path).solo).toBeUndefined();
         expect((await run(['git', 'cat-file', '-e', batch.top! + ':file-mem-a'], f.root)).code).not.toBe(0);
       }
       expect(readFileSync(resolve(selected.state.worktree!, 'uncommitted'), 'utf8')).toBe('operator edit\n');

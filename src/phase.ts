@@ -552,11 +552,8 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
         const dirty: string[] = [];
         for (const entry of staying)
           if (await worktreeDirty(repo, entry.leaf.state.worktree)) dirty.push(entry.member.slug);
-        for (const slug of dirty) {
-          const entry: Leaf = findLeaf(repo, slug);
-          saveState(entry.path, { ...entry.state, solo: true });
+        for (const slug of dirty)
           await command(['git', 'update-ref', 'refs/heads/' + slug, memberHead(batch, slug)], repo.root);
-        }
         if (dirty.length > 0) {
           members = batch.members.filter((member) => !dirty.includes(member.slug));
           saveState(current.path, {
@@ -602,8 +599,6 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
             { slug: current.state.slug, head: holderHead, leaf: current },
           ]);
           const lateDirty: Set<string> = new Set([...moved.dirty, ...restored.dirty]);
-          for (const entry of staying.filter((item) => lateDirty.has(item.member.slug)))
-            saveState(entry.leaf.path, { ...readState(entry.leaf.path), solo: true });
           members = batch.members.filter((member) => !lateDirty.has(member.slug));
           const solo: boolean = lateDirty.has(current.state.slug);
           saveState(current.path, {
@@ -792,15 +787,11 @@ export async function phaseCommand(
         pending = await batchPush(repo, leaf, requested, slot, verdict, reason, record, onCommitted);
       else if (record.members.length > 0) {
         const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
-        const dirty: string[] = (
-          await restoreMembers(
-            repo,
-            members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-          )
-        ).dirty;
+        await restoreMembers(
+          repo,
+          members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
+        );
         await restoreHolder(repo, leaf, record);
-        for (const entry of members.filter((item) => dirty.includes(item.member.slug)))
-          saveState(entry.leaf.path, { ...entry.leaf.state, solo: true });
         const limit: number = Math.floor(record.members.length / 2);
         saveState(leaf.path, { ...readState(leaf.path), batch: undefined, batch_limit: limit });
         console.log(`batch split, holder keeps ${limit} of ${record.members.length} members`);
