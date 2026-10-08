@@ -1,0 +1,33 @@
+slug: hand-built-removal
+phase: merged
+created: 2026-10-08
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t9J
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/hand-built-removal
+pane: 
+  A: w8:pJ3
+  B: w8:pJ4
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-08T13:26:16.596Z

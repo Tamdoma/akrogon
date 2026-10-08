@@ -1,0 +1,14 @@
+bun test v1.4.2 (744846f84)
+--changed: 8 changed files, running 1/26 test files
+
+tests/direct-guards.test.ts:
+(pass) refuses uncommitted work [63.93ms]
+(pass) refuses an empty branch [65.37ms]
+(pass) refuses issue files on the branch [66.53ms]
+(pass) refuses changed test files without a citation [68.19ms]
+(pass) passes a clean, cited, non-empty branch [69.81ms]
+
+ 5 pass
+ 0 fail
+ 10 expect() calls
+Ran 5 tests across 1 file. [97.00ms]

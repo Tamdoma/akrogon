@@ -1,0 +1,33 @@
+slug: direct-route
+phase: merged
+created: 2026-10-08
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - hand-built-removal
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:t9K
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/direct-route
+pane: 
+  A: w8:pJ5
+  B: w8:pJ6
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-08T13:36:51.959Z

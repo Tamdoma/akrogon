@@ -1,0 +1,5 @@
+# Landing rebuttal C (disagreement only)
+
+1. B's re-check trigger "whenever the head differs" (merged line 5). A rebase onto a moved `<remote>/<default_branch>` always produces a new sha, even when the branch's own diff is byte-identical, so this trigger means a second B pass on every landing where anything merged meanwhile, which in a busy repo is most landings. The command already answers this question for leaves: a restacked top keeps its tested status when it is equal to the tested top outside `issues/` and `learnings/` and `issues/config.yaml` is unchanged (src/phase.ts:526-531, `equalOutsideRecordFolders` and `recordConfigEqual`; docs/guide/merge.md `reuse` line). Using the same rule here keeps one definition of "the reviewed content still stands"; the range-diff record (merge-issue/SKILL.md:53) is the evidence B would read when it does differ. A's "anything outside the review range" and my "content outside record folders" are the same test stated two ways; the round should offer that one and not the head-sha trigger.
+
+Everything else: none.

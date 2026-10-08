@@ -1,0 +1,5 @@
+# Rebuttal C (disagreement only)
+
+1. Eligibility, "conceptual with recorded reasons, no categorical ban on live ops" (merged line 22). Under fork 1a there is no `state.yaml`, so the mechanisms that make grants and inputs safe for a seat do not exist: `akrogon status` cannot see a readiness file without `state.yaml` (chart-issues/SKILL.md:83), and the seats' only permitted presence check is the `Missing:` lines of `akrogon status <slug>` (implement-issue/SKILL.md:45, :59; check-issue/SKILL.md:31). The grant reuse rule also reads `grants[]` from the leaf's readiness (implement-issue/SKILL.md:49). With no leaf, a door doing live mutations or consuming env values has no presence gate and no recorded grant the reviewer can compare against. So under 1a, `inputs`, `grants` and `produces` in the draft readiness must be hard refusals of the direct option, not recorded reasons. Under 1c they can stay conceptual, because the leaf record exists. The merged note should tie this fork to fork 1 rather than present it as a free-standing B-vs-C difference.
+
+Everything else: none.

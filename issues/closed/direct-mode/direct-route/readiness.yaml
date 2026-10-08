@@ -1,0 +1,45 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: 'git push'
+    command: 'git push --dry-run origin f57bb356c149ed6b9d87a5e122a79d1b54de15ad:refs/heads/main'
+    identity: 'operator git identity ivanjuras (keyring)'
+    target: 'origin Tamdoma/akrogon main'
+    version: 'git 2.56.0'
+    date: '2026-10-08'
+    result: 'Everything up-to-date, exit 0'
+    cleanup: 'none, nothing written'
+    limits: 'not write permission or non-fast-forward handling'
+    record: issues/chart/direct-mode/forks/landing.md
+  - operation: 'akrogon close'
+    command: 'akrogon close Tamdoma/akrogon#58 --by "f57bb35"'
+    identity: 'gh account ivanjuras (keyring)'
+    target: 'Tamdoma/akrogon#58'
+    version: 'akrogon f57bb35'
+    date: '2026-10-08'
+    result: 'closed, read-back CLOSED COMPLETED, exit 0'
+    cleanup: 'none, intended final state'
+    limits: 'not the direct --by text form or the other-owner check'
+    record: issues/chart/direct-mode/forks/landing.md
+  - operation: 'broadcast send'
+    command: 'bun skills/broadcast-issue/scripts/discord-send.ts --target <configured webhook_env>'
+    identity: 'webhook from ~/.config/akrogon/env'
+    target: 'configured Discord target'
+    version: 'broadcast-issue at f57bb35'
+    date: '2026-10-08'
+    result: 'delivered, exit 0'
+    cleanup: 'none, real announcement'
+    limits: 'not the direct-route message context'
+    record: issues/chart/direct-mode/forks/landing.md
+  - operation: 'herdr prompt'
+    command: 'herdr agent prompt <pane> "<text>" --wait --until working --timeout 5000'
+    identity: 'operator herdr session'
+    target: 'panes w8:pGY, w8:pGZ'
+    version: 'herdr 0.9.3'
+    date: '2026-10-08'
+    result: 'agent_prompted, peers returned files'
+    cleanup: 'none'
+    limits: 'not a B review under check-issue'
+    record: issues/chart/direct-mode/forks/landing.md
