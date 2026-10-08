@@ -113,6 +113,14 @@ A working, blocked or unknown seat is not treated as idle. A recently delivered 
 
 Each dispatch pass makes at most one delivery attempt per pending seat. Repeated delivery failures can put the leaf into failed. Running next again does not resume a failed leaf. Read its cause and choose a recovery phase first.
 
+## When picked work cannot start
+
+A typed pass reports every picked leaf it cannot start. Picked means the `next <target>` selection, the typed bare `next` selection without event JSON, and the `next --all` sweep inside one repo or across every repo outside one. Each picked leaf gets at most one line naming the leaf and why, ready siblings still start, and any line sets exit 1.
+
+Reasons come in order. A failed leaf needs phase recovery first. Otherwise every unmerged dependency is named with its phase, or `parked`, `missing`, or `unreadable`. Otherwise every missing input is named by kind, name, and holder, never values. Dependencies win over inputs.
+
+For waits, automatic passes stay quiet: `--resume`, Herdr events, the merge wake after `phase`, dependents started by a completion, and merge turn, capacity, and busy seats never produce a line. Real errors still report.
+
 ## Release work without managing every prompt
 
 Manual dispatch is the normal way to start work. A completed leaf starts only same-repository leaves that depend on it; every other leaf waits for a manual `akrogon next`. Once a leaf is running, the state and Herdr events let the seats progress without you copying the next skill prompt between panes.
