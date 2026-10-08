@@ -164,7 +164,7 @@ foreclosed alternatives>
 <owned surfaces, literal interfaces, exclusions and necessary dependencies>
 ```
 
-Each design is self-contained. Copy every binding decision into each affected leaf, with explicit exclusions for binding decisions that do not belong there. Cross-leaf claims name an owner whose own brief/design accepts that responsibility. Known human-only prerequisites have a named owner and recorded completion before handoff, separately from any `hand_built` choice.
+Each design is self-contained. Copy every binding decision into each affected leaf, with explicit exclusions for binding decisions that do not belong there. Cross-leaf claims name an owner whose own brief/design accepts that responsibility. Known human-only prerequisites have a named owner and recorded completion before handoff.
 
 ### readiness.yaml
 
@@ -256,7 +256,7 @@ blocked-by: []
 sources: []
 ```
 
-Replace sample values with the chosen slug, creation date and registered repo key. `debate: 'no'` starts at `plan.synthesis`; `debate: 'yes'` starts at `plan.positions`. Debate is one door election, default no, with very small issues using no without a question. Every leaf gets `sources`, empty when unsourced. Emit `hand_built: true` only for that explicit operator choice, otherwise omit the field. Attempts, done, fix_rounds, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
+Replace sample values with the chosen slug, creation date and registered repo key. `debate: 'no'` starts at `plan.synthesis`; `debate: 'yes'` starts at `plan.positions`. Debate is one door election, default no, with very small issues using no without a question. Every leaf gets `sources`, empty when unsourced. Attempts, done, fix_rounds, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
 
 A GitHub report has exactly one completion owner, an issue or an epic: every leaf beneath that owner carries its exact identity in sources. For an epic owner, that includes leaves of every child issue. Do not distribute one identity across unrelated completion owners. Legacy source paths stay in intake provenance, not sources.
 

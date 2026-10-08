@@ -9,7 +9,7 @@ akrogon status export-csv
 
 **Nothing starts.**
 
-Check the repo registration, the leaf's phase, dependencies and the global capacity limit. Confirm the leaf is not parked or marked hand_built.
+Check the repo registration, the leaf's phase, dependencies and the global capacity limit. Confirm the leaf issue is not parked.
 
 Dispatch also needs the repository's Herdr workspace. Its name must match the registered repository key, such as widgets.
 

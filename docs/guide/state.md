@@ -29,7 +29,6 @@ The repo value must match the registration key in the machine configuration.
 - **repo** identifies the registered repository.
 - **phase** selects the lifecycle step. Use the phase command for changes.
 - **blocked-by** lists prerequisite leaf slugs.
-- **hand_built** keeps a leaf out of automatic dispatch.
 
 For example, a download-button leaf can wait for the export code:
 
@@ -44,20 +43,7 @@ blocked-by:
 sources: []
 ```
 
-Use hand_built when you intend to handle the leaf yourself:
-
-```yaml
-slug: export-csv
-created: '2026-09-19'
-repo: widgets
-phase: plan.synthesis
-debate: 'no'
-blocked-by: []
-hand_built: true
-sources: []
-```
-
-That prevents later dispatch. It does not stop an agent already working.
+To keep work away from agents, park its issue with `akrogon park <issue>`. Parking removes the whole issue from the open queue (see [next.md](next.md)).
 
 ## The fields Akrogon owns
 
