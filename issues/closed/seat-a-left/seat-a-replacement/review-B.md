@@ -39,3 +39,16 @@ Read docs/reference-index.md, src/AREA.md, tests/AREA.md, and docs/guide/next.md
 - 5cda354: `Test-Change: tests/next.test.ts added seat-A replacement cases covering order, focus, swap failure and unchanged paths; no existing expectation changed`
 
 Both paths match src/test-files.ts. The additions follow plan units U1/U3 and brief criteria 1-4. The fake schema replacement retains existing pane/tab fields and fixtures, and no existing assertion, fixture expectation, or recorded output was changed or deleted. These trailers accurately describe the diff.
+
+## Merge verification — 2026-10-09
+
+Attempt: 337ccb94-3597-4bee-a9ba-961ed8e30e2e. Applied top: 083264efd506864cb24bebf281fb2e3ca158df46. Refreshed base: b168ca73f42252a8bfd20000ddeecdbd105e2bf2. No carried members. The applied diff remains the same four-file implementation. Both reviews accept the implementation. No fetch, rebase, or commit was performed.
+
+All configured checks ran on the applied top, with exit 0:
+
+- `bun run format`: implementation/merge-format.log. Reverted only its unrelated src/status.ts formatting change, restoring the initially clean tree.
+- `bun run typecheck`: implementation/merge-typecheck.log.
+- `bun test --timeout=30000`: implementation/merge-test.log, 603 pass / 0 fail.
+- `bun test --changed="$AKROGON_BASE" --timeout=30000` with the refreshed base: implementation/merge-changed.log, 573 pass / 0 fail.
+
+No merge checks, merge covers, or advisory commands are configured. Completion context gathered from seat-a-left/ISSUE.md and its sole leaf brief: replacement A goes left of surviving B, restores operator tab focus, and preserves the replacement ID on swap failure without creating another pane on retry. Other allocation paths remain unchanged.

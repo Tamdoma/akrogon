@@ -1,0 +1,30 @@
+1:  ced5d01 = 1:  051df25 named-targets U1: resolve bare epic/issue names in selectLeaves
+2:  6dd0316 ! 2:  6c1f87f named-targets U2: CLI boundary tests for bare owner names
+    @@ Commit message
+         Test-Change: tests/next.test.ts added T1-T6 named-target cases; no existing expectation changed
+     
+      ## tests/next.test.ts ##
+    -@@ tests/next.test.ts: test('unstamped merge dispatch uses log order and refuses unreadable history', a
+    +@@ tests/next.test.ts: test('blocked-report no line for busy seats', async () => {
+          f.clean();
+        }
+      }, 15000);
+    -+
+     +function dispatchedSlugs(f: DispatchFixture): string[] {
+     +  return database(f).prompts.map((prompt) => prompt.text.split(' ')[1]).sort();
+     +}
+3:  cd0b26e = 3:  fdf2734 named-targets U3: document named targets and same-name path form
+4:  f91a268 ! 4:  e53a42e named-targets: prettier reflow of U1/U2 lines
+    @@ src/next.ts: function resolveName(repo: Repo, inventory: Inventory, input: strin
+          ...owners.map((owner) => ({
+     
+      ## tests/next.test.ts ##
+    -@@ tests/next.test.ts: test('unstamped merge dispatch uses log order and refuses unreadable history', a
+    +@@ tests/next.test.ts: test('blocked-report no line for busy seats', async () => {
+    +   }
+      }, 15000);
+    - 
+      function dispatchedSlugs(f: DispatchFixture): string[] {
+     -  return database(f).prompts.map((prompt) => prompt.text.split(' ')[1]).sort();
+     +  return database(f)
+5:  d149dc5 = 5:  b168ca7 docs: use folder paths for same-name next examples
