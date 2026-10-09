@@ -1,0 +1,10 @@
+{"scenario":"stack-green","code":0,"markers":["keep","merge"]}
+{"scenario":"stack-red","code":7,"markers":["keep"]}
+{"scenario":"stack-rerun","code":0,"markers":["keep","merge"]}
+{"scenario":"solo-green","code":0,"markers":["keep","merge"]}
+{"scenario":"solo-red","code":7,"markers":["keep"]}
+{"scenario":"solo-rerun","code":0,"markers":["keep","merge"]}
+{"scenario":"full-checks","code":0,"markers":["keep","drop"]}
+{"scenario":"default","code":0,"markers":["keep","drop","merge"]}
+{"action":"init refusal","value":["nope"],"code":1,"repoNamed":true,"configUnchanged":true}
+{"action":"init refusal","value":["drop"],"code":1,"repoNamed":true,"configUnchanged":true}

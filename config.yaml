@@ -2,8 +2,8 @@ max_active: 20
 slots: 
   a: 
     harness: pi
-    model: meta/muse-spark-1.3
-    effort: max
+    model: devin/swe-2-max
+    effort: high
   b: 
     harness: codex
     model: gpt-6.1-sol

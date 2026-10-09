@@ -1,5 +1,5 @@
 slug: seat-a-replacement
-phase: plan.synthesis
+phase: check.review
 created: 2026-10-08
 repo: akrogon
 debate: "no"
@@ -8,25 +8,26 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#60"
 busy_since: 
-  A: 2026-10-08T21:14:18.489Z
+  A: 2026-10-09T07:41:45.923Z
 busy_notified: 
   {}
 attempts: 
   A: 0
   B: 0
 done: 
-  []
+  - B
 fix_rounds: 0
 verdict: 
-  {}
+  B: ready
 tab: w8:t9X
 worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/seat-a-replacement
 pane: 
-  A: w8:pJY
+  A: w8:pK4
   B: w8:pJZ
 prompted: 
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-seat-a-replacement--/2026-10-08T21-14-15-182Z_01a11d5d-e50e-7756-8422-46282d2c9274.jsonl
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-seat-a-replacement--/2026-10-09T07-41-42-661Z_01a11f9c-5985-7717-9340-21c68a1c2ec6.jsonl
 prompted_at: 
-  A: 2026-10-08T21:14:18.489Z
+  A: 2026-10-09T07:41:45.924Z
+  B: 2026-10-09T07:41:36.229Z
 delivery_error: 
   {}

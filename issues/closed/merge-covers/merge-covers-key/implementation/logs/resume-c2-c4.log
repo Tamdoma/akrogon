@@ -1,0 +1,24 @@
+--- C2 stack-green (run on HEAD as-is) ---
+markers: keep.marker merge.marker 
+drop.marker absent: yes
+--- C2 stack-red (keep fails) ---
+keep failed, run red
+markers: 
+drop.marker absent: yes
+--- C2 stack-rerun (main advances, rerun filtered set) ---
+markers: keep.marker merge.marker 
+drop.marker absent: yes
+--- C2 solo-green (leaf branch rebased, then run) ---
+rebase clean
+markers: keep.marker merge.marker 
+drop.marker absent: yes
+--- C2 solo-red (rebased, keep fails) ---
+keep failed, run red
+markers: 
+drop.marker absent: yes
+--- C2 solo-rerun (rebase onto advanced main, rerun) ---
+rebase clean
+markers: keep.marker merge.marker 
+drop.marker absent: yes
+--- C4 check/implement side (full checks set, no filter) ---
+markers: drop.marker keep.marker 

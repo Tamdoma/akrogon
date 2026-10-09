@@ -100,3 +100,29 @@ Artifacts: `implementation/logs/` in the leaf folder holds every log below.
 
 - None. C1-C5 all verified with passing proof above. The blocker is checks red
   on base, not an unverified criterion.
+
+## Resume on fixed base (2026-10-08)
+
+Operator fixed the base with `4534a56 config: restore {model} subagent
+placeholder in claude harness` and returned the leaf to implement. The lane's
+three commits were restacked unchanged on the new base.
+
+New base: 4534a569205c3903bcfd56145e74ec8caa4197d5
+New head: 54b6a34917e1934be1947c0ad5169fa371f8e462 (same 7-file diff, verified
+via `git diff $AKROGON_BASE...HEAD --stat`)
+
+Rerun evidence (`implementation/logs/resume-*.log`):
+
+- `bun test tests/harness-template.test.ts`: 3 pass, 0 fail. Base-red cause gone.
+- `bun test tests/config.test.ts` (C1, C3, C5): 21 pass, 0 fail.
+- Fixture `c2-c4.sh` (C2, C4): exit 0, `drop.marker absent: yes` in all 6 merge
+  scenarios, full checks side writes both markers.
+- `grep merge_covers` over check/implement skills (C4): no hits.
+- `bun run format`: exit 0 (`src/status.ts` drift reverted again, uncommitted).
+- `bun run typecheck`: exit 0.
+- `bun test` (checks.test): 542 pass, 0 fail, 25.4 s.
+- `bun test --changed=$AKROGON_BASE` (checks.test_changed): 430 pass, 0 fail,
+  21.1 s.
+
+No code changed this pass, so no new commit. Prior fail-first and regression
+evidence above still stands. Ready for review.

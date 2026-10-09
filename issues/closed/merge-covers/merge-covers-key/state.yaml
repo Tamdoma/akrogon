@@ -1,5 +1,5 @@
 slug: merge-covers-key
-phase: failed
+phase: merged
 created: 2026-10-08
 repo: akrogon
 debate: "no"
@@ -30,9 +30,4 @@ prompted_at:
   {}
 delivery_error: 
   {}
-failure: 
-  cause: blocked
-  phase: implement
-  slot: A
-  reason: bun test tests/harness-template.test.ts red on base 3e034dee43f0853446c2ba8f97bb72668ab213dc; see implementation/report.md
-  delivery: shown
+merge_stamp: 2026-10-08T21:19:26.505Z

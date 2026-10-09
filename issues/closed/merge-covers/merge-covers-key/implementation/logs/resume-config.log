@@ -1,0 +1,29 @@
+bun test v1.4.2 (744846f84)
+
+tests/config.test.ts:
+(pass) seats throws SeatIndexError naming the file and seat for malformed indexes [45.03ms]
+(pass) seats resolves index seats nearest-first and reports each seat source [45.66ms]
+(pass) config printed check skips both sides of a || b when the frozen lockfile mismatches [110.67ms]
+(pass) config runs all of setup inside the install lock [113.70ms]
+(pass) config leaves merge_covers unwrapped when setup is set [71.22ms]
+(pass) commonDirectory spawns git once per call and reports failures with cwd [123.16ms]
+(pass) config printed check installs into a fresh worktree without a separate install step [120.69ms]
+(pass) config requires explicit grounding [124.26ms]
+(pass) config refuses unknown merge_covers names and empty merge_checks with covers [122.06ms]
+(pass) config printed checks run concurrently in one worktree and leave it clean [124.78ms]
+(pass) config printed check resolves the worktree lockfile version over the root install [126.83ms]
+(pass) config reports merge_checks separately from checks [131.21ms]
+(pass) config defaults merge_covers to empty and prints it [127.02ms]
+(pass) config prints per-repo merged slots with two overrides [158.01ms]
+(pass) config prints merged slots from root, linked worktree, and global outside [159.60ms]
+(pass) config composes setup into printed checks, merge_checks and advisory identically from worktree [164.83ms]
+(pass) config prints worktree_store matching the leaf path for every root shape and caller [221.23ms]
+(pass) config prints direct, defaults it to false, and rejects non-boolean values [243.28ms]
+(pass) config combines defaults and repo values, reports none, and recalculates worktree base [283.44ms]
+(pass) config rejects invalid slots shapes and accepts empty slots [321.65ms]
+(pass) config prints leaf-resolved slots in a managed leaf worktree only [359.83ms]
+
+ 21 pass
+ 0 fail
+ 165 expect() calls
+Ran 21 tests across 1 file. [387.00ms]

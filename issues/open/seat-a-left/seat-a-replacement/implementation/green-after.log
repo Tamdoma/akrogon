@@ -1,0 +1,47 @@
+===== FILTER: missing A beside surviving B =====
+bun test v1.4.2 (744846f84)
+
+tests/next.test.ts:
+(pass) missing A beside surviving B puts A left of B [892.44ms]
+
+ 1 pass
+ 193 filtered out
+ 0 fail
+ 11 expect() calls
+Ran 1 test across 1 file. [915.00ms]
+===== FILTER: restores operator tab focus =====
+bun test v1.4.2 (744846f84)
+
+tests/next.test.ts:
+(pass) restores operator tab focus within the leaf tab [1069.21ms]
+(pass) restores operator tab focus from another workspace [1087.72ms]
+
+ 2 pass
+ 192 filtered out
+ 0 fail
+ 17 expect() calls
+Ran 2 tests across 1 file. [1121.00ms]
+===== FILTER: swap failure keeps =====
+bun test v1.4.2 (744846f84)
+
+tests/next.test.ts:
+(pass) swap failure keeps A recorded and reports the leaf [1134.48ms]
+
+ 1 pass
+ 193 filtered out
+ 0 fail
+ 17 expect() calls
+Ran 1 test across 1 file. [1163.00ms]
+===== FILTER: allocation paths unchanged =====
+
+tests/next.test.ts:
+(pass) allocation paths unchanged: new tab keeps A left with no swap or focus [353.09ms]
+(pass) allocation paths unchanged: extra panes keep position while missing A still repairs [982.58ms]
+(pass) allocation paths unchanged: present and reversed seats keep IDs and positions [1238.98ms]
+(pass) allocation paths unchanged: bootstrap and B-only keep A left with no swap or focus [1269.79ms]
+
+ 4 pass
+ 190 filtered out
+ 0 fail
+ 54 expect() calls
+Ran 4 tests across 1 file. [1292.00ms]

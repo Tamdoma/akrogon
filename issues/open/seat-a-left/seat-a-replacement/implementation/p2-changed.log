@@ -1,0 +1,6 @@
+(pass) a leaf re-entering merge queues behind the two leaves stamped earlier [3139.19ms]
+
+ 566 pass
+ 0 fail
+ 5964 expect() calls
+Ran 566 tests across 25 files. [29.08s]

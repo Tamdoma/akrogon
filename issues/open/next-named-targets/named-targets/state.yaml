@@ -1,5 +1,5 @@
 slug: named-targets
-phase: plan.synthesis
+phase: check.review
 created: 2026-10-08
 repo: akrogon
 debate: "no"
@@ -8,25 +8,26 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#59"
 busy_since: 
-  A: 2026-10-08T21:14:22.789Z
+  A: 2026-10-09T07:39:37.876Z
 busy_notified: 
   {}
 attempts: 
   A: 0
   B: 0
 done: 
-  []
+  - B
 fix_rounds: 0
 verdict: 
-  {}
+  B: fix
 tab: w8:t9Y
 worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/named-targets
 pane: 
   A: w8:pJ0
   B: w8:pK1
 prompted: 
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-named-targets--/2026-10-08T21-14-19-478Z_01a11d5d-f5d6-75e1-8551-849663a622a8.jsonl
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-named-targets--/2026-10-09T07-35-49-987Z_01a11f96-f7e3-7055-ab43-7e9faf91aeca.jsonl
 prompted_at: 
-  A: 2026-10-08T21:14:22.789Z
+  A: 2026-10-09T07:39:37.876Z
+  B: 2026-10-09T07:39:42.208Z
 delivery_error: 
   {}

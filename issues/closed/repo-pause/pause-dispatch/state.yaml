@@ -1,5 +1,5 @@
 slug: pause-dispatch
-phase: plan.synthesis
+phase: merged
 created: 2026-10-08
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#61"
 busy_since: 
-  A: 2026-10-08T21:14:14.322Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -25,8 +25,9 @@ pane:
   A: w8:pJW
   B: w8:pJX
 prompted: 
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-pause-dispatch--/2026-10-08T21-14-11-024Z_01a11d5d-d4d0-7489-a42b-40b05486fb77.jsonl
+  {}
 prompted_at: 
-  A: 2026-10-08T21:14:14.322Z
+  {}
 delivery_error: 
   {}
+merge_stamp: 2026-10-08T22:17:47.277Z
