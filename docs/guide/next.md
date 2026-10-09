@@ -12,7 +12,7 @@ Start or continue one leaf:
 
 ```sh
 cd ~/Work/widgets
-akrogon next export-csv
+akrogon next issues/open/export-csv/export-csv
 ```
 
 Start or continue every leaf of an issue or epic by name:
@@ -66,7 +66,7 @@ Restore it when ready:
 
 ```sh
 akrogon unpark export-csv
-akrogon next export-csv
+akrogon next issues/open/export-csv/export-csv
 ```
 
 Use top-level issue folder names. Parking moves the issue's files:
