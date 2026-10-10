@@ -12,6 +12,7 @@
 - `tests/command-reference.test.ts` checks README command argument contracts.
 - `tests/docs-links.test.ts` checks relative links and heading anchors in README and the guide.
 - `tests/watch-issues-scripts.test.ts` is the `skills/watch-issues` gate, running its scripts tests and typecheck.
+- `tests/guard.test.ts` checks the `akrogon guard` ancestor and own-modules refusals.
 
 ## Non-obvious patterns
 

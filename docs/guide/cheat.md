@@ -122,13 +122,13 @@ Start or stop the optional watcher in Claude Code only:
 /watch-issues stop
 ```
 
-Common paths, using the default worktree root:
+Common paths, using the default worktree store:
 
 ```text
 ~/Work/widgets/issues/config.yaml
 ~/Work/widgets/issues/open/export-csv/export-csv/brief.md
 ~/Work/widgets/issues/open/export-csv/export-csv/state.yaml
-~/Work/widgets/issues/worktrees/export-csv/
+~/.akrogon/worktrees/widgets/export-csv/
 ~/.config/akrogon/env
 ```
 

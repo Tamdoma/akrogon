@@ -98,7 +98,7 @@ Direct is not offered, and the review names the refusal in one line and asks the
 When on and eligible, the review asks one combined route question with the door's recommendation and a reply key: lifecycle debate no, lifecycle debate yes, or direct. The door may recommend lifecycle for a risky small job. Explicit direct authorization already given in the session is the answer. The chosen route is recorded in CHART.md as the `Route:` line, and a later setting change does not alter an approved route. Selecting direct includes the door's push authority; push, source close and broadcast are coordination, not live calls under eligibility.
 
 Protocol, using the shapes in shapes.md:
-1. Attempt start: choose a slug, create worktree `<worktree_root>/<slug>` on branch `<slug>` from the destination's default branch, and write the `Direct attempt` section with the slug recorded.
+1. Attempt start: choose a slug, create worktree `<worktree_store>/<slug>` on branch `<slug>` from the destination's default branch, and write the `Direct attempt` section with the slug recorded.
 2. Implement: the door itself runs `implement-issue direct chart=<chart-folder> worktree=<path>`, which writes `<chart>/direct/plan.md` and `<chart>/direct/report.md`.
 3. B review: send the chart's B pane `check-issue direct slot=B chart=<chart-folder> worktree=<path> base=<sha> head=<sha> out=<chart>/slots/review-B-<n>.md`, with `n` = 1 for the initial review and the exact path named. The Fix/Nit bar and verdict rules are check-issue's.
 4. Repair rounds per the bound below.

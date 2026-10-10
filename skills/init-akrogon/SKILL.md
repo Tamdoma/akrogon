@@ -22,7 +22,6 @@ Propose every repo key below, using inspected values or these defaults, includin
 ```yaml
 remote: origin
 default_branch: main
-worktree_root: issues/worktrees
 rebuttal: true
 fix_rounds: 3
 implement: subagents
@@ -78,7 +77,7 @@ akrogon init --from "$proposal_file"
 rm -- "$proposal_file"
 ```
 
-The command owns both config files, repo registration, `issues/open`, the worktree/seeds/lock ignore entries, the `.gitattributes` `learnings/LESSONS.md merge=union` rule and current `learnings/LESSONS.md` scaffolding, while the skill does not directly write configs, ignore rules, attributes, packages or scripts.
+The command owns both config files, repo registration, `issues/open`, the in-checkout worktree, seeds and lock ignore entries, the `.gitattributes` `learnings/LESSONS.md merge=union` rule and current `learnings/LESSONS.md` scaffolding, while the skill does not directly write configs, ignore rules, attributes, packages or scripts.
 
 Read command results and generated files to verify the proposal, registration, index links and preserved consumer manifest, run proposed checks with a real fixture or leaf base for `test_changed`, and remove the temporary proposal also on failure without parsing config YAML or calling `akrogon config` again in this pass. Do not report setup complete until a top index exists whose rows link to real paths, AREA files exist where one row is not enough, and the proposal `grounding.index` names that index.
 

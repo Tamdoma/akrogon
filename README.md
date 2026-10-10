@@ -164,7 +164,7 @@ Sync requires the configured default branch in the registered checkout. It refus
 ```text
 issues/seeds/
 files named .lock
-the configured worktree_root
+the worktree store when inside the checkout
 ```
 
 Sync uses the configured integration remote. GitHub intake reads the repository's GitHub origin. Reports filed through seed-issue can use a separate destination in the root configuration:

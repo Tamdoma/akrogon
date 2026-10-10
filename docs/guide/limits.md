@@ -24,10 +24,10 @@ Keep lifecycle records in the registered checkout and code changes in the leaf w
 
 ```text
 ~/Work/widgets/issues/open/export-csv/export-csv/
-~/Work/widgets/issues/worktrees/export-csv/
+~/.akrogon/worktrees/widgets/export-csv/
 ```
 
-The second path uses the default worktree root. Your configuration may choose another.
+The second path uses the default worktree store. Your configuration may choose another.
 
 Normal phase moves enforce worktree and artifact conditions. Recording a failure is allowed without first cleaning a blocked worktree. Do not assume that every phase move applies the same checks.
 

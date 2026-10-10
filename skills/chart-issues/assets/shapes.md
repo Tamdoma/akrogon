@@ -37,7 +37,7 @@ Route: <lifecycle (debate no|yes) | direct>
 
 ## Direct attempt
 <only on the direct route, written at attempt start and updated through landing; the route is fixed by the approved handoff review and a later `direct` setting change does not alter it>
-- branch: <slug, also the worktree directory name under worktree_root>
+- branch: <slug, also the worktree directory name under worktree_store>
 - worktree: <path>
 - base: <sha the attempt started from, then the sha after each rebase>
 - head: <sha of the latest committed head>
