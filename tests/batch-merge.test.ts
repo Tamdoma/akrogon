@@ -19,6 +19,92 @@ import { readState, saveState, type Batch, type Leaf, type State } from '../src/
 import { command, run, type Result } from '../src/shell';
 import { applyStack, buildStack } from '../src/batch';
 
+test.serial('restack preserves a retirement when an unrelated member predates the lesson', async () => {
+  const f: Fixture = await fixture();
+  try {
+    process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+    const repo: Repo = readRepo('repo', f.root);
+    const olderBase: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    const older: Branch = await branchAt(f, 'older', olderBase, 'file-older');
+    const alpha: string = '- alpha. 2026-10-09. history/alpha.md\n';
+    const beta: string = '- beta. 2026-10-09. history/beta.md\n';
+    const gamma: string = '- gamma. 2026-10-10. history/gamma.md\n';
+    const delta: string = '- delta. 2026-10-10. history/delta.md\n';
+    const recurrence: string = '- new recurrence. 2026-10-10. history/alpha.md\n';
+    mkdirSync(resolve(f.root, 'learnings/history'), { recursive: true });
+    writeFileSync(resolve(f.root, '.gitattributes'), 'learnings/LESSONS.md merge=union\n');
+    writeFileSync(resolve(f.root, 'learnings/LESSONS.md'), alpha + beta);
+    writeFileSync(resolve(f.root, 'learnings/history/alpha.md'), '# alpha\n');
+    await command(['git', 'add', '.'], f.root);
+    await command(['git', 'commit', '-m', 'lessons'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const guardBase: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    const guard: Branch = await branchAt(f, 'guard', guardBase, 'file-guard', async (worktree) => {
+      writeFileSync(resolve(worktree, 'learnings/LESSONS.md'), beta);
+      writeFileSync(resolve(worktree, 'learnings/history/alpha.md'), '# alpha\nApplied 2026-10-10 by guard.ts:1: guard\n');
+    });
+    const held: Branch = await branchAt(f, 'holder', guardBase, 'file-holder');
+    writeFileSync(resolve(f.root, 'learnings/LESSONS.md'), alpha + gamma + recurrence + beta);
+    await command(['git', 'add', '.'], f.root);
+    await command(['git', 'commit', '-m', 'new lessons'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const builtOn: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    const members: Leaf[] = [older, guard].map((branch, index) => {
+      const path: string = leaf(f, branch.slug, 'merge', {
+        worktree: branch.worktree,
+        merge_stamp: '2026-10-10T00:00:0' + (index + 1) + '.000Z',
+      });
+      return { path, state: readState(path) };
+    });
+    const holderPath: string = leaf(f, 'holder', 'merge', {
+      worktree: held.worktree,
+      merge_stamp: '2026-10-10T00:00:00.000Z',
+    });
+    const original: { slug: string; base: string; head: string }[] = [
+      { slug: older.slug, base: olderBase, head: older.head },
+      { slug: guard.slug, base: guardBase, head: guard.head },
+    ];
+    const built: Awaited<ReturnType<typeof buildStack>> = await buildStack(repo, builtOn, original, held.head);
+    if (!built.ok) throw new Error('fixture stack conflict: ' + built.conflict);
+    const record: Batch = {
+      attempt: 'a1', built_on: builtOn, holder: { base: guardBase, head: held.head }, applied: true, top: built.top,
+      members: original.map((member) => ({ ...member, tip: built.tips.get(member.slug)! })),
+    };
+    saveState(holderPath, { ...readState(holderPath), batch: record });
+    const holder: Leaf = { path: holderPath, state: readState(holderPath) };
+    await applyStack(repo, built.top, record.members.map((member) => ({
+      ...member, leaf: members.find((item) => item.state.slug === member.slug)!,
+    })), holder);
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const args: string[] = ['phase', 'holder', 'merged', '--slot', 'B', '--attempt', 'a1'];
+    expect((await cli(f, [...args, '--check'], f.root, herdr.env)).code).toBe(0);
+    writeFileSync(resolve(f.root, 'learnings/LESSONS.md'), alpha + gamma + delta + recurrence + beta);
+    await command(['git', 'add', '.'], f.root);
+    await command(['git', 'commit', '-m', 'main adds delta'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    expect((await cli(f, args, f.root, herdr.env)).code).toBe(0);
+    const restacked: Batch = readState(holderPath).batch!;
+    const expected: string = gamma + delta + recurrence + beta;
+    expect(readFileSync(resolve(held.worktree, 'learnings/LESSONS.md'), 'utf8')).toBe(expected);
+
+    writeFileSync(resolve(held.worktree, 'learnings/LESSONS.md'), alpha + expected);
+    await command(['git', 'add', 'learnings/LESSONS.md'], held.worktree);
+    await command(['git', 'commit', '-m', 'resurrect retired line'], held.worktree);
+    const resurrected: string = await command(['git', 'rev-parse', 'HEAD'], held.worktree);
+    saveState(holderPath, { ...readState(holderPath), batch: { ...restacked, top: resurrected } });
+    const refused: Result = await cli(f, [...args, '--check'], f.root, herdr.env);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('history/alpha');
+    await command(['git', 'reset', '--hard', restacked.top!], held.worktree);
+    saveState(holderPath, { ...readState(holderPath), batch: restacked });
+    expect((await cli(f, [...args, '--check'], f.root, herdr.env)).code).toBe(0);
+    expect((await cli(f, args, f.root, herdr.env)).code).toBe(0);
+    expect(await command(['git', 'show', 'origin/main:learnings/LESSONS.md'], f.root)).toBe(expected.trim());
+  } finally {
+    f.clean();
+  }
+});
+
 const originalTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
 afterEach(() => {
   if (originalTempRoot === undefined) delete process.env.AKROGON_LEAF_TEMP_ROOT;
