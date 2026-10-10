@@ -38,7 +38,7 @@ The prompt ends `attempt=<id> top=<sha>` for an applied stack with the holder on
 
 ### attempt top: the worktree is already the stack top
 
-B commits nothing and does not fetch or rebase. Refresh `AKROGON_BASE` from `akrogon config`, run every `checks` command not named in `merge_covers`, then every `merge_checks` command, on `HEAD` in the worktree, and record evidence in `review-B.md` under the `leaf=` folder with advisory failures as Nits.
+B commits nothing and does not fetch or rebase. The command removed the worktree's empty untracked folders before this prompt; ignored files remain. Refresh `AKROGON_BASE` from `akrogon config`, run every `checks` command not named in `merge_covers`, then every `merge_checks` command, on `HEAD` in the worktree, and record evidence in `review-B.md` under the `leaf=` folder with advisory failures as Nits.
 
 On green checks run `akrogon phase <slug> merged --slot B --check --attempt <id>`, which requires HEAD to equal the recorded top, checks the `Test-Change:` trailers over each carried member's range and over the whole stack, and records the tested top. A refusal names each uncited file; nothing may commit on the recorded top, so the pass ends by routing the gap through `akrogon phase <slug> check.fix --slot B --attempt <id>`; red runs take the base-red hold or leaf-red endings below.
 
@@ -48,7 +48,7 @@ A non-fast-forward refusal restacks the stack onto the new remote tip and prints
 
 ### attempt solo: B rebases its own leaf
 
-Commit scoped outstanding changes (each scoped commit that changes an existing file matched by the path rule in `src/test-files.ts` ends its message with a `Test-Change: <exact path> <source and reason>` trailer in the final trailer block, one per changed old test file, and a commit adding a case to an existing test file names what was added and that no existing expectation changed, citing no source), fetch the configured remote, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` after rebase, and run every `checks` command not named in `merge_covers`, then every `merge_checks` command, in the worktree, recording evidence in `review-B.md` under the `leaf=` folder and advisory failures as Nits.
+Commit scoped outstanding changes (each scoped commit that changes an existing file matched by the path rule in `src/test-files.ts` ends its message with a `Test-Change: <exact path> <source and reason>` trailer in the final trailer block, one per changed old test file, and a commit adding a case to an existing test file names what was added and that no existing expectation changed, citing no source), fetch the configured remote, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` after rebase, and run every `checks` command not named in `merge_covers`, then every `merge_checks` command, in the worktree, recording evidence in `review-B.md` under the `leaf=` folder and advisory failures as Nits. The command removed the worktree's empty untracked folders before this prompt; ignored files remain.
 
 On a rebase conflict, resolve it in the worktree keeping both true sides, complete the rebase, and record in `review-B.md` under the `leaf=` folder the rebase target, the prior reviewed head, the resolved head and `git range-diff <old-base>..<prior-head> <target>..<resolved-head>` before running the checks, where old-base is the `AKROGON_BASE` value before the post-rebase refresh.
 
