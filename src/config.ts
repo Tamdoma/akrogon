@@ -278,7 +278,7 @@ export function withSetup(config: RepoConfig): RepoConfig {
       ? cmd
       : `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(setup)} && sh -c ${quote(cmd)}`;
   const runCheck = (name: string, cmd: string): string =>
-    `akrogon run-check --name ${name} -- sh -c ${quote(inner(cmd))}`;
+    `akrogon run-check --name ${quote(name)} -- sh -c ${quote(inner(cmd))}`;
   const map = (record: Record<string, string>): Record<string, string> =>
     Object.fromEntries(Object.entries(record).map(([k, v]): [string, string] => [k, runCheck(k, v)]));
   return {

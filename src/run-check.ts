@@ -111,7 +111,7 @@ export async function runCheck(
     process.stdout.write(stdout);
     process.stderr.write(stderr);
     mkdirSync(target, { recursive: true });
-    copyFileSync(log, resolve(target, `check-${name ?? 'run'}-${Date.now()}-${process.pid}.log`));
+    copyFileSync(log, resolve(target, `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`));
     return code;
   } finally {
     rmSync(runRoot, { recursive: true, force: true });

@@ -15,7 +15,8 @@ import {
   type Repo,
 } from '../src/config';
 
-const runCheck = (name: string, inner: string): string => `akrogon run-check --name ${name} -- sh -c ${quote(inner)}`;
+const runCheck = (name: string, inner: string): string =>
+  `akrogon run-check --name ${quote(name)} -- sh -c ${quote(inner)}`;
 
 const runCheckInner = (printed: string): string => printed.replace(/^akrogon run-check --name \S+ -- /, '');
 
