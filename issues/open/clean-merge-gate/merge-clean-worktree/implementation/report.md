@@ -44,3 +44,17 @@ Base `1d7d536100aebc183bd22f63b7c3ba31d5d07ea5`, head `564a125c81dde5325668f64c6
 ## Unverified criteria
 
 None.
+
+## 2026-10-10 check.fix — red on base stop
+
+Finding (from review-B.md merge gate): `bun test --timeout=30000` red on the rebased head with 9 failures in `tests/dependents-first.test.ts` (1) and `tests/peer-wait.test.ts` (8 — `herdr agent list` not in the fixture).
+
+Base-run comparison per the Shared context rule:
+
+- Command: `bun test tests/dependents-first.test.ts tests/peer-wait.test.ts --timeout=30000` (the 2 files containing all 9 gate failures).
+- Lane head `75ff06c36f6b22dc9c70b4a3eca274c4fc0f3c93`: exit 1, 4 pass / 9 fail. Log: `/tmp/akrogon-1000/merge-clean-worktree-3ea9278d4217/checkfix-leaf-run.log`.
+- Base `f3199df89b25b4f215df04f8703ef6d71880cd6a` (detached worktree, `bun install`): exit 1, 4 pass / 9 fail, identical failing tests and error shapes (`agent list` unexpected-invocation failures on all 8 peer-wait cases; dependents-first `Expected: 1, Received: 0` at line 103). Log: `/tmp/akrogon-1000/merge-clean-worktree-3ea9278d4217/checkfix-base-run.log`.
+- Leaf diff touches `src/batch.ts`, `src/shell.ts`, `src/next.ts` dispatchSlot, `skills/merge-issue/SKILL.md`, `tests/batch-dispatch.test.ts` — no path used by peer-wait or dependents-first ordering; the restack diff `f3199df..75ff06c` changed no peer-wait or dependents-first machinery (recent base commits `f3199df`, `36eb9ff`, `251628f` own that area).
+- Both runs completed with terminal exit status; base worktree removed after the run. This is a stop, not a handoff: the base run explains the leaf failure.
+
+Disposition: `bun test --timeout=30000` red on base `f3199df89b25b4f215df04f8703ef6d71880cd6a` → `akrogon phase failed`, slot A.

@@ -56,8 +56,25 @@ Base: `2d9becac4365ec4a1079853364d561d90e356b5e` · Head: `e8be187`
 - Commit `5d7b459`: the merge-issue one-liner passed `Bun.spawn(...).stdout.text().then(...)` (a Promise) as `base`; added `mergeBase` to `src/lessons.ts` and fixed the verbatim text. Verified: `bun -e` prints `none` in the leaf worktree.
 - Commit `e8be187`: prettier formatting of touched files only; `src/status.ts` drift reverted (known format-run hazard, history `2026-10-08-pause-dispatch.md`).
 
+## check.fix repairs
+
+### B's check.repair (commits `31db229`, `14aa6a2`)
+
+A-F2/B-F1 consumer-repo import: `tests/lessons.test.ts` reproduces the solo cleanup in a consumer fixture (red: `Cannot find module './src/lessons.ts'`); fix resolves `lessons.ts` beside `readlink -f "$(command -v akrogon)"` via a dynamic import; green with literal-skill-command execution.
+
+### A's check.fix round 2 (worker sa-5, commits `4a313b4`, `90ceddd`)
+
+A-F1 over-removal: `lessonDiffLines` added; `removeRetiredLessons` removes only lines byte-identical to a `-` line in a leaf's original range AND naming a retired stem; `retiredLessonsPresent` flags stem lines except those main added on top of each leaf fork. `buildStack` computes member/holder `memberBase` ranges; `batchCheck` passes `record.members`/`record.holder` ranges; the merge-issue one-liner gains `ORIG_HEAD`. Worker deviation kept: `retiredLessonsPresent` diffs `merge-base(r.base, base)` both directions because `restack` can overwrite `holder.base` with a newer base while `built_on` stays stale.
+
+Proof: `bun test` 656/656, `--changed` 160/160, typecheck clean; B's failing scenario green; new cases cover same-stem recurrence, superstring stem, half-retired lesson. `bun run format` rewrote only pre-existing `src/status.ts` drift — reverted, not committed.
+
+Worker-noted limitation kept: on a restack, `item.head` is an already-rebased tip, so a resurrected line already inside that tip isn't in its deleted set — `buildStack` leaves it and `merged --check` refuses it to B's pass instead. Acceptable (still enforced; auto-removal only degrades).
+
 ## Known limitations and unverified criteria
 
 - Direct-route limitation preserved from plan D10: `implement-issue direct` + door push does not run `buildStack`/`batchCheck`, so a direct landing could resurrect a retired line. Brief scoped to solo/stack-top only; recorded, not fixed.
 - The solo-mode re-removal is proven mechanically by `--check` tests plus the one-liner's verified run; the end-to-end solo merge with a real `gh`/remote push is exercised by existing `phase.test.ts` solo cases rather than a bespoke live push.
 - No unverified criteria.
+
+| `4a313b4` | fix: re-remove only lesson lines the leaf itself deleted (A-F1) |
+| `90ceddd` | test: cover same-stem and prefix-colliding lessons (A-F1) |

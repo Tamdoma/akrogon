@@ -1,0 +1,24 @@
+bun test v1.4.2 (744846f84)
+--changed: 3 changed files, running 2/33 test files
+
+tests/peer-wait.test.ts:
+(pass) rejects missing args and a non-numeric budget [38.09ms]
+(pass) passes a non-timeout herdr failure through unchanged [59.09ms]
+(pass) done when the return file is written during a timed-out wait [62.12ms]
+(pass) blocked wins over a non-empty return file [63.50ms]
+(pass) done while herdr still reports working [65.34ms]
+(pass) budget keeps the last status herdr returned [339.82ms]
+(pass) budget clamps each wait timeout to the remaining budget [542.57ms]
+(pass) failure on idle with the return file missing [10082.88ms]
+(pass) failure on done with a 0-byte return file [10083.07ms]
+
+tests/dependents-first.test.ts:
+(pass) TURN ignores merged leaves when counting dependents [56.42ms]
+(pass) TURN places the merge leaf with more unmerged dependents first despite the later stamp [57.83ms]
+(pass) TURN keeps the batch record holder first ahead of a leaf with more dependents [57.27ms]
+(pass) next --all dispatches a leaf with unmerged dependents before an earlier leaf with none [554.77ms]
+
+ 13 pass
+ 0 fail
+ 53 expect() calls
+Ran 13 tests across 2 files. [10.67s]

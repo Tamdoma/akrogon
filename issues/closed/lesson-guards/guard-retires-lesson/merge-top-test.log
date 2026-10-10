@@ -1,0 +1,18 @@
+Captured terminal excerpt from bun test --timeout=30000 at 5d3d1a8fd9604d20d8edf77e40f36a45ea5e55fd.
+Exit status: 1. Output was returned through the command tool, not redirected during execution.
+
+9 tests failed:
+(fail) next --all dispatches a leaf with unmerged dependents before an earlier leaf with none [677.96ms]
+(fail) failure on done with a 0-byte return file [43.62ms]
+(fail) passes a non-timeout herdr failure through unchanged [45.03ms]
+(fail) done while herdr still reports working [44.95ms]
+(fail) budget keeps the last status herdr returned [44.00ms]
+(fail) blocked wins over a non-empty return file [45.82ms]
+(fail) failure on idle with the return file missing [45.71ms]
+(fail) budget clamps each wait timeout to the remaining budget [45.90ms]
+(fail) done when the return file is written during a timed-out wait [49.31ms]
+
+664 pass
+9 fail
+7166 expect() calls
+Ran 673 tests across 34 files. [66.91s]

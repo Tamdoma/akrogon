@@ -1,0 +1,33 @@
+slug: fix-red-base-tests
+phase: merged
+created: 2026-10-10
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAG
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/fix-red-base-tests
+pane: 
+  A: w8:pM3
+  B: w8:pM4
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-10T10:05:13.772Z

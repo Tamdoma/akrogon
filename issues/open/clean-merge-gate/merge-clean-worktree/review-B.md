@@ -81,3 +81,55 @@ Pass-after evidence: `bun test tests/batch-dispatch.test.ts --timeout=30000` exi
 Check logs are under the exported leaf TMPDIR `/tmp/akrogon-1000/merge-clean-worktree-3ea9278d4217`: `merge-clean-format.log`, `merge-clean-tests.log`, `merge-clean-changed.log`. Each command's completed exit status was captured separately from log inspection. `git diff --check` passed and the worktree is clean after both repair commits.
 
 A's N1 about traversal of ignored dependency trees is resolved by the same repair. B holds no remaining reusable Nit. No learning artifact is needed for an unresolved concern. No Fix is handed to A and no operator action remains. Request merge.
+
+## 2026-10-10 merge gate
+
+Attempt `dbc5bb3a-fd96-4760-a3a1-3b02850325fb`, applied top `78ad86681903fd5614fbe4c142c0a6306d8225dd`, built on `5356df31d46384164b0900afcd70720f6de59b31`. The recorded attempt and top matched live state and HEAD. This batch has no carried members. The repaired helper and dispatch test file are identical to repaired head `239fbf262d93cb86b0b16e481ee4ded4e494059a`; the command rebased the leaf onto newer main while building the stack. B neither committed nor fetched nor rebased during this applied-top pass.
+
+Ran every configured check on the recorded top with freshly configured base `5356df31d46384164b0900afcd70720f6de59b31`:
+
+- `bun run format`: exit 0. Restored only formatter-created drift in previously clean `src/status.ts`, preserving the recorded top.
+- `bun test --timeout=30000`: exit 0, 666 pass, 0 fail, 33 files, 61.30 seconds.
+- `bun run typecheck`: exit 0.
+- `: "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE" --timeout=30000`: exit 0, 635 pass, 0 fail, 28 files, 55.24 seconds.
+
+No merge_covers, merge_checks or advisory commands are configured. Each terminal exit status was captured before inspecting log tails. Logs are `merge-gate-format.log`, `merge-gate-tests.log` and `merge-gate-changed.log` under exported leaf TMPDIR `/tmp/akrogon-1000/merge-clean-worktree-3ea9278d4217`. Worktree status and `git diff --check` are clean. F1 remains resolved, with its regression included in both test runs.
+
+Read the completion owner's `clean-merge-gate/ISSUE.md` and the sole leaf brief before publication. Its shipped outcome is empty-folder cleanup before both merge prompt forms, preserving files and ignored paths, with cleanup errors stopping dispatch. Pending publication is performed only by the lifecycle command under this attempt.
+
+### Publication refusal and red restack
+
+The initial `merged --check --attempt dbc5bb3a-fd96-4760-a3a1-3b02850325fb` returned `ok`. The publication call exited 0 but did not complete the merge. It printed:
+
+```text
+rerun tested=78ad86681903fd5614fbe4c142c0a6306d8225dd pushed=75ff06c36f6b22dc9c70b4a3eca274c4fc0f3c93
+```
+
+The command restacked onto newly advanced main. Refreshed config gives base/rebase target `f3199df89b25b4f215df04f8703ef6d71880cd6a`; live tested head is `75ff06c36f6b22dc9c70b4a3eca274c4fc0f3c93`, under the same attempt. B committed nothing and performed no fetch or rebase. The cleanup helper is unchanged by this restack.
+
+Reran the configured gate: `bun run format` exited 0, with only formatter-created changes to previously clean `src/status.ts` and `skills/chart-issues/scripts/peer-wait.ts` restored. `bun run typecheck` exited 0. `bun test --timeout=30000` exited 1: 658 pass, 9 fail, 667 tests across 33 files in 54.08 seconds. Worktree status is clean. The changed-tests command was not reached after the blocking full-suite failure.
+
+Failing tests:
+
+```text
+tests/dependents-first.test.ts:
+next --all dispatches a leaf with unmerged dependents before an earlier leaf with none
+  line 103: Expected exit 1, received 0
+
+tests/peer-wait.test.ts:
+done while herdr still reports working
+done when the return file is written during a timed-out wait
+blocked wins over a non-empty return file
+passes a non-timeout herdr failure through unchanged
+failure on idle with the return file missing
+failure on done with a 0-byte return file
+budget keeps the last status herdr returned
+budget clamps each wait timeout to the remaining budget
+  expected successful outcomes return exit 1
+  non-timeout failure comparison instead receives:
+  herdr agent list failed (exit 1)
+  Unexpected fixture invocation: ["agent","list"]
+  at tests/fake-herdr.ts:259
+```
+
+Complete failing output is saved beside this review as `merge-rerun-tests.log`. Other rerun logs remain under the exported leaf TMPDIR as `merge-rerun-format.log` and `merge-rerun-tests.log`. Captured each terminal exit status before inspecting output. No completion line was printed, no issue closure was confirmed and no broadcast was sent. Route these red gate failures to `check.fix` under the existing attempt, as the merge skill requires.

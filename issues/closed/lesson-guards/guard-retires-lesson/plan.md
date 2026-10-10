@@ -85,6 +85,10 @@ Docs one-liners: `docs/guide/learn.md`, `docs/guide/merge.md`, `src/AREA.md`, `s
 
 Plus the blocking `checks` commands at implement end: `bun run format`, `bun test --timeout=30000`, `bun run typecheck`, and `bun test --changed=$AKROGON_BASE` as work lands.
 
+## Implementation notes
+
+2026-10-10, check.fix round 2 (review finding A-F1): line identity for removal is the exact `-` line text each leaf deleted in its original range (`member.base..member.head`, `holder.base..holder.head` — original heads preserved in the batch record; `ORIG_HEAD` for the solo one-liner), intersected with the retired-stem set. Stem-substring matching stays only inside `retiredLessonsPresent`'s refusal, which also spares lines main added on top of each leaf's fork (merge-base both ways, covering restack's `holder.base` overwrite). Refines D2's re-removal key and D4's refusal semantics; the design's interface sentence stays intact (stems key the *retirement*, deleted lines key the *line*).
+
 ## Notes
 
 - Slow/live run: U4 is the leaf's only live run (fresh agent through the harness). Idempotent; restart boundary is per-exercise rerun.

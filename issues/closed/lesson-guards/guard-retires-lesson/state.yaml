@@ -1,5 +1,5 @@
 slug: guard-retires-lesson
-phase: check.repair
+phase: merged
 created: 2026-10-10
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#73"
 busy_since: 
-  B: 2026-10-10T09:34:09.395Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -16,7 +16,7 @@ attempts:
   B: 0
 done: 
   []
-fix_rounds: 0
+fix_rounds: 1
 verdict: 
   {}
 tab: w8:tAF
@@ -25,8 +25,9 @@ pane:
   A: w8:pM1
   B: w8:pM2
 prompted: 
-  B: 01a12527-1668-7631-9940-a78c5f1d42b7
+  {}
 prompted_at: 
-  B: 2026-10-10T09:34:09.396Z
+  {}
 delivery_error: 
   {}
+merge_stamp: 2026-10-10T10:04:29.006Z

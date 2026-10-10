@@ -1,5 +1,5 @@
 slug: merge-clean-worktree
-phase: merge
+phase: failed
 created: 2026-10-10
 repo: akrogon
 debate: "no"
@@ -8,7 +8,7 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#63"
 busy_since: 
-  B: 2026-10-10T09:36:06.677Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -16,7 +16,7 @@ attempts:
   B: 0
 done: 
   []
-fix_rounds: 0
+fix_rounds: 1
 verdict: 
   {}
 tab: w8:tAD
@@ -25,19 +25,15 @@ pane:
   A: w8:pKX
   B: w8:pKY
 prompted: 
-  B: 01a12525-74aa-7962-9f8e-ca579b8298a1
+  {}
 prompted_at: 
-  B: 2026-10-10T09:36:06.677Z
+  {}
 delivery_error: 
   {}
 merge_stamp: 2026-10-10T09:36:00.635Z
-batch: 
-  attempt: dbc5bb3a-fd96-4760-a3a1-3b02850325fb
-  built_on: 5356df31d46384164b0900afcd70720f6de59b31
-  holder: 
-    base: 1d7d536100aebc183bd22f63b7c3ba31d5d07ea5
-    head: 239fbf262d93cb86b0b16e481ee4ded4e494059a
-  members: 
-    []
-  top: 78ad86681903fd5614fbe4c142c0a6306d8225dd
-  applied: true
+failure: 
+  cause: blocked
+  phase: check.fix
+  slot: A
+  reason: "bun test --timeout=30000 red on base f3199df89b25b4f215df04f8703ef6d71880cd6a: 9 identical failures in tests/dependents-first.test.ts and tests/peer-wait.test.ts on leaf head 75ff06c and on base; see implementation/report.md"
+  delivery: shown
