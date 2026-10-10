@@ -2334,3 +2334,68 @@ test('frozen guard ignores a rebase-replayed planning trailer for a path no leaf
     f.clean();
   }
 });
+
+test('frozen guard refuses a rebase-replayed empty planning cite until a fresh trailer-only commit', async () => {
+  const f: Fixture = await fixture();
+  try {
+    writeFileSync(resolve(f.root, 'old.test.ts'), 'obsolete test\n');
+    await command(['git', 'add', 'old.test.ts'], f.root);
+    await command(['git', 'commit', '-m', 'old test on main'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const wt: string = await frozenBranch(f, 'frozen-rbec');
+    const path: string = leaf(f, 'frozen-rbec', 'plan.synthesis', { worktree: wt });
+    await command(['git', 'rm', '-q', 'old.test.ts'], wt);
+    await commitAll(wt, ['drop obsolete test']);
+    await command(
+      [
+        'git',
+        'commit',
+        '--allow-empty',
+        '-m',
+        'cite planning deletion\n\nTest-Change: old.test.ts planning deletes obsolete test',
+      ],
+      wt,
+    );
+    expect((await cli(f, ['phase', 'frozen-rbec', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    expect(readState(path).frozen?.['old.test.ts']).toBeNull();
+    writeFileSync(resolve(f.root, 'old.test.ts'), 'main version\n');
+    await command(['git', 'add', 'old.test.ts'], f.root);
+    await command(['git', 'commit', '-m', 'main edits old test'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    await command(['git', 'fetch', 'origin'], wt);
+    const rebase: Result = await run(['git', 'rebase', 'origin/main'], wt);
+    expect(rebase.code).not.toBe(0);
+    await command(['git', 'checkout', '--ours', '--', 'old.test.ts'], wt);
+    await command(['git', 'add', 'old.test.ts'], wt);
+    await command(['git', '-c', 'core.editor=true', 'rebase', '--continue'], wt);
+    expect(await command(['git', 'show', 'HEAD:old.test.ts'], wt)).toBe('main version');
+    expect(await command(['git', 'log', '--format=%s', 'origin/main..HEAD', '--', 'old.test.ts'], wt)).toBe('');
+    expect(readState(path).frozen).toBeDefined();
+    const refused: Result = await cli(f, ['phase', 'frozen-rbec', 'check.review', '--slot', 'A']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('Test-Change: old.test.ts <source and reason>');
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite again\n\nTest-Change: old.test.ts planning deletes obsolete test'],
+      wt,
+    );
+    const identical: Result = await cli(f, ['phase', 'frozen-rbec', 'check.review', '--slot', 'A']);
+    expect(identical.code).not.toBe(0);
+    expect(identical.stderr).toContain('Test-Change: old.test.ts <source and reason>');
+    expect([...(readState(path).frozen_cited ?? [])].sort()).toEqual(
+      ['gone.test.ts removed during planning', 'old.test.ts planning deletes obsolete test'].sort(),
+    );
+    await command(
+      [
+        'git',
+        'commit',
+        '--allow-empty',
+        '-m',
+        "cite rebase\n\nTest-Change: old.test.ts rebase restored main's version",
+      ],
+      wt,
+    );
+    expect((await cli(f, ['phase', 'frozen-rbec', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+  } finally {
+    f.clean();
+  }
+});

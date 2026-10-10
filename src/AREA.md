@@ -31,7 +31,7 @@
 - A main-red merge ends in a repo hold (`held.yaml`) that `mergeTurn` checks after fetch and inside the batch lock; the hold's `fix` field names one leaf that takes the merge turn solo while the hold stands.
 - A leaf worktree's `.env` is a symlink to the registered checkout's file; dispatch refuses a real file, tracked path, foreign link or missing ignore rule.
 - `buildStack` removes resurrected retired lesson lines as a fixup commit on the stack top, and `merged --check` refuses a pushed range still holding one.
-- The `plan.synthesis` to `implement` move records each branch-changed path's blob id in state `frozen`; a later move refuses a recorded path changed or gone, or an added test-file-matched path outside the record, until the last commit touching it or a later one carries a `Test-Change` trailer naming it, and a path no commit touches needs a later trailer-only commit.
+- The `plan.synthesis` to `implement` move records each branch-changed path's blob id in state `frozen`; a later move refuses a recorded path changed or gone, or an added test-file-matched path outside the record, until the last commit touching it or a later one carries a `Test-Change` trailer naming it, and a path no commit touches needs a later trailer-only commit carrying a trailer not already on the branch at the implement move.
 
 ## See also
 

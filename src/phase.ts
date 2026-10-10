@@ -281,7 +281,7 @@ export async function transition(
   if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path);
   if (state.worktree !== undefined) await requireTestChangeCitations(repo, state.worktree);
   if (state.worktree !== undefined && state.frozen !== undefined)
-    await requireFrozenCitations(repo, state.worktree, state.frozen);
+    await requireFrozenCitations(repo, state.worktree, state.frozen, state.frozen_cited);
   if (requested === 'check.review' && state.worktree !== undefined) await requireNonEmpty(repo, state.worktree);
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
@@ -315,7 +315,11 @@ export async function transition(
     repo,
     leaf,
     state.phase === 'plan.synthesis' && requested === 'implement'
-      ? { ...recorded, frozen: state.worktree === undefined ? {} : await frozenRecord(repo, state.worktree) }
+      ? {
+          ...recorded,
+          frozen: state.worktree === undefined ? {} : await frozenRecord(repo, state.worktree),
+          frozen_cited: state.worktree === undefined ? [] : await frozenCitedRecord(repo, state.worktree),
+        }
       : recorded,
     capped,
     slot ?? null,
@@ -343,14 +347,15 @@ export async function requireNoIssueFiles(
   if (files !== '') throw new Error(`Issue files on leaf branch belong in ${leafPath}:\n${files}`);
 }
 
+function trailerValues(values: string): string[] {
+  return values
+    .split('\n')
+    .map((value) => value.trim())
+    .filter((value) => /^\S+\s+\S/.test(value));
+}
+
 function trailerCitedPaths(values: string): Set<string> {
-  return new Set(
-    values
-      .split('\n')
-      .map((value) => value.trim())
-      .filter((value) => /^\S+\s+\S/.test(value))
-      .map((value) => value.split(/\s/, 1)[0]),
-  );
+  return new Set(trailerValues(values).map((value) => value.split(/\s/, 1)[0]));
 }
 
 async function citedPaths(worktree: string, range: string): Promise<Set<string>> {
@@ -361,7 +366,7 @@ async function citedPaths(worktree: string, range: string): Promise<Set<string>>
   return trailerCitedPaths(log);
 }
 
-async function emptyCommitCitedPaths(worktree: string, range: string): Promise<Set<string>> {
+async function emptyCommitCitedPaths(worktree: string, range: string, old: Set<string>): Promise<Set<string>> {
   const log: string = await command(
     ['git', 'log', '--format=%x1e%H%x1f%(trailers:key=Test-Change,valueonly,unfold)', range],
     worktree,
@@ -375,7 +380,8 @@ async function emptyCommitCitedPaths(worktree: string, range: string): Promise<S
       ['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', sha.trim()],
       worktree,
     );
-    if (touched === '') for (const path of trailerCitedPaths(values)) cited.add(path);
+    if (touched === '')
+      for (const value of trailerValues(values)) if (!old.has(value)) cited.add(value.split(/\s/, 1)[0]);
   }
   return cited;
 }
@@ -426,10 +432,19 @@ async function frozenRecord(repo: Repo, worktree: string): Promise<Record<string
   return Object.fromEntries(changed.map(([, path]): [string, string | null] => [path, tree.get(path) ?? null]));
 }
 
+async function frozenCitedRecord(repo: Repo, worktree: string): Promise<string[]> {
+  const log: string = await command(
+    ['git', 'log', '--format=%(trailers:key=Test-Change,valueonly,unfold)', `${target(repo)}..HEAD`],
+    worktree,
+  );
+  return Array.from(new Set(trailerValues(log)));
+}
+
 export async function requireFrozenCitations(
   repo: Repo,
   worktree: string,
   frozen: Record<string, string | null>,
+  frozenCited?: string[],
   from: string = target(repo),
   to: string = 'HEAD',
 ): Promise<void> {
@@ -450,7 +465,7 @@ export async function requireFrozenCitations(
     );
     const cited: Set<string> =
       lastTouch === ''
-        ? (emptyCited ??= await emptyCommitCitedPaths(worktree, `${from}..${to}`))
+        ? (emptyCited ??= await emptyCommitCitedPaths(worktree, `${from}..${to}`, new Set(frozenCited ?? [])))
         : await citedPaths(worktree, `${lastTouch}^..${to}`);
     if (!cited.has(path)) missing.push(path);
   }

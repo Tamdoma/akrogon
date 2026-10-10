@@ -100,6 +100,7 @@ export const stateSchema = z
     batch: batchSchema.optional(),
     batch_limit: z.number().int().nonnegative().optional(),
     frozen: z.record(z.string(), z.string().nullable()).optional(),
+    frozen_cited: z.array(z.string()).optional(),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
 
