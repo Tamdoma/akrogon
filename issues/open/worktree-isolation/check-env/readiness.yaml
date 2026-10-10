@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: 'P6 constructed env'
+    command: 'env -i HOME PATH TMPDIR XDG_CACHE_HOME NODE_DISABLE_COMPILE_CACHE sh -c ''bun -e ...'''
+    identity: 'operator user ivan, local CLI, no credentials'
+    target: 'local shell'
+    version: 'bun 1.4.2'
+    date: '2026-10-10'
+    result: 'os.tmpdir() returns the given TMPDIR; process env holds only the given names plus PWD, SHLVL, _'
+    cleanup: 'scratch dir removed'
+    limits: 'does not run a real check command'
+    record: issues/chart/worktree-isolation/forks/proofs.md

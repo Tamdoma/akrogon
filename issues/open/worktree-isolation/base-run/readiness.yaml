@@ -1,0 +1,35 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: 'P1 sparse worktree create'
+    command: 'git worktree add --no-checkout -b probe-sparse-20261010 ~/.akrogon/worktrees/framework/probe-sparse HEAD~2; git -C <wt> sparse-checkout set --no-cone ''/*'' ''!/issues/''; git -C <wt> checkout'
+    identity: 'operator user ivan, local CLI, no credentials'
+    target: 'framework repo, real store path ~/.akrogon/worktrees/framework/'
+    version: 'git 2.56.0'
+    date: '2026-10-10'
+    result: 'all exit 0; no issues/ in the worktree, .claude present, status --porcelain empty; core.sparseCheckout true only in worktree config, unset at the root; root keeps issues/closed'
+    cleanup: 'worktree removed, branch deleted, ~/.akrogon removed'
+    limits: 'no conflict inside issues/ during rebase'
+    record: issues/chart/worktree-isolation/forks/proofs.md
+  - operation: 'P3 worktree listing, reachability, branch delete'
+    command: 'git worktree list --porcelain; git merge-base --is-ancestor <head> <tip>; git branch -d on an unmerged and a merged branch; git worktree remove'
+    identity: 'operator user ivan, local CLI, no credentials'
+    target: 'framework repo'
+    version: 'git 2.56.0'
+    date: '2026-10-10'
+    result: 'listed once; reachable exit 0; -d unmerged exit 1 (refused), -d merged exit 0; remove exit 0 and path gone'
+    cleanup: 'unmerged probe branch removed with -D'
+    limits: 'dirty and mid-rebase refusal not exercised'
+    record: issues/chart/worktree-isolation/forks/proofs.md
+  - operation: 'P6 constructed env'
+    command: 'env -i HOME PATH TMPDIR XDG_CACHE_HOME NODE_DISABLE_COMPILE_CACHE sh -c ''bun -e ...'''
+    identity: 'operator user ivan, local CLI, no credentials'
+    target: 'local shell'
+    version: 'bun 1.4.2'
+    date: '2026-10-10'
+    result: 'os.tmpdir() returns the given TMPDIR; process env holds only the given names plus PWD, SHLVL, _'
+    cleanup: 'scratch dir removed'
+    limits: 'does not run a real check command'
+    record: issues/chart/worktree-isolation/forks/proofs.md

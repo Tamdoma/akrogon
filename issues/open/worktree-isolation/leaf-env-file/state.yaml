@@ -1,0 +1,7 @@
+slug: leaf-env-file
+phase: plan.synthesis
+created: '2026-10-10'
+repo: akrogon
+debate: 'no'
+blocked-by: [check-env]
+sources: []

@@ -1,0 +1,14 @@
+open: "2026-10-10T18:00:00+02:00"
+seats:
+  - seat: A
+    pane: wA:pMT
+    kind: claude
+    session: 006b0531-2aa9-4ec4-a3c3-e42f9bee0450
+  - seat: B
+    pane: wA:pMS
+    kind: codex
+    session: 01a12490-2041-7dc1-9f01-cf94bb25bd36
+  - seat: C
+    pane: wA:pPW
+    kind: claude
+    session: 9a69cfdb-ea1e-4b82-8024-78de4341d326

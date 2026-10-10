@@ -1,0 +1,7 @@
+slug: base-run
+phase: plan.synthesis
+created: '2026-10-10'
+repo: akrogon
+debate: 'no'
+blocked-by: [worktree-store, check-env, leaf-env-file]
+sources: []
