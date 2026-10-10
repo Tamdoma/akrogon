@@ -5318,3 +5318,141 @@ test('owners resolve without ISSUE.md or EPIC.md', async () => {
     }
   }
 });
+
+const selfUpdateMock: string = `import { mock } from 'bun:test';
+import { appendFileSync } from 'node:fs';
+mock.module(SELF_UPDATE_MODULE, () => ({
+  selfUpdate: async (repo: { root: string }) => {
+    if (process.env.SELF_UPDATE_THROW === '1') throw new Error('self-update sentinel');
+    appendFileSync(process.env.FAKE_HERDR + '.calls', JSON.stringify(['self-update', repo.root]) + '\\n');
+    appendFileSync(process.env.SELF_UPDATE_LOG, repo.root + '\\n');
+  },
+}));
+await import(ENTRY);
+`;
+
+async function selfUpdateCli(
+  f: DispatchFixture,
+  args: string[],
+  env: NodeJS.ProcessEnv = {},
+  cwd: string = f.root,
+): Promise<Result> {
+  const script: string = resolve(f.home, 'wired-self-update.ts');
+  writeFileSync(
+    script,
+    selfUpdateMock
+      .replace('SELF_UPDATE_MODULE', JSON.stringify(resolve(import.meta.dir, '../src/self-update.ts')))
+      .replace('ENTRY', JSON.stringify(entry)),
+  );
+  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, script, ...args], {
+    cwd,
+    env: {
+      ...process.env,
+      ...f.env,
+      AKROGON_HOME: f.home,
+      HERDR_PANE_ID: '',
+      SELF_UPDATE_LOG: f.db + '.self-update',
+      ...env,
+    },
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  return { code, stdout: stdout.trim(), stderr: stderr.trim() };
+}
+
+function selfUpdateCalls(f: DispatchFixture): string[] {
+  const path: string = f.db + '.self-update';
+  return existsSync(path) ? readFileSync(path, 'utf8').trim().split('\n') : [];
+}
+
+test('phase merged records one self-update call for the repo', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'landed', 'merge');
+    const result: Result = await selfUpdateCli(f, ['phase', 'landed', 'merged']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('moved merged');
+    expect(selfUpdateCalls(f)).toEqual([f.root]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('phase failed commits without a self-update call', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'landed', 'merge');
+    const result: Result = await selfUpdateCli(f, ['phase', 'landed', 'failed', '--reason', 'merge broke']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('moved failed');
+    expect(selfUpdateCalls(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a throwing self-update still lets phase merged commit and next dispatch', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'landed', 'merge');
+    leaf(f, 'queued', 'plan.synthesis', {}, 'other-issue');
+    const env: NodeJS.ProcessEnv = { SELF_UPDATE_THROW: '1' };
+    const merged: Result = await selfUpdateCli(f, ['phase', 'landed', 'merged'], env);
+    expect(merged.code).toBe(0);
+    expect(merged.stdout).toContain('moved merged');
+    const dispatched: Result = await selfUpdateCli(f, ['next', 'queued'], env);
+    expect(dispatched.code).toBe(0);
+    expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
+      `plan-issue queued slot=A phase=plan.synthesis leaf=${resolve(f.root, 'issues/open/other-issue/queued')}`,
+    ]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('next --all, --resume and manual next record the registered or selected repos before dispatch', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const g: Fixture = await fixture();
+  try {
+    configure(f, { repos: { repo: f.root, other: g.root } });
+    const picked: string = leaf(f, 'picked', 'plan.synthesis');
+    leaf(f, 'sweep', 'implement', {}, 'other-issue');
+    const before: number = calls(f).length;
+    expect((await selfUpdateCli(f, ['next', '--all'])).code).toBe(0);
+    expect(selfUpdateCalls(f)).toEqual([f.root, g.root]);
+    expect(calls(f).slice(before)[0]).toEqual(['self-update', f.root]);
+    expect(calls(f).slice(before)[1]).toEqual(['self-update', g.root]);
+    expect(calls(f).slice(before).some((args) => args[0] === 'tab' || args[0] === 'agent')).toBe(true);
+    resetPrompts(f, picked);
+    const resumed: number = calls(f).length;
+    expect((await selfUpdateCli(f, ['next', '--resume'])).code).toBe(0);
+    expect(selfUpdateCalls(f)).toEqual([f.root, g.root, f.root, g.root]);
+    expect(calls(f).slice(resumed)[0]).toEqual(['self-update', f.root]);
+    expect(calls(f).slice(resumed).some((args) => args[0] === 'agent' && args[1] === 'prompt')).toBe(true);
+    resetPrompts(f, picked);
+    const manual: number = calls(f).length;
+    expect((await selfUpdateCli(f, ['next', 'picked'])).code).toBe(0);
+    expect(selfUpdateCalls(f)).toEqual([f.root, g.root, f.root, g.root, f.root]);
+    expect(calls(f).slice(manual)[0]).toEqual(['self-update', f.root]);
+    expect(calls(f).slice(manual).some((args) => args[0] === 'agent' && args[1] === 'prompt')).toBe(true);
+    const tabbed: number = calls(f).length;
+    const closed: Result = await selfUpdateCli(f, ['next'], {
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'tab_closed',
+        data: { type: 'tab_closed', tab_id: 'w1:t999', workspace_id: 'w1' },
+      }),
+    });
+    expect(closed.code).toBe(0);
+    expect(selfUpdateCalls(f)).toHaveLength(5);
+    expect(calls(f)).toHaveLength(tabbed);
+  } finally {
+    f.clean();
+    g.clean();
+  }
+});
