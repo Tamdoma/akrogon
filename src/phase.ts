@@ -343,18 +343,41 @@ export async function requireNoIssueFiles(
   if (files !== '') throw new Error(`Issue files on leaf branch belong in ${leafPath}:\n${files}`);
 }
 
-async function citedPaths(worktree: string, range: string): Promise<Set<string>> {
-  const log: string = await command(
-    ['git', 'log', '--format=%(trailers:key=Test-Change,valueonly,unfold)', range],
-    worktree,
-  );
+function trailerCitedPaths(values: string): Set<string> {
   return new Set(
-    log
+    values
       .split('\n')
       .map((value) => value.trim())
       .filter((value) => /^\S+\s+\S/.test(value))
       .map((value) => value.split(/\s/, 1)[0]),
   );
+}
+
+async function citedPaths(worktree: string, range: string): Promise<Set<string>> {
+  const log: string = await command(
+    ['git', 'log', '--format=%(trailers:key=Test-Change,valueonly,unfold)', range],
+    worktree,
+  );
+  return trailerCitedPaths(log);
+}
+
+async function emptyCommitCitedPaths(worktree: string, range: string): Promise<Set<string>> {
+  const log: string = await command(
+    ['git', 'log', '--format=%x1e%H%x1f%(trailers:key=Test-Change,valueonly,unfold)', range],
+    worktree,
+  );
+  const cited: Set<string> = new Set();
+  for (const entry of log.split('\x1e')) {
+    const [sha, ...rest]: string[] = entry.split('\x1f');
+    const values: string = rest.join('\x1f').trim();
+    if (sha.trim() === '' || values === '') continue;
+    const touched: string = await command(
+      ['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', sha.trim()],
+      worktree,
+    );
+    if (touched === '') for (const path of trailerCitedPaths(values)) cited.add(path);
+  }
+  return cited;
 }
 
 async function changedPaths(worktree: string, from: string, to: string): Promise<[string, string][]> {
@@ -419,13 +442,17 @@ export async function requireFrozenCitations(
   ];
   if (violating.length === 0) return;
   const missing: string[] = [];
+  let emptyCited: Set<string> | undefined;
   for (const path of violating) {
     const lastTouch: string = await command(
       ['git', 'log', '--format=%H', '-1', `${from}..${to}`, '--', path],
       worktree,
     );
-    const range: string = lastTouch === '' ? `${from}..${to}` : `${lastTouch}^..${to}`;
-    if (!(await citedPaths(worktree, range)).has(path)) missing.push(path);
+    const cited: Set<string> =
+      lastTouch === ''
+        ? (emptyCited ??= await emptyCommitCitedPaths(worktree, `${from}..${to}`))
+        : await citedPaths(worktree, `${lastTouch}^..${to}`);
+    if (!cited.has(path)) missing.push(path);
   }
   if (missing.length === 0) return;
   throw new Error(

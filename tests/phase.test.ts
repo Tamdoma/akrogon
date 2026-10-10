@@ -2290,3 +2290,47 @@ test('frozen guard holds after fetch and rebase including a recorded path no lea
     f.clean();
   }
 });
+
+test('frozen guard ignores a rebase-replayed planning trailer for a path no leaf commit touches', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const wt: string = await frozenBranch(f, 'frozen-rbpt', ['Test-Change: old.txt planning deletes obsolete file']);
+    const path: string = leaf(f, 'frozen-rbpt', 'plan.synthesis', { worktree: wt });
+    expect((await cli(f, ['phase', 'frozen-rbpt', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    expect(readState(path).frozen?.['old.txt']).toBeNull();
+    writeFileSync(resolve(f.root, 'old.txt'), 'main kept\n');
+    await command(['git', 'add', 'old.txt'], f.root);
+    await command(['git', 'commit', '-m', 'main keeps old.txt'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    await command(['git', 'fetch', 'origin'], wt);
+    const rebase: Result = await run(['git', 'rebase', 'origin/main'], wt);
+    expect(rebase.code).not.toBe(0);
+    await command(['git', 'checkout', '--ours', '--', 'old.txt'], wt);
+    await command(['git', 'add', 'old.txt'], wt);
+    await command(['git', '-c', 'core.editor=true', 'rebase', '--continue'], wt);
+    expect(await command(['git', 'show', 'HEAD:old.txt'], wt)).toBe('main kept');
+    expect(await command(['git', 'log', '--format=%s', 'origin/main..HEAD', '--', 'old.txt'], wt)).toBe('');
+    const refused: Result = await cli(f, ['phase', 'frozen-rbpt', 'check.review', '--slot', 'A']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('Test-Change: old.txt <source and reason>');
+    expect(readState(path).frozen).toBeDefined();
+    writeFileSync(resolve(wt, 'notes.txt'), 'non-empty cite\n');
+    await commitAll(wt, ['carry trailer on a real change', 'Test-Change: old.txt trailer on a non-empty commit']);
+    const stillRefused: Result = await cli(f, ['phase', 'frozen-rbpt', 'check.review', '--slot', 'A']);
+    expect(stillRefused.code).not.toBe(0);
+    expect(stillRefused.stderr).toContain('Test-Change: old.txt <source and reason>');
+    await command(
+      [
+        'git',
+        'commit',
+        '--allow-empty',
+        '-m',
+        'cite\n\nTest-Change: old.txt target kept its own version of a deleted path',
+      ],
+      wt,
+    );
+    expect((await cli(f, ['phase', 'frozen-rbpt', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+  } finally {
+    f.clean();
+  }
+});
