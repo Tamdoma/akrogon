@@ -15,6 +15,7 @@ const contracts: Record<string, string> = {
   phase:
     '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>] [--red-on-base <sha> --command <command>]',
   unhold: '',
+  'hold-fix': '<slug>',
   next: '[<slug>|<path>|--all|--resume]',
   pull: '[--all]',
   close: '<owner/repo#n> --by <text>',

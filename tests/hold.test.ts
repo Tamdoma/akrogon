@@ -212,7 +212,7 @@ async function heldMergeLeaf(f: Fixture): Promise<{ herdr: HerdrFixture; holderP
   return { herdr: fakeHerdr(f), holderPath, sha };
 }
 
-function holdAt(f: Fixture, holderPath: string, sha: string): void {
+function holdAt(f: Fixture, holderPath: string, sha: string, fix?: string): void {
   yaml(resolve(f.home, 'held.yaml'), {
     repo: {
       sha,
@@ -221,8 +221,28 @@ function holdAt(f: Fixture, holderPath: string, sha: string): void {
       attempt: 'a1',
       at: new Date().toISOString(),
       evidence: resolve(holderPath, 'review-B.md'),
+      ...(fix === undefined ? {} : { fix }),
     },
   });
+}
+
+async function heldMergePair(
+  f: Fixture,
+): Promise<{ herdr: HerdrFixture; holderPath: string; fixPath: string; sha: string }> {
+  process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+  const sha: string = await remoteTip(f);
+  const holdBranch: Branch = await branchAt(f, 'hold', sha, 'file-hold', undefined, true);
+  const fixBranch: Branch = await branchAt(f, 'fix', sha, 'file-fix', undefined, true);
+  const holderPath: string = leaf(f, 'hold', 'merge', {
+    worktree: holdBranch.worktree,
+    merge_stamp: '2026-10-05T00:00:00.000Z',
+  });
+  const fixPath: string = leaf(f, 'fix', 'merge', {
+    worktree: fixBranch.worktree,
+    merge_stamp: '2026-10-05T00:00:01.000Z',
+    solo: true,
+  });
+  return { herdr: fakeHerdr(f), holderPath, fixPath, sha };
 }
 
 test.serial(
@@ -746,5 +766,149 @@ exec '${git}' "$@"
     } finally {
       f.clean();
     }
+  }
+});
+
+test.serial(
+  'hold-fix names a queued merge leaf: next builds its solo attempt while the queue head stays idle',
+  async () => {
+    const f: Fixture = await fixture();
+    try {
+      const { herdr, holderPath, fixPath, sha } = await heldMergePair(f);
+      holdAt(f, holderPath, sha);
+      const named: Result = await cli(f, ['hold-fix', 'fix'], f.root, herdr.env);
+      expect(named.code).toBe(0);
+      expect(named.stdout).toBe('held repo fix fix');
+      expect(heldRecords(f).repo.fix).toBe('fix');
+      expect(readState(fixPath).merge_stamp).toBe('2026-10-05T00:00:01.000Z');
+      const res: Result = await cli(f, ['next'], f.root, herdr.env);
+      expect(res.code).toBe(0);
+      const fixBatch: Batch | undefined = readState(fixPath).batch;
+      expect(fixBatch).toBeDefined();
+      expect(fixBatch!.members).toEqual([]);
+      expect(fixBatch!.applied).toBe(true);
+      expect(readState(holderPath).batch).toBeUndefined();
+      const prompts: Database['prompts'] = database(herdr).prompts;
+      expect(prompts).toHaveLength(1);
+      expect(prompts[0].text).toBe(
+        'merge-issue fix slot=B phase=merge leaf=' + fixPath + ' attempt=' + fixBatch!.attempt + ' solo',
+      );
+    } finally {
+      f.clean();
+    }
+  },
+);
+
+test.serial(
+  'the fix leaf is authorized to merge while the queue head is refused, then order returns',
+  async () => {
+    const f: Fixture = await fixture();
+    try {
+      const { herdr, holderPath, fixPath, sha } = await heldMergePair(f);
+      holdAt(f, holderPath, sha);
+      expect((await cli(f, ['hold-fix', 'fix'], f.root, herdr.env)).code).toBe(0);
+      expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
+      const attempt: string = readState(fixPath).batch!.attempt;
+      const probe: Result = await cli(
+        f,
+        ['phase', 'fix', 'check.fix', '--check', '--attempt', attempt],
+        f.root,
+        herdr.env,
+      );
+      expect(probe.code).toBe(0);
+      expect(probe.stderr).not.toContain('Merge turn refused');
+      const refused: Result = await cli(f, ['phase', 'hold', 'merged'], f.root, herdr.env);
+      expect(refused.code).not.toBe(0);
+      expect(refused.stderr).toContain('holder is fix');
+      const merged: Result = await cli(
+        f,
+        ['phase', 'fix', 'merged', '--slot', 'B', '--attempt', attempt],
+        f.root,
+        herdr.env,
+      );
+      expect(merged.code).toBe(0);
+      const res: Result = await cli(f, ['next'], f.root, herdr.env);
+      expect(res.code).toBe(0);
+      expect(heldRecords(f).repo).toBeUndefined();
+      const holdBatch: Batch | undefined = readState(holderPath).batch;
+      expect(holdBatch).toBeDefined();
+      const prompts: Database['prompts'] = database(herdr).prompts;
+      expect(prompts).toHaveLength(2);
+      expect(prompts[1].text).toContain('merge-issue hold slot=B');
+      expect(prompts[1].text).toContain('attempt=' + holdBatch!.attempt);
+    } finally {
+      f.clean();
+    }
+  },
+);
+
+test.serial('hold-fix refusals change nothing: no hold, missing leaf, leaf outside the merge queue', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr, holderPath, fixPath, sha } = await heldMergePair(f);
+    const holderBefore: string = readFileSync(resolve(holderPath, 'state.yaml'), 'utf8');
+    const fixBefore: string = readFileSync(resolve(fixPath, 'state.yaml'), 'utf8');
+    const noHold: Result = await cli(f, ['hold-fix', 'fix'], f.root, herdr.env);
+    expect(noHold.code).not.toBe(0);
+    expect(noHold.stderr).toContain('repo');
+    expect(existsSync(resolve(f.home, 'held.yaml'))).toBe(false);
+    holdAt(f, holderPath, sha);
+    const heldFilePath: string = resolve(f.home, 'held.yaml');
+    const heldBefore: string = readFileSync(heldFilePath, 'utf8');
+    const bogus: Result = await cli(f, ['hold-fix', 'bogus'], f.root, herdr.env);
+    expect(bogus.code).not.toBe(0);
+    expect(readFileSync(heldFilePath, 'utf8')).toBe(heldBefore);
+    const parked: string = leaf(f, 'idle', 'implement');
+    const parkedBefore: string = readFileSync(resolve(parked, 'state.yaml'), 'utf8');
+    const notQueued: Result = await cli(f, ['hold-fix', 'idle'], f.root, herdr.env);
+    expect(notQueued.code).not.toBe(0);
+    expect(notQueued.stderr).toContain('merge queue');
+    expect(readFileSync(heldFilePath, 'utf8')).toBe(heldBefore);
+    expect(readFileSync(resolve(holderPath, 'state.yaml'), 'utf8')).toBe(holderBefore);
+    expect(readFileSync(resolve(fixPath, 'state.yaml'), 'utf8')).toBe(fixBefore);
+    expect(readFileSync(resolve(parked, 'state.yaml'), 'utf8')).toBe(parkedBefore);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('unhold mid-attempt still lets the batch record authorize the fix merge', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr, holderPath, fixPath, sha } = await heldMergePair(f);
+    holdAt(f, holderPath, sha);
+    expect((await cli(f, ['hold-fix', 'fix'], f.root, herdr.env)).code).toBe(0);
+    expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
+    const attempt: string = readState(fixPath).batch!.attempt;
+    const unhold: Result = await cli(f, ['unhold'], f.root, herdr.env);
+    expect(unhold.code).toBe(0);
+    expect(heldRecords(f).repo).toBeUndefined();
+    const merged: Result = await cli(f, ['phase', 'fix', 'merged', '--attempt', attempt], f.root, herdr.env);
+    expect(merged.code).toBe(0);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('status surfaces the fix name on the board and the targeted held line', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr, holderPath, fixPath, sha } = await heldMergePair(f);
+    holdAt(f, holderPath, sha, 'fix');
+    const board: Result = await cli(f, ['status'], f.root, herdr.env);
+    expect(board.code).toBe(0);
+    expect(board.stdout).toContain('held fix fix');
+    const targeted: Result = await cli(f, ['status', 'fix'], f.root, herdr.env);
+    expect(targeted.code).toBe(0);
+    expect(targeted.stdout).toContain('held: ' + sha + ' bun test fix fix');
+    holdAt(f, holderPath, sha);
+    const unfixedBoard: Result = await cli(f, ['status'], f.root, herdr.env);
+    expect(unfixedBoard.code).toBe(0);
+    expect(unfixedBoard.stdout).toContain('(held)');
+    const unfixedTargeted: Result = await cli(f, ['status', 'fix'], f.root, herdr.env);
+    expect(unfixedTargeted.code).toBe(0);
+    expect(unfixedTargeted.stdout).toContain('held: ' + sha + ' bun test');
+  } finally {
+    f.clean();
   }
 });
