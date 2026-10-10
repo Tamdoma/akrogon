@@ -20,6 +20,7 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
           attempt: { type: 'string' },
           'red-on-base': { type: 'string' },
           command: { type: 'string' },
+          culprit: { type: 'string' },
         }
       : verb === 'next'
         ? { all: { type: 'boolean' }, resume: { type: 'boolean' } }
@@ -71,6 +72,7 @@ switch (verb) {
         values.attempt,
         values['red-on-base'],
         values.command,
+        values.culprit,
       );
       if (result.committed) committed = result;
     } catch (error) {

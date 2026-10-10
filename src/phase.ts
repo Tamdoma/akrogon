@@ -765,6 +765,7 @@ export async function phaseCommand(
   rawAttempt: string | boolean | undefined,
   rawRedOnBase: string | boolean | undefined,
   rawCommand: string | boolean | undefined,
+  rawCulprit: string | boolean | undefined,
 ): Promise<{ repo: Repo; committed: boolean }> {
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
@@ -774,6 +775,7 @@ export async function phaseCommand(
   const attempt: string | undefined = z.string().trim().min(1).optional().parse(rawAttempt);
   const redOnBase: string | undefined = z.string().trim().min(1).optional().parse(rawRedOnBase);
   const cmd: string | undefined = z.string().trim().min(1).optional().parse(rawCommand);
+  const culprit: string | undefined = z.string().trim().min(1).optional().parse(rawCulprit);
   if (cmd !== undefined && redOnBase === undefined) throw new Error('--command requires --red-on-base');
   if (redOnBase !== undefined) {
     if (check) throw new Error('--check cannot combine with --red-on-base');
@@ -781,6 +783,10 @@ export async function phaseCommand(
     if (cmd === undefined) throw new Error('--red-on-base requires --command');
     if (slot !== 'B') throw new Error('--red-on-base requires --slot B');
   }
+  if (check && culprit !== undefined) throw new Error('--check cannot combine with --culprit');
+  if (culprit !== undefined && requested !== 'check.fix') throw new Error('--culprit is only valid for check.fix');
+  if (culprit !== undefined && redOnBase !== undefined) throw new Error('--culprit cannot combine with --red-on-base');
+  if (culprit !== undefined && slot !== 'B') throw new Error('--culprit requires --slot B');
   const global: GlobalConfig = readGlobal();
   const repo: Repo = await requireRepo(global, process.cwd());
   let committed: boolean = false;
@@ -803,6 +809,8 @@ export async function phaseCommand(
     const record: Batch | undefined = leaf.state.batch;
     if (redOnBase !== undefined && record === undefined)
       throw new Error(`--red-on-base requires a batch record: ${slug} holds none`);
+    if (culprit !== undefined && record === undefined)
+      throw new Error(`--culprit requires a batch record: ${slug} holds none`);
     if (leaf.state.phase === 'merge' && record !== undefined && (requested === 'merged' || requested === 'check.fix')) {
       if (slot !== undefined && attempt !== record.attempt)
         throw new Error(
@@ -855,6 +863,31 @@ export async function phaseCommand(
             }),
           );
         }
+      } else if (culprit !== undefined) {
+        const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
+        const entry: { member: BatchMember; leaf: Leaf } | undefined = members.find(
+          (item) => item.member.slug === culprit,
+        );
+        if (leaf.state.slug !== culprit && entry === undefined)
+          throw new Error(`--culprit ${culprit} is not the holder or a carried member of ${leaf.state.slug}`);
+        const culpritLeaf: Leaf = entry?.leaf ?? leaf;
+        const savedHead: string =
+          entry !== undefined ? entry.member.head : record.solo === true ? 'HEAD' : record.holder.head;
+        if (culpritLeaf.state.done.includes('B')) throw new Error(`--culprit ${culprit}: slot B already recorded`);
+        if (culpritLeaf.state.worktree !== undefined) {
+          await requireClean(culpritLeaf.state.worktree);
+          await requireNoIssueFiles(repo, culpritLeaf.state.worktree, culpritLeaf.path, target(repo), savedHead);
+          await requireTestChangeCitations(repo, culpritLeaf.state.worktree, target(repo), savedHead);
+        }
+        await restoreMembers(
+          repo,
+          members.map((item) => ({ ...item.member, leaf: item.leaf })),
+        );
+        await restoreHolder(repo, leaf, record);
+        saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
+        appendAttempt(repo, leaf.state.slug, record, 'ejected', culprit);
+        console.log(`ejected ${culprit}`);
+        await transition(repo, culpritLeaf, 'check.fix', 'B', undefined, undefined, false, onCommitted);
       } else if (requested === 'merged')
         pending = await batchPush(repo, leaf, requested, slot, verdict, reason, record, onCommitted);
       else if (record.members.length > 0) {
