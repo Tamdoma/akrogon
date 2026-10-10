@@ -55,18 +55,22 @@ export async function retiredLessonsPresent(
     if (shown.stderr.includes('does not exist') || shown.stderr.includes('exists on disk, but not in')) return [];
     throw new CommandError(['git', 'show', head + ':' + lessonsPath], cwd, shown);
   }
-  const addedOnMain: Set<string> = new Set();
-  for (const range of leafRanges) {
-    const fork: string = await mergeBase(cwd, range.base, base);
-    for (const line of await lessonDiffLines(cwd, fork, base, '+')) addedOnMain.add(line);
-    if (range.base !== fork)
-      for (const line of await lessonDiffLines(cwd, fork, range.base, '+')) addedOnMain.add(line);
-  }
+  const retirements: { base: string; head: string; stems: string[] }[] = await Promise.all(
+    leafRanges.map(async (range) => ({
+      ...range,
+      stems: await retiredHistoryStems(cwd, range.base, range.head),
+    })),
+  );
   const flagged: Set<string> = new Set();
-  for (const line of shown.stdout.split('\n')) {
-    if (addedOnMain.has(line)) continue;
-    const stem: string | undefined = stems.find((s) => line.includes(s));
-    if (stem !== undefined) flagged.add(stem);
+  for (const stem of stems) {
+    const addedOnMain: Set<string> = new Set();
+    for (const range of retirements.filter((range) => range.stems.includes(stem))) {
+      const fork: string = await mergeBase(cwd, range.base, base);
+      for (const line of await lessonDiffLines(cwd, fork, base, '+')) addedOnMain.add(line);
+      if (range.base !== fork)
+        for (const line of await lessonDiffLines(cwd, fork, range.base, '+')) addedOnMain.add(line);
+    }
+    if (shown.stdout.split('\n').some((line) => line.includes(stem) && !addedOnMain.has(line))) flagged.add(stem);
   }
   return [...flagged].sort();
 }

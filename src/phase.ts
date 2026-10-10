@@ -541,7 +541,10 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
       base: record.members[record.members.findIndex((entry) => entry.slug === member.slug) - 1]?.tip ?? record.built_on,
       head: member.tip,
     }));
-    const staged: Awaited<ReturnType<typeof buildStack>> = await buildStack(repo, builtOn, items, holderHead);
+    const staged: Awaited<ReturnType<typeof buildStack>> = await buildStack(repo, builtOn, items, holderHead, [
+      ...members.map((member) => member.head),
+      record.holder.head,
+    ]);
     if (staged.ok) {
       const tested: { main: string; top: string } | undefined =
         record.tested_main !== undefined && record.tested_top !== undefined

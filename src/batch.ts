@@ -45,6 +45,7 @@ export async function buildStack(
   builtOn: string,
   items: { slug: string; base: string; head: string }[],
   holderHead: string,
+  retirementHeads: string[] = [...items.map((item) => item.head), holderHead],
 ): Promise<{ ok: true; tips: Map<string, string>; top: string } | { ok: false; conflict: string }> {
   const dir: string = leafTemp(repo, 'batch-' + attemptId());
   await command(['git', 'worktree', 'add', '--detach', dir, builtOn], repo.root);
@@ -72,9 +73,9 @@ export async function buildStack(
       }
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
     }
-    const leafRanges: { base: string; head: string }[] = [];
-    for (const item of items) leafRanges.push({ base: await memberBase(repo, builtOn, item.head), head: item.head });
-    leafRanges.push({ base: await memberBase(repo, builtOn, holderHead), head: holderHead });
+    const leafRanges: { base: string; head: string }[] = await Promise.all(
+      retirementHeads.map(async (head) => ({ base: await memberBase(repo, builtOn, head), head })),
+    );
     const removed: string[] = await removeRetiredLessons(dir, builtOn, 'HEAD', leafRanges);
     if (removed.length > 0) {
       await command(['git', 'add', 'learnings/LESSONS.md'], dir);

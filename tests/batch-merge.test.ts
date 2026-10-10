@@ -41,7 +41,10 @@ test.serial('restack preserves a retirement when an unrelated member predates th
     const guardBase: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
     const guard: Branch = await branchAt(f, 'guard', guardBase, 'file-guard', async (worktree) => {
       writeFileSync(resolve(worktree, 'learnings/LESSONS.md'), beta);
-      writeFileSync(resolve(worktree, 'learnings/history/alpha.md'), '# alpha\nApplied 2026-10-10 by guard.ts:1: guard\n');
+      writeFileSync(
+        resolve(worktree, 'learnings/history/alpha.md'),
+        '# alpha\nApplied 2026-10-10 by guard.ts:1: guard\n',
+      );
     });
     const held: Branch = await branchAt(f, 'holder', guardBase, 'file-holder');
     writeFileSync(resolve(f.root, 'learnings/LESSONS.md'), alpha + gamma + recurrence + beta);
@@ -67,14 +70,24 @@ test.serial('restack preserves a retirement when an unrelated member predates th
     const built: Awaited<ReturnType<typeof buildStack>> = await buildStack(repo, builtOn, original, held.head);
     if (!built.ok) throw new Error('fixture stack conflict: ' + built.conflict);
     const record: Batch = {
-      attempt: 'a1', built_on: builtOn, holder: { base: guardBase, head: held.head }, applied: true, top: built.top,
+      attempt: 'a1',
+      built_on: builtOn,
+      holder: { base: guardBase, head: held.head },
+      applied: true,
+      top: built.top,
       members: original.map((member) => ({ ...member, tip: built.tips.get(member.slug)! })),
     };
     saveState(holderPath, { ...readState(holderPath), batch: record });
     const holder: Leaf = { path: holderPath, state: readState(holderPath) };
-    await applyStack(repo, built.top, record.members.map((member) => ({
-      ...member, leaf: members.find((item) => item.state.slug === member.slug)!,
-    })), holder);
+    await applyStack(
+      repo,
+      built.top,
+      record.members.map((member) => ({
+        ...member,
+        leaf: members.find((item) => item.state.slug === member.slug)!,
+      })),
+      holder,
+    );
     const herdr: HerdrFixture = fakeHerdr(f);
     const args: string[] = ['phase', 'holder', 'merged', '--slot', 'B', '--attempt', 'a1'];
     expect((await cli(f, [...args, '--check'], f.root, herdr.env)).code).toBe(0);
