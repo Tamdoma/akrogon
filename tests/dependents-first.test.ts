@@ -100,7 +100,9 @@ test('next --all dispatches a leaf with unmerged dependents before an earlier le
     leaf(f, 'd2', 'plan.synthesis', { 'blocked-by': ['d1'] });
     const few: string = leaf(f, 'few', 'plan.synthesis');
     const result: Result = await cli(f, ['next', '--all'], f.root, f.env);
-    expect(result.code).toBe(1);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('waiting: d1 on many (plan.synthesis)');
+    expect(result.stdout).toContain('waiting: d2 on d1 (plan.synthesis)');
     const prompts: Database['prompts'] = (JSON.parse(readFileSync(f.db, 'utf8')) as Database).prompts;
     expect(prompts.map((prompt) => prompt.text)).toEqual([
       `plan-issue many slot=A phase=plan.synthesis leaf=${many}`,
