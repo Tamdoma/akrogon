@@ -54,6 +54,8 @@ Compare tests with acceptance criteria: a missing or bad test blocks only when a
 
 A missing-test Fix names the scenario and what existing tests miss, with its realistic source, its consequence today, and the criterion or gap it hits. Look-alike code alone is not a Fix, and these triggers add no review rerun beyond the rerun rule below.
 
+A `learnings/LESSONS.md` line removal is accepted only when the diff carries a running mechanical guard covering the lesson's mechanism on every reachable path; a removal beside an uncalled or partial guard is a Fix, and any removal tied to report closure, duplicate or rejection is a Fix.
+
 Failed `checks` commands always block and scenarios a done-criterion names always block by citing that check or criterion instead of a realistic source, where a scenario a criterion names blocks as an outcome the criterion names, never as a named test, because a criterion names a result, not a test file; optional `advisory` failures are Nits, and a report gap blocks only when material to correctness or verification.
 
 Rerun checks only for a code change, missing evidence or a specific concern, leaving doc/index authorship with A and recording any reusable lesson found here as one active mechanism/date/history line plus a history file with case, evidence and learning ([lesson rule](../lesson-rule.md)), written under the registered checkout's `learnings/` and left for the operator to commit. Before a verdict that is not `fix`, B records each reusable Nit it still holds the same way: one line naming mechanism/date/history in the registered checkout's `learnings/LESSONS.md` plus a `learnings/history/` file with case, evidence and learning, left for the operator to commit.

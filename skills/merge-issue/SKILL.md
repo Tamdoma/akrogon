@@ -54,6 +54,14 @@ On a rebase conflict, resolve it in the worktree keeping both true sides, comple
 
 Same-line index conflicts retain both true entries and recheck pointers. An existing assertion, fixture or recorded output changes or is deleted only with a cited brief outcome or real source (a real build, user action or content, integration or attacker-reachable input) that the old expectation contradicts. A new test needs no cited source. A wrong test exposed by the rebase, its expectation contradicting a brief outcome or a real source, is fixed in its own commit with the reason and the merge continues; a broken default branch discovered by this leaf is fixed forward with failing tests as criteria.
 
+After the rebase resolves, B runs the re-removal one-liner and commits the removal as its own scoped commit when the output is non-empty; `merged --check` refuses a pushed range still holding a retired line.
+
+```
+bun -e "import {removeRetiredLessons} from './src/lessons.ts'; const r=await removeRetiredLessons(process.cwd(),(await Bun.spawn(['git','merge-base','origin/main','HEAD'],{stdout:'pipe'})).stdout.text().then(s=>s.trim()),'HEAD'); console.log(r.length?r.join('\n'):'none')"
+```
+
+When the output is non-empty: `git add learnings/LESSONS.md && git commit -m "lessons: retire applied lines"`.
+
 On green checks run `akrogon phase <slug> merged --slot B --check --attempt <id>`; on a trailer refusal B adds a commit carrying the missing trailer when the change has a real source, a trailer-only empty commit when the change sits inside a rebased commit, or reverts the change, then reruns the checks and `--check`.
 
 Then gather the completion owner's briefs (the issue's, or every leaf brief under the epic when the leaf has one) and run `akrogon phase <slug> merged --slot B --attempt <id>`; the command pushes the tested head fast-forward and moves the leaf. `reuse`, `rerun` and `rerun rebase` lines mean the same as in the applied form.
