@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: GitHub issue create and delete as the seat login
+    command: gh issue create -R Tamdoma/akrogon --title "[probe] lesson-guards seed filing test 20261010T080956Z" --body "...lesson-guards-probe..."; gh issue view 74; gh issue delete 74 --yes; gh issue view 74; gh issue list --search "lesson-guards-probe in:body" --state all
+    identity: gh keyring login ivanjuras
+    target: Tamdoma/akrogon (public)
+    version: gh 2.102.0
+    date: '2026-10-10'
+    result: created issue 74, read back OPEN by ivanjuras, deleted with exit 0
+    cleanup: absence confirmed, view could not resolve 74, body search count 0
+    limits: does not prove filing into Tamdoma/tamdoma-framework, seed-issue's dedupe search, or a harness sandbox allowing gh network calls
+    record: issues/chart/lesson-guards/forks/promotion-trigger.md

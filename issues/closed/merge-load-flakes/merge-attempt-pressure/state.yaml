@@ -1,0 +1,33 @@
+slug: merge-attempt-pressure
+phase: merged
+created: 2026-10-10
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAE
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/merge-attempt-pressure
+pane: 
+  A: w8:pKZ
+  B: w8:pK0
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-10T09:31:19.568Z

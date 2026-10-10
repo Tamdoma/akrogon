@@ -1,0 +1,41 @@
+slug: merge-attempt-records
+phase: merged
+created: 2026-10-10
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#62"
+  - "Tamdoma/akrogon#64"
+  - "Tamdoma/akrogon#65"
+  - "Tamdoma/akrogon#66"
+  - "Tamdoma/akrogon#67"
+  - "Tamdoma/akrogon#68"
+  - "Tamdoma/akrogon#70"
+  - "Tamdoma/akrogon#71"
+  - "Tamdoma/akrogon#72"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tA5
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/merge-attempt-records
+pane: 
+  A: w8:pKD
+  B: w8:pKE
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-10T07:06:28.593Z

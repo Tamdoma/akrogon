@@ -1,0 +1,27 @@
+bun test v1.4.2 (744846f84)
+
+../../../../../../../../tmp/akrogon-1000/hold-fix-leaf-1e5387dc66a3/hold-fix-review-we8cxvui/probe.test.ts:
+RENAME {"code":0,"stdout":"held repo fix hold","stderr":""}
+FIRST ATTEMPT AUTHORIZATION {"code":1,"stdout":"","stderr":"787 |     const leaf: Leaf = findLeaf(repo, slug);\n788 |     if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);\n789 |     if (leaf.state.phase === 'merge' && (requested === 'merged' || requested === 'check.fix')) {\n790 |       const holder: QueueEntry | undefined = mergeHolder(repo.name, global, allLeaves(repo), () => readLog(repo.root));\n791 |       if (holder === undefined || holder.leaf.state.slug !== leaf.state.slug)\n792 |         throw new Error(\n                        ^\nerror: Merge turn refused for fix: holder is hold\n      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/hold-fix-leaf/src/phase.ts:792:19)\n      at withLock (/home/ivan/Work/infra/akrogon/issues/worktrees/hold-fix-leaf/src/state.ts:196:18)\n      at async phaseCommand (/home/ivan/Work/infra/akrogon/issues/worktrees/hold-fix-leaf/src/phase.ts:786:9)\n\nBun v1.4.2 (Linux x64)"}
+NEXT {"code":0,"stdout":"","stderr":""}
+ACTIVE RECORDS {"fix":{"attempt":"8c5ffece-56d8-4c40-bc17-5f48c0a426c2","started":"2026-10-10T08:09:34.344Z","built_on":"d057dec9c5f814fdc5da4d0896074a9faa765879","holder":{"base":"d057dec9c5f814fdc5da4d0896074a9faa765879","head":"0e73b49b151eaf3e979843c7ff9afbbca0bc7dfd"},"members":[],"top":"0e73b49b151eaf3e979843c7ff9afbbca0bc7dfd","applied":true},"hold":{"attempt":"dd92d292-4cae-44be-81c9-808767af8fb0","started":"2026-10-10T08:09:34.745Z","built_on":"d057dec9c5f814fdc5da4d0896074a9faa765879","holder":{"base":"d057dec9c5f814fdc5da4d0896074a9faa765879","head":"22594c2e3914ee46606a798ce4a1101b761a396a"},"members":[],"top":"22594c2e3914ee46606a798ce4a1101b761a396a","applied":true}}
+928 |  const phase: Result = await cli(f,['phase','fix','merged','--check','--slot','B','--attempt',attempt],f.root,herdr.env);
+929 |  console.log('FIRST ATTEMPT AUTHORIZATION',JSON.stringify(phase));
+930 |  const next: Result = await cli(f,['next'],f.root,herdr.env);
+931 |  console.log('NEXT',JSON.stringify(next));
+932 |  console.log('ACTIVE RECORDS',JSON.stringify({fix:readState(fixPath).batch,hold:readState(holderPath).batch}));
+933 |  expect([readState(fixPath),readState(holderPath)].filter(state=>state.batch!==undefined)).toHaveLength(1);
+                                                                                                 ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 2
+
+      at <anonymous> (/tmp/akrogon-1000/hold-fix-leaf-1e5387dc66a3/hold-fix-review-we8cxvui/probe.test.ts:933:92)
+(fail) review probe: changing fix while its attempt is active [780.55ms]
+
+ 0 pass
+ 17 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [804.00ms]

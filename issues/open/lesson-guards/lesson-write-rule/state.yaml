@@ -1,0 +1,33 @@
+slug: lesson-write-rule
+phase: merged
+created: 2026-10-10
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - seed-owner-routing
+sources: 
+  - "Tamdoma/akrogon#73"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 1
+verdict: 
+  {}
+tab: w8:tAC
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/lesson-write-rule
+pane: 
+  A: w8:pKV
+  B: w8:pKW
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-10T09:08:00.133Z

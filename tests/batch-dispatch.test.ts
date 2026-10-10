@@ -438,7 +438,7 @@ test('a landed batch moves member and holder once, closes member tabs with the r
     toMerge(m1.path, '2026-09-12T00:00:00.000Z');
     toMerge(m2.path, '2026-09-13T00:00:00.000Z');
     saveDatabase(f, { ...database(f), prompts: [] });
-    expect((await next(f, ['--all'])).code).toBe(1);
+    expect((await next(f, ['--all'])).code).toBe(0);
     const record = readState(holder.path).batch;
     const m1Tip: string = z.string().parse(record?.members.find((member) => member.slug === 'm1')?.tip);
     const m2Tip: string = z.string().parse(record?.members.find((member) => member.slug === 'm2')?.tip);
@@ -448,7 +448,7 @@ test('a landed batch moves member and holder once, closes member tabs with the r
     saveState(m1.path, { ...readState(m1.path), phase: 'merged' });
     saveState(holder.path, { ...readState(holder.path), batch: { ...record!, candidate: top } });
     saveDatabase(f, { ...database(f), prompts: [] });
-    expect((await next(f, ['--all'])).code).toBe(1);
+    expect((await next(f, ['--all'])).code).toBe(0);
     expect(leafState(m2.path).phase).toBe('merged');
     expect(leafState(holder.path).phase).toBe('merged');
     expect(leafState(holder.path).batch).toBeUndefined();

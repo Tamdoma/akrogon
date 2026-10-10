@@ -1,0 +1,59 @@
+bun test v1.4.2 (744846f84)
+--changed: 12 changed files, running 3/32 test files
+
+tests/batch-dispatch.test.ts:
+(pass) solo-seat commits survive the check.fix handoff [2325.37ms]
+(pass) a failed holder with a landed candidate is told to move back, then reconciles without run or push [2585.84ms]
+(pass) a failed published holder receives one recovery notice across repeated passes [2585.27ms]
+(pass) solo-seat commits survive the failed handoff [2670.89ms]
+(pass) a merged holder keeps the record while a member is still in merge, then finishes it [2936.65ms]
+(pass) a dirty member worktree is dropped from the apply unmarked and keeps its uncommitted files [3065.79ms]
+(pass) an interrupted build restores drifted members and rebuilds under a new attempt [3146.58ms]
+(pass) a fetch failure keeps the record, restores nothing and reports the error [3186.03ms]
+(pass) the holder gets a batch record, members are applied, and only the holder is prompted [3243.53ms]
+(pass) a dirty holder worktree drops the batch to solo and restores carried members [3263.20ms]
+moved merged
+issue complete member-issue
+(pass) cleanup retains a closed carried worktree while publication recovery is blocked [3504.70ms]
+(pass) a solo leaf leaving merge and returning joins the next holder batch [3511.54ms]
+(pass) late holder dirt during initial apply is isolated and survives cleanup [3581.12ms]
+(pass) a memberless applied holder retains its checked integration head on red [1442.42ms]
+(pass) a failed holder keeps carried members, and the move-back clears the record and member tabs [4283.97ms]
+(pass) an edit arriving after the move status read survives the Git reset [2063.89ms]
+(pass) a green batch clears the record and closes member tabs once the holder lands [4413.52ms]
+(pass) late member dirt during initial apply is isolated and survives cleanup [4442.73ms]
+(pass) a leaf entering merge after the record was written is excluded and becomes the next holder [4609.77ms]
+(pass) a red-batch member carries a later waiter when it next holds the turn [4702.49ms]
+(pass) a member conflict marks it solo, rewrites the record without it and leaves its branch untouched [4884.35ms]
+(pass) a landed batch moves member and holder once, closes member tabs with the record, and wakes dependents [4913.24ms]
+
+tests/command-reference.test.ts:
+(pass) README covers every dispatched command and its argument contract [0.68ms]
+(pass) coverage rejects missing, extra and duplicate rows and newly dispatched verbs [0.56ms]
+(pass) argument contracts reject lost values, requiredness and exclusive alternatives [1.42ms]
+(pass) escaped alternatives and reordered rows preserve argument semantics [0.08ms]
+
+tests/hold.test.ts:
+(pass) a batch --red-on-base holds the repo: heads restored, record cleared, held line and one notification [166.53ms]
+(pass) a solo --red-on-base holds the repo with members [] [118.93ms]
+(pass) refused --red-on-base calls exit nonzero, name the reason and change nothing [273.57ms]
+(pass) --red-on-base on a merge leaf without a batch record is refused [46.76ms]
+(pass) --red-on-base requires slot B even with a missing or stale attempt [133.63ms]
+(pass) unhold clears the hold from root, a subfolder and a leaf worktree; absent hold fails naming the repo [416.96ms]
+(pass) a notification failure still leaves the hold, attempt line and state committed [125.99ms]
+(pass) a hold at the fetched sha blocks next: held line, no batch record, no mutating herdr calls [63.76ms]
+(pass) a hold survives a main advance confined to record folders [77.83ms]
+(pass) a main advance outside record folders clears the hold and starts a normal attempt [349.70ms]
+(pass) unhold then next starts a normal attempt [371.59ms]
+(pass) overlapping next calls preserve a newer red-on-base hold [526.02ms]
+(pass) hold-fix names a queued merge leaf: next builds its stack attempt while the queue head stays idle [379.14ms]
+(pass) changing the named fix preserves the active batch holder and its authorization [1025.50ms]
+(pass) the fix leaf is authorized to merge while the queue head is refused, then order returns [1070.41ms]
+(pass) hold-fix refusals change nothing: no hold, missing leaf, leaf outside the merge queue [122.11ms]
+(pass) unhold mid-attempt still lets the batch record authorize the fix merge [804.43ms]
+(pass) status surfaces the fix name on the board and the targeted held line [157.79ms]
+
+ 44 pass
+ 0 fail
+ 1819 expect() calls
+Ran 44 tests across 3 files. [11.19s]

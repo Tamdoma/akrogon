@@ -1,0 +1,33 @@
+bun test v1.4.2 (744846f84)
+
+tests/hold.test.ts:
+813 |     expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
+814 |     const attempt: string = readState(fixPath).batch!.attempt;
+815 |     expect((await cli(f, ['hold-fix', 'hold'], f.root, herdr.env)).code).toBe(0);
+816 |     expect(heldRecords(f).repo.fix).toBe('hold');
+817 |     expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
+818 |     expect(readState(holderPath).batch).toBeUndefined();
+                                              ^
+error: expect(received).toBeUndefined()
+
+Received: {
+  attempt: "a29646ac-7f22-4f4c-9779-aa92e3ed545c",
+  started: "2026-10-10T08:11:12.442Z",
+  built_on: "96c74fb47710218ff7292f59e2a1f89a1bdced9f",
+  holder: {
+    base: "96c74fb47710218ff7292f59e2a1f89a1bdced9f",
+    head: "35dc52c75c73691610a9caa93acb3bff0c0138fe",
+  },
+  members: [],
+  top: "35dc52c75c73691610a9caa93acb3bff0c0138fe",
+  applied: true,
+}
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/hold-fix-leaf/tests/hold.test.ts:818:41)
+(fail) changing the named fix preserves the active batch holder and its authorization [1545.66ms]
+
+ 0 pass
+ 17 filtered out
+ 1 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [1.58s]

@@ -1,0 +1,18 @@
+opened: '2026-10-10T06:43:42Z'
+seats:
+  - seat: A
+    pane: w8:pCT
+    harness: claude
+    session: a7a6765b-b14d-4e24-bc1e-b2fa7fcdbc97
+  - seat: B
+    pane: w8:pGY
+    harness: codex
+    session: 01a11d66-cf8f-75a2-95e4-a6cc685b1a70
+  - seat: B
+    pane: w8:pGY
+    harness: codex
+    session: 01a1248b-9d86-7922-b3c0-78bf688904e2
+  - seat: C
+    pane: w8:pGZ
+    harness: claude
+    session: 17afe92f-f47e-446f-b005-6c217b21b2c5

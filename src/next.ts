@@ -684,10 +684,10 @@ async function dispatchLeaf(
       inventory.leaves,
     );
     if (detail?.kind === 'deps') {
-      if (picked)
-        throw new Error(
-          `Leaf dependencies are not merged: ${slug}: ${detail.deps.map((d) => `${d.slug} (${d.label})`).join(', ')}`,
-        );
+      const deps: string = detail.deps.map((d) => `${d.slug} (${d.label})`).join(', ');
+      if (picked && detail.deps.some((d) => ['failed', 'parked', 'unreadable', 'missing'].includes(d.label)))
+        throw new Error(`Leaf dependencies are not merged: ${slug}: ${deps}`);
+      if (picked) console.log(`waiting: ${slug} on ${deps}`);
       return 'waiting';
     }
     if (detail?.kind === 'inputs') {

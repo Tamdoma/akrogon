@@ -1,0 +1,10 @@
+opened: '2026-10-10T08:23:43Z'
+seats:
+  - seat: A
+    pane: w8:pKN
+    harness: claude
+    session: 5eb6ac92-9694-4129-a9d5-e4daf384da70
+  - seat: B
+    pane: w8:pKR
+    harness: claude
+    session: e28567ad-f17d-4190-8088-9746d11e7e53

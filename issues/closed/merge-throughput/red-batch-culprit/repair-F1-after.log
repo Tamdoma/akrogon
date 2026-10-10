@@ -1,0 +1,10 @@
+bun test v1.4.2 (744846f84)
+
+tests/culprit.test.ts:
+(pass) refused --culprit calls exit nonzero, name the reason and change nothing [948.38ms]
+
+ 1 pass
+ 4 filtered out
+ 0 fail
+ 91 expect() calls
+Ran 1 test across 1 file. [985.00ms]

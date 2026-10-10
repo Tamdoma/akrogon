@@ -1,0 +1,22 @@
+bun test v1.4.2 (744846f84)
+
+tests/culprit.test.ts:
+393 |         '--culprit',
+394 |         'mem-a',
+395 |         flag,
+396 |         value,
+397 |       ]);
+398 |       expect(invalid.code).not.toBe(0);
+                                     ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/red-batch-culprit/tests/culprit.test.ts:398:32)
+(fail) refused --culprit calls exit nonzero, name the reason and change nothing [1230.16ms]
+
+ 0 pass
+ 4 filtered out
+ 1 fail
+ 78 expect() calls
+Ran 1 test across 1 file. [1261.00ms]

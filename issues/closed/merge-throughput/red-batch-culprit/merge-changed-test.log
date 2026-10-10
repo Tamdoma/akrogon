@@ -1,0 +1,46 @@
+bun test v1.4.2 (744846f84)
+--changed: 10 changed files, running 3/33 test files
+
+tests/batch-dispatch.test.ts:
+(pass) solo-seat commits survive the check.fix handoff [1475.79ms]
+(pass) solo-seat commits survive the failed handoff [1550.77ms]
+(pass) a failed published holder receives one recovery notice across repeated passes [1596.96ms]
+(pass) a failed holder with a landed candidate is told to move back, then reconciles without run or push [1623.57ms]
+(pass) a merged holder keeps the record while a member is still in merge, then finishes it [1767.40ms]
+(pass) a dirty holder worktree drops the batch to solo and restores carried members [1857.19ms]
+(pass) an interrupted build restores drifted members and rebuilds under a new attempt [1923.72ms]
+moved merged
+issue complete member-issue
+(pass) a dirty member worktree is dropped from the apply unmarked and keeps its uncommitted files [1957.45ms]
+(pass) the holder gets a batch record, members are applied, and only the holder is prompted [1983.62ms]
+(pass) a solo leaf leaving merge and returning joins the next holder batch [1997.59ms]
+(pass) a fetch failure keeps the record, restores nothing and reports the error [2051.59ms]
+(pass) cleanup retains a closed carried worktree while publication recovery is blocked [2085.80ms]
+(pass) late holder dirt during initial apply is isolated and survives cleanup [2205.49ms]
+(pass) a memberless applied holder retains its checked integration head on red [970.46ms]
+(pass) a failed holder keeps carried members, and the move-back clears the record and member tabs [2684.10ms]
+(pass) late member dirt during initial apply is isolated and survives cleanup [2774.42ms]
+(pass) a green batch clears the record and closes member tabs once the holder lands [2832.64ms]
+(pass) an edit arriving after the move status read survives the Git reset [1359.94ms]
+(pass) a leaf entering merge after the record was written is excluded and becomes the next holder [3036.44ms]
+(pass) a red-batch member carries a later waiter when it next holds the turn [3128.88ms]
+(pass) a member conflict marks it solo, rewrites the record without it and leaves its branch untouched [3272.17ms]
+(pass) a landed batch moves member and holder once, closes member tabs with the record, and wakes dependents [3363.54ms]
+
+tests/command-reference.test.ts:
+(pass) README covers every dispatched command and its argument contract [0.60ms]
+(pass) coverage rejects missing, extra and duplicate rows and newly dispatched verbs [0.39ms]
+(pass) argument contracts reject lost values, requiredness and exclusive alternatives [1.45ms]
+(pass) escaped alternatives and reordered rows preserve argument semantics [0.12ms]
+
+tests/culprit.test.ts:
+(pass) a member culprit ejects to check.fix and the next batch carries only the survivors [1065.19ms]
+(pass) a culprit at the fix-rounds cap ends failed with the shared attempts outcome [167.98ms]
+(pass) a holder culprit ejects itself and the members stay in merge at saved heads [149.36ms]
+(pass) refused --culprit calls exit nonzero, name the reason and change nothing [507.24ms]
+(pass) --culprit on a merge leaf without a batch record is refused [49.61ms]
+
+ 31 pass
+ 0 fail
+ 1744 expect() calls
+Ran 31 tests across 3 files. [5.35s]

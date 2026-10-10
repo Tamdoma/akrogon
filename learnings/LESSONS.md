@@ -25,3 +25,6 @@ One line per lesson: mechanism, date, history file. A line leaves when applied o
 - Automatic cascade lock ownership (2026-10-09): trace post-reconciliation dependent launches across lock release points and prove pause cannot acknowledge during their launch. History: [case](history/2026-10-09-pause-dispatch-cascade-lock.md).
 
 - Conditional automatic-dispatch documentation (2026-10-09): check general wake descriptions against pause exceptions, and distinguish a documented exception from proven operator confusion. History: [case](history/2026-10-09-pause-dispatch-doc-qualifier.md).
+- Attempt records: a one-shot write driven by a persistent state record replays when the record survives its trigger (post-phase mergeWake, mid-call failure retry, recovery reconcile); exactly-once needs a persisted `recorded` flag and a phase gate on the holder. 2026-10-10. History: [case](history/2026-10-10-attempt-record-replay.md).
+
+- 2026-10-10: A hold-clear decision must revalidate the current record under its deletion lock. A stale pre-lock comparison can erase a newer hold. History: [red-main-hold stale clear](history/2026-10-10-red-main-hold-stale-clear.md).

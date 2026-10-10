@@ -1,0 +1,10 @@
+bun test v1.4.2 (744846f84)
+
+tests/hold.test.ts:
+(pass) changing the named fix preserves the active batch holder and its authorization [1850.99ms]
+
+ 1 pass
+ 17 filtered out
+ 0 fail
+ 10 expect() calls
+Ran 1 test across 1 file. [1.88s]
