@@ -787,6 +787,8 @@ export async function phaseCommand(
   if (culprit !== undefined && requested !== 'check.fix') throw new Error('--culprit is only valid for check.fix');
   if (culprit !== undefined && redOnBase !== undefined) throw new Error('--culprit cannot combine with --red-on-base');
   if (culprit !== undefined && slot !== 'B') throw new Error('--culprit requires --slot B');
+  if (culprit !== undefined && verdict !== undefined) throw new Error('--verdict is only valid for check.review');
+  if (culprit !== undefined && reason !== undefined) throw new Error('--reason is only valid for failed');
   const global: GlobalConfig = readGlobal();
   const repo: Repo = await requireRepo(global, process.cwd());
   let committed: boolean = false;
