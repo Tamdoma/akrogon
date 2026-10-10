@@ -231,7 +231,7 @@ test.serial(
     const f: Fixture = await fixture();
     try {
       const { holder, record, branches, builtOn, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
-      saveState(holder.path, { ...readState(holder.path), batch_limit: 2 });
+      saveState(holder.path, { ...readState(holder.path), batch_limit: 2, fix_rounds: 1 });
       // Paused so mergeWake is a no-op; U2's mergeTurn guard owns the unpaused case.
       expect((await cli(f, ['pause'], f.root)).code).toBe(0);
       const res: Result = await cli(
@@ -258,6 +258,7 @@ test.serial(
       expect(holderState.phase).toBe('merge');
       expect(holderState.batch).toBeUndefined();
       expect(holderState.batch_limit).toBe(2);
+      expect(holderState.fix_rounds).toBe(1);
       expect(await headOf(f, 'mem-a')).toBe(record.members.find((m) => m.slug === 'mem-a')!.head);
       expect(await headOf(f, 'mem-b')).toBe(record.members.find((m) => m.slug === 'mem-b')!.head);
       expect(await command(['git', 'rev-parse', 'HEAD'], branches.get('mem-a')!.worktree)).toBe(

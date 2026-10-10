@@ -130,10 +130,14 @@ test('review fix routes to check.repair, B hands to A, rechecks only B, caps han
     expect(readState(path)).toMatchObject({ phase: 'implement', fix_rounds: 1 });
     const mergePath: string = leaf(f, 'conflict', 'merge');
     expect((await cli(f, ['phase', 'conflict', 'check.fix'])).code).toBe(0);
-    expect(readState(mergePath).fix_rounds).toBe(0);
+    expect(readState(mergePath).fix_rounds).toBe(1);
     const cappedPath: string = leaf(f, 'capped', 'merge', { fix_rounds: 1 });
-    expect((await cli(f, ['phase', 'capped', 'check.fix'])).stdout).toBe('moved check.fix');
-    expect(readState(cappedPath)).toMatchObject({ phase: 'check.fix', fix_rounds: 1 });
+    expect((await cli(f, ['phase', 'capped', 'check.fix'], f.root, herdr.env)).stdout).toBe('moved failed');
+    expect(readState(cappedPath)).toMatchObject({
+      phase: 'failed',
+      failure: { cause: 'attempts', phase: 'merge', slot: 'B', reason: 'fix rounds exhausted', delivery: 'shown' },
+      fix_rounds: 1,
+    });
     const log = JSON.parse(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').split('\n')[0]);
     expect(log).toMatchObject({
       from: 'check.review',

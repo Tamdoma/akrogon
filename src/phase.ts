@@ -150,7 +150,10 @@ export async function commitMove(
     failure: to === 'failed' ? failure : undefined,
     busy_since: to === 'failed' || to === 'merged' ? {} : recorded.busy_since,
     busy_notified: to === 'failed' || to === 'merged' ? {} : recorded.busy_notified,
-    fix_rounds: to === 'check.fix' && recorded.phase === 'check.repair' ? recorded.fix_rounds + 1 : recorded.fix_rounds,
+    fix_rounds:
+      to === 'check.fix' && (recorded.phase === 'check.repair' || recorded.phase === 'merge')
+        ? recorded.fix_rounds + 1
+        : recorded.fix_rounds,
     merge_stamp: to === 'merge' ? new Date().toISOString() : recorded.merge_stamp,
     solo: to === 'merge' ? recorded.solo : undefined,
     batch_limit: to === 'merge' ? recorded.batch_limit : undefined,
@@ -301,7 +304,9 @@ export async function transition(
         : 'merge'
       : requested;
   const capped: Phase =
-    destination === 'check.fix' && state.phase === 'check.repair' && state.fix_rounds >= repo.config.fix_rounds
+    destination === 'check.fix' &&
+    (state.phase === 'check.repair' || state.phase === 'merge') &&
+    state.fix_rounds >= repo.config.fix_rounds
       ? 'failed'
       : destination;
   await commitMove(
@@ -311,7 +316,7 @@ export async function transition(
     capped,
     slot ?? null,
     capped === 'failed'
-      ? { cause: 'attempts', phase: 'check.repair', slot: slot ?? required[0], reason: 'fix rounds exhausted' }
+      ? { cause: 'attempts', phase: state.phase, slot: slot ?? required[0], reason: 'fix rounds exhausted' }
       : undefined,
     onCommitted,
   );

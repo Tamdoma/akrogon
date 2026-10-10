@@ -105,6 +105,6 @@ Suppose a CSV field with a newline pasted from a user spreadsheet creates an ext
 
 B re-checks only A's repair diff. That pass confirms the earlier findings and can block a new defect introduced by the repair. It does not restart an unrestricted review of the whole feature.
 
-The configured repair cap prevents an endless review cycle and counts handoffs to A. If the cap is exhausted, the leaf fails with a recorded cause.
+The configured repair cap prevents an endless review cycle and counts handoffs to A. Merge `check.fix` bounces count toward `fix_rounds` as well. If the cap is exhausted, the leaf fails with a recorded cause.
 
 Previous: [Next](next.md) · Next: [Files](files.md) · [Home](../../README.md)
