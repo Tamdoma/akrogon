@@ -2,7 +2,7 @@ import { test, expect, afterEach } from 'bun:test';
 import { z } from 'zod';
 import { dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { cli, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture, type HerdrFixture } from './helpers';
 import type { Database } from './fake-herdr';
 import { readRepo, type Repo } from '../src/config';
@@ -677,5 +677,73 @@ test.serial('unhold then next starts a normal attempt', async () => {
     expect(prompts[0].text).toContain('merge-issue hold slot=B');
   } finally {
     f.clean();
+  }
+});
+
+test.serial('overlapping next calls preserve a newer red-on-base hold', async () => {
+  const f: Fixture = await fixture();
+  const release: string = resolve(f.home, 'release-diff');
+  let pending: Promise<Result> | undefined;
+  try {
+    const { herdr, holderPath, sha } = await heldMergeLeaf(f);
+    holdAt(f, holderPath, sha);
+    const advanced: string = await advanceRemote(f, { 'real-file': 'changed\n' });
+    const git: string = await command(['sh', '-c', 'command -v git']);
+    const ready: string = resolve(f.home, 'diff-ready');
+    const wrapper: string = resolve(f.home, 'bin/git');
+    writeFileSync(
+      wrapper,
+      `#!/bin/sh
+if [ "$1" = diff ] && [ "$2" = --quiet ] && [ "$3" = '${sha}' ] && mkdir '${f.home}/diff-claimed' 2>/dev/null; then
+  touch '${ready}'
+  while [ ! -e '${release}' ]; do sleep 0.01; done
+fi
+exec '${git}' "$@"
+`,
+    );
+    chmodSync(wrapper, 0o755);
+    pending = cli(f, ['next'], f.root, herdr.env, 20000);
+    const deadline: number = Date.now() + 10000;
+    while (!existsSync(ready) && Date.now() < deadline) await Bun.sleep(10);
+    expect(existsSync(ready)).toBe(true);
+    expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
+    const record: Batch = readState(holderPath).batch!;
+    expect(record).toBeDefined();
+    const red: Result = await cli(
+      f,
+      [
+        'phase',
+        'hold',
+        'check.fix',
+        '--slot',
+        'B',
+        '--attempt',
+        record.attempt,
+        '--red-on-base',
+        advanced,
+        '--command',
+        'bun test',
+      ],
+      f.root,
+      herdr.env,
+    );
+    expect(red.code).toBe(0);
+    const held: Hold = heldRecords(f).repo;
+    expect(held.sha).toBe(advanced);
+    expect(readState(holderPath).batch).toBeUndefined();
+    writeFileSync(release, 'go');
+    const first: Result = await pending;
+    expect(first.code).toBe(0);
+    expect(heldRecords(f).repo).toEqual(held);
+    expect(readState(holderPath).batch).toBeUndefined();
+    expect(attemptLines(f)).toHaveLength(1);
+    expect(attemptLines(f)[0].outcome).toBe('held');
+  } finally {
+    writeFileSync(release, 'go');
+    try {
+      if (pending !== undefined) await pending;
+    } finally {
+      f.clean();
+    }
   }
 });
