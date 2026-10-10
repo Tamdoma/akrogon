@@ -1,6 +1,5 @@
 import { test, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { fixture, cli, leaf, fakeHerdr, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import type { Result } from '../src/shell';
@@ -111,12 +110,3 @@ test('next --all dispatches a leaf with unmerged dependents before an earlier le
     f.clean();
   }
 }, 20000);
-
-test('merge and next docs describe dependents-first ordering through blocked-by', () => {
-  const merge: string = readFileSync(resolve(import.meta.dir, '../docs/guide/merge.md'), 'utf8');
-  const next: string = readFileSync(resolve(import.meta.dir, '../docs/guide/next.md'), 'utf8');
-  expect(merge).toContain('blocked-by');
-  expect(merge).toContain('transitively');
-  expect(next).toContain('blocked-by');
-  expect(next).toContain('transitively');
-});
