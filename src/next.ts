@@ -44,7 +44,7 @@ import {
   type Leaf,
   type State,
 } from './state';
-import { requiredSlots, routing, type Slot } from './routing';
+import { requiredSlots, routing, type Phase, type Slot } from './routing';
 import {
   herdr,
   panes,
@@ -82,6 +82,7 @@ import { sessionFile, deliveredAfter } from './session-file';
 import { heldFor, dropHeld, mergeHolder, type Hold } from './hold';
 import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
+import { selfUpdate } from './self-update';
 import { blockDetail, dependentCounts, mergeQueue } from './turn';
 
 const hookEventSchema = z.discriminatedUnion('event', [
@@ -1290,10 +1291,12 @@ export async function mergePass(
 export async function mergeWake(
   global: GlobalConfig,
   repo: Repo,
+  committedTo?: Phase,
   pressureDir: string = '/proc/pressure',
 ): Promise<void> {
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
   try {
+    if (committedTo === 'merged') await selfUpdate(repo);
     const paused: boolean = await withLock(resolve(globalHome(), '.lock'), async () => isPaused(repo.name));
     if (paused) return;
     await mergePass(global, repo, invocation, true, pressureDir);
@@ -1446,6 +1449,25 @@ export async function nextCommand(input: string | undefined, pressureDir: string
     input !== '--all' && input !== '--resume' && event?.event !== 'tab_closed' && (input !== undefined || !hooked)
       ? await selectLeaves(global, invocation, input)
       : undefined;
+  const updating: Repo[] =
+    input === '--all' || input === '--resume'
+      ? registeredRepos(global, invocation).repos
+      : selection === undefined
+        ? []
+        : [selection.repo];
+  for (const repo of updating) {
+    try {
+      await selfUpdate(repo);
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          warning: 'self-update threw',
+          repo: repo.name,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }
   if (selection === undefined || selection.leaves.length > 0) {
     const touched: Map<string, { repo: Repo; isAutomatic: boolean }> = new Map();
     await withLock(resolve(globalHome(), '.lock'), async () => {

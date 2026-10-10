@@ -5,6 +5,7 @@ import { effectiveConfig, readGlobal, requireRepo, type Repo } from './config';
 import { initialize } from './init';
 import { sourcePattern } from './state';
 import { type Hold } from './hold';
+import { type Phase } from './routing';
 
 const verb: string | undefined = process.argv[2];
 
@@ -60,9 +61,9 @@ switch (verb) {
     const [slug, phase]: [string, string] = z.tuple([z.string(), z.string()]).parse(positionals);
     const { phaseCommand, MoveCommittedError } = await import('./phase');
     const { mergeWake } = await import('./next');
-    let committed: { repo: Repo } | undefined;
+    let committed: { repo: Repo; to?: Phase } | undefined;
     try {
-      const result: { repo: Repo; committed: boolean } = await phaseCommand(
+      const result: { repo: Repo; committed: boolean; to?: Phase } = await phaseCommand(
         slug,
         phase,
         values.slot,
@@ -79,7 +80,7 @@ switch (verb) {
       if (error instanceof MoveCommittedError) committed = error;
       throw error;
     } finally {
-      if (committed !== undefined) await mergeWake(readGlobal(), committed.repo);
+      if (committed !== undefined) await mergeWake(readGlobal(), committed.repo, committed.to);
     }
     break;
   }
