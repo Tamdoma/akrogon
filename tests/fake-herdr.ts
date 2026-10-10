@@ -237,6 +237,15 @@ if (args[0] === 'agent' && args[1] === 'wait') {
   }
   result({ agent: target });
 }
+if (args[0] === 'agent' && args[1] === 'list') {
+  result({
+    agents: db.panes.flatMap((p) =>
+      p.agent === null
+        ? []
+        : [{ pane_id: p.pane_id, agent: p.agent, ...(p.agent_session ? { agent_session: p.agent_session } : {}) }],
+    ),
+  });
+}
 if (args[0] === 'tab' && args[1] === 'close') {
   db.panes = db.panes.filter((p) => p.tab_id !== args[2]);
   db.tabs = db.tabs.filter((t) => t.tab_id !== args[2]);
