@@ -7,9 +7,7 @@ import { command, run, CommandError, type Result } from './shell';
 import { removeRetiredLessons } from './lessons';
 
 export async function removeEmptyUntrackedDirs(worktree: string): Promise<void> {
-  const present: string =
-    (await command(['git', 'ls-files', '-c', '-o', '--exclude-standard', '-z'], worktree)) +
-    (await command(['git', 'ls-files', '-o', '-i', '--exclude-standard', '-z'], worktree));
+  const present: string = await command(['git', 'ls-files', '-c', '-z'], worktree);
   const files: Set<string> = new Set(present.split('\0').filter((path) => path !== ''));
   const dirs: string[] = [];
   const keep: Set<string> = new Set();
@@ -20,22 +18,35 @@ export async function removeEmptyUntrackedDirs(worktree: string): Promise<void> 
       kept = dirname(kept);
     }
   }
-  function walk(path: string, rel: string): void {
+  async function walk(path: string, rel: string): Promise<void> {
+    const children: string[] = [];
     for (const entry of readdirSync(path, { withFileTypes: true })) {
       const entryRel: string = rel === '' ? entry.name : rel + sep + entry.name;
       if (entry.isDirectory() && entry.name !== '.git' && !files.has(entryRel)) {
-        dirs.push(entryRel);
-        walk(resolve(path, entry.name), entryRel);
+        children.push(entryRel);
       } else {
         keepDir(rel);
       }
     }
+    if (children.length === 0) return;
+    const ignored: Result = await run(
+      ['git', 'check-ignore', '-z', '--stdin'],
+      worktree,
+      undefined,
+      children.join('\0'),
+    );
+    if (ignored.code !== 0 && ignored.code !== 1)
+      throw new CommandError(['git', 'check-ignore', '-z', '--stdin'], worktree, ignored);
+    const ignoredDirs: Set<string> = new Set(ignored.stdout.split('\0'));
+    for (const child of children) {
+      if (ignoredDirs.has(child)) keepDir(child);
+      else {
+        dirs.push(child);
+        await walk(resolve(worktree, child), child);
+      }
+    }
   }
-  walk(worktree, '');
-  const ignored: Result = await run(['git', 'check-ignore', '-z', '--stdin'], worktree, undefined, dirs.join('\0'));
-  if (ignored.code !== 0 && ignored.code !== 1)
-    throw new CommandError(['git', 'check-ignore', '-z', '--stdin'], worktree, ignored);
-  for (const rel of ignored.stdout.split('\0').filter((path) => path !== '')) keepDir(rel);
+  await walk(worktree, '');
   for (const rel of dirs.toReversed()) if (!keep.has(rel)) rmdirSync(resolve(worktree, rel));
 }
 
