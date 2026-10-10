@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { effectiveConfig, readGlobal, requireRepo, type Repo } from './config';
 import { initialize } from './init';
 import { sourcePattern } from './state';
+import { type Hold } from './hold';
 
 const verb: string | undefined = process.argv[2];
 
@@ -118,8 +119,10 @@ switch (verb) {
   case 'unpause': {
     z.tuple([]).parse(positionals);
     await (await import('./pause')).pauseCommand(verb, process.cwd());
-    const { unpausePass } = await import('./next');
-    await unpausePass(await requireRepo(readGlobal(), process.cwd()));
+    const repo: Repo = await requireRepo(readGlobal(), process.cwd());
+    const hold: Hold | undefined = (await import('./hold')).heldFor(repo.name);
+    if (hold !== undefined) console.log(`held ${repo.name} on ${hold.sha}: ${hold.command}`);
+    await (await import('./next')).unpausePass(repo);
     break;
   }
   case 'status':

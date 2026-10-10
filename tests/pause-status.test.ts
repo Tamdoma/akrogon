@@ -105,6 +105,102 @@ test('unpaused repos print as before with phases and blockers unchanged', async 
   }
 });
 
+function hold(f: Fixture, sha: string = '0123456789abcdef0123456789abcdef01234567'): void {
+  yaml(resolve(f.home, 'held.yaml'), {
+    repo: {
+      sha,
+      command: 'bun test',
+      holder: 'hold',
+      attempt: 'a1',
+      at: '2026-10-10T00:00:00.000Z',
+      evidence: '/x/review-B.md',
+    },
+  });
+}
+
+test('status marks the held repo beside its heading, alone and with paused, until unhold', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'build', 'plan.synthesis');
+    hold(f);
+    const held: Result = await cli(f, ['status']);
+    expect(held.code).toBe(0);
+    expect(heading(held.stdout, 'repo')).toContain('(held)');
+    expect(heading(held.stdout, 'repo')).not.toContain('(paused)');
+    const charts: Result = await cli(f, ['status', '--charts']);
+    expect(charts.code).toBe(0);
+    expect(heading(charts.stdout, 'repo')).toContain('(held)');
+    expect((await cli(f, ['pause'])).code).toBe(0);
+    const both: Result = await cli(f, ['status']);
+    expect(both.code).toBe(0);
+    expect(heading(both.stdout, 'repo')).toContain('(paused) (held)');
+    expect((await cli(f, ['unhold'])).code).toBe(0);
+    const after: Result = await cli(f, ['status']);
+    expect(after.code).toBe(0);
+    expect(heading(after.stdout, 'repo')).toContain('(paused)');
+    expect(heading(after.stdout, 'repo')).not.toContain('held');
+  } finally {
+    f.clean();
+  }
+});
+
+test('unpause prints the hold after unpausing a held repo', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'build', 'plan.synthesis');
+    expect((await cli(f, ['pause'])).code).toBe(0);
+    const plain: Result = await cli(f, ['unpause']);
+    expect(plain.code).toBe(0);
+    expect(plain.stdout).toContain('unpaused');
+    expect(plain.stdout).not.toContain('held');
+    hold(f, '89abcdef0123456789abcdef0123456789abcdef');
+    expect((await cli(f, ['pause'])).code).toBe(0);
+    const run: Result = await cli(f, ['unpause']);
+    expect(run.code).toBe(0);
+    expect(run.stdout).toContain('unpaused');
+    expect(run.stdout).toContain('held repo on 89abcdef0123456789abcdef0123456789abcdef: bun test');
+  } finally {
+    f.clean();
+  }
+});
+
+test('targeted status prints the held line while the repo is held', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'build', 'plan.synthesis');
+    const before: Result = await cli(f, ['status', 'build']);
+    expect(before.code).toBe(0);
+    expect(before.stdout).not.toContain('held:');
+    hold(f);
+    const run: Result = await cli(f, ['status', 'build']);
+    expect(run.code).toBe(0);
+    expect(run.stdout).toContain('held: 0123456789abcdef0123456789abcdef01234567 bun test');
+    expect((await cli(f, ['unhold'])).code).toBe(0);
+    const after: Result = await cli(f, ['status', 'build']);
+    expect(after.code).toBe(0);
+    expect(after.stdout).not.toContain('held:');
+  } finally {
+    f.clean();
+  }
+});
+
+test('invalid held file fails status naming the file', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'build', 'plan.synthesis');
+    const file: string = resolve(f.home, 'held.yaml');
+    writeFileSync(file, '["just", "a", "list"]\n');
+    const board: Result = await cli(f, ['status']);
+    expect(board.code).not.toBe(0);
+    expect(board.stderr).toContain(file);
+    const targeted: Result = await cli(f, ['status', 'build']);
+    expect(targeted.code).not.toBe(0);
+    expect(targeted.stderr).toContain(file);
+  } finally {
+    f.clean();
+  }
+});
+
 test('invalid pause file fails status naming the file', async () => {
   const f: Fixture = await fixture();
   try {
