@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, fakeHerdr, leaf, editOnSecondStatus, type Fixture } from './helpers';
+import { fixture, cli, fakeHerdr, leaf, editOnSecondStatus, yaml, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { Database } from './fake-herdr';
@@ -120,7 +120,7 @@ test('the holder gets a batch record, members are applied, and only the holder i
   }
 }, 15000);
 
-test('a member conflict marks it solo, rewrites the record without it and leaves its branch untouched', async () => {
+test('a member conflict excludes it from the attempt, rewrites the record without it and leaves its branch untouched', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
@@ -136,14 +136,14 @@ test('a member conflict marks it solo, rewrites the record without it and leaves
     toMerge(cc.path, '2026-09-13T00:00:00.000Z');
     saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, ['--all'])).code).toBe(0);
-    expect(readState(cc.path).solo).toBe(true);
-    expect(await head(f, 'cc')).toBe(ccHead);
     const state: State = readState(aa.path);
+    expect(state.batch?.excluded).toEqual(['cc']);
+    expect(await head(f, 'cc')).toBe(ccHead);
     expect(state.batch?.applied).toBe(true);
     expect(state.batch?.members.map((member) => member.slug)).toEqual(['bb']);
     expect(await head(f, 'bb')).toBe(z.string().parse(state.batch?.members[0]?.tip));
     expect(database(f).prompts).toEqual([expectedPrompt(aa.path, aa.b)]);
-    // The solo leaf becomes a holder under a fresh record once the batch finishes.
+    // The excluded leaf becomes a holder under a fresh record once the batch finishes.
     idleAll(f);
     const aaAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
     expect(
@@ -152,8 +152,8 @@ test('a member conflict marks it solo, rewrites the record without it and leaves
     expect((await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code).toBe(
       0,
     );
-    // bb stayed carried and landed with aa's push; the solo-conflicted cc holds the
-    // next turn under a fresh memberless solo record and is prompted (criterion 3).
+    // bb stayed carried and landed with aa's push; the excluded cc holds the
+    // next turn under a fresh memberless record and is prompted (criterion 3).
     expect(await head(f, 'bb')).toBe(bbHead);
     expect(readState(bb.path).phase).toBe('merged');
     expect(readState(cc.path).batch?.applied).toBe(true);
@@ -185,6 +185,118 @@ test('a member conflict marks it solo, rewrites the record without it and leaves
     f.clean();
   }
 }, 20000);
+
+test('the default batch_limit caps carried members at three', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    const cc: { path: string; b: string } = await allocatedLeaf(f, 'cc');
+    await commitFile(f, aa.path, 'aa-file', 'aa\n');
+    await commitFile(f, bb.path, 'bb-file', 'bb\n');
+    await commitFile(f, cc.path, 'cc-file', 'cc\n');
+    // max_active leaves dd/ee/ff unallocated; merge leaves need no worktree to queue.
+    const dd: string = leaf(f, 'dd', 'plan.synthesis');
+    const ee: string = leaf(f, 'ee', 'plan.synthesis');
+    const ff: string = leaf(f, 'ff', 'plan.synthesis');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    toMerge(cc.path, '2026-09-13T00:00:00.000Z');
+    toMerge(dd, '2026-09-14T00:00:00.000Z');
+    toMerge(ee, '2026-09-15T00:00:00.000Z');
+    toMerge(ff, '2026-09-16T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const batch = readState(aa.path).batch;
+    expect(batch?.applied).toBe(true);
+    expect(batch?.members.map((member) => member.slug)).toEqual(['bb', 'cc', 'dd']);
+  } finally {
+    f.clean();
+  }
+}, 20000);
+
+test('batch_limit and a holder split limit cap carried members', async () => {
+  const cases: { limit: number; split?: number; members: string[] }[] = [
+    { limit: 1, members: [] },
+    { limit: 2, split: 0, members: [] },
+    { limit: 4, split: 1, members: ['m1'] },
+  ];
+  for (const { limit, split, members } of cases) {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+      const m1: { path: string; b: string } = await allocatedLeaf(f, 'm1');
+      const m2: { path: string; b: string } = await allocatedLeaf(f, 'm2');
+      await commitFile(f, m1.path, 'm1-file', 'm1\n');
+      await commitFile(f, m2.path, 'm2-file', 'm2\n');
+      yaml(resolve(f.root, 'issues/config.yaml'), {
+        checks: { test: 'bun test' },
+        grounding: 'none',
+        batch_limit: limit,
+      });
+      toMerge(holder.path, '2026-09-11T00:00:00.000Z', split === undefined ? {} : { batch_limit: split });
+      toMerge(m1.path, '2026-09-12T00:00:00.000Z');
+      toMerge(m2.path, '2026-09-13T00:00:00.000Z');
+      saveDatabase(f, { ...database(f), prompts: [] });
+      expect((await next(f, ['--all'])).code).toBe(0);
+      const batch = readState(holder.path).batch;
+      expect(batch?.applied).toBe(true);
+      expect(batch?.members.map((member) => member.slug)).toEqual(members);
+    } finally {
+      f.clean();
+    }
+  }
+}, 45000);
+
+test('a conflicted member is excluded from the attempt and eligible for the next batch', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    const cc: { path: string; b: string } = await allocatedLeaf(f, 'cc');
+    await commitFile(f, aa.path, 'aa-file', 'aa\n');
+    const bbWorktree: string = z.string().parse(readState(bb.path).worktree);
+    await command(['git', 'rm', 'file'], bbWorktree);
+    await command(['git', 'commit', '-m', 'delete file'], bbWorktree);
+    const ccWorktree: string = z.string().parse(readState(cc.path).worktree);
+    writeFileSync(resolve(ccWorktree, 'file'), 'cc edit\n');
+    await command(['git', 'commit', '-am', 'edit file'], ccWorktree);
+    const ccHead: string = await head(f, 'cc');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    toMerge(cc.path, '2026-09-13T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    // Building bb then cc: cc's edit-vs-delete rebase onto bb's tip conflicts, so cc
+    // is dropped from this attempt's members and kept on the record as excluded.
+    const batch = readState(aa.path).batch;
+    expect(batch?.members.map((member) => member.slug)).toEqual(['bb']);
+    expect(batch?.excluded).toEqual(['cc']);
+    expect(await head(f, 'cc')).toBe(ccHead);
+    expect((await cli(f, ['phase', 'bb', 'failed', '--reason', 'stop'], f.root, f.env)).code).toBe(0);
+    // A carried member leaving merge refuses the holder's push and dissolves the batch.
+    const refused: Result = await cli(
+      f,
+      ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', batch!.attempt],
+      f.root,
+      f.env,
+    );
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('bb');
+    expect(readState(aa.path).batch).toBeUndefined();
+    // The failed bb is reported each pass until operator recovery; the pass still
+    // runs the merge turn and rebuilds.
+    const again: Result = await next(f, ['--all']);
+    expect(again.code).toBe(1);
+    expect(again.stderr).toContain('bb');
+    // No persistent mark filters cc: it joins aa's fresh batch as the only member.
+    const nextBatch = readState(aa.path).batch;
+    expect(nextBatch?.applied).toBe(true);
+    expect(nextBatch?.members.map((member) => member.slug)).toEqual(['cc']);
+  } finally {
+    f.clean();
+  }
+}, 25000);
 
 test('an interrupted build restores drifted members and rebuilds under a new attempt', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -526,7 +638,6 @@ test('a red-batch member carries a later waiter when it next holds the turn', as
     expect((await cli(f, ['phase', 'aa', 'check.fix', '--slot', 'B', '--attempt', attempt], f.root, f.env)).code).toBe(
       0,
     );
-    expect(readState(bb.path).solo).toBeUndefined();
     toMerge(cc.path, '2026-09-13T00:00:00Z');
     expect((await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop'], f.root, f.env)).code).toBe(0);
     expect(readState(bb.path).batch!.members.map((member) => member.slug)).toEqual(['cc']);
@@ -582,16 +693,15 @@ test('a failed published holder receives one recovery notice across repeated pas
   }
 });
 
-test('a solo leaf leaving merge and returning joins the next holder batch', async () => {
+test('a leaf leaving merge and returning joins the next holder batch', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const holder = await allocatedLeaf(f, 'holder');
     const member = await allocatedLeaf(f, 'member');
     await commitFile(f, holder.path, 'holder-file', 'h');
     await commitFile(f, member.path, 'member-file', 'm');
-    toMerge(member.path, '2026-09-11T00:00:00Z', { solo: true });
+    toMerge(member.path, '2026-09-11T00:00:00Z');
     expect((await cli(f, ['phase', 'member', 'failed', '--reason', 'stop'], f.root, f.env)).code).toBe(0);
-    expect(readState(member.path).solo).toBeUndefined();
     toMerge(holder.path, '2026-09-12T00:00:00Z');
     idleAll(f);
     expect((await cli(f, ['phase', 'member', 'merge'], f.root, f.env)).code).toBe(0);
@@ -615,7 +725,6 @@ test('a dirty member worktree is dropped from the apply unmarked and keeps its u
     saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, ['--all'])).code).toBe(0);
     const bbState: State = readState(bb.path);
-    expect(bbState.solo).toBeUndefined();
     expect(await head(f, 'bb')).toBe(bbHead);
     const bbWorktree: string = z.string().parse(bbState.worktree);
     expect(readFileSync(resolve(bbWorktree, 'file'), 'utf8')).toBe('uncommitted\n');
@@ -653,7 +762,6 @@ test('a dirty holder worktree drops the batch to solo and restores carried membe
     expect(batch?.applied).toBe(true);
     expect(batch?.solo).toBe(true);
     expect(batch?.members).toEqual([]);
-    expect(readState(bb.path).solo).toBeUndefined();
     expect(mergePrompts(f).at(-1)?.text).toContain('solo');
     expect(mergePrompts(f).at(-1)?.pane).toBe(aa.b);
   } finally {
@@ -662,16 +770,16 @@ test('a dirty holder worktree drops the batch to solo and restores carried membe
 }, 15000);
 
 for (const ending of ['check.fix', 'failed'] as const) {
-  test(`solo-seat commits survive the ${ending} handoff`, async () => {
+  test(`holder-seat commits survive the ${ending} handoff`, async () => {
     const f: DispatchFixture = await dispatchFixture();
     try {
       const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
       await commitFile(f, holder.path, 'original', 'original');
-      toMerge(holder.path, '2026-09-11T00:00:00Z', { solo: true });
+      toMerge(holder.path, '2026-09-11T00:00:00Z');
       idleAll(f);
       expect((await next(f, ['--all'])).code).toBe(0);
       const attempt: string = readState(holder.path).batch!.attempt;
-      await commitFile(f, holder.path, 'solo-fix', 'committed solo repair');
+      await commitFile(f, holder.path, 'seat-fix', 'committed holder repair');
       const repaired: string = await head(f, 'holder');
       const args: string[] =
         ending === 'check.fix'
@@ -680,7 +788,7 @@ for (const ending of ['check.fix', 'failed'] as const) {
       expect((await cli(f, args, f.root, f.env)).code).toBe(0);
       expect(readState(holder.path).phase).toBe(ending);
       expect(await head(f, 'holder')).toBe(repaired);
-      expect(readFileSync(resolve(readState(holder.path).worktree!, 'solo-fix'), 'utf8')).toBe('committed solo repair');
+      expect(readFileSync(resolve(readState(holder.path).worktree!, 'seat-fix'), 'utf8')).toBe('committed holder repair');
     } finally {
       f.clean();
     }
@@ -710,7 +818,6 @@ for (const edited of ['holder', 'member'] as const) {
       if (edited === 'holder') {
         expect(batch.solo).toBe(true);
       } else {
-        expect(readState(member.path).solo).toBeUndefined();
         expect((await run(['git', 'cat-file', '-e', batch.top! + ':member-file'], f.root)).code).not.toBe(0);
         expect(
           (
@@ -762,7 +869,6 @@ exec '${git}' "$@"
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(created)).toBe(true);
     expect(readFileSync(resolve(worktree, 'file'), 'utf8')).toBe('operator tracked edit\n');
-    expect(readState(member.path).solo).toBeUndefined();
     expect(readState(holder.path).batch!.members).toEqual([]);
   } finally {
     f.clean();

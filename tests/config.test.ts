@@ -17,12 +17,13 @@ test('config combines defaults and repo values, reports none, and recalculates w
     });
     const unset = await cli(f, ['config']);
     expect(unset.code).toBe(0);
-    expect(Bun.YAML.parse(unset.stdout)).toMatchObject({ max_active: 3 });
+    expect(Bun.YAML.parse(unset.stdout)).toMatchObject({ max_active: 3, batch_limit: 4 });
     yaml(resolve(f.root, 'issues/config.yaml'), {
       fix_rounds: 2,
       implement: 'inline',
       remote: 'upstream',
       default_branch: 'trunk',
+      batch_limit: 2,
       grounding: 'none',
     });
     await command(['git', 'update-ref', 'refs/remotes/upstream/trunk', 'HEAD'], f.root);
@@ -32,6 +33,7 @@ test('config combines defaults and repo values, reports none, and recalculates w
       max_active: 3,
       fix_rounds: 2,
       implement: 'inline',
+      batch_limit: 2,
       repo: 'repo',
       remote: 'upstream',
     });
@@ -60,6 +62,12 @@ test('config combines defaults and repo values, reports none, and recalculates w
     const badRepo = await cli(f, ['config']);
     expect(badRepo.code).not.toBe(0);
     expect(badRepo.stderr).toContain('max_active');
+    for (const value of [0, -1, 1.5]) {
+      yaml(resolve(f.root, 'issues/config.yaml'), { batch_limit: value, grounding: 'none' });
+      const badLimit = await cli(f, ['config']);
+      expect(badLimit.code).not.toBe(0);
+      expect(badLimit.stderr).toContain('batch_limit');
+    }
   } finally {
     f.clean();
   }
