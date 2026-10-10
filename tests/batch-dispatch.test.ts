@@ -969,6 +969,38 @@ test('empty untracked folders are removed before a solo merge prompt', async () 
   }
 }, 15000);
 
+test('unreadable ignored folders do not stop empty-folder cleanup before merge', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const worktree: string = z.string().parse(readState(holder.path).worktree);
+    await commitFile(f, holder.path, '.gitignore', '.env\n.cache/\nnode_modules/\n');
+    const ignored: string[] = [resolve(worktree, '.cache'), resolve(worktree, 'up/node_modules')];
+    for (const path of ignored) {
+      mkdirSync(path, { recursive: true });
+      writeFileSync(resolve(path, 'keep'), 'ignored content\n');
+    }
+    mkdirSync(resolve(worktree, 'empty'));
+    mkdirSync(resolve(worktree, 'up/empty-child'));
+    for (const path of ignored) chmodSync(path, 0);
+    try {
+      toMerge(holder.path, '2026-09-11T00:00:00.000Z');
+      saveDatabase(f, { ...database(f), prompts: [] });
+      expect((await command(['git', 'status', '--porcelain'], worktree)).trim()).toBe('');
+      expect((await next(f, ['--all'])).code).toBe(0);
+      expect(mergePrompts(f)).toEqual([expectedPrompt(holder.path, holder.b)]);
+      expect(existsSync(resolve(worktree, 'empty'))).toBe(false);
+      expect(existsSync(resolve(worktree, 'up/empty-child'))).toBe(false);
+      expect(existsSync(resolve(worktree, 'up'))).toBe(true);
+    } finally {
+      for (const path of ignored) chmodSync(path, 0o755);
+    }
+    for (const path of ignored) expect(readFileSync(resolve(path, 'keep'), 'utf8')).toBe('ignored content\n');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('a failed removal stops the merge prompt', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
