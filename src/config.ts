@@ -44,6 +44,7 @@ export const repoSchema = z
     direct: z.boolean().default(false),
     fix_rounds: z.number().int().positive().default(3),
     implement: z.enum(['subagents', 'inline']).default('subagents'),
+    batch_limit: z.number().int().positive().default(4),
     setup: text.optional(),
     checks: z.record(text, text).default({}),
     merge_checks: z.record(text, text).default({}),

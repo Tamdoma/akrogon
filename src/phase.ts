@@ -155,7 +155,6 @@ export async function commitMove(
         ? recorded.fix_rounds + 1
         : recorded.fix_rounds,
     merge_stamp: to === 'merge' ? new Date().toISOString() : recorded.merge_stamp,
-    solo: to === 'merge' ? recorded.solo : undefined,
     batch_limit: to === 'merge' ? recorded.batch_limit : undefined,
   };
   saveState(leaf.path, after);
@@ -690,15 +689,11 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
       if (batch?.attempt !== record.attempt || current.state.phase !== 'merge')
         throw new Error('Batch attempt superseded during restack');
       const entries: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
-      const entry: { member: BatchMember; leaf: Leaf } | undefined = entries.find(
-        (item) => item.member.slug === conflictedSlug,
-      );
       await restoreMembers(
         repo,
         entries.map((item) => ({ ...item.member, leaf: item.leaf })),
       );
       await restoreHolder(repo, current, batch);
-      if (entry !== undefined) saveState(entry.leaf.path, { ...entry.leaf.state, solo: true });
       members = batch.members.filter((member) => member.slug !== conflictedSlug);
       saveState(current.path, {
         ...current.state,
@@ -706,6 +701,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
           ...batch,
           holder: { base: builtOn, head: holderHead },
           members,
+          excluded: [...(batch.excluded ?? []), conflictedSlug],
           tested_top: undefined,
           tested_main: undefined,
           decision: 'rerun',

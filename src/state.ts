@@ -46,6 +46,7 @@ export const batchSchema = z.strictObject({
   built_on: z.string(),
   holder: z.strictObject({ base: z.string(), head: z.string() }),
   members: z.array(batchMemberSchema),
+  excluded: z.array(z.string()).optional(),
   top: z.string().optional(),
   tested_top: z.string().optional(),
   tested_main: z.string().optional(),
@@ -83,7 +84,6 @@ export const stateSchema = z
     failure: failureSchema.optional(),
     merge_stamp: z.string().optional(),
     batch: batchSchema.optional(),
-    solo: z.boolean().optional(),
     batch_limit: z.number().int().nonnegative().optional(),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
@@ -103,7 +103,7 @@ export function readState(path: string): State {
   return stateSchema.parse(
     parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
       ? Object.fromEntries(
-          Object.entries(parsed).filter(([key]) => key !== 'priority' && key !== 'slot' && key !== 'failed_notified'),
+          Object.entries(parsed).filter(([key]) => key !== 'priority' && key !== 'slot' && key !== 'failed_notified' && key !== 'solo'),
         )
       : parsed,
   );

@@ -807,11 +807,7 @@ async function restoreDrifted(repo: Repo, members: BatchMember[], leaves: Leaf[]
     const leaf: Leaf | undefined = leaves.find((item) => item.state.slug === member.slug);
     drifted.push({ ...member, leaf: worktreeLeaf(leaf) });
   }
-  const dirty: string[] = (await restoreMembers(repo, drifted)).dirty;
-  for (const slug of dirty) {
-    const leaf: Leaf | undefined = leaves.find((item) => item.state.slug === slug);
-    if (leaf !== undefined) saveState(leaf.path, { ...readState(leaf.path), solo: true });
-  }
+  await restoreMembers(repo, drifted);
 }
 
 async function worktreeDirty(repo: Repo, worktree: string | undefined): Promise<boolean> {
@@ -1057,8 +1053,7 @@ async function mergeTurn(
     if (!fixHeld)
       for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root))
         .slice(1)
-        .filter((entry) => fresh.state.solo !== true && entry.leaf.state.solo !== true)
-        .slice(0, fresh.state.batch_limit)) {
+        .slice(0, Math.min(repo.config.batch_limit - 1, fresh.state.batch_limit ?? Number.POSITIVE_INFINITY))) {
         const sha: string | undefined = await branchSha(repo, candidate.leaf.state.slug);
         const head: string = sha ?? builtOn;
         members.push({
@@ -1076,24 +1071,12 @@ async function mergeTurn(
       built_on: builtOn,
       holder: { base: await memberBase(repo, builtOn, holderHead), head: holderHead },
       members,
-      applied: fresh.state.solo === true,
-      solo: fresh.state.solo,
+      applied: false,
     };
     saveState(fresh.path, { ...fresh.state, batch: next });
     batch = next;
   });
   if (batch === undefined) return;
-  if (batch.solo === true) {
-    await dispatchMergeLeaf(
-      global,
-      repo,
-      { path: holder.path, state: readState(holder.path) },
-      invocation,
-      `attempt=${batch.attempt} solo`,
-      isAutomatic,
-    );
-    return;
-  }
   const holderHead: string = batch.holder.head;
   let current: Batch = batch;
   let built: Awaited<ReturnType<typeof buildStack>>;
@@ -1218,13 +1201,11 @@ async function mergeTurn(
       const leaves: Leaf[] = allLeaves(repo);
       const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
       if (fresh?.state.batch?.attempt !== current.attempt) return undefined;
-      const memberLeaf: Leaf | undefined = leaves.find((item) => item.state.slug === conflicted);
-      if (memberLeaf !== undefined && memberLeaf.state.solo !== true)
-        saveState(memberLeaf.path, { ...memberLeaf.state, solo: true });
       const updated: Batch = {
         ...fresh.state.batch,
         attempt: attemptId(),
         members: fresh.state.batch.members.filter((member) => member.slug !== conflicted),
+        excluded: [...(fresh.state.batch.excluded ?? []), conflicted],
       };
       saveState(fresh.path, { ...fresh.state, batch: updated });
       return updated;
