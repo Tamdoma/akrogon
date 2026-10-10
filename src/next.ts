@@ -949,7 +949,7 @@ async function reconcileBatch(
     );
     if (fresh !== undefined && batch.members.length > 0) await restoreHolder(repo, fresh, batch);
     if (fresh !== undefined) {
-      if (fresh.state.phase === 'merge' && batch.recorded !== true)
+      if ((fresh.state.phase === 'merge' || fresh.state.phase === 'failed') && batch.recorded !== true)
         appendAttempt(repo, holder.state.slug, batch, 'red');
       saveState(fresh.path, { ...fresh.state, batch: undefined });
     }
