@@ -783,3 +783,57 @@ test.serial('a malformed pressure file stops batch creation before any batch or 
     f.clean();
   }
 });
+
+test.serial('a decimal pressure total stops the ending call before any push or state change', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const batch: Batch = withStart(record, { cpu: 10, memory: 20, io: 30 });
+    saveBatch(holder.path, batch);
+    const dir: string = pressureDir(f, { cpu: '12.5', memory: '90', io: '180' });
+    const checked: Result = await spawn(
+      f,
+      'check',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir),
+      herdr.env,
+    );
+    expect(checked.code).toBe(0);
+    const before: State = readState(holder.path);
+    const tip: string = await remoteTip(f);
+    const merged: Result = await spawn(
+      f,
+      'merged',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      herdr.env,
+    );
+    expect(merged.code).not.toBe(0);
+    expect(merged.stderr).toContain(resolve(dir, 'cpu'));
+    expect(merged.stderr).toContain('total=');
+    expect(attemptLines(f)).toEqual([]);
+    expect(readState(holder.path)).toEqual(before);
+    expect(await remoteTip(f)).toBe(tip);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a decimal pressure total stops batch creation before any batch or line exists', async () => {
+  const f: Fixture = await fixture();
+  try {
+    process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const holderPath: string = leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
+    const dir: string = pressureDir(f, { cpu: '12.5', memory: '90', io: '180' });
+    const before: State = readState(holderPath);
+    const tip: string = await remoteTip(f);
+    const merged: Result = await spawn(f, 'create', mergePassBody, herdr.env, [dir]);
+    expect(merged.code).not.toBe(0);
+    expect(merged.stderr).toContain(resolve(dir, 'cpu'));
+    expect(merged.stderr).toContain('total=');
+    expect(readState(holderPath)).toEqual(before);
+    expect(await remoteTip(f)).toBe(tip);
+    expect(attemptLines(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
