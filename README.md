@@ -133,7 +133,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon init [--from <proposal.yaml>] [--toolkit <lang>=<runner>]` | Initialize or update repository setup. |
 | `akrogon config` | Print effective configuration. |
 | `akrogon preflight` | Verify the configured base remote branch and local tracking ref. |
-| `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>] [--check]` | Record a pass or declare a failure with its reason. Moves except failed refuse changed old test files without Test-Change trailers; src/test-files.ts defines the path rule. --check runs the move's guards without recording or moving and prints ok on success. Merge batch calls carry `--attempt <id>` from the prompt; stale ids are refused. |
+| `akrogon phase <slug> <phase> --slot <A\|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>] [--red-on-base <sha> --command <command>]` | Record a pass or declare a failure with its reason. Moves except failed refuse changed old test files without Test-Change trailers; src/test-files.ts defines the path rule. --check runs the move's guards without recording or moving and prints ok on success. Merge batch calls carry `--attempt <id>` from the prompt; stale ids are refused. A merge red on the base lands `check.fix --red-on-base <fetched-main-sha> --command <exact command>`, which holds the repo's merges until fetched main moves. |
 | `akrogon next [<slug>\|<path>\|--all\|--resume]` | Dispatch eligible work. |
 | `akrogon pull [--all]` | Import open GitHub issues as seeds. With --all, pull every registered repository from any directory. |
 | `akrogon close <owner/repo#n> --by <text>` | Close one unowned GitHub issue with a delivered-by note. |
@@ -143,6 +143,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon unpark <issue>... \| --all` | Restore whole issues to the open queue. |
 | `akrogon pause` | Pause automatic dispatch for the current repository. |
 | `akrogon unpause` | Resume automatic dispatch with one pass for the current repository. |
+| `akrogon unhold` | Clear a base-red merge hold for the current repository. |
 ```
 
 A normal starting point for CSV export is:
