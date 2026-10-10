@@ -60,7 +60,7 @@ As A, write `plan.md` under the `leaf=` folder with stable D1…Dn decisions, re
 
 plan.md maps each done-criterion to its proof command, the failure it catches, a size (seconds, minutes, hours or unknown) and a rerun trigger, and a slow-run leaf's plan names its restart boundaries.
 
-A plan proves the brief's done-criteria with the leaf's own tests and `checks` commands and adds no `merge_checks` or whole-suite requirement the brief does not name; a whole run the brief names stays.
+A plan proves the brief's done-criteria with the leaf's own tests and `checks` commands and adds no `merge_checks` or whole-suite requirement the brief does not name; a whole run the brief names stays; the one exception is A's `check.fix` pass after a red merge ending, which replays the exact rejected command.
 
 The synthesis resolves implementation choices without reopening locked scope; it contains acceptance criteria before implementation derives tests, preserves a real open limitation, and names a dependency only when execution actually requires ordering.
 
