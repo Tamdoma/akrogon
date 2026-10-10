@@ -4,26 +4,25 @@ import { homedir } from 'node:os';
 import { readGlobal, toolRoot, type GlobalConfig } from './config';
 import { command, quote } from './shell';
 
-type Link = { source: string; destination: string };
+export type Link = { source: string; destination: string };
 
-export async function install(): Promise<void> {
-  const global: GlobalConfig = readGlobal();
+export function planSkillLinks(home: string, sourceRoot: string): { links: Link[]; conflicts: Link[] } {
   const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
-  const skills: string[] = readdirSync(resolve(toolRoot, 'skills'), { withFileTypes: true })
+  const skills: string[] = readdirSync(resolve(sourceRoot, 'skills'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
   const links: Link[] = [
-    { source: resolve(toolRoot, 'src/akrogon.ts'), destination: resolve(homedir(), '.local/bin/akrogon') },
+    { source: resolve(sourceRoot, 'src/akrogon.ts'), destination: resolve(home, '.local/bin/akrogon') },
     ...roots.flatMap((root) =>
       skills.map((skill) => ({
-        source: resolve(toolRoot, 'skills', skill),
-        destination: resolve(homedir(), root, skill),
+        source: resolve(sourceRoot, 'skills', skill),
+        destination: resolve(home, root, skill),
       })),
     ),
   ];
-  const ownedPrefix: string = resolve(toolRoot, 'skills') + sep;
+  const ownedPrefix: string = resolve(sourceRoot, 'skills') + sep;
   for (const root of roots) {
-    const directory: string = resolve(homedir(), root);
+    const directory: string = resolve(home, root);
     if (!existsSync(directory)) continue;
     for (const entry of readdirSync(directory)) {
       const path: string = resolve(directory, entry);
@@ -39,15 +38,25 @@ export async function install(): Promise<void> {
       (!info.isSymbolicLink() || resolve(dirname(link.destination), readlinkSync(link.destination)) !== link.source)
     );
   });
-  if (conflicts.length > 0) {
-    for (const link of conflicts) console.error(`rm -r -- ${quote(link.destination)}`);
-    throw new Error('Install destinations conflict. Remove the listed paths before installing.');
-  }
+  return { links, conflicts };
+}
+
+export function applySkillLinks(links: Link[]): void {
   for (const link of links) {
     mkdirSync(dirname(link.destination), { recursive: true });
     if (lstatSync(link.destination, { throwIfNoEntry: false }) === undefined)
       symlinkSync(link.source, link.destination);
   }
+}
+
+export async function install(): Promise<void> {
+  const global: GlobalConfig = readGlobal();
+  const { links, conflicts }: { links: Link[]; conflicts: Link[] } = planSkillLinks(homedir(), toolRoot);
+  if (conflicts.length > 0) {
+    for (const link of conflicts) console.error(`rm -r -- ${quote(link.destination)}`);
+    throw new Error('Install destinations conflict. Remove the listed paths before installing.');
+  }
+  applySkillLinks(links);
   for (const kind of Object.keys(global.harnesses)) await command(['herdr', 'integration', 'install', kind]);
   await command(['herdr', 'plugin', 'link', resolve(toolRoot, 'plugin')]);
 }
