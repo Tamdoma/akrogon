@@ -12,7 +12,7 @@
 - `skills/implement-issue/SKILL.md` runs implementation and repair passes.
 - `skills/implement-issue/worker-protocol.md` defines worker scope and returns.
 - `skills/check-issue/SKILL.md` defines review evidence and Fix/Nit verdicts.
-- `skills/learn-issues/SKILL.md` triages active lessons: removes guarded lines, prints seed lines for checkable ones.
+- `skills/learn-issues/SKILL.md` triages active lessons not yet retired by a guard leaf: removes guarded lines, prints seed lines for checkable ones.
 - `skills/lesson-rule.md` holds the shared rule every lesson write site follows.
 - `skills/watch-issues/SKILL.md` runs the operator-started cron watch; `scripts/observe.ts` is its read-only inventory and `scripts/log-tail.ts` summarizes a seat's session log.
 

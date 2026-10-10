@@ -29,6 +29,7 @@
 - `akrogon config` composes a repo's `setup` key into every printed `checks`, `merge_checks` and `advisory` command as a `flock`ed `sh -c <setup> && sh -c <command>`.
 - A main-red merge ends in a repo hold (`held.yaml`) that `mergeTurn` checks after fetch and inside the batch lock; the hold's `fix` field names one leaf that takes the merge turn solo while the hold stands.
 - A leaf worktree's `.env` is a symlink to the registered checkout's file; dispatch refuses a real file, tracked path, foreign link or missing ignore rule.
+- `buildStack` removes resurrected retired lesson lines as a fixup commit on the stack top, and `merged --check` refuses a pushed range still holding one.
 
 ## See also
 
