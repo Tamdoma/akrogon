@@ -33,11 +33,11 @@ bun src/akrogon.ts install
 
 Installation links the command, skills and Herdr plugin. It also installs the configured harness integrations. If a destination conflicts with an existing file, installation stops and prints removal commands for you to review.
 
-The links point back to this checkout. Update it with:
+The links point back to this checkout, so this checkout is the program you run. Landed work deploys itself: after a merge lands, and on `akrogon next`, `next --all` and `next --resume` runs that select or cover the Akrogon repository, one step fetches the default branch, fast-forwards the checkout when it is strictly behind, runs `bun install --frozen-lockfile` and reconciles the skill links.
 
-```sh
-git pull
-```
+The step prints one line: `deployed <old>..<new>` on a fast-forward, `current <sha>` when already up to date, otherwise the failing step, the git or bun error, the lag count and the remedy. A failed step retries at the next trigger; nothing else changes.
+
+You still act when the line reports the checkout is on another branch or detached, ahead of or diverged from the remote (run `akrogon sync`), or blocked by an uncommitted edit that overlaps incoming changes (commit or finish that edit).
 
 Make sure your shell can find the command directory:
 
