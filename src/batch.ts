@@ -72,7 +72,10 @@ export async function buildStack(
       }
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
     }
-    const removed: string[] = await removeRetiredLessons(dir, builtOn, 'HEAD');
+    const leafRanges: { base: string; head: string }[] = [];
+    for (const item of items) leafRanges.push({ base: await memberBase(repo, builtOn, item.head), head: item.head });
+    leafRanges.push({ base: await memberBase(repo, builtOn, holderHead), head: holderHead });
+    const removed: string[] = await removeRetiredLessons(dir, builtOn, 'HEAD', leafRanges);
     if (removed.length > 0) {
       await command(['git', 'add', 'learnings/LESSONS.md'], dir);
       await command(['git', 'commit', '-m', 'lessons: retire applied lines'], dir);

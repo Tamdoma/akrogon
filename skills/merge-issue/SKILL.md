@@ -57,7 +57,7 @@ Same-line index conflicts retain both true entries and recheck pointers. An exis
 After the rebase resolves, B runs the re-removal one-liner, resolving the helper beside the installed akrogon entry point while operating in the target worktree, and commits the removal as its own scoped commit when the output lists removed histories; `merged --check` refuses a pushed range still holding a retired line.
 
 ```
-bun -e "const {mergeBase, removeRetiredLessons}=await import(process.argv[1]); const b=await mergeBase(process.cwd(),'<remote>/<default_branch>','HEAD'); const r=await removeRetiredLessons(process.cwd(),b,'HEAD'); console.log(r.length?r.join('\n'):'none')" "$(dirname "$(readlink -f "$(command -v akrogon)")")/lessons.ts"
+bun -e "const {mergeBase, removeRetiredLessons}=await import(process.argv[1]); const b=await mergeBase(process.cwd(),'<remote>/<default_branch>','HEAD'); const ob=await mergeBase(process.cwd(),'<remote>/<default_branch>','ORIG_HEAD'); const r=await removeRetiredLessons(process.cwd(),b,'HEAD',[{base:ob,head:'ORIG_HEAD'}]); console.log(r.length?r.join('\n'):'none')" "$(dirname "$(readlink -f "$(command -v akrogon)")")/lessons.ts"
 ```
 
 When the output lists removed histories (`none` means no removal): `git add learnings/LESSONS.md && git commit -m "lessons: retire applied lines"`.

@@ -426,7 +426,12 @@ async function batchCheck(
     await requireNoIssueFiles(repo, repo.root, leaf.path, record.built_on, head);
     await requireTestChangeCitations(repo, repo.root, record.built_on, head);
   }
-  const retired: string[] = await retiredLessonsPresent(worktree, record.built_on, head);
+  const leafRanges: { base: string; head: string }[] = record.members.map((member) => ({
+    base: member.base,
+    head: member.head,
+  }));
+  leafRanges.push({ base: record.holder.base, head: record.holder.head });
+  const retired: string[] = await retiredLessonsPresent(worktree, record.built_on, head, leafRanges);
   if (retired.length > 0)
     throw new Error(
       'Retired lesson lines present in push range: ' +
