@@ -41,6 +41,7 @@ import {
   withLock,
   type Batch,
   type BatchMember,
+  type Tool,
   type Leaf,
   type State,
 } from './state';
@@ -77,7 +78,7 @@ import {
   restoreMembers,
 } from './batch';
 import { commitMove, completeOwner } from './phase';
-import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
+import { appendAttempt, readPressure, resolveTools, type PressureSnapshot } from './attempts';
 import { sessionFile, deliveredAfter } from './session-file';
 import { heldFor, dropHeld, mergeHolder, type Hold } from './hold';
 import { readLog } from './log';
@@ -1088,6 +1089,7 @@ async function mergeTurn(
       }
     const holderSha: string | undefined = await branchSha(repo, holder.state.slug);
     const holderHead: string = holderSha ?? builtOn;
+    const tools: Tool[] | undefined = repo.config.tools.length > 0 ? await resolveTools(repo) : undefined;
     const next: Batch = {
       attempt: attemptId(),
       started: new Date().toISOString(),
@@ -1095,6 +1097,7 @@ async function mergeTurn(
       built_on: builtOn,
       holder: { base: await memberBase(repo, builtOn, holderHead), head: holderHead },
       members,
+      tools,
       applied: false,
     };
     saveState(fresh.path, { ...fresh.state, batch: next });

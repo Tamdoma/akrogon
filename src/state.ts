@@ -7,6 +7,7 @@ import { writeYaml } from './shell';
 import { issueFolders } from './park';
 
 const counts = z.object({ A: z.number().int().nonnegative().default(0), B: z.number().int().nonnegative().default(0) });
+const text = z.string().min(1);
 
 export const failureSchema = z.strictObject({
   cause: z.enum(['blocked', 'attempts']),
@@ -39,6 +40,10 @@ export const batchMemberSchema = z.strictObject({
   tip: z.string(),
 });
 
+export const toolSchema = z.strictObject({ name: text, path: text, version: text });
+
+export type Tool = z.infer<typeof toolSchema>;
+
 export const batchSchema = z.strictObject({
   attempt: z.string().min(1),
   started: z.iso.datetime().optional(),
@@ -54,6 +59,7 @@ export const batchSchema = z.strictObject({
   built_on: z.string(),
   holder: z.strictObject({ base: z.string(), head: z.string() }),
   members: z.array(batchMemberSchema),
+  tools: z.array(toolSchema).optional(),
   excluded: z.array(z.string()).optional(),
   top: z.string().optional(),
   tested_top: z.string().optional(),

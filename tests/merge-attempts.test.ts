@@ -2,10 +2,10 @@ import { test, expect, afterEach } from 'bun:test';
 import { z } from 'zod';
 import { dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { cli, fakeHerdr, fixture, leaf, leafTempRoot, type Fixture, type HerdrFixture } from './helpers';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cli, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture, type HerdrFixture } from './helpers';
 import { readRepo, type Repo } from '../src/config';
-import { readState, saveState, type Batch, type Leaf, type State } from '../src/state';
+import { readState, saveState, type Batch, type Leaf, type State, type Tool } from '../src/state';
 import { attemptRecordSchema } from '../src/attempts';
 import { logSchema } from '../src/log';
 import { command, type Result } from '../src/shell';
@@ -917,6 +917,83 @@ test.serial('a created batch preserves PSI counters through rerun then reuse', a
     expect(lines).toHaveLength(1);
     expect(lines[0].outcome).toBe('reuse');
     expect(lines[0].pressure).toEqual({ cpu: 10, memory: 20, io: 40 });
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a merge turn records declared tools on the batch and the attempt line', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const bin: string = resolve(f.home, 'bin');
+    writeFileSync(resolve(bin, 'tool-a'), '#!/bin/sh\necho tool-a 1.2.3\n');
+    chmodSync(resolve(bin, 'tool-a'), 0o755);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      tools: ['tool-a'],
+    });
+    const holderPath: string = leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
+    const next: Result = await cli(f, ['next'], f.root, herdr.env);
+    expect(next.code).toBe(0);
+    const tools: Tool[] = [{ name: 'tool-a', path: resolve(bin, 'tool-a'), version: 'tool-a 1.2.3' }];
+    const attempt: string = z.string().parse(readState(holderPath).batch?.attempt);
+    expect(readState(holderPath).batch?.tools).toEqual(tools);
+    const red: Result = await cli(
+      f,
+      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', attempt],
+      f.root,
+      herdr.env,
+    );
+    expect(red.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('red');
+    expect(lines[0].tools).toEqual(tools);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a declared tool absent from PATH fails the dispatch before any batch record', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const herdr: HerdrFixture = fakeHerdr(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      tools: ['ghost-tool'],
+    });
+    const holderPath: string = leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
+    const next: Result = await cli(f, ['next'], f.root, herdr.env);
+    expect(next.code).not.toBe(0);
+    expect(next.stderr).toContain('which');
+    expect(next.stderr).toContain('ghost-tool');
+    expect(readState(holderPath).batch).toBeUndefined();
+    expect(attemptLines(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a stored tools list lands on the solo red line', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await soloFixture(f);
+    const tools: Tool[] = [{ name: 'tool-a', path: '/bin/tool-a', version: 'tool-a 1.2.3' }];
+    saveBatch(holder.path, { ...record, tools });
+    const red: Result = await cli(
+      f,
+      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(red.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('red');
+    expect(lines[0].tools).toEqual(tools);
   } finally {
     f.clean();
   }

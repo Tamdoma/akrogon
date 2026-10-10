@@ -2,7 +2,8 @@ import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { type Repo } from './config';
-import { type Batch } from './state';
+import { command, run } from './shell';
+import { toolSchema, type Batch, type Tool } from './state';
 
 export const attemptOutcomeSchema = z.enum(['merged', 'red', 'split', 'held', 'reuse', 'ejected']);
 export type Outcome = z.infer<typeof attemptOutcomeSchema>;
@@ -42,7 +43,19 @@ export const attemptRecordSchema = z.object({
       io: z.number().int().nonnegative(),
     })
     .optional(),
+  tools: z.array(toolSchema).optional(),
 });
+
+export async function resolveTools(repo: Repo): Promise<Tool[]> {
+  return Promise.all(
+    repo.config.tools.map(async (name): Promise<Tool> => {
+      const path: string = await command(['which', name]);
+      const probe: Awaited<ReturnType<typeof run>> = await run([name, '--version']);
+      const first: string = (probe.stdout !== '' ? probe.stdout : probe.stderr).split('\n', 1)[0];
+      return { name, path, version: probe.code === 0 && first !== '' ? first : 'unknown' };
+    }),
+  );
+}
 
 export function appendAttempt(
   repo: Repo,
@@ -63,6 +76,7 @@ export function appendAttempt(
     culprit,
     start: batch.started,
     end: new Date().toISOString(),
+    tools: batch.tools,
     pressure:
       batch.pressure_start !== undefined && end !== undefined && end.boot_id === batch.pressure_start.boot_id
         ? {

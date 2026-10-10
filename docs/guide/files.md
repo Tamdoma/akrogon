@@ -69,6 +69,7 @@ Each line carries:
 - `start` is the batch creation time; it is absent on batches created before this field existed.
 - `end` is the attempt end time.
 - `pressure` holds cpu, memory and io stall in integer microseconds (the `some` `total=` increase over the attempt); it is absent when the batch predates this field, the host has no `/proc/pressure`, or the host rebooted mid-attempt.
+- `tools` lists the repo's declared `tools:` as `{name, path, version}` resolved once when the merge batch is dispatched; it is absent on lines predating this field and when the repo declares no tools.
 
 The command writes `merged`, `red`, `split`, `held`, `reuse` and `ejected` now.
 
