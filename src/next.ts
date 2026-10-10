@@ -4,15 +4,17 @@ import {
   lstatSync,
   mkdirSync,
   readdirSync,
-  readlinkSync,
+  readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
-  symlinkSync,
+  writeFileSync,
   type Dirent,
 } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
+import { parseEnv } from 'node:util';
 import { z } from 'zod';
 import { parse } from 'shell-quote';
 import {
@@ -306,7 +308,7 @@ export async function createSparseWorktree(
   }
 }
 
-async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
+async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<State> {
   const path: string = resolve(worktreeStore(repo), leaf.state.slug);
   if (leaf.state.worktree !== undefined && leaf.state.worktree !== path)
     throw new Error(
@@ -332,35 +334,43 @@ async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
       branch: branch.code === 0 ? undefined : leaf.state.slug,
     });
   }
-  await linkEnv(repo, path);
-  const state: State = { ...leaf.state, worktree: path };
+  const wrote: boolean = await writeLeafEnv(repo, path, live);
+  const state: State = {
+    ...leaf.state,
+    worktree: path,
+    env_names: wrote ? repo.config.env : leaf.state.env_names,
+    env_generation:
+      wrote && leaf.state.worktree !== undefined ? leaf.state.env_generation + 1 : leaf.state.env_generation,
+  };
   saveState(leaf.path, state);
   return state;
 }
 
-async function linkEnv(repo: Repo, worktree: string): Promise<void> {
-  const target: string = resolve(repo.root, '.env');
+async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promise<boolean> {
   const link: string = resolve(worktree, '.env');
   const tracked: Result = await run(['git', 'ls-files', '--error-unmatch', '.env'], worktree);
-  if (tracked.code === 0) throw new Error(`Refusing .env link at ${link}: path is tracked by git`);
+  if (tracked.code === 0) throw new Error(`Refusing .env write at ${link}: path is tracked by git`);
   if (tracked.code !== 1) throw new CommandError(['git', 'ls-files', '--error-unmatch', '.env'], worktree, tracked);
   const ignored: Result = await run(['git', 'check-ignore', '-q', '.env'], worktree);
-  if (ignored.code === 1) throw new Error(`Refusing .env link at ${link}: path is not ignored by git`);
+  if (ignored.code === 1) throw new Error(`Refusing .env write at ${link}: path is not ignored by git`);
   if (ignored.code !== 0) throw new CommandError(['git', 'check-ignore', '-q', '.env'], worktree, ignored);
   const ignoredAtRoot: Result = await run(['git', 'check-ignore', '-q', '.env'], repo.root);
   if (ignoredAtRoot.code === 1)
-    throw new Error(`Refusing .env link at ${link}: path is not ignored in the registered checkout ${repo.root}`);
+    throw new Error(`Refusing .env write at ${link}: path is not ignored in the registered checkout ${repo.root}`);
   if (ignoredAtRoot.code !== 0) throw new CommandError(['git', 'check-ignore', '-q', '.env'], repo.root, ignoredAtRoot);
-  let stats: ReturnType<typeof lstatSync>;
-  try {
-    stats = lstatSync(link);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    symlinkSync(target, link);
-    return;
-  }
-  if (stats.isSymbolicLink() && readlinkSync(link) === target) return;
-  throw new Error(`Refusing .env link at ${link}: path exists and does not already link to ${target}`);
+  if (live) return false;
+  const root: string = resolve(repo.root, '.env');
+  const parsed: Record<string, string | undefined> = existsSync(root) ? parseEnv(readFileSync(root, 'utf8')) : {};
+  const missing: string[] = repo.config.env.filter((name) => parsed[name] === undefined);
+  if (missing.length > 0)
+    throw new Error(`Refusing .env write at ${link}: missing declared names in ${root}: ${missing.join(', ')}`);
+  const declared: string[] = repo.config.env.map((name) => `${name}=${JSON.stringify(parsed[name]!)}`);
+  const content: string = declared.length > 0 ? declared.join('\n') + '\n' : '';
+  const gitDir: string = resolve(worktree, await command(['git', 'rev-parse', '--git-dir'], worktree));
+  const temp: string = resolve(gitDir, `akrogon-env-${process.pid}`);
+  writeFileSync(temp, content, { mode: 0o600 });
+  renameSync(temp, link);
+  return true;
 }
 
 async function activeCount(global: GlobalConfig, invocation: Invocation): Promise<number> {
@@ -396,7 +406,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     const total: number = await activeCount(global, invocation);
     if (total >= global.max_active) return null;
   }
-  const state: State = await ensureWorktree(repo, leaf);
+  const state: State = await ensureWorktree(repo, leaf, matches.length === 1);
   const scratch: string = leafTemp(repo, state.slug);
   function ensurePrivateDir(path: string): void {
     function validate(): void {

@@ -64,6 +64,8 @@ for (const area of ['open', 'closed', 'parked']) {
           verdict: { A: 'fix', B: 'nits' },
           tab: 'tab',
           worktree: '/worktree',
+          env_names: [],
+          env_generation: 0,
           pane: { A: 'pane-a', B: 'pane-b' },
           prompted: { B: 'session-b' },
           prompted_at: { B: '2026-09-10T10:00:00Z' },

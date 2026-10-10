@@ -91,6 +91,8 @@ export const stateSchema = z
     verdict: z.object({ A: verdictSchema.optional(), B: verdictSchema.optional() }).default({}),
     tab: z.string().min(1).optional(),
     worktree: z.string().min(1).optional(),
+    env_names: z.array(z.string()).default([]),
+    env_generation: z.number().int().nonnegative().default(0),
     pane: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
     prompted: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
     prompted_at: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),

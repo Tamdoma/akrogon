@@ -44,7 +44,7 @@ Proof order applies at implement end and after every check.fix repair. A slow ru
 
 A never opens, prints, appends to, or writes `.env` or `.env.*` with any tool; declared checks and live operations consume values only inside a run process such as `bun --env-file=<holder file> <script>` printing results, never values, and presence is checked with the `Missing:` lines of `akrogon status <slug>`, where absent or empty counts as missing, ending the pass with the stop above when a required value is absent.
 
-A producer's key is saved only through the operation recorded in `produces[].save` (entry point, inspected revision, non-secret `args`, key `name`, `holder` repo's real file, private `value_source`): the value passes privately, writes the `holder` repo's real `.env` file and never the worktree link, never returns through seat arguments, output or artifacts, and the new key is revoked when saving fails.
+A producer's key is saved only through the operation recorded in `produces[].save` (entry point, inspected revision, non-secret `args`, key `name`, `holder` repo's real file, private `value_source`): the value passes privately, writes the `holder` repo's real `.env` file and never the worktree `.env`, never returns through seat arguments, output or artifacts, and the new key is revoked when saving fails.
 
 A reuses `grants[]` for probes, implementation, repairs, reruns, merge checks and cleanup without asking again; before mutating it compares operation, target and identity with the grant, records the grant reference, results and created IDs in its pass artifact, never widens it, and treats anything outside it as an operator blocker under the stop rule.
 
