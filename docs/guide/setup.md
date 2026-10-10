@@ -61,10 +61,12 @@ Check these choices:
 - **batch_limit** (integer at least 1, default 4) caps the whole merge batch including the holder.
 - **slots** optionally replaces a machine seat for this repo — a full {harness, model, effort} per seat (a or b); it applies at the next agent start.
 - **setup** optionally runs before your checks, usually to install dependencies.
+- **env** lists environment variable names copied into each check command's constructed environment; a name that is unset stays unset.
+- **tools** lists PATH tools resolved at merge dispatch and recorded on merge attempts.
 
 Check commands must not read tracked files under `issues/` (except `issues/config.yaml`, the check list itself) or `learnings/` — a green batch run is reused when only those folders moved on the default branch.
 
-`setup` runs before every `checks`, `merge_checks` and `advisory` command that `akrogon config` prints. It runs under a per-worktree lock kept under the git dir, so the lock never shows in `git status` and is removed with the worktree. The setup skill proposes it only when a lockfile is committed.
+`setup` runs before every `checks`, `merge_checks` and `advisory` command that `akrogon config` prints. It runs under a per-worktree lock kept under the git dir, so the lock never shows in `git status` and is removed with the worktree. The setup skill proposes it only when a lockfile is committed. Every printed check command runs under `akrogon run-check`, which refuses forbidden caller environment (`NODE_PATH`, `BUN_OPTIONS`, `BUN_INSTALL_CACHE_DIR`, `FFMPEG_BIN`, `CHROME_PATH`, `CDP_BROWSER_BINARY`, a global bunfig) and runs the command in a constructed environment.
 
 Use the effective configuration to check the result:
 

@@ -19,6 +19,8 @@ import { readState, saveState, type Batch, type Leaf, type State } from '../src/
 import { command, run, type Result } from '../src/shell';
 import { applyStack, buildStack } from '../src/batch';
 
+const runCheckInner = (printed: string): string => printed.replace(/^akrogon run-check --name \S+ -- /, '');
+
 test.serial('restack preserves a retirement when an unrelated member predates the lesson', async () => {
   const f: Fixture = await fixture();
   try {
@@ -846,7 +848,7 @@ test.serial(
       const composed: string = z
         .object({ checks: z.record(z.string(), z.string()) })
         .parse(Bun.YAML.parse(config.stdout)).checks.versions;
-      const onTop: Result = await run(['sh', '-c', composed], holder.state.worktree!);
+      const onTop: Result = await run(['sh', '-c', runCheckInner(composed)], holder.state.worktree!);
       expect(onTop.stdout.split('\n').slice(-2)).toEqual(['1.0.0', '2.0.0']);
       expect(onTop.code).toBe(0);
       const red: Result = await cli(
@@ -859,14 +861,14 @@ test.serial(
       expect(red.stdout).toBe('batch split, holder keeps 0 of 1 members');
       const memberWorktree: string = z.string().parse(readState(members[0].path).worktree);
       rmSync(resolve(memberWorktree, 'node_modules'), { recursive: true, force: true });
-      const onMember: Result = await run(['sh', '-c', composed], memberWorktree);
+      const onMember: Result = await run(['sh', '-c', runCheckInner(composed)], memberWorktree);
       expect(onMember.stdout.split('\n').slice(-2)).toEqual(['1.0.0', '2.0.0']);
       expect(onMember.code).toBe(0);
       // The restored holder carries the base lockfile only: extra is absent from it and
       // cannot be resolved once the stale install is gone.
       rmSync(resolve(holder.state.worktree!, 'node_modules'), { recursive: true, force: true });
       expect(readFileSync(resolve(holder.state.worktree!, 'bun.lock'), 'utf8')).not.toContain('extra');
-      const onHolder: Result = await run(['sh', '-c', composed], holder.state.worktree!);
+      const onHolder: Result = await run(['sh', '-c', runCheckInner(composed)], holder.state.worktree!);
       expect(onHolder.code).not.toBe(0);
     } finally {
       f.clean();

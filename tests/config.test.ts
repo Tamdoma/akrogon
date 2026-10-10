@@ -1,9 +1,23 @@
 import { test, expect } from 'bun:test';
-import { isAbsolute, resolve } from 'node:path';
+import { basename, isAbsolute, resolve, sep } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
-import { command, run, type Result } from '../src/shell';
-import { SeatIndexError, readGlobal, readRepo, seats, type GlobalConfig, type Repo } from '../src/config';
+import { command, quote, run, type Result } from '../src/shell';
+import {
+  SeatIndexError,
+  leafTemp,
+  readGlobal,
+  readRepo,
+  repoSchema,
+  seats,
+  type GlobalConfig,
+  type Repo,
+} from '../src/config';
+
+const runCheck = (name: string, inner: string): string => `akrogon run-check --name ${name} -- sh -c ${quote(inner)}`;
+
+const runCheckInner = (printed: string): string => printed.replace(/^akrogon run-check --name \S+ -- /, '');
 
 test('config combines defaults and repo values, reports none, and recalculates worktree base', async () => {
   const f: Fixture = await fixture();
@@ -303,8 +317,8 @@ test('config reports merge_checks separately from checks', async () => {
     const result = await cli(f, ['config']);
     expect(result.code).toBe(0);
     expect(Bun.YAML.parse(result.stdout)).toMatchObject({
-      checks: { test: 'bun test' },
-      merge_checks: { full: 'bun run verify' },
+      checks: { test: runCheck('test', 'bun test') },
+      merge_checks: { full: runCheck('full', 'bun run verify') },
     });
   } finally {
     f.clean();
@@ -379,9 +393,9 @@ test('config composes setup into printed checks, merge_checks and advisory ident
     const atRoot = Bun.YAML.parse((await cli(f, ['config'])).stdout) as Printed;
     expect(atRoot).toMatchObject({
       setup: 'bun install --frozen-lockfile',
-      checks: { t: composed('bun test') },
-      merge_checks: { m: composed('bun run verify') },
-      advisory: [composed('bun run lint')],
+      checks: { t: runCheck('t', composed('bun test')) },
+      merge_checks: { m: runCheck('m', composed('bun run verify')) },
+      advisory: [runCheck('advisory-0', composed('bun run lint'))],
     });
     const worktree: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
@@ -396,9 +410,9 @@ test('config composes setup into printed checks, merge_checks and advisory ident
       grounding: 'none',
     });
     expect(Bun.YAML.parse((await cli(f, ['config'])).stdout)).toMatchObject({
-      checks: { t: 'bun test' },
-      merge_checks: { m: 'bun run verify' },
-      advisory: ['bun run lint'],
+      checks: { t: runCheck('t', 'bun test') },
+      merge_checks: { m: runCheck('m', 'bun run verify') },
+      advisory: [runCheck('advisory-0', 'bun run lint')],
     });
   } finally {
     f.clean();
@@ -418,7 +432,7 @@ test('config printed check installs into a fresh worktree without a separate ins
     const printed: string = (
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
     ).checks.resolve;
-    const result: Result = await run(['sh', '-c', printed], worktree);
+    const result: Result = await run(['sh', '-c', runCheckInner(printed)], worktree);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain(`${worktree}/node_modules/widget/`);
   } finally {
@@ -452,7 +466,7 @@ test('config printed check resolves the worktree lockfile version over the root 
     const printed: string = (
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
     ).checks.version;
-    const result: Result = await run(['sh', '-c', printed], worktree);
+    const result: Result = await run(['sh', '-c', runCheckInner(printed)], worktree);
     expect(result.code).toBe(0);
     expect(result.stdout.split('\n')).toContain('2.0.0');
     expect(result.stdout).toContain(`${worktree}/node_modules/`);
@@ -476,7 +490,7 @@ test('config printed checks run concurrently in one worktree and leave it clean'
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
     ).checks;
     const results: Result[] = await Promise.all(
-      Object.values(checks).map((printed: string) => run(['sh', '-c', printed], worktree)),
+      Object.values(checks).map((printed: string) => run(['sh', '-c', runCheckInner(printed)], worktree)),
     );
     expect(results.map((result: Result) => result.code)).toEqual([0, 0, 0, 0]);
     expect(await command(['git', 'status', '--porcelain'], worktree)).toBe('');
@@ -507,7 +521,7 @@ test('config printed check skips both sides of a || b when the frozen lockfile m
     const printed: string = (
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
     ).checks.either;
-    const result: Result = await run(['sh', '-c', printed], worktree);
+    const result: Result = await run(['sh', '-c', runCheckInner(printed)], worktree);
     expect(result.code).not.toBe(0);
     expect(result.stderr.toLowerCase()).toContain('lockfile');
     expect(existsSync(resolve(f.home, 'a'))).toBe(false);
@@ -531,7 +545,7 @@ test('config runs all of setup inside the install lock', async () => {
     const printed: string = (
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
     ).checks.ok;
-    const result: Result = await run(['sh', '-c', printed], worktree);
+    const result: Result = await run(['sh', '-c', runCheckInner(printed)], worktree);
     expect(result.code).toBe(0);
     expect(existsSync(marker)).toBe(true);
   } finally {
@@ -769,5 +783,59 @@ test('config leaves merge_covers unwrapped when setup is set', async () => {
     expect(parsed.checks.keep).toContain('flock');
   } finally {
     f.clean();
+  }
+});
+
+test('config accepts env and tools lists and refuses bad and reserved env names', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = resolve(f.root, 'issues/config.yaml');
+    yaml(path, { grounding: 'none' });
+    expect(Bun.YAML.parse((await cli(f, ['config'])).stdout)).toMatchObject({ env: [], tools: [] });
+    yaml(path, { grounding: 'none', env: ['API_KEY', '_TOKEN'], tools: ['ffmpeg'] });
+    const set = await cli(f, ['config']);
+    expect(set.code).toBe(0);
+    expect(Bun.YAML.parse(set.stdout)).toMatchObject({ env: ['API_KEY', '_TOKEN'], tools: ['ffmpeg'] });
+    for (const name of ['api_key', '9LIVES', 'HAS-DASH']) {
+      yaml(path, { grounding: 'none', env: [name] });
+      const bad = await cli(f, ['config']);
+      expect(bad.code).not.toBe(0);
+      expect(bad.stderr).toContain('env');
+      expect(bad.stderr).toContain(name);
+    }
+    for (const name of [
+      'TMPDIR',
+      'AKROGON_BASE',
+      'NODE_PATH',
+      'BUN_OPTIONS',
+      'BUN_INSTALL_CACHE_DIR',
+      'FFMPEG_BIN',
+      'CHROME_PATH',
+      'CDP_BROWSER_BINARY',
+    ]) {
+      yaml(path, { grounding: 'none', env: [name] });
+      const reserved = await cli(f, ['config']);
+      expect(reserved.code).not.toBe(0);
+      expect(reserved.stderr).toContain('env');
+      expect(reserved.stderr).toContain(name);
+    }
+  } finally {
+    f.clean();
+  }
+});
+
+test('leafTemp defaults to the home scratch root and keeps the override', () => {
+  const previous: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
+  const repo: Repo = { name: 'repo', root: '/r', config: repoSchema.parse({ grounding: 'none' }) };
+  try {
+    delete process.env.AKROGON_LEAF_TEMP_ROOT;
+    const path: string = leafTemp(repo, 'long-slug');
+    expect(path.startsWith(resolve(homedir(), '.akrogon/scratch/repo') + sep)).toBe(true);
+    expect(basename(path)).toMatch(/^long-slug-[0-9a-f]{12}$/);
+    process.env.AKROGON_LEAF_TEMP_ROOT = '/x/leaf-temp';
+    expect(leafTemp(repo, 's').startsWith('/x/leaf-temp/')).toBe(true);
+  } finally {
+    if (previous === undefined) delete process.env.AKROGON_LEAF_TEMP_ROOT;
+    else process.env.AKROGON_LEAF_TEMP_ROOT = previous;
   }
 });

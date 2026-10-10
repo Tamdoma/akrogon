@@ -50,6 +50,8 @@ export const repoSchema = z
     merge_checks: z.record(text, text).default({}),
     merge_covers: z.array(text).default([]),
     advisory: z.array(text).default([]),
+    env: z.array(text).default([]),
+    tools: z.array(text).default([]),
     grounding: z.union([
       z.literal('none'),
       z.object({
@@ -63,6 +65,22 @@ export const repoSchema = z
     slots: z.strictObject({ a: slotConfigSchema.optional(), b: slotConfigSchema.optional() }).optional(),
   })
   .superRefine((config, ctx) => {
+    const constructed: Set<string> = new Set([
+      'TMPDIR',
+      'AKROGON_BASE',
+      'NODE_PATH',
+      'BUN_OPTIONS',
+      'BUN_INSTALL_CACHE_DIR',
+      'FFMPEG_BIN',
+      'CHROME_PATH',
+      'CDP_BROWSER_BINARY',
+    ]);
+    const envName: RegExp = /^[A-Z_][A-Z0-9_]*$/;
+    for (const name of config.env) {
+      if (!envName.test(name)) ctx.addIssue({ code: 'custom', path: ['env'], message: `Invalid env entry: ${name}` });
+      else if (constructed.has(name))
+        ctx.addIssue({ code: 'custom', path: ['env'], message: `Reserved env entry: ${name}` });
+    }
     for (const name of config.merge_covers) {
       if (!Object.hasOwn(config.checks, name))
         ctx.addIssue({
@@ -237,7 +255,7 @@ export function leafTemp(repo: Repo, slug: string): string {
   const override: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
   if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
     throw new Error(`Invalid AKROGON_LEAF_TEMP_ROOT: must be a non-blank absolute path`);
-  const root: string = override ?? `/tmp/akrogon-${process.getuid!()}`;
+  const root: string = override ?? resolve(homedir(), '.akrogon/scratch', repo.name);
   const hex: string = createHash('sha256')
     .update(repo.root + '\n' + slug)
     .digest('hex')
@@ -254,17 +272,20 @@ export async function base(repo: Repo, cwd: string): Promise<string> {
 }
 
 export function withSetup(config: RepoConfig): RepoConfig {
-  if (config.setup === undefined) return config;
-  const setup: string = config.setup;
-  const wrap = (cmd: string): string =>
-    `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(setup)} && sh -c ${quote(cmd)}`;
+  const setup: string | undefined = config.setup;
+  const inner = (cmd: string): string =>
+    setup === undefined
+      ? cmd
+      : `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(setup)} && sh -c ${quote(cmd)}`;
+  const runCheck = (name: string, cmd: string): string =>
+    `akrogon run-check --name ${name} -- sh -c ${quote(inner(cmd))}`;
   const map = (record: Record<string, string>): Record<string, string> =>
-    Object.fromEntries(Object.entries(record).map(([k, v]): [string, string] => [k, wrap(v)]));
+    Object.fromEntries(Object.entries(record).map(([k, v]): [string, string] => [k, runCheck(k, v)]));
   return {
     ...config,
     checks: map(config.checks),
     merge_checks: map(config.merge_checks),
-    advisory: config.advisory.map(wrap),
+    advisory: config.advisory.map((cmd, i): string => runCheck(`advisory-${i}`, cmd)),
   };
 }
 

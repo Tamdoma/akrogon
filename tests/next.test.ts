@@ -16,7 +16,7 @@ import {
   mkdtempSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import {
   fixture,
   cli,
@@ -3853,7 +3853,7 @@ test('allocation carries TMPDIR corrects permissive owned dirs to 0700', async (
     f.clean();
   }
 }, 15000);
-test('leaf temp path bounds stay short with mocked uid', async () => {
+test('leaf temp path bounds stay short under the home scratch root', async () => {
   const f: Fixture = await fixture();
   try {
     const slug: string = 'a'.repeat(200);
@@ -3862,7 +3862,6 @@ test('leaf temp path bounds stay short with mocked uid', async () => {
     const configPath: string = resolve(import.meta.dir, '../src/config.ts');
     const code: string =
       'delete process.env.AKROGON_LEAF_TEMP_ROOT; ' +
-      'process.getuid = () => 1234567890; ' +
       'const { leafTemp } = await import(' +
       JSON.stringify(configPath) +
       '); ' +
@@ -3898,10 +3897,10 @@ test('leaf temp path bounds stay short with mocked uid', async () => {
     expect(stderr.trim()).toBe('');
     expect(exited).toBe(0);
     const out: { p1: string; p2: string; len: number; base: string; prefix: string } = JSON.parse(stdout.trim());
-    expect(out.len).toBeLessThanOrEqual(62);
+    expect(Buffer.byteLength(out.base)).toBeLessThanOrEqual(33);
     expect(out.base.startsWith(out.prefix)).toBe(true);
     expect(out.p1).not.toBe(out.p2);
-    expect(out.p1.startsWith('/tmp/akrogon-1234567890/')).toBe(true);
+    expect(out.p1.startsWith(`${homedir()}/.akrogon/scratch/repo/`)).toBe(true);
     expect(existsSync(out.p1)).toBe(false);
     expect(existsSync(out.p2)).toBe(false);
     expect(existsSync(leafTempRoot(f))).toBe(false);
