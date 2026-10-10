@@ -4365,22 +4365,52 @@ test('a dispatched .env file preserves spaced assignments, multiline values and 
   }
 }, 15000);
 
-test('next refuses a declared value that cannot be written as dotenv', async () => {
+test('a dispatched .env file round-trips mixed quotes, backticks and escape-looking text', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_QUOTES=a\'b"c\n');
+    const root: string = resolve(f.root, '.env');
+    writeFileSync(
+      root,
+      'SYNTHETIC_MIXED=a\'b"c\n' +
+        'SYNTHETIC_TICK=`literal`\n' +
+        "SYNTHETIC_BS='a\\\\nb'\n" +
+        'SYNTHETIC_ESC="x\\ry"\n',
+    );
     yaml(resolve(f.root, 'issues/config.yaml'), {
       checks: { test: 'bun test' },
       grounding: 'none',
-      env: ['SYNTHETIC_QUOTES'],
+      env: ['SYNTHETIC_MIXED', 'SYNTHETIC_TICK', 'SYNTHETIC_BS', 'SYNTHETIC_ESC'],
+    });
+    leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const copied: Record<string, string | undefined> = parseEnv(readFileSync(envFile, 'utf8'));
+    const original: Record<string, string | undefined> = parseEnv(readFileSync(root, 'utf8'));
+    for (const name of ['SYNTHETIC_MIXED', 'SYNTHETIC_TICK', 'SYNTHETIC_BS', 'SYNTHETIC_ESC'])
+      expect(copied[name]).toBe(original[name]);
+    expect(copied.SYNTHETIC_MIXED).toBe('a\'b"c');
+    expect(copied.SYNTHETIC_TICK).toBe('literal');
+    expect(copied.SYNTHETIC_ESC).toBe('x\ry');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next refuses a declared value that cannot be written as dotenv', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_HARD="a\\r\\"b"\n');
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      env: ['SYNTHETIC_HARD'],
     });
     const path: string = leaf(f, 'build', 'plan.synthesis');
     const result: Result = await next(f, ['build']);
     expect(result.code).not.toBe(0);
     const error: string = skips(result)[0].error;
     expect(error).toContain('unwritable declared values');
-    expect(error).toContain('SYNTHETIC_QUOTES');
-    expect(error).not.toContain('a\'b"c');
+    expect(error).toContain('SYNTHETIC_HARD');
     expect(() => lstatSync(resolve(f.root, 'issues/worktrees/build/.env'))).toThrow(/ENOENT/);
   } finally {
     f.clean();
