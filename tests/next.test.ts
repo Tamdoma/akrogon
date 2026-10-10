@@ -30,6 +30,7 @@ import {
   type Fixture,
 } from './helpers';
 import { readState, saveState, type State } from '../src/state';
+import { parseEnv } from 'node:util';
 import { command, run, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import type { Database } from './fake-herdr';
@@ -4298,10 +4299,30 @@ test('a dispatched worktree gets a real .env file with the declared subset', asy
     const envFile: string = resolve(storeDir(f), 'build/.env');
     expect(lstatSync(envFile).isFile()).toBe(true);
     expect(statSync(envFile).mode & 0o777).toBe(0o600);
-    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="1"\nSYNTHETIC_TWO="two words"\n');
+    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\nSYNTHETIC_TWO=two words\n');
     const state: State = readState(path);
     expect(state.env_names).toEqual(['SYNTHETIC_ONE', 'SYNTHETIC_TWO']);
     expect(state.env_generation).toBe(0);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a dispatched .env file round-trips quotes and backslashes through dotenv parsing', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_QUOTE=' + "'has\"quote'" + '\nSYNTHETIC_PATH=' + "'path\\\\segment'" + '\n');
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      env: ['SYNTHETIC_QUOTE', 'SYNTHETIC_PATH'],
+    });
+    leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const copied: Record<string, string | undefined> = parseEnv(readFileSync(envFile, 'utf8'));
+    expect(copied.SYNTHETIC_QUOTE).toBe('has"quote');
+    expect(copied.SYNTHETIC_PATH).toBe('path\\segment');
   } finally {
     f.clean();
   }
