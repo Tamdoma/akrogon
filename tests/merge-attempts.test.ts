@@ -173,6 +173,97 @@ async function advanceRemote(f: Fixture, files: Record<string, string>): Promise
   }
 }
 
+function psiFile(total: string): string {
+  return 'some avg10=0.00 avg60=0.00 avg300=0.00 total=' + total + '\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n';
+}
+
+function pressureDir(
+  f: Fixture,
+  totals: { cpu: string; memory: string; io: string },
+  bootId: string = 'boot-1',
+): string {
+  const dir: string = resolve(f.home, 'psi/proc/pressure');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, 'cpu'), psiFile(totals.cpu));
+  writeFileSync(resolve(dir, 'memory'), psiFile(totals.memory));
+  writeFileSync(resolve(dir, 'io'), psiFile(totals.io));
+  const boot: string = resolve(f.home, 'psi/proc/sys/kernel/random');
+  mkdirSync(boot, { recursive: true });
+  writeFileSync(resolve(boot, 'boot_id'), bootId + '\n');
+  return dir;
+}
+
+function withStart(
+  record: Batch,
+  start: { cpu: number; memory: number; io: number },
+  bootId: string = 'boot-1',
+): Batch {
+  return { ...record, pressure_start: { ...start, boot_id: bootId } };
+}
+
+function saveBatch(leafPath: string, record: Batch): void {
+  saveState(leafPath, { ...readState(leafPath), batch: record });
+}
+
+function argList(args: (string | boolean | undefined)[]): string {
+  return args.map((arg) => (arg === undefined ? 'undefined' : JSON.stringify(arg))).join(', ');
+}
+
+function phaseBody(slug: string, phase: string, args: (string | boolean | undefined)[], dir: string): string {
+  const params: (string | boolean | undefined)[] = [slug, phase, ...args];
+  while (params.length < 10) params.push(undefined);
+  params.push(dir);
+  return (
+    'import { phaseCommand } from ' +
+    JSON.stringify(resolve(import.meta.dir, '../src/phase.ts')) +
+    ';\ntry { await phaseCommand(' +
+    argList(params) +
+    '); } catch (e) { console.error(e); process.exit(1); }\n'
+  );
+}
+
+const nextBody: string =
+  'import { nextCommand } from ' +
+  JSON.stringify(resolve(import.meta.dir, '../src/next.ts')) +
+  ';\ntry { await nextCommand(undefined, process.argv[2]); } catch (e) { console.error(e); process.exit(1); }\n';
+
+const mergePassBody: string =
+  'import { mergePass } from ' +
+  JSON.stringify(resolve(import.meta.dir, '../src/next.ts')) +
+  ';\nimport { readGlobal, readRepo } from ' +
+  JSON.stringify(resolve(import.meta.dir, '../src/config.ts')) +
+  ";\ntry { await mergePass(readGlobal(), readRepo('repo', process.cwd()), { skipped: new Set(), dispatched: new Set() }, false, process.argv[2]); } catch (e) { console.error(e); process.exit(1); }\n";
+
+async function spawn(
+  f: Fixture,
+  name: string,
+  body: string,
+  env: NodeJS.ProcessEnv,
+  args: string[] = [],
+): Promise<Result> {
+  const script: string = resolve(f.home, name + '.ts');
+  writeFileSync(script, body);
+  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, script, ...args], {
+    cwd: f.root,
+    env: {
+      ...process.env,
+      AKROGON_HOME: f.home,
+      HERDR_PANE_ID: '',
+      AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+      ...env,
+    },
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  return { code, stdout: stdout.trim(), stderr: stderr.trim() };
+}
+
 test.serial('a green batch appends one merged attempt line and log.jsonl keeps its move-line shape', async () => {
   const f: Fixture = await fixture();
   try {
@@ -390,6 +481,303 @@ test.serial('stale-attempt and non-holder phase calls write no attempt line', as
     expect(outsider.code).not.toBe(0);
     expect(outsider.stderr).toContain('Merge turn refused');
     expect(existsSync(resolve(f.root, 'issues/merge-attempts.jsonl'))).toBe(false);
+    expect(attemptLines(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a merged line carries PSI stall deltas from batch creation', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }));
+    const dir: string = pressureDir(f, { cpu: '60', memory: '90', io: '180' });
+    const checked: Result = await spawn(
+      f,
+      'check',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir),
+      herdr.env,
+    );
+    expect(checked.code).toBe(0);
+    expect(attemptLines(f)).toEqual([]);
+    const merged: Result = await spawn(
+      f,
+      'merged',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('merged');
+    expect(lines[0].pressure).toEqual({ cpu: 50, memory: 70, io: 150 });
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a restacked reuse line carries PSI stall deltas from batch creation', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    saveBatch(holder.path, withStart(record, { cpu: 5, memory: 6, io: 7 }));
+    const dir: string = pressureDir(f, { cpu: '15', memory: '26', io: '47' });
+    expect(
+      (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), herdr.env))
+        .code,
+    ).toBe(0);
+    const advanced: string = await advanceRemote(f, {
+      'issues/open/x/state.yaml': 'x\n',
+      'learnings/history/y.md': 'y\n',
+    });
+    const refused: Result = await spawn(
+      f,
+      'refused',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      herdr.env,
+    );
+    expect(refused.code).toBe(0);
+    expect(refused.stdout).toMatch(/^reuse tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
+    expect(attemptLines(f)).toEqual([]);
+    const landed: Result = await spawn(
+      f,
+      'landed',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      herdr.env,
+    );
+    expect(landed.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('reuse');
+    expect(lines[0].built_on).toBe(advanced);
+    expect(lines[0].pressure).toEqual({ cpu: 10, memory: 20, io: 40 });
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a solo red line carries PSI stall deltas from batch creation', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await soloFixture(f);
+    saveBatch(holder.path, withStart(record, { cpu: 3, memory: 4, io: 5 }));
+    const dir: string = pressureDir(f, { cpu: '7', memory: '12', io: '25' });
+    const red: Result = await spawn(
+      f,
+      'red',
+      phaseBody('hold', 'check.fix', ['B', undefined, undefined, undefined, 'a1'], dir),
+      herdr.env,
+    );
+    expect(red.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('red');
+    expect(lines[0].pressure).toEqual({ cpu: 4, memory: 8, io: 20 });
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a split line carries PSI stall deltas from batch creation', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    saveBatch(holder.path, withStart(record, { cpu: 1, memory: 2, io: 3 }));
+    const dir: string = pressureDir(f, { cpu: '9', memory: '6', io: '33' });
+    const red: Result = await spawn(
+      f,
+      'split',
+      phaseBody('hold', 'check.fix', ['B', undefined, undefined, undefined, 'a1'], dir),
+      herdr.env,
+    );
+    expect(red.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('split');
+    expect(lines[0].pressure).toEqual({ cpu: 8, memory: 4, io: 30 });
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a held line carries PSI stall deltas from batch creation', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, builtOn, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    saveBatch(holder.path, withStart(record, { cpu: 2, memory: 3, io: 4 }));
+    const dir: string = pressureDir(f, { cpu: '6', memory: '8', io: '14' });
+    const held: Result = await spawn(
+      f,
+      'held',
+      phaseBody('hold', 'check.fix', ['B', undefined, undefined, undefined, 'a1', builtOn, 'bun test'], dir),
+      herdr.env,
+    );
+    expect(held.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('held');
+    expect(lines[0].pressure).toEqual({ cpu: 4, memory: 5, io: 10 });
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('an ejected line carries PSI stall deltas from batch creation', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b'], true);
+    saveBatch(holder.path, withStart(record, { cpu: 8, memory: 7, io: 6 }));
+    const dir: string = pressureDir(f, { cpu: '18', memory: '12', io: '10' });
+    const ejected: Result = await spawn(
+      f,
+      'ejected',
+      phaseBody('hold', 'check.fix', ['B', undefined, undefined, undefined, 'a1', undefined, undefined, 'mem-a'], dir),
+      herdr.env,
+    );
+    expect(ejected.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('ejected');
+    expect(lines[0].culprit).toBe('mem-a');
+    expect(lines[0].pressure).toEqual({ cpu: 10, memory: 5, io: 4 });
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a reconciled merged line carries PSI stall deltas from batch creation', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    await command(['git', 'push', 'origin', 'refs/heads/hold:main'], f.root);
+    saveBatch(holder.path, withStart({ ...record, candidate: record.top }, { cpu: 11, memory: 13, io: 17 }));
+    const dir: string = pressureDir(f, { cpu: '21', memory: '23', io: '47' });
+    const next: Result = await spawn(f, 'next', nextBody, herdr.env, [dir]);
+    expect(next.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('merged');
+    expect(lines[0].pressure).toEqual({ cpu: 10, memory: 10, io: 30 });
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a merged line without pressure_start keeps no pressure key even with a malformed dir', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const dir: string = pressureDir(f, { cpu: 'abc', memory: '90', io: '180' });
+    expect(
+      (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), herdr.env))
+        .code,
+    ).toBe(0);
+    const merged: Result = await spawn(
+      f,
+      'merged',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('merged');
+    expect(lines[0].pressure).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a merged line with an absent pressure dir keeps no pressure key', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }));
+    const dir: string = resolve(f.home, 'psi/proc/pressure');
+    expect(
+      (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), herdr.env))
+        .code,
+    ).toBe(0);
+    const merged: Result = await spawn(
+      f,
+      'merged',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('merged');
+    expect(lines[0].pressure).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a merged line with a changed boot id keeps no pressure key', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }, 'boot-old'));
+    const dir: string = pressureDir(f, { cpu: '60', memory: '90', io: '180' }, 'boot-new');
+    expect(
+      (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), herdr.env))
+        .code,
+    ).toBe(0);
+    const merged: Result = await spawn(
+      f,
+      'merged',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('merged');
+    expect(lines[0].pressure).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a malformed pressure file stops the ending call before any push or state change', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const batch: Batch = withStart(record, { cpu: 10, memory: 20, io: 30 });
+    saveBatch(holder.path, batch);
+    const dir: string = pressureDir(f, { cpu: 'abc', memory: '90', io: '180' });
+    const tip: string = await remoteTip(f);
+    const merged: Result = await spawn(
+      f,
+      'merged',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      herdr.env,
+    );
+    expect(merged.code).not.toBe(0);
+    expect(merged.stderr).toContain(resolve(dir, 'cpu'));
+    expect(merged.stderr).toContain('total=');
+    expect(attemptLines(f)).toEqual([]);
+    expect(readState(holder.path).batch).toEqual(batch);
+    expect(await remoteTip(f)).toBe(tip);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a malformed pressure file stops batch creation before any batch or line exists', async () => {
+  const f: Fixture = await fixture();
+  try {
+    process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const holderPath: string = leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
+    const dir: string = pressureDir(f, { cpu: 'abc', memory: '90', io: '180' });
+    const merged: Result = await spawn(f, 'create', mergePassBody, herdr.env, [dir]);
+    expect(merged.code).not.toBe(0);
+    expect(merged.stderr).toContain(resolve(dir, 'cpu'));
+    expect(merged.stderr).toContain('total=');
+    expect(readState(holderPath).batch).toBeUndefined();
     expect(attemptLines(f)).toEqual([]);
   } finally {
     f.clean();
