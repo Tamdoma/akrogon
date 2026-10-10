@@ -1,7 +1,16 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { type RepoConfig, type GlobalConfig, globalHome, readGlobal, repoSchema, seats, within } from './config';
+import {
+  type RepoConfig,
+  type GlobalConfig,
+  globalHome,
+  readGlobal,
+  repoSchema,
+  seats,
+  within,
+  worktreeStore,
+} from './config';
 import { command, writeYaml } from './shell';
 
 export function writeRepoConfig(root: string, config: RepoConfig): void {
@@ -57,7 +66,7 @@ export async function initialize(
   if (!existsSync(lessons)) writeFileSync(lessons, '# Lessons\n');
   const ignore: string = resolve(root, '.gitignore');
   const prior: string = existsSync(ignore) ? readFileSync(ignore, 'utf8') : '';
-  const worktreeRoot: string = resolve(root, config.worktree_root);
+  const worktreeRoot: string = worktreeStore({ name: repoName, root, config });
   const additions: string[] = [
     ...(worktreeRoot !== root && within(worktreeRoot, root) ? [`${relative(root, worktreeRoot)}/`] : []),
     'issues/seeds/',

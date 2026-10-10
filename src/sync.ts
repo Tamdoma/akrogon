@@ -1,5 +1,5 @@
 import { basename, dirname, relative, resolve } from 'node:path';
-import { expandPath, globalHome, readGlobal, requireRepo, within, type GlobalConfig, type Repo } from './config';
+import { globalHome, readGlobal, requireRepo, within, worktreeStore, type GlobalConfig, type Repo } from './config';
 import { CommandError, command, run, type Result } from './shell';
 import { withLock } from './state';
 
@@ -14,7 +14,7 @@ export async function syncCommand(cwd: string): Promise<void> {
     if (branch.code === 1 || actual !== repo.config.default_branch)
       throw new Error(`Cannot sync from ${actual}; required branch: ${repo.config.default_branch}`);
 
-    const worktree: string = expandPath(repo.config.worktree_root, repo.root);
+    const worktree: string = worktreeStore(repo);
     const stagedPaths: string = await command(
       ['git', 'diff', '--cached', '--name-only', '--no-renames', '-z'],
       repo.root,

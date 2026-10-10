@@ -39,7 +39,7 @@ export const repoSchema = z
   .strictObject({
     remote: text.default('origin'),
     default_branch: text.default('main'),
-    worktree_root: text.default('issues/worktrees'),
+    worktree_root: text.optional(),
     rebuttal: z.boolean().default(true),
     direct: z.boolean().default(false),
     fix_rounds: z.number().int().positive().default(3),
@@ -248,7 +248,9 @@ export async function requireRepo(global: GlobalConfig, cwd: string): Promise<Re
 }
 
 export function worktreeStore(repo: Repo): string {
-  return resolve(repo.root, repo.config.worktree_root);
+  return repo.config.worktree_root === undefined
+    ? resolve(homedir(), '.akrogon/worktrees', repo.name)
+    : expandPath(repo.config.worktree_root, repo.root);
 }
 
 export function leafTemp(repo: Repo, slug: string): string {
@@ -275,8 +277,8 @@ export function withSetup(config: RepoConfig): RepoConfig {
   const setup: string | undefined = config.setup;
   const inner = (cmd: string): string =>
     setup === undefined
-      ? cmd
-      : `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(setup)} && sh -c ${quote(cmd)}`;
+      ? `akrogon guard ancestors && akrogon guard own-modules && sh -c ${quote(cmd)}`
+      : `akrogon guard ancestors && flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(setup)} && akrogon guard own-modules && sh -c ${quote(cmd)}`;
   const runCheck = (name: string, cmd: string): string =>
     `akrogon run-check --name ${quote(name)} -- sh -c ${quote(inner(cmd))}`;
   const map = (record: Record<string, string>): Record<string, string> =>

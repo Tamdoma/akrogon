@@ -160,8 +160,11 @@ switch (verb) {
     );
     break;
   }
+  case 'guard':
+    process.exitCode = await (await import('./guard')).guard(process.cwd(), positionals);
+    break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|hold-fix|sync|status|run-check>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|hold-fix|sync|status|run-check|guard>',
     );
 }
