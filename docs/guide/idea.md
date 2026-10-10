@@ -37,8 +37,8 @@ Pass                     Seat A         Seat B
 ----------------------   ------------   ------------
 Positions, if debate     own proposal   own proposal
 Rebuttal, if enabled     own response   own response
-Synthesis                final plan     -
-Implement                code + tests   -
+Synthesis                plan + tests   -
+Implement                code           -
 Initial check.review     own review     own review
 check.repair             -              repairs
 check.fix                handed repairs -

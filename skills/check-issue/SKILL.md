@@ -52,7 +52,9 @@ A Fix is wrong behavior, a broken contract or a maintainability defect with a co
 
 Compare tests with acceptance criteria: a missing or bad test blocks only when a done-criterion has no test that would catch its failure, a realistic Fix has no test, or a test mocks the unit under test. Default to the smallest test at the real boundary (CLI, HTTP, browser, DB), with unit or property tests only for logic that matters where they catch bugs more cheaply, and E2E only where smaller tests miss browser, runtime or wiring bugs. An existing assertion, fixture or recorded output changes or is deleted only with a cited brief outcome or real source that the old expectation contradicts. A new test needs no cited source, and a change or deletion without a real cited source is a defect. A false or outdated expectation is deleted with its reason, a duplicate only after naming the test that still catches the same bug, batches are judged as batches, and tests guarding real past regressions stay. Bug fixes show fail-before/pass-after and new behavior shows one deliberate break turning its test red, never a mutation score; assertion style, wording coupling that does not fail today, extra cases and coverage gaps are Nits, and reject akrogon tests of prose/output wording except commands, numbers or fixed references that run literally as written.
 
-A missing-test Fix names the scenario and what existing tests miss, with its realistic source, its consequence today, and the criterion or gap it hits. Look-alike code alone is not a Fix, and these triggers add no review rerun beyond the rerun rule below.
+B checks that the implementation report runs the planned tests through the commands `plan.md` names and that no change since planning skips, filters or disables a planned test or the runner configuration it depends on.
+
+A case outside the done-criteria with no realistic source stays a Nit: it does not block, and it gets no test and no new issue.
 
 A `learnings/LESSONS.md` line removal is accepted only when the diff carries a running mechanical guard covering the lesson's mechanism on every reachable path; a removal beside an uncalled or partial guard is a Fix, and any removal tied to report closure, duplicate or rejection is a Fix.
 
@@ -72,11 +74,11 @@ A `recorded` result waits for the other initial verdict; the command derives the
 
 B reads every Fix in the review files for the latest reviewed head, meaning both initial reviews or B's latest re-check entry in `review-B.md`.
 
-B repairs every Fix except plan or design changes, missing planned units, required live runs, and work B judges too large for its pass. Each of those goes under a `Handed to A` heading in `review-B.md`, one line each with the Fix and the reason, and B never edits `plan.md` or `design.md`.
+B repairs every Fix except plan or design changes, missing planned units, required live runs, and work B judges too large for its pass. Each of those goes under a `Handed to A` heading in `review-B.md`, one line each with the Fix and the reason, and B never edits `plan.md` or `design.md`. A review finding that evidence machinery is missing is the stop's cause: B ends the pass with `akrogon phase <slug> failed --reason "<criterion> red: <missing machinery>" --slot B` rather than repairing it or handing it to A; a proven product defect whose repair needs a live rerun is still handed to A.
 
 Operator-only items follow the operator-only rule in Shared context and are never handed to A. When only operator actions remain after B's repairs, B makes that rule's one `failed` stop. When `Handed to A` items also remain, B moves to `check.fix`, and A's check.fix makes the stop after its repairs.
 
-Each behavior Fix gets its own commits, never shared with another Fix. First comes a commit adding a test that reproduces the recorded source, run and shown failing, then the fix commit, with the failing and passing output in `review-B.md`. B changes or deletes an existing assertion, fixture or recorded output only with a cited brief outcome or real source that the old expectation contradicts; a new test needs no cited source.
+Each behavior Fix gets its own commits, never shared with another Fix. For a proven bug the fixing seat commits one reproduction test shown red on the head before the fix, its `Test-Change` trailer citing the finding's realistic source; that reproduction test is the only test a repair seat writes. Then the fix commit, with the failing and passing output in `review-B.md`.
 
 Each docs or command Fix is its own commit, with before and after evidence (quoted text or command output) in `review-B.md`.
 
