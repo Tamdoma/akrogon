@@ -805,6 +805,39 @@ test.serial(
   },
 );
 
+test.serial('changing the named fix preserves the active batch holder and its authorization', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr, holderPath, fixPath, sha } = await heldMergePair(f);
+    holdAt(f, holderPath, sha);
+    expect((await cli(f, ['hold-fix', 'fix'], f.root, herdr.env)).code).toBe(0);
+    expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
+    const attempt: string = readState(fixPath).batch!.attempt;
+    expect((await cli(f, ['hold-fix', 'hold'], f.root, herdr.env)).code).toBe(0);
+    expect(heldRecords(f).repo.fix).toBe('hold');
+    expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
+    expect(readState(holderPath).batch).toBeUndefined();
+    expect(readState(fixPath).batch!.attempt).toBe(attempt);
+    const checked: Result = await cli(
+      f,
+      ['phase', 'fix', 'merged', '--check', '--slot', 'B', '--attempt', attempt],
+      f.root,
+      herdr.env,
+    );
+    expect(checked.code).toBe(0);
+    const merged: Result = await cli(
+      f,
+      ['phase', 'fix', 'merged', '--slot', 'B', '--attempt', attempt],
+      f.root,
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    expect(readState(fixPath).phase).toBe('merged');
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('the fix leaf is authorized to merge while the queue head is refused, then order returns', async () => {
   const f: Fixture = await fixture();
   try {
