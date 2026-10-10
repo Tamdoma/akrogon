@@ -93,6 +93,22 @@ test('README and guide links resolve to files and anchors', () => {
   expect(broken).toEqual([]);
 });
 
+test('lesson write sites link the shared lesson rule', () => {
+  const root: string = resolve(import.meta.dir, '..');
+  const writeSites: string[] = [
+    'skills/plan-issue/SKILL.md',
+    'skills/implement-issue/SKILL.md',
+    'skills/check-issue/SKILL.md',
+    'skills/chart-issues/SKILL.md',
+  ];
+  const missing: string[] = [];
+  for (const site of writeSites) {
+    const content: string = readFileSync(join(root, site), 'utf8');
+    if (!content.includes('lesson-rule.md')) missing.push(site);
+  }
+  expect(missing).toEqual([]);
+});
+
 test('broken relative link is reported', () => {
   const files: Record<string, string> = { '/docs/a.md': '# Title\n' };
   const resolveFile: FileResolver = (path: string): string | null => (Object.hasOwn(files, path) ? files[path] : null);
