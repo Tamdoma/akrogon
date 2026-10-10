@@ -16,7 +16,7 @@ export function readPressure(dir: string = '/proc/pressure'): PressureSnapshot |
     const line: string | undefined = readFileSync(file, 'utf8')
       .split('\n')
       .find((entry) => entry.startsWith('some '));
-    const match: RegExpMatchArray | null = line === undefined ? null : /total=(\d+)/.exec(line);
+    const match: RegExpMatchArray | null = line === undefined ? null : /(?:^|\s)total=(\d+)(?=\s|$)/.exec(line);
     if (match === null) throw new Error(`Pressure file ${file} has no integer total= on its some line`);
     return Number.parseInt(match[1], 10);
   };
