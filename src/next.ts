@@ -69,6 +69,7 @@ import {
   applyStack,
   batchMemberSlugs,
   buildStack,
+  equalOutsideRecordFolders,
   isAncestor,
   memberBase,
   restoreHolder,
@@ -77,6 +78,7 @@ import {
 import { commitMove, completeOwner } from './phase';
 import { appendAttempt } from './attempts';
 import { sessionFile, deliveredAfter } from './session-file';
+import { heldFor, clearHeld, dropHeld, type Hold } from './hold';
 import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
 import { blockDetail, dependentCounts, mergeQueue, type QueueEntry } from './turn';
@@ -1020,6 +1022,15 @@ async function mergeTurn(
         stderr: fetched.stderr,
       }),
     );
+  const heldBefore: Hold | undefined = heldFor(repo.name);
+  if (heldBefore !== undefined) {
+    const baseSha: string = await localBase(repo);
+    if (await equalOutsideRecordFolders(repo, heldBefore.sha, baseSha)) {
+      console.log(`held ${repo.name} on ${heldBefore.sha}: ${heldBefore.command}`);
+      return;
+    }
+    await clearHeld(repo.name);
+  }
   let batch: Batch | undefined;
   await withLock(resolve(globalHome(), '.lock'), async () => {
     if (isAutomatic && isPaused(repo.name)) return;
@@ -1028,6 +1039,14 @@ async function mergeTurn(
     if (fresh?.state.phase !== 'merge' || fresh.state.batch !== undefined) return;
     if (mergeQueue(global, leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== holder.state.slug) return;
     const builtOn: string = await localBase(repo);
+    const heldNow: Hold | undefined = heldFor(repo.name);
+    if (heldNow !== undefined) {
+      if (await equalOutsideRecordFolders(repo, heldNow.sha, builtOn)) {
+        console.log(`held ${repo.name} on ${heldNow.sha}: ${heldNow.command}`);
+        return;
+      }
+      dropHeld(repo.name);
+    }
     const members: BatchMember[] = [];
     for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root))
       .slice(1)

@@ -1,8 +1,10 @@
 import { test, expect, afterEach } from 'bun:test';
 import { z } from 'zod';
 import { dirname, resolve } from 'node:path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { cli, fakeHerdr, fixture, leaf, leafTempRoot, type Fixture, type HerdrFixture } from './helpers';
+import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cli, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture, type HerdrFixture } from './helpers';
+import type { Database } from './fake-herdr';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State } from '../src/state';
 import { attemptRecordSchema } from '../src/attempts';
@@ -165,6 +167,62 @@ async function remoteTip(f: Fixture): Promise<string> {
 
 async function headOf(f: Fixture, slug: string): Promise<string> {
   return command(['git', 'rev-parse', 'refs/heads/' + slug], f.root);
+}
+
+async function advanceRemote(f: Fixture, files: Record<string, string>): Promise<string> {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akrogon-adv-'));
+  await command(['git', 'worktree', 'add', '--detach', dir, 'origin/main'], f.root);
+  try {
+    for (const [name, content] of Object.entries(files)) {
+      const path: string = resolve(dir, name);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, content);
+    }
+    await command(['git', 'add', '.'], dir);
+    await command(['git', 'commit', '-m', 'adv'], dir);
+    const sha: string = await command(['git', 'rev-parse', 'HEAD'], dir);
+    await command(['git', 'push', 'origin', 'HEAD:main'], dir);
+    return sha;
+  } finally {
+    await command(['git', 'worktree', 'remove', '--force', dir], f.root);
+  }
+}
+
+function mutating(herdr: HerdrFixture): string[][] {
+  return herdrCalls(herdr).filter(
+    (argv) =>
+      (argv[0] === 'tab' && (argv[1] === 'create' || argv[1] === 'close')) ||
+      (argv[0] === 'pane' && argv[1] === 'split') ||
+      (argv[0] === 'agent' && (argv[1] === 'start' || argv[1] === 'prompt')),
+  );
+}
+
+function database(herdr: HerdrFixture): Database {
+  return JSON.parse(readFileSync(herdr.db, 'utf8')) as Database;
+}
+
+async function heldMergeLeaf(f: Fixture): Promise<{ herdr: HerdrFixture; holderPath: string; sha: string }> {
+  process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+  const sha: string = await remoteTip(f);
+  const branch: Branch = await branchAt(f, 'hold', sha, 'file-hold', undefined, true);
+  const holderPath: string = leaf(f, 'hold', 'merge', {
+    worktree: branch.worktree,
+    merge_stamp: '2026-10-05T00:00:00.000Z',
+  });
+  return { herdr: fakeHerdr(f), holderPath, sha };
+}
+
+function holdAt(f: Fixture, holderPath: string, sha: string): void {
+  yaml(resolve(f.home, 'held.yaml'), {
+    repo: {
+      sha,
+      command: 'bun test',
+      holder: 'hold',
+      attempt: 'a1',
+      at: new Date().toISOString(),
+      evidence: resolve(holderPath, 'review-B.md'),
+    },
+  });
 }
 
 test.serial(
@@ -515,6 +573,83 @@ test.serial('a notification failure still leaves the hold, attempt line and stat
         'request',
       ],
     ]);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a hold at the fetched sha blocks next: held line, no batch record, no mutating herdr calls', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr, holderPath, sha } = await heldMergeLeaf(f);
+    holdAt(f, holderPath, sha);
+    const res: Result = await cli(f, ['next'], f.root, herdr.env);
+    expect(res.code).toBe(0);
+    expect(res.stdout).toBe(`held repo on ${sha}: bun test`);
+    expect(readState(holderPath).batch).toBeUndefined();
+    expect(mutating(herdr)).toEqual([]);
+    expect(Object.keys(heldRecords(f))).toEqual(['repo']);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a hold survives a main advance confined to record folders', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr, holderPath, sha } = await heldMergeLeaf(f);
+    holdAt(f, holderPath, sha);
+    await advanceRemote(f, { 'issues/open/x/state.yaml': 'x\n' });
+    const res: Result = await cli(f, ['next'], f.root, herdr.env);
+    expect(res.code).toBe(0);
+    expect(res.stdout).toBe(`held repo on ${sha}: bun test`);
+    expect(readState(holderPath).batch).toBeUndefined();
+    expect(mutating(herdr)).toEqual([]);
+    expect(Object.keys(heldRecords(f))).toEqual(['repo']);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a main advance outside record folders clears the hold and starts a normal attempt', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr, holderPath, sha } = await heldMergeLeaf(f);
+    holdAt(f, holderPath, sha);
+    await advanceRemote(f, { 'real-file': 'x\n' });
+    const res: Result = await cli(f, ['next'], f.root, herdr.env);
+    expect(res.code).toBe(0);
+    expect(res.stdout).not.toContain('held repo');
+    expect(heldRecords(f).repo).toBeUndefined();
+    const state: State = readState(holderPath);
+    expect(state.batch).toBeDefined();
+    const prompts: Database['prompts'] = database(herdr).prompts;
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0].text).toBe(
+      `merge-issue hold slot=B phase=merge leaf=${holderPath} attempt=${state.batch!.attempt} top=${state.batch!.top}`,
+    );
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('unhold then next starts a normal attempt', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr, holderPath, sha } = await heldMergeLeaf(f);
+    holdAt(f, holderPath, sha);
+    const unhold: Result = await cli(f, ['unhold'], f.root, herdr.env);
+    expect(unhold.code).toBe(0);
+    expect(unhold.stdout).toBe('unheld repo');
+    const res: Result = await cli(f, ['next'], f.root, herdr.env);
+    expect(res.code).toBe(0);
+    expect(res.stdout).not.toContain('held repo');
+    expect(heldRecords(f).repo).toBeUndefined();
+    const state: State = readState(holderPath);
+    expect(state.batch).toBeDefined();
+    const prompts: Database['prompts'] = database(herdr).prompts;
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0].text).toContain('merge-issue hold slot=B');
   } finally {
     f.clean();
   }
