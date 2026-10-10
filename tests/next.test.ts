@@ -4299,7 +4299,7 @@ test('a dispatched worktree gets a real .env file with the declared subset', asy
     const envFile: string = resolve(storeDir(f), 'build/.env');
     expect(lstatSync(envFile).isFile()).toBe(true);
     expect(statSync(envFile).mode & 0o777).toBe(0o600);
-    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\nSYNTHETIC_TWO=' + "'two words'" + '\n');
+    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\nSYNTHETIC_TWO=two words\n');
     const state: State = readState(path);
     expect(state.env_names).toEqual(['SYNTHETIC_ONE', 'SYNTHETIC_TWO']);
     expect(state.env_generation).toBe(0);
@@ -4380,7 +4380,7 @@ test('next refuses a declared value that cannot be written as dotenv', async () 
     const error: string = skips(result)[0].error;
     expect(error).toContain('unwritable declared values');
     expect(error).toContain('SYNTHETIC_QUOTES');
-    expect(error).not.toContain("a'b\"c");
+    expect(error).not.toContain('a\'b"c');
     expect(() => lstatSync(resolve(f.root, 'issues/worktrees/build/.env'))).toThrow(/ENOENT/);
   } finally {
     f.clean();

@@ -365,13 +365,20 @@ async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promis
   const missing: string[] = repo.config.env.filter((name) => parsed[name] === undefined);
   if (missing.length > 0)
     throw new Error(`Refusing .env write at ${link}: missing declared names in ${root}: ${missing.join(', ')}`);
-  const scanned: Map<string, string> = new Map();
-  for (const line of text.split('\n')) {
-    const match: RegExpMatchArray | null = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
-    if (match !== null) scanned.set(match[1], match[2].trimEnd());
-  }
-  const declared: string[] = repo.config.env.map((name) => `${name}=${scanned.get(name)!}`);
-  const content: string = declared.length > 0 ? declared.join('\n') + '\n' : '';
+  // parseEnv grammar: unquoted values end at # or whitespace, single quotes are
+  // verbatim except literal \r (normalized to \n), double quotes unescape only
+  // \n and \r. A value is emitted so a parseEnv consumer reads the same string.
+  const emit = (name: string, v: string): string | null => {
+    if (!/[#'"\n\r]/.test(v) && v === v.trim()) return `${name}=${v}`;
+    if (!v.includes("'") && !v.includes('\r')) return `${name}='${v}'`;
+    if (!v.includes('"') && !/\\[nr]/.test(v)) return `${name}="${v.replace(/\r/g, '\\r')}"`;
+    return null;
+  };
+  const emitted: (string | null)[] = repo.config.env.map((name) => emit(name, parsed[name]!));
+  const unwritable: string[] = repo.config.env.filter((_, i) => emitted[i] === null);
+  if (unwritable.length > 0)
+    throw new Error(`Refusing .env write at ${link}: unwritable declared values in ${root}: ${unwritable.join(', ')}`);
+  const content: string = emitted.length > 0 ? emitted.join('\n') + '\n' : '';
   const gitDir: string = resolve(worktree, await command(['git', 'rev-parse', '--git-dir'], worktree));
   const temp: string = resolve(gitDir, `akrogon-env-${process.pid}`);
   writeFileSync(temp, content, { mode: 0o600 });
