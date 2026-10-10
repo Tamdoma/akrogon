@@ -1,4 +1,5 @@
 import { test, expect } from 'bun:test';
+import { z } from 'zod';
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, leaf, yaml, fakeAkrogon, type Fixture } from './helpers';
@@ -13,7 +14,9 @@ test('printed checks preserve names containing spaces and slashes in argv and lo
     const shim: { env: NodeJS.ProcessEnv } = fakeAkrogon(f);
     for (const name of ['two words', 'lint/type']) {
       yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', checks: { [name]: 'echo name-check' } });
-      const printed: string = Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout).checks[name];
+      const printed: string = z
+        .object({ checks: z.record(z.string(), z.string()) })
+        .parse(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout)).checks[name];
       const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(['sh', '-c', printed], {
         cwd: worktree,
         env: { ...process.env, ...shim.env, HOME: f.home, AKROGON_HOME: f.home },
