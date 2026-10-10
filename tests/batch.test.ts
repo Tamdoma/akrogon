@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { fixture, leaf, leafTempRoot, type Fixture } from './helpers';
 import { readRepo, type Repo } from '../src/config';
-import { readState, stateSchema, type Leaf } from '../src/state';
+import { readState, stateSchema, type Leaf, type State } from '../src/state';
 import { command, CommandError } from '../src/shell';
 import {
   attemptId,
@@ -32,17 +32,29 @@ const record: object = {
   applied: false,
 };
 
-test.serial('stateSchema accepts a state with batch and solo', () => {
+test.serial('stateSchema accepts a state with a batch record carrying solo and excluded', () => {
   const parsed: ReturnType<typeof stateSchema.parse> = stateSchema.parse({
     ...baseState,
-    batch: { ...record, top: 'sha3', tested_top: 'sha3', candidate: 'sha3', solo: true },
-    solo: true,
+    batch: { ...record, top: 'sha3', tested_top: 'sha3', candidate: 'sha3', solo: true, excluded: ['x'] },
   });
   expect(parsed.batch?.attempt).toBe('attempt-1');
   expect(parsed.batch?.members[0].slug).toBe('mem-a');
-  expect(parsed.solo).toBe(true);
+  expect(parsed.batch?.solo).toBe(true);
+  expect(parsed.batch?.excluded).toEqual(['x']);
   const minimal: ReturnType<typeof stateSchema.parse> = stateSchema.parse({ ...baseState, batch: record });
   expect(minimal.batch?.applied).toBe(false);
+});
+
+test.serial('readState drops a legacy solo key left in state.yaml', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'legacy', 'merge', { solo: true });
+    const state: State = readState(path);
+    expect(state.slug).toBe('legacy');
+    expect(state).not.toHaveProperty('solo');
+  } finally {
+    f.clean();
+  }
 });
 
 test.serial('stateSchema rejects unknown or missing-required batch fields', () => {

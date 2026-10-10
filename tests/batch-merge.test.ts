@@ -223,42 +223,37 @@ test.serial(
   },
 );
 
-test.serial(
-  'a member leaving merge before merged refuses the push and dissolves the batch without solo marks',
-  async () => {
-    const f: Fixture = await fixture();
-    try {
-      const { record, holder, members, herdr, branches } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
-      const remoteBefore: string = await remoteTip(f);
-      expect(
-        (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env))
-          .code,
-      ).toBe(0);
-      expect((await cli(f, ['phase', 'mem-a', 'failed', '--reason', 'operator'], f.root, herdr.env)).code).toBe(0);
-      const merged: Result = await cli(
-        f,
-        ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
-        f.root,
-        herdr.env,
-      );
-      expect(merged.code).not.toBe(0);
-      expect(merged.stderr).toContain('mem-a');
-      expect(await remoteTip(f)).toBe(remoteBefore);
-      const holderState: State = readState(holder.path);
-      expect(holderState.phase).toBe('merge');
-      expect(holderState.batch).toBeUndefined();
-      expect(await command(['git', 'rev-parse', 'refs/heads/hold'], f.root)).toBe(branches.get('hold')!.head);
-      expect(await command(['git', 'rev-parse', 'HEAD'], holder.state.worktree!)).toBe(branches.get('hold')!.head);
-      const stayed: State = readState(members[1].path);
-      expect(stayed.phase).toBe('merge');
-      expect(stayed.solo).toBeUndefined();
-      expect(await command(['git', 'rev-parse', 'refs/heads/mem-b'], f.root)).toBe(record.members[1].head);
-      expect(readState(members[0].path).phase).toBe('failed');
-    } finally {
-      f.clean();
-    }
-  },
-);
+test.serial('a member leaving merge before merged refuses the push and dissolves the batch', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { record, holder, members, herdr, branches } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const remoteBefore: string = await remoteTip(f);
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
+    ).toBe(0);
+    expect((await cli(f, ['phase', 'mem-a', 'failed', '--reason', 'operator'], f.root, herdr.env)).code).toBe(0);
+    const merged: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(merged.code).not.toBe(0);
+    expect(merged.stderr).toContain('mem-a');
+    expect(await remoteTip(f)).toBe(remoteBefore);
+    const holderState: State = readState(holder.path);
+    expect(holderState.phase).toBe('merge');
+    expect(holderState.batch).toBeUndefined();
+    expect(await command(['git', 'rev-parse', 'refs/heads/hold'], f.root)).toBe(branches.get('hold')!.head);
+    expect(await command(['git', 'rev-parse', 'HEAD'], holder.state.worktree!)).toBe(branches.get('hold')!.head);
+    const stayed: State = readState(members[1].path);
+    expect(stayed.phase).toBe('merge');
+    expect(await command(['git', 'rev-parse', 'refs/heads/mem-b'], f.root)).toBe(record.members[1].head);
+    expect(readState(members[0].path).phase).toBe('failed');
+  } finally {
+    f.clean();
+  }
+});
 
 test.serial('a stale or missing attempt is refused, changes nothing, and the current attempt still lands', async () => {
   const f: Fixture = await fixture();
@@ -351,62 +346,57 @@ test.serial('a refused push restacks onto the new remote, prints rerun and the r
   }
 });
 
-test.serial(
-  'a red check.fix halves the batch without solo marks until the holder alone moves to check.fix',
-  async () => {
-    const f: Fixture = await fixture();
-    try {
-      const { holder, members, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
-      const remoteBefore: string = await remoteTip(f);
-      const red: Result = await cli(
-        f,
-        ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
-        f.root,
-        herdr.env,
+test.serial('a red check.fix halves the batch until the holder alone moves to check.fix', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, members, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const remoteBefore: string = await remoteTip(f);
+    const red: Result = await cli(
+      f,
+      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(red.code).toBe(0);
+    expect(red.stdout).toBe('batch split, holder keeps 1 of 2 members');
+    const halved: State = readState(holder.path);
+    expect(halved.phase).toBe('merge');
+    expect(halved.batch_limit).toBe(1);
+    // The post-call mergeWake immediately rebuilds the holder's batch with the first half.
+    expect(halved.batch?.members.map((member) => member.slug)).toEqual(['mem-a']);
+    expect(halved.batch?.attempt).not.toBe(record.attempt);
+    expect(await command(['git', 'rev-parse', 'refs/heads/mem-b'], f.root)).toBe(record.members[1].head);
+    const halvedRed: Result = await cli(
+      f,
+      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', z.string().parse(halved.batch?.attempt)],
+      f.root,
+      herdr.env,
+    );
+    expect(halvedRed.stdout).toBe('batch split, holder keeps 0 of 1 members');
+    const alone: State = readState(holder.path);
+    expect(alone.batch?.members).toEqual([]);
+    for (const [index, member] of members.entries()) {
+      const state: State = readState(member.path);
+      expect(state.phase).toBe('merge');
+      expect(await command(['git', 'rev-parse', 'refs/heads/' + member.state.slug], f.root)).toBe(
+        record.members[index].head,
       );
-      expect(red.code).toBe(0);
-      expect(red.stdout).toBe('batch split, holder keeps 1 of 2 members');
-      const halved: State = readState(holder.path);
-      expect(halved.phase).toBe('merge');
-      expect(halved.batch_limit).toBe(1);
-      // The post-call mergeWake immediately rebuilds the holder's batch with the first half.
-      expect(halved.batch?.members.map((member) => member.slug)).toEqual(['mem-a']);
-      expect(halved.batch?.attempt).not.toBe(record.attempt);
-      for (const member of members) expect(readState(member.path).solo).toBeUndefined();
-      expect(await command(['git', 'rev-parse', 'refs/heads/mem-b'], f.root)).toBe(record.members[1].head);
-      const halvedRed: Result = await cli(
-        f,
-        ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', z.string().parse(halved.batch?.attempt)],
-        f.root,
-        herdr.env,
-      );
-      expect(halvedRed.stdout).toBe('batch split, holder keeps 0 of 1 members');
-      const alone: State = readState(holder.path);
-      expect(alone.batch?.members).toEqual([]);
-      for (const [index, member] of members.entries()) {
-        const state: State = readState(member.path);
-        expect(state.phase).toBe('merge');
-        expect(state.solo).toBeUndefined();
-        expect(await command(['git', 'rev-parse', 'refs/heads/' + member.state.slug], f.root)).toBe(
-          record.members[index].head,
-        );
-      }
-      expect(await remoteTip(f)).toBe(remoteBefore);
-      const solo: Result = await cli(
-        f,
-        ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', z.string().parse(alone.batch?.attempt)],
-        f.root,
-        herdr.env,
-      );
-      expect(solo.code).toBe(0);
-      expect(solo.stdout).toBe('moved check.fix');
-      expect(readState(holder.path).phase).toBe('check.fix');
-      expect(readState(holder.path).batch_limit).toBeUndefined();
-    } finally {
-      f.clean();
     }
-  },
-);
+    expect(await remoteTip(f)).toBe(remoteBefore);
+    const solo: Result = await cli(
+      f,
+      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', z.string().parse(alone.batch?.attempt)],
+      f.root,
+      herdr.env,
+    );
+    expect(solo.code).toBe(0);
+    expect(solo.stdout).toBe('moved check.fix');
+    expect(readState(holder.path).phase).toBe('check.fix');
+    expect(readState(holder.path).batch_limit).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
 
 test.serial(
   'the batch prints issue complete once for a standalone issue and no epic complete for an unfinished epic',
@@ -682,8 +672,9 @@ test.serial(
       const batch: Batch = readState(holder.path).batch!;
       expect(batch.top).toBe(newTop);
       expect(batch.members.map((member) => member.slug)).toEqual(['mem-b']);
+      expect(batch.excluded).toContain('mem-a');
       const dropped: State = readState(resolve(f.root, 'issues/open/issue/mem-a'));
-      expect(dropped.solo).toBe(true);
+      expect(dropped.phase).toBe('merge');
       expect(await command(['git', 'rev-parse', 'refs/heads/mem-a'], f.root)).toBe(record.members[0].head);
       expect((await run(['git', 'merge-base', '--is-ancestor', droppedTip, newTop], f.root)).code).toBe(1);
       expect((await run(['git', 'cat-file', '-e', newTop + ':file-mem-a'], f.root)).code).not.toBe(0);
@@ -712,7 +703,6 @@ test.serial('a dirty member worktree keeps its files and branch at head when the
     expect(readFileSync(dirty, 'utf8')).toBe('uncommitted\n');
     expect(await command(['git', 'status', '--porcelain'], members[0].state.worktree!)).toContain('file');
     expect(await command(['git', 'rev-parse', 'refs/heads/mem-a'], f.root)).toBe(record.members[0].head);
-    expect(readState(members[0].path).solo).toBeUndefined();
     expect(readState(holder.path).batch?.members).toEqual([]);
   } finally {
     f.clean();
@@ -844,7 +834,6 @@ for (const edited of ['holder', 'member'] as const) {
       expect(await command(['git', 'rev-parse', 'mem-a'], f.root)).toBe(record.members[0].head);
       if (edited === 'holder') expect(batch.solo).toBe(true);
       else {
-        expect(readState(members[0].path).solo).toBeUndefined();
         expect((await run(['git', 'cat-file', '-e', batch.top! + ':file-mem-a'], f.root)).code).not.toBe(0);
       }
       expect(readFileSync(resolve(selected.state.worktree!, 'uncommitted'), 'utf8')).toBe('operator edit\n');
@@ -1070,8 +1059,9 @@ test.serial(
       expect(batch.tested_main).toBeUndefined();
       expect(batch.members).toEqual([]);
       expect(batch.top).toBe(t2);
+      expect(batch.excluded).toContain('mem-a');
       const dropped: State = readState(resolve(f.root, 'issues/open/issue/mem-a'));
-      expect(dropped.solo).toBe(true);
+      expect(dropped.phase).toBe('merge');
       expect(await command(['git', 'rev-parse', 'refs/heads/mem-a'], f.root)).toBe(record.members[0].head);
       expect(await command(['git', 'show', t2 + ':learnings/history/shared.md'], f.root)).toBe('from-main');
       expect(await remoteTip(f)).toBe(m2);
