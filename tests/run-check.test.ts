@@ -1,8 +1,9 @@
 import { test, expect } from 'bun:test';
+import { z } from 'zod';
 import { basename, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
-import { fixture, cli, leaf, yaml, fakeAkrogon, leafTempRoot, type Fixture } from './helpers';
-import { command } from '../src/shell';
+import { fixture, cli, leaf, yaml, fakeAkrogon, printedChecks, leafTempRoot, type Fixture } from './helpers';
+import { command, type Result } from '../src/shell';
 
 const sh = (script: string): string[] => ['sh', '-c', script];
 
@@ -329,6 +330,41 @@ test('constructed PATH can dispatch akrogon itself', async () => {
       /^check-(outer|inner)-.+\.log$/.test(name),
     );
     expect(logs.length).toBe(2);
+  } finally {
+    f.clean();
+  }
+});
+
+test('printed checks refuse before setup and isolate both setup and check environments', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const marker: string = resolve(f.home, 'setup-output');
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      env: ['CHECK_TOKEN'],
+      grounding: 'none',
+      setup: `printf '%s|%s|%s' "$CHECK_TOKEN" "$EXTRA_TOKEN" "$TMPDIR" > '${marker}'`,
+      checks: { probe: `cat '${marker}'; printf '\n%s|%s|%s' "$CHECK_TOKEN" "$EXTRA_TOKEN" "$TMPDIR"` },
+    });
+    const { worktree, leafPath } = await leafWorktree(f, 'printed');
+    const check: ReturnType<typeof printedChecks> = printedChecks(f);
+    const printed: string = z
+      .object({ checks: z.record(z.string(), z.string()) })
+      .parse(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout)).checks.probe;
+    const refused: Result = await check(printed, worktree, { NODE_PATH: '/fixture' });
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('NODE_PATH');
+    expect(existsSync(marker)).toBe(false);
+    const passed: Result = await check(printed, worktree, { CHECK_TOKEN: 'declared', EXTRA_TOKEN: 'omit' });
+    expect(passed.code).toBe(0);
+    const lines: string[] = passed.stdout.split('\n');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe(lines[1]);
+    const [token, extra, root]: string[] = lines[0].split('|');
+    expect(token).toBe('declared');
+    expect(extra).toBe('');
+    expect(root.startsWith(leafTempRoot(f) + '/')).toBe(true);
+    expect(existsSync(root)).toBe(false);
+    expect(readdirSync(resolve(leafPath, 'implementation'))).toHaveLength(1);
   } finally {
     f.clean();
   }

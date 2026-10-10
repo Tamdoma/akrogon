@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { basename, isAbsolute, resolve, sep } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
+import { fixture, cli, leaf, yaml, printedChecks, type Fixture } from './helpers';
 import { command, quote, run, type Result } from '../src/shell';
 import {
   SeatIndexError,
@@ -17,8 +17,6 @@ import {
 
 const runCheck = (name: string, inner: string): string =>
   `akrogon run-check --name ${quote(name)} -- sh -c ${quote(inner)}`;
-
-const runCheckInner = (printed: string): string => printed.replace(/^akrogon run-check --name \S+ -- /, '');
 
 test('config combines defaults and repo values, reports none, and recalculates worktree base', async () => {
   const f: Fixture = await fixture();
@@ -423,6 +421,7 @@ test('config composes setup into printed checks, merge_checks and advisory ident
 test('config printed check installs into a fresh worktree without a separate install step', async () => {
   const f: Fixture = await fixture();
   try {
+    const check: ReturnType<typeof printedChecks> = printedChecks(f);
     await installFixture(f, {
       setup: 'bun install --frozen-lockfile',
       checks: { resolve: `bun -e 'console.log(require.resolve("widget"))'` },
@@ -430,10 +429,11 @@ test('config printed check installs into a fresh worktree without a separate ins
     });
     const worktree: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    leaf(f, 'check', 'implement', { worktree });
     const printed: string = (
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
     ).checks.resolve;
-    const result: Result = await run(['sh', '-c', runCheckInner(printed)], worktree);
+    const result: Result = await check(printed, worktree);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain(`${worktree}/node_modules/widget/`);
   } finally {
@@ -444,6 +444,7 @@ test('config printed check installs into a fresh worktree without a separate ins
 test('config printed check resolves the worktree lockfile version over the root install', async () => {
   const f: Fixture = await fixture();
   try {
+    const check: ReturnType<typeof printedChecks> = printedChecks(f);
     await installFixture(f, {
       setup: 'bun install --frozen-lockfile',
       checks: {
@@ -464,10 +465,11 @@ test('config printed check resolves the worktree lockfile version over the root 
     expect(JSON.parse(readFileSync(resolve(f.root, 'node_modules/widget/package.json'), 'utf8')).version).toBe('1.0.0');
     const worktree: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    leaf(f, 'check', 'implement', { worktree });
     const printed: string = (
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
     ).checks.version;
-    const result: Result = await run(['sh', '-c', runCheckInner(printed)], worktree);
+    const result: Result = await check(printed, worktree);
     expect(result.code).toBe(0);
     expect(result.stdout.split('\n')).toContain('2.0.0');
     expect(result.stdout).toContain(`${worktree}/node_modules/`);
@@ -480,6 +482,7 @@ test('config printed check resolves the worktree lockfile version over the root 
 test('config printed checks run concurrently in one worktree and leave it clean', async () => {
   const f: Fixture = await fixture();
   try {
+    const check: ReturnType<typeof printedChecks> = printedChecks(f);
     await installFixture(f, {
       setup: 'bun install --frozen-lockfile',
       checks: { a: 'true', b: 'true', c: 'true', d: 'true' },
@@ -487,11 +490,12 @@ test('config printed checks run concurrently in one worktree and leave it clean'
     });
     const worktree: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    leaf(f, 'check', 'implement', { worktree });
     const checks: Record<string, string> = (
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
     ).checks;
     const results: Result[] = await Promise.all(
-      Object.values(checks).map((printed: string) => run(['sh', '-c', runCheckInner(printed)], worktree)),
+      Object.values(checks).map((printed: string) => check(printed, worktree)),
     );
     expect(results.map((result: Result) => result.code)).toEqual([0, 0, 0, 0]);
     expect(await command(['git', 'status', '--porcelain'], worktree)).toBe('');
@@ -503,6 +507,7 @@ test('config printed checks run concurrently in one worktree and leave it clean'
 test('config printed check skips both sides of a || b when the frozen lockfile mismatches', async () => {
   const f: Fixture = await fixture();
   try {
+    const check: ReturnType<typeof printedChecks> = printedChecks(f);
     await installFixture(f, {
       setup: 'bun install --frozen-lockfile',
       checks: { either: `touch ${f.home}/a || touch ${f.home}/b` },
@@ -510,6 +515,7 @@ test('config printed check skips both sides of a || b when the frozen lockfile m
     });
     const worktree: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    leaf(f, 'check', 'implement', { worktree });
     mkdirSync(resolve(worktree, 'vendor/widget2'), { recursive: true });
     writeFileSync(
       resolve(worktree, 'vendor/widget2/package.json'),
@@ -522,7 +528,7 @@ test('config printed check skips both sides of a || b when the frozen lockfile m
     const printed: string = (
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
     ).checks.either;
-    const result: Result = await run(['sh', '-c', runCheckInner(printed)], worktree);
+    const result: Result = await check(printed, worktree);
     expect(result.code).not.toBe(0);
     expect(result.stderr.toLowerCase()).toContain('lockfile');
     expect(existsSync(resolve(f.home, 'a'))).toBe(false);
@@ -535,6 +541,7 @@ test('config printed check skips both sides of a || b when the frozen lockfile m
 test('config runs all of setup inside the install lock', async () => {
   const f: Fixture = await fixture();
   try {
+    const check: ReturnType<typeof printedChecks> = printedChecks(f);
     const marker: string = resolve(f.home, 'setup-marker');
     await installFixture(f, {
       setup: `touch ${marker} && ! flock -n "$(git rev-parse --git-path akrogon-install.lock)" true`,
@@ -543,10 +550,11 @@ test('config runs all of setup inside the install lock', async () => {
     });
     const worktree: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    leaf(f, 'check', 'implement', { worktree });
     const printed: string = (
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
     ).checks.ok;
-    const result: Result = await run(['sh', '-c', runCheckInner(printed)], worktree);
+    const result: Result = await check(printed, worktree);
     expect(result.code).toBe(0);
     expect(existsSync(marker)).toBe(true);
   } finally {

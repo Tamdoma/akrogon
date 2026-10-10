@@ -90,7 +90,7 @@ export function fakeHerdr(f: Fixture): HerdrFixture {
 
 export function fakeAkrogon(f: Fixture): { env: NodeJS.ProcessEnv } {
   const bin: string = resolve(f.home, 'bin');
-  mkdirSync(bin);
+  mkdirSync(bin, { recursive: true });
   symlinkSync(entry, resolve(bin, 'akrogon'));
   return { env: { PATH: `${bin}:${process.env.PATH}`, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) } };
 }
@@ -125,4 +125,23 @@ exec '${git}' "$@"
   );
   chmodSync(wrapper, 0o755);
   return created;
+}
+
+export function printedChecks(f: Fixture): (printed: string, cwd: string, env?: NodeJS.ProcessEnv) => Promise<Result> {
+  const shim: { env: NodeJS.ProcessEnv } = fakeAkrogon(f);
+  return async (printed: string, cwd: string, env: NodeJS.ProcessEnv = {}): Promise<Result> => {
+    const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(['sh', '-c', printed], {
+      cwd,
+      env: { ...process.env, ...shim.env, HOME: f.home, AKROGON_HOME: f.home, ...env },
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const [stdout, stderr, code]: [string, string, number] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    return { code, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
+  };
 }
