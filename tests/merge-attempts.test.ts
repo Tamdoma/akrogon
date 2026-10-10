@@ -998,3 +998,42 @@ test.serial('a stored tools list lands on the solo red line', async () => {
     f.clean();
   }
 });
+
+test.serial('a merge turn records the FFmpeg version using its real version option', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const tool: string = resolve(f.home, 'bin/ffmpeg');
+    writeFileSync(tool, '#!/bin/sh\nif [ "$1" != "-version" ]; then echo "Unrecognized option" >&2; exit 8; fi\necho "ffmpeg version n9.0.2"\n');
+    chmodSync(tool, 0o755);
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', tools: ['ffmpeg'] });
+    const holder: string = leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
+    const result: Result = await cli(f, ['next'], f.root, herdr.env);
+    expect(result.code).toBe(0);
+    expect(readState(holder).batch?.tools).toEqual([{ name: 'ffmpeg', path: tool, version: 'ffmpeg version n9.0.2' }]);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a failed or empty version probe fails dispatch with command context', async () => {
+  for (const script of ['echo probe-failed >&2; exit 9', 'exit 0']) {
+    const f: Fixture = await fixture();
+    try {
+      const herdr: HerdrFixture = fakeHerdr(f);
+      const tool: string = resolve(f.home, 'bin/tool-a');
+      writeFileSync(tool, `#!/bin/sh\n${script}\n`);
+      chmodSync(tool, 0o755);
+      yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', tools: ['tool-a'] });
+      const holder: string = leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
+      const result: Result = await cli(f, ['next'], f.root, herdr.env);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain(tool);
+      expect(result.stderr).toContain('--version');
+      if (script.includes('probe-failed')) expect(result.stderr).toContain('probe-failed');
+      expect(readState(holder).batch).toBeUndefined();
+    } finally {
+      f.clean();
+    }
+  }
+});
