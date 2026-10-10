@@ -440,6 +440,9 @@ describe('self-update', () => {
       expect(first).toHaveLength(1);
       expect(first[0]).toContain('install');
       expect(first[0]).toContain('failed');
+      expect(first[0]).toContain('error:');
+      expect(first[0]).toContain('bun.lock');
+      expect(first[0]).not.toContain('\n');
       expect(first[0]).toContain('0 behind origin/main');
       expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
       writeFileSync(resolve(f.clone, 'bun.lock'), readFileSync(resolve(f.seed, 'bun.lock'), 'utf8'));
