@@ -792,7 +792,12 @@ test.serial(
       const prompts: Database['prompts'] = database(herdr).prompts;
       expect(prompts).toHaveLength(1);
       expect(prompts[0].text).toBe(
-        'merge-issue fix slot=B phase=merge leaf=' + fixPath + ' attempt=' + fixBatch!.attempt + ' top=' + fixBatch!.top,
+        'merge-issue fix slot=B phase=merge leaf=' +
+          fixPath +
+          ' attempt=' +
+          fixBatch!.attempt +
+          ' top=' +
+          fixBatch!.top,
       );
     } finally {
       f.clean();
@@ -800,48 +805,45 @@ test.serial(
   },
 );
 
-test.serial(
-  'the fix leaf is authorized to merge while the queue head is refused, then order returns',
-  async () => {
-    const f: Fixture = await fixture();
-    try {
-      const { herdr, holderPath, fixPath, sha } = await heldMergePair(f);
-      holdAt(f, holderPath, sha);
-      expect((await cli(f, ['hold-fix', 'fix'], f.root, herdr.env)).code).toBe(0);
-      expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
-      const attempt: string = readState(fixPath).batch!.attempt;
-      const probe: Result = await cli(
-        f,
-        ['phase', 'fix', 'check.fix', '--check', '--attempt', attempt],
-        f.root,
-        herdr.env,
-      );
-      expect(probe.code).toBe(0);
-      expect(probe.stderr).not.toContain('Merge turn refused');
-      const refused: Result = await cli(f, ['phase', 'hold', 'merged'], f.root, herdr.env);
-      expect(refused.code).not.toBe(0);
-      expect(refused.stderr).toContain('holder is fix');
-      const merged: Result = await cli(
-        f,
-        ['phase', 'fix', 'merged', '--slot', 'B', '--attempt', attempt],
-        f.root,
-        herdr.env,
-      );
-      expect(merged.code).toBe(0);
-      const res: Result = await cli(f, ['next'], f.root, herdr.env);
-      expect(res.code).toBe(0);
-      expect(heldRecords(f).repo).toBeUndefined();
-      const holdBatch: Batch | undefined = readState(holderPath).batch;
-      expect(holdBatch).toBeDefined();
-      const prompts: Database['prompts'] = database(herdr).prompts;
-      expect(prompts).toHaveLength(2);
-      expect(prompts[1].text).toContain('merge-issue hold slot=B');
-      expect(prompts[1].text).toContain('attempt=' + holdBatch!.attempt);
-    } finally {
-      f.clean();
-    }
-  },
-);
+test.serial('the fix leaf is authorized to merge while the queue head is refused, then order returns', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr, holderPath, fixPath, sha } = await heldMergePair(f);
+    holdAt(f, holderPath, sha);
+    expect((await cli(f, ['hold-fix', 'fix'], f.root, herdr.env)).code).toBe(0);
+    expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
+    const attempt: string = readState(fixPath).batch!.attempt;
+    const probe: Result = await cli(
+      f,
+      ['phase', 'fix', 'check.fix', '--check', '--attempt', attempt],
+      f.root,
+      herdr.env,
+    );
+    expect(probe.code).toBe(0);
+    expect(probe.stderr).not.toContain('Merge turn refused');
+    const refused: Result = await cli(f, ['phase', 'hold', 'merged'], f.root, herdr.env);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('holder is fix');
+    const merged: Result = await cli(
+      f,
+      ['phase', 'fix', 'merged', '--slot', 'B', '--attempt', attempt],
+      f.root,
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    const res: Result = await cli(f, ['next'], f.root, herdr.env);
+    expect(res.code).toBe(0);
+    expect(heldRecords(f).repo).toBeUndefined();
+    const holdBatch: Batch | undefined = readState(holderPath).batch;
+    expect(holdBatch).toBeDefined();
+    const prompts: Database['prompts'] = database(herdr).prompts;
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1].text).toContain('merge-issue hold slot=B');
+    expect(prompts[1].text).toContain('attempt=' + holdBatch!.attempt);
+  } finally {
+    f.clean();
+  }
+});
 
 test.serial('hold-fix refusals change nothing: no hold, missing leaf, leaf outside the merge queue', async () => {
   const f: Fixture = await fixture();
