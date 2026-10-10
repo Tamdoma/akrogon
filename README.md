@@ -177,7 +177,7 @@ akrogon.yaml
 issues_repo: owner/repo
 ```
 
-That report destination does not redirect pull.
+A report whose named failure path lives under the installed akrogon checkout routes to that checkout's report destination instead, and reports already covering the failure end the run with their URL. That report destination does not redirect pull.
 
 ## Skills
 

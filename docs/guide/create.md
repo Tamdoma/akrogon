@@ -87,7 +87,9 @@ The seed skill files one GitHub issue with six sections: the observation, locati
 
 To form that hypothesis, the agent reads the files the failure names and follows them one hop, reading only. It stops at a hypothesis or a named evidence gap.
 
-It also runs two read-only `gh` searches on the destination repo: the account's reports from the last two days, and a 2-3 word keyword search. Linked reports are listed with a reason each; "none found" or "search failed" is recorded instead.
+The destination is the repository's configured `issues_repo` or its GitHub origin. When a path the failure names is absent from the current repository but lives under the installed Akrogon checkout, the report routes to that checkout's issue repository instead; if the `akrogon` command cannot be resolved then, the run stops naming the path and reason.
+
+It also runs two read-only `gh` searches on the routed repo: the account's reports from the last two days, and a 2-3 word keyword search. Linked reports are listed with a reason each; "none found" or "search failed" is recorded instead. A found report covering the same failure ends the run with its URL and files nothing.
 
 You can capture a problem while its details are still incomplete. The skill records missing details and unsupported causes instead of guessing.
 
@@ -97,7 +99,7 @@ For example:
 /seed-issue CSV export drops the last row when the list has 500 rows
 ```
 
-The result is a report URL, not an implementation plan. After filing, when several reports share one suspected condition, the skill may print one `/seed-issue` line you can run to file a root report. The report itself stays one issue per run.
+The result is a report URL, newly filed or already covering the failure, not an implementation plan. After filing, when several reports share one suspected condition, the skill may print one `/seed-issue` line you can run to file a root report. The report itself stays one issue per run.
 
 Pull imports reports into the seed store:
 

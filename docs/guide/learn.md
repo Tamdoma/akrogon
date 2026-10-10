@@ -35,7 +35,7 @@ That setting lives in:
 akrogon.yaml
 ```
 
-Without it, the skill uses the repository's GitHub origin. A report about an Akrogon skill belongs in Akrogon.
+Without it, the skill uses the repository's GitHub origin. A report about an Akrogon skill belongs in Akrogon: when the file a failure names is absent from the current repository but lives under the installed Akrogon checkout, the report routes to that checkout's issue repository. If the `akrogon` command cannot be resolved then, the run stops naming the path and reason instead of posting. When a search finds a report already covering the failure, the run files nothing and prints that report's URL.
 
 New work still needs investigation and a contract. Do not treat every review suggestion as permission to change more code.
 

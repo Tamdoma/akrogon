@@ -139,7 +139,7 @@ Remember: capacity counts leaves across repositories. Failed can resume at any a
 | Need | Skill | What you get |
 | --- | --- | --- |
 | Set up a project | init-akrogon | Inspected settings, checks and grounding. |
-| Capture a problem | seed-issue | One unverified GitHub report. |
+| Capture a problem | seed-issue | One unverified GitHub report, new or already covering it. |
 | Decide what to build | chart-issues | Researched choices and leaf contracts. |
 | Plan the change | plan-issue | File-level steps and verification. |
 | Build or repair it | implement-issue | Code, checks and an implementation report. |

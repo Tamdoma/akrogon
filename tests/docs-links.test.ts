@@ -79,7 +79,12 @@ test('README and guide links resolve to files and anchors', () => {
     .filter((name: string) => name.endsWith('.md'))
     .sort()
     .map((name: string) => join(guideDir, name));
-  const files: string[] = [join(root, 'README.md'), ...guideFiles];
+  const skillsDir: string = join(root, 'skills');
+  const skillFiles: string[] = readdirSync(skillsDir)
+    .map((name: string) => join(skillsDir, name, 'SKILL.md'))
+    .filter((path: string) => existsSync(path))
+    .sort();
+  const files: string[] = [join(root, 'README.md'), ...guideFiles, ...skillFiles];
   const broken: string[] = [];
   for (const file of files) {
     const content: string = readFileSync(file, 'utf8');
