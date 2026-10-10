@@ -339,7 +339,8 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     console.log(Bun.YAML.stringify(leaf.state, null, 2).trimEnd());
     if (paused.has(repo.name)) console.log(`paused: ${repo.name}`);
     const hold: Hold | undefined = heldFor(repo.name);
-    if (hold !== undefined) console.log(`held: ${hold.sha} ${hold.command}`);
+    if (hold !== undefined)
+      console.log(`held: ${hold.sha} ${hold.command}${hold.fix === undefined ? '' : ` fix ${hold.fix}`}`);
     for (const gap of missing)
       console.log(`Missing: ${repo.name}/${slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`);
     console.log('History:');
@@ -383,9 +384,10 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   }
   for (const scan of scans) {
     if (!scan.ok) continue;
+    const hold: Hold | undefined = held[scan.repo.name];
     const marks: string[] = [
       paused.has(scan.repo.name) ? 'paused' : '',
-      held[scan.repo.name] !== undefined ? 'held' : '',
+      hold === undefined ? '' : hold.fix === undefined ? 'held' : `held fix ${hold.fix}`,
     ].filter((mark) => mark !== '');
     console.log(paint('1;4', `${scan.repo.name}${marks.length > 0 ? ` (${marks.join(') (')})` : ''}`));
     if (charts) {

@@ -78,10 +78,10 @@ import {
 import { commitMove, completeOwner } from './phase';
 import { appendAttempt } from './attempts';
 import { sessionFile, deliveredAfter } from './session-file';
-import { heldFor, dropHeld, type Hold } from './hold';
+import { heldFor, dropHeld, mergeHolder, type Hold } from './hold';
 import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
-import { blockDetail, dependentCounts, mergeQueue, type QueueEntry } from './turn';
+import { blockDetail, dependentCounts, mergeQueue } from './turn';
 
 const hookEventSchema = z.discriminatedUnion('event', [
   z.object({
@@ -699,7 +699,7 @@ async function dispatchLeaf(
     }
     if (
       state.phase === 'merge' &&
-      (mergeQueue(global, inventory.leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== slug ||
+      (mergeHolder(repo.name, global, inventory.leaves, () => readLog(repo.root))?.leaf.state.slug !== slug ||
         mergeContext === undefined)
     )
       return 'waiting';
@@ -986,8 +986,9 @@ async function mergeTurn(
       report(invocation, repo.name, leaf.path, error, leaf.state.slug);
     }
   }
-  const queue: QueueEntry[] = mergeQueue(global, discover(repo, invocation).leaves, () => readLog(repo.root));
-  const holder: Leaf | undefined = queue[0]?.leaf;
+  const holder: Leaf | undefined = mergeHolder(repo.name, global, discover(repo, invocation).leaves, () =>
+    readLog(repo.root),
+  )?.leaf;
   if (holder === undefined) return;
   const recorded: Batch | undefined = holder.state.batch;
   if (recorded !== undefined && recorded.applied === true) {
@@ -1025,7 +1026,7 @@ async function mergeTurn(
   const heldBefore: Hold | undefined = heldFor(repo.name);
   if (heldBefore !== undefined) {
     const baseSha: string = await localBase(repo);
-    if (await equalOutsideRecordFolders(repo, heldBefore.sha, baseSha)) {
+    if ((await equalOutsideRecordFolders(repo, heldBefore.sha, baseSha)) && heldBefore.fix !== holder.state.slug) {
       console.log(`held ${repo.name} on ${heldBefore.sha}: ${heldBefore.command}`);
       return;
     }
@@ -1036,30 +1037,37 @@ async function mergeTurn(
     const leaves: Leaf[] = allLeaves(repo);
     const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
     if (fresh?.state.phase !== 'merge' || fresh.state.batch !== undefined) return;
-    if (mergeQueue(global, leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== holder.state.slug) return;
+    if (mergeHolder(repo.name, global, leaves, () => readLog(repo.root))?.leaf.state.slug !== holder.state.slug) return;
     const builtOn: string = await localBase(repo);
+    let fixHeld: boolean = false;
     const heldNow: Hold | undefined = heldFor(repo.name);
     if (heldNow !== undefined) {
       if (await equalOutsideRecordFolders(repo, heldNow.sha, builtOn)) {
-        console.log(`held ${repo.name} on ${heldNow.sha}: ${heldNow.command}`);
-        return;
+        if (heldNow.fix !== fresh.state.slug) {
+          console.log(`held ${repo.name} on ${heldNow.sha}: ${heldNow.command}`);
+          return;
+        }
+        fixHeld = true;
+      } else {
+        dropHeld(repo.name);
+        if (mergeQueue(global, leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== fresh.state.slug) return;
       }
-      dropHeld(repo.name);
     }
     const members: BatchMember[] = [];
-    for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root))
-      .slice(1)
-      .filter((entry) => fresh.state.solo !== true && entry.leaf.state.solo !== true)
-      .slice(0, fresh.state.batch_limit)) {
-      const sha: string | undefined = await branchSha(repo, candidate.leaf.state.slug);
-      const head: string = sha ?? builtOn;
-      members.push({
-        slug: candidate.leaf.state.slug,
-        base: sha === undefined || head === builtOn ? head : await memberBase(repo, builtOn, head),
-        head,
-        tip: head,
-      });
-    }
+    if (!fixHeld)
+      for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root))
+        .slice(1)
+        .filter((entry) => fresh.state.solo !== true && entry.leaf.state.solo !== true)
+        .slice(0, fresh.state.batch_limit)) {
+        const sha: string | undefined = await branchSha(repo, candidate.leaf.state.slug);
+        const head: string = sha ?? builtOn;
+        members.push({
+          slug: candidate.leaf.state.slug,
+          base: sha === undefined || head === builtOn ? head : await memberBase(repo, builtOn, head),
+          head,
+          tip: head,
+        });
+      }
     const holderSha: string | undefined = await branchSha(repo, holder.state.slug);
     const holderHead: string = holderSha ?? builtOn;
     const next: Batch = {

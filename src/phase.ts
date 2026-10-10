@@ -29,11 +29,11 @@ import {
 import { command, run, herdr, herdrError, retryable, CommandError, type Result } from './shell';
 import { logMove, readLog } from './log';
 import { appendAttempt } from './attempts';
-import { mergeQueue, type QueueEntry } from './turn';
+import { type QueueEntry } from './turn';
 import { closeSources } from './pull';
 import { testFile } from './test-files';
 import { localBase, trackingRef } from './preflight';
-import { writeHeld } from './hold';
+import { mergeHolder, writeHeld } from './hold';
 import {
   applyStack,
   buildStack,
@@ -792,7 +792,7 @@ export async function phaseCommand(
     const leaf: Leaf = findLeaf(repo, slug);
     if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
     if (leaf.state.phase === 'merge' && (requested === 'merged' || requested === 'check.fix')) {
-      const holder: QueueEntry | undefined = mergeQueue(global, allLeaves(repo), () => readLog(repo.root))[0];
+      const holder: QueueEntry | undefined = mergeHolder(repo.name, global, allLeaves(repo), () => readLog(repo.root));
       if (holder === undefined || holder.leaf.state.slug !== leaf.state.slug)
         throw new Error(
           holder === undefined

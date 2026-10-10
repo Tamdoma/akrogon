@@ -112,6 +112,11 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./hold')).unholdCommand(process.cwd());
     break;
+  case 'hold-fix': {
+    const [slug]: [string] = z.tuple([z.string().trim().min(1)]).parse(positionals);
+    await (await import('./hold')).holdFixCommand(process.cwd(), slug);
+    break;
+  }
   case 'pause':
     z.tuple([]).parse(positionals);
     await (await import('./pause')).pauseCommand(verb, process.cwd());
@@ -121,7 +126,10 @@ switch (verb) {
     await (await import('./pause')).pauseCommand(verb, process.cwd());
     const repo: Repo = await requireRepo(readGlobal(), process.cwd());
     const hold: Hold | undefined = (await import('./hold')).heldFor(repo.name);
-    if (hold !== undefined) console.log(`held ${repo.name} on ${hold.sha}: ${hold.command}`);
+    if (hold !== undefined)
+      console.log(
+        `held ${repo.name} on ${hold.sha}: ${hold.command}${hold.fix === undefined ? '' : ` fix ${hold.fix}`}`,
+      );
     await (await import('./next')).unpausePass(repo);
     break;
   }
@@ -136,6 +144,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|sync|status>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|hold-fix|sync|status>',
     );
 }
