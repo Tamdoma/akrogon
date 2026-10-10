@@ -5428,19 +5428,31 @@ test('next --all, --resume and manual next record the registered or selected rep
     expect(selfUpdateCalls(f)).toEqual([f.root, g.root]);
     expect(calls(f).slice(before)[0]).toEqual(['self-update', f.root]);
     expect(calls(f).slice(before)[1]).toEqual(['self-update', g.root]);
-    expect(calls(f).slice(before).some((args) => args[0] === 'tab' || args[0] === 'agent')).toBe(true);
+    expect(
+      calls(f)
+        .slice(before)
+        .some((args) => args[0] === 'tab' || args[0] === 'agent'),
+    ).toBe(true);
     resetPrompts(f, picked);
     const resumed: number = calls(f).length;
     expect((await selfUpdateCli(f, ['next', '--resume'])).code).toBe(0);
     expect(selfUpdateCalls(f)).toEqual([f.root, g.root, f.root, g.root]);
     expect(calls(f).slice(resumed)[0]).toEqual(['self-update', f.root]);
-    expect(calls(f).slice(resumed).some((args) => args[0] === 'agent' && args[1] === 'prompt')).toBe(true);
+    expect(
+      calls(f)
+        .slice(resumed)
+        .some((args) => args[0] === 'agent' && args[1] === 'prompt'),
+    ).toBe(true);
     resetPrompts(f, picked);
     const manual: number = calls(f).length;
     expect((await selfUpdateCli(f, ['next', 'picked'])).code).toBe(0);
     expect(selfUpdateCalls(f)).toEqual([f.root, g.root, f.root, g.root, f.root]);
     expect(calls(f).slice(manual)[0]).toEqual(['self-update', f.root]);
-    expect(calls(f).slice(manual).some((args) => args[0] === 'agent' && args[1] === 'prompt')).toBe(true);
+    expect(
+      calls(f)
+        .slice(manual)
+        .some((args) => args[0] === 'agent' && args[1] === 'prompt'),
+    ).toBe(true);
     const tabbed: number = calls(f).length;
     const closed: Result = await selfUpdateCli(f, ['next'], {
       HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
