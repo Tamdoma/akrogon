@@ -366,24 +366,29 @@ async function citedPaths(worktree: string, range: string): Promise<Set<string>>
   return trailerCitedPaths(log);
 }
 
-async function emptyCommitCitedPaths(worktree: string, range: string, old: Set<string>): Promise<Set<string>> {
+async function emptyCommitTrailerValues(worktree: string, range: string): Promise<string[]> {
   const log: string = await command(
     ['git', 'log', '--format=%x1e%H%x1f%(trailers:key=Test-Change,valueonly,unfold)', range],
     worktree,
   );
-  const cited: Set<string> = new Set();
+  const values: string[] = [];
   for (const entry of log.split('\x1e')) {
     const [sha, ...rest]: string[] = entry.split('\x1f');
-    const values: string = rest.join('\x1f').trim();
-    if (sha.trim() === '' || values === '') continue;
+    const block: string = rest.join('\x1f').trim();
+    if (sha.trim() === '' || block === '') continue;
     const touched: string = await command(
       ['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', sha.trim()],
       worktree,
     );
-    if (touched === '')
-      for (const value of trailerValues(values)) if (!old.has(value)) cited.add(value.split(/\s/, 1)[0]);
+    if (touched === '') values.push(...trailerValues(block));
   }
-  return cited;
+  return values;
+}
+
+function countValues(values: string[]): Map<string, number> {
+  const counts: Map<string, number> = new Map();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  return counts;
 }
 
 async function changedPaths(worktree: string, from: string, to: string): Promise<[string, string][]> {
@@ -433,11 +438,7 @@ async function frozenRecord(repo: Repo, worktree: string): Promise<Record<string
 }
 
 async function frozenCitedRecord(repo: Repo, worktree: string): Promise<string[]> {
-  const log: string = await command(
-    ['git', 'log', '--format=%(trailers:key=Test-Change,valueonly,unfold)', `${target(repo)}..HEAD`],
-    worktree,
-  );
-  return Array.from(new Set(trailerValues(log)));
+  return emptyCommitTrailerValues(worktree, `${target(repo)}..HEAD`);
 }
 
 export async function requireFrozenCitations(
@@ -457,6 +458,7 @@ export async function requireFrozenCitations(
   ];
   if (violating.length === 0) return;
   const missing: string[] = [];
+  const frozenCounts: Map<string, number> = countValues(frozenCited ?? []);
   let emptyCited: Set<string> | undefined;
   for (const path of violating) {
     const lastTouch: string = await command(
@@ -465,7 +467,11 @@ export async function requireFrozenCitations(
     );
     const cited: Set<string> =
       lastTouch === ''
-        ? (emptyCited ??= await emptyCommitCitedPaths(worktree, `${from}..${to}`, new Set(frozenCited ?? [])))
+        ? (emptyCited ??= new Set(
+            [...countValues(await emptyCommitTrailerValues(worktree, `${from}..${to}`))]
+              .filter(([value, count]) => count > (frozenCounts.get(value) ?? 0))
+              .map(([value]) => value.split(/\s/, 1)[0]),
+          ))
         : await citedPaths(worktree, `${lastTouch}^..${to}`);
     if (!cited.has(path)) missing.push(path);
   }
