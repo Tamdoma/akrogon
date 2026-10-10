@@ -26,6 +26,7 @@ import {
   fakeGh,
   fakeHerdr,
   leafTempRoot,
+  storeDir,
   type GhFixture,
   type Fixture,
 } from './helpers';
@@ -93,7 +94,7 @@ for (const kind of ['relative file', 'absolute file', 'file symlink']) {
       expect(result.stderr).not.toContain('ENOTDIR');
       expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
       expect(calls(f)).toEqual([]);
-      expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+      expect(existsSync(storeDir(f))).toBe(false);
     } finally {
       f.clean();
     }
@@ -104,7 +105,7 @@ for (const kind of ['leaf folder', 'worktree path']) {
   test(`next dispatches an explicit ${kind}`, async () => {
     const f: DispatchFixture = await dispatchFixture();
     try {
-      const worktree: string = resolve(f.root, 'issues/worktrees/build');
+      const worktree: string = resolve(storeDir(f), 'build');
       if (kind === 'worktree path') await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
       const path: string = leaf(f, 'build', 'plan.synthesis', kind === 'worktree path' ? { worktree } : {});
       expect((await next(f, [kind === 'worktree path' ? worktree : path])).code).toBe(0);
@@ -395,7 +396,7 @@ async function nextAt(f: DispatchFixture, slug: string, now: number): Promise<Re
     ],
     {
       cwd: f.root,
-      env: { ...process.env, AKROGON_HOME: f.home, HERDR_PANE_ID: '', ...f.env },
+      env: { ...process.env, AKROGON_HOME: f.home, HOME: f.home, HERDR_PANE_ID: '', ...f.env },
       stdin: 'ignore',
       stdout: 'pipe',
       stderr: 'pipe',
@@ -1382,7 +1383,7 @@ test('next selection and sweep report both repo keys without dispatching or chan
       `plan-issue healthy slot=A phase=plan.synthesis leaf=${f.root}/issues/open/issue/healthy`,
     ]);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
-    expect(existsSync(resolve(f.root, 'issues/worktrees/wrong-key'))).toBe(false);
+    expect(existsSync(resolve(storeDir(f), 'wrong-key'))).toBe(false);
   } finally {
     f.clean();
   }
@@ -1556,7 +1557,7 @@ for (const moved of ['worktree root', 'repo root'] as const) {
       await command(['git', 'worktree', 'add', '-b', 'relocated', recorded], f.root);
       leaf(f, 'relocated', 'plan.synthesis', { worktree: recorded });
       const root: string = moved === 'repo root' ? resolve(f.home, 'moved-repo') : f.root;
-      const worktreeRoot: string = moved === 'worktree root' ? 'issues/new-worktrees' : 'issues/worktrees';
+      const worktreeRoot: string = moved === 'worktree root' ? 'issues/new-worktrees' : storeDir(f);
       if (moved === 'repo root') renameSync(f.root, root);
       else yaml(resolve(root, 'issues/config.yaml'), { worktree_root: worktreeRoot, grounding: 'none' });
       configure(f, { repos: { repo: root } });
@@ -1603,7 +1604,7 @@ test('moving a repo with the same registered key supports status, phase and disp
     const state: State = readState(resolve(root, 'issues/open/issue/movable'));
     expect(state.repo).toBe('repo');
     expect(state.phase).toBe('implement');
-    expect(state.worktree).toBe(resolve(root, 'issues/worktrees/movable'));
+    expect(state.worktree).toBe(resolve(storeDir(f), 'movable'));
     expect(await command(['git', 'branch', '--show-current'], state.worktree)).toBe('movable');
     expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
       `implement-issue movable slot=A phase=implement leaf=${root}/issues/open/issue/movable`,
@@ -2658,7 +2659,7 @@ for (const area of ['open', 'closed']) {
           expect(readFileSync(f.db, 'utf8')).toBe(db);
           expect(calls(f)).toEqual([]);
           expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
-          expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+          expect(existsSync(storeDir(f))).toBe(false);
           expect(existsSync(resolve(f.home, '.lock'))).toBe(false);
           console.log(result.stderr);
         }
@@ -3029,6 +3030,7 @@ test('timeout settlement records delivery when exact user text lands after the o
   try {
     const slug: string = 'timeout-found';
     const path: string = leaf(f, slug, 'plan.synthesis');
+    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
     saveDatabase(f, { ...database(f), blockOnStart: true });
     expect((await next(f, [slug])).code).toBe(0);
     const a: string = readState(path).pane.A!;
@@ -3065,6 +3067,7 @@ test('timeout settlement ignores the same text before the offset', async () => {
   try {
     const slug: string = 'timeout-before';
     const path: string = leaf(f, slug, 'plan.synthesis');
+    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
     saveDatabase(f, { ...database(f), blockOnStart: true });
     expect((await next(f, [slug])).code).toBe(0);
     const a: string = readState(path).pane.A!;
@@ -3101,6 +3104,7 @@ test('timeout settlement ignores prompt text inside assistant and tool records',
   try {
     const slug: string = 'timeout-role';
     const path: string = leaf(f, slug, 'plan.synthesis');
+    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
     saveDatabase(f, { ...database(f), blockOnStart: true });
     expect((await next(f, [slug])).code).toBe(0);
     const a: string = readState(path).pane.A!;
@@ -3139,6 +3143,7 @@ test('timeout settlement ignores a trailing partial line but keeps earlier recor
   try {
     const slug: string = 'timeout-partial';
     const path: string = leaf(f, slug, 'plan.synthesis');
+    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
     saveDatabase(f, { ...database(f), blockOnStart: true });
     expect((await next(f, [slug])).code).toBe(0);
     const a: string = readState(path).pane.A!;
@@ -3175,6 +3180,7 @@ test('a record appended after a timeout is recognized by the next pass without r
   try {
     const slug: string = 'timeout-late';
     const path: string = leaf(f, slug, 'plan.synthesis');
+    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
     saveDatabase(f, { ...database(f), blockOnStart: true });
     expect((await next(f, [slug])).code).toBe(0);
     const a: string = readState(path).pane.A!;
@@ -3217,6 +3223,7 @@ test('timeout with a missing session file records a plain error without offset',
   try {
     const slug: string = 'timeout-missing';
     const path: string = leaf(f, slug, 'plan.synthesis');
+    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
     saveDatabase(f, { ...database(f), blockOnStart: true });
     expect((await next(f, [slug])).code).toBe(0);
     const a: string = readState(path).pane.A!;
@@ -3248,6 +3255,7 @@ test('timeout settlement resolves id-kind references under HOME', async () => {
   try {
     const slug: string = 'timeout-id';
     const path: string = leaf(f, slug, 'plan.synthesis');
+    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
     saveDatabase(f, { ...database(f), blockOnStart: true });
     expect((await next(f, [slug])).code).toBe(0);
     const a: string = readState(path).pane.A!;
@@ -3278,6 +3286,7 @@ test('timeout with an unresolvable id records a plain error without offset', asy
   try {
     const slug: string = 'timeout-id-missing';
     const path: string = leaf(f, slug, 'plan.synthesis');
+    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
     saveDatabase(f, { ...database(f), blockOnStart: true });
     expect((await next(f, [slug])).code).toBe(0);
     const a: string = readState(path).pane.A!;
@@ -3473,7 +3482,7 @@ test('next refuses unknown harness override before allocation', async () => {
     expect(database(f).tabs).toHaveLength(0);
     expect(database(f).panes).toHaveLength(0);
     expect(readState(path).worktree).toBeUndefined();
-    expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+    expect(existsSync(storeDir(f))).toBe(false);
   } finally {
     f.clean();
   }
@@ -3574,7 +3583,7 @@ for (const [name, content] of malformedIndex) {
       expect(database(f).tabs).toHaveLength(0);
       expect(database(f).panes).toHaveLength(0);
       expect(database(f).starts).toHaveLength(0);
-      expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+      expect(existsSync(storeDir(f))).toBe(false);
     } finally {
       f.clean();
     }
@@ -3595,7 +3604,7 @@ test('next refuses an ISSUE.md index whose harness has no template before any al
     expect(database(f).tabs).toHaveLength(0);
     expect(database(f).panes).toHaveLength(0);
     expect(database(f).starts).toHaveLength(0);
-    expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+    expect(existsSync(storeDir(f))).toBe(false);
   } finally {
     f.clean();
   }
@@ -3642,7 +3651,7 @@ for (const { code, remedy, sabotage } of [
       const skip: Refusal = await refusal(f, 'fresh', path);
       expect(skip.error).toContain(code);
       expect(skip.error).toContain(remedy);
-      expect(existsSync(resolve(f.root, 'issues/worktrees/fresh'))).toBe(false);
+      expect(existsSync(resolve(storeDir(f), 'fresh'))).toBe(false);
       expect(readState(path).worktree).toBeUndefined();
     } finally {
       f.clean();
@@ -3659,7 +3668,7 @@ test('next refuses a leaf branch without a worktree when the remote branch is go
     await command(['git', 'remote', 'set-url', 'origin', resolve(f.home, 'empty.git')], f.root);
     const skip: Refusal = await refusal(f, 'stale', path);
     expect(skip.error).toContain('C2');
-    expect(existsSync(resolve(f.root, 'issues/worktrees/stale'))).toBe(false);
+    expect(existsSync(resolve(storeDir(f), 'stale'))).toBe(false);
     expect(readState(path).worktree).toBeUndefined();
   } finally {
     f.clean();
@@ -3669,7 +3678,7 @@ test('next refuses a leaf branch without a worktree when the remote branch is go
 test('next refuses an existing worktree whose tracking ref is deleted while the remote branch lives', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const worktree: string = resolve(f.root, 'issues/worktrees/resident');
+    const worktree: string = resolve(storeDir(f), 'resident');
     await command(['git', 'worktree', 'add', '-b', 'resident', worktree], f.root);
     const path: string = leaf(f, 'resident', 'plan.synthesis', { worktree });
     await command(['git', 'update-ref', '-d', 'refs/remotes/origin/main'], f.root);
@@ -3686,7 +3695,7 @@ test('next refuses an existing worktree whose tracking ref is deleted while the 
 test('next refuses an existing worktree whose tracking ref is deleted when the remote branch is gone', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const worktree: string = resolve(f.root, 'issues/worktrees/resident');
+    const worktree: string = resolve(storeDir(f), 'resident');
     await command(['git', 'worktree', 'add', '-b', 'resident', worktree], f.root);
     const path: string = leaf(f, 'resident', 'plan.synthesis', { worktree });
     await command(['git', 'update-ref', '-d', 'refs/remotes/origin/main'], f.root);
@@ -3704,7 +3713,7 @@ test('next refuses an existing worktree whose tracking ref is deleted when the r
 test('next dispatches an existing worktree without querying an unreachable remote', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const worktree: string = resolve(f.root, 'issues/worktrees/resident');
+    const worktree: string = resolve(storeDir(f), 'resident');
     await command(['git', 'worktree', 'add', '-b', 'resident', worktree], f.root);
     leaf(f, 'resident', 'plan.synthesis', { worktree });
     await command(['git', 'remote', 'set-url', 'origin', resolve(f.home, 'gone.git')], f.root);
@@ -3723,7 +3732,7 @@ test('next refuses to create a worktree while the remote is unreachable', async 
     const skip: Refusal = await refusal(f, 'fresh', path);
     expect(skip.error).toContain('Unproven');
     expect(skip.error).toContain('ls-remote');
-    expect(existsSync(resolve(f.root, 'issues/worktrees/fresh'))).toBe(false);
+    expect(existsSync(resolve(storeDir(f), 'fresh'))).toBe(false);
     expect(readState(path).worktree).toBeUndefined();
   } finally {
     f.clean();
@@ -4163,7 +4172,7 @@ const envFoo: object = {
   done: 'd',
 };
 async function undispatched(f: DispatchFixture, slug: string): Promise<void> {
-  expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+  expect(existsSync(storeDir(f))).toBe(false);
   expect((await run(['git', 'branch', '--list', slug], f.root)).stdout).toBe('');
   expect(database(f).tabs).toHaveLength(0);
   expect(database(f).panes).toHaveLength(0);
@@ -4283,7 +4292,7 @@ test('a dispatched worktree links .env to the registered checkout and reads appe
     writeFileSync(target, 'SYNTHETIC_ONE=1\n');
     leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
-    const link: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const link: string = resolve(storeDir(f), 'build/.env');
     expect(lstatSync(link).isSymbolicLink()).toBe(true);
     expect(readlinkSync(link)).toBe(target);
     appendFileSync(target, 'SYNTHETIC_TWO=2\n');
@@ -4298,7 +4307,7 @@ test('dispatch recreates a deleted .env link in a reused worktree', async () => 
   try {
     leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
-    const link: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const link: string = resolve(storeDir(f), 'build/.env');
     rmSync(link);
     expect((await next(f, ['build'])).code).toBe(0);
     expect(lstatSync(link).isSymbolicLink()).toBe(true);
@@ -4311,7 +4320,7 @@ test('dispatch recreates a deleted .env link in a reused worktree', async () => 
 test('a pre-linked worktree keeps its .env link unchanged across dispatch', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const worktree: string = resolve(f.root, 'issues/worktrees/build');
+    const worktree: string = resolve(storeDir(f), 'build');
     await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
     const link: string = resolve(worktree, '.env');
     symlinkSync(resolve(f.root, '.env'), link);
@@ -4329,7 +4338,7 @@ test('without a registered .env the worktree gets a dangling link and no target 
   try {
     leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
-    const link: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const link: string = resolve(storeDir(f), 'build/.env');
     expect(lstatSync(link).isSymbolicLink()).toBe(true);
     expect(existsSync(resolve(f.root, '.env'))).toBe(false);
   } finally {
@@ -4341,7 +4350,7 @@ for (const kind of ['real file', 'tracked file', 'stale link', 'unignored'] as c
   test(`next refuses an .env link over ${kind}`, async () => {
     const f: DispatchFixture = await dispatchFixture();
     try {
-      const worktree: string = resolve(f.root, 'issues/worktrees/build');
+      const worktree: string = resolve(storeDir(f), 'build');
       await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
       const link: string = resolve(worktree, '.env');
       if (kind === 'real file') writeFileSync(link, 'SYNTHETIC_SECRET=1\n');
@@ -4382,10 +4391,10 @@ test('next refuses to link .env not ignored in the registered checkout, keeps th
     expect(result.code).not.toBe(0);
     const target: string = resolve(f.root, '.env');
     const error: string = skips(result)[0].error;
-    expect(error).toContain(resolve(f.root, 'issues/worktrees/build/.env'));
+    expect(error).toContain(resolve(storeDir(f), 'build/.env'));
     expect(error).toContain(`path is not ignored in the registered checkout ${f.root}`);
     expect(existsSync(target)).toBe(false);
-    const worktree: string = resolve(f.root, 'issues/worktrees/build');
+    const worktree: string = resolve(storeDir(f), 'build');
     expect(existsSync(worktree)).toBe(true);
     expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/build'], f.root)).code).toBe(0);
     expect(database(f).prompts).toHaveLength(0);
@@ -5111,7 +5120,7 @@ function stateSnapshot(paths: string[]): string[] {
 function expectNoLaunch(f: DispatchFixture, paths: string[], before: string[]): void {
   expect(paths.map((path) => readFileSync(resolve(path, 'state.yaml'), 'utf8'))).toEqual(before);
   expect(calls(f)).toEqual([]);
-  expect(existsSync(resolve(f.root, 'issues/worktrees'))).toBe(false);
+  expect(existsSync(storeDir(f))).toBe(false);
   expect(existsSync(resolve(f.home, '.lock'))).toBe(false);
   expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
 }
@@ -5374,6 +5383,7 @@ async function selfUpdateCli(
       ...process.env,
       ...f.env,
       AKROGON_HOME: f.home,
+      HOME: f.home,
       HERDR_PANE_ID: '',
       SELF_UPDATE_LOG: f.db + '.self-update',
       ...env,

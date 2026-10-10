@@ -24,6 +24,7 @@ test.serial('restack preserves a retirement when an unrelated member predates th
   const f: Fixture = await fixture();
   try {
     process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+    process.env.HOME = f.home;
     const repo: Repo = readRepo('repo', f.root);
     const olderBase: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
     const older: Branch = await branchAt(f, 'older', olderBase, 'file-older');
@@ -120,9 +121,12 @@ test.serial('restack preserves a retirement when an unrelated member predates th
 });
 
 const originalTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
+const originalHome: string | undefined = process.env.HOME;
 afterEach(() => {
   if (originalTempRoot === undefined) delete process.env.AKROGON_LEAF_TEMP_ROOT;
   else process.env.AKROGON_LEAF_TEMP_ROOT = originalTempRoot;
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
 });
 
 type Branch = { slug: string; head: string; worktree: string };
@@ -161,6 +165,7 @@ async function batchFixture(
   prepare: Record<string, (worktree: string) => Promise<void>> = {},
 ): Promise<BatchFixture> {
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+  process.env.HOME = f.home;
   const repo: Repo = readRepo('repo', f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
   const [holderSlug, ...memberSlugs] = slugs;
@@ -223,6 +228,7 @@ async function batchFixture(
 
 async function soloFixture(f: Fixture): Promise<BatchFixture> {
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+  process.env.HOME = f.home;
   const repo: Repo = readRepo('repo', f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
   const branch: Branch = await branchAt(f, 'hold', builtOn, 'file-hold');

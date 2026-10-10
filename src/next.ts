@@ -65,6 +65,7 @@ import {
   type Workspace,
 } from './shell';
 import { checkBase, localBase, trackingRef } from './preflight';
+import { checkLocation } from './guard';
 import {
   attemptId,
   applyStack,
@@ -274,6 +275,37 @@ function launch(global: GlobalConfig, repo: Repo, slot: Slot, leafPath?: string)
   return { kind: config.harness, args: argv.slice(1) };
 }
 
+export async function createSparseWorktree(
+  repo: Repo,
+  path: string,
+  ref: string,
+  opts: { detach?: boolean; branch?: string },
+): Promise<void> {
+  checkLocation(path);
+  let added: boolean = false;
+  try {
+    await command(
+      [
+        'git',
+        'worktree',
+        'add',
+        '--no-checkout',
+        ...(opts.detach === true ? ['--detach'] : []),
+        ...(opts.branch === undefined ? [] : ['-b', opts.branch]),
+        path,
+        ref,
+      ],
+      repo.root,
+    );
+    added = true;
+    await command(['git', '-C', path, 'sparse-checkout', 'set', '--no-cone', '/*', '!/issues/'], repo.root);
+    await command(['git', '-C', path, 'checkout'], repo.root);
+  } catch (error) {
+    if (added) await command(['git', 'worktree', 'remove', '--force', path], repo.root);
+    throw error;
+  }
+}
+
 async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
   const path: string = resolve(worktreeStore(repo), leaf.state.slug);
   if (leaf.state.worktree !== undefined && leaf.state.worktree !== path)
@@ -296,12 +328,9 @@ async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
     );
     if (branch.code !== 0 && branch.code !== 1)
       throw new CommandError(['git', 'show-ref', leaf.state.slug], repo.root, branch);
-    await command(
-      branch.code === 0
-        ? ['git', 'worktree', 'add', path, leaf.state.slug]
-        : ['git', 'worktree', 'add', '-b', leaf.state.slug, path, trackingRef(repo)],
-      repo.root,
-    );
+    await createSparseWorktree(repo, path, branch.code === 0 ? leaf.state.slug : trackingRef(repo), {
+      branch: branch.code === 0 ? undefined : leaf.state.slug,
+    });
   }
   await linkEnv(repo, path);
   const state: State = { ...leaf.state, worktree: path };

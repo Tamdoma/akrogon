@@ -8,6 +8,9 @@ export type Fixture = { home: string; root: string; clean: () => void };
 export function leafTempRoot(f: Fixture): string {
   return resolve(f.home, 'leaf-temp');
 }
+export function storeDir(f: Fixture, repo: string = 'repo'): string {
+  return resolve(f.home, '.akrogon/worktrees', repo);
+}
 export function yaml(path: string, data: object): void {
   writeFileSync(path, Bun.YAML.stringify(data));
 }

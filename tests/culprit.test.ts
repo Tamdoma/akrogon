@@ -2,7 +2,17 @@ import { test, expect, afterEach } from 'bun:test';
 import { z } from 'zod';
 import { dirname, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { cli, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture, type HerdrFixture } from './helpers';
+import {
+  cli,
+  fakeHerdr,
+  fixture,
+  leaf,
+  leafTempRoot,
+  storeDir,
+  yaml,
+  type Fixture,
+  type HerdrFixture,
+} from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State } from '../src/state';
 import { attemptRecordSchema } from '../src/attempts';
@@ -10,9 +20,12 @@ import { command, type Result } from '../src/shell';
 import { applyStack, buildStack } from '../src/batch';
 
 const originalTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
+const originalHome: string | undefined = process.env.HOME;
 afterEach(() => {
   if (originalTempRoot === undefined) delete process.env.AKROGON_LEAF_TEMP_ROOT;
   else process.env.AKROGON_LEAF_TEMP_ROOT = originalTempRoot;
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
 });
 
 type Attempt = z.infer<typeof attemptRecordSchema>;
@@ -44,7 +57,7 @@ async function branchAt(
   prepare?: (worktree: string) => Promise<void>,
   inStore: boolean = false,
 ): Promise<Branch> {
-  const worktree: string = inStore ? resolve(f.root, 'issues/worktrees', slug) : resolve(f.home, 'wt-' + slug);
+  const worktree: string = inStore ? resolve(storeDir(f), slug) : resolve(f.home, 'wt-' + slug);
   await command(['git', 'worktree', 'add', '-b', slug, worktree, base], f.root);
   mkdirSync(dirname(resolve(worktree, file)), { recursive: true });
   writeFileSync(resolve(worktree, file), slug + '\n');
@@ -56,6 +69,7 @@ async function branchAt(
 
 async function batchFixture(f: Fixture, slugs: string[], inStore: boolean = false): Promise<BatchFixture> {
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+  process.env.HOME = f.home;
   const repo: Repo = readRepo('repo', f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
   const [holderSlug, ...memberSlugs] = slugs;

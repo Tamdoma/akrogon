@@ -436,7 +436,14 @@ async function waitFor(path: string, ms: number): Promise<void> {
 }
 
 function cliEnv(f: DispatchFixture, extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return { ...process.env, AKROGON_HOME: f.home, HERDR_PANE_ID: '', AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f), ...extra };
+  return {
+    ...process.env,
+    AKROGON_HOME: f.home,
+    HERDR_PANE_ID: '',
+    HOME: f.home,
+    AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+    ...extra,
+  };
 }
 
 test('race A: pause recorded before the locked merge section suppresses the launch', async () => {

@@ -1,10 +1,11 @@
 import { existsSync, readdirSync, rmdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
-import { leafTemp, type Repo } from './config';
+import { worktreeStore, type Repo } from './config';
 import { allLeaves, type Batch, type Leaf } from './state';
 import { command, run, CommandError, type Result } from './shell';
 import { removeRetiredLessons } from './lessons';
+import { createSparseWorktree } from './next';
 
 export async function removeEmptyUntrackedDirs(worktree: string): Promise<void> {
   const present: string = await command(['git', 'ls-files', '-c', '-z'], worktree);
@@ -92,8 +93,8 @@ export async function buildStack(
   holderHead: string,
   retirementHeads: string[] = [...items.map((item) => item.head), holderHead],
 ): Promise<{ ok: true; tips: Map<string, string>; top: string } | { ok: false; conflict: string }> {
-  const dir: string = leafTemp(repo, 'batch-' + attemptId());
-  await command(['git', 'worktree', 'add', '--detach', dir, builtOn], repo.root);
+  const dir: string = resolve(worktreeStore(repo), 'batch-' + attemptId());
+  await createSparseWorktree(repo, dir, builtOn, { detach: true });
   try {
     let tip: string = builtOn;
     const tips: Map<string, string> = new Map();

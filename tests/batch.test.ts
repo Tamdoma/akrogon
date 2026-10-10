@@ -1,7 +1,7 @@
 import { test, expect, afterEach } from 'bun:test';
 import { resolve } from 'node:path';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { fixture, leaf, leafTempRoot, type Fixture } from './helpers';
+import { fixture, leaf, leafTempRoot, storeDir, type Fixture } from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, stateSchema, type Leaf, type State } from '../src/state';
 import { command, CommandError } from '../src/shell';
@@ -93,9 +93,12 @@ test.serial('attemptId returns unique nonempty strings', () => {
 });
 
 const originalTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
+const originalHome: string | undefined = process.env.HOME;
 afterEach(() => {
   if (originalTempRoot === undefined) delete process.env.AKROGON_LEAF_TEMP_ROOT;
   else process.env.AKROGON_LEAF_TEMP_ROOT = originalTempRoot;
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
 });
 
 async function branch(
@@ -118,14 +121,16 @@ async function branch(
 }
 
 function noLeftoverWorktrees(f: Fixture): void {
-  const root: string = leafTempRoot(f);
-  const leftovers: string[] = existsSync(root) ? readdirSync(root).filter((dir) => dir.startsWith('batch-')) : [];
+  const leftovers: string[] = existsSync(storeDir(f))
+    ? readdirSync(storeDir(f)).filter((dir) => dir.startsWith('batch-'))
+    : [];
   expect(leftovers).toEqual([]);
 }
 
 async function batchFixture(): Promise<{ f: Fixture; repo: Repo; builtOn: string }> {
   const f: Fixture = await fixture();
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+  process.env.HOME = f.home;
   writeFileSync(resolve(f.root, 'file-m'), 'm\n');
   await command(['git', 'add', '.'], f.root);
   await command(['git', 'commit', '-m', 'main-advance'], f.root);
@@ -138,6 +143,7 @@ async function batchFixture(): Promise<{ f: Fixture; repo: Repo; builtOn: string
 async function lessonsFixture(): Promise<{ f: Fixture; repo: Repo; builtOn: string; base: string }> {
   const f: Fixture = await fixture();
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+  process.env.HOME = f.home;
   writeFileSync(resolve(f.root, '.gitattributes'), 'learnings/LESSONS.md merge=union\n');
   mkdirSync(resolve(f.root, 'learnings/history'), { recursive: true });
   writeFileSync(
@@ -301,7 +307,7 @@ test.serial('buildStack rebases member ranges in order then the holder range', a
     expect(await command(['git', 'rev-parse', result.top + '~3'], f.root)).toBe(builtOn);
     expect(await command(['git', 'rev-parse', 'mem-a'], f.root)).toBe(a.sha);
     expect(await command(['git', 'rev-parse', 'holder'], f.root)).toBe(holder.sha);
-    expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).not.toContain('leaf-temp');
+    expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).not.toContain('batch-');
     noLeftoverWorktrees(f);
   } finally {
     f.clean();
@@ -373,7 +379,7 @@ test.serial('a member conflict reports the slug and leaves no live branch change
     expect(result).toEqual({ ok: false, conflict: 'mem-b' });
     expect(await command(['git', 'rev-parse', 'mem-a'], f.root)).toBe(a.sha);
     expect(await command(['git', 'rev-parse', 'mem-b'], f.root)).toBe(b.sha);
-    expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).not.toContain('leaf-temp');
+    expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).not.toContain('batch-');
     noLeftoverWorktrees(f);
   } finally {
     f.clean();
