@@ -88,6 +88,13 @@ export function fakeHerdr(f: Fixture): HerdrFixture {
   return { db, env: { PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) } };
 }
 
+export function fakeAkrogon(f: Fixture): { env: NodeJS.ProcessEnv } {
+  const bin: string = resolve(f.home, 'bin');
+  mkdirSync(bin);
+  symlinkSync(entry, resolve(bin, 'akrogon'));
+  return { env: { PATH: `${bin}:${process.env.PATH}`, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) } };
+}
+
 export type GhFixture = { db: string; env: NodeJS.ProcessEnv };
 export function fakeGh(f: Fixture): GhFixture {
   const bin: string = resolve(f.home, 'gh-bin');

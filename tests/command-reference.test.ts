@@ -25,6 +25,7 @@ const contracts: Record<string, string> = {
   pause: '',
   unpause: '',
   status: '[<slug>|--charts]',
+  'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
 };
 
 function commandRows(markdown: string): CommandRow[] {

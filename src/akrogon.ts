@@ -29,9 +29,11 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
           ? { all: { type: 'boolean' } }
           : verb === 'close'
             ? { by: { type: 'string' } }
-            : verb === 'status'
-              ? { charts: { type: 'boolean' } }
-              : {};
+            : verb === 'run-check'
+              ? { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } }
+              : verb === 'status'
+                ? { charts: { type: 'boolean' } }
+                : {};
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(3),
@@ -145,8 +147,21 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./install')).install();
     break;
+  case 'run-check': {
+    const optional: z.ZodOptional<z.ZodString> = z.string().optional();
+    process.exitCode = await (
+      await import('./run-check')
+    ).runCheck(
+      process.cwd(),
+      optional.parse(values.name),
+      optional.parse(values.leaf),
+      optional.parse(values.holder),
+      positionals,
+    );
+    break;
+  }
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|hold-fix|sync|status>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|hold-fix|sync|status|run-check>',
     );
 }

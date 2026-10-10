@@ -4,6 +4,7 @@
 
 - `bun src/akrogon.ts close <owner/repo#n> --by <text>` closes one unowned GitHub issue.
 - `bun src/akrogon.ts config` prints effective settings and the worktree base.
+- `bun src/akrogon.ts run-check -- <argv>...` runs a command under the constructed check environment.
 - `bun run typecheck` checks the TypeScript command and tests.
 - `bun test tests/phase.test.ts` exercises lifecycle transitions and guards.
 

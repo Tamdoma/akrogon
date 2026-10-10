@@ -143,6 +143,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon unpause` | Resume automatic dispatch with one pass for the current repository. |
 | `akrogon hold-fix <slug>` | Name one merge leaf that takes the merge turn solo while the repository's hold stands. |
 | `akrogon unhold` | Clear a base-red merge hold for the current repository. |
+| `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Run a command under the constructed check environment and log output into the leaf. |
 ```
 
 A normal starting point for CSV export is:
