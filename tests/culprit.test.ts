@@ -378,6 +378,26 @@ test.serial('refused --culprit calls exit nonzero, name the reason and change no
     expect(withBase.code).not.toBe(0);
     expect(withBase.stderr).toContain('--culprit cannot combine with --red-on-base');
     await intact();
+    for (const [flag, value] of [
+      ['--verdict', 'ready'],
+      ['--reason', 'oops'],
+    ]) {
+      const invalid: Result = await run([
+        'phase',
+        'hold',
+        'check.fix',
+        '--slot',
+        'B',
+        '--attempt',
+        'a1',
+        '--culprit',
+        'mem-a',
+        flag,
+        value,
+      ]);
+      expect(invalid.code).not.toBe(0);
+      await intact();
+    }
   } finally {
     f.clean();
   }
