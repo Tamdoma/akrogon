@@ -4299,7 +4299,7 @@ test('a dispatched worktree gets a real .env file with the declared subset', asy
     const envFile: string = resolve(storeDir(f), 'build/.env');
     expect(lstatSync(envFile).isFile()).toBe(true);
     expect(statSync(envFile).mode & 0o777).toBe(0o600);
-    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\nSYNTHETIC_TWO=two words\n');
+    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\nSYNTHETIC_TWO=' + "'two words'" + '\n');
     const state: State = readState(path);
     expect(state.env_names).toEqual(['SYNTHETIC_ONE', 'SYNTHETIC_TWO']);
     expect(state.env_generation).toBe(0);
@@ -4326,6 +4326,62 @@ test('a dispatched .env file round-trips quotes and backslashes through dotenv p
     const copied: Record<string, string | undefined> = parseEnv(readFileSync(envFile, 'utf8'));
     expect(copied.SYNTHETIC_QUOTE).toBe('has"quote');
     expect(copied.SYNTHETIC_PATH).toBe('path\\\\segment');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a dispatched .env file preserves spaced assignments, multiline values and nested assignment text', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const root: string = resolve(f.root, '.env');
+    writeFileSync(
+      root,
+      'SYNTHETIC_SPACED = v \n' +
+        'SYNTHETIC_MULTI="line one\n' +
+        'line two"\n' +
+        'SYNTHETIC_OUTER=outside\n' +
+        'OTHER="a\n' +
+        'SYNTHETIC_OUTER=inside\n' +
+        'b"\n',
+    );
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      env: ['SYNTHETIC_SPACED', 'SYNTHETIC_MULTI', 'SYNTHETIC_OUTER'],
+    });
+    leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const copied: Record<string, string | undefined> = parseEnv(readFileSync(envFile, 'utf8'));
+    const original: Record<string, string | undefined> = parseEnv(readFileSync(root, 'utf8'));
+    expect(copied.SYNTHETIC_SPACED).toBe(original.SYNTHETIC_SPACED);
+    expect(copied.SYNTHETIC_MULTI).toBe(original.SYNTHETIC_MULTI);
+    expect(copied.SYNTHETIC_MULTI).toBe('line one\nline two');
+    expect(copied.SYNTHETIC_OUTER).toBe('outside');
+    expect(copied.OTHER).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next refuses a declared value that cannot be written as dotenv', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_QUOTES=a\'b"c\n');
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      env: ['SYNTHETIC_QUOTES'],
+    });
+    const path: string = leaf(f, 'build', 'plan.synthesis');
+    const result: Result = await next(f, ['build']);
+    expect(result.code).not.toBe(0);
+    const error: string = skips(result)[0].error;
+    expect(error).toContain('unwritable declared values');
+    expect(error).toContain('SYNTHETIC_QUOTES');
+    expect(error).not.toContain("a'b\"c");
+    expect(() => lstatSync(resolve(f.root, 'issues/worktrees/build/.env'))).toThrow(/ENOENT/);
   } finally {
     f.clean();
   }
