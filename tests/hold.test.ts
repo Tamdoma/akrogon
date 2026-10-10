@@ -240,7 +240,6 @@ async function heldMergePair(
   const fixPath: string = leaf(f, 'fix', 'merge', {
     worktree: fixBranch.worktree,
     merge_stamp: '2026-10-05T00:00:01.000Z',
-    solo: true,
   });
   return { herdr: fakeHerdr(f), holderPath, fixPath, sha };
 }
@@ -770,7 +769,7 @@ exec '${git}' "$@"
 });
 
 test.serial(
-  'hold-fix names a queued merge leaf: next builds its solo attempt while the queue head stays idle',
+  'hold-fix names a queued merge leaf: next builds its stack attempt while the queue head stays idle',
   async () => {
     const f: Fixture = await fixture();
     try {
@@ -787,11 +786,13 @@ test.serial(
       expect(fixBatch).toBeDefined();
       expect(fixBatch!.members).toEqual([]);
       expect(fixBatch!.applied).toBe(true);
+      expect(fixBatch!.solo).toBeUndefined();
+      expect(fixBatch!.top).toBeDefined();
       expect(readState(holderPath).batch).toBeUndefined();
       const prompts: Database['prompts'] = database(herdr).prompts;
       expect(prompts).toHaveLength(1);
       expect(prompts[0].text).toBe(
-        'merge-issue fix slot=B phase=merge leaf=' + fixPath + ' attempt=' + fixBatch!.attempt + ' solo',
+        'merge-issue fix slot=B phase=merge leaf=' + fixPath + ' attempt=' + fixBatch!.attempt + ' top=' + fixBatch!.top,
       );
     } finally {
       f.clean();
