@@ -474,6 +474,7 @@ async function batchPush(
   );
   if (pushed.code === 0) {
     appendAttempt(repo, leaf.state.slug, record, record.decision === 'reuse' ? 'reuse' : 'merged');
+    saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head, recorded: true } });
     for (const entry of members)
       await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
     await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted);
@@ -731,8 +732,12 @@ async function finishPush(
       const batch: Batch | undefined = leaf.state.batch;
       if (batch?.attempt !== pending.record.attempt || leaf.state.phase !== 'merge')
         throw new Error('Batch record changed while verifying the push');
-      appendAttempt(repo, slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
-      saveState(leaf.path, { ...leaf.state, batch: { ...batch, applied: true, top: pending.candidate } });
+      if (batch.recorded !== true)
+        appendAttempt(repo, slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
+      saveState(leaf.path, {
+        ...leaf.state,
+        batch: { ...batch, applied: true, top: pending.candidate, recorded: true },
+      });
       const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
       for (const entry of members)
         await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);

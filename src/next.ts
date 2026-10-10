@@ -899,7 +899,6 @@ async function reconcileBatch(
     const landed: boolean =
       batch.candidate !== undefined && (await isAncestor(repo.root, batch.candidate, trackingRef(repo)));
     if (landed) {
-      appendAttempt(repo, holder.state.slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
       for (const member of batch.members) {
         const item: Leaf | undefined = allLeaves(repo).find((entry) => entry.state.slug === member.slug);
         if (item?.state.phase === 'merge' && (await isAncestor(repo.root, member.tip, trackingRef(repo)))) {
@@ -913,6 +912,8 @@ async function reconcileBatch(
         allLeaves(repo).some((item) => item.state.slug === member.slug && item.state.phase === 'merge'),
       );
       if (holderNow.state.phase === 'merge') {
+        if (batch.recorded !== true)
+          appendAttempt(repo, holder.state.slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
         await commitMove(repo, holderNow, holderNow.state, 'merged', null);
         if (!inFlight) {
           const remaining: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
@@ -929,8 +930,13 @@ async function reconcileBatch(
         const survivors: BatchMember[] = holderNow.state.batch.members.filter((member) =>
           allLeaves(repo).some((item) => item.state.slug === member.slug && item.state.phase === 'merge'),
         );
+        if (batch.recorded !== true)
+          appendAttempt(repo, holder.state.slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
         const notified: boolean = batch.notified === true || (await mergeNotice(repo, holderNow.state.slug));
-        saveState(holderNow.path, { ...holderNow.state, batch: { ...batch, members: survivors, notified } });
+        saveState(holderNow.path, {
+          ...holderNow.state,
+          batch: { ...batch, members: survivors, notified, recorded: true },
+        });
       }
       return;
     }
@@ -943,7 +949,8 @@ async function reconcileBatch(
     );
     if (fresh !== undefined && batch.members.length > 0) await restoreHolder(repo, fresh, batch);
     if (fresh !== undefined) {
-      appendAttempt(repo, holder.state.slug, batch, 'red');
+      if (fresh.state.phase === 'merge' && batch.recorded !== true)
+        appendAttempt(repo, holder.state.slug, batch, 'red');
       saveState(fresh.path, { ...fresh.state, batch: undefined });
     }
   });
