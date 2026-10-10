@@ -458,6 +458,31 @@ test.serial('--red-on-base on a merge leaf without a batch record is refused', a
   }
 });
 
+test.serial('--red-on-base requires slot B even with a missing or stale attempt', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, builtOn, herdr } = await soloFixture(f);
+    expect((await cli(f, ['pause'])).code).toBe(0);
+    const variants: string[][] = [[], ['--attempt', 'stale-a0'], ['--slot', 'A', '--attempt', record.attempt]];
+    for (const args of variants) {
+      const result: Result = await cli(
+        f,
+        ['phase', 'hold', 'check.fix', ...args, '--red-on-base', builtOn, '--command', 'bun test'],
+        f.root,
+        herdr.env,
+      );
+      expect(result.code).not.toBe(0);
+      expect(readState(holder.path).batch).toEqual(record);
+      expect(await headOf(f, 'hold')).toBe(record.holder.head);
+      expect(heldRecords(f)).toEqual({});
+      expect(attemptLines(f)).toEqual([]);
+      expect(herdrCalls(herdr)).toEqual([]);
+    }
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial(
   'unhold clears the hold from root, a subfolder and a leaf worktree; absent hold fails naming the repo',
   async () => {
