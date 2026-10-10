@@ -52,6 +52,25 @@ That command commits eligible issue data. It excludes imported seeds, lock files
 
 When the containing issue is complete, Akrogon moves its records into the closed store. If it belongs to an epic, the whole epic must be complete before that top-level folder moves.
 
+## merge-attempts.jsonl: record each merge attempt
+
+Every merge attempt end appends one JSON line to `issues/merge-attempts.jsonl` in the registered repo, written by the command beside `issues/log.jsonl`. The two are separate files: `log.jsonl` records lifecycle moves, `merge-attempts.jsonl` records merge attempts. Like other issue records, the lines are committed through `akrogon sync`.
+
+Each line carries:
+
+- `attempt` is the batch attempt id.
+- `repo` is the registered repo name.
+- `holder` is the holder leaf slug.
+- `members` lists the carried member slugs in batch order.
+- `built_on` is the remote tip the batch stacked on.
+- `tested_top` is the stack top the checks ran against; it is absent when the attempt ended with no checked top.
+- `outcome` is `merged`, `red`, `split`, `held`, `reuse` or `ejected`.
+- `culprit` is the leaf slug named as the cause; it is present only on `ejected` lines.
+- `start` is the batch creation time; it is absent on batches created before this field existed.
+- `end` is the attempt end time.
+
+The command writes `merged`, `red`, `split` and `reuse` now; `held` and `ejected` are written by other leaves of the merge-throughput work.
+
 ## sync: save lifecycle records separately from code
 
 You can edit briefs and inspect reviews in the main checkout while agents change code in worktrees. Sync publishes the eligible lifecycle records without treating every local edit as issue data.
