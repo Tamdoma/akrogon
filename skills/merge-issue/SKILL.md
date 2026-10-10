@@ -62,7 +62,7 @@ Then gather the completion owner's briefs (the issue's, or every leaf brief unde
 
 Red runs and reruns reuse the same filtered set: every `checks` command not named in `merge_covers`, then every `merge_checks` command.
 
-On red checks, append the failing output, the rebase target commit and the tested head to `review-B.md` under the `leaf=` folder, call `akrogon phase <slug> check.fix --slot B --attempt <id>`, and finish with the actual result and repair footer. With carried members this prints `batch split, holder keeps <n> of <m> members`: the members are restored to their saved heads while the holder keeps the turn under a fresh prompt carrying at most the first half of them, and the pass ends there. With none, the leaf moves to `check.fix` as before.
+On red checks, append each failing command exactly as invoked (command and arguments), its failing output, the rebase target commit and the tested head to `review-B.md` under the `leaf=` folder, call `akrogon phase <slug> check.fix --slot B --attempt <id>`, and finish with the actual result and repair footer. With carried members this prints `batch split, holder keeps <n> of <m> members`: the members are restored to their saved heads while the holder keeps the turn under a fresh prompt carrying at most the first half of them, and the pass ends there. With none, the leaf moves to `check.fix` as before.
 
 A local default branch is unnecessary; the command's fast-forward push serializes competing merges. An unchanged successful check run is reused only when neither code nor integration changed.
 
