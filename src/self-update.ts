@@ -6,12 +6,12 @@ import { applySkillLinks, planSkillLinks, type Link } from './install';
 import { command, run, CommandError, type Result } from './shell';
 import { withLock } from './state';
 
-function firstLine(result: Result): string {
-  return (result.stderr !== '' ? result.stderr : result.stdout).split('\n')[0];
+function errorLine(result: Result): string {
+  return (result.stderr !== '' ? result.stderr : result.stdout).replaceAll('\n', ' ');
 }
 
 function describeError(error: unknown): string {
-  return firstLine(error instanceof CommandError ? error.result : { code: 1, stdout: '', stderr: String(error) });
+  return errorLine(error instanceof CommandError ? error.result : { code: 1, stdout: '', stderr: String(error) });
 }
 
 export async function selfUpdate(repo: Repo, ownRoot: string = toolRoot, home: string = homedir()): Promise<void> {
@@ -30,7 +30,7 @@ export async function selfUpdate(repo: Repo, ownRoot: string = toolRoot, home: s
       async (): Promise<string> => {
         const fetched: Result = await run(['git', 'fetch', repo.config.remote, repo.config.default_branch], root);
         if (fetched.code !== 0)
-          return `fetch failed: ${firstLine(fetched)}; ${await lag()}; retried at the next trigger`;
+          return `fetch failed: ${errorLine(fetched)}; ${await lag()}; retried at the next trigger`;
         const symbolic: Result = await run(['git', 'symbolic-ref', '--short', 'HEAD'], root);
         let skip: string | null;
         let old: string | null = null;
@@ -55,12 +55,12 @@ export async function selfUpdate(repo: Repo, ownRoot: string = toolRoot, home: s
               old = before;
               skip = null;
             } else
-              skip = `fast-forward refused: ${firstLine(merged)}; ${behind} behind ${target}; commit or finish the overlapping edit`;
+              skip = `fast-forward refused: ${errorLine(merged)}; ${behind} behind ${target}; commit or finish the overlapping edit`;
           }
         }
         let failure: string | null = null;
         const installed: Result = await run([process.execPath, 'install', '--frozen-lockfile'], root);
-        if (installed.code !== 0) failure = `install failed: ${firstLine(installed)}`;
+        if (installed.code !== 0) failure = `install failed: ${errorLine(installed)}`;
         else {
           try {
             const planned: { links: Link[]; conflicts: Link[] } = planSkillLinks(home, ownRoot);
