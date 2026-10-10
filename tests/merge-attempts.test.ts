@@ -837,3 +837,87 @@ test.serial('a decimal pressure total stops batch creation before any batch or l
     f.clean();
   }
 });
+
+test.serial('a created batch preserves PSI counters through rerun then reuse', async () => {
+  const f: Fixture = await fixture();
+  try {
+    process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const base: string = await remoteTip(f);
+    const holder: Branch = await branchAt(f, 'hold', base, 'file-hold');
+    const member: Branch = await branchAt(f, 'mem-a', base, 'file-mem-a');
+    const holderPath: string = leaf(f, 'hold', 'merge', {
+      worktree: holder.worktree,
+      merge_stamp: '2026-10-05T00:00:00.000Z',
+    });
+    leaf(f, 'mem-a', 'merge', {
+      worktree: member.worktree,
+      merge_stamp: '2026-10-05T00:00:01.000Z',
+    });
+    const dir: string = pressureDir(f, { cpu: '5', memory: '6', io: '7' });
+    const created: Result = await spawn(f, 'create', mergePassBody, herdr.env, [dir]);
+    expect(created.code).toBe(0);
+    const batch: Batch = readState(holderPath).batch!;
+    expect(batch.pressure_start).toEqual({ cpu: 5, memory: 6, io: 7, boot_id: 'boot-1' });
+    expect(batch.members.map((entry) => entry.slug)).toEqual(['mem-a']);
+    expect(
+      (
+        await spawn(
+          f,
+          'check',
+          phaseBody('hold', 'merged', ['B', undefined, undefined, true, batch.attempt], dir),
+          herdr.env,
+        )
+      ).code,
+    ).toBe(0);
+    await advanceRemote(f, { file: 'advanced\n' });
+    pressureDir(f, { cpu: '9', memory: '16', io: '27' });
+    const rerun: Result = await spawn(
+      f,
+      'rerun',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, batch.attempt], dir),
+      herdr.env,
+    );
+    expect(rerun.code).toBe(0);
+    const restacked: Batch = readState(holderPath).batch!;
+    expect(restacked.decision).toBe('rerun');
+    expect(restacked.tested_top).toBeUndefined();
+    expect(restacked.pressure_start).toEqual(batch.pressure_start);
+    expect(
+      (
+        await spawn(
+          f,
+          'recheck',
+          phaseBody('hold', 'merged', ['B', undefined, undefined, true, batch.attempt], dir),
+          herdr.env,
+        )
+      ).code,
+    ).toBe(0);
+    await advanceRemote(f, { 'issues/open/x/state.yaml': 'x\n' });
+    pressureDir(f, { cpu: '15', memory: '26', io: '47' });
+    const reuse: Result = await spawn(
+      f,
+      'reuse',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, batch.attempt], dir),
+      herdr.env,
+    );
+    expect(reuse.code).toBe(0);
+    const reused: Batch = readState(holderPath).batch!;
+    expect(reused.decision).toBe('reuse');
+    expect(reused.pressure_start).toEqual(batch.pressure_start);
+    expect(attemptLines(f)).toEqual([]);
+    const landed: Result = await spawn(
+      f,
+      'land',
+      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, batch.attempt], dir),
+      herdr.env,
+    );
+    expect(landed.code).toBe(0);
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('reuse');
+    expect(lines[0].pressure).toEqual({ cpu: 10, memory: 20, io: 40 });
+  } finally {
+    f.clean();
+  }
+});
