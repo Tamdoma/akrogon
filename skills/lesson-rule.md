@@ -3,5 +3,5 @@
 How a seat writes a lesson.
 
 - **Match**: before adding a line, check the active list for a lesson with the same failure cause and scope; shared keywords are not a match, and an unsure match gets a new line. On a match, append the new case to that lesson's history file and add no line.
-- **Seed**: a lesson whose mechanism a command could detect as a fixed pattern gets `/seed-issue` run for it unless its history already links a report; the created or returned report URL is appended to the history file. A judgment lesson files nothing. Detection is the Checkable definition in [learn-issues/SKILL.md](learn-issues/SKILL.md); whether a running guard already covers the mechanism is left to charting.
+- **Seed**: a lesson meeting the first clause of the Checkable definition in [learn-issues/SKILL.md](learn-issues/SKILL.md), new or matched, gets `/seed-issue` run for it unless its history already links a report; the created or returned report URL is appended to the history file. A judgment lesson files nothing. Whether a running guard already covers the mechanism is left to charting.
 - **Home**: a lesson about akrogon's own skills or command is written into akrogon's `learnings/`, with the root located by [seed-issue's owner rule](seed-issue/SKILL.md); the write is left for the operator to commit. When the root cannot be found, the seat says so and writes locally.
