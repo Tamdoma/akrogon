@@ -360,11 +360,17 @@ async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promis
   if (ignoredAtRoot.code !== 0) throw new CommandError(['git', 'check-ignore', '-q', '.env'], repo.root, ignoredAtRoot);
   if (live) return false;
   const root: string = resolve(repo.root, '.env');
-  const parsed: Record<string, string | undefined> = existsSync(root) ? parseEnv(readFileSync(root, 'utf8')) : {};
+  const text: string = existsSync(root) ? readFileSync(root, 'utf8') : '';
+  const parsed: Record<string, string | undefined> = parseEnv(text);
   const missing: string[] = repo.config.env.filter((name) => parsed[name] === undefined);
   if (missing.length > 0)
     throw new Error(`Refusing .env write at ${link}: missing declared names in ${root}: ${missing.join(', ')}`);
-  const declared: string[] = repo.config.env.map((name) => `${name}=${JSON.stringify(parsed[name]!)}`);
+  const scanned: Map<string, string> = new Map();
+  for (const line of text.split('\n')) {
+    const match: RegExpMatchArray | null = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
+    if (match !== null) scanned.set(match[1], match[2].trimEnd());
+  }
+  const declared: string[] = repo.config.env.map((name) => `${name}=${scanned.get(name)!}`);
   const content: string = declared.length > 0 ? declared.join('\n') + '\n' : '';
   const gitDir: string = resolve(worktree, await command(['git', 'rev-parse', '--git-dir'], worktree));
   const temp: string = resolve(gitDir, `akrogon-env-${process.pid}`);

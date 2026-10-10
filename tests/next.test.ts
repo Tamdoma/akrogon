@@ -4311,7 +4311,10 @@ test('a dispatched worktree gets a real .env file with the declared subset', asy
 test('a dispatched .env file round-trips quotes and backslashes through dotenv parsing', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_QUOTE=' + "'has\"quote'" + '\nSYNTHETIC_PATH=' + "'path\\\\segment'" + '\n');
+    writeFileSync(
+      resolve(f.root, '.env'),
+      'SYNTHETIC_QUOTE=' + "'has\"quote'" + '\nSYNTHETIC_PATH=' + "'path\\\\segment'" + '\n',
+    );
     yaml(resolve(f.root, 'issues/config.yaml'), {
       checks: { test: 'bun test' },
       grounding: 'none',
@@ -4319,10 +4322,10 @@ test('a dispatched .env file round-trips quotes and backslashes through dotenv p
     });
     leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
-    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const envFile: string = resolve(storeDir(f), 'build/.env');
     const copied: Record<string, string | undefined> = parseEnv(readFileSync(envFile, 'utf8'));
     expect(copied.SYNTHETIC_QUOTE).toBe('has"quote');
-    expect(copied.SYNTHETIC_PATH).toBe('path\\segment');
+    expect(copied.SYNTHETIC_PATH).toBe('path\\\\segment');
   } finally {
     f.clean();
   }
@@ -4341,10 +4344,10 @@ test('a live tab freezes .env while a dead tab lets the next dispatch rewrite it
     const path: string = leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
     const envFile: string = resolve(storeDir(f), 'build/.env');
-    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="1"\n');
+    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
     appendFileSync(root, 'SYNTHETIC_ONE=2\n');
     expect((await next(f, ['build'])).code).toBe(0);
-    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="1"\n');
+    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
     expect(readState(path).env_generation).toBe(0);
     const tab: string = readState(path).tab!;
     const db: Database = database(f);
@@ -4354,7 +4357,7 @@ test('a live tab freezes .env while a dead tab lets the next dispatch rewrite it
       panes: db.panes.filter((pane) => pane.tab_id !== tab),
     });
     expect((await next(f, ['build'])).code).toBe(0);
-    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="2"\n');
+    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=2\n');
     const state: State = readState(path);
     expect(state.env_names).toEqual(['SYNTHETIC_ONE']);
     expect(state.env_generation).toBe(1);
@@ -4413,7 +4416,7 @@ test('dispatch recreates a deleted .env file in a reused worktree once its tab i
     expect((await next(f, ['build'])).code).toBe(0);
     expect(lstatSync(envFile).isFile()).toBe(true);
     expect(statSync(envFile).mode & 0o777).toBe(0o600);
-    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="1"\n');
+    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
     expect(readState(path).env_generation).toBe(1);
   } finally {
     f.clean();
@@ -4437,7 +4440,7 @@ test('a pre-linked worktree has its .env symlink replaced by a real file on disp
     expect((await next(f, ['build'])).code).toBe(0);
     expect(lstatSync(envFile).isFile()).toBe(true);
     expect(statSync(envFile).mode & 0o777).toBe(0o600);
-    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="1"\n');
+    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
   } finally {
     f.clean();
   }
@@ -4512,7 +4515,7 @@ for (const kind of ['real file', 'stale link'] as const) {
       expect((await next(f, ['build'])).code).toBe(0);
       expect(lstatSync(envFile).isFile()).toBe(true);
       expect(statSync(envFile).mode & 0o777).toBe(0o600);
-      expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="1"\n');
+      expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
     } finally {
       f.clean();
     }
