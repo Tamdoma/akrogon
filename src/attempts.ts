@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { type Repo } from './config';
-import { command, run } from './shell';
+import { command, CommandError, run } from './shell';
 import { toolSchema, type Batch, type Tool } from './state';
 
 export const attemptOutcomeSchema = z.enum(['merged', 'red', 'split', 'held', 'reuse', 'ejected']);
@@ -50,9 +50,11 @@ export async function resolveTools(repo: Repo): Promise<Tool[]> {
   return Promise.all(
     repo.config.tools.map(async (name): Promise<Tool> => {
       const path: string = await command(['which', name]);
-      const probe: Awaited<ReturnType<typeof run>> = await run([name, '--version']);
+      const argv: string[] = [path, name === 'ffmpeg' ? '-version' : '--version'];
+      const probe: Awaited<ReturnType<typeof run>> = await run(argv);
       const first: string = (probe.stdout !== '' ? probe.stdout : probe.stderr).split('\n', 1)[0];
-      return { name, path, version: probe.code === 0 && first !== '' ? first : 'unknown' };
+      if (probe.code !== 0 || first === '') throw new CommandError(argv, process.cwd(), probe);
+      return { name, path, version: first };
     }),
   );
 }

@@ -1004,7 +1004,10 @@ test.serial('a merge turn records the FFmpeg version using its real version opti
   try {
     const herdr: HerdrFixture = fakeHerdr(f);
     const tool: string = resolve(f.home, 'bin/ffmpeg');
-    writeFileSync(tool, '#!/bin/sh\nif [ "$1" != "-version" ]; then echo "Unrecognized option" >&2; exit 8; fi\necho "ffmpeg version n9.0.2"\n');
+    writeFileSync(
+      tool,
+      '#!/bin/sh\nif [ "$1" != "-version" ]; then echo "Unrecognized option" >&2; exit 8; fi\necho "ffmpeg version n9.0.2"\n',
+    );
     chmodSync(tool, 0o755);
     yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', tools: ['ffmpeg'] });
     const holder: string = leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
