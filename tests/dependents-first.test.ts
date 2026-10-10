@@ -91,9 +91,9 @@ test('TURN ignores merged leaves when counting dependents', async () => {
 });
 
 test('next --all dispatches a leaf with unmerged dependents before an earlier leaf with none', async () => {
-  const f: Fixture & { db: string; env: NodeJS.ProcessEnv } = { ...(await fixture()) };
+  const base: Fixture = await fixture();
+  const f: Fixture & { db: string; env: NodeJS.ProcessEnv } = { ...base, ...fakeHerdr(base) };
   try {
-    Object.assign(f, fakeHerdr(f));
     // Discovery enumerates last-created first on tmpfs, so creating few after
     // the many chain puts few before many in the unsorted visit order.
     const many: string = leaf(f, 'many', 'plan.synthesis');
