@@ -346,6 +346,34 @@ test.serial('an unlanded candidate discards to exactly one red attempt line', as
   }
 });
 
+test.serial('a failed unlanded holder records one red attempt before recovery discards its batch', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b'], true);
+    saveState(holder.path, { ...readState(holder.path), batch: { ...record, candidate: record.top } });
+    const failed: Result = await cli(
+      f,
+      ['phase', 'hold', 'failed', '--slot', 'B', '--reason', 'push interrupted before landing'],
+      f.root,
+      herdr.env,
+    );
+    expect(failed.code).toBe(0);
+    expect(readState(holder.path).phase).toBe('failed');
+    expect(readState(holder.path).batch).toBeUndefined();
+    const lines: Attempt[] = attemptLines(f);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].outcome).toBe('red');
+    expect(lines[0].attempt).toBe(record.attempt);
+    expect(lines[0].members).toEqual(['mem-a', 'mem-b']);
+    for (let pass: number = 0; pass < 2; pass++) {
+      await cli(f, ['next'], f.root, herdr.env);
+      expect(attemptLines(f)).toEqual(lines);
+    }
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('stale-attempt and non-holder phase calls write no attempt line', async () => {
   const f: Fixture = await fixture();
   try {
