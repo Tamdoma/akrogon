@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, writeFileSync, chmodSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, fakeHerdr, leaf, editOnSecondStatus, yaml, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
@@ -933,10 +933,9 @@ test('empty untracked folders are removed before an applied merge prompt', async
     expect(readFileSync(resolve(worktree, 'node_modules/pkg.js'), 'utf8')).toBe('module\n');
     expect(existsSync(resolve(worktree, 'td/ige'))).toBe(true);
     expect(readFileSync(resolve(worktree, 'td/keep'), 'utf8')).toBe('keep\n');
-    const envLink: string = resolve(worktree, '.env');
-    expect(lstatSync(envLink).isSymbolicLink()).toBe(true);
-    expect(readlinkSync(envLink)).toBe(resolve(f.root, '.env'));
-    expect(readFileSync(envLink, 'utf8')).toBe('secret\n');
+    const envFile: string = resolve(worktree, '.env');
+    expect(lstatSync(envFile).isFile()).toBe(true);
+    expect(readFileSync(envFile, 'utf8')).toBe('');
   } finally {
     f.clean();
   }
