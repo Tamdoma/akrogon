@@ -774,6 +774,7 @@ export async function phaseCommand(
     if (check) throw new Error('--check cannot combine with --red-on-base');
     if (requested !== 'check.fix') throw new Error('--red-on-base is only valid for check.fix');
     if (cmd === undefined) throw new Error('--red-on-base requires --command');
+    if (slot !== 'B') throw new Error('--red-on-base requires --slot B');
   }
   const global: GlobalConfig = readGlobal();
   const repo: Repo = await requireRepo(global, process.cwd());
