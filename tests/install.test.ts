@@ -1,20 +1,24 @@
-import { test, expect } from 'bun:test';
+import { test, expect, describe } from 'bun:test';
 import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
   readlinkSync,
   realpathSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
   type Stats,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, relative, resolve } from 'node:path';
 import { z } from 'zod';
-import { toolRoot } from '../src/config';
-import { quote, type Result } from '../src/shell';
+import { repoSchema, toolRoot, type Repo } from '../src/config';
+import { command, quote, type Result } from '../src/shell';
+import { selfUpdate } from '../src/self-update';
 import { fixture, cli, yaml, type Fixture } from './helpers';
 
 const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
@@ -213,4 +217,299 @@ test('install still refuses an executable destination conflict before linking or
   } finally {
     f.clean();
   }
+});
+
+describe('self-update', () => {
+  type SelfUpdateFixture = {
+    home: string;
+    clone: string;
+    seed: string;
+    remote: string;
+    repo: Repo;
+    clean: () => void;
+  };
+
+  async function selfUpdateFixture(): Promise<SelfUpdateFixture> {
+    const home: string = mkdtempSync(resolve(tmpdir(), 'akrogon-self-update-'));
+    const seed: string = resolve(home, 'seed');
+    const remote: string = resolve(home, 'remote.git');
+    const clone: string = resolve(home, 'clone');
+    mkdirSync(resolve(seed, 'skills/skill-one'), { recursive: true });
+    mkdirSync(resolve(seed, 'skills/skill-two'), { recursive: true });
+    mkdirSync(resolve(seed, 'vendor/tiny'), { recursive: true });
+    writeFileSync(resolve(seed, 'skills/skill-one/SKILL.md'), 'one\n');
+    writeFileSync(resolve(seed, 'skills/skill-two/SKILL.md'), 'two\n');
+    mkdirSync(resolve(seed, 'src'));
+    writeFileSync(resolve(seed, 'src/akrogon.ts'), 'x\n');
+    writeFileSync(resolve(seed, 'file'), 'initial\n');
+    writeFileSync(resolve(seed, '.gitignore'), 'node_modules/\n');
+    writeFileSync(resolve(seed, 'vendor/tiny/package.json'), JSON.stringify({ name: 'tiny', version: '1.0.0' }));
+    writeFileSync(
+      resolve(seed, 'package.json'),
+      JSON.stringify({ name: 'self-update-fixture', dependencies: { tiny: 'file:vendor/tiny' } }),
+    );
+    await command(['git', 'init', '-b', 'main', seed]);
+    await command(['git', 'config', 'user.email', 'test@example.invalid'], seed);
+    await command(['git', 'config', 'user.name', 'Test'], seed);
+    await command([process.execPath, 'install'], seed);
+    expect(existsSync(resolve(seed, 'bun.lock'))).toBe(true);
+    await command(['git', 'add', '.'], seed);
+    await command(['git', 'commit', '-m', 'initial'], seed);
+    await command(['git', 'init', '--bare', '-b', 'main', remote]);
+    await command(['git', 'remote', 'add', 'origin', remote], seed);
+    await command(['git', 'push', 'origin', 'HEAD:main'], seed);
+    await command(['git', 'clone', remote, clone]);
+    await command(['git', 'config', 'user.email', 'test@example.invalid'], clone);
+    await command(['git', 'config', 'user.name', 'Test'], clone);
+    const repo: Repo = {
+      name: 'akrogon',
+      root: clone,
+      config: repoSchema.parse({ grounding: 'none' }),
+    };
+    return { home, clone, seed, remote, repo, clean: () => rmSync(home, { recursive: true, force: true }) };
+  }
+
+  async function pushSeed(f: SelfUpdateFixture, change: () => void): Promise<string> {
+    change();
+    await command(['git', 'add', '-A'], f.seed);
+    await command(['git', 'commit', '-m', 'change'], f.seed);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.seed);
+    return await command(['git', 'rev-parse', 'HEAD'], f.seed);
+  }
+
+  async function withHome(home: string, body: () => Promise<void>): Promise<void> {
+    const previous: string | undefined = process.env.AKROGON_HOME;
+    process.env.AKROGON_HOME = home;
+    try {
+      await body();
+    } finally {
+      if (previous === undefined) delete process.env.AKROGON_HOME;
+      else process.env.AKROGON_HOME = previous;
+    }
+  }
+
+  async function captured(home: string, body: () => Promise<void>): Promise<string[]> {
+    const lines: string[] = [];
+    const original: typeof console.log = console.log;
+    console.log = (...args: unknown[]) => {
+      lines.push(args.join(' '));
+    };
+    try {
+      await withHome(home, body);
+    } finally {
+      console.log = original;
+    }
+    return lines;
+  }
+
+  test.serial('fast-forwards a behind checkout, keeps an unrelated dirty file and prints deployed', async () => {
+    const f: SelfUpdateFixture = await selfUpdateFixture();
+    try {
+      const oldSha: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
+      const newSha: string = await pushSeed(f, () => {
+        writeFileSync(resolve(f.seed, 'file'), 'changed\n');
+      });
+      writeFileSync(resolve(f.clone, 'skills/skill-one/SKILL.md'), 'local edit\n');
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      expect(logs).toEqual([`deployed ${oldSha.slice(0, 12)}..${newSha.slice(0, 12)}`]);
+      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(newSha);
+      expect(readFileSync(resolve(f.clone, 'skills/skill-one/SKILL.md'), 'utf8')).toBe('local edit\n');
+      for (const root of roots) {
+        const link: string = resolve(f.home, root, 'skill-one');
+        expect(lstatSync(link).isSymbolicLink()).toBe(true);
+        expect(realpathSync(link)).toBe(resolve(f.clone, 'skills/skill-one'));
+      }
+      expect(realpathSync(resolve(f.home, '.local/bin/akrogon'))).toBe(resolve(f.clone, 'src/akrogon.ts'));
+      expect(existsSync(resolve(f.clone, '.git/akrogon-install.lock'))).toBe(true);
+      expect(existsSync(resolve(f.home, '.lock'))).toBe(true);
+    } finally {
+      f.clean();
+    }
+  });
+
+  test.serial('refuses a fast-forward overlapping a dirty edit and reports step, error, lag and remedy', async () => {
+    const f: SelfUpdateFixture = await selfUpdateFixture();
+    try {
+      const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
+      const newSha: string = await pushSeed(f, () => {
+        writeFileSync(resolve(f.seed, 'file'), 'changed\n');
+      });
+      writeFileSync(resolve(f.clone, 'file'), 'dirty\n');
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toContain('self-update skipped: fast-forward refused');
+      expect(logs[0]).toContain('Your local changes');
+      expect(logs[0]).toContain('1 behind origin/main');
+      expect(logs[0]).toContain('commit or finish the overlapping edit');
+      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
+      expect(await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.clone)).toBe(newSha);
+      expect(readFileSync(resolve(f.clone, 'file'), 'utf8')).toBe('dirty\n');
+    } finally {
+      f.clean();
+    }
+  });
+
+  test.serial('skips a checkout on another branch and reports the branch', async () => {
+    const f: SelfUpdateFixture = await selfUpdateFixture();
+    try {
+      const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
+      await pushSeed(f, () => {
+        writeFileSync(resolve(f.seed, 'file'), 'changed\n');
+      });
+      await command(['git', 'checkout', '-b', 'topic'], f.clone);
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toContain('self-update skipped:');
+      expect(logs[0]).toContain('topic');
+      expect(logs[0]).toContain('1 behind origin/main');
+      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
+      expect(await command(['git', 'symbolic-ref', '--short', 'HEAD'], f.clone)).toBe('topic');
+    } finally {
+      f.clean();
+    }
+  });
+
+  test.serial('skips a detached HEAD checkout and reports it', async () => {
+    const f: SelfUpdateFixture = await selfUpdateFixture();
+    try {
+      const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
+      await pushSeed(f, () => {
+        writeFileSync(resolve(f.seed, 'file'), 'changed\n');
+      });
+      await command(['git', 'checkout', '--detach', 'HEAD'], f.clone);
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toContain('self-update skipped: detached HEAD');
+      expect(logs[0]).toContain('1 behind origin/main');
+      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
+      expect(
+        (await command(['git', 'symbolic-ref', '--short', 'HEAD'], f.clone).catch(() => 'detached')) === 'detached',
+      ).toBe(true);
+    } finally {
+      f.clean();
+    }
+  });
+
+  test.serial('skips a checkout ahead of the remote and names akrogon sync', async () => {
+    const f: SelfUpdateFixture = await selfUpdateFixture();
+    try {
+      writeFileSync(resolve(f.clone, 'local-only'), 'x\n');
+      await command(['git', 'add', '.'], f.clone);
+      await command(['git', 'commit', '-m', 'ahead'], f.clone);
+      const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toContain('self-update skipped:');
+      expect(logs[0]).toContain('akrogon sync');
+      expect(logs[0]).toContain('0 behind origin/main');
+      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
+    } finally {
+      f.clean();
+    }
+  });
+
+  test.serial('skips a checkout diverged from the remote and names akrogon sync', async () => {
+    const f: SelfUpdateFixture = await selfUpdateFixture();
+    try {
+      writeFileSync(resolve(f.clone, 'local-only'), 'x\n');
+      await command(['git', 'add', '.'], f.clone);
+      await command(['git', 'commit', '-m', 'ahead'], f.clone);
+      const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
+      const newSha: string = await pushSeed(f, () => {
+        writeFileSync(resolve(f.seed, 'file'), 'changed\n');
+      });
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toContain('self-update skipped:');
+      expect(logs[0]).toContain('diverged');
+      expect(logs[0]).toContain('akrogon sync');
+      expect(logs[0]).toContain('1 behind origin/main');
+      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
+      expect(await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.clone)).toBe(newSha);
+    } finally {
+      f.clean();
+    }
+  });
+
+  test.serial('reports a failed install and reports current once the lockfile is restored', async () => {
+    const f: SelfUpdateFixture = await selfUpdateFixture();
+    try {
+      const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
+      writeFileSync(resolve(f.clone, 'bun.lock'), 'garbage\n');
+      const first: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      expect(first).toHaveLength(1);
+      expect(first[0]).toContain('install');
+      expect(first[0]).toContain('failed');
+      expect(first[0]).toContain('0 behind origin/main');
+      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
+      writeFileSync(resolve(f.clone, 'bun.lock'), readFileSync(resolve(f.seed, 'bun.lock'), 'utf8'));
+      const second: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      expect(second).toEqual([`current ${head.slice(0, 12)}`]);
+    } finally {
+      f.clean();
+    }
+  });
+
+  test.serial('is a silent no-op when repo.root is not ownRoot', async () => {
+    const f: SelfUpdateFixture = await selfUpdateFixture();
+    try {
+      const elsewhere: string = mkdtempSync(resolve(f.home, 'elsewhere-'));
+      rmSync(f.remote, { recursive: true, force: true });
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, elsewhere, f.home));
+      expect(logs).toEqual([]);
+      expect(existsSync(resolve(f.home, '.local/bin'))).toBe(false);
+      expect(existsSync(resolve(f.clone, '.git/akrogon-install.lock'))).toBe(false);
+    } finally {
+      f.clean();
+    }
+  });
+
+  test.serial('links a skill added on the remote and prunes links to a removed skill after deploying', async () => {
+    const f: SelfUpdateFixture = await selfUpdateFixture();
+    try {
+      for (const root of roots) {
+        const directory: string = resolve(f.home, root);
+        mkdirSync(directory, { recursive: true });
+        symlinkSync(resolve(f.clone, 'skills/skill-two'), resolve(directory, 'skill-two'));
+      }
+      const newSha: string = await pushSeed(f, () => {
+        mkdirSync(resolve(f.seed, 'skills/skill-three'));
+        writeFileSync(resolve(f.seed, 'skills/skill-three/SKILL.md'), 'three\n');
+        rmSync(resolve(f.seed, 'skills/skill-two'), { recursive: true, force: true });
+      });
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toMatch(/^deployed [0-9a-f]{12}\.\.[0-9a-f]{12}$/);
+      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(newSha);
+      for (const root of roots) {
+        const directory: string = resolve(f.home, root);
+        expect(lstatSync(resolve(directory, 'skill-two'), { throwIfNoEntry: false })).toBeUndefined();
+        expect(realpathSync(resolve(directory, 'skill-three'))).toBe(resolve(f.clone, 'skills/skill-three'));
+        expect(realpathSync(resolve(directory, 'skill-one'))).toBe(resolve(f.clone, 'skills/skill-one'));
+      }
+    } finally {
+      f.clean();
+    }
+  });
+
+  test.serial('names a conflicting directory in the line and still creates the other links', async () => {
+    const f: SelfUpdateFixture = await selfUpdateFixture();
+    try {
+      mkdirSync(resolve(f.home, '.claude/skills/skill-one'), { recursive: true });
+      await pushSeed(f, () => {
+        writeFileSync(resolve(f.seed, 'file'), 'changed\n');
+      });
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toContain('links');
+      expect(logs[0]).toContain(resolve(f.home, '.claude/skills/skill-one'));
+      expect(logs[0]).toContain('remove');
+      expect(lstatSync(resolve(f.home, '.claude/skills/skill-one')).isDirectory()).toBe(true);
+      for (const root of roots.filter((root) => root !== '.claude/skills'))
+        expect(realpathSync(resolve(f.home, root, 'skill-one'))).toBe(resolve(f.clone, 'skills/skill-one'));
+      expect(realpathSync(resolve(f.home, '.local/bin/akrogon'))).toBe(resolve(f.clone, 'src/akrogon.ts'));
+    } finally {
+      f.clean();
+    }
+  });
 });
