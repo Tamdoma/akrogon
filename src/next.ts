@@ -78,7 +78,7 @@ import {
 import { commitMove, completeOwner } from './phase';
 import { appendAttempt } from './attempts';
 import { sessionFile, deliveredAfter } from './session-file';
-import { heldFor, clearHeld, dropHeld, type Hold } from './hold';
+import { heldFor, dropHeld, type Hold } from './hold';
 import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
 import { blockDetail, dependentCounts, mergeQueue, type QueueEntry } from './turn';
@@ -1029,7 +1029,6 @@ async function mergeTurn(
       console.log(`held ${repo.name} on ${heldBefore.sha}: ${heldBefore.command}`);
       return;
     }
-    await clearHeld(repo.name);
   }
   let batch: Batch | undefined;
   await withLock(resolve(globalHome(), '.lock'), async () => {
