@@ -206,6 +206,52 @@ test.serial('buildStack re-removes a retired lesson line the union merge resurre
   }
 });
 
+test.serial('buildStack keeps a same-stem lesson main added while the retiring member was in flight', async () => {
+  const { f, repo } = await lessonsFixture();
+  try {
+    const a = await branch(
+      f,
+      'mem-a',
+      {
+        'learnings/LESSONS.md': '- lesson beta. 2026-09-11. [beta](history/beta.md)\n',
+        'learnings/history/alpha.md': '# alpha\n\nApplied 2026-10-05 by tests/batch.test.ts: buildStack same-stem\n',
+        'file-mem-a': 'a\n',
+      },
+      false,
+    );
+    const holder = await branch(f, 'holder', { 'file-holder': 'h\n' }, false);
+    const recurrence: string = '- new recurrence. 2026-10-10. history/alpha.md\n';
+    writeFileSync(
+      resolve(f.root, 'learnings/LESSONS.md'),
+      '- lesson alpha. 2026-09-10. history/alpha.md\n- lesson gamma. 2026-09-12. history/gamma.md\n' +
+        recurrence +
+        '- lesson beta. 2026-09-11. [beta](history/beta.md)\n',
+    );
+    await command(['git', 'add', '.'], f.root);
+    await command(['git', 'commit', '-m', 'recurrence'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const builtOn: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+    const result = await buildStack(
+      repo,
+      builtOn,
+      [{ slug: 'mem-a', base: await memberBase(repo, builtOn, a.sha), head: a.sha }],
+      holder.sha,
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result));
+    const topLessons: string = await command(['git', 'show', result.top + ':learnings/LESSONS.md'], f.root);
+    expect(topLessons).toContain('new recurrence. 2026-10-10. history/alpha.md');
+    expect(topLessons).toContain('lesson gamma');
+    expect(topLessons).toContain('lesson beta');
+    expect(topLessons).not.toContain('lesson alpha. 2026-09-10');
+    expect(await command(['git', 'log', '--format=%s', '-1', result.top], f.root)).toBe(
+      'lessons: retire applied lines',
+    );
+    noLeftoverWorktrees(f);
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('buildStack adds no fixup commit when no retired lesson is resurrected', async () => {
   const { f, repo, builtOn } = await lessonsFixture();
   try {
