@@ -783,7 +783,7 @@ export async function phaseCommand(
   rawCommand: string | boolean | undefined,
   rawCulprit: string | boolean | undefined,
   pressureDir: string = '/proc/pressure',
-): Promise<{ repo: Repo; committed: boolean }> {
+): Promise<{ repo: Repo; committed: boolean; to?: Phase }> {
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
   const verdict: Verdict | undefined = verdictSchema.optional().parse(rawVerdict);
@@ -809,8 +809,10 @@ export async function phaseCommand(
   const global: GlobalConfig = readGlobal();
   const repo: Repo = await requireRepo(global, process.cwd());
   let committed: boolean = false;
+  let committedTo: Phase | undefined;
   let pending: BatchPending = { kind: 'none' };
   const onCommitted: () => void = () => {
+    committedTo = requested;
     committed = true;
   };
   await withLock(resolve(globalHome(), '.lock'), async () => {
@@ -947,5 +949,5 @@ export async function phaseCommand(
   });
   if (pending.kind !== 'none')
     await finishPush(repo, slug, pending, requested, slot, verdict, reason, onCommitted, pressureDir);
-  return { repo, committed };
+  return { repo, committed, to: committedTo };
 }
