@@ -244,9 +244,9 @@ test('completion prints only when the owner finishes, stays silent on inner issu
   try {
     // merge_stamp fixes the queue order the dropped Promise.all race relied on; the
     // one-holder-per-repo rule requires sequential merges.
-    leaf(f, 'one', 'merge', { merge_stamp: '2026-10-05T20:00:00Z', solo: true }, 'epic/first');
-    leaf(f, 'two', 'merge', { merge_stamp: '2026-10-05T20:00:01Z', solo: true }, 'epic/first');
-    leaf(f, 'three', 'merge', { merge_stamp: '2026-10-05T20:00:02Z', solo: true }, 'epic/second');
+    leaf(f, 'one', 'merge', { merge_stamp: '2026-10-05T20:00:00Z', batch_limit: 0 }, 'epic/first');
+    leaf(f, 'two', 'merge', { merge_stamp: '2026-10-05T20:00:01Z', batch_limit: 0 }, 'epic/first');
+    leaf(f, 'three', 'merge', { merge_stamp: '2026-10-05T20:00:02Z', batch_limit: 0 }, 'epic/second');
     mkdirSync(resolve(f.root, 'issues/chart/epic'), { recursive: true });
     writeFileSync(resolve(f.root, 'issues/chart/epic/CHART.md'), '# Chart: epic\n');
     const race: Result[] = [];
@@ -267,8 +267,8 @@ test('completion prints only when the owner finishes, stays silent on inner issu
     const repeated: Result = await cli(f, ['phase', 'three', 'merged']);
     expect(repeated.code).not.toBe(0);
     expect(repeated.stdout).not.toContain('complete');
-    leaf(f, 'penultimate', 'merge', { merge_stamp: '2026-10-05T20:00:03Z', solo: true }, 'standalone');
-    leaf(f, 'last', 'merge', { merge_stamp: '2026-10-05T20:00:04Z', solo: true }, 'standalone');
+    leaf(f, 'penultimate', 'merge', { merge_stamp: '2026-10-05T20:00:03Z', batch_limit: 0 }, 'standalone');
+    leaf(f, 'last', 'merge', { merge_stamp: '2026-10-05T20:00:04Z', batch_limit: 0 }, 'standalone');
     const standalone: Result[] = [];
     for (const slug of ['penultimate', 'last']) standalone.push(await cli(f, ['phase', slug, 'merged']));
     expect(standalone.every((r) => r.code === 0)).toBe(true);
@@ -294,8 +294,8 @@ function snapshot(dir: string, prefix: string = ''): Map<string, Buffer> {
 test('completion leaves a chart holding a same-slug draft in place and keeps the inventory readable', async () => {
   const f: Fixture = await fixture();
   try {
-    const alpha: string = leaf(f, 'alpha', 'merge', { solo: true }, 'epic/one');
-    leaf(f, 'beta', 'merge', { solo: true }, 'epic/two');
+    const alpha: string = leaf(f, 'alpha', 'merge', { batch_limit: 0 }, 'epic/one');
+    leaf(f, 'beta', 'merge', { batch_limit: 0 }, 'epic/two');
     const chart: string = resolve(f.root, 'issues/chart/epic');
     const slot: string = resolve(chart, 'slots/leaf-draft/alpha');
     mkdirSync(slot, { recursive: true });
@@ -392,15 +392,20 @@ test('asymmetric and empty leaf sources defer until epic completion under open l
       f,
       'one',
       'merge',
-      { worktree: first, sources: ['team/project#1', 'team/project#2'], solo: true },
+      { worktree: first, sources: ['team/project#1', 'team/project#2'], batch_limit: 0 },
       'epic/first',
     );
     leaf(f, 'empty', 'merged', {}, 'epic/first');
+    const main: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
     leaf(
       f,
       'two',
       'merge',
-      { worktree: last, sources: ['team/project#2', 'team/project#3'], solo: true },
+      {
+        worktree: last,
+        sources: ['team/project#2', 'team/project#3'],
+        batch: { attempt: 'a1', built_on: main, holder: { base: main, head }, applied: true, solo: true, members: [] },
+      },
       'epic/second',
     );
     expect((await cli(f, ['phase', 'one', 'merged'], f.root, gh.env)).code).toBe(0);
@@ -1854,8 +1859,8 @@ test('merge turn refusal fires before worktree guards on a missing worktree', as
 test('an earlier merge_stamp takes the turn over slug order', async () => {
   const f: Fixture = await fixture();
   try {
-    leaf(f, 'aa', 'merge', { merge_stamp: '2026-10-05T20:00:02Z', solo: true }, 'epic/first');
-    leaf(f, 'bb', 'merge', { merge_stamp: '2026-10-05T20:00:01Z', solo: true }, 'epic/second');
+    leaf(f, 'aa', 'merge', { merge_stamp: '2026-10-05T20:00:02Z', batch_limit: 0 }, 'epic/first');
+    leaf(f, 'bb', 'merge', { merge_stamp: '2026-10-05T20:00:01Z', batch_limit: 0 }, 'epic/second');
     const refused: Result = await cli(f, ['phase', 'aa', 'merged']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('bb');
