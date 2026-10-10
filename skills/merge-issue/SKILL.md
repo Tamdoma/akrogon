@@ -54,13 +54,13 @@ On a rebase conflict, resolve it in the worktree keeping both true sides, comple
 
 Same-line index conflicts retain both true entries and recheck pointers. An existing assertion, fixture or recorded output changes or is deleted only with a cited brief outcome or real source (a real build, user action or content, integration or attacker-reachable input) that the old expectation contradicts. A new test needs no cited source. A wrong test exposed by the rebase, its expectation contradicting a brief outcome or a real source, is fixed in its own commit with the reason and the merge continues; a broken default branch discovered by this leaf is fixed forward with failing tests as criteria.
 
-After the rebase resolves, B runs the re-removal one-liner and commits the removal as its own scoped commit when the output is non-empty; `merged --check` refuses a pushed range still holding a retired line.
+After the rebase resolves, B runs the re-removal one-liner, resolving the helper beside the installed akrogon entry point while operating in the target worktree, and commits the removal as its own scoped commit when the output lists removed histories; `merged --check` refuses a pushed range still holding a retired line.
 
 ```
-bun -e "import {mergeBase, removeRetiredLessons} from './src/lessons.ts'; const b=await mergeBase(process.cwd(),'<remote>/<default_branch>','HEAD'); const r=await removeRetiredLessons(process.cwd(),b,'HEAD'); console.log(r.length?r.join('\n'):'none')"
+bun -e "const {mergeBase, removeRetiredLessons}=await import(process.argv[1]); const b=await mergeBase(process.cwd(),'<remote>/<default_branch>','HEAD'); const r=await removeRetiredLessons(process.cwd(),b,'HEAD'); console.log(r.length?r.join('\n'):'none')" "$(dirname "$(readlink -f "$(command -v akrogon)")")/lessons.ts"
 ```
 
-When the output is non-empty: `git add learnings/LESSONS.md && git commit -m "lessons: retire applied lines"`.
+When the output lists removed histories (`none` means no removal): `git add learnings/LESSONS.md && git commit -m "lessons: retire applied lines"`.
 
 On green checks run `akrogon phase <slug> merged --slot B --check --attempt <id>`; on a trailer refusal B adds a commit carrying the missing trailer when the change has a real source, a trailer-only empty commit when the change sits inside a rebased commit, or reverts the change, then reruns the checks and `--check`.
 
