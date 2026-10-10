@@ -1,0 +1,8 @@
+# batch-size proposed final shape (operator 2026-10-10: "1a | 2a | 3a |")
+
+1. Red batch ending order in merge-issue:65: `--red-on-base <sha>` first (red-main-hold). Else `--culprit <slug>` when B can name the holder or one member from evidence (failing output traced to that leaf's diff, recorded in review-B.md). Else today's split (src/phase.ts:788-798) unchanged.
+2. `akrogon phase <holder> check.fix --slot B --attempt <id> --culprit <slug>`: refuses a stale attempt and a slug that is not the holder or a batch member. Restores the other members and the holder to saved heads, clears the batch record, then moves only the culprit merge -> check.fix through transition (new merge_stamp, counts toward fix_rounds per bounce-counting). Holder as culprit: members restored and record cleared before the holder's transition. Next mergeTurn rebuilds from the queue with the existing build (src/next.ts:1008-1042). No halving on this path.
+3. Size: `batch_limit` in repo `issues/config.yaml`, counts the whole stack including the holder (followers = batch_limit - 1), default 4. It replaces the whole-queue first batch at src/next.ts:1020. The per-leaf state key stays only for the fallback split within one holder and resets when the holder leaves merge as today. Replaces first-package Q2 2a (start 2, halve, floor 1, kept across holders). The solo-clear-after-clean-run rule stays.
+4. A wrong name counts like any bounce. No refund rule.
+5. attempt-records gains outcome `ejected` with the culprit slug.
+6. Leaf: `batch-limit-repo` becomes `red-batch-culprit` (config cap + --culprit + skill order), blocked-by `merge-attempt-records` (writes `ejected`).

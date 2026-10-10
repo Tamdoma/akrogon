@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr notification show
+    command: herdr notification show "akrogon/merge-throughput probe" --body "charting proof for red-main-hold notify, ignore" --sound request
+    identity: operator's local herdr session (same process user akrogon next runs as)
+    target: local herdr server, workspace w8
+    version: herdr 0.9.3
+    date: '2026-10-10'
+    result: exit 0, {"reason":"shown","shown":true,"type":"notification_show"}
+    cleanup: none needed, the notification is transient
+    limits: proves the call shape and that a notification shows on this machine; does not prove an operator saw it or behavior on other herdr versions
+    record: issues/chart/merge-throughput/forks/red-main-hold.md

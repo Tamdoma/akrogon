@@ -1,0 +1,40 @@
+slug: bounce-repair-proof
+phase: plan.synthesis
+created: 2026-10-10
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#62"
+  - "Tamdoma/akrogon#64"
+  - "Tamdoma/akrogon#65"
+  - "Tamdoma/akrogon#66"
+  - "Tamdoma/akrogon#67"
+  - "Tamdoma/akrogon#68"
+  - "Tamdoma/akrogon#70"
+  - "Tamdoma/akrogon#71"
+  - "Tamdoma/akrogon#72"
+busy_since: 
+  A: 2026-10-10T06:30:01.683Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tA2
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/bounce-repair-proof
+pane: 
+  A: w8:pK7
+  B: w8:pK8
+prompted: 
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-bounce-repair-proof--/2026-10-10T06-29-58-590Z_01a12481-08be-73ff-ad96-7216e2cdfe38.jsonl
+prompted_at: 
+  A: 2026-10-10T06:30:01.683Z
+delivery_error: 
+  {}

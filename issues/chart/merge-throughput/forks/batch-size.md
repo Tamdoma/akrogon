@@ -1,0 +1,25 @@
+# Batch size
+
+## Question
+Q1. What sets merge batch size, and what happens to a red batch, so the merge turn lands the most leaves per run at the same gate?
+
+### Carries
+- first-package Q2 2a as recorded: repo limit start 2, halve on red, floor 1, kept across holders, no growth step. Door found it collapses to 1 permanently after the first red pair.
+- Operator 2026-10-10, verbatim: "why did we choose only 2 at a time? From the systems thinking perspective, is there a more elegant solution to this stock and flow problem? what enforces bad reinforcement looping, and are there any balancing loops that are optimizing for the wrong target? Consult with slot B and C (they're both active)."
+- Locks: merge-turn (one turn per repo, batching), first-package 1a (bounce repair reruns rejected command), red-main-hold (base red holds the turn, no split), bounce-counting, queue-order, attempt-records (per-attempt records with outcome and times).
+
+## Findings
+- "2" is the n·p^n optimum at p 0.62 only and ignores red-run cost (A,B,C). With today's holder-keeping split, any batch size lands at or below solo at today's pass rate: p 0.62 solo 0.63, fixed 2 0.49, AIMD 0.45 leaves per run (A,C simulations). Ejecting a named culprit, cap 4: 1.01 (perfect naming), 0.75 (50% naming); cap 8: 1.23 / 0.78 (A). Details and loop analysis: slots/batch-size-merged.md.
+- Loops: queue length sets batch size (src/next.ts:1017-1020) is reinforcing; holder-keeping halving (src/phase.ts:788-798) balances toward the wrong target; recorded 2a ratchets to 1 (A,B,C).
+- Rebuttals: B rejects blame without evidence (F4) and notes wrong names cost innocent fix rounds (F3); C notes prefix testing is serial log2(n) here and naming costs no turn run.
+- Final-shape check: restore every member including the culprit, solo-holder exception kept (B F1, C); check transition first with checkOnly and refuse before any write (C); culprit's own artifacts get the finding and rejected command (B F2); follower count combines repo and holder limits (B F3); merge_stamp kept on ejection (B F4); lands after hold and bounce counting (B F5).
+- Door proposal 2026-10-10, for the handoff review: the Q2 cap and the first-package solo clear need no prerequisite, so they ship as `batch-limit-repo` (no blocked-by) and only `--culprit` waits as `red-batch-culprit`. Only an actual dependency orders work.
+
+## Taken
+Operator 2026-10-10, verbatim: "1a | 2a | 3a |"
+
+- Q1 1a: red batch ending order at merge-issue:65 is `--red-on-base <sha>` first, then `--culprit <slug>` when B names the holder or one member from evidence, else today's split unchanged. `akrogon phase <holder> check.fix --slot B --attempt <id> --culprit <slug>` refuses a stale attempt or a slug outside holder plus members, runs the culprit's transition as checkOnly and refuses the whole call before any write on failure, then restores every member (culprit included) and the holder to saved heads (solo-holder exception as restoreHolder), clears the batch record, then moves only the culprit merge -> check.fix. merge_stamp is kept on ejection and refreshed on return to merge (src/phase.ts:152). The finding (exact command, arguments, tested base and top, logs, attributed diff, restored head) is copied into the culprit's own review so its check.fix can rerun the rejected command (first-package 1a). Next mergeTurn rebuilds from the queue with the existing build. Reason: one run per bad leaf instead of one per halving. Foreclosed: 1b unnamed blames holder (no evidence), 1c AIMD plus split (below solo at today's p).
+- Q2 2a: repo `batch_limit` in `issues/config.yaml`, integer >= 1, counts the whole stack including holder, default 4. Followers = min(batch_limit - 1, holder state batch_limit) when the holder has a split limit, else batch_limit - 1. The per-leaf state key stays for the fallback split only and resets when the holder leaves merge. Replaces first-package Q2 2a sizing; its solo-clear-after-clean-run rule stays. Foreclosed: 2b default 8 (longer red runs, more conflicts; raise later from attempt records).
+- Q3 3a: a wrong culprit counts like any merge bounce (bounce-counting). No refund. Attempt records gain outcome `ejected` with the culprit slug, so wrong-name rate is measurable. Foreclosed: 3b refund on green rerun.
+- Leaf: `batch-limit-repo` becomes `red-batch-culprit`, blocked-by `merge-attempt-records` and `merge-bounce-rounds` (and through it `red-main-hold`).
+- Correction, operator 2026-10-10 at handoff review, verbatim: "1a | debate - no |". Q1 1a: a member that conflicts while its stack builds is excluded from that attempt only (the attempt record keeps the slug) and may be carried by the next attempt; the per-leaf `solo` mark goes away; the holder-conflict solo attempt is unchanged. Replaces first-package Q2's solo-clear rule, which had no code event (B,C). Reason: a conflict with one stack should not exclude a leaf for its whole stay in merge. Foreclosed: 1b drop the rule. The door split (batch-limit-repo without prerequisite, red-batch-culprit for `--culprit`) was approved in the same review.

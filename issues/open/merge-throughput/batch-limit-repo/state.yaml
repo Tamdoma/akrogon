@@ -1,0 +1,40 @@
+slug: batch-limit-repo
+phase: plan.synthesis
+created: 2026-10-10
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#62"
+  - "Tamdoma/akrogon#64"
+  - "Tamdoma/akrogon#65"
+  - "Tamdoma/akrogon#66"
+  - "Tamdoma/akrogon#67"
+  - "Tamdoma/akrogon#68"
+  - "Tamdoma/akrogon#70"
+  - "Tamdoma/akrogon#71"
+  - "Tamdoma/akrogon#72"
+busy_since: 
+  A: 2026-10-10T06:30:06.583Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tA3
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/batch-limit-repo
+pane: 
+  A: w8:pK9
+  B: w8:pKA
+prompted: 
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-batch-limit-repo--/2026-10-10T06-30-02-971Z_01a12481-19db-70ab-a2ed-9e3f181a337a.jsonl
+prompted_at: 
+  A: 2026-10-10T06:30:06.583Z
+delivery_error: 
+  {}
