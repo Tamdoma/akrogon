@@ -58,3 +58,16 @@ Base-run comparison per the Shared context rule:
 - Both runs completed with terminal exit status; base worktree removed after the run. This is a stop, not a handoff: the base run explains the leaf failure.
 
 Disposition: `bun test --timeout=30000` red on base `f3199df89b25b4f215df04f8703ef6d71880cd6a` → `akrogon phase failed`, slot A.
+
+## 2026-10-10 check.fix — second pass, base repaired upstream
+
+Main advanced and the leaf was restacked: new base `9e2dfbebcfd98e647d34bed995741410ce95c2e4`, lane head `e7d0e6d`. The previous red-on-base blocker (`dependents-first` + `peer-wait`, 9 failures on `f3199df`) is resolved on the new base — both files now pass 13/13 on this head, so no repair was required of the leaf diff.
+
+Checks on `e7d0e6d`:
+
+- `bun run format`: clean on leaf files; rewrote unrelated drift in `src/status.ts` and `skills/chart-issues/scripts/peer-wait.ts`, reverted.
+- `bun run typecheck`: exit 0.
+- `bun test --timeout=30000`: 677 pass, 0 fail, 34 files (71.1s wall).
+- `bun test --changed="$AKROGON_BASE" --timeout=30000`: 659 pass, 0 fail, 31 files (64.6s wall).
+
+Done-criterion proofs unchanged from the initial report and review-B repair; `bun test tests/batch-dispatch.test.ts` included in both runs above (29 tests, all green). No edits this pass.

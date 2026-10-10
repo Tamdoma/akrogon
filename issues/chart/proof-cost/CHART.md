@@ -16,3 +16,5 @@ None.
 - framework SESSION_TIMEOUT_MS 30 min: consumer-side; a shorter timeout cuts the worst case. Seed to framework if wanted. (C)
 - Stall notice `notified=` empty at 1h15m: not traced; hooked next events touch only the owning repo's leaves. (B,C)
 - Live leaf formspark-build-wiring: instance already steered by the operator; no live-leaf action.
+
+Handed off 2026-10-10

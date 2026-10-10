@@ -1,0 +1,33 @@
+slug: live-proof-line
+phase: merged
+created: 2026-10-10
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#75"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAJ
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/live-proof-line
+pane: 
+  A: w8:pM7
+  B: w8:pM8
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-10T11:59:53.195Z

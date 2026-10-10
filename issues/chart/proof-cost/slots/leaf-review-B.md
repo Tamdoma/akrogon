@@ -1,0 +1,3 @@
+# live-proof-line: disagreements
+
+F1 Done-criterion 5 contradicts the required audit refusal. Draft brief.md:17 requires a new refusal for serial sessions with no named shared resource, while :19 forbids any new gate in the four owned files. The design's locked exclusion is narrower: no enforced budget, timer or numeric gate (design.md:10), and its explicit new side-by-side contract is authorized (:9; chart forks/proof-run.md:21). Change criterion 5 to prohibit a new numeric/duration gate, while permitting the requested contract audit and existing failed exit. As written, implementing criterion 3 fails criterion 5.

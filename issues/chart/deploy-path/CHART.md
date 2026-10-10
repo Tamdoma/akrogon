@@ -17,3 +17,5 @@ None.
 - Mixed-version read when a pull lands during a lazily importing call: accepted, seconds-wide window, same as a manual pull today.
 - Direct route pushes: akrogon has `direct: false`; if enabled later, its landing deploys at the next trigger. (C)
 - By-ancestry completion and landings from another machine: deploy at the next trigger (startup, next akrogon merge, manual next). Accepted.
+
+Handed off 2026-10-10

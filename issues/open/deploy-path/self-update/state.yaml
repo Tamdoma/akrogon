@@ -1,0 +1,32 @@
+slug: self-update
+phase: implement
+created: 2026-10-10
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  A: 2026-10-10T12:00:29.437Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAH
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/self-update
+pane: 
+  A: w8:pM5
+  B: w8:pM6
+prompted: 
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon-issues-worktrees-self-update--/2026-10-10T11-53-01-767Z_01a125a8-cc47-7209-bfd6-8a741633d538.jsonl
+prompted_at: 
+  A: 2026-10-10T12:00:29.438Z
+delivery_error: 
+  {}

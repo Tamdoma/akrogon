@@ -1,0 +1,35 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: git fetch of the default branch on the root
+    command: git fetch origin main
+    identity: operator local git, user ivan, existing GitHub HTTPS read
+    target: /home/ivan/Work/infra/akrogon (origin Tamdoma/akrogon)
+    version: git 2.56.0
+    date: '2026-10-10'
+    result: exit 0, FETCH_HEAD updated, read-only
+    cleanup: none needed
+    limits: does not prove push or auth for private remotes
+    record: issues/chart/deploy-path/forks/deploy-path.md
+  - operation: fast-forward with an unrelated and an overlapping uncommitted edit
+    command: git fetch -q origin main && git merge --ff-only origin/main
+    identity: operator local git, user ivan
+    target: throwaway clone of https://github.com/Tamdoma/akrogon.git, reset 3 behind
+    version: git 2.56.0
+    date: '2026-10-10'
+    result: unrelated dirty file exit 0, fast-forwarded, edit kept; overlapping dirty file exit 1, no change
+    cleanup: clone deleted, absence confirmed by ls
+    limits: does not prove behavior under a concurrent writer or a diverged root
+    record: issues/chart/deploy-path/forks/deploy-path.md
+  - operation: frozen dependency install on the root
+    command: bun install --frozen-lockfile
+    identity: operator local bun, user ivan
+    target: /home/ivan/Work/infra/akrogon
+    version: bun 1.4.2
+    date: '2026-10-10'
+    result: exit 0, no changes
+    cleanup: none needed
+    limits: does not prove a lockfile change installs cleanly
+    record: issues/chart/deploy-path/forks/deploy-path.md

@@ -133,3 +133,40 @@ budget clamps each wait timeout to the remaining budget
 ```
 
 Complete failing output is saved beside this review as `merge-rerun-tests.log`. Other rerun logs remain under the exported leaf TMPDIR as `merge-rerun-format.log` and `merge-rerun-tests.log`. Captured each terminal exit status before inspecting output. No completion line was printed, no issue closure was confirmed and no broadcast was sent. Route these red gate failures to `check.fix` under the existing attempt, as the merge skill requires.
+
+## 2026-10-10 check.review after check.fix
+
+Verdict: ready. Prior reviewed/restacked head: `75ff06c36f6b22dc9c70b4a3eca274c4fc0f3c93`. Current base: `9e2dfbebcfd98e647d34bed995741410ce95c2e4`. Reviewed head: `e7d0e6d9e877a6ae46edd89aac37ae0e946aaecc`.
+
+Read A's two check.fix report entries. The first pass established the nine failures also occurred on base `f3199df89b25b4f215df04f8703ef6d71880cd6a` and stopped. Upstream subsequently repaired the fixtures and expectation, and the leaf was restacked. A made no additional leaf edits in the resumed pass.
+
+Compared `git range-diff f3199df89b25b4f215df04f8703ef6d71880cd6a..75ff06c36f6b22dc9c70b4a3eca274c4fc0f3c93 9e2dfbebcfd98e647d34bed995741410ce95c2e4..HEAD`. All five leaf patches are preserved. The two marked differences contain only context from the upstream `removeRetiredLessons` import in `src/batch.ts`. Cleanup behavior, its tests, shell stdin support and dispatch wiring have no additional repair changes. F1 remains resolved. No new defect was introduced by repair.
+
+Confirmed upstream addresses the observed failures: fake-Herdr now answers `agent list` and honors `agent wait --until`; the two idle/done tests allow the existing ten-second grace wait to finish; the dependents-first test expects the documented successful waiting outcome while retaining its prompt-order assertion.
+
+Reran the specific previously failing boundary: `bun test tests/dependents-first.test.ts tests/peer-wait.test.ts --timeout=30000` exited 0 with 13 pass, 0 fail and 53 assertions in 10.67 seconds. Reused A's unchanged-head check evidence: format and typecheck exit 0, full suite 677 pass / 0 fail across 34 files, changed suite 659 pass / 0 fail across 31 files. The 29 dispatch tests pass in both reported runs. No further full-suite rerun is justified by this re-check.
+
+The current `<target>..HEAD` range has two Test-Change trailers:
+
+```text
+c4dea1c249fb2ffb9beef16f1b5672721779b852:
+Test-Change: tests/batch-dispatch.test.ts added T1 applied-form removal case, T2 solo-form removal case, T4 failed-removal case, and a planted empty-dirty dir plus its removal assertion inside the existing dirty-holder solo test; no existing expectation changed
+
+3dd61f164774f6ea9df3daa63336e818082f835b:
+Test-Change: tests/batch-dispatch.test.ts added an F1 regression for unreadable ignored cache and dependency directories through merge dispatch; no existing expectation changed
+```
+
+Both remain accurate additions under the path rule in `src/test-files.ts`; no old expectation changed within this leaf. No additional documentation or AREA.md repair diff exists. The previously reviewed merge clauses remain in place. Worktree status is clean. No open Fix, Nit, operator action or reusable unresolved lesson remains. Request merge with verdict ready.
+
+## 2026-10-10 merge attempt fca7a378
+
+Attempt `fca7a378-b14b-4b79-950f-0371e0e5d69f`, recorded and tested top `7933573d3de984896925d0d580a0c778e8dea516`, refreshed base `975139ddda571ae01f5a5d4cc3b4b5ad629ab43e`. Live state and HEAD match the prompt. No carried members. B committed nothing and performed no fetch or rebase.
+
+All configured checks passed on this top:
+
+- `bun run format`: exit 0. Restored only formatter-created drift in previously clean `src/status.ts` and `skills/chart-issues/scripts/peer-wait.ts`.
+- `bun test --timeout=30000`: exit 0, 677 pass, 0 fail, 34 files, 70.16 seconds.
+- `bun run typecheck`: exit 0.
+- `: "${AKROGON_BASE:?AKROGON_BASE is required}" && bun test --changed="$AKROGON_BASE" --timeout=30000`: exit 0, 646 pass, 0 fail, 29 files, 54.74 seconds, using the refreshed base above.
+
+No merge_covers, merge_checks or advisory commands are configured. Each completed exit status was captured before inspecting logs. Logs are `merge-final-format.log`, `merge-final-tests.log` and `merge-final-changed.log` under exported leaf TMPDIR `/tmp/akrogon-1000/merge-clean-worktree-3ea9278d4217`. Worktree status and `git diff --check` are clean. Previously failing tests and the ignored-directory regression are green. The reviewed implementation report, reviews and completion-owner brief supply the context for closing clean-merge-gate and its required broadcast.

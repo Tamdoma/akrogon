@@ -12,3 +12,7 @@ seats:
     pane: w8:pGZ
     harness: claude
     session: 1d9ac3af-a972-414b-ac34-990172f14f4a
+  - seat: B
+    pane: w8:pGY
+    harness: codex
+    session: 01a1250e-a444-7171-9b8d-17ab3e4c4bf0

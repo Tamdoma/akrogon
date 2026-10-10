@@ -1,5 +1,5 @@
 slug: merge-clean-worktree
-phase: failed
+phase: merged
 created: 2026-10-10
 repo: akrogon
 debate: "no"
@@ -30,10 +30,4 @@ prompted_at:
   {}
 delivery_error: 
   {}
-merge_stamp: 2026-10-10T09:36:00.635Z
-failure: 
-  cause: blocked
-  phase: check.fix
-  slot: A
-  reason: "bun test --timeout=30000 red on base f3199df89b25b4f215df04f8703ef6d71880cd6a: 9 identical failures in tests/dependents-first.test.ts and tests/peer-wait.test.ts on leaf head 75ff06c and on base; see implementation/report.md"
-  delivery: shown
+merge_stamp: 2026-10-10T12:04:00.708Z
