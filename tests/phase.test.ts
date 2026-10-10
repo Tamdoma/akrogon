@@ -21,7 +21,7 @@ import {
   type HerdrFixture,
   type Fixture,
 } from './helpers';
-import { readState, saveState, type Failure } from '../src/state';
+import { readState, saveState, type Batch, type Failure } from '../src/state';
 import { command, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import { z } from 'zod';
@@ -1887,6 +1887,137 @@ test('moving into merge writes merge_stamp and re-entering refreshes it', async 
     const second: string | undefined = readState(path).merge_stamp;
     expect(Date.parse(second ?? '')).not.toBeNaN();
     expect(second).not.toBe(first);
+  } finally {
+    f.clean();
+  }
+});
+
+async function lessonsMain(f: Fixture): Promise<{ builtOn: string; lessons: string[] }> {
+  writeFileSync(resolve(f.root, '.gitattributes'), 'learnings/LESSONS.md merge=union\n');
+  mkdirSync(resolve(f.root, 'learnings/history'), { recursive: true });
+  writeFileSync(
+    resolve(f.root, 'learnings/LESSONS.md'),
+    '- lesson alpha. 2026-09-10. history/alpha.md\n- lesson beta. 2026-09-11. [beta](history/beta.md)\n',
+  );
+  writeFileSync(resolve(f.root, 'learnings/history/alpha.md'), '# alpha\n');
+  writeFileSync(resolve(f.root, 'learnings/history/beta.md'), '# beta\n');
+  await command(['git', 'add', '.'], f.root);
+  await command(['git', 'commit', '-m', 'lessons'], f.root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+  const builtOn: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+  const lessons: string[] = ['- lesson alpha. 2026-09-10. history/alpha.md', '- lesson beta. 2026-09-11. [beta](history/beta.md)'];
+  return { builtOn, lessons };
+}
+
+test('merged --check refuses an applied stack whose top still contains a retired lesson line', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { builtOn } = await lessonsMain(f);
+    const worktree: string = resolve(f.home, 'wt-hold');
+    await command(['git', 'worktree', 'add', '-b', 'hold', worktree, builtOn], f.root);
+    writeFileSync(
+      resolve(worktree, 'learnings/history/alpha.md'),
+      '# alpha\n\nApplied 2026-10-05 by tests/phase.test.ts: stack refusal\n',
+    );
+    writeFileSync(resolve(worktree, 'file-mem-a'), 'a\n');
+    await command(['git', 'add', '.'], worktree);
+    await command(['git', 'commit', '-m', 'mem-a applies alpha'], worktree);
+    const memberTip: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    writeFileSync(resolve(worktree, 'file-hold'), 'h\n');
+    await command(['git', 'add', '.'], worktree);
+    await command(['git', 'commit', '-m', 'holder'], worktree);
+    const top: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    const path: string = leaf(f, 'hold', 'merge', {
+      worktree,
+      merge_stamp: '2026-10-05T00:00:00.000Z',
+    });
+    leaf(f, 'mem-a', 'merge', { merge_stamp: '2026-10-05T00:00:01.000Z' });
+    const record: Batch = {
+      attempt: 'a1',
+      built_on: builtOn,
+      holder: { base: builtOn, head: top },
+      applied: true,
+      top,
+      members: [{ slug: 'mem-a', base: builtOn, head: memberTip, tip: memberTip }],
+    };
+    saveState(path, { ...readState(path), batch: record });
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const refused: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
+      f.root,
+      herdr.env,
+    );
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('history/alpha');
+    expect(readState(path).batch?.tested_top).toBeUndefined();
+    writeFileSync(resolve(worktree, 'learnings/LESSONS.md'), '- lesson beta. 2026-09-11. [beta](history/beta.md)\n');
+    await command(['git', 'add', '.'], worktree);
+    await command(['git', 'commit', '-m', 'lessons: retire applied lines'], worktree);
+    const fixedTop: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    saveState(path, { ...readState(path), batch: { ...record, top: fixedTop } });
+    const checked: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
+      f.root,
+      herdr.env,
+    );
+    expect(checked.code).toBe(0);
+    expect(checked.stdout).toBe('ok');
+    expect(readState(path).batch?.tested_top).toBe(fixedTop);
+  } finally {
+    f.clean();
+  }
+});
+
+test('merged --check refuses a solo record whose rebased head contains a retired lesson line', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { builtOn } = await lessonsMain(f);
+    const worktree: string = resolve(f.home, 'wt-hold');
+    await command(['git', 'worktree', 'add', '-b', 'hold', worktree, builtOn], f.root);
+    writeFileSync(
+      resolve(worktree, 'learnings/history/alpha.md'),
+      '# alpha\n\nApplied 2026-10-05 by tests/phase.test.ts: solo refusal\n',
+    );
+    writeFileSync(resolve(worktree, 'file-hold'), 'h\n');
+    await command(['git', 'add', '.'], worktree);
+    await command(['git', 'commit', '-m', 'hold applies alpha'], worktree);
+    const path: string = leaf(f, 'hold', 'merge', {
+      worktree,
+      merge_stamp: '2026-10-05T00:00:00.000Z',
+    });
+    const record: Batch = {
+      attempt: 'a1',
+      built_on: builtOn,
+      holder: { base: builtOn, head: builtOn },
+      applied: true,
+      solo: true,
+      members: [],
+    };
+    saveState(path, { ...readState(path), batch: record });
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const refused: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
+      f.root,
+      herdr.env,
+    );
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('history/alpha');
+    expect(readState(path).batch?.tested_top).toBeUndefined();
+    writeFileSync(resolve(worktree, 'learnings/LESSONS.md'), '- lesson beta. 2026-09-11. [beta](history/beta.md)\n');
+    await command(['git', 'add', '.'], worktree);
+    await command(['git', 'commit', '-m', 'lessons: retire applied lines'], worktree);
+    const checked: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
+      f.root,
+      herdr.env,
+    );
+    expect(checked.code).toBe(0);
+    expect(checked.stdout).toBe('ok');
+    expect(readState(path).batch?.tested_top).toBe(await command(['git', 'rev-parse', 'HEAD'], worktree));
   } finally {
     f.clean();
   }

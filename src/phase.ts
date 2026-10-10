@@ -34,6 +34,7 @@ import { closeSources } from './pull';
 import { testFile } from './test-files';
 import { localBase, trackingRef } from './preflight';
 import { mergeHolder, writeHeld } from './hold';
+import { retiredLessonsPresent } from './lessons';
 import {
   applyStack,
   buildStack,
@@ -425,6 +426,13 @@ async function batchCheck(
     await requireNoIssueFiles(repo, repo.root, leaf.path, record.built_on, head);
     await requireTestChangeCitations(repo, repo.root, record.built_on, head);
   }
+  const retired: string[] = await retiredLessonsPresent(worktree, record.built_on, head);
+  if (retired.length > 0)
+    throw new Error(
+      'Retired lesson lines present in push range: ' +
+        retired.join(', ') +
+        '. Remove the learnings/LESSONS.md line(s) and commit before pushing.',
+    );
   await transition(repo, leaf, requested, slot, verdict, reason, true);
   if (record.decision !== 'reuse') {
     const testedMain: string = await command(['git', 'merge-base', head, trackingRef(repo)], repo.root);
