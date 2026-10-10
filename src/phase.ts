@@ -732,8 +732,7 @@ async function finishPush(
       const batch: Batch | undefined = leaf.state.batch;
       if (batch?.attempt !== pending.record.attempt || leaf.state.phase !== 'merge')
         throw new Error('Batch record changed while verifying the push');
-      if (batch.recorded !== true)
-        appendAttempt(repo, slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
+      if (batch.recorded !== true) appendAttempt(repo, slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
       saveState(leaf.path, {
         ...leaf.state,
         batch: { ...batch, applied: true, top: pending.candidate, recorded: true },
