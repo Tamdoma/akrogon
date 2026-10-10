@@ -230,7 +230,14 @@ if (args[0] === 'agent' && args[1] === 'wait') {
   if (entry?.append !== undefined) appendFileSync(entry.append, `${target.pane_id}\n`);
   scriptedFailure(entry);
   if (entry?.status !== undefined) result({ agent: { ...target, agent_status: entry.status } });
-  if (target.agent_status === 'working') {
+  const untils: string[] = args.flatMap((a, i) => (a === '--until' ? [args[i + 1]] : []));
+  if (untils.length > 0 && !untils.includes(target.agent_status)) {
+    Bun.sleepSync(Number(flag('--timeout')));
+    save();
+    console.error('{"error":{"code":"timeout","message":"timed out waiting for agent status"},"id":"cli:agent:wait"}');
+    process.exit(1);
+  }
+  if (untils.length === 0 && target.agent_status === 'working') {
     save();
     console.error('{"error":{"code":"timeout","message":"timed out waiting for agent status"},"id":"cli:agent:wait"}');
     process.exit(1);

@@ -110,7 +110,7 @@ test('done while herdr still reports working', async (): Promise<void> => {
 test('failure on idle with the return file missing', async (): Promise<void> => {
   const s: Setup = setup('idle');
   try {
-    const result: RunResult = await s.run(pane, s.file, '10');
+    const result: RunResult = await s.run(pane, s.file, '12');
     expectOutcome(result, { outcome: 'failure', pane, file: s.file, status: 'idle' });
   } finally {
     s.clean();
@@ -121,7 +121,7 @@ test('failure on done with a 0-byte return file', async (): Promise<void> => {
   const s: Setup = setup('done');
   try {
     writeFileSync(s.file, '');
-    const result: RunResult = await s.run(pane, s.file, '10');
+    const result: RunResult = await s.run(pane, s.file, '12');
     expectOutcome(result, { outcome: 'failure', pane, file: s.file, status: 'done' });
   } finally {
     s.clean();
