@@ -32,7 +32,7 @@ The merge seat reuses `grants[]` for probes, implementation, repairs, reruns, me
 
 ## merge
 
-Each registered repo holds one merge turn, and the command batches the leaves waiting behind the holder: it records a batch, builds one stack of the members' branches then the holder's on `<remote>/<default_branch>` in disposable state, moves the live branches to the built tips, and prompts only the holder's B. A `merged`, `merged --check` or `check.fix` call on a leaf whose turn is not held is refused (naming the current holder when one holds it), ending that pass; `failed` is never refused.
+Each registered repo holds one merge turn, and the command batches the leaves waiting behind the holder: it records a batch, builds one stack of the members' branches then the holder's on `<remote>/<default_branch>` in disposable state, moves the live branches to the built tips, and prompts only the holder's B. A `merged`, `merged --check` or `check.fix` call on a leaf whose turn is not held is refused (naming the current holder when one holds it), ending that pass; `failed` is never refused. While a repo hold stands, the hold's named fix leaf takes the turn and is accepted by phase authorization in its place.
 
 The prompt ends `attempt=<id> top=<sha>` for an applied stack with the holder on top, or `attempt=<id> solo` when the holder's own branch cannot be rebased mechanically (it conflicted while the stack was built or restacked) and B rebases it by hand. Every `merged`, `merged --check` and `check.fix` call carries `--attempt <id>`; a stale or missing id is refused and changes nothing, ending the pass.
 

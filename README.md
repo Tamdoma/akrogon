@@ -143,6 +143,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon unpark <issue>... \| --all` | Restore whole issues to the open queue. |
 | `akrogon pause` | Pause automatic dispatch for the current repository. |
 | `akrogon unpause` | Resume automatic dispatch with one pass for the current repository. |
+| `akrogon hold-fix <slug>` | Name one merge leaf that takes the merge turn solo while the repository's hold stands. |
 | `akrogon unhold` | Clear a base-red merge hold for the current repository. |
 ```
 
