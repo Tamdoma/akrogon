@@ -126,6 +126,8 @@ Leaves in `merge` take their repository's single merge turn: the merge pass writ
 
 A working, blocked or unknown seat is not treated as idle. A recently delivered prompt also gets a grace period.
 
+A dispatch pass attempts leaves with more unmerged leaves waiting on them through `blocked-by`, directly or transitively, before leaves with fewer; ties keep the previous visit order with merged leaves first.
+
 Each dispatch pass makes at most one delivery attempt per pending seat. Repeated delivery failures can put the leaf into failed. Running next again does not resume a failed leaf. Read its cause and choose a recovery phase first.
 
 ## When picked work cannot start

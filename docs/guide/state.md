@@ -47,7 +47,7 @@ To keep work away from agents, park its issue with `akrogon park <issue>`. Parki
 
 ## The fields Akrogon owns
 
-Akrogon records the worktree, Herdr tab, completed seats, review verdicts, prompt delivery attempts and the `merge_stamp` ordering the merge turn. It also records failure details.
+Akrogon records the worktree, Herdr tab, completed seats, review verdicts, prompt delivery attempts and the `merge_stamp` breaking ties in the merge turn's dependent-count ordering. It also records failure details.
 
 The merge holder's state carries `batch`, the record the command wrote for its merge pass, kept after the push for reconciliation: `attempt` (the id every batched phase call must repeat), `built_on` (the remote base the stack was built on), `members` (each carried leaf as `{ slug, base, head, tip }`, its saved merge-base, pre-batch head and applied tip), then `top` (the applied stack head), `tested_top` (the head the merge seat checked), `tested_main` (the remote base that head stood on), `candidate` (the head submitted for the push), `decision` (`reuse` or `rerun` after a refused push), `applied` and `solo` (the holder rebases itself instead of using a recorded top).
 
