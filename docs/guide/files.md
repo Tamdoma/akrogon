@@ -69,7 +69,7 @@ Each line carries:
 - `start` is the batch creation time; it is absent on batches created before this field existed.
 - `end` is the attempt end time.
 
-The command writes `merged`, `red`, `split` and `reuse` now; `held` and `ejected` are written by other leaves of the merge-throughput work.
+The command writes `merged`, `red`, `split`, `held`, `reuse` and `ejected` now.
 
 ## sync: save lifecycle records separately from code
 

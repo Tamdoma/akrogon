@@ -13,7 +13,7 @@ const contracts: Record<string, string> = {
   config: '',
   preflight: '',
   phase:
-    '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>] [--red-on-base <sha> --command <command>]',
+    '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>] [--red-on-base <sha> --command <command>] [--culprit <slug>]',
   unhold: '',
   'hold-fix': '<slug>',
   next: '[<slug>|<path>|--all|--resume]',
