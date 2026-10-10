@@ -15,6 +15,8 @@ import {
   type Repo,
 } from '../src/config';
 
+const guarded = (cmd: string): string => `akrogon guard ancestors && akrogon guard own-modules && sh -c ${quote(cmd)}`;
+
 const runCheck = (name: string, inner: string): string =>
   `akrogon run-check --name ${quote(name)} -- sh -c ${quote(inner)}`;
 
@@ -238,30 +240,32 @@ test('config prints worktree_store matching the leaf path for every root shape a
   const f: Fixture = await fixture();
   try {
     const root: string = realpathSync(f.root);
-    type StoreParsed = { worktree_root: string; worktree_store: string };
-    const check = (parsed: StoreParsed, worktreeRoot: string, worktreeStore: string): void => {
-      expect(parsed).toMatchObject({ worktree_root: worktreeRoot, worktree_store: worktreeStore });
+    type StoreParsed = { worktree_root?: string | null; worktree_store: string };
+    const check = (parsed: StoreParsed, worktreeStore: string): void => {
+      expect(parsed.worktree_store).toBe(worktreeStore);
       expect(isAbsolute(parsed.worktree_store)).toBe(true);
     };
-    check(
-      Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed,
-      'issues/worktrees',
-      resolve(root, 'issues/worktrees'),
-    );
+    const unset = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
+    expect(unset.worktree_root ?? null).toBeNull();
+    check(unset, resolve(f.home, '.akrogon/worktrees/repo'));
     yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: 'custom/trees' });
-    check(
-      Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed,
-      'custom/trees',
-      resolve(root, 'custom/trees'),
-    );
+    const custom = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
+    expect(custom.worktree_root).toBe('custom/trees');
+    check(custom, resolve(root, 'custom/trees'));
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: '~/x' });
+    const tilde = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
+    expect(tilde.worktree_root).toBe('~/x');
+    check(tilde, resolve(f.home, 'x'));
     const absolute: string = resolve(f.home, 'absolute-trees');
     yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: absolute });
     const atRoot = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
-    check(atRoot, absolute, absolute);
+    expect(atRoot.worktree_root).toBe(absolute);
+    check(atRoot, absolute);
     const linked: string = resolve(f.home, 'linked-store');
     await command(['git', 'worktree', 'add', '-b', 'linked-store', linked], f.root);
     const atLinked = Bun.YAML.parse((await cli(f, ['config'], linked)).stdout) as StoreParsed;
-    check(atLinked, absolute, absolute);
+    expect(atLinked.worktree_root).toBe(absolute);
+    check(atLinked, absolute);
     expect(atLinked.worktree_store).toBe(atRoot.worktree_store);
     const outside = Bun.YAML.parse((await cli(f, ['config'], f.home)).stdout);
     expect(outside).toMatchObject({ repo: 'none' });
@@ -316,8 +320,8 @@ test('config reports merge_checks separately from checks', async () => {
     const result = await cli(f, ['config']);
     expect(result.code).toBe(0);
     expect(Bun.YAML.parse(result.stdout)).toMatchObject({
-      checks: { test: runCheck('test', 'bun test') },
-      merge_checks: { full: runCheck('full', 'bun run verify') },
+      checks: { test: runCheck('test', guarded('bun test')) },
+      merge_checks: { full: runCheck('full', guarded('bun run verify')) },
     });
   } finally {
     f.clean();
@@ -387,7 +391,7 @@ test('config composes setup into printed checks, merge_checks and advisory ident
       grounding: 'none',
     });
     const composed = (cmd: string): string =>
-      `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c 'bun install --frozen-lockfile' && sh -c '${cmd}'`;
+      `akrogon guard ancestors && flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c 'bun install --frozen-lockfile' && akrogon guard own-modules && sh -c ${quote(cmd)}`;
     type Printed = { checks: Record<string, string>; merge_checks: Record<string, string>; advisory: string[] };
     const atRoot = Bun.YAML.parse((await cli(f, ['config'])).stdout) as Printed;
     expect(atRoot).toMatchObject({
@@ -409,9 +413,9 @@ test('config composes setup into printed checks, merge_checks and advisory ident
       grounding: 'none',
     });
     expect(Bun.YAML.parse((await cli(f, ['config'])).stdout)).toMatchObject({
-      checks: { t: runCheck('t', 'bun test') },
-      merge_checks: { m: runCheck('m', 'bun run verify') },
-      advisory: [runCheck('advisory-0', 'bun run lint')],
+      checks: { t: runCheck('t', guarded('bun test')) },
+      merge_checks: { m: runCheck('m', guarded('bun run verify')) },
+      advisory: [runCheck('advisory-0', guarded('bun run lint'))],
     });
   } finally {
     f.clean();
@@ -544,7 +548,7 @@ test('config runs all of setup inside the install lock', async () => {
     const check: ReturnType<typeof printedChecks> = printedChecks(f);
     const marker: string = resolve(f.home, 'setup-marker');
     await installFixture(f, {
-      setup: `touch ${marker} && ! flock -n "$(git rev-parse --git-path akrogon-install.lock)" true`,
+      setup: `mkdir -p node_modules && touch ${marker} && ! flock -n "$(git rev-parse --git-path akrogon-install.lock)" true`,
       checks: { ok: 'true' },
       grounding: 'none',
     });

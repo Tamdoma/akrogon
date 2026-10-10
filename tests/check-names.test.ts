@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { z } from 'zod';
-import { readdirSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, leaf, yaml, fakeAkrogon, type Fixture } from './helpers';
 import { command } from '../src/shell';
@@ -10,6 +10,7 @@ test('printed checks preserve names containing spaces and slashes in argv and lo
   try {
     const worktree: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', '-b', 'named', worktree, 'origin/main'], f.root);
+    mkdirSync(resolve(worktree, 'node_modules'));
     const target: string = leaf(f, 'named', 'implement', { worktree });
     const shim: { env: NodeJS.ProcessEnv } = fakeAkrogon(f);
     for (const name of ['two words', 'lint/type']) {

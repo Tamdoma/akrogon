@@ -47,7 +47,7 @@ export async function cli(
     'AKROGON_LEAF_TEMP_ROOT' in env ? env : { ...env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) };
   const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, entry, ...args], {
     cwd,
-    env: { ...process.env, AKROGON_HOME: f.home, HERDR_PANE_ID: '', ...withDefault },
+    env: { ...process.env, AKROGON_HOME: f.home, HERDR_PANE_ID: '', HOME: f.home, ...withDefault },
     timeout,
     killSignal: 'SIGKILL',
     stdin: 'ignore',

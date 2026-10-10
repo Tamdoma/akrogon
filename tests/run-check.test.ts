@@ -342,7 +342,7 @@ test('printed checks refuse before setup and isolate both setup and check enviro
     yaml(resolve(f.root, 'issues/config.yaml'), {
       env: ['CHECK_TOKEN'],
       grounding: 'none',
-      setup: `printf '%s|%s|%s' "$CHECK_TOKEN" "$EXTRA_TOKEN" "$TMPDIR" > '${marker}'`,
+      setup: `mkdir -p node_modules && printf '%s|%s|%s' "$CHECK_TOKEN" "$EXTRA_TOKEN" "$TMPDIR" > '${marker}'`,
       checks: { probe: `cat '${marker}'; printf '\n%s|%s|%s' "$CHECK_TOKEN" "$EXTRA_TOKEN" "$TMPDIR"` },
     });
     const { worktree, leafPath } = await leafWorktree(f, 'printed');
