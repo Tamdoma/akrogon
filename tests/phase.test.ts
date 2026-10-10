@@ -22,7 +22,7 @@ import {
   type Fixture,
 } from './helpers';
 import { readState, saveState, type Batch, type Failure } from '../src/state';
-import { command, type Result } from '../src/shell';
+import { command, run, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import { z } from 'zod';
 
@@ -2021,6 +2021,271 @@ test('merged --check refuses a solo record whose rebased head contains a retired
     expect(checked.code).toBe(0);
     expect(checked.stdout).toBe('ok');
     expect(readState(path).batch?.tested_top).toBe(await command(['git', 'rev-parse', 'HEAD'], worktree));
+  } finally {
+    f.clean();
+  }
+});
+
+async function frozenBranch(f: Fixture, name: string, trailers: string[] = []): Promise<string> {
+  if (!existsSync(resolve(f.root, 'gone.test.ts'))) {
+    writeFileSync(resolve(f.root, 'gone.test.ts'), 'gone test\n');
+    writeFileSync(resolve(f.root, 'old.txt'), 'old text\n');
+    await command(['git', 'add', 'gone.test.ts', 'old.txt'], f.root);
+    await command(['git', 'commit', '-m', 'planning era files'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+  }
+  const worktree: string = resolve(f.home, `wt-${name}`);
+  await command(['git', 'worktree', 'add', '-b', name, worktree], f.root);
+  writeFileSync(resolve(worktree, 'file'), 'edited during planning\n');
+  writeFileSync(resolve(worktree, 'plan.test.ts'), 'planned test\n');
+  mkdirSync(resolve(worktree, 'scripts'), { recursive: true });
+  writeFileSync(resolve(worktree, 'scripts/proof.sh'), 'proof\n');
+  await command(['git', 'rm', '-q', 'gone.test.ts', 'old.txt'], worktree);
+  await commitAll(worktree, [
+    'plan files',
+    ['Test-Change: gone.test.ts removed during planning', ...trailers].join('\n'),
+  ]);
+  return worktree;
+}
+
+async function frozenRecord(worktree: string): Promise<Record<string, string | null>> {
+  const blob = async (name: string): Promise<string> => command(['git', 'rev-parse', `HEAD:${name}`], worktree);
+  return {
+    file: await blob('file'),
+    'plan.test.ts': await blob('plan.test.ts'),
+    'scripts/proof.sh': await blob('scripts/proof.sh'),
+    'gone.test.ts': null,
+    'old.txt': null,
+  };
+}
+
+test('plan.synthesis move writes a frozen record of every changed path and rewrites it on replan', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = await frozenBranch(f, 'frozen-rec');
+    const path: string = leaf(f, 'frozen-rec', 'plan.synthesis', { worktree });
+    const moved: Result = await cli(f, ['phase', 'frozen-rec', 'implement', '--slot', 'A']);
+    expect(moved.stdout).toBe('moved implement');
+    expect(readState(path).frozen).toEqual(await frozenRecord(worktree));
+    const empty: string = await oldFileBranch(f, 'frozen-empty');
+    const emptyPath: string = leaf(f, 'frozen-empty', 'plan.synthesis', { worktree: empty });
+    expect((await cli(f, ['phase', 'frozen-empty', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    expect(readState(emptyPath).frozen).toEqual({});
+    const againWt: string = await frozenBranch(f, 'frozen-again');
+    const againPath: string = leaf(f, 'frozen-again', 'failed', {
+      worktree: againWt,
+      frozen: {
+        ...(await frozenRecord(againWt)),
+        '.gitignore': await command(['git', 'rev-parse', 'HEAD:.gitignore'], againWt),
+      },
+      failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'x' },
+    });
+    expect((await cli(f, ['phase', 'frozen-again', 'plan.synthesis'])).stdout).toBe('moved plan.synthesis');
+    expect((await cli(f, ['phase', 'frozen-again', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    expect(readState(againPath).frozen).toEqual(await frozenRecord(againWt));
+    writeFileSync(resolve(againWt, 'file'), 'drifted\n');
+    await commitAll(againWt, ['post-freeze edit']);
+    const drift: Result = await cli(f, ['phase', 'frozen-again', 'check.review', '--slot', 'A']);
+    expect(drift.code).not.toBe(0);
+    expect(drift.stderr).toContain('Test-Change: file <source and reason>');
+    expect(readState(againPath).frozen?.['.gitignore']).toBeUndefined();
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: file drifted after the freeze'],
+      againWt,
+    );
+    expect((await cli(f, ['phase', 'frozen-again', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+  } finally {
+    f.clean();
+  }
+});
+
+test('frozen record refuses drifted, reappearing, deleted and renamed paths until a citing trailer', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const editWt: string = await frozenBranch(f, 'frozen-edit', ['Test-Change: file planned during planning']);
+    const editPath: string = leaf(f, 'frozen-edit', 'plan.synthesis', { worktree: editWt });
+    expect((await cli(f, ['phase', 'frozen-edit', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    const record: Record<string, string | null> | undefined = readState(editPath).frozen;
+    writeFileSync(resolve(editWt, 'file'), 'edited after the freeze\n');
+    await commitAll(editWt, ['edit file']);
+    const before: string = bytes(editPath);
+    const refused: Result = await cli(f, ['phase', 'frozen-edit', 'check.review', '--slot', 'A']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('file');
+    expect(refused.stderr).toContain('Test-Change: file <source and reason>');
+    expect(refused.stderr).toContain('final trailer block');
+    expect(bytes(editPath)).toBe(before);
+    expect(readState(editPath).frozen).toEqual(record);
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: file edited after the freeze'],
+      editWt,
+    );
+    expect((await cli(f, ['phase', 'frozen-edit', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+    const ownWt: string = await frozenBranch(f, 'frozen-own');
+    leaf(f, 'frozen-own', 'plan.synthesis', { worktree: ownWt });
+    expect((await cli(f, ['phase', 'frozen-own', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    writeFileSync(resolve(ownWt, 'file'), 'own trailer edit\n');
+    await commitAll(ownWt, ['edit file']);
+    const ownRefused: Result = await cli(f, ['phase', 'frozen-own', 'check.review', '--slot', 'A']);
+    expect(ownRefused.code).not.toBe(0);
+    expect(ownRefused.stderr).toContain('Test-Change: file <source and reason>');
+    await command(
+      ['git', 'commit', '--amend', '-m', 'edit file\n\nTest-Change: file edit carries its own trailer'],
+      ownWt,
+    );
+    expect((await cli(f, ['phase', 'frozen-own', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+    const backWt: string = await frozenBranch(f, 'frozen-back');
+    leaf(f, 'frozen-back', 'plan.synthesis', { worktree: backWt });
+    expect((await cli(f, ['phase', 'frozen-back', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    writeFileSync(resolve(backWt, 'old.txt'), 'reappeared\n');
+    await commitAll(backWt, ['reappear old.txt']);
+    const backRefused: Result = await cli(f, ['phase', 'frozen-back', 'check.review', '--slot', 'A']);
+    expect(backRefused.code).not.toBe(0);
+    expect(backRefused.stderr).toContain('Test-Change: old.txt <source and reason>');
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: old.txt reappeared after the freeze'],
+      backWt,
+    );
+    expect((await cli(f, ['phase', 'frozen-back', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+    const rmWt: string = await frozenBranch(f, 'frozen-rm');
+    leaf(f, 'frozen-rm', 'plan.synthesis', { worktree: rmWt });
+    expect((await cli(f, ['phase', 'frozen-rm', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    await command(['git', 'rm', '-q', 'scripts/proof.sh'], rmWt);
+    await commitAll(rmWt, ['delete proof']);
+    const rmRefused: Result = await cli(f, ['phase', 'frozen-rm', 'check.review', '--slot', 'A']);
+    expect(rmRefused.code).not.toBe(0);
+    expect(rmRefused.stderr).toContain('Test-Change: scripts/proof.sh <source and reason>');
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: scripts/proof.sh deleted after the freeze'],
+      rmWt,
+    );
+    expect((await cli(f, ['phase', 'frozen-rm', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+    const mvWt: string = await frozenBranch(f, 'frozen-mv');
+    leaf(f, 'frozen-mv', 'plan.synthesis', { worktree: mvWt });
+    expect((await cli(f, ['phase', 'frozen-mv', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    await command(['git', 'mv', 'scripts/proof.sh', 'scripts/moved.sh'], mvWt);
+    await commitAll(mvWt, ['rename proof']);
+    const mvRefused: Result = await cli(f, ['phase', 'frozen-mv', 'check.review', '--slot', 'A']);
+    expect(mvRefused.code).not.toBe(0);
+    expect(mvRefused.stderr).toContain('Test-Change: scripts/proof.sh <source and reason>');
+    expect(mvRefused.stderr).not.toContain('moved.sh');
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: scripts/proof.sh renamed after the freeze'],
+      mvWt,
+    );
+    expect((await cli(f, ['phase', 'frozen-mv', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+    const mvtWt: string = await frozenBranch(f, 'frozen-mvt');
+    leaf(f, 'frozen-mvt', 'plan.synthesis', { worktree: mvtWt });
+    expect((await cli(f, ['phase', 'frozen-mvt', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    await command(['git', 'mv', 'plan.test.ts', 'moved.test.ts'], mvtWt);
+    await commitAll(mvtWt, ['rename test', 'Test-Change: plan.test.ts renamed']);
+    const mvtRefused: Result = await cli(f, ['phase', 'frozen-mvt', 'check.review', '--slot', 'A']);
+    expect(mvtRefused.code).not.toBe(0);
+    expect(mvtRefused.stderr).toContain('Test-Change: moved.test.ts <source and reason>');
+    expect(mvtRefused.stderr).not.toContain('plan.test.ts <source and reason>');
+    await command(['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: moved.test.ts rename target'], mvtWt);
+    expect((await cli(f, ['phase', 'frozen-mvt', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+  } finally {
+    f.clean();
+  }
+});
+
+test('frozen record refuses unrecorded added test files and edited recorded non-test files', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const addWt: string = await frozenBranch(f, 'frozen-add');
+    leaf(f, 'frozen-add', 'plan.synthesis', { worktree: addWt });
+    expect((await cli(f, ['phase', 'frozen-add', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    writeFileSync(resolve(addWt, 'extra.test.ts'), 'late test\n');
+    await commitAll(addWt, ['add extra test']);
+    const addRefused: Result = await cli(f, ['phase', 'frozen-add', 'check.review', '--slot', 'A']);
+    expect(addRefused.code).not.toBe(0);
+    expect(addRefused.stderr).toContain('Test-Change: extra.test.ts <source and reason>');
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: extra.test.ts added after the freeze'],
+      addWt,
+    );
+    expect((await cli(f, ['phase', 'frozen-add', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+    const proofWt: string = await frozenBranch(f, 'frozen-proof');
+    leaf(f, 'frozen-proof', 'plan.synthesis', { worktree: proofWt });
+    expect((await cli(f, ['phase', 'frozen-proof', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    writeFileSync(resolve(proofWt, 'scripts/proof.sh'), 'better proof\n');
+    await commitAll(proofWt, ['edit proof']);
+    const proofRefused: Result = await cli(f, ['phase', 'frozen-proof', 'check.review', '--slot', 'A']);
+    expect(proofRefused.code).not.toBe(0);
+    expect(proofRefused.stderr).toContain('Test-Change: scripts/proof.sh <source and reason>');
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: scripts/proof.sh edited after the freeze'],
+      proofWt,
+    );
+    expect((await cli(f, ['phase', 'frozen-proof', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+  } finally {
+    f.clean();
+  }
+});
+
+test('frozen guard holds after fetch and rebase including a recorded path no leaf commit touches', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const wt: string = await frozenBranch(f, 'frozen-rb');
+    const path: string = leaf(f, 'frozen-rb', 'plan.synthesis', { worktree: wt });
+    expect((await cli(f, ['phase', 'frozen-rb', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    writeFileSync(resolve(f.root, 'file'), 'main change\n');
+    await command(['git', 'add', 'file'], f.root);
+    await command(['git', 'commit', '-m', 'main change'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    await command(['git', 'fetch', 'origin'], wt);
+    const rebase: Result = await run(['git', 'rebase', 'origin/main'], wt);
+    expect(rebase.code).not.toBe(0);
+    writeFileSync(resolve(wt, 'file'), 'rebased resolution\n');
+    await command(['git', 'add', 'file'], wt);
+    await command(['git', '-c', 'core.editor=true', 'rebase', '--continue'], wt);
+    const refused: Result = await cli(f, ['phase', 'frozen-rb', 'check.review', '--slot', 'A']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('Test-Change: file <source and reason>');
+    expect(readState(path).frozen).toBeDefined();
+    writeFileSync(resolve(wt, 'extra.test.ts'), 'late test\n');
+    await command(['git', 'add', 'extra.test.ts'], wt);
+    await command(
+      [
+        'git',
+        'commit',
+        '-m',
+        'cite\n\nTest-Change: file conflict resolution changed it\nTest-Change: extra.test.ts added after the freeze',
+      ],
+      wt,
+    );
+    expect((await cli(f, ['phase', 'frozen-rb', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
+    const nt: string = await frozenBranch(f, 'frozen-rbnt');
+    const ntPath: string = leaf(f, 'frozen-rbnt', 'plan.synthesis', { worktree: nt });
+    expect((await cli(f, ['phase', 'frozen-rbnt', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
+    writeFileSync(resolve(f.root, 'old.txt'), 'main kept\n');
+    await command(['git', 'add', 'old.txt'], f.root);
+    await command(['git', 'commit', '-m', 'main keeps old.txt'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    await command(['git', 'fetch', 'origin'], nt);
+    const ntRebase: Result = await run(['git', 'rebase', 'origin/main'], nt);
+    expect(ntRebase.code).not.toBe(0);
+    await command(['git', 'checkout', '--ours', '--', 'old.txt'], nt);
+    await command(['git', 'add', 'old.txt'], nt);
+    await command(['git', '-c', 'core.editor=true', 'rebase', '--continue'], nt);
+    expect(await command(['git', 'show', 'HEAD:old.txt'], nt)).toBe('main kept');
+    expect(await command(['git', 'log', '--format=%s', 'origin/main..HEAD', '--', 'old.txt'], nt)).toBe('');
+    const ntRefused: Result = await cli(f, ['phase', 'frozen-rbnt', 'check.review', '--slot', 'A']);
+    expect(ntRefused.code).not.toBe(0);
+    expect(ntRefused.stderr).toContain('Test-Change: old.txt <source and reason>');
+    expect(readState(ntPath).frozen).toBeDefined();
+    await command(
+      [
+        'git',
+        'commit',
+        '--allow-empty',
+        '-m',
+        'cite\n\nTest-Change: old.txt target kept its own version of a deleted path',
+      ],
+      nt,
+    );
+    expect((await cli(f, ['phase', 'frozen-rbnt', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
   } finally {
     f.clean();
   }

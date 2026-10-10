@@ -280,6 +280,8 @@ export async function transition(
     await requireClean(state.worktree);
   if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path);
   if (state.worktree !== undefined) await requireTestChangeCitations(repo, state.worktree);
+  if (state.worktree !== undefined && state.frozen !== undefined)
+    await requireFrozenCitations(repo, state.worktree, state.frozen);
   if (requested === 'check.review' && state.worktree !== undefined) await requireNonEmpty(repo, state.worktree);
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
@@ -312,7 +314,9 @@ export async function transition(
   await commitMove(
     repo,
     leaf,
-    recorded,
+    state.phase === 'plan.synthesis' && requested === 'implement'
+      ? { ...recorded, frozen: state.worktree === undefined ? {} : await frozenRecord(repo, state.worktree) }
+      : recorded,
     capped,
     slot ?? null,
     capped === 'failed'
@@ -339,31 +343,90 @@ export async function requireNoIssueFiles(
   if (files !== '') throw new Error(`Issue files on leaf branch belong in ${leafPath}:\n${files}`);
 }
 
-export async function requireTestChangeCitations(
-  repo: Repo,
-  worktree: string,
-  from: string = target(repo),
-  to: string = 'HEAD',
-): Promise<void> {
-  const status: string = await command(['git', 'diff', '--no-renames', '--name-status', `${from}...${to}`], worktree);
-  const changed: string[] = status
-    .split('\n')
-    .filter((line) => line.startsWith('M\t') || line.startsWith('D\t') || line.startsWith('T\t'))
-    .map((line) => line.slice(line.indexOf('\t') + 1))
-    .filter((path) => testFile(path));
-  if (changed.length === 0) return;
+async function citedPaths(worktree: string, range: string): Promise<Set<string>> {
   const log: string = await command(
-    ['git', 'log', '--format=%(trailers:key=Test-Change,valueonly,unfold)', `${from}..${to}`],
+    ['git', 'log', '--format=%(trailers:key=Test-Change,valueonly,unfold)', range],
     worktree,
   );
-  const cited: Set<string> = new Set(
+  return new Set(
     log
       .split('\n')
       .map((value) => value.trim())
       .filter((value) => /^\S+\s+\S/.test(value))
       .map((value) => value.split(/\s/, 1)[0]),
   );
+}
+
+async function changedPaths(worktree: string, from: string, to: string): Promise<[string, string][]> {
+  const status: string = await command(['git', 'diff', '--no-renames', '--name-status', `${from}...${to}`], worktree);
+  return status
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line): [string, string] => [line.slice(0, line.indexOf('\t')), line.slice(line.indexOf('\t') + 1)]);
+}
+
+export async function requireTestChangeCitations(
+  repo: Repo,
+  worktree: string,
+  from: string = target(repo),
+  to: string = 'HEAD',
+): Promise<void> {
+  const changed: string[] = (await changedPaths(worktree, from, to))
+    .filter(([status]) => status === 'M' || status === 'D' || status === 'T')
+    .map(([, path]) => path)
+    .filter((path) => testFile(path));
+  if (changed.length === 0) return;
+  const cited: Set<string> = await citedPaths(worktree, `${from}..${to}`);
   const missing: string[] = changed.filter((path) => !cited.has(path));
+  if (missing.length === 0) return;
+  throw new Error(
+    `Changed test files need a citation:\n${missing.map((path) => `Test-Change: ${path} <source and reason>`).join('\n')}\nAdd each line to the final trailer block of a commit on this branch; a later empty commit may carry it.`,
+  );
+}
+
+async function treeBlobs(worktree: string, rev: string): Promise<Map<string, string>> {
+  const tree: string = await command(['git', 'ls-tree', '-r', '--full-tree', rev], worktree);
+  return new Map(
+    tree
+      .split('\n')
+      .filter((line) => line !== '')
+      .map((line): [string, string] => [
+        line.slice(line.indexOf('\t') + 1),
+        line.slice(0, line.indexOf('\t')).split(/\s+/)[2],
+      ]),
+  );
+}
+
+async function frozenRecord(repo: Repo, worktree: string): Promise<Record<string, string | null>> {
+  const tree: Map<string, string> = await treeBlobs(worktree, 'HEAD');
+  const changed: [string, string][] = await changedPaths(worktree, target(repo), 'HEAD');
+  return Object.fromEntries(changed.map(([, path]): [string, string | null] => [path, tree.get(path) ?? null]));
+}
+
+export async function requireFrozenCitations(
+  repo: Repo,
+  worktree: string,
+  frozen: Record<string, string | null>,
+  from: string = target(repo),
+  to: string = 'HEAD',
+): Promise<void> {
+  const tree: Map<string, string> = await treeBlobs(worktree, to);
+  const violating: string[] = [
+    ...Object.keys(frozen).filter((path) => (tree.get(path) ?? null) !== frozen[path]),
+    ...(await changedPaths(worktree, from, to))
+      .filter(([status, path]) => status === 'A' && testFile(path) && frozen[path] === undefined)
+      .map(([, path]) => path),
+  ];
+  if (violating.length === 0) return;
+  const missing: string[] = [];
+  for (const path of violating) {
+    const lastTouch: string = await command(
+      ['git', 'log', '--format=%H', '-1', `${from}..${to}`, '--', path],
+      worktree,
+    );
+    const range: string = lastTouch === '' ? `${from}..${to}` : `${lastTouch}^..${to}`;
+    if (!(await citedPaths(worktree, range)).has(path)) missing.push(path);
+  }
   if (missing.length === 0) return;
   throw new Error(
     `Changed test files need a citation:\n${missing.map((path) => `Test-Change: ${path} <source and reason>`).join('\n')}\nAdd each line to the final trailer block of a commit on this branch; a later empty commit may carry it.`,

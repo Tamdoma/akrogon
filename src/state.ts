@@ -99,6 +99,7 @@ export const stateSchema = z
     merge_stamp: z.string().optional(),
     batch: batchSchema.optional(),
     batch_limit: z.number().int().nonnegative().optional(),
+    frozen: z.record(z.string(), z.string().nullable()).optional(),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
 
