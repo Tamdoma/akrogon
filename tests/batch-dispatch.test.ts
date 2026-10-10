@@ -321,7 +321,7 @@ test('a landed batch moves member and holder once, closes member tabs with the r
     const m1: { path: string; b: string } = await allocatedLeaf(f, 'm1');
     const m2: { path: string; b: string } = await allocatedLeaf(f, 'm2');
     await commitFile(f, holder.path, 'h-file', 'h\n');
-    const dependent: string = leaf(f, 'dep', 'plan.synthesis', { 'blocked-by': ['m2'] }, 'dep-issue');
+    const dependent: string = leaf(f, 'dep', 'plan.synthesis', { 'blocked-by': ['m2', 'holder'] }, 'dep-issue');
     toMerge(holder.path, '2026-09-11T00:00:00.000Z');
     toMerge(m1.path, '2026-09-12T00:00:00.000Z');
     toMerge(m2.path, '2026-09-13T00:00:00.000Z');

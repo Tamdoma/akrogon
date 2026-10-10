@@ -572,7 +572,7 @@ test('race: pause waits for landed-batch dependent dispatch, later automatic wor
     writeFileSync(resolve(worktree, 'change'), 'landed\n');
     await command(['git', 'add', 'change'], worktree);
     await command(['git', 'commit', '-m', 'change'], worktree);
-    const dependent: string = leaf(f, 'dep', 'plan.synthesis', { 'blocked-by': ['member'] }, 'dep-issue');
+    const dependent: string = leaf(f, 'dep', 'plan.synthesis', { 'blocked-by': ['member', 'holder'] }, 'dep-issue');
     saveState(holder, { ...readState(holder), phase: 'merge', merge_stamp: '2026-09-11' });
     saveState(member, { ...readState(member), phase: 'merge', merge_stamp: '2026-09-12' });
     expect((await next(f, ['--all'])).code).toBe(1);
