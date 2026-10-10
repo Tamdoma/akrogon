@@ -4,6 +4,10 @@ import { command, run, CommandError, type Result } from './shell';
 
 const lessonsPath: string = 'learnings/LESSONS.md';
 
+export async function mergeBase(cwd: string, onto: string, head: string): Promise<string> {
+  return command(['git', 'merge-base', onto, head], cwd);
+}
+
 export async function retiredHistoryStems(cwd: string, base: string, head: string): Promise<string[]> {
   const diff: string = await command(['git', 'diff', '--unified=0', base + '..' + head, '--', 'learnings/history'], cwd);
   const stems: Set<string> = new Set();

@@ -57,7 +57,7 @@ Same-line index conflicts retain both true entries and recheck pointers. An exis
 After the rebase resolves, B runs the re-removal one-liner and commits the removal as its own scoped commit when the output is non-empty; `merged --check` refuses a pushed range still holding a retired line.
 
 ```
-bun -e "import {removeRetiredLessons} from './src/lessons.ts'; const r=await removeRetiredLessons(process.cwd(),(await Bun.spawn(['git','merge-base','origin/main','HEAD'],{stdout:'pipe'})).stdout.text().then(s=>s.trim()),'HEAD'); console.log(r.length?r.join('\n'):'none')"
+bun -e "import {mergeBase, removeRetiredLessons} from './src/lessons.ts'; const b=await mergeBase(process.cwd(),'<remote>/<default_branch>','HEAD'); const r=await removeRetiredLessons(process.cwd(),b,'HEAD'); console.log(r.length?r.join('\n'):'none')"
 ```
 
 When the output is non-empty: `git add learnings/LESSONS.md && git commit -m "lessons: retire applied lines"`.
