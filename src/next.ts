@@ -381,7 +381,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       try {
-        mkdirSync(path, { mode: 0o700 });
+        mkdirSync(path, { recursive: true, mode: 0o700 });
       } catch (mkdirError) {
         if ((mkdirError as NodeJS.ErrnoException).code !== 'EEXIST') throw mkdirError;
         validate();
@@ -390,7 +390,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
       return;
     }
     try {
-      mkdirSync(path, { mode: 0o700 });
+      mkdirSync(path, { recursive: true, mode: 0o700 });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
     }

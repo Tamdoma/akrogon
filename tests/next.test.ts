@@ -3767,6 +3767,31 @@ test('fresh allocation carries TMPDIR on create and B split with 0700 scratch', 
   }
 }, 15000);
 
+test('allocation creates missing leaf temp ancestors and recreates deleted intermediate parents', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const root: string = resolve(f.home, 'scratch/missing/parent');
+    leaf(f, 'deep-tmp', 'plan.synthesis');
+    expect((await next(f, ['deep-tmp'], { AKROGON_LEAF_TEMP_ROOT: root })).code).toBe(0);
+    const create: string[] = calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!;
+    const scratch: string = tmpdirOf(create);
+    expect(scratch.startsWith(root + '/')).toBe(true);
+    expect(existsSync(scratch)).toBe(true);
+    expect(statSync(scratch).mode & 0o777).toBe(0o700);
+    rmSync(resolve(f.home, 'scratch'), { recursive: true, force: true });
+    leaf(f, 'again', 'plan.synthesis');
+    expect((await next(f, ['again'], { AKROGON_LEAF_TEMP_ROOT: root })).code).toBe(0);
+    const recreate: string[] = calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create')[1];
+    const second: string = tmpdirOf(recreate);
+    expect(second.startsWith(root + '/')).toBe(true);
+    expect(second).not.toBe(scratch);
+    expect(existsSync(second)).toBe(true);
+    expect(statSync(second).mode & 0o777).toBe(0o700);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('new tab empties stale scratch, live tab keeps it, and seats disable the node compile cache', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
