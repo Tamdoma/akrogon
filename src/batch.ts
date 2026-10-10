@@ -1,9 +1,43 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, rmdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { dirname, resolve, sep } from 'node:path';
 import { leafTemp, type Repo } from './config';
 import { allLeaves, type Batch, type Leaf } from './state';
 import { command, run, CommandError, type Result } from './shell';
 import { removeRetiredLessons } from './lessons';
+
+export async function removeEmptyUntrackedDirs(worktree: string): Promise<void> {
+  const present: string =
+    (await command(['git', 'ls-files', '-c', '-o', '--exclude-standard', '-z'], worktree)) +
+    (await command(['git', 'ls-files', '-o', '-i', '--exclude-standard', '-z'], worktree));
+  const files: Set<string> = new Set(present.split('\0').filter((path) => path !== ''));
+  const dirs: string[] = [];
+  const keep: Set<string> = new Set();
+  function keepDir(rel: string): void {
+    let kept: string = rel;
+    while (kept !== '.' && kept !== '') {
+      keep.add(kept);
+      kept = dirname(kept);
+    }
+  }
+  function walk(path: string, rel: string): void {
+    for (const entry of readdirSync(path, { withFileTypes: true })) {
+      const entryRel: string = rel === '' ? entry.name : rel + sep + entry.name;
+      if (entry.isDirectory() && entry.name !== '.git' && !files.has(entryRel)) {
+        dirs.push(entryRel);
+        walk(resolve(path, entry.name), entryRel);
+      } else {
+        keepDir(rel);
+      }
+    }
+  }
+  walk(worktree, '');
+  const ignored: Result = await run(['git', 'check-ignore', '-z', '--stdin'], worktree, undefined, dirs.join('\0'));
+  if (ignored.code !== 0 && ignored.code !== 1)
+    throw new CommandError(['git', 'check-ignore', '-z', '--stdin'], worktree, ignored);
+  for (const rel of ignored.stdout.split('\0').filter((path) => path !== '')) keepDir(rel);
+  for (const rel of dirs.toReversed()) if (!keep.has(rel)) rmdirSync(resolve(worktree, rel));
+}
 
 export function attemptId(): string {
   return randomUUID();

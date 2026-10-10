@@ -72,6 +72,7 @@ import {
   equalOutsideRecordFolders,
   isAncestor,
   memberBase,
+  removeEmptyUntrackedDirs,
   restoreHolder,
   restoreMembers,
 } from './batch';
@@ -598,6 +599,8 @@ async function dispatchSlot(
   const ready: Pane = await currentPane(pane.pane_id);
   await observeBusy(leaf.path, readState(leaf.path), slot, ready, Date.now());
   if (!idle(ready)) return;
+  if (mergeContext !== undefined && state.worktree !== undefined && existsSync(state.worktree))
+    await removeEmptyUntrackedDirs(state.worktree);
   let file: string | undefined;
   let offset: number | undefined;
   if (ready.agent_session !== null && ready.agent_session !== undefined) {

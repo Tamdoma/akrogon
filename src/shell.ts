@@ -14,10 +14,15 @@ export class CommandError extends Error {
   }
 }
 
-export async function run(argv: string[], cwd: string = process.cwd(), deadlineMs?: number): Promise<Result> {
-  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(argv, {
+export async function run(
+  argv: string[],
+  cwd: string = process.cwd(),
+  deadlineMs?: number,
+  stdin?: string,
+): Promise<Result> {
+  const child: Bun.Subprocess<'ignore' | Blob, 'pipe', 'pipe'> = Bun.spawn(argv, {
     cwd,
-    stdin: 'ignore',
+    stdin: stdin === undefined ? 'ignore' : new Blob([stdin]),
     stdout: 'pipe',
     stderr: 'pipe',
   });
@@ -45,8 +50,8 @@ export async function run(argv: string[], cwd: string = process.cwd(), deadlineM
   }
 }
 
-export async function command(argv: string[], cwd: string = process.cwd()): Promise<string> {
-  const result: Result = await run(argv, cwd);
+export async function command(argv: string[], cwd: string = process.cwd(), stdin?: string): Promise<string> {
+  const result: Result = await run(argv, cwd, undefined, stdin);
   if (result.code !== 0) throw new CommandError(argv, cwd, result);
   return result.stdout;
 }
