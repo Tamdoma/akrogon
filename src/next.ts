@@ -365,12 +365,14 @@ async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promis
   const missing: string[] = repo.config.env.filter((name) => parsed[name] === undefined);
   if (missing.length > 0)
     throw new Error(`Refusing .env write at ${link}: missing declared names in ${root}: ${missing.join(', ')}`);
-  // parseEnv grammar: unquoted values end at # or whitespace, single quotes are
-  // verbatim except literal \r (normalized to \n), double quotes unescape only
-  // \n and \r. A value is emitted so a parseEnv consumer reads the same string.
+  // parseEnv grammar (probe-verified): unquoted values end at # or a line edge
+  // and a leading quote char opens quoting; single quotes and backticks are
+  // verbatim except a literal \r (normalized to \n); double quotes unescape
+  // \n and \r only (\\ stays literal). Emission reproduces the parsed value.
   const emit = (name: string, v: string): string | null => {
-    if (!/[#'"\n\r]/.test(v) && v === v.trim()) return `${name}=${v}`;
+    if (!/[#\n\r]/.test(v) && v === v.trim() && !['"', "'", '`'].includes(v[0] ?? '')) return `${name}=${v}`;
     if (!v.includes("'") && !v.includes('\r')) return `${name}='${v}'`;
+    if (!v.includes('`') && !v.includes('\r')) return `${name}=\`${v}\``;
     if (!v.includes('"') && !/\\[nr]/.test(v)) return `${name}="${v.replace(/\r/g, '\\r')}"`;
     return null;
   };
