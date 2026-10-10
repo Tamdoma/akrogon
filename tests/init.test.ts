@@ -10,7 +10,7 @@ test('init writes proposal, registration and toolkit and preserves repeated user
     const proposal: string = resolve(f.home, 'proposal.yaml');
     yaml(proposal, { checks: { test: 'bun test' }, implement: 'inline', grounding: 'none' });
     expect((await cli(f, ['init', '--from', proposal, '--toolkit', 'typescript=bun:test'])).code).toBe(0);
-    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe('.env\nissues/worktrees/\nissues/seeds/\n.lock\n');
+    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe('.env\nissues/seeds/\n.lock\n');
     expect(Bun.YAML.parse(readFileSync(resolve(f.root, 'issues/config.yaml'), 'utf8'))).toMatchObject({
       implement: 'inline',
       remote: 'origin',
@@ -71,6 +71,7 @@ test('init ignores the custom worktree root and preserves user rules on repeated
 const rootCases: [string, (f: Fixture) => string, string][] = [
   ['relative external', () => '../trees', ''],
   ['absolute external', (f: Fixture) => resolve(f.home, 'trees'), ''],
+  ['tilde external', () => '~/trees', ''],
   ['repo-prefix sibling', (f: Fixture) => `${f.root}-trees`, ''],
   ['normalized relative internal', () => './work/temporary/../trees/', 'work/trees/\n'],
   ['absolute internal', (f: Fixture) => resolve(f.root, 'work/trees'), 'work/trees/\n'],

@@ -34,10 +34,13 @@ test('sync commits local changes, rebases on the remote and pushes', async () =>
   }
 });
 
-async function remoteFixture(worktreeRoot: string = 'issues/worktrees', branch: string = 'main'): Promise<Fixture> {
+async function remoteFixture(
+  worktreeRoot: string | null = 'issues/worktrees',
+  branch: string = 'main',
+): Promise<Fixture> {
   const f: Fixture = await fixture();
   yaml(resolve(f.root, 'issues/config.yaml'), {
-    worktree_root: worktreeRoot,
+    ...(worktreeRoot !== null ? { worktree_root: worktreeRoot } : {}),
     default_branch: branch,
     grounding: 'none',
   });
@@ -99,6 +102,24 @@ for (const advancing of [false, true]) {
     }
   });
 }
+
+test('sync scopes eligible issue records with the default home worktree store', async () => {
+  const f: Fixture = await remoteFixture(null);
+  try {
+    put(f, 'issues/log.jsonl');
+    put(f, 'file', 'operator edits\n');
+    const result: Result = await cli(f, ['sync']);
+    expect(result.code, result.stderr).toBe(0);
+    expect(await command(['git', 'diff', '--cached', '--name-only'], f.root)).toBe('');
+    expect(await command(['git', 'show', '--format=', '--name-only', 'HEAD'], resolve(f.home, 'remote.git'))).toBe(
+      'issues/log.jsonl',
+    );
+    expect(readFileSync(resolve(f.root, 'file'), 'utf8')).toBe('operator edits\n');
+    await locksFree(f);
+  } finally {
+    f.clean();
+  }
+});
 
 test('autostash restoration conflict refuses push and preserves recovery stash', async () => {
   const f: Fixture = await remoteFixture();
