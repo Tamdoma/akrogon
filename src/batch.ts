@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { leafTemp, type Repo } from './config';
 import { allLeaves, type Batch, type Leaf } from './state';
 import { command, run, CommandError, type Result } from './shell';
+import { removeRetiredLessons } from './lessons';
 
 export function attemptId(): string {
   return randomUUID();
@@ -63,13 +64,21 @@ export async function buildStack(
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
       tips.set(item.slug, tip);
     }
-    if (await isAncestor(dir, holderHead, tip)) return { ok: true, tips, top: tip };
-    const held: Result = await run(['git', 'rebase', '--onto', tip, tip, holderHead], dir);
-    if (held.code !== 0) {
-      await command(['git', 'rebase', '--abort'], dir);
-      return { ok: false, conflict: holderHead };
+    if (!(await isAncestor(dir, holderHead, tip))) {
+      const held: Result = await run(['git', 'rebase', '--onto', tip, tip, holderHead], dir);
+      if (held.code !== 0) {
+        await command(['git', 'rebase', '--abort'], dir);
+        return { ok: false, conflict: holderHead };
+      }
+      tip = await command(['git', 'rev-parse', 'HEAD'], dir);
     }
-    return { ok: true, tips, top: await command(['git', 'rev-parse', 'HEAD'], dir) };
+    const removed: string[] = await removeRetiredLessons(dir, builtOn, 'HEAD');
+    if (removed.length > 0) {
+      await command(['git', 'add', 'learnings/LESSONS.md'], dir);
+      await command(['git', 'commit', '-m', 'lessons: retire applied lines'], dir);
+      tip = await command(['git', 'rev-parse', 'HEAD'], dir);
+    }
+    return { ok: true, tips, top: tip };
   } finally {
     await command(['git', 'worktree', 'remove', '--force', dir], repo.root);
   }

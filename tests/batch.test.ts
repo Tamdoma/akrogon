@@ -1,6 +1,6 @@
 import { test, expect, afterEach } from 'bun:test';
 import { resolve } from 'node:path';
-import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { fixture, leaf, leafTempRoot, type Fixture } from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, stateSchema, type Leaf, type State } from '../src/state';
@@ -134,6 +134,99 @@ async function batchFixture(): Promise<{ f: Fixture; repo: Repo; builtOn: string
   const builtOn: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
   return { f, repo, builtOn };
 }
+
+async function lessonsFixture(): Promise<{ f: Fixture; repo: Repo; builtOn: string; base: string }> {
+  const f: Fixture = await fixture();
+  process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
+  writeFileSync(resolve(f.root, '.gitattributes'), 'learnings/LESSONS.md merge=union\n');
+  mkdirSync(resolve(f.root, 'learnings/history'), { recursive: true });
+  writeFileSync(
+    resolve(f.root, 'learnings/LESSONS.md'),
+    '- lesson alpha. 2026-09-10. history/alpha.md\n- lesson beta. 2026-09-11. [beta](history/beta.md)\n',
+  );
+  writeFileSync(resolve(f.root, 'learnings/history/alpha.md'), '# alpha\n');
+  writeFileSync(resolve(f.root, 'learnings/history/beta.md'), '# beta\n');
+  await command(['git', 'add', '.'], f.root);
+  await command(['git', 'commit', '-m', 'lessons'], f.root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+  const base: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+  writeFileSync(
+    resolve(f.root, 'learnings/LESSONS.md'),
+    '- lesson alpha. 2026-09-10. history/alpha.md\n- lesson gamma. 2026-09-12. history/gamma.md\n- lesson beta. 2026-09-11. [beta](history/beta.md)\n',
+  );
+  writeFileSync(resolve(f.root, 'learnings/history/gamma.md'), '# gamma\n');
+  await command(['git', 'add', '.'], f.root);
+  await command(['git', 'commit', '-m', 'gamma'], f.root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+  const builtOn: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+  return { f, repo: readRepo('repo', f.root), builtOn, base };
+}
+
+test.serial('buildStack re-removes a retired lesson line the union merge resurrects', async () => {
+  const { f, repo, builtOn } = await lessonsFixture();
+  try {
+    const a = await branch(
+      f,
+      'mem-a',
+      {
+        'learnings/LESSONS.md': '- lesson beta. 2026-09-11. [beta](history/beta.md)\n',
+        'learnings/history/alpha.md': '# alpha\n\nApplied 2026-10-05 by tests/batch.test.ts: buildStack re-removes\n',
+        'file-mem-a': 'a\n',
+      },
+      false,
+    );
+    const holder = await branch(f, 'holder', { 'file-holder': 'h\n' }, false);
+    const result = await buildStack(
+      repo,
+      builtOn,
+      [{ slug: 'mem-a', base: await memberBase(repo, builtOn, a.sha), head: a.sha }],
+      holder.sha,
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result));
+    const tipA: string = result.tips.get('mem-a')!;
+    const tipLessons: string = await command(['git', 'show', tipA + ':learnings/LESSONS.md'], f.root);
+    expect(tipLessons).toContain('history/alpha.md');
+    expect(tipLessons).toContain('lesson beta');
+    expect(tipLessons).toContain('lesson gamma');
+    const topLessons: string = await command(['git', 'show', result.top + ':learnings/LESSONS.md'], f.root);
+    expect(topLessons.split('\n')).toEqual([
+      '- lesson gamma. 2026-09-12. history/gamma.md',
+      '- lesson beta. 2026-09-11. [beta](history/beta.md)',
+    ]);
+    expect(await command(['git', 'log', '--format=%s', '-1', result.top], f.root)).toBe('lessons: retire applied lines');
+    expect(await command(['git', 'rev-parse', result.top + '~1'], f.root)).not.toBe(tipA);
+    expect(await command(['git', 'rev-list', '--count', result.top], f.root)).toBe('6');
+    const shown: string = await command(['git', 'show', '--format=', '--name-only', result.top], f.root);
+    expect(shown).toBe('learnings/LESSONS.md');
+    noLeftoverWorktrees(f);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('buildStack adds no fixup commit when no retired lesson is resurrected', async () => {
+  const { f, repo, builtOn } = await lessonsFixture();
+  try {
+    const a = await branch(f, 'mem-a', { 'file-mem-a': 'a\n' }, false);
+    const holder = await branch(f, 'holder', { 'file-holder': 'h\n' }, false);
+    const result = await buildStack(
+      repo,
+      builtOn,
+      [{ slug: 'mem-a', base: await memberBase(repo, builtOn, a.sha), head: a.sha }],
+      holder.sha,
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result));
+    expect(await command(['git', 'log', '--format=%s', '-1', result.top], f.root)).toBe('holder');
+    expect(await command(['git', 'rev-list', '--count', result.top], f.root)).toBe('5');
+    const topLessons: string = await command(['git', 'show', result.top + ':learnings/LESSONS.md'], f.root);
+    expect(topLessons).toContain('lesson alpha');
+    expect(topLessons).toContain('lesson beta');
+    expect(topLessons).toContain('lesson gamma');
+    noLeftoverWorktrees(f);
+  } finally {
+    f.clean();
+  }
+});
 
 test.serial('buildStack rebases member ranges in order then the holder range', async () => {
   const { f, repo, builtOn } = await batchFixture();
