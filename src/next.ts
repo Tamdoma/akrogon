@@ -78,7 +78,7 @@ import { commitMove, completeOwner } from './phase';
 import { sessionFile, deliveredAfter } from './session-file';
 import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
-import { blockDetail, mergeQueue, type QueueEntry } from './turn';
+import { blockDetail, dependentCounts, mergeQueue, type QueueEntry } from './turn';
 
 const hookEventSchema = z.discriminatedUnion('event', [
   z.object({
@@ -770,8 +770,11 @@ async function sweep(
   isAutomatic: boolean,
 ): Promise<void> {
   if (isAutomatic && isPaused(repo.name)) return;
+  const counts: Map<string, number> = dependentCounts(discover(repo, invocation).leaves);
   const ordered: Leaf[] = [...leaves].sort(
-    (a, b) => Number(b.state.phase === 'merged') - Number(a.state.phase === 'merged'),
+    (a, b) =>
+      Number(b.state.phase === 'merged') - Number(a.state.phase === 'merged') ||
+      (counts.get(b.state.slug) ?? 0) - (counts.get(a.state.slug) ?? 0),
   );
   for (const leaf of ordered) {
     const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, picked, invocation, undefined, isAutomatic);
