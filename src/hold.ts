@@ -81,6 +81,7 @@ export function mergeHolder(
   log: () => LogRecord[],
 ): QueueEntry | undefined {
   const queue: QueueEntry[] = mergeQueue(global, leaves, log);
+  if (queue[0]?.leaf.state.batch !== undefined) return queue[0];
   const fix: string | undefined = heldFor(repoName)?.fix;
   if (fix === undefined) return queue[0];
   return queue.find((entry) => entry.leaf.state.slug === fix) ?? queue[0];
