@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, fakeHerdr, leaf, editOnSecondStatus, yaml, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
@@ -751,11 +751,13 @@ test('a dirty holder worktree drops the batch to solo and restores carried membe
     const bbHead: string = await head(f, 'bb');
     const aaWorktree: string = z.string().parse(readState(aa.path).worktree);
     writeFileSync(resolve(aaWorktree, 'file'), 'holder dirty\n');
+    mkdirSync(resolve(aaWorktree, 'empty-dirty'));
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(readFileSync(resolve(aaWorktree, 'file'), 'utf8')).toBe('holder dirty\n');
+    expect(existsSync(resolve(aaWorktree, 'empty-dirty'))).toBe(false);
     expect(await head(f, 'aa')).toBe(aaHead);
     expect(await head(f, 'bb')).toBe(bbHead);
     const batch = readState(aa.path).batch;
@@ -898,3 +900,95 @@ test('a memberless applied holder retains its checked integration head on red', 
     f.clean();
   }
 });
+
+test('empty untracked folders are removed before an applied merge prompt', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    writeFileSync(resolve(f.root, '.env'), 'secret\n');
+    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const worktree: string = z.string().parse(readState(holder.path).worktree);
+    mkdirSync(resolve(worktree, 'td'));
+    await commitFile(f, holder.path, 'td/keep', 'keep\n');
+    await commitFile(f, holder.path, '.gitignore', '.env\n.temp/\nnode_modules/\nign.txt\ntd/ige/\n');
+    // Only ignored or empty entries may be planted: any untracked file would dirty
+    // the holder and drop the batch to solo before the prompt is sent.
+    mkdirSync(resolve(worktree, 'e1'));
+    mkdirSync(resolve(worktree, 'td/e2'));
+    mkdirSync(resolve(worktree, 'td/ige'));
+    mkdirSync(resolve(worktree, 'up/empty-child'), { recursive: true });
+    writeFileSync(resolve(worktree, 'up/ign.txt'), 'ignored\n');
+    mkdirSync(resolve(worktree, '.temp'));
+    writeFileSync(resolve(worktree, '.temp/out'), 'temp out\n');
+    mkdirSync(resolve(worktree, 'node_modules'));
+    writeFileSync(resolve(worktree, 'node_modules/pkg.js'), 'module\n');
+    toMerge(holder.path, '2026-09-11T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(database(f).prompts).toEqual([expectedPrompt(holder.path, holder.b)]);
+    expect(existsSync(resolve(worktree, 'e1'))).toBe(false);
+    expect(existsSync(resolve(worktree, 'td/e2'))).toBe(false);
+    expect(existsSync(resolve(worktree, 'up/empty-child'))).toBe(false);
+    expect(readFileSync(resolve(worktree, 'up/ign.txt'), 'utf8')).toBe('ignored\n');
+    expect(readFileSync(resolve(worktree, '.temp/out'), 'utf8')).toBe('temp out\n');
+    expect(readFileSync(resolve(worktree, 'node_modules/pkg.js'), 'utf8')).toBe('module\n');
+    expect(existsSync(resolve(worktree, 'td/ige'))).toBe(true);
+    expect(readFileSync(resolve(worktree, 'td/keep'), 'utf8')).toBe('keep\n');
+    const envLink: string = resolve(worktree, '.env');
+    expect(lstatSync(envLink).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(envLink)).toBe(resolve(f.root, '.env'));
+    expect(readFileSync(envLink, 'utf8')).toBe('secret\n');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('empty untracked folders are removed before a solo merge prompt', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const worktree: string = z.string().parse(readState(holder.path).worktree);
+    await commitFile(f, holder.path, '.gitignore', '.env\n.temp/\n');
+    mkdirSync(resolve(worktree, 'solempty'));
+    mkdirSync(resolve(worktree, 'up/empty-child'), { recursive: true });
+    writeFileSync(resolve(worktree, 'up/keep.txt'), 'keep\n');
+    mkdirSync(resolve(worktree, '.temp'));
+    writeFileSync(resolve(worktree, '.temp/x'), 'temp\n');
+    // up/keep.txt makes the holder dirty, so the batch collapses to the solo form.
+    toMerge(holder.path, '2026-09-11T00:00:00.000Z', { solo: true });
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(resolve(worktree, 'solempty'))).toBe(false);
+    expect(existsSync(resolve(worktree, 'up/empty-child'))).toBe(false);
+    expect(readFileSync(resolve(worktree, 'up/keep.txt'), 'utf8')).toBe('keep\n');
+    expect(readFileSync(resolve(worktree, '.temp/x'), 'utf8')).toBe('temp\n');
+    expect(mergePrompts(f)).toHaveLength(1);
+    expect(mergePrompts(f)[0].pane).toBe(holder.b);
+    expect(mergePrompts(f)[0].text).toContain('solo');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a failed removal stops the merge prompt', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const worktree: string = z.string().parse(readState(holder.path).worktree);
+    const locked: string = resolve(worktree, 'lp');
+    mkdirSync(resolve(locked, 'child'), { recursive: true });
+    // lp is still listable so git status reads clean, but rmSync(lp/child) fails EACCES.
+    chmodSync(locked, 0o555);
+    try {
+      toMerge(holder.path, '2026-09-11T00:00:00.000Z');
+      const result: Result = await next(f, ['--all']);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain(resolve(locked, 'child'));
+      expect(mergePrompts(f)).toEqual([]);
+      expect(existsSync(resolve(locked, 'child'))).toBe(true);
+    } finally {
+      chmodSync(locked, 0o755);
+    }
+  } finally {
+    f.clean();
+  }
+}, 15000);
