@@ -12,7 +12,7 @@ In delegated mode A runs each plan wave whole, up to 3 workers at once, once its
 
 A report missing changed files/reasons, tests/results, known limitations or unverified criteria goes back to that worker for completion, even when the worker says it is done; this is a worker turn with no phase change or `fix_rounds` increment.
 
-A mismatch names the conflicting requirement, actual code/interface or scale evidence, and the smallest brief correction; A revises the brief and reruns the affected worker, without escalating the implementation choice to the operator or changing phase.
+A mismatch names the conflicting requirement, actual code/interface or scale evidence, and the smallest brief correction; A revises the brief and reruns the affected worker, without escalating the implementation choice to the operator or changing phase. A leaf worker writes and edits no test: a planned test that is wrong or stays red once the worker's code is correct is a mismatch returned to A, never fixed in the worker's worktree.
 
 A worker whose failed result carries a provider error in its error text (the pi-retried kind: overloaded, 429/500/502/503/504, rate limit, unavailable, network and stream drops; never quota, billing or context overflow) is relaunched once, only after the old worker has ended, with its retained worktree as the spawn cwd and its original brief plus this added line verbatim:
 
@@ -22,9 +22,9 @@ A second provider failure of the same unit ends a leaf pass `failed`, with a rea
 
 ## Failure ownership
 
-Workers run only the brief's changed-test command against A's supplied base and repair failures within their brief; criterion proof and every `checks` command belong to A, which may run independent proof beside workers under the implement-issue overlap rule and runs the final passing proof and `checks` after the final worker lands.
+Workers run only the brief's changed-test command against A's supplied base and repair failures within their brief; a leaf's planned tests are A's, run by the worker, never written or edited by it; criterion proof and every `checks` command belong to A, which may run independent proof beside workers under the implement-issue overlap rule and runs the final passing proof and `checks` after the final worker lands.
 
-A red criterion proof or `checks` command becomes one more sub-brief with failing output pasted, worker repairs with changed tests, A reruns that proof and `checks`.
+A red criterion proof or `checks` command becomes one more sub-brief with failing output pasted, worker repairs with changed tests, A reruns that proof and `checks`; a planned test red because its own expectation is wrong is no worker repair; it is the mismatch above, and only A's cited expectation correction resolves it.
 
 A conflicting pick is aborted with `git cherry-pick --abort` and that worker's worktree kept so its commit stays reachable; A resolves the conflict itself or delegates only the remainder, whose sub-brief reads its starting state from the retained worktree. After a crash A inspects and resumes a retained worktree. A failure between briefs, a wrong shared interface or incompatible worker choices belongs to A to fix in the brief and rerun the affected worker; a one- or two-line repair may be edited directly by A.
 

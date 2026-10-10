@@ -10,7 +10,7 @@ The outcome and plan decision IDs; standalone assigns its brief's own decision I
 
 ## 2. Numbered acceptance criteria
 
-Observable outcomes written before code; write the smallest test set proving every done-criterion, one test may prove several criteria, with one before and after proof per real bug fixed; extra negative or edge cases need a named concrete consequence on a realistic path (a broken required outcome, a security boundary, data loss or an unsafe mutation); extend existing tests before adding files; trivial one-liners need no test. An existing assertion, fixture or recorded output changes or is deleted only with a cited brief outcome or real source that the old expectation contradicts. A new test needs no cited source. Default to the smallest test at the real boundary (CLI, HTTP, browser, DB), with unit or property tests only for logic that matters where they catch bugs more cheaply and E2E only where smaller tests miss browser, runtime or wiring bugs. Delete a false or outdated expectation with its reason, a duplicate only after naming the test that still catches the same bug, batches judged as batches, keeping tests guarding real past regressions. A bug fix shows fail-before/pass-after and new behavior shows one deliberate break turning its test red, with no mutation score.
+Observable outcomes written before code. A test exists only as the proof of a done-criterion or as the red-first reproduction of a proven bug; after planning no seat adds an edge or negative case on a named consequence alone. For a delegated leaf the planned tests and their run command come from `plan.md`, copied in for the tests this unit touches; those tests live in the leaf diff and run under section 7's changed-test command. A worker writes and edits no test: a planned test that is wrong or red returns a mismatch, never a test fix. Standalone has no planned tests and no guard; its only rule is order: tests from the brief first, committed, then code.
 
 ## 3. Read-first list
 
@@ -28,7 +28,7 @@ End this section by restating the reasons and exceptions so they remain attached
 
 ## 6. Ordered steps
 
-Each step names its file and acceptance criterion, with tests derived before code and red/green evidence where relevant.
+Each step names its file and acceptance criterion, with red/green evidence where relevant.
 
 Advisory size: about N files and under M turns, with M at least four turns per file because each file costs a read, an edit and a test run; work clearly beyond it returns a mismatch with evidence, not a hard cutoff.
 
@@ -41,8 +41,6 @@ If the checkout has no changed-test runner, name the actual targeted check deriv
 ## 8. Done-when, evidence and report
 
 Acceptance outcomes and pasted command results; the report links each done-criterion and each real bug fix to its test or evidence, with a path to any required end-to-end artifact; limitations and unverified criteria remain explicit.
-
-A worker commit that changes an existing file matched by the path rule in `src/test-files.ts` ends its message with a `Test-Change: <exact path> <source and reason>` trailer in the final trailer block, one per changed old test file, a later trailer-only empty commit is the allowed exception to the no-empty-commit rule, and a commit adding a case to an existing test file carries the same trailer naming what was added and that no existing expectation changed, citing no source; delegated commits survive cherry-pick, so the trailer lands on the lane.
 
 For akrogon command work, scenarios use temporary repositories, real files/processes and herdr/gh replaced at one boundary, with no real panes, install roots, GitHub or herdr socket; tests need an observable contract or observed defect, not coverage or wording except literal commands, numbers and fixed references.
 
