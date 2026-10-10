@@ -397,19 +397,20 @@ test('asymmetric and empty leaf sources defer until epic completion under open l
     );
     leaf(f, 'empty', 'merged', {}, 'epic/first');
     const main: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
-    leaf(
+    const second: string = leaf(
       f,
       'two',
-      'merge',
-      {
-        worktree: last,
-        sources: ['team/project#2', 'team/project#3'],
-        batch: { attempt: 'a1', built_on: main, holder: { base: main, head }, applied: true, solo: true, members: [] },
-      },
+      'check.review',
+      { worktree: last, sources: ['team/project#2', 'team/project#3'] },
       'epic/second',
     );
     expect((await cli(f, ['phase', 'one', 'merged'], f.root, gh.env)).code).toBe(0);
     expect(existsSync(gh.db + '.calls')).toBe(false);
+    saveState(second, {
+      ...readState(second),
+      phase: 'merge',
+      batch: { attempt: 'a1', built_on: main, holder: { base: main, head }, applied: true, solo: true, members: [] },
+    });
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/epic'),
       closed: resolve(f.root, 'issues/closed/epic'),
