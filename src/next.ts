@@ -75,6 +75,7 @@ import {
   restoreMembers,
 } from './batch';
 import { commitMove, completeOwner } from './phase';
+import { appendAttempt } from './attempts';
 import { sessionFile, deliveredAfter } from './session-file';
 import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
@@ -898,6 +899,7 @@ async function reconcileBatch(
     const landed: boolean =
       batch.candidate !== undefined && (await isAncestor(repo.root, batch.candidate, trackingRef(repo)));
     if (landed) {
+      appendAttempt(repo, holder.state.slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
       for (const member of batch.members) {
         const item: Leaf | undefined = allLeaves(repo).find((entry) => entry.state.slug === member.slug);
         if (item?.state.phase === 'merge' && (await isAncestor(repo.root, member.tip, trackingRef(repo)))) {
@@ -940,7 +942,10 @@ async function reconcileBatch(
       leaves,
     );
     if (fresh !== undefined && batch.members.length > 0) await restoreHolder(repo, fresh, batch);
-    if (fresh !== undefined) saveState(fresh.path, { ...fresh.state, batch: undefined });
+    if (fresh !== undefined) {
+      appendAttempt(repo, holder.state.slug, batch, 'red');
+      saveState(fresh.path, { ...fresh.state, batch: undefined });
+    }
   });
   if (error !== null) {
     report(invocation, repo.name, holder.path, error, holder.state.slug);
@@ -1034,6 +1039,7 @@ async function mergeTurn(
     const holderHead: string = holderSha ?? builtOn;
     const next: Batch = {
       attempt: attemptId(),
+      started: new Date().toISOString(),
       built_on: builtOn,
       holder: { base: await memberBase(repo, builtOn, holderHead), head: holderHead },
       members,

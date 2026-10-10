@@ -28,6 +28,7 @@ import {
 } from './routing';
 import { command, run, herdr, herdrError, retryable, CommandError, type Result } from './shell';
 import { logMove, readLog } from './log';
+import { appendAttempt } from './attempts';
 import { mergeQueue, type QueueEntry } from './turn';
 import { closeSources } from './pull';
 import { testFile } from './test-files';
@@ -472,6 +473,7 @@ async function batchPush(
     repo.root,
   );
   if (pushed.code === 0) {
+    appendAttempt(repo, leaf.state.slug, record, record.decision === 'reuse' ? 'reuse' : 'merged');
     for (const entry of members)
       await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
     await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted);
@@ -729,6 +731,7 @@ async function finishPush(
       const batch: Batch | undefined = leaf.state.batch;
       if (batch?.attempt !== pending.record.attempt || leaf.state.phase !== 'merge')
         throw new Error('Batch record changed while verifying the push');
+      appendAttempt(repo, slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
       saveState(leaf.path, { ...leaf.state, batch: { ...batch, applied: true, top: pending.candidate } });
       const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
       for (const entry of members)
@@ -795,8 +798,13 @@ export async function phaseCommand(
         const limit: number = Math.floor(record.members.length / 2);
         saveState(leaf.path, { ...readState(leaf.path), batch: undefined, batch_limit: limit });
         console.log(`batch split, holder keeps ${limit} of ${record.members.length} members`);
+        appendAttempt(repo, leaf.state.slug, record, 'split');
         committed = true;
-      } else await transition(repo, leaf, requested, slot, verdict, reason, check, onCommitted);
+      } else
+        await transition(repo, leaf, requested, slot, verdict, reason, check, () => {
+          appendAttempt(repo, leaf.state.slug, record, 'red');
+          onCommitted();
+        });
     } else {
       await transition(repo, leaf, requested, slot, verdict, reason, check, onCommitted);
     }

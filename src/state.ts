@@ -41,6 +41,7 @@ export const batchMemberSchema = z.strictObject({
 
 export const batchSchema = z.strictObject({
   attempt: z.string().min(1),
+  started: z.iso.datetime().optional(),
   built_on: z.string(),
   holder: z.strictObject({ base: z.string(), head: z.string() }),
   members: z.array(batchMemberSchema),
