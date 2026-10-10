@@ -68,6 +68,7 @@ Each line carries:
 - `culprit` is the leaf slug named as the cause; it is present only on `ejected` lines.
 - `start` is the batch creation time; it is absent on batches created before this field existed.
 - `end` is the attempt end time.
+- `pressure` holds cpu, memory and io stall in integer microseconds (the `some` `total=` increase over the attempt); it is absent when the batch predates this field, the host has no `/proc/pressure`, or the host rebooted mid-attempt.
 
 The command writes `merged`, `red`, `split`, `held`, `reuse` and `ejected` now.
 

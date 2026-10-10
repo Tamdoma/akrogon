@@ -76,7 +76,7 @@ import {
   restoreMembers,
 } from './batch';
 import { commitMove, completeOwner } from './phase';
-import { appendAttempt } from './attempts';
+import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
 import { sessionFile, deliveredAfter } from './session-file';
 import { heldFor, dropHeld, mergeHolder, type Hold } from './hold';
 import { readLog } from './log';
@@ -871,6 +871,7 @@ async function reconcileBatch(
   holder: Leaf,
   invocation: Invocation,
   isAutomatic: boolean,
+  pressureDir: string = '/proc/pressure',
 ): Promise<void> {
   const record: Batch | undefined = holder.state.batch;
   if (record === undefined) return;
@@ -894,6 +895,8 @@ async function reconcileBatch(
       (fresh?.state.phase === 'merge' && !(batch.applied === true && batch.candidate !== undefined))
     )
       return;
+    const end: PressureSnapshot | undefined =
+      batch.pressure_start === undefined ? undefined : readPressure(pressureDir);
     const landed: boolean =
       batch.candidate !== undefined && (await isAncestor(repo.root, batch.candidate, trackingRef(repo)));
     if (landed) {
@@ -911,7 +914,14 @@ async function reconcileBatch(
       );
       if (holderNow.state.phase === 'merge') {
         if (batch.recorded !== true)
-          appendAttempt(repo, holder.state.slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
+          appendAttempt(
+            repo,
+            holder.state.slug,
+            batch,
+            batch.decision === 'reuse' ? 'reuse' : 'merged',
+            undefined,
+            end,
+          );
         await commitMove(repo, holderNow, holderNow.state, 'merged', null);
         if (!inFlight) {
           const remaining: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
@@ -929,7 +939,14 @@ async function reconcileBatch(
           allLeaves(repo).some((item) => item.state.slug === member.slug && item.state.phase === 'merge'),
         );
         if (batch.recorded !== true)
-          appendAttempt(repo, holder.state.slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
+          appendAttempt(
+            repo,
+            holder.state.slug,
+            batch,
+            batch.decision === 'reuse' ? 'reuse' : 'merged',
+            undefined,
+            end,
+          );
         const notified: boolean = batch.notified === true || (await mergeNotice(repo, holderNow.state.slug));
         saveState(holderNow.path, {
           ...holderNow.state,
@@ -948,7 +965,7 @@ async function reconcileBatch(
     if (fresh !== undefined && batch.members.length > 0) await restoreHolder(repo, fresh, batch);
     if (fresh !== undefined) {
       if ((fresh.state.phase === 'merge' || fresh.state.phase === 'failed') && batch.recorded !== true)
-        appendAttempt(repo, holder.state.slug, batch, 'red');
+        appendAttempt(repo, holder.state.slug, batch, 'red', undefined, end);
       saveState(fresh.path, { ...fresh.state, batch: undefined });
     }
   });
@@ -971,12 +988,13 @@ async function mergeTurn(
   repo: Repo,
   invocation: Invocation,
   isAutomatic: boolean,
+  pressureDir: string = '/proc/pressure',
 ): Promise<void> {
   if (isAutomatic && isPaused(repo.name)) return;
   const inventory: Inventory = discover(repo, invocation);
   for (const leaf of inventory.leaves.filter((item) => item.state.batch !== undefined)) {
     try {
-      await reconcileBatch(global, repo, leaf, invocation, isAutomatic);
+      await reconcileBatch(global, repo, leaf, invocation, isAutomatic, pressureDir);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       report(invocation, repo.name, leaf.path, error, leaf.state.slug);
@@ -1034,6 +1052,7 @@ async function mergeTurn(
     const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
     if (fresh?.state.phase !== 'merge' || fresh.state.batch !== undefined) return;
     if (mergeHolder(repo.name, global, leaves, () => readLog(repo.root))?.leaf.state.slug !== holder.state.slug) return;
+    const start: PressureSnapshot | undefined = readPressure(pressureDir);
     const builtOn: string = await localBase(repo);
     let fixHeld: boolean = false;
     const heldNow: Hold | undefined = heldFor(repo.name);
@@ -1068,6 +1087,7 @@ async function mergeTurn(
     const next: Batch = {
       attempt: attemptId(),
       started: new Date().toISOString(),
+      pressure_start: start,
       built_on: builtOn,
       holder: { base: await memberBase(repo, builtOn, holderHead), head: holderHead },
       members,
@@ -1247,12 +1267,13 @@ export async function mergePass(
   repo: Repo,
   invocation: Invocation,
   isAutomatic: boolean,
+  pressureDir: string = '/proc/pressure',
 ): Promise<void> {
   for (;;) {
     if (isAutomatic && isPaused(repo.name)) return;
     const holder: Leaf | undefined = mergeQueue(global, discover(repo, invocation).leaves, () => readLog(repo.root))[0]
       ?.leaf;
-    await mergeTurn(global, repo, invocation, isAutomatic);
+    await mergeTurn(global, repo, invocation, isAutomatic, pressureDir);
     if (
       holder === undefined ||
       discover(repo, invocation).leaves.some(
@@ -1263,12 +1284,16 @@ export async function mergePass(
   }
 }
 
-export async function mergeWake(global: GlobalConfig, repo: Repo): Promise<void> {
+export async function mergeWake(
+  global: GlobalConfig,
+  repo: Repo,
+  pressureDir: string = '/proc/pressure',
+): Promise<void> {
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
   try {
     const paused: boolean = await withLock(resolve(globalHome(), '.lock'), async () => isPaused(repo.name));
     if (paused) return;
-    await mergePass(global, repo, invocation, true);
+    await mergePass(global, repo, invocation, true, pressureDir);
   } catch (error) {
     if (!(error instanceof Error)) throw error;
     report(invocation, repo.name, repo.root, error);
@@ -1405,7 +1430,7 @@ async function paneOwners(
   );
 }
 
-export async function nextCommand(input: string | undefined): Promise<void> {
+export async function nextCommand(input: string | undefined, pressureDir: string = '/proc/pressure'): Promise<void> {
   const rawEvent: string | undefined = input === undefined ? process.env.HERDR_PLUGIN_EVENT_JSON : undefined;
   const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
   readPaused();
@@ -1533,7 +1558,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
     });
     for (const { repo, isAutomatic } of touched.values()) {
       try {
-        await mergePass(global, repo, invocation, isAutomatic);
+        await mergePass(global, repo, invocation, isAutomatic, pressureDir);
       } catch (error) {
         if (!(error instanceof Error)) throw error;
         report(invocation, repo.name, repo.root, error);
@@ -1543,7 +1568,7 @@ export async function nextCommand(input: string | undefined): Promise<void> {
   if (invocation.skipped.size > 0) process.exitCode = 1;
 }
 
-export async function unpausePass(repo: Repo): Promise<void> {
+export async function unpausePass(repo: Repo, pressureDir: string = '/proc/pressure'): Promise<void> {
   const global: GlobalConfig = readGlobal();
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
   await withLock(resolve(globalHome(), '.lock'), async () => {
@@ -1559,7 +1584,7 @@ export async function unpausePass(repo: Repo): Promise<void> {
     );
     await cleanupRepos([repo], invocation, false);
   });
-  await mergePass(global, repo, invocation, false);
+  await mergePass(global, repo, invocation, false, pressureDir);
   if (invocation.skipped.size > 0)
     throw new Error(`Unpause pass incomplete for ${repo.name}: ${invocation.skipped.size} skipped`);
 }

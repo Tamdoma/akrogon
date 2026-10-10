@@ -42,6 +42,14 @@ export const batchMemberSchema = z.strictObject({
 export const batchSchema = z.strictObject({
   attempt: z.string().min(1),
   started: z.iso.datetime().optional(),
+  pressure_start: z
+    .strictObject({
+      cpu: z.number().int().nonnegative(),
+      memory: z.number().int().nonnegative(),
+      io: z.number().int().nonnegative(),
+      boot_id: z.string(),
+    })
+    .optional(),
   recorded: z.boolean().optional(),
   built_on: z.string(),
   holder: z.strictObject({ base: z.string(), head: z.string() }),

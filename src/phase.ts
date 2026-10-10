@@ -28,7 +28,7 @@ import {
 } from './routing';
 import { command, run, herdr, herdrError, retryable, CommandError, type Result } from './shell';
 import { logMove, readLog } from './log';
-import { appendAttempt } from './attempts';
+import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
 import { type QueueEntry } from './turn';
 import { closeSources } from './pull';
 import { testFile } from './test-files';
@@ -437,8 +437,8 @@ async function batchCheck(
 
 type BatchPending =
   | { kind: 'none' }
-  | { kind: 'refused'; record: Batch; candidate: string }
-  | { kind: 'error'; record: Batch; candidate: string; result: Result };
+  | { kind: 'refused'; record: Batch; candidate: string; end: PressureSnapshot | undefined }
+  | { kind: 'error'; record: Batch; candidate: string; result: Result; end: PressureSnapshot | undefined };
 
 async function batchPush(
   repo: Repo,
@@ -449,6 +449,8 @@ async function batchPush(
   reason: string | undefined,
   record: Batch,
   onCommitted: () => void,
+  end: PressureSnapshot | undefined,
+  pressureDir: string = '/proc/pressure',
 ): Promise<BatchPending> {
   const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
   if (members.length !== record.members.length) {
@@ -478,7 +480,7 @@ async function batchPush(
     repo.root,
   );
   if (pushed.code === 0) {
-    appendAttempt(repo, leaf.state.slug, record, record.decision === 'reuse' ? 'reuse' : 'merged');
+    appendAttempt(repo, leaf.state.slug, record, record.decision === 'reuse' ? 'reuse' : 'merged', undefined, end);
     saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head, recorded: true } });
     for (const entry of members)
       await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
@@ -497,10 +499,10 @@ async function batchPush(
         decision: undefined,
       },
     });
-    return { kind: 'refused', record, candidate: head };
+    return { kind: 'refused', record, candidate: head, end };
   }
   saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: undefined } });
-  return { kind: 'error', record, candidate: head, result: pushed };
+  return { kind: 'error', record, candidate: head, result: pushed, end };
 }
 
 async function worktreeDirty(repo: Repo, worktree: string | undefined): Promise<boolean> {
@@ -720,6 +722,7 @@ async function finishPush(
   verdict: Verdict | undefined,
   reason: string | undefined,
   onCommitted: () => void,
+  pressureDir: string = '/proc/pressure',
 ): Promise<void> {
   const fetched: Result = await run(['git', 'fetch', repo.config.remote], repo.root);
   if (fetched.code !== 0) {
@@ -734,7 +737,8 @@ async function finishPush(
       const batch: Batch | undefined = leaf.state.batch;
       if (batch?.attempt !== pending.record.attempt || leaf.state.phase !== 'merge')
         throw new Error('Batch record changed while verifying the push');
-      if (batch.recorded !== true) appendAttempt(repo, slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged');
+      if (batch.recorded !== true)
+        appendAttempt(repo, slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged', undefined, pending.end);
       saveState(leaf.path, {
         ...leaf.state,
         batch: { ...batch, applied: true, top: pending.candidate, recorded: true },
@@ -762,6 +766,7 @@ export async function phaseCommand(
   rawRedOnBase: string | boolean | undefined,
   rawCommand: string | boolean | undefined,
   rawCulprit: string | boolean | undefined,
+  pressureDir: string = '/proc/pressure',
 ): Promise<{ repo: Repo; committed: boolean }> {
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
@@ -815,100 +820,116 @@ export async function phaseCommand(
           `Stale attempt ${attempt === undefined ? 'missing' : JSON.stringify(attempt)}: current batch attempt is ${record.attempt}`,
         );
       if (check) await batchCheck(repo, leaf, requested, slot, verdict, reason, record);
-      else if (redOnBase !== undefined) {
-        await command(['git', 'fetch', repo.config.remote], repo.root);
-        const baseSha: string = await localBase(repo);
-        if (redOnBase !== baseSha)
-          throw new Error(`--red-on-base ${redOnBase} is not fetched ${trackingRef(repo)} ${baseSha}`);
-        const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
-        await restoreMembers(
-          repo,
-          members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-        );
-        await restoreHolder(repo, leaf, record);
-        appendAttempt(repo, leaf.state.slug, record, 'held');
-        saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
-        writeHeld(repo.name, {
-          sha: redOnBase,
-          command: cmd!,
-          holder: leaf.state.slug,
-          attempt: record.attempt,
-          at: new Date().toISOString(),
-          evidence: resolve(leaf.path, 'review-B.md'),
-        });
-        console.log(`held ${repo.name} on ${redOnBase}: ${cmd}`);
-        committed = true;
-        try {
-          await herdrCall(
-            [
-              'notification',
-              'show',
-              `${repo.name} merge held on ${redOnBase.slice(0, 12)}`,
-              '--body',
-              cmd!,
-              '--sound',
-              'request',
-            ],
-            z.object({ shown: z.boolean(), reason: z.string() }),
-            slug,
+      else {
+        const end: PressureSnapshot | undefined =
+          record.pressure_start === undefined ? undefined : readPressure(pressureDir);
+        if (redOnBase !== undefined) {
+          await command(['git', 'fetch', repo.config.remote], repo.root);
+          const baseSha: string = await localBase(repo);
+          if (redOnBase !== baseSha)
+            throw new Error(`--red-on-base ${redOnBase} is not fetched ${trackingRef(repo)} ${baseSha}`);
+          const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
+          await restoreMembers(
+            repo,
+            members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
           );
-        } catch (error) {
-          console.warn(
-            JSON.stringify({
-              warning: 'hold notice failed',
+          await restoreHolder(repo, leaf, record);
+          appendAttempt(repo, leaf.state.slug, record, 'held', undefined, end);
+          saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
+          writeHeld(repo.name, {
+            sha: redOnBase,
+            command: cmd!,
+            holder: leaf.state.slug,
+            attempt: record.attempt,
+            at: new Date().toISOString(),
+            evidence: resolve(leaf.path, 'review-B.md'),
+          });
+          console.log(`held ${repo.name} on ${redOnBase}: ${cmd}`);
+          committed = true;
+          try {
+            await herdrCall(
+              [
+                'notification',
+                'show',
+                `${repo.name} merge held on ${redOnBase.slice(0, 12)}`,
+                '--body',
+                cmd!,
+                '--sound',
+                'request',
+              ],
+              z.object({ shown: z.boolean(), reason: z.string() }),
               slug,
-              error: error instanceof Error ? error.message : String(error),
-            }),
+            );
+          } catch (error) {
+            console.warn(
+              JSON.stringify({
+                warning: 'hold notice failed',
+                slug,
+                error: error instanceof Error ? error.message : String(error),
+              }),
+            );
+          }
+        } else if (culprit !== undefined) {
+          const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
+          const entry: { member: BatchMember; leaf: Leaf } | undefined = members.find(
+            (item) => item.member.slug === culprit,
           );
-        }
-      } else if (culprit !== undefined) {
-        const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
-        const entry: { member: BatchMember; leaf: Leaf } | undefined = members.find(
-          (item) => item.member.slug === culprit,
-        );
-        if (leaf.state.slug !== culprit && entry === undefined)
-          throw new Error(`--culprit ${culprit} is not the holder or a carried member of ${leaf.state.slug}`);
-        const culpritLeaf: Leaf = entry?.leaf ?? leaf;
-        const savedHead: string =
-          entry !== undefined ? entry.member.head : record.solo === true ? 'HEAD' : record.holder.head;
-        if (culpritLeaf.state.done.includes('B')) throw new Error(`--culprit ${culprit}: slot B already recorded`);
-        if (culpritLeaf.state.worktree !== undefined) {
-          await requireClean(culpritLeaf.state.worktree);
-          await requireNoIssueFiles(repo, culpritLeaf.state.worktree, culpritLeaf.path, target(repo), savedHead);
-          await requireTestChangeCitations(repo, culpritLeaf.state.worktree, target(repo), savedHead);
-        }
-        await restoreMembers(
-          repo,
-          members.map((item) => ({ ...item.member, leaf: item.leaf })),
-        );
-        await restoreHolder(repo, leaf, record);
-        saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
-        appendAttempt(repo, leaf.state.slug, record, 'ejected', culprit);
-        console.log(`ejected ${culprit}`);
-        await transition(repo, culpritLeaf, 'check.fix', 'B', undefined, undefined, false, onCommitted);
-      } else if (requested === 'merged')
-        pending = await batchPush(repo, leaf, requested, slot, verdict, reason, record, onCommitted);
-      else if (record.members.length > 0) {
-        const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
-        await restoreMembers(
-          repo,
-          members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-        );
-        await restoreHolder(repo, leaf, record);
-        const limit: number = Math.floor(record.members.length / 2);
-        saveState(leaf.path, { ...readState(leaf.path), batch: undefined, batch_limit: limit });
-        console.log(`batch split, holder keeps ${limit} of ${record.members.length} members`);
-        appendAttempt(repo, leaf.state.slug, record, 'split');
-        committed = true;
-      } else
-        await transition(repo, leaf, requested, slot, verdict, reason, check, () => {
-          appendAttempt(repo, leaf.state.slug, record, 'red');
-          onCommitted();
-        });
+          if (leaf.state.slug !== culprit && entry === undefined)
+            throw new Error(`--culprit ${culprit} is not the holder or a carried member of ${leaf.state.slug}`);
+          const culpritLeaf: Leaf = entry?.leaf ?? leaf;
+          const savedHead: string =
+            entry !== undefined ? entry.member.head : record.solo === true ? 'HEAD' : record.holder.head;
+          if (culpritLeaf.state.done.includes('B')) throw new Error(`--culprit ${culprit}: slot B already recorded`);
+          if (culpritLeaf.state.worktree !== undefined) {
+            await requireClean(culpritLeaf.state.worktree);
+            await requireNoIssueFiles(repo, culpritLeaf.state.worktree, culpritLeaf.path, target(repo), savedHead);
+            await requireTestChangeCitations(repo, culpritLeaf.state.worktree, target(repo), savedHead);
+          }
+          await restoreMembers(
+            repo,
+            members.map((item) => ({ ...item.member, leaf: item.leaf })),
+          );
+          await restoreHolder(repo, leaf, record);
+          saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
+          appendAttempt(repo, leaf.state.slug, record, 'ejected', culprit, end);
+          console.log(`ejected ${culprit}`);
+          await transition(repo, culpritLeaf, 'check.fix', 'B', undefined, undefined, false, onCommitted);
+        } else if (requested === 'merged')
+          pending = await batchPush(
+            repo,
+            leaf,
+            requested,
+            slot,
+            verdict,
+            reason,
+            record,
+            onCommitted,
+            end,
+            pressureDir,
+          );
+        else if (record.members.length > 0) {
+          const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
+          await restoreMembers(
+            repo,
+            members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
+          );
+          await restoreHolder(repo, leaf, record);
+          const limit: number = Math.floor(record.members.length / 2);
+          saveState(leaf.path, { ...readState(leaf.path), batch: undefined, batch_limit: limit });
+          console.log(`batch split, holder keeps ${limit} of ${record.members.length} members`);
+          appendAttempt(repo, leaf.state.slug, record, 'split', undefined, end);
+          committed = true;
+        } else
+          await transition(repo, leaf, requested, slot, verdict, reason, check, () => {
+            appendAttempt(repo, leaf.state.slug, record, 'red', undefined, end);
+            onCommitted();
+          });
+      }
     } else {
       await transition(repo, leaf, requested, slot, verdict, reason, check, onCommitted);
     }
   });
-  if (pending.kind !== 'none') await finishPush(repo, slug, pending, requested, slot, verdict, reason, onCommitted);
+  if (pending.kind !== 'none')
+    await finishPush(repo, slug, pending, requested, slot, verdict, reason, onCommitted, pressureDir);
   return { repo, committed };
 }
