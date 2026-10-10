@@ -1905,7 +1905,10 @@ async function lessonsMain(f: Fixture): Promise<{ builtOn: string; lessons: stri
   await command(['git', 'commit', '-m', 'lessons'], f.root);
   await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
-  const lessons: string[] = ['- lesson alpha. 2026-09-10. history/alpha.md', '- lesson beta. 2026-09-11. [beta](history/beta.md)'];
+  const lessons: string[] = [
+    '- lesson alpha. 2026-09-10. history/alpha.md',
+    '- lesson beta. 2026-09-11. [beta](history/beta.md)',
+  ];
   return { builtOn, lessons };
 }
 

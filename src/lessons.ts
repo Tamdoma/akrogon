@@ -9,7 +9,10 @@ export async function mergeBase(cwd: string, onto: string, head: string): Promis
 }
 
 export async function retiredHistoryStems(cwd: string, base: string, head: string): Promise<string[]> {
-  const diff: string = await command(['git', 'diff', '--unified=0', base + '..' + head, '--', 'learnings/history'], cwd);
+  const diff: string = await command(
+    ['git', 'diff', '--unified=0', base + '..' + head, '--', 'learnings/history'],
+    cwd,
+  );
   const stems: Set<string> = new Set();
   let file: string | undefined;
   for (const line of diff.split('\n')) {

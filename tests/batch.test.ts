@@ -193,7 +193,9 @@ test.serial('buildStack re-removes a retired lesson line the union merge resurre
       '- lesson gamma. 2026-09-12. history/gamma.md',
       '- lesson beta. 2026-09-11. [beta](history/beta.md)',
     ]);
-    expect(await command(['git', 'log', '--format=%s', '-1', result.top], f.root)).toBe('lessons: retire applied lines');
+    expect(await command(['git', 'log', '--format=%s', '-1', result.top], f.root)).toBe(
+      'lessons: retire applied lines',
+    );
     expect(await command(['git', 'rev-parse', result.top + '~1'], f.root)).not.toBe(tipA);
     expect(await command(['git', 'rev-list', '--count', result.top], f.root)).toBe('6');
     const shown: string = await command(['git', 'show', '--format=', '--name-only', result.top], f.root);
