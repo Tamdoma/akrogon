@@ -32,7 +32,8 @@ import { appendAttempt } from './attempts';
 import { mergeQueue, type QueueEntry } from './turn';
 import { closeSources } from './pull';
 import { testFile } from './test-files';
-import { trackingRef } from './preflight';
+import { localBase, trackingRef } from './preflight';
+import { writeHeld } from './hold';
 import {
   applyStack,
   buildStack,
@@ -757,6 +758,8 @@ export async function phaseCommand(
   rawReason: string | boolean | undefined,
   rawCheck: string | boolean | undefined,
   rawAttempt: string | boolean | undefined,
+  rawRedOnBase: string | boolean | undefined,
+  rawCommand: string | boolean | undefined,
 ): Promise<{ repo: Repo; committed: boolean }> {
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
@@ -764,6 +767,14 @@ export async function phaseCommand(
   const reason: string | undefined = z.string().trim().min(1).optional().parse(rawReason);
   const check: boolean = z.literal(true).optional().parse(rawCheck) === true;
   const attempt: string | undefined = z.string().trim().min(1).optional().parse(rawAttempt);
+  const redOnBase: string | undefined = z.string().trim().min(1).optional().parse(rawRedOnBase);
+  const cmd: string | undefined = z.string().trim().min(1).optional().parse(rawCommand);
+  if (cmd !== undefined && redOnBase === undefined) throw new Error('--command requires --red-on-base');
+  if (redOnBase !== undefined) {
+    if (check) throw new Error('--check cannot combine with --red-on-base');
+    if (requested !== 'check.fix') throw new Error('--red-on-base is only valid for check.fix');
+    if (cmd === undefined) throw new Error('--red-on-base requires --command');
+  }
   const global: GlobalConfig = readGlobal();
   const repo: Repo = await requireRepo(global, process.cwd());
   let committed: boolean = false;
@@ -784,13 +795,61 @@ export async function phaseCommand(
         );
     }
     const record: Batch | undefined = leaf.state.batch;
+    if (redOnBase !== undefined && record === undefined)
+      throw new Error(`--red-on-base requires a batch record: ${slug} holds none`);
     if (leaf.state.phase === 'merge' && record !== undefined && (requested === 'merged' || requested === 'check.fix')) {
       if (slot !== undefined && attempt !== record.attempt)
         throw new Error(
           `Stale attempt ${attempt === undefined ? 'missing' : JSON.stringify(attempt)}: current batch attempt is ${record.attempt}`,
         );
       if (check) await batchCheck(repo, leaf, requested, slot, verdict, reason, record);
-      else if (requested === 'merged')
+      else if (redOnBase !== undefined) {
+        await command(['git', 'fetch', repo.config.remote], repo.root);
+        const baseSha: string = await localBase(repo);
+        if (redOnBase !== baseSha)
+          throw new Error(`--red-on-base ${redOnBase} is not fetched ${trackingRef(repo)} ${baseSha}`);
+        const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
+        await restoreMembers(
+          repo,
+          members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
+        );
+        await restoreHolder(repo, leaf, record);
+        appendAttempt(repo, leaf.state.slug, record, 'held');
+        saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
+        writeHeld(repo.name, {
+          sha: redOnBase,
+          command: cmd!,
+          holder: leaf.state.slug,
+          attempt: record.attempt,
+          at: new Date().toISOString(),
+          evidence: resolve(leaf.path, 'review-B.md'),
+        });
+        console.log(`held ${repo.name} on ${redOnBase}: ${cmd}`);
+        committed = true;
+        try {
+          await herdrCall(
+            [
+              'notification',
+              'show',
+              `${repo.name} merge held on ${redOnBase.slice(0, 12)}`,
+              '--body',
+              cmd!,
+              '--sound',
+              'request',
+            ],
+            z.object({ shown: z.boolean(), reason: z.string() }),
+            slug,
+          );
+        } catch (error) {
+          console.warn(
+            JSON.stringify({
+              warning: 'hold notice failed',
+              slug,
+              error: error instanceof Error ? error.message : String(error),
+            }),
+          );
+        }
+      } else if (requested === 'merged')
         pending = await batchPush(repo, leaf, requested, slot, verdict, reason, record, onCommitted);
       else if (record.members.length > 0) {
         const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);

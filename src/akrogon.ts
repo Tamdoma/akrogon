@@ -17,6 +17,8 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
           reason: { type: 'string' },
           check: { type: 'boolean' },
           attempt: { type: 'string' },
+          'red-on-base': { type: 'string' },
+          command: { type: 'string' },
         }
       : verb === 'next'
         ? { all: { type: 'boolean' }, resume: { type: 'boolean' } }
@@ -66,6 +68,8 @@ switch (verb) {
         values.reason,
         values.check,
         values.attempt,
+        values['red-on-base'],
+        values.command,
       );
       if (result.committed) committed = result;
     } catch (error) {
@@ -103,6 +107,10 @@ switch (verb) {
     if (values.all !== true && positionals.length === 0) throw new Error('Name at least one issue or pass --all');
     await (await import('./park')).parkCommand(verb, positionals, values.all === true, process.cwd());
     break;
+  case 'unhold':
+    z.tuple([]).parse(positionals);
+    await (await import('./hold')).unholdCommand(process.cwd());
+    break;
   case 'pause':
     z.tuple([]).parse(positionals);
     await (await import('./pause')).pauseCommand(verb, process.cwd());
@@ -125,6 +133,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|sync|status>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|sync|status>',
     );
 }
