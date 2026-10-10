@@ -788,7 +788,9 @@ for (const ending of ['check.fix', 'failed'] as const) {
       expect((await cli(f, args, f.root, f.env)).code).toBe(0);
       expect(readState(holder.path).phase).toBe(ending);
       expect(await head(f, 'holder')).toBe(repaired);
-      expect(readFileSync(resolve(readState(holder.path).worktree!, 'seat-fix'), 'utf8')).toBe('committed holder repair');
+      expect(readFileSync(resolve(readState(holder.path).worktree!, 'seat-fix'), 'utf8')).toBe(
+        'committed holder repair',
+      );
     } finally {
       f.clean();
     }

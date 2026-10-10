@@ -103,7 +103,9 @@ export function readState(path: string): State {
   return stateSchema.parse(
     parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
       ? Object.fromEntries(
-          Object.entries(parsed).filter(([key]) => key !== 'priority' && key !== 'slot' && key !== 'failed_notified' && key !== 'solo'),
+          Object.entries(parsed).filter(
+            ([key]) => key !== 'priority' && key !== 'slot' && key !== 'failed_notified' && key !== 'solo',
+          ),
         )
       : parsed,
   );
