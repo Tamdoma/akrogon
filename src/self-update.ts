@@ -134,7 +134,7 @@ async function moveCheckout(repo: Repo, moveTo: string): Promise<Move> {
   const refused: Result = await run(['git', 'reset', '--keep', moveTo], root);
   if (refused.code === 0) return { state: 'moved', old: head };
   // keep refuses when a colliding path is dirty even if it already carries the
-  // target bytes; adopt the index tree when every collider is content-equal.
+  // target bytes; adopt the index tree only when every changed path is equal.
   const changed: Set<string> = new Set(paths(await command(['git', 'diff', '--name-only', '-z', head, moveTo], root)));
   const dirty: Set<string> = new Set([
     ...paths(await command(['git', 'diff', '--name-only', '-z'], root)),
@@ -149,7 +149,7 @@ async function moveCheckout(repo: Repo, moveTo: string): Promise<Move> {
     const want: Result = await run(['git', 'rev-parse', `${moveTo}:${path}`], root);
     if (have.code !== 0 || want.code !== 0 || have.stdout !== want.stdout) equal = false;
   }
-  if (equal && colliding.length > 0) {
+  if (equal && colliding.length > 0 && colliding.length === changed.size) {
     await command(['git', 'reset', '--mixed', moveTo], root);
     return { state: 'moved', old: head };
   }
