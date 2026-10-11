@@ -259,7 +259,7 @@ export async function mergeRecords(repo: Repo, file: string, records: Comparison
   return { resolved, newResolved, applied, byUnit };
 }
 
-export async function hasKnownRed(repo: Repo, files: string[], builtOn?: string): Promise<boolean> {
+export async function hasKnownRed(repo: Repo, files: string[]): Promise<boolean> {
   for (const file of files) {
     let record: Comparison;
     try {
@@ -275,16 +275,7 @@ export async function hasKnownRed(repo: Repo, files: string[], builtOn?: string)
       );
       continue;
     }
-    for (const unit of record.units) {
-      if (!('verdict' in unit) || unit.verdict !== 'known-red' || unit.leaf.outcome !== 'fail') continue;
-      if ('base' in unit) {
-        if (unit.base.outcome === 'fail') return true;
-        continue;
-      }
-      const counterpart: string | undefined =
-        'counterpart_revision' in record ? (record.counterpart_revision ?? builtOn) : builtOn;
-      if (counterpart !== undefined) return true;
-    }
+    if (record.units.some((unit) => 'verdict' in unit && unit.verdict === 'known-red')) return true;
   }
   return false;
 }

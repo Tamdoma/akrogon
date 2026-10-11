@@ -323,7 +323,7 @@ async function comparisonsCarryRed(repo: Repo, record: Batch): Promise<boolean> 
       if (!(error instanceof ComparisonError)) throw error;
       return true;
     }
-  return hasKnownRed(repo, files, record.built_on);
+  return hasKnownRed(repo, files);
 }
 
 export async function transition(
