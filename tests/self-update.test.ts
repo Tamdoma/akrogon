@@ -198,6 +198,35 @@ test.serial('self-update reports a pending checkout on a behind-only move withou
   }
 });
 
+test.serial('a record commit landed while the lock waits is replayed, not dropped', async () => {
+  const f: SelfUpdateFixture = await selfUpdateFixture();
+  try {
+    await pushSeed(f, 'file', 'incoming\n');
+    await commitRecord(f, 'issues/log.jsonl', '{"ts":"a"}\n');
+    const lockPath: string = resolve(f.home, '.lock');
+    writeFileSync(lockPath, '');
+    const held: Bun.Subprocess = Bun.spawn(['flock', '-x', lockPath, 'sleep', '3']);
+    const update: Promise<string[]> = captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    await Bun.sleep(500);
+    await commitRecord(f, 'issues/open/y/brief.md', 'brief\n');
+    await held.exited;
+    const logs: string[] = await update;
+    expect(logs.join(' ')).toContain('pushed');
+    const remoteTip: string = await remoteHead(f);
+    // the commit landed mid-wait is replayed, so its content and subject reach
+    // the remote under a rewritten sha
+    expect(await command(['git', 'show', `${remoteTip}:issues/open/y/brief.md`], f.remote)).toBe('brief');
+    expect(await command(['git', 'log', '--format=%s', '-3', remoteTip], f.remote)).toContain(
+      'record issues/open/y/brief.md',
+    );
+    expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(remoteTip);
+    expect(await command(['git', 'status', '--porcelain'], f.clone)).toBe('');
+    expect(await worktreeCount(f)).toBe(1);
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('a local code commit ahead leaves the checkout and remote unchanged', async () => {
   const f: SelfUpdateFixture = await selfUpdateFixture();
   try {
