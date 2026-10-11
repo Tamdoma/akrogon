@@ -300,3 +300,27 @@ test.serial('a record changed on both sides pushes nothing and names the path an
     f.clean();
   }
 });
+
+test.serial('another repo finishes a pending checkout after its records are already upstream', async () => {
+  const f: SelfUpdateFixture = await selfUpdateFixture();
+  try {
+    await pushSeed(f, 'file', 'incoming\n');
+    await commitRecord(f, 'issues/log.jsonl', '{"ts":"now"}\n');
+    writeFileSync(resolve(f.clone, 'file'), 'dirty\n');
+    const repo: Repo = { ...f.repo, name: 'other' };
+    const ownRoot: string = resolve(f.home, 'elsewhere');
+    await captured(f.home, () => selfUpdate(repo, ownRoot, f.home));
+    const pushedTip: string = await remoteHead(f);
+    await command(['git', 'restore', 'file'], f.clone);
+    await captured(f.home, () => selfUpdate(repo, ownRoot, f.home));
+    expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(pushedTip);
+    expect(await remoteHead(f)).toBe(pushedTip);
+    expect(readFileSync(resolve(f.clone, 'file'), 'utf8')).toBe('incoming\n');
+    expect(await command(['git', 'status', '--porcelain'], f.clone)).toBe('');
+    expect(await command(['git', 'stash', 'list'], f.clone)).toBe('');
+    expect(await worktreeCount(f)).toBe(1);
+    expect(existsSync(resolve(f.clone, '.git/akrogon-install.lock'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
