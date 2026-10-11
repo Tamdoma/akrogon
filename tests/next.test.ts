@@ -4442,6 +4442,26 @@ test('next preserves a declared value that escapes every quoting form', async ()
   }
 }, 15000);
 
+test('a dispatched .env file preserves declared names matching encoding context names', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    writeFileSync(resolve(f.root, '.env'), 'Z1=x\nY4=y\n');
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      env: ['Z1', 'Y4'],
+    });
+    leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const copied: Record<string, string | undefined> = parseEnv(
+      readFileSync(resolve(f.root, 'issues/worktrees/build/.env'), 'utf8'),
+    );
+    expect(copied).toEqual({ Z1: 'x', Y4: 'y' });
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('a live tab freezes .env while a dead tab lets the next dispatch rewrite it', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
