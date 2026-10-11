@@ -1,7 +1,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { command, type Result } from '../src/shell';
+import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
 export type Fixture = { home: string; root: string; clean: () => void };
@@ -48,22 +48,15 @@ export async function cli(
 ): Promise<Result> {
   const withDefault: NodeJS.ProcessEnv =
     'AKROGON_LEAF_TEMP_ROOT' in env ? env : { ...env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) };
-  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, entry, ...args], {
+  const result: SpawnResult = await spawnCaptured([process.execPath, entry, ...args], {
     cwd,
     env: { ...process.env, AKROGON_HOME: f.home, HERDR_PANE_ID: '', HOME: f.home, ...withDefault },
     timeout,
     killSignal: 'SIGKILL',
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
   });
-  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  if (child.signalCode !== null)
-    throw new Error(JSON.stringify({ args, timeout, signal: child.signalCode, code, stdout, stderr }));
+  const { stdout, stderr, code } = result;
+  if (result.signalCode !== null)
+    throw new Error(JSON.stringify({ args, timeout, signal: result.signalCode, code, stdout, stderr }));
   return { code, stdout: stdout.trim(), stderr: stderr.trim() };
 }
 export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}, container: string = 'issue'): string {
@@ -133,18 +126,10 @@ exec '${git}' "$@"
 export function printedChecks(f: Fixture): (printed: string, cwd: string, env?: NodeJS.ProcessEnv) => Promise<Result> {
   const shim: { env: NodeJS.ProcessEnv } = fakeAkrogon(f);
   return async (printed: string, cwd: string, env: NodeJS.ProcessEnv = {}): Promise<Result> => {
-    const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(['sh', '-c', printed], {
+    const { code, stdout, stderr }: Result = await spawnCaptured(['sh', '-c', printed], {
       cwd,
       env: { ...process.env, ...shim.env, HOME: f.home, AKROGON_HOME: f.home, ...env },
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
     });
-    const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ]);
     return { code, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
   };
 }

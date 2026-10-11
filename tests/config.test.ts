@@ -3,7 +3,7 @@ import { basename, isAbsolute, resolve, sep } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { fixture, cli, leaf, yaml, printedChecks, type Fixture } from './helpers';
-import { command, quote, run, type Result } from '../src/shell';
+import { command, quote, run, spawnCaptured, type Result } from '../src/shell';
 import {
   SeatIndexError,
   leafTemp,
@@ -107,19 +107,13 @@ test('commonDirectory spawns git once per call and reports failures with cwd', a
     const toolRoot: string = resolve(import.meta.dir, '..');
     const script: string =
       'import { commonDirectory } from "./src/config.ts";\nconst out = [];\nfor (const cwd of process.argv.slice(2)) out.push(await commonDirectory(cwd));\nconsole.log(JSON.stringify(out));\n';
-    const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(
+    const { stdout, stderr, code }: Result = await spawnCaptured(
       [process.execPath, '-e', script, 'placeholder', f.root, nested, linked, nonRepo],
       {
         cwd: toolRoot,
         env: { ...process.env, PATH: bin + ':' + process.env.PATH },
-        stdin: 'ignore',
-        stdout: 'pipe',
-        stderr: 'pipe',
       },
     );
-    const stdout: string = await new Response(child.stdout).text();
-    const stderr: string = await new Response(child.stderr).text();
-    const code: number = await child.exited;
     expect(code).toBe(0);
     expect(stderr.trim()).toBe('');
     expect(JSON.parse(stdout.trim())).toEqual([expected, expected, expected, null]);
@@ -129,19 +123,14 @@ test('commonDirectory spawns git once per call and reports failures with cwd', a
     writeFileSync(resolve(bin, 'git'), '#!/bin/sh\necho "fatal: disk gone" >&2\nexit 128\n', { mode: 0o755 });
     const failing: string =
       'import { commonDirectory } from "./src/config.ts";\nawait commonDirectory(process.argv[2]);\n';
-    const failed: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(
-      [process.execPath, '-e', failing, 'placeholder', f.root],
-      {
-        cwd: toolRoot,
-        env: { ...process.env, PATH: bin + ':' + process.env.PATH },
-        stdin: 'ignore',
-        stdout: 'pipe',
-        stderr: 'pipe',
-      },
-    );
-    const failStdout: string = await new Response(failed.stdout).text();
-    const failStderr: string = await new Response(failed.stderr).text();
-    const failCode: number = await failed.exited;
+    const {
+      stdout: failStdout,
+      stderr: failStderr,
+      code: failCode,
+    }: Result = await spawnCaptured([process.execPath, '-e', failing, 'placeholder', f.root], {
+      cwd: toolRoot,
+      env: { ...process.env, PATH: bin + ':' + process.env.PATH },
+    });
     expect(failCode).not.toBe(0);
     expect(failStderr).toContain(f.root);
     expect(failStderr).toContain('disk gone');

@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, entry, type Fixture } from './helpers';
-import { command, type Result } from '../src/shell';
+import { command, spawnCaptured, type Result } from '../src/shell';
 import { mergeBase, removeRetiredLessons, retiredLessonsPresent } from '../src/lessons';
 
 test('solo cleanup command retires a union-resurrected lesson in a consumer repository', async () => {
@@ -42,18 +42,10 @@ test('solo cleanup command retires a union-resurrected lesson in a consumer repo
       .split('\n')
       .find((line) => line.startsWith('bun -e '))!
       .replaceAll('<remote>/<default_branch>', 'origin/main');
-    const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(['bash', '-c', invocation], {
+    const { stdout, stderr, code }: Result = await spawnCaptured(['bash', '-c', invocation], {
       cwd: f.root,
       env: { ...process.env, PATH: bin + ':' + process.env.PATH },
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
     });
-    const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ]);
     const result: Result = { stdout: stdout.trim(), stderr: stderr.trim(), code };
     expect(result).toEqual({ stdout: 'history/alpha', stderr: '', code: 0 });
     expect(readFileSync(resolve(f.root, 'learnings/LESSONS.md'), 'utf8')).toBe(gamma + beta);

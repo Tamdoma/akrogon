@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFi
 import { resolve } from 'node:path';
 import { cli, fakeHerdr, fixture, leaf, storeDir, yaml, type Fixture } from './helpers';
 import { readState } from '../src/state';
-import { command, run, type Result } from '../src/shell';
+import { command, run, spawnCaptured, type Result } from '../src/shell';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 async function dispatchFixture(): Promise<DispatchFixture> {
@@ -109,21 +109,13 @@ if (!built.ok) throw new Error('stack conflict: ' + built.conflict);
 console.log(built.top);
 `,
     );
-    const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, script], {
+    const { stdout, stderr, code }: Result = await spawnCaptured([process.execPath, script], {
       env: {
         ...process.env,
         PATH: resolve(f.home, 'bin') + ':' + (process.env.PATH ?? ''),
         HOME: f.home,
       },
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
     });
-    const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ]);
     expect({ code, stderr }).toEqual({ code: 0, stderr: '' });
     const top: string = stdout.trim();
     const log: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');

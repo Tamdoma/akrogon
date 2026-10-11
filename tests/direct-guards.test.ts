@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { command } from '../src/shell';
+import { command, spawnCaptured, type Result } from '../src/shell';
 import { fixture, type Fixture } from './helpers';
 
 const script: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/direct-guards.ts');
@@ -21,11 +21,10 @@ async function withBranch(
     const wt: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', '-b', 'direct', wt], f.root);
     const run = async (): Promise<RunResult> => {
-      const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(
+      const { stderr, code }: Result = await spawnCaptured(
         [process.execPath, script, wt, 'repo', resolve(f.home, 'chart')],
-        { env: { ...process.env, AKROGON_HOME: f.home }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
+        { env: { ...process.env, AKROGON_HOME: f.home } },
       );
-      const [stderr, code]: [string, number] = await Promise.all([new Response(child.stderr).text(), child.exited]);
       return { code, stderr };
     };
     await body(f, wt, run);

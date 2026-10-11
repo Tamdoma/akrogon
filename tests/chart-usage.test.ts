@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { spawnCaptured, type SpawnResult } from '../src/shell';
 
 const script: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/chart-usage.ts');
 const fixtures: string = resolve(import.meta.dir, 'fixtures/chart-usage');
@@ -64,17 +65,9 @@ function setup(): World {
       }
     },
     run: async (...args: string[]): Promise<RunResult> => {
-      const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, script, ...args], {
+      const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, ...args], {
         env: { ...process.env, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome },
-        stdin: 'ignore',
-        stdout: 'pipe',
-        stderr: 'pipe',
       });
-      const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ]);
       return { code, stdout, stderr };
     },
     clean: (): void => rmSync(dir, { recursive: true, force: true }),

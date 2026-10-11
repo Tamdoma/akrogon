@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { command, type Result } from '../src/shell';
+import { command, finishCaptured, spawnFiles, type Captured, type Result } from '../src/shell';
 import { readState, saveState, type State } from '../src/state';
 import type { Database } from './fake-herdr';
 import { cli, entry, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
@@ -457,7 +457,7 @@ test('race A: pause recorded before the locked merge section suppresses the laun
     control.clean();
   }
   const f: DispatchFixture = await dispatchFixture();
-  const child: { current?: Bun.Subprocess<'ignore', 'pipe', 'pipe'> } = {};
+  const child: { current?: Bun.Subprocess } = {};
   try {
     leaf(f, 'holder', 'merge', { solo: true });
     const barrier: string = resolve(f.home, 'barrier');
@@ -468,13 +468,14 @@ test('race A: pause recorded before the locked merge section suppresses the laun
       ...f.env,
       PATH: `${resolve(f.home, 'gitbin')}:${resolve(f.home, 'bin')}:${process.env.PATH}`,
     });
-    child.current = Bun.spawn([process.execPath, entry, 'next', '--resume'], {
-      cwd: f.root,
-      env,
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
+    const spawned: { child: Bun.Subprocess; captured: Captured } = spawnFiles(
+      [process.execPath, entry, 'next', '--resume'],
+      {
+        cwd: f.root,
+        env,
+      },
+    );
+    child.current = spawned.child;
     await waitFor(resolve(barrier, 'entered'), 15000);
     const paused: Result = await cli(f, ['pause']);
     expect(paused.code).toBe(0);
@@ -482,11 +483,7 @@ test('race A: pause recorded before the locked merge section suppresses the laun
       'repo',
     ]);
     writeFileSync(resolve(barrier, 'release'), '');
-    const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-      new Response(child.current.stdout).text(),
-      new Response(child.current.stderr).text(),
-      child.current.exited,
-    ]);
+    const { stdout, stderr, code }: Result = await finishCaptured(child.current, spawned.captured);
     expect({ stdout, stderr, code }).toMatchObject({ code: 0 });
     expect(mutating(f)).toEqual([]);
     expect(database(f).prompts).toEqual([]);

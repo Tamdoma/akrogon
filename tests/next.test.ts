@@ -31,7 +31,7 @@ import {
 } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { parseEnv } from 'node:util';
-import { command, run, type Result } from '../src/shell';
+import { command, run, type Result, spawnCaptured } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import type { Database } from './fake-herdr';
 import { z } from 'zod';
@@ -388,7 +388,7 @@ test('failed leaves never notify on dispatch', async () => {
 });
 
 async function nextAt(f: DispatchFixture, slug: string, now: number): Promise<Result> {
-  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(
+  const { stdout, stderr, code }: Result = await spawnCaptured(
     [
       process.execPath,
       '--eval',
@@ -397,16 +397,8 @@ async function nextAt(f: DispatchFixture, slug: string, now: number): Promise<Re
     {
       cwd: f.root,
       env: { ...process.env, AKROGON_HOME: f.home, HOME: f.home, HERDR_PANE_ID: '', ...f.env },
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
     },
   );
-  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
   return { stdout, stderr, code };
 }
 
@@ -1648,14 +1640,10 @@ const { nextCommand } = await import(${JSON.stringify(resolve(import.meta.dir, '
 try { await nextCommand('--all'); process.exit(2); } catch (error) { if (error !== 'non-error-sentinel') throw error; console.error(error); process.exit(9); }
 `,
     );
-    const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, script], {
+    const { stderr, code }: Result = await spawnCaptured([process.execPath, script], {
       env: { ...process.env, ...f.env, AKROGON_HOME: f.home },
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
     });
-    const stderr: string = await new Response(child.stderr).text();
-    expect(await child.exited).toBe(9);
+    expect(code).toBe(9);
     expect(stderr.trim()).toBe('non-error-sentinel');
   } finally {
     f.clean();
@@ -1962,13 +1950,9 @@ const seatLayoutSchema = z.object({
 });
 
 async function herdrOut(f: DispatchFixture, args: string[]): Promise<unknown> {
-  const child = Bun.spawn(['herdr', ...args], {
+  const { stdout, code }: Result = await spawnCaptured(['herdr', ...args], {
     env: { ...process.env, ...f.env },
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
   });
-  const [stdout, code]: [string, number] = await Promise.all([new Response(child.stdout).text(), child.exited]);
   expect(code).toBe(0);
   return JSON.parse(stdout).result;
 }
@@ -3918,16 +3902,14 @@ test('leaf temp path bounds stay short under the home scratch root', async () =>
       'console.log(JSON.stringify({ p1: p1, p2: p2, len: Buffer.byteLength(p1), base: basename(p1), prefix: slug.slice(0, 20) }));';
     const env: NodeJS.ProcessEnv = { ...process.env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) };
     delete env.AKROGON_LEAF_TEMP_ROOT;
-    const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, '--eval', code], {
+    const {
+      stdout,
+      stderr,
+      code: exited,
+    }: Result = await spawnCaptured([process.execPath, '--eval', code], {
       cwd: f.root,
       env: env,
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
     });
-    const stdout: string = await new Response(child.stdout).text();
-    const stderr: string = await new Response(child.stderr).text();
-    const exited: number = await child.exited;
     expect(stderr.trim()).toBe('');
     expect(exited).toBe(0);
     const out: { p1: string; p2: string; len: number; base: string; prefix: string } = JSON.parse(stdout.trim());
@@ -5650,7 +5632,7 @@ async function selfUpdateCli(
       .replace('SELF_UPDATE_MODULE', JSON.stringify(resolve(import.meta.dir, '../src/self-update.ts')))
       .replace('ENTRY', JSON.stringify(entry)),
   );
-  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, script, ...args], {
+  const { stdout, stderr, code }: Result = await spawnCaptured([process.execPath, script, ...args], {
     cwd,
     env: {
       ...process.env,
@@ -5661,15 +5643,7 @@ async function selfUpdateCli(
       SELF_UPDATE_LOG: f.db + '.self-update',
       ...env,
     },
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
   });
-  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
   return { code, stdout: stdout.trim(), stderr: stderr.trim() };
 }
 

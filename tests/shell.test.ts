@@ -4,7 +4,16 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, mkdirSync, symlinkSync, 
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fixture, type Fixture } from './helpers';
-import { CommandError, herdrError, paneSchema, retryable, retryCommand, run, type Result } from '../src/shell';
+import {
+  CommandError,
+  herdrError,
+  paneSchema,
+  retryable,
+  retryCommand,
+  run,
+  spawnCaptured,
+  type Result,
+} from '../src/shell';
 
 for (const firstFailure of [false, true]) {
   test.serial(`deadline kills sleeping attempt after ${firstFailure ? 'one failure' : 'no failures'}`, async () => {
@@ -106,15 +115,11 @@ await assert.rejects(herdr(['invalid-command'], z.object({})), (error) => {
   assert.equal(error.cause, undefined);
   return true;
 });`;
-      const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, '-e', script], {
+      const { stderr, code }: Result = await spawnCaptured([process.execPath, '-e', script], {
         cwd: f.root,
         env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db },
-        stdin: 'ignore',
-        stdout: 'pipe',
-        stderr: 'pipe',
       });
-      const stderr: string = await new Response(child.stderr).text();
-      expect({ code: await child.exited, stderr }).toEqual({ code: 0, stderr: '' });
+      expect({ code, stderr }).toEqual({ code: 0, stderr: '' });
     } finally {
       f.clean();
     }

@@ -18,7 +18,7 @@ import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State, type Tool } from '../src/state';
 import { attemptRecordSchema } from '../src/attempts';
 import { logSchema } from '../src/log';
-import { command, type Result } from '../src/shell';
+import { command, spawnCaptured, type Result } from '../src/shell';
 import { applyStack, buildStack } from '../src/batch';
 
 const originalTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
@@ -258,7 +258,7 @@ async function spawn(
 ): Promise<Result> {
   const script: string = resolve(f.home, name + '.ts');
   writeFileSync(script, body);
-  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, script, ...args], {
+  const { stdout, stderr, code }: Result = await spawnCaptured([process.execPath, script, ...args], {
     cwd: f.root,
     env: {
       ...process.env,
@@ -268,15 +268,7 @@ async function spawn(
       AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
       ...env,
     },
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
   });
-  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
   return { code, stdout: stdout.trim(), stderr: stderr.trim() };
 }
 

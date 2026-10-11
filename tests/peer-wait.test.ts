@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { spawnCaptured, type SpawnResult } from '../src/shell';
 
 const script: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/peer-wait.ts');
 const pane: string = 'w8:pX';
@@ -39,17 +40,9 @@ function setup(agentStatus: string, waitScript: (file: string) => WaitEntry[] = 
         .split('\n')
         .map((line: string) => JSON.parse(line) as string[]),
     run: async (...args: string[]): Promise<RunResult> => {
-      const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn([process.execPath, script, ...args], {
+      const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, ...args], {
         env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db },
-        stdin: 'ignore',
-        stdout: 'pipe',
-        stderr: 'pipe',
       });
-      const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ]);
       return { code, stdout, stderr };
     },
     clean: (): void => rmSync(dir, { recursive: true, force: true }),
