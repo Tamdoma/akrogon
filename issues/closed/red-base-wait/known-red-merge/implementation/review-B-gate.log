@@ -1,0 +1,1 @@
+{"scenario":"C5 accepted known-red unit with passing counterpart (D5 resolve-then-apply)","expected":true,"actual":false}

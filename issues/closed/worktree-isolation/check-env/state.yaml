@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tAM
-worktree: /home/ivan/.akrogon/worktrees/akrogon/check-env
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pMA
   B: w8:pMB

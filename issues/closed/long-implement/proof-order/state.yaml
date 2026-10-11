@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t84
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/proof-order
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pF9
   B: w8:pFA

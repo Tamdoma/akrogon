@@ -1,7 +1,6 @@
 slug: retire-old
 phase: merged
 created: 2026-09-09
-priority: "n"
 repo: akrogon
 debate: "no"
 blocked-by: 
@@ -12,6 +11,10 @@ blocked-by:
   - seed-issue
   - chart-issues
   - init-issues
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -21,10 +24,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tP
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/retire-old
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p15
   B: w8:p16
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

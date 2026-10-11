@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t94
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/merge-turn-order
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pH8
   B: w8:pH9

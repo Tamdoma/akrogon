@@ -1,0 +1,22 @@
+SCENARIO foreign-behind
+checkout equals remote: false
+checkout stayed at initial: true
+file: "old\n"
+second: "old second\n"
+status: ""
+SCENARIO foreign-pending-retry
+pushed 1 record commit(s) to origin/main; checkout pending: error: Entry 'file' not uptodate. Cannot merge. fatal: Could not reset index file to revision '4563563585df775f6a077709eec306a03aea4afb'.; 2 behind origin/main; commit or finish the overlapping edit
+SECOND TRIGGER AFTER RESTORE
+retry checkout at remote: false
+checkout equals remote: false
+checkout stayed at initial: false
+file: "old\n"
+second: "old second\n"
+status: ""
+SCENARIO mixed-adoption
+links failed: ENOENT: no such file or directory, scandir '/home/ivan/.akrogon/scratch/akrogon/records-sync-ab1ea73b025b/records-sync-review-B-PcUld9/clone/skills'; 0 behind origin/main; retried at the next trigger
+checkout equals remote: true
+checkout stayed at initial: false
+file: "incoming\n"
+second: "old second\n"
+status: " M second"

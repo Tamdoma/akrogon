@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t77
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/pull-all-repos
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pDJ
   B: w8:pDK

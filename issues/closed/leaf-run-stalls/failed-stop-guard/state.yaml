@@ -22,7 +22,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t7S
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/failed-stop-guard
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pEN
   B: w8:pEP

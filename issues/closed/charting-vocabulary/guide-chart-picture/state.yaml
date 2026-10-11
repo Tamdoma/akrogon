@@ -7,7 +7,6 @@ blocked-by:
   - rename-vocabulary
 sources: 
   []
-failed_notified: false
 busy_since: 
   A: 2026-09-13T22:21:48.338Z
 busy_notified: 
@@ -21,11 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t55
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/guide-chart-picture
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p9M
   B: w8:p9N
 prompted: 
   {}
 prompted_at: 
+  {}
+delivery_error: 
   {}

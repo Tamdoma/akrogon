@@ -1,13 +1,16 @@
 slug: seed-slug-cut
 phase: merged
 created: 2026-09-11
-priority: l
 repo: akrogon
 debate: "no"
 blocked-by: 
   []
 sources: 
   - "Tamdoma/akrogon#4"
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -17,10 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t4A
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/seed-slug-cut
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p86
   B: w8:p87
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

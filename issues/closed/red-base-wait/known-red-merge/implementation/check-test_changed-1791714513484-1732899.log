@@ -1,0 +1,547 @@
+bun install v1.4.2 (744846f84)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+bun test v1.4.2 (744846f84)
+--changed: 14 changed files, running 6/42 test files
+
+tests/command-reference.test.ts:
+61 |   const verbs: string[] = [...dispatch[1].matchAll(/^\s*case\s+['"]([^'"]+)['"]\s*:/gm)].map(
+62 |     (match: RegExpMatchArray) => match[1],
+63 |   );
+64 |   const rows: CommandRow[] = commandRows(markdown);
+65 |   expect(verbs.length).toBeGreaterThan(0);
+66 |   expect(rows.map((row: CommandRow) => row.verb).sort()).toEqual([...new Set(verbs)].sort());
+                                                              ^
+error: expect(received).toEqual(expected)
+
+  [
+    "base-run",
+    "close",
+    "config",
+    "guard",
+-   "hold-fix",
+    "init",
+    "install",
+    "next",
+    "park",
+    "pause",
+    "phase",
+    "preflight",
+    "pull",
+    "run-check",
+    "status",
+    "sync",
+-   "unhold",
+    "unpark",
+    "unpause",
+  ]
+
+- Expected  - 2
++ Received  + 0
+
+      at checkReference (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/command-reference.test.ts:66:58)
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/command-reference.test.ts:81:3)
+(fail) README covers every dispatched command and its argument contract [0.63ms]
+(pass) coverage rejects missing, extra and duplicate rows and newly dispatched verbs [0.53ms]
+(pass) argument contracts reject lost values, requiredness and exclusive alternatives [0.77ms]
+61 |   const verbs: string[] = [...dispatch[1].matchAll(/^\s*case\s+['"]([^'"]+)['"]\s*:/gm)].map(
+62 |     (match: RegExpMatchArray) => match[1],
+63 |   );
+64 |   const rows: CommandRow[] = commandRows(markdown);
+65 |   expect(verbs.length).toBeGreaterThan(0);
+66 |   expect(rows.map((row: CommandRow) => row.verb).sort()).toEqual([...new Set(verbs)].sort());
+                                                              ^
+error: expect(received).toEqual(expected)
+
+  [
+    "base-run",
+    "close",
+    "config",
+    "guard",
+-   "hold-fix",
+    "init",
+    "install",
+    "next",
+    "park",
+    "pause",
+    "phase",
+    "preflight",
+    "pull",
+    "run-check",
+    "status",
+    "sync",
+-   "unhold",
+    "unpark",
+    "unpause",
+  ]
+
+- Expected  - 2
++ Received  + 0
+
+      at checkReference (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/command-reference.test.ts:66:58)
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/command-reference.test.ts:117:3)
+(fail) escaped alternatives and reordered rows preserve argument semantics [0.13ms]
+
+tests/hold-retired.test.ts:
+47 |     const f: Fixture = await fixture();
+48 |     try {
+49 |       const args: string[] = verb === 'hold-fix' ? [verb, 'hold'] : [verb];
+50 |       const res: Result = await cli(f, args);
+51 |       expect(res.code).not.toBe(0);
+52 |       expect(res.stderr).toContain(POINTER);
+                              ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "skills/merge-issue/SKILL.md"
+Received: "90 | export async function holdFixCommand(cwd: string, slug: string): Promise<void> {\n91 |   const global: GlobalConfig = readGlobal();\n92 |   const repo: Repo = await requireRepo(global, cwd);\n93 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n94 |     const hold: Hold | undefined = heldFor(repo.name);\n95 |     if (hold === undefined) throw new Error(`No hold on ${repo.name}`);\n                                           ^\nerror: No hold on repo\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/hold.ts:95:39)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async holdFixCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/hold.ts:93:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/hold-retired.test.ts:52:26)
+(fail) retired verb hold-fix fails naming the known-red rule [49.79ms]
+47 |     const f: Fixture = await fixture();
+48 |     try {
+49 |       const args: string[] = verb === 'hold-fix' ? [verb, 'hold'] : [verb];
+50 |       const res: Result = await cli(f, args);
+51 |       expect(res.code).not.toBe(0);
+52 |       expect(res.stderr).toContain(POINTER);
+                              ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "skills/merge-issue/SKILL.md"
+Received: "103 | \n104 | export async function unholdCommand(cwd: string): Promise<void> {\n105 |   const global: GlobalConfig = readGlobal();\n106 |   const repo: Repo = await requireRepo(global, cwd);\n107 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n108 |     if (heldFor(repo.name) === undefined) throw new Error(`No hold on ${repo.name}`);\n                                                          ^\nerror: No hold on repo\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/hold.ts:108:53)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async unholdCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/hold.ts:107:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/hold-retired.test.ts:52:26)
+(fail) retired verb unhold fails naming the known-red rule [51.05ms]
+66 |       ['--red-on-base', 'a'.repeat(40), '--command', 'bun test'],
+67 |       ['--command', 'bun test'],
+68 |     ]) {
+69 |       const res: Result = await cli(f, [...base, ...extra]);
+70 |       expect(res.code).not.toBe(0);
+71 |       expect(res.stderr).toContain(POINTER);
+                              ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "skills/merge-issue/SKILL.md"
+Received: "994 |             : `Merge turn refused for ${slug}: holder is ${holder.leaf.state.slug}`,\n995 |         );\n996 |     }\n997 |     const record: Batch | undefined = leaf.state.batch;\n998 |     if (redOnBase !== undefined && record === undefined)\n999 |       throw new Error(`--red-on-base requires a batch record: ${slug} holds none`);\n                      ^\nerror: --red-on-base requires a batch record: hold holds none\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:999:17)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/hold-retired.test.ts:71:26)
+(fail) the retired merge flags fail naming the known-red rule and change nothing [57.72ms]
+ 96 |       merge_stamp: '2026-10-05T00:00:00.000Z',
+ 97 |     });
+ 98 |     const herdr = fakeHerdr(f);
+ 99 |     const board: Result = await cli(f, ['status'], f.root, herdr.env);
+100 |     expect(board.code).toBe(0);
+101 |     expect(board.stdout).not.toContain('held');
+                                   ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "held"
+Received: "repo (held fix hold)\n  LEAF     PHASE  AGE  BLOCKED BY  NOTE  TURN\n  issue\n     hold  merge  -                      holder"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/hold-retired.test.ts:101:30)
+(fail) a nonempty legacy held.yaml is inert for status, pause, unpause and the merge turn [61.81ms]
+160 |     /unholdCommand/,
+161 |     /held\.ya?ml/,
+162 |   ];
+163 |   for (const name of srcFiles) {
+164 |     const text: string = readFileSync(resolve(root, 'src', name), 'utf8');
+165 |     for (const pattern of banned) expect(text, `${name} matches ${pattern}`).not.toMatch(pattern);
+                                                                                       ^
+error: akrogon.ts matches /heldFor/
+
+Expected substring or pattern: not /heldFor/
+Received: "#!/usr/bin/env bun\nimport { parseArgs } from 'node:util';\nimport { z } from 'zod';\nimport { effectiveConfig, readGlobal, requireRepo, type Repo } from './config';\nimport { initialize } from './init';\nimport { sourcePattern } from './state';\nimport { type Hold } from './hold';\nimport { type Phase } from './routing';\n\nconst verb: string | undefined = process.argv[2];\n\nconst options: Record<string, { type: 'string' | 'boolean' }> =\n  verb === 'init'\n    ? { from: { type: 'string' }, toolkit: { type: 'string' } }\n    : verb === 'phase'\n      ? {\n          slot: { type: 'string' },\n          verdict: { type: 'string' },\n          reason: { type: 'string' },\n          check: { type: 'boolean' },\n          attempt: { type: 'string' },\n          compare: { type: 'string', multiple: true } as { type: 'string' },\n          'red-on-base': { type: 'string' },\n          command: { type: 'string' },\n          culprit: { type: 'string' },\n        }\n      : verb === 'next'\n        ? { all: { type: 'boolean' }, resume: { type: 'boolean' } }\n        : verb === 'pull' || verb === 'park' || verb === 'unpark'\n          ? { all: { type: 'boolean' } }\n          : verb === 'close'\n            ? { by: { type: 'string' } }\n            : verb === 'run-check'\n              ? { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } }\n              : verb === 'base-run'\n                ? { base: { type: 'string' }, attempt: { type: 'string' }, cwd: { type: 'string' } }\n                : verb === 'status'\n                  ? { charts: { type: 'boolean' } }\n                  : {};\n\nconst { values, positionals } = parseArgs({\n  args: process.argv.slice(3),\n  options,\n  allowPositionals: true,\n  strict: true,\n});\n\nswitch (verb) {\n  case 'config':\n    z.tuple([]).parse(positionals);\n    console.log(await effectiveConfig(process.cwd()));\n    break;\n  case 'preflight':\n    z.tuple([]).parse(positionals);\n    await (await import('./preflight')).preflightCommand(process.cwd());\n    break;\n  case 'init':\n    z.tuple([]).parse(positionals);\n    await initialize(\n      process.cwd(),\n      z.string().optional().parse(values.from),\n      z.string().optional().parse(values.toolkit),\n    );\n    break;\n  case 'phase': {\n    const [slug, phase]: [string, string] = z.tuple([z.string(), z.string()]).parse(positionals);\n    const { phaseCommand, MoveCommittedError } = await import('./phase');\n    const { mergeWake } = await import('./next');\n    let committed: { repo: Repo; to?: Phase } | undefined;\n    try {\n      const result: { repo: Repo; committed: boolean; to?: Phase } = await phaseCommand(\n        slug,\n        phase,\n        values.slot,\n        values.verdict,\n        values.reason,\n        values.check,\n        values.attempt,\n        values['red-on-base'],\n        values.command,\n        values.culprit,\n        undefined,\n        z.array(z.string()).optional().parse(values.compare),\n      );\n      if (result.committed) committed = result;\n    } catch (error) {\n      if (error instanceof MoveCommittedError) committed = error;\n      throw error;\n    } finally {\n      if (committed !== undefined) await mergeWake(readGlobal(), committed.repo, committed.to);\n    }\n    break;\n  }\n  case 'next':\n    if (positionals.length + Number(values.all === true) + Number(values.resume === true) > 1)\n      throw new Error('Use a target, --all or --resume, not combined');\n    await (\n      await import('./next')\n    ).nextCommand(values.resume === true ? '--resume' : values.all === true ? '--all' : positionals[0]);\n    break;\n  case 'pull':\n    z.tuple([]).parse(positionals);\n    await (await import('./pull')).pullCommand(values.all === true);\n    break;\n  case 'close': {\n    const [source]: [string] = z.tuple([z.string().regex(sourcePattern)]).parse(positionals);\n    const by: string = z.string().trim().min(1).parse(values.by);\n    await (await import('./pull')).closeCommand(source, by);\n    break;\n  }\n  case 'sync':\n    z.tuple([]).parse(positionals);\n    await (await import('./sync')).syncCommand(process.cwd());\n    break;\n  case 'park':\n  case 'unpark':\n    if (values.all === true && positionals.length !== 0) throw new Error('Use issue names or --all, not both');\n    if (values.all !== true && positionals.length === 0) throw new Error('Name at least one issue or pass --all');\n    await (await import('./park')).parkCommand(verb, positionals, values.all === true, process.cwd());\n    break;\n  case 'unhold':\n    z.tuple([]).parse(positionals);\n    await (await import('./hold')).unholdCommand(process.cwd());\n    break;\n  case 'hold-fix': {\n    const [slug]: [string] = z.tuple([z.string().trim().min(1)]).parse(positionals);\n    await (await import('./hold')).holdFixCommand(process.cwd(), slug);\n    break;\n  }\n  case 'pause':\n    z.tuple([]).parse(positionals);\n    await (await import('./pause')).pauseCommand(verb, process.cwd());\n    break;\n  case 'unpause': {\n    z.tuple([]).parse(positionals);\n    await (await import('./pause')).pauseCommand(verb, process.cwd());\n    const repo: Repo = await requireRepo(readGlobal(), process.cwd());\n    const hold: Hold | undefined = (await import('./hold')).heldFor(repo.name);\n    if (hold !== undefined)\n      console.log(\n        `held ${repo.name} on ${hold.sha}: ${hold.command}${hold.fix === undefined ? '' : ` fix ${hold.fix}`}`,\n      );\n    await (await import('./next')).unpausePass(repo);\n    break;\n  }\n  case 'status':\n    if (values.charts === true && positionals.length !== 0) throw new Error('Use a slug or --charts, not both');\n    z.array(z.string()).max(1).parse(positionals);\n    await (await import('./status')).statusCommand(positionals[0], values.charts === true);\n    break;\n  case 'install':\n    z.tuple([]).parse(positionals);\n    await (await import('./install')).install();\n    break;\n  case 'run-check': {\n    const optional: z.ZodOptional<z.ZodString> = z.string().optional();\n    process.exitCode = await (\n      await import('./run-check')\n    ).runCheck(\n      process.cwd(),\n      optional.parse(values.name),\n      optional.parse(values.leaf),\n      optional.parse(values.holder),\n      positionals,\n    );\n    break;\n  }\n  case 'base-run': {\n    const baseSha: string = z.string().trim().min(1).parse(values.base);\n    if (positionals.length === 0)\n      throw new Error('Usage: akrogon base-run --base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...');\n    const optional: z.ZodOptional<z.ZodString> = z.string().optional();\n    process.exitCode = await (\n      await import('./base-run')\n    ).baseRun(process.cwd(), baseSha, optional.parse(values.attempt), optional.parse(values.cwd), positionals);\n    break;\n  }\n  case 'guard':\n    process.exitCode = await (await import('./guard')).guard(process.cwd(), positionals);\n    break;\n  default:\n    throw new Error(\n      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|hold-fix|sync|status|run-check|base-run|guard>',\n    );\n}\n"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/hold-retired.test.ts:165:82)
+(fail) no source file reads or writes held.yaml and the hold module is gone [0.48ms]
+(pass) sweep: no hold or merge red-on-base surface remains in skills, docs or the readme [1.15ms]
+(pass) a held outcome already in merge-attempts.jsonl still parses and status still runs [62.12ms]
+
+tests/merge-attempts.test.ts:
+(pass) a green batch appends one merged attempt line and log.jsonl keeps its move-line shape [214.01ms]
+(pass) a landed candidate reconciles to exactly one merged attempt line [135.53ms]
+(pass) a solo check.fix appends exactly one red attempt line [80.32ms]
+(pass) a batch check.fix appends exactly one split attempt line [258.69ms]
+(pass) a refused push restacked to reuse appends exactly one reuse line at the landing push [316.36ms]
+(pass) an unlanded candidate discards to exactly one red attempt line [439.88ms]
+(pass) a failed unlanded holder records one red attempt before recovery discards its batch [864.06ms]
+(pass) stale-attempt and non-holder phase calls write no attempt line [135.10ms]
+(pass) a merged line carries PSI stall deltas from batch creation [185.82ms]
+(pass) a restacked reuse line carries PSI stall deltas from batch creation [263.33ms]
+(pass) a solo red line carries PSI stall deltas from batch creation [70.85ms]
+(pass) a split line carries PSI stall deltas from batch creation [99.25ms]
+(pass) a legacy held line still parses beside a recorded attempt [75.88ms]
+(pass) an ejected line carries PSI stall deltas from batch creation [110.96ms]
+(pass) a reconciled merged line carries PSI stall deltas from batch creation [135.82ms]
+(pass) a merged line without pressure_start keeps no pressure key even with a malformed dir [172.78ms]
+(pass) a merged line with an absent pressure dir keeps no pressure key [167.22ms]
+(pass) a merged line with a changed boot id keeps no pressure key [167.39ms]
+(pass) a malformed pressure file stops the ending call before any push or state change [97.13ms]
+(pass) a malformed pressure file stops batch creation before any batch or line exists [53.56ms]
+(pass) a decimal pressure total stops the ending call before any push or state change [149.94ms]
+(pass) a decimal pressure total stops batch creation before any batch or line exists [55.63ms]
+(pass) a created batch preserves PSI counters through rerun then reuse [487.18ms]
+(pass) a merge turn records declared tools on the batch and the attempt line [437.37ms]
+(pass) a declared tool absent from PATH fails the dispatch before any batch record [62.67ms]
+(pass) a stored tools list lands on the solo red line [79.46ms]
+(pass) a merge turn records the FFmpeg version using its real version option [340.20ms]
+(pass) a failed or empty version probe fails dispatch with command context [122.81ms]
+
+tests/merge-compare.test.ts:
+386 |         f,
+387 |         ['base-run', '--base', fx.builtOn, '--attempt', 'a1', '--', ...CHECK],
+388 |         fx.holder.state.worktree,
+389 |         env,
+390 |       );
+391 |       expect(run.code).toBe(3);
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: 3
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:391:24)
+(fail) a compared record with every unit known-red stamps --check, opens entries, and the push lands with no hold [147.13ms]
+427 |       fx.holderPath,
+428 |       'compare-flaky.yaml',
+429 |       mergeRecord(fx.holderPath, { state: 'inconsistent', leafRevision: head }),
+430 |     );
+431 |     const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+432 |     expect(checked.code).toBe(0);
+                               ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:432:26)
+(fail) an inconsistent record stamps --check without a base run [83.33ms]
+(pass) --compare on merged without --check and on check.fix is refused [114.39ms]
+486 |           ...refusal.opts,
+487 |         }),
+488 |       );
+489 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+490 |       expect(checked.code).not.toBe(0);
+491 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:491:34)
+(fail) merged --check --compare refuses a wrong attempt [76.50ms]
+486 |           ...refusal.opts,
+487 |         }),
+488 |       );
+489 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+490 |       expect(checked.code).not.toBe(0);
+491 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:491:34)
+(fail) merged --check --compare refuses no attempt [76.33ms]
+486 |           ...refusal.opts,
+487 |         }),
+488 |       );
+489 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+490 |       expect(checked.code).not.toBe(0);
+491 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:491:34)
+(fail) merged --check --compare refuses a wrong leaf revision [68.61ms]
+486 |           ...refusal.opts,
+487 |         }),
+488 |       );
+489 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+490 |       expect(checked.code).not.toBe(0);
+491 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:491:34)
+(fail) merged --check --compare refuses a wrong counterpart [75.26ms]
+539 |         'compare-1.yaml',
+540 |         mergeRecord(fx.holderPath, { leafRevision: head, counterpart: fx.builtOn, baseLog }),
+541 |       );
+542 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+543 |       expect(checked.code).not.toBe(0);
+544 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:544:34)
+(fail) merged --check --compare refuses no base-run line at all [75.18ms]
+539 |         'compare-1.yaml',
+540 |         mergeRecord(fx.holderPath, { leafRevision: head, counterpart: fx.builtOn, baseLog }),
+541 |       );
+542 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+543 |       expect(checked.code).not.toBe(0);
+544 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:544:34)
+(fail) merged --check --compare refuses a base-run line without the attempt [69.29ms]
+539 |         'compare-1.yaml',
+540 |         mergeRecord(fx.holderPath, { leafRevision: head, counterpart: fx.builtOn, baseLog }),
+541 |       );
+542 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+543 |       expect(checked.code).not.toBe(0);
+544 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:544:34)
+(fail) merged --check --compare refuses a base-run line started before the merge prompt [74.84ms]
+539 |         'compare-1.yaml',
+540 |         mergeRecord(fx.holderPath, { leafRevision: head, counterpart: fx.builtOn, baseLog }),
+541 |       );
+542 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+543 |       expect(checked.code).not.toBe(0);
+544 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:544:34)
+(fail) merged --check --compare refuses a base-run line for a different command [71.40ms]
+539 |         'compare-1.yaml',
+540 |         mergeRecord(fx.holderPath, { leafRevision: head, counterpart: fx.builtOn, baseLog }),
+541 |       );
+542 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+543 |       expect(checked.code).not.toBe(0);
+544 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:544:34)
+(fail) merged --check --compare refuses a base-run line with no end or exit [73.12ms]
+567 |         'compare-1.yaml',
+568 |         mergeRecord(fx.holderPath, { state: 'inconsistent', leafRevision: head, units: [refusal.unit] }),
+569 |       );
+570 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+571 |       expect(checked.code).not.toBe(0);
+572 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:572:34)
+(fail) merged --check --compare refuses a new unit [76.11ms]
+567 |         'compare-1.yaml',
+568 |         mergeRecord(fx.holderPath, { state: 'inconsistent', leafRevision: head, units: [refusal.unit] }),
+569 |       );
+570 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+571 |       expect(checked.code).not.toBe(0);
+572 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:572:34)
+(fail) merged --check --compare refuses an unverified unit [75.23ms]
+567 |         'compare-1.yaml',
+568 |         mergeRecord(fx.holderPath, { state: 'inconsistent', leafRevision: head, units: [refusal.unit] }),
+569 |       );
+570 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+571 |       expect(checked.code).not.toBe(0);
+572 |       expect(checked.stderr).not.toContain('not valid during merge');
+                                       ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "not valid during merge"
+Received: "980 |   };\n981 |   await withLock(resolve(globalHome(), '.lock'), async () => {\n982 |     const leaf: Leaf = findLeaf(repo, slug);\n983 |     if (compareFiles.length > 0) {\n984 |       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);\n985 |       if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);\n                                                        ^\nerror: '--compare' is not valid during merge\n      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:985:51)\n      at withLock (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/state.ts:216:18)\n      at async phaseCommand (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/src/phase.ts:981:9)\n\nBun v1.4.2 (Linux x64)"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:572:34)
+(fail) merged --check --compare refuses an own-criterion unit [69.91ms]
+605 |         ],
+606 |       });
+607 |       (record.units as Record<string, unknown>[])[0].base = { outcome: 'pass', log: baseLog };
+608 |       const file: string = writeRecord(fx.holderPath, 'compare-1.yaml', record);
+609 |       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+610 |       expect(checked.code).toBe(0);
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:610:28)
+(fail) a unit passing on the built_on side resolves at --check under the ancestry rule; a newer first_seen stays [300.86ms]
+643 |           { name: 'unit one', outcome: 'pass' },
+644 |           { name: 'still-red', outcome: 'fail' },
+645 |         ],
+646 |       }),
+647 |     );
+648 |     expect((await cli(f, checkArgs(file), f.root, env)).code).toBe(0);
+                                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:648:63)
+(fail) a green record resolves its passed units only when the landed revision is its leaf revision [169.36ms]
+666 |     const file: string = writeRecord(
+667 |       fx.holderPath,
+668 |       'green-1.yaml',
+669 |       mergeRecord(fx.holderPath, { state: 'green', leafRevision: head }),
+670 |     );
+671 |     expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
+                                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:671:72)
+(fail) a green record with no matching entry resolves nothing and a stale file fails the stamp [150.76ms]
+685 |     const file: string = writeRecord(
+686 |       fx.holderPath,
+687 |       'green-1.yaml',
+688 |       mergeRecord(fx.holderPath, { state: 'green', leafRevision: head }),
+689 |     );
+690 |     expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
+                                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:690:72)
+(fail) a green record resolves in the landed path after a refused push that actually landed [164.57ms]
+721 |     const file: string = writeRecord(
+722 |       fx.holderPath,
+723 |       'green-1.yaml',
+724 |       mergeRecord(fx.holderPath, { state: 'green', leafRevision: head }),
+725 |     );
+726 |     expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
+                                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:726:72)
+(fail) a landed candidate resolves green records in the next pass reconcile [164.29ms]
+750 |         state: 'inconsistent',
+751 |         leafRevision: head,
+752 |         units: [{ name: 'unit one', verdict: 'known-red' }],
+753 |       }),
+754 |     );
+755 |     expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
+                                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:755:72)
+(fail) a restack holding a known-red record prints rerun and drops the records [181.72ms]
+775 |     const file: string = writeRecord(
+776 |       fx.holderPath,
+777 |       'green-1.yaml',
+778 |       mergeRecord(fx.holderPath, { state: 'green', leafRevision: head }),
+779 |     );
+780 |     expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
+                                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:780:72)
+(fail) a restack holding only a green record keeps reuse and resolves nothing at landing [174.28ms]
+809 |     const file: string = writeRecord(
+810 |       fx.holderPath,
+811 |       'compare-1.yaml',
+812 |       mergeRecord(fx.holderPath, { leafRevision: head, counterpart: fx.builtOn, baseLog }),
+813 |     );
+814 |     expect((await cli(f, checkArgs(file), f.root, env)).code).toBe(0);
+                                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge-u3/tests/merge-compare.test.ts:814:63)
+(fail) a solo record accepts a compared record bound to its built_on and head [350.52ms]
+
+tests/pause-status.test.ts:
+(pass) unpaused repos print as before with phases and blockers unchanged [156.70ms]
+(pass) status charts marks the paused repo heading [208.28ms]
+(pass) invalid pause file fails status naming the file [252.72ms]
+(pass) targeted status names the pause for a leaf of a paused repo [293.77ms]
+(pass) status marks the paused repo beside its heading, including an empty repo [495.35ms]
+
+tests/red-docs.test.ts:
+(pass) seat skills carry the literal flag, command and record-token contracts [0.47ms]
+(pass) the guide and README carry the literal flag and record tokens [0.07ms]
+(pass) no skill or guide retains the retired red-on-base stop command [0.78ms]
+(pass) the merge skill carries the merge comparison, green-record and batch-base contracts [0.08ms]
+
+29 tests failed:
+(fail) README covers every dispatched command and its argument contract [0.63ms]
+(fail) escaped alternatives and reordered rows preserve argument semantics [0.13ms]
+(fail) retired verb hold-fix fails naming the known-red rule [49.79ms]
+(fail) retired verb unhold fails naming the known-red rule [51.05ms]
+(fail) the retired merge flags fail naming the known-red rule and change nothing [57.72ms]
+(fail) a nonempty legacy held.yaml is inert for status, pause, unpause and the merge turn [61.81ms]
+(fail) no source file reads or writes held.yaml and the hold module is gone [0.48ms]
+(fail) a compared record with every unit known-red stamps --check, opens entries, and the push lands with no hold [147.13ms]
+(fail) an inconsistent record stamps --check without a base run [83.33ms]
+(fail) merged --check --compare refuses a wrong attempt [76.50ms]
+(fail) merged --check --compare refuses no attempt [76.33ms]
+(fail) merged --check --compare refuses a wrong leaf revision [68.61ms]
+(fail) merged --check --compare refuses a wrong counterpart [75.26ms]
+(fail) merged --check --compare refuses no base-run line at all [75.18ms]
+(fail) merged --check --compare refuses a base-run line without the attempt [69.29ms]
+(fail) merged --check --compare refuses a base-run line started before the merge prompt [74.84ms]
+(fail) merged --check --compare refuses a base-run line for a different command [71.40ms]
+(fail) merged --check --compare refuses a base-run line with no end or exit [73.12ms]
+(fail) merged --check --compare refuses a new unit [76.11ms]
+(fail) merged --check --compare refuses an unverified unit [75.23ms]
+(fail) merged --check --compare refuses an own-criterion unit [69.91ms]
+(fail) a unit passing on the built_on side resolves at --check under the ancestry rule; a newer first_seen stays [300.86ms]
+(fail) a green record resolves its passed units only when the landed revision is its leaf revision [169.36ms]
+(fail) a green record with no matching entry resolves nothing and a stale file fails the stamp [150.76ms]
+(fail) a green record resolves in the landed path after a refused push that actually landed [164.57ms]
+(fail) a landed candidate resolves green records in the next pass reconcile [164.29ms]
+(fail) a restack holding a known-red record prints rerun and drops the records [181.72ms]
+(fail) a restack holding only a green record keeps reuse and resolves nothing at landing [174.28ms]
+(fail) a solo record accepts a compared record bound to its built_on and head [350.52ms]
+
+ 42 pass
+ 29 fail
+ 574 expect() calls
+Ran 71 tests across 6 files. [9.44s]

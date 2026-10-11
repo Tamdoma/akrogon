@@ -1,0 +1,9 @@
+SCENARIO mixed-adoption with complete own-repo fixture
+deployed 7636d8dbbe4d..d53a9703be64
+HEAD equals remote: True
+file: 'incoming\n'
+second: 'old second\n'
+status: M second
+SECOND TRIGGER
+current d53a9703be64
+second after retry: 'old second\n'

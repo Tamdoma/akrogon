@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t9A
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/subagent-seat-model
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pHM
   B: w8:pHN

@@ -20,7 +20,9 @@ fix_rounds: 7
 verdict: 
   {}
 tab: w8:tAR
-worktree: /home/ivan/.akrogon/worktrees/akrogon/leaf-env-file
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pMJ
   B: w8:pMK

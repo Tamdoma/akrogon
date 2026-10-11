@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t8Y
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/learn-issues
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pGW
   B: w8:pGX

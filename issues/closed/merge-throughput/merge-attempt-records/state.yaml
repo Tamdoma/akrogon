@@ -28,7 +28,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tA5
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/merge-attempt-records
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pKD
   B: w8:pKE

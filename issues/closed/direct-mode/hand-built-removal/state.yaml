@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t9J
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/hand-built-removal
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pJ3
   B: w8:pJ4

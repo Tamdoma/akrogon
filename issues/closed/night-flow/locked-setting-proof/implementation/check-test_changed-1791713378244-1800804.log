@@ -1,0 +1,10 @@
+bun install v1.4.2 (744846f84)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+bun test v1.4.2 (744846f84)
+[0.00ms] ".env"
+--changed: 1 changed file, but no test files are affected
+
+ 0 pass
+ 0 fail
+Ran 0 tests across 0 files. [10.00ms]

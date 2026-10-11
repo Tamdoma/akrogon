@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t98
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/chart-usage-table
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pHG
   B: w8:pHH

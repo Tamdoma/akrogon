@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tAP
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/test-proof-rules
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pME
   B: w8:pMF

@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t83
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/wave-table
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pF7
   B: w8:pF8

@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t63
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/watch-issues-skill
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pBA
   B: w8:pBB

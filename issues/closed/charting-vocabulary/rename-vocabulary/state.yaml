@@ -7,7 +7,6 @@ blocked-by:
   []
 sources: 
   []
-failed_notified: false
 busy_since: 
   A: 2026-09-13T21:39:41.864Z
 busy_notified: 
@@ -21,11 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t54
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/rename-vocabulary
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p9J
   B: w8:p9K
 prompted: 
   {}
 prompted_at: 
+  {}
+delivery_error: 
   {}

@@ -22,7 +22,6 @@ fix_rounds: 1
 verdict: 
   {}
 tab: w8:tAW
-worktree: /home/ivan/.akrogon/worktrees/akrogon/worktree-reconciler
 env_names: 
   []
 env_generation: 0

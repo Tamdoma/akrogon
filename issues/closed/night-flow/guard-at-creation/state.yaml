@@ -1,0 +1,46 @@
+slug: guard-at-creation
+phase: merged
+created: 2026-10-11
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#80"
+  - "Tamdoma/akrogon#81"
+  - "Tamdoma/akrogon#82"
+  - "Tamdoma/akrogon#83"
+  - "Tamdoma/akrogon#84"
+  - "Tamdoma/akrogon#85"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAZ
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pMZ
+  B: w8:pM0
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-11T10:21:05.059Z
+frozen: 
+  tests/batch.test.ts: 2e7301a82af34060cbba4be5d1dcd0d5906d7bf8
+  tests/config.test.ts: b601360320d997ac81817bfa4ebffc58e5f0641e
+  tests/guard.test.ts: e924e87775711f35badf2bb6634dee0e6acdf601
+frozen_cited: 
+  []

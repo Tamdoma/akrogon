@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t99
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/index-seats
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pHJ
   B: w8:pHK

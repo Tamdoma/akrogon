@@ -1,13 +1,16 @@
 slug: status-empty-open-fix
 phase: merged
 created: 2026-09-11
-priority: "n"
 repo: akrogon
 debate: "no"
 blocked-by: 
   []
 sources: 
   - "Tamdoma/akrogon#1"
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -17,10 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t4S
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/status-empty-open-fix
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p8Z
   B: w8:p80
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

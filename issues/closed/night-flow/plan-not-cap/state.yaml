@@ -1,0 +1,45 @@
+slug: plan-not-cap
+phase: merged
+created: 2026-10-11
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#80"
+  - "Tamdoma/akrogon#81"
+  - "Tamdoma/akrogon#82"
+  - "Tamdoma/akrogon#83"
+  - "Tamdoma/akrogon#84"
+  - "Tamdoma/akrogon#85"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAY
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pMX
+  B: w8:pMY
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-11T10:27:05.685Z
+frozen: 
+  tests/culprit.test.ts: 0a0a48f35c6146006e9cb3c01a331b6b6b24e4fc
+  tests/phase.test.ts: 6f2d58231f3078771f0daf8a101e13b0d62b2bdd
+frozen_cited: 
+  []

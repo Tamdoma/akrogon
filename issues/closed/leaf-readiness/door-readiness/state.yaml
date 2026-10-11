@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t8K
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/door-readiness
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pG4
   B: w8:pG5

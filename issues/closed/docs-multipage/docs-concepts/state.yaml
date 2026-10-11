@@ -1,13 +1,16 @@
 slug: docs-concepts
 phase: merged
 created: 2026-09-11
-priority: l
 repo: akrogon
 debate: "no"
 blocked-by: 
   - docs-shell
 sources: 
   - "Tamdoma/akrogon#3"
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -17,10 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t10
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/docs-concepts
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p3M
   B: w8:p3N
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

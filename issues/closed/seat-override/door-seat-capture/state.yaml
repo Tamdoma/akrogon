@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t9B
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/door-seat-capture
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pHP
   B: w8:pHQ

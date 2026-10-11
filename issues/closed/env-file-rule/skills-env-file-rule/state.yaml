@@ -20,11 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t62
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/skills-env-file-rule
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pB8
   B: w8:pB9
 prompted: 
   {}
 prompted_at: 
+  {}
+delivery_error: 
   {}

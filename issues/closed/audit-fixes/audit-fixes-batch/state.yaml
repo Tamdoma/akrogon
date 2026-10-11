@@ -7,7 +7,6 @@ blocked-by:
   []
 sources: 
   []
-failed_notified: false
 busy_since: 
   A: 2026-09-14T00:59:04.078Z
 busy_notified: 
@@ -21,11 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t58
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/audit-fixes-batch
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p9S
   B: w8:p9T
 prompted: 
   {}
 prompted_at: 
+  {}
+delivery_error: 
   {}

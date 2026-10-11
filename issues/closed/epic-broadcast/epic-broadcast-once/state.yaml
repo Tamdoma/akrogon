@@ -20,7 +20,9 @@ fix_rounds: 1
 verdict: 
   {}
 tab: w8:t7N
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/epic-broadcast-once
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pEC
   B: w8:pED

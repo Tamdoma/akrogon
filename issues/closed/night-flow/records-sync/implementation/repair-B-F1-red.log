@@ -1,0 +1,30 @@
+bun test v1.4.2 (744846f84)
+
+tests/self-update.test.ts:
+(pass) self-update pushes and moves record-only commits on own repo [111.87ms]
+(pass) self-update pushes and moves record-only commits on other repo [94.65ms]
+(pass) self-update pushes then reports a pending checkout the next trigger moves [133.41ms]
+(pass) self-update reports a pending checkout on a behind-only move without pushing [71.66ms]
+(pass) a local code commit ahead leaves the checkout and remote unchanged [61.81ms]
+(pass) an incoming tracked active lock path refuses a behind-only move [61.05ms]
+(pass) an incoming tracked path colliding with an ignored file refuses a behind-only move [61.85ms]
+(pass) a record changed on both sides pushes nothing and names the path and akrogon sync [81.67ms]
+311 |     const ownRoot: string = resolve(f.home, 'elsewhere');
+312 |     await captured(f.home, () => selfUpdate(repo, ownRoot, f.home));
+313 |     const pushedTip: string = await remoteHead(f);
+314 |     await command(['git', 'restore', 'file'], f.clone);
+315 |     await captured(f.home, () => selfUpdate(repo, ownRoot, f.home));
+316 |     expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(pushedTip);
+                                                                       ^
+error: expect(received).toBe(expected)
+
+Expected: "76bec377c927b01a94315798aaeef20d3678edcc"
+Received: "3c2b6da8422f916089c86173fade3c39a7967d82"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/records-sync/tests/self-update.test.ts:316:66)
+(fail) another repo finishes a pending checkout after its records are already upstream [116.74ms]
+
+ 8 pass
+ 1 fail
+ 79 expect() calls
+Ran 9 tests across 1 file. [814.00ms]

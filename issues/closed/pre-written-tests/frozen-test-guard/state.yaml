@@ -20,7 +20,9 @@ fix_rounds: 3
 verdict: 
   {}
 tab: w8:tAN
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/frozen-test-guard
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pMC
   B: w8:pMD

@@ -1,0 +1,45 @@
+slug: seat-retry
+phase: merged
+created: 2026-10-11
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#80"
+  - "Tamdoma/akrogon#81"
+  - "Tamdoma/akrogon#82"
+  - "Tamdoma/akrogon#83"
+  - "Tamdoma/akrogon#84"
+  - "Tamdoma/akrogon#85"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 1
+verdict: 
+  {}
+tab: w8:tA0
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pN1
+  B: w8:pN2
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-11T10:52:25.421Z
+frozen: 
+  tests/next.test.ts: 4307c83f025e688aa9e3b3403985a231991ccb1a
+  tests/status.test.ts: ecb12f4be55d169f2904515b9418d94eb10b5ac6
+frozen_cited: 
+  []

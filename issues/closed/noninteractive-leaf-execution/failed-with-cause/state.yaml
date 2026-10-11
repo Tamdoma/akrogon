@@ -8,7 +8,6 @@ blocked-by:
 sources: 
   - "Tamdoma/akrogon#19"
   - "Tamdoma/akrogon#20"
-failed_notified: false
 busy_since: 
   A: 2026-09-19T07:52:55.022Z
 busy_notified: 
@@ -22,11 +21,15 @@ fix_rounds: 1
 verdict: 
   {}
 tab: w8:t5Y
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/failed-with-cause
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pA0
   B: w8:pB1
 prompted: 
   {}
 prompted_at: 
+  {}
+delivery_error: 
   {}

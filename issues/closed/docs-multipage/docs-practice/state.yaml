@@ -1,13 +1,16 @@
 slug: docs-practice
 phase: merged
 created: 2026-09-11
-priority: l
 repo: akrogon
 debate: "no"
 blocked-by: 
   - docs-shell
 sources: 
   - "Tamdoma/akrogon#3"
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -17,10 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t22
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/docs-practice
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p3R
   B: w8:p3S
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t89
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/b-repair-phase
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pFJ
   B: w8:pFK

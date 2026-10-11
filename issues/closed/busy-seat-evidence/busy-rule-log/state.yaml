@@ -22,7 +22,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t8F
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/busy-rule-log
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pFW
   B: w8:pFX

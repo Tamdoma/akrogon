@@ -1,11 +1,14 @@
 slug: init-issues
 phase: merged
 created: 2026-09-09
-priority: "n"
 repo: akrogon
 debate: "no"
 blocked-by: 
   - status
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -15,10 +18,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tM
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/init-issues
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p11
   B: w8:p12
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

@@ -22,7 +22,9 @@ fix_rounds: 1
 verdict: 
   {}
 tab: w8:t95
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/merge-batch
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pHA
   B: w8:pHB

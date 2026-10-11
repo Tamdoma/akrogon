@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t6Y
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/create-peer-panes
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pCR
   B: w8:pCS

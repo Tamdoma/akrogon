@@ -7,7 +7,6 @@ blocked-by:
   []
 sources: 
   []
-failed_notified: false
 busy_since: 
   A: 2026-09-18T17:25:24.568Z
 busy_notified: 
@@ -21,11 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t5N
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/terminal-stage-marker
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pAG
   B: w8:pAH
 prompted: 
   {}
 prompted_at: 
+  {}
+delivery_error: 
   {}

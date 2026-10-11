@@ -1,11 +1,14 @@
 slug: seed-issue
 phase: merged
 created: 2026-09-09
-priority: "n"
 repo: akrogon
 debate: "no"
 blocked-by: 
   - status
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -15,10 +18,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tK
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/seed-issue
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pZ
   B: w8:p0
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

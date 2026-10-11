@@ -28,7 +28,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tA2
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/bounce-repair-proof
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pK7
   B: w8:pK8

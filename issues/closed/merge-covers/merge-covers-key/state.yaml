@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t9V
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/merge-covers-key
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pJT
   B: w8:pJV

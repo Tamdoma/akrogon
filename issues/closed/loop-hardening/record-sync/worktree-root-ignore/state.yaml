@@ -1,7 +1,6 @@
 slug: worktree-root-ignore
 phase: merged
 created: 2026-09-11
-priority: "n"
 repo: akrogon
 debate: "no"
 blocked-by: 
@@ -10,6 +9,10 @@ sources:
   - "Tamdoma/akrogon#7"
   - "Tamdoma/akrogon#10"
   - "Tamdoma/akrogon#14"
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -19,10 +22,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t4H
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/worktree-root-ignore
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p8H
   B: w8:p8J
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

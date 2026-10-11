@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t6J
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/completion-dependents
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pC3
   B: w8:pC4

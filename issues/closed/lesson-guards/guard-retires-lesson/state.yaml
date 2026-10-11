@@ -20,7 +20,9 @@ fix_rounds: 1
 verdict: 
   {}
 tab: w8:tAF
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/guard-retires-lesson
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pM1
   B: w8:pM2

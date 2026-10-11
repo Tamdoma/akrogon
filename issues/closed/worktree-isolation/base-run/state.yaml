@@ -22,7 +22,6 @@ fix_rounds: 1
 verdict: 
   {}
 tab: w8:tAS
-worktree: /home/ivan/.akrogon/worktrees/akrogon/base-run
 env_names: 
   []
 env_generation: 0

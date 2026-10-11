@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t88
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/recovery-keeps-rounds
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pFG
   B: w8:pFH

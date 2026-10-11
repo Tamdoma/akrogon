@@ -1,0 +1,44 @@
+slug: known-red-leaf
+phase: merged
+created: 2026-10-10
+repo: akrogon
+debate: "no"
+blocked-by: 
+  - base-run
+  - test-proof-rules
+sources: 
+  - "Tamdoma/akrogon#76"
+  - "Tamdoma/akrogon#77"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 1
+verdict: 
+  {}
+tab: w8:tAV
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pMQ
+  B: w8:pMR
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-11T09:39:50.604Z
+frozen: 
+  tests/base-run.test.ts: e6845550b0c3eceed16f4df31cb16c14280473ed
+  tests/command-reference.test.ts: bdecf8cc4ab10a122de61e696914486c3d7a0b64
+  tests/compare.test.ts: 8b99bbe11bf218eba2f8fc157f6c39b19ec58871
+  tests/red-docs.test.ts: c715e9aa0dab856bc79a31ba9732a9ee72f2771f
+frozen_cited: 
+  []

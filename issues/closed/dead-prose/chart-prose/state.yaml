@@ -7,7 +7,6 @@ blocked-by:
   []
 sources: 
   []
-failed_notified: false
 busy_since: 
   A: 2026-09-14T16:24:34.562Z
 busy_notified: 
@@ -21,11 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t5H
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/chart-prose
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pAA
   B: w8:pAB
 prompted: 
   {}
 prompted_at: 
+  {}
+delivery_error: 
   {}

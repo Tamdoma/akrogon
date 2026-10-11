@@ -1,13 +1,16 @@
 slug: docs-operate
 phase: merged
 created: 2026-09-11
-priority: l
 repo: akrogon
 debate: "no"
 blocked-by: 
   - docs-shell
 sources: 
   - "Tamdoma/akrogon#3"
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -17,10 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t21
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/docs-operate
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p3P
   B: w8:p3Q
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

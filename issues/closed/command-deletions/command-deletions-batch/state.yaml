@@ -7,7 +7,6 @@ blocked-by:
   []
 sources: 
   []
-failed_notified: false
 busy_since: 
   A: 2026-09-14T12:18:09.730Z
 busy_notified: 
@@ -21,11 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t5D
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/command-deletions-batch
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pA2
   B: w8:pA3
 prompted: 
   {}
 prompted_at: 
+  {}
+delivery_error: 
   {}

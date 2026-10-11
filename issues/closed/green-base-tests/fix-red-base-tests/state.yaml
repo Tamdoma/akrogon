@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tAG
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/fix-red-base-tests
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pM3
   B: w8:pM4

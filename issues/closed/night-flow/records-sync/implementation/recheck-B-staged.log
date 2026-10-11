@@ -1,0 +1,10 @@
+BEFORE
+record: 'uncommitted staged operator edit\n'
+index record: uncommitted staged operator edit
+status: M  record
+SELF UPDATE
+deployed 8d68669191b7..d958fe74d4c4
+AFTER
+record: 'initial operator file\n'
+index record: initial operator file
+status: 

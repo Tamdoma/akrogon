@@ -1,0 +1,40 @@
+bun test v1.4.2 (744846f84)
+
+tests/red-docs.test.ts:
+(pass) seat skills carry the literal flag, command and record-token contracts [0.18ms]
+(pass) the guide and README carry the literal flag and record tokens [0.04ms]
+(pass) no skill or guide retains the retired red-on-base stop command [0.58ms]
+(pass) the merge skill carries the merge comparison, green-record and batch-base contracts [0.03ms]
+
+tests/merge-compare.test.ts:
+(pass) a compared record with every unit known-red stamps --check, opens entries, and the push lands with no hold [320.36ms]
+(pass) an inconsistent record stamps --check without a base run [107.01ms]
+(pass) --compare on merged without --check and on check.fix is refused [112.91ms]
+(pass) merged --check --compare refuses a wrong attempt [85.11ms]
+(pass) merged --check --compare refuses no attempt [81.21ms]
+(pass) merged --check --compare refuses a wrong leaf revision [86.59ms]
+(pass) merged --check --compare refuses a wrong counterpart [85.68ms]
+(pass) merged --check --compare refuses no base-run line at all [81.82ms]
+(pass) merged --check --compare refuses a base-run line without the attempt [89.51ms]
+(pass) merged --check --compare refuses a base-run line started before the merge prompt [84.65ms]
+(pass) merged --check --compare refuses a base-run line for a different command [86.40ms]
+(pass) merged --check --compare refuses a base-run line with no end or exit [82.57ms]
+(pass) merged --check --compare refuses a new unit [83.71ms]
+(pass) merged --check --compare refuses an unverified unit [85.50ms]
+(pass) merged --check --compare refuses an own-criterion unit [87.25ms]
+(pass) a unit passing on the built_on side resolves at --check under the ancestry rule; a newer first_seen stays [207.88ms]
+(pass) a green record resolves its passed units only when the landed revision is its leaf revision [171.26ms]
+(pass) a green record with no matching entry resolves nothing and a stale file fails the stamp [168.38ms]
+(pass) a green record resolves in the landed path after a refused push that actually landed [188.40ms]
+(pass) a landed candidate resolves green records in the next pass reconcile [159.24ms]
+(pass) a restack holding a known-red record prints rerun and drops the records [333.50ms]
+(pass) a restack holding only a green record keeps reuse and resolves nothing at landing [560.18ms]
+(pass) a restack with a green record still reruns when issues/config.yaml changed [386.73ms]
+(pass) a solo record accepts a compared record bound to its built_on and head [358.48ms]
+(pass) a later merge check without comparisons clears the prior accepted records [248.76ms]
+(pass) restack reruns an accepted known-red record even when its counterpart unit passed [391.34ms]
+
+ 30 pass
+ 0 fail
+ 180 expect() calls
+Ran 30 tests across 2 files. [4.76s]

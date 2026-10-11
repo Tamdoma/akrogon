@@ -1,0 +1,20 @@
+bun test v1.4.2 (744846f84)
+
+tests/self-update.test.ts:
+(pass) self-update pushes and moves record-only commits on own repo [105.13ms]
+(pass) self-update pushes and moves record-only commits on other repo [93.98ms]
+(pass) self-update pushes then reports a pending checkout the next trigger moves [129.41ms]
+(pass) self-update reports a pending checkout on a behind-only move without pushing [74.85ms]
+(pass) a record commit landed while the lock waits is replayed, not dropped [3088.19ms]
+(pass) a record commit landed at the branch write is pending, not dropped [2137.01ms]
+(pass) a local code commit ahead leaves the checkout and remote unchanged [61.77ms]
+(pass) an incoming tracked active lock path refuses a behind-only move [58.69ms]
+(pass) an incoming tracked path colliding with an ignored file refuses a behind-only move [59.66ms]
+(pass) a record changed on both sides pushes nothing and names the path and akrogon sync [75.56ms]
+(pass) another repo finishes a pending checkout after its records are already upstream [112.87ms]
+(pass) a content-equal overlap does not report deployment with another incoming file left stale [126.48ms]
+
+ 12 pass
+ 0 fail
+ 106 expect() calls
+Ran 12 tests across 1 file. [6.14s]

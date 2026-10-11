@@ -1,7 +1,6 @@
 slug: seat-guards
 phase: merged
 created: 2026-09-11
-priority: "n"
 repo: akrogon
 debate: "no"
 blocked-by: 
@@ -12,6 +11,10 @@ sources:
   - "Tamdoma/akrogon#11"
   - "Tamdoma/akrogon#10"
   - "Tamdoma/akrogon#14"
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -21,10 +24,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w7:t9
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/seat-guards
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w7:pA
   B: w7:pB
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

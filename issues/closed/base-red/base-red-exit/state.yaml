@@ -20,7 +20,9 @@ fix_rounds: 1
 verdict: 
   {}
 tab: w8:t81
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/base-red-exit
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pF4
   B: w8:pF5

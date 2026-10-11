@@ -1,0 +1,44 @@
+slug: records-sync
+phase: merged
+created: 2026-10-11
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#80"
+  - "Tamdoma/akrogon#81"
+  - "Tamdoma/akrogon#82"
+  - "Tamdoma/akrogon#83"
+  - "Tamdoma/akrogon#84"
+  - "Tamdoma/akrogon#85"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 3
+verdict: 
+  {}
+tab: w8:tB1
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pN3
+  B: w8:pN4
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-11T12:07:17.084Z
+frozen: 
+  tests/self-update.test.ts: e1caeb341799e6586aa33d1e58825d7052c9e289
+frozen_cited: 
+  []

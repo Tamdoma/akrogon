@@ -7,7 +7,6 @@ blocked-by:
   []
 sources: 
   - "Tamdoma/akrogon#17"
-failed_notified: false
 busy_since: 
   A: 2026-09-18T22:41:56.635Z
 busy_notified: 
@@ -21,11 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t5W
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/foreign-leaf-summary
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pAX
   B: w8:pAY
 prompted: 
   {}
 prompted_at: 
+  {}
+delivery_error: 
   {}

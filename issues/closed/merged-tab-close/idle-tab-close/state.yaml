@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t6M
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/idle-tab-close
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pC7
   B: w8:pC8

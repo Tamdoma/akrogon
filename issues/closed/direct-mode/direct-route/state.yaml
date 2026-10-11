@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t9K
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/direct-route
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pJ5
   B: w8:pJ6

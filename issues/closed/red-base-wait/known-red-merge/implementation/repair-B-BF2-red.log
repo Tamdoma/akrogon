@@ -1,0 +1,23 @@
+bun test v1.4.2 (744846f84)
+
+tests/merge-compare.test.ts:
+869 |     const file: string = writeRecord(fx.holderPath, 'known-red-passing-base.yaml', record);
+870 |     expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
+871 |     await advanceRemote(f, { 'issues/notes.md': 'another issue record landed\n' });
+872 |     const merged: Result = await cli(f, mergeArgs, f.root, fx.herdr.env);
+873 |     expect(merged.code).toBe(0);
+874 |     expect(readState(fx.holderPath).batch!.decision).toBe('rerun');
+                                                           ^
+error: expect(received).toBe(expected)
+
+Expected: "rerun"
+Received: "reuse"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-merge/tests/merge-compare.test.ts:874:54)
+(fail) restack reruns an accepted known-red record even when its counterpart unit passed [235.23ms]
+
+ 0 pass
+ 24 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [261.00ms]

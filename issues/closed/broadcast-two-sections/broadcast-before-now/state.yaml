@@ -7,7 +7,6 @@ blocked-by:
   []
 sources: 
   []
-failed_notified: false
 busy_since: 
   A: 2026-09-14T08:10:04.974Z
 busy_notified: 
@@ -21,11 +20,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t5B
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/broadcast-before-now
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p9Z
   B: w8:p90
 prompted: 
   {}
 prompted_at: 
+  {}
+delivery_error: 
   {}

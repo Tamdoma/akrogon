@@ -20,7 +20,9 @@ fix_rounds: 1
 verdict: 
   {}
 tab: w8:t80
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/seed-cause-evidence
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pH1
   B: w8:pH2

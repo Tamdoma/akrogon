@@ -1,7 +1,6 @@
 slug: dead-fields
 phase: merged
 created: 2026-09-11
-priority: "n"
 repo: akrogon
 debate: "no"
 blocked-by: 
@@ -10,6 +9,10 @@ sources:
   - "Tamdoma/akrogon#8"
   - "Tamdoma/akrogon#10"
   - "Tamdoma/akrogon#14"
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -19,10 +22,15 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t4Q
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/dead-fields
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p8V
   B: w8:p8W
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

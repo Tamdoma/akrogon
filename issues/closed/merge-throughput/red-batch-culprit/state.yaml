@@ -30,7 +30,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tAA
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/red-batch-culprit
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pKP
   B: w8:pKQ

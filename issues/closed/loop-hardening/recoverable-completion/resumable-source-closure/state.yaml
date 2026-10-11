@@ -1,7 +1,6 @@
 slug: resumable-source-closure
 phase: merged
 created: 2026-09-11
-priority: "n"
 repo: akrogon
 debate: "no"
 blocked-by: 
@@ -11,6 +10,10 @@ sources:
   - "Tamdoma/akrogon#13"
   - "Tamdoma/akrogon#10"
   - "Tamdoma/akrogon#14"
+busy_since: 
+  {}
+busy_notified: 
+  {}
 attempts: 
   A: 0
   B: 0
@@ -20,10 +23,15 @@ fix_rounds: 2
 verdict: 
   {}
 tab: w8:t4P
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/resumable-source-closure
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:p8S
   B: w8:p8T
-slot: A
 prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
   {}

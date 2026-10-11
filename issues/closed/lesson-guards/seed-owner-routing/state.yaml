@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tAB
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/seed-owner-routing
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pKS
   B: w8:pKT

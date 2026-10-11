@@ -1,0 +1,57 @@
+ 1:  dd3c183 =  1:  9dc8781 plan(records-sync): self-update record-sync tests, red on base
+ 2:  e0a0521 =  2:  5bd86bf sync: extract integrate spine from syncCommand
+ 3:  07654ac =  3:  f98cf07 docs: self-update replays record commits for every registered checkout
+ 4:  6d7b399 =  4:  cb4148f self-update: classify, replay and push record commits for every registered checkout
+ 5:  9e28d73 =  5:  9796956 test: self-update pending vocabulary and non-own-repo git stage expectations
+ 6:  0827334 =  6:  4cdfdef self-update: move checkout inside .lock, drop history rewrite, report fetch/push failures
+ 7:  2bc2e09 =  7:  b72ff52 test: align self-update expectations with kept-history pending and worktree ignore rules
+ 8:  d6ea570 =  8:  3d68cab self-update: skip integration when up-to-date or untracked; refuse empty commits
+ 9:  58c689e =  9:  0fed7aa test: reproduce pending record sync retry for another repo
+10:  25f4112 = 10:  9ffc622 fix: move every eligible checkout after record integration
+11:  9142378 = 11:  0b5adbd test: reproduce stale code after a mixed checkout reset
+12:  f0d0084 = 12:  5933e89 fix: keep checkout pending when mixed reset would leave stale files
+13:  f39f422 = 13:  de3e7f6 test: reproduce dropped commit when a record lands while .lock waits
+14:  6a7f2e2 = 14:  ba89956 self-update: capture the replay base under .lock and guard the move
+15:  24ca71d ! 15:  e467e75 test: correct hold and batch expectations for every-repo self-update moves
+    @@ tests/batch-merge.test.ts: test.serial(
+            expect(await remoteTip(f)).toBe(record.top!);
+            expect(await remoteSubjects(f, 3)).toEqual(['hold', 'mem-b', 'mem-a']);
+            for (const slug of ['hold', 'mem-a', 'mem-b'])
+    -
+    - ## tests/hold.test.ts ##
+    -@@ tests/hold.test.ts: test.serial('a hold survives a main advance confined to record folders', async (
+    -   try {
+    -     const { herdr, holderPath, sha } = await heldMergeLeaf(f);
+    -     holdAt(f, holderPath, sha);
+    --    await advanceRemote(f, { 'issues/open/x/state.yaml': 'x\n' });
+    -+    const oldHead: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    -+    const advanced: string = await advanceRemote(f, { 'issues/log.jsonl': '{"ts":"remote"}\n' });
+    -     const res: Result = await cli(f, ['next'], f.root, herdr.env);
+    -     expect(res.code).toBe(0);
+    --    expect(res.stdout).toBe(`held repo on ${sha}: bun test`);
+    -+    expect(res.stdout).toBe(`deployed ${oldHead.slice(0, 12)}..${advanced.slice(0, 12)}\nheld repo on ${sha}: bun test`);
+    -     expect(readState(holderPath).batch).toBeUndefined();
+    -     expect(mutating(herdr)).toEqual([]);
+    -     expect(Object.keys(heldRecords(f))).toEqual(['repo']);
+16:  6e3ef1d ! 16:  1c9f27b format: prettier pass over the repair files
+    @@ src/self-update.ts: async function gitStage(repo: Repo, target: string, lag: ()
+        const fetched: Result = await run(['git', 'fetch', repo.config.remote, repo.config.default_branch], root);
+        if (fetched.code !== 0)
+          throw new CommandError(['git', 'fetch', repo.config.remote, repo.config.default_branch], root, fetched);
+    -
+    - ## tests/hold.test.ts ##
+    -@@ tests/hold.test.ts: test.serial('a hold survives a main advance confined to record folders', async (
+    -     const advanced: string = await advanceRemote(f, { 'issues/log.jsonl': '{"ts":"remote"}\n' });
+    -     const res: Result = await cli(f, ['next'], f.root, herdr.env);
+    -     expect(res.code).toBe(0);
+    --    expect(res.stdout).toBe(`deployed ${oldHead.slice(0, 12)}..${advanced.slice(0, 12)}\nheld repo on ${sha}: bun test`);
+    -+    expect(res.stdout).toBe(
+    -+      `deployed ${oldHead.slice(0, 12)}..${advanced.slice(0, 12)}\nheld repo on ${sha}: bun test`,
+    -+    );
+    -     expect(readState(holderPath).batch).toBeUndefined();
+    -     expect(mutating(herdr)).toEqual([]);
+    -     expect(Object.keys(heldRecords(f))).toEqual(['repo']);
+17:  d8c5bda = 17:  5907206 test: reproduce dropped commit at the branch write window
+18:  a803e56 = 18:  e307405 self-update: move the checkout ref by compare-and-swap
+19:  e3b8595 = 19:  430137d test: reproduce lost staged edit during a checkout move
+20:  778ef94 = 20:  1282356 self-update: merge head..moveTo in the read-tree, not the index alone

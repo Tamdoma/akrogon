@@ -20,7 +20,9 @@ fix_rounds: 1
 verdict: 
   {}
 tab: w8:t7Q
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/realistic-review-bar
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pEF
   B: w8:pEG

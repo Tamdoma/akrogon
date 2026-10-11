@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tAH
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/self-update
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pM5
   B: w8:pM6

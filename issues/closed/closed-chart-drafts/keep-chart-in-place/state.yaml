@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t7D
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/keep-chart-in-place
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pDW
   B: w8:pDX

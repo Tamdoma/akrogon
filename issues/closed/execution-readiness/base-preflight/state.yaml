@@ -20,7 +20,9 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:t74
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/base-preflight
+env_names: 
+  []
+env_generation: 0
 pane: 
   A: w8:pD5
   B: w8:pD6
