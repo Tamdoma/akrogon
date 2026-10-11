@@ -227,6 +227,56 @@ test.serial('a record commit landed while the lock waits is replayed, not droppe
   }
 });
 
+test.serial('a record commit landed at the branch write is pending, not dropped', async () => {
+  const f: SelfUpdateFixture = await selfUpdateFixture();
+  try {
+    await pushSeed(f, 'file', 'incoming\n');
+    await commitRecord(f, 'issues/log.jsonl', '{"ts":"a"}\n');
+    const realGit: string = (await command(['which', 'git'])).trim();
+    const shimDir: string = resolve(f.home, 'shim');
+    mkdirSync(shimDir, { recursive: true });
+    const marker: string = resolve(f.home, 'in-update-ref');
+    writeFileSync(
+      resolve(shimDir, 'git'),
+      // pausing only the branch move's compare-and-swap leaves a real commit
+      // window between HEAD validation and the ref write; other update-ref
+      // calls (rebase ORIG_HEAD and friends) pass through
+      `#!/bin/sh\nif [ "$1" = update-ref ] && [ "$2" = refs/heads/main ]; then touch "${marker}"; sleep 2; fi\nexec "${realGit}" "$@"\n`,
+      { mode: 0o755 },
+    );
+    const runner: string = resolve(f.home, 'run-self-update.ts');
+    writeFileSync(
+      runner,
+      `import { repoSchema } from '${resolve(process.cwd(), 'src/config.ts')}';\n` +
+        `import { selfUpdate } from '${resolve(process.cwd(), 'src/self-update.ts')}';\n` +
+        `import { readFileSync } from 'node:fs';\n` +
+        `await selfUpdate({ name: 'akrogon', root: '${f.clone}', config: repoSchema.parse({ grounding: 'none' }) }, '${f.clone}', '${f.home}');\n`,
+    );
+    const child: Bun.Subprocess = Bun.spawn([process.execPath, 'run', runner], {
+      cwd: f.home,
+      env: { ...process.env, PATH: `${shimDir}:${process.env.PATH}` },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    for (let i: number = 0; i < 100 && !existsSync(marker); i += 1) await Bun.sleep(50);
+    mkdirSync(resolve(f.clone, 'issues/open/late'), { recursive: true });
+    await commitRecord(f, 'issues/open/late/brief.md', 'late\n');
+    const lateTip: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
+    await child.exited;
+    const res: Result = { code: child.exitCode ?? 1, stdout: await new Response(child.stdout).text(), stderr: '' };
+    expect(res.stdout).toContain('checkout pending');
+    expect(res.stdout).toContain('the checkout moved to');
+    expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(lateTip);
+    expect(await command(['git', 'status', '--porcelain'], f.clone)).toBe('');
+    expect(
+      await run(['git', 'cat-file', '-e', `${await remoteHead(f)}:issues/open/late/brief.md`], f.remote),
+    ).toMatchObject({ code: 128 });
+    expect(await worktreeCount(f)).toBe(1);
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('a local code commit ahead leaves the checkout and remote unchanged', async () => {
   const f: SelfUpdateFixture = await selfUpdateFixture();
   try {
