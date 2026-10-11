@@ -76,6 +76,7 @@ import {
   equalOutsideRecordFolders,
   isAncestor,
   memberBase,
+  recordConfigEqual,
   removeEmptyUntrackedDirs,
   restoreHolder,
   restoreMembers,
@@ -1117,7 +1118,11 @@ async function mergeTurn(
   const heldBefore: Hold | undefined = heldFor(repo.name);
   if (heldBefore !== undefined) {
     const baseSha: string = await localBase(repo);
-    if ((await equalOutsideRecordFolders(repo, heldBefore.sha, baseSha)) && heldBefore.fix !== holder.state.slug) {
+    if (
+      (await equalOutsideRecordFolders(repo, heldBefore.sha, baseSha)) &&
+      (await recordConfigEqual(repo, heldBefore.sha, baseSha)) &&
+      heldBefore.fix !== holder.state.slug
+    ) {
       console.log(`held ${repo.name} on ${heldBefore.sha}: ${heldBefore.command}`);
       return;
     }
@@ -1134,7 +1139,10 @@ async function mergeTurn(
     let fixHeld: boolean = false;
     const heldNow: Hold | undefined = heldFor(repo.name);
     if (heldNow !== undefined) {
-      if (await equalOutsideRecordFolders(repo, heldNow.sha, builtOn)) {
+      if (
+        (await equalOutsideRecordFolders(repo, heldNow.sha, builtOn)) &&
+        (await recordConfigEqual(repo, heldNow.sha, builtOn))
+      ) {
         if (heldNow.fix !== fresh.state.slug) {
           console.log(`held ${repo.name} on ${heldNow.sha}: ${heldNow.command}`);
           return;

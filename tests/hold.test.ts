@@ -693,6 +693,24 @@ test.serial('a main advance outside record folders clears the hold and starts a 
   }
 });
 
+test.serial('a main advance changing issues/config.yaml clears the hold and starts a normal attempt', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr, holderPath, sha } = await heldMergeLeaf(f);
+    holdAt(f, holderPath, sha);
+    const config: string = readFileSync(resolve(f.root, 'issues/config.yaml'), 'utf8');
+    await advanceRemote(f, { 'issues/config.yaml': `${config}env: [DISPLAY]\n` });
+    const res: Result = await cli(f, ['next'], f.root, herdr.env);
+    expect(res.code).toBe(0);
+    expect(res.stdout).not.toContain('held repo');
+    expect(heldRecords(f).repo).toBeUndefined();
+    expect(readState(holderPath).batch).toBeDefined();
+    expect(database(herdr).prompts[0].text).toContain('merge-issue hold slot=B');
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('unhold then next starts a normal attempt', async () => {
   const f: Fixture = await fixture();
   try {
