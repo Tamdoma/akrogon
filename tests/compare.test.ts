@@ -280,6 +280,7 @@ test('--compare is refused on failed moves and from the merge phase', async () =
         members: [],
         tools: [],
         solo: true,
+        applied: true,
       },
     });
     const merging: Result = await cli(
@@ -644,7 +645,9 @@ test('a base pass resolves only the matching active entry at or below its revisi
       env,
     );
     expect(moved2.code).toBe(0);
-    const reopened = redRecords(f).filter((event) => event.event === 'opened' && event.id !== 'entry-unit one');
+    const reopened = redRecords(f).filter(
+      (event) => event.event === 'opened' && event.file === 'compare-2.yaml',
+    );
     expect(reopened.length).toBe(1);
     expect(noticeCalls(herdr.db)).toBe(1);
   } finally {
