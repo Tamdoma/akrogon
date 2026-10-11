@@ -284,8 +284,8 @@ export function withSetup(config: RepoConfig): RepoConfig {
   const setup: string | undefined = config.setup;
   const inner = (cmd: string): string =>
     setup === undefined
-      ? `akrogon guard ancestors && akrogon guard own-modules && sh -c ${quote(cmd)}`
-      : `akrogon guard ancestors && flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(setup)} && akrogon guard own-modules && sh -c ${quote(cmd)}`;
+      ? `akrogon guard own-modules && sh -c ${quote(cmd)}`
+      : `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(setup)} && akrogon guard own-modules && sh -c ${quote(cmd)}`;
   const runCheck = (name: string, cmd: string): string =>
     `akrogon run-check --name ${quote(name)} -- sh -c ${quote(inner(cmd))}`;
   const map = (record: Record<string, string>): Record<string, string> =>

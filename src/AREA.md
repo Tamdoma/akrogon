@@ -5,7 +5,7 @@
 - `bun src/akrogon.ts close <owner/repo#n> --by <text>` closes one unowned GitHub issue; `bun src/akrogon.ts config` prints effective settings and the worktree base.
 - `bun src/akrogon.ts run-check -- <argv>...` runs a command under the constructed check environment.
 - `bun src/akrogon.ts base-run --base <sha> -- <argv>...` runs a command on a detached base checkout in the worktree store.
-- `bun src/akrogon.ts guard <ancestors|own-modules>` refuses a checkout under foreign `node_modules`/`package.json` or a worktree missing its own `node_modules`; composed check commands run both.
+- `bun src/akrogon.ts guard <ancestors|own-modules>` refuses a checkout under foreign `node_modules`/`package.json` or a worktree missing its own `node_modules`; composed check commands run `own-modules` while `ancestors` runs at worktree creation through `checkLocation`.
 - `bun run typecheck` checks the TypeScript command and tests; `bun test tests/phase.test.ts` exercises lifecycle transitions and guards.
 
 ## Key files
