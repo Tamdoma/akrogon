@@ -1991,6 +1991,52 @@ test('merged --check refuses an applied stack whose top still contains a retired
   }
 });
 
+test('a solo merge push keeps citations valid when the remote ref advanced', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = await oldFileBranch(f, 'push-cite');
+    const frozenBlob: string = await command(['git', 'rev-parse', 'HEAD:x.test.ts'], worktree);
+    writeFileSync(resolve(worktree, 'x.test.ts'), 'edited after the freeze\n');
+    await commitAll(worktree, ['edit test', 'Test-Change: x.test.ts implementation rewrote the expectation']);
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    const builtOn: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+    const path: string = leaf(f, 'push-cite', 'merge', {
+      worktree,
+      merge_stamp: '2026-10-05T00:00:00.000Z',
+      frozen: { 'x.test.ts': frozenBlob },
+    });
+    const record: Batch = {
+      attempt: 'a1',
+      built_on: builtOn,
+      holder: { base: builtOn, head },
+      applied: true,
+      solo: true,
+      members: [],
+    };
+    saveState(path, { ...readState(path), batch: record });
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const checked: Result = await cli(
+      f,
+      ['phase', 'push-cite', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
+      f.root,
+      herdr.env,
+    );
+    expect(checked.code).toBe(0);
+    const merged: Result = await cli(
+      f,
+      ['phase', 'push-cite', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    expect(readState(resolve(f.root, 'issues/closed/issue/push-cite')).phase).toBe('merged');
+    const remoteMain: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+    expect(remoteMain).toBe(head);
+  } finally {
+    f.clean();
+  }
+});
+
 test('merged --check refuses a solo record whose rebased head contains a retired lesson line', async () => {
   const f: Fixture = await fixture();
   try {
