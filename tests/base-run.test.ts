@@ -314,3 +314,34 @@ test('base-run removes its TMPDIR and command temporary files on success and fai
     f.clean();
   }
 });
+
+test('base-run replays an exact configured check with its supplied base and relative cwd', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      env: ['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT'],
+      setup: 'mkdir -p node_modules',
+      checks: { test: 'printf "base=%s\\ncwd=%s\\n" "$AKROGON_BASE" "$PWD"' },
+      grounding: 'none',
+    });
+    writeFileSync(resolve(f.root, 'file'), 'new base\n');
+    await command(['git', 'add', 'file'], f.root);
+    await command(['git', 'commit', '-m', 'advance beyond tracking base'], f.root);
+    const { leafPath, worktree } = await callerWorktree(f);
+    const sha: string = await baseSha(f);
+    mkdirSync(resolve(worktree, 'src/sub'), { recursive: true });
+    const config: { checks: { test: string } } = Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout);
+    const result: Result = await baseRun(
+      f,
+      ['base-run', '--base', sha, '--', 'sh', '-c', config.checks.test],
+      resolve(worktree, 'src/sub'),
+    );
+    expect(result.code).toBe(0);
+    const log: string = readFileSync(result.stdout.split('\n')[0].replace(/^log: /, ''), 'utf8');
+    expect(log).toContain(`base=${sha}`);
+    expect(log).toContain(`cwd=${String(records(f)[0].path)}/src/sub`);
+    expect(readdirSync(resolve(leafPath, 'implementation')).some((name) => name.startsWith('check-test-'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
