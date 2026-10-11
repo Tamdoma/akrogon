@@ -243,6 +243,10 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   const panes: Pane[] = live ?? [];
 
   async function mergedWorktree(leaf: Leaf, worktree: string, open: boolean): Promise<void> {
+    if (leaf.state.batch !== undefined || memberSlugs.has(leaf.state.slug)) {
+      keep(worktree, 'state.batch');
+      return;
+    }
     const tab: string | undefined = leaf.state.tab;
     if (live === null) {
       keep(worktree, 'pane list unavailable');
