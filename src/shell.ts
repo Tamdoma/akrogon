@@ -1,5 +1,6 @@
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
 export type Result = { code: number; stdout: string; stderr: string };
@@ -14,29 +15,77 @@ export class CommandError extends Error {
   }
 }
 
+export type SpawnResult = Result & { signalCode: NodeJS.Signals | null; killed: boolean };
+
+// Pipe streams in Bun.spawn can lose their EOF or buffered data under load, so
+// capture through files instead: the OS owns the bytes end to end.
+export type Captured = { dir: string; outPath: string; errPath: string };
+
+export function spawnFiles(
+  argv: string[],
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    stdin?: string;
+    timeout?: number;
+    killSignal?: NodeJS.Signals;
+  } = {},
+): { child: Bun.Subprocess; captured: Captured } {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akrogon-io-'));
+  const captured: Captured = { dir, outPath: resolve(dir, 'out'), errPath: resolve(dir, 'err') };
+  const child = Bun.spawn(argv, {
+    cwd: options.cwd ?? process.cwd(),
+    env: options.env,
+    stdin: options.stdin === undefined ? 'ignore' : new Blob([options.stdin]),
+    stdout: Bun.file(captured.outPath),
+    stderr: Bun.file(captured.errPath),
+    timeout: options.timeout,
+    killSignal: options.killSignal,
+  });
+  return { child, captured };
+}
+
+export async function finishCaptured(child: Bun.Subprocess, captured: Captured): Promise<SpawnResult> {
+  const code: number = await child.exited;
+  const result: SpawnResult = {
+    code,
+    signalCode: child.signalCode,
+    killed: child.killed,
+    stdout: readFileSync(captured.outPath, 'utf8'),
+    stderr: readFileSync(captured.errPath, 'utf8'),
+  };
+  rmSync(captured.dir, { recursive: true, force: true });
+  return result;
+}
+
+export async function spawnCaptured(
+  argv: string[],
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    stdin?: string;
+    timeout?: number;
+    killSignal?: NodeJS.Signals;
+  } = {},
+): Promise<SpawnResult> {
+  const { child, captured }: { child: Bun.Subprocess; captured: Captured } = spawnFiles(argv, options);
+  return finishCaptured(child, captured);
+}
+
 export async function run(
   argv: string[],
   cwd: string = process.cwd(),
   deadlineMs?: number,
   stdin?: string,
 ): Promise<Result> {
-  const child: Bun.Subprocess<'ignore' | Blob, 'pipe', 'pipe'> = Bun.spawn(argv, {
-    cwd,
-    stdin: stdin === undefined ? 'ignore' : new Blob([stdin]),
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-  const collected: Promise<[string, string, number]> = Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
+  const { child, captured }: { child: Bun.Subprocess; captured: Captured } = spawnFiles(argv, { cwd, stdin });
+  const finished: Promise<SpawnResult> = finishCaptured(child, captured);
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const [stdout, stderr, code]: [string, string, number] = await (deadlineMs === undefined
-      ? collected
+    const result: SpawnResult = await (deadlineMs === undefined
+      ? finished
       : Promise.race([
-          collected,
+          finished,
           new Promise<never>((_, reject) => {
             timer = setTimeout(() => {
               child.kill();
@@ -44,7 +93,7 @@ export async function run(
             }, deadlineMs);
           }),
         ]));
-    return { code, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
+    return { code: result.code, stdout: result.stdout.trimEnd(), stderr: result.stderr.trimEnd() };
   } finally {
     clearTimeout(timer);
   }

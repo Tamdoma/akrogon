@@ -13,7 +13,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { base, readGlobal, requireRepo, type Repo } from './config';
 import { allLeaves, readState, type Leaf } from './state';
-import { command, type Result } from './shell';
+import { command, spawnCaptured, type Result } from './shell';
 import { readBaseRuns, type BaseRun } from './base-run';
 
 const forbidden: readonly string[] = [
@@ -58,18 +58,7 @@ export async function spawnLogged(
   env: Record<string, string>,
   log: string,
 ): Promise<Result> {
-  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(argv, {
-    cwd,
-    env,
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
+  const { code, stdout, stderr }: Result = await spawnCaptured(argv, { cwd, env });
   appendFileSync(log, stdout);
   appendFileSync(log, stderr);
   return { code, stdout, stderr };
