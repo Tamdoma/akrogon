@@ -98,7 +98,7 @@ test('real same-slot and different-slot races record once and refuse stale moves
   }
 });
 
-test('review fix routes to check.repair, B hands to A, rechecks only B, caps handoffs and permits operator restart', async () => {
+test('review fix routes to check.repair, B hands to A past the configured count, rechecks only B, permits operator restart', async () => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1, grounding: 'none' });
@@ -122,7 +122,8 @@ test('review fix routes to check.repair, B hands to A, rechecks only B, caps han
     expect((await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'B'], f.root, herdr.env)).stdout).toBe(
       'moved check.fix',
     );
-    expect(readState(path)).toMatchObject({ phase: 'check.fix', fix_rounds: 2, failure: undefined });
+    expect(readState(path)).toMatchObject({ phase: 'check.fix', fix_rounds: 2 });
+    expect(readState(path).failure).toBeUndefined();
     expect(
       (await cli(f, ['phase', 'repair', 'failed', '--slot', 'A', '--reason', 'needs a decision'], f.root, herdr.env))
         .stdout,
@@ -136,9 +137,9 @@ test('review fix routes to check.repair, B hands to A, rechecks only B, caps han
     expect((await cli(f, ['phase', 'capped', 'check.fix'], f.root, herdr.env)).stdout).toBe('moved check.fix');
     expect(readState(cappedPath)).toMatchObject({
       phase: 'check.fix',
-      failure: undefined,
       fix_rounds: 2,
     });
+    expect(readState(cappedPath).failure).toBeUndefined();
     const log = JSON.parse(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').split('\n')[0]);
     expect(log).toMatchObject({
       from: 'check.review',
@@ -1199,7 +1200,8 @@ test('check.fix request at the configured round count moves and increments', asy
     const herdr = fakeHerdr(f);
     const result: Result = await cli(f, ['phase', 'cap', 'check.fix', '--slot', 'B'], f.root, herdr.env);
     expect(result.stdout).toBe('moved check.fix');
-    expect(readState(path)).toMatchObject({ phase: 'check.fix', fix_rounds: 2, failure: undefined });
+    expect(readState(path)).toMatchObject({ phase: 'check.fix', fix_rounds: 2 });
+    expect(readState(path).failure).toBeUndefined();
   } finally {
     f.clean();
   }
