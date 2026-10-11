@@ -345,3 +345,28 @@ test('base-run replays an exact configured check with its supplied base and rela
     f.clean();
   }
 });
+
+test('merge base-run refuses relative and absolute cwd values outside its checkout before allocation', async () => {
+  const f: Fixture = await fixture();
+  try {
+    withSetup(f);
+    const sha: string = await baseSha(f);
+    leaf(f, 'holder', 'merge', {
+      batch: { attempt: 'att-cwd', built_on: sha, holder: { base: sha, head: sha }, members: [], applied: true },
+    });
+    const marker: string = resolve(f.home, 'command-ran');
+    for (const inside of ['../escaped', resolve(f.home, 'absolute')]) {
+      const result: Result = await baseRun(
+        f,
+        ['base-run', '--base', sha, '--attempt', 'att-cwd', '--cwd', inside, '--', 'touch', marker],
+        f.root,
+      );
+      expect(result.code).not.toBe(0);
+      expect(existsSync(marker)).toBe(false);
+      expect(records(f)).toEqual([]);
+      expect(existsSync(resolve(storeDir(f), inside))).toBe(false);
+    }
+  } finally {
+    f.clean();
+  }
+});
