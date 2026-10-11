@@ -26,7 +26,7 @@ function paths(output: string): string[] {
 type GitResult =
   { kind: 'skipped'; skip: string } | { kind: 'done'; pushed: string | null; incoming: string; move: Move };
 
-async function gitStage(repo: Repo, own: boolean, target: string, lag: () => Promise<string>): Promise<GitResult> {
+async function gitStage(repo: Repo, target: string, lag: () => Promise<string>): Promise<GitResult> {
   const root: string = repo.root;
   const symbolic: Result = await run(['git', 'symbolic-ref', '--short', 'HEAD'], root);
   if (symbolic.code !== 0 || symbolic.stdout !== repo.config.default_branch) {
@@ -67,9 +67,6 @@ async function gitStage(repo: Repo, own: boolean, target: string, lag: () => Pro
     ).split('\t');
     return `${counts[1] === '0' ? 'ahead of' : 'diverged from'} ${target}; ${counts[1]} behind ${target}; run akrogon sync`;
   };
-  // Other checkouts only move after a push of their own record commits:
-  // pulling remote changes into a repo akrogon does not own is not this
-  // path's job (and remote record shapes must not reach discover here).
   let move: Move = { state: 'none' };
   const integrated: { pushed: string | null; incoming: string; skip: string | null } = await integrate(
     repo,
@@ -93,7 +90,7 @@ async function gitStage(repo: Repo, own: boolean, target: string, lag: () => Pro
         return null;
       },
       after: async (pushed: string | null, incoming: string): Promise<void> => {
-        move = own || pushed !== null ? await moveCheckout(repo, pushed ?? incoming) : { state: 'none' };
+        move = await moveCheckout(repo, pushed ?? incoming);
       },
     },
     async (incoming: string) => {
@@ -188,7 +185,7 @@ export async function selfUpdate(repo: Repo, ownRoot: string = toolRoot, home: s
     const body = async (): Promise<string | null> => {
       let git: GitResult;
       try {
-        git = await gitStage(repo, own, target, lag);
+        git = await gitStage(repo, target, lag);
       } catch (error) {
         if (error instanceof CommandError && (error.argv[1] === 'fetch' || error.argv[1] === 'push'))
           return `${error.argv[1]} failed: ${errorLine(error.result)}; ${await lag()}; retried at the next trigger`;
