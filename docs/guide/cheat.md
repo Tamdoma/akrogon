@@ -107,12 +107,11 @@ akrogon park export-csv
 akrogon unpark export-csv
 ```
 
-Pause automatic dispatch for the current repository, then resume with one pass; a base-red merge run holds the repo instead, and `akrogon unhold` clears the hold:
+Pause automatic dispatch for the current repository, then resume with one pass:
 
 ```sh
 akrogon pause
 akrogon unpause
-akrogon unhold
 ```
 
 Start or stop the optional watcher in Claude Code only:
