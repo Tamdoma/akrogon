@@ -383,10 +383,10 @@ async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promis
       `"${v.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}"`,
     ];
     for (const c of candidates) {
-      const lines: string[] = [...context.slice(0, 4), `${name}=${c}`, ...context.slice(4)];
+      const lines: string[] = [...context.slice(0, 4), `KEY=${c}`, ...context.slice(4)];
       const check: Record<string, string | undefined> = parseEnv(lines.join('\n') + '\n');
       const keys: string[] = Object.keys(check);
-      if (keys.length === 9 && keys.every((k) => check[k] === (k === name ? v : 'x'))) return `${name}=${c}`;
+      if (keys.length === 9 && keys.every((k) => check[k] === (k === 'KEY' ? v : 'x'))) return `${name}=${c}`;
     }
     return null;
   };
