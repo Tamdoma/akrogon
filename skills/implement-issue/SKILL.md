@@ -22,7 +22,7 @@ For leaf work, read `akrogon config` once, locate the unique slug in the registe
 
 Pass artifacts are written under the `leaf=` folder while code is read and edited only in the leaf worktree and its worker worktrees, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`. Standalone keeps its no-config, local-artifact behavior except in the direct form below.
 
-Temp files, logs, and base copies go under `$TMPDIR`, never a fixed `/tmp/<name>`; anything needed later goes in the leaf folder.
+Temp files and logs go under `$TMPDIR`, never a fixed `/tmp/<name>`; a base copy is made only through `akrogon base-run`; anything needed later goes in the leaf folder.
 
 Effective settings supply `implement`, `checks`, optional `advisory` and `setup`, `AKROGON_BASE` and the repair cap; when `akrogon config` prints `setup`, a dependency-using proof outside the printed commands runs `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c <quoted setup>` first; the command owns state/counters and dispatch, while a repeated pass finishes remaining work from the diff and artifacts, rerunning checks for changed code, missing evidence or a specific concern.
 
