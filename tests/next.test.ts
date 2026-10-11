@@ -202,7 +202,7 @@ test('next re-prompts an idle seat whose prompt is older than the grace period a
   }
 }, 15000);
 
-test('a stale prompt never re-prompts a busy or done seat, succeeds without failing, and three failing passes fail the leaf', async () => {
+test('a stale prompt never re-prompts a busy or done seat, and repeated delivery failures keep the leaf in phase', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'misses', 'plan.synthesis');
@@ -237,25 +237,16 @@ test('a stale prompt never re-prompts a busy or done seat, succeeds without fail
     expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
     expect(readState(path).phase).toBe('plan.synthesis');
     saveDatabase(f, { ...database(f), failPrompts: true });
-    for (let i: number = 0; i < 2; i++) {
+    for (let i: number = 0; i < 3; i++) {
       status('idle');
       stale();
       expect((await next(f, ['misses'])).code).toBe(0);
       expect(readState(path).phase).toBe('plan.synthesis');
     }
-    expect(readState(path).attempts.A).toBe(2);
-    expect(database(f).prompts).toHaveLength(6);
-    status('idle');
-    stale();
-    expect((await next(f, ['misses'])).code).toBe(0);
-    expect(readState(path).phase).toBe('failed');
-    expect(readState(path).failure?.cause).toBe('attempts');
-    expect(readState(path).failure?.slot).toBe('A');
-    expect(readState(path).failure?.reason.startsWith('prompt undelivered to seat A after 3 passes:')).toBe(true);
-    const history: string[] = readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n');
-    const record = JSON.parse(history[history.length - 1]);
-    expect(record).toMatchObject({ slug: 'misses', to: 'failed' });
-    expect(record.failure).toEqual(readState(path).failure);
+    expect(readState(path).attempts.A).toBe(3);
+    expect(readState(path).delivery_error.A?.code).toBe('agent_prompt_stalled');
+    expect(readState(path).failure).toBeUndefined();
+    expect(database(f).prompts).toHaveLength(7);
     expect(database(f).prompts.every((p) => p.pane === a)).toBe(true);
   } finally {
     f.clean();
@@ -319,7 +310,7 @@ test('next waits on a blocked agent instead of counting attempts or flipping sea
   }
 }, 15000);
 
-test('next resumes interrupted tab creation, fails after three failing passes', async () => {
+test('next resumes interrupted tab creation, then retries every failing pass without failing', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'retry', 'plan.synthesis');
@@ -338,12 +329,10 @@ test('next resumes interrupted tab creation, fails after three failing passes', 
     expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(2);
     const retried: Result = await next(f, ['retry']);
     expect(retried.code).toBe(0);
-    expect(readState(path).phase).toBe('failed');
-    expect(readState(path).failure?.cause).toBe('attempts');
-    expect(readState(path).failure?.slot).toBe('A');
-    expect(
-      readState(path).failure?.reason.startsWith('prompt undelivered to seat A after 3 passes: agent_prompt_stalled'),
-    ).toBe(true);
+    expect(readState(path).phase).toBe('plan.synthesis');
+    expect(readState(path).attempts.A).toBe(3);
+    expect(readState(path).delivery_error.A?.code).toBe('agent_prompt_stalled');
+    expect(readState(path).failure).toBeUndefined();
     const db: Database = database(f);
     expect(db.tabs).toHaveLength(1);
     expect(db.prompts).toHaveLength(3);
@@ -351,15 +340,7 @@ test('next resumes interrupted tab creation, fails after three failing passes', 
     expect(db.prompts[2].pane).toBe(db.prompts[0].pane);
     expect(db.prompts.every((p) => p.text.includes('slot=A'))).toBe(true);
     expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(3);
-    expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8')).toContain('"to":"failed"');
-    const before: number = calls(f).length;
-    const stateBefore: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
-    expect((await next(f, ['retry'])).code).toBe(1);
-    const notified: string[][] = calls(f)
-      .slice(before)
-      .filter((args) => args[0] === 'notification');
-    expect(notified).toHaveLength(0);
-    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(stateBefore);
+    expect(readState(path).phase).toBe('plan.synthesis');
   } finally {
     f.clean();
   }
@@ -2958,7 +2939,7 @@ test('retryable prompt failure charges one attempt, records delivery_error, and 
   }
 }, 15000);
 
-test('three consecutive prompt failures fail the leaf during the third pass', async () => {
+test('three consecutive prompt failures keep the leaf in phase, record each error, and retry on the next pass', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'three-fails', 'plan.synthesis');
@@ -2972,25 +2953,20 @@ test('three consecutive prompt failures fail the leaf during the third pass', as
     expect(readState(path).attempts.A).toBe(2);
     expect((await next(f, ['three-fails'])).code).toBe(0);
     const state: State = readState(path);
-    expect(state.phase).toBe('failed');
-    expect(state.failure?.cause).toBe('attempts');
-    expect(state.failure?.slot).toBe('A');
-    const paneId: string = state.pane.A!;
-    const pane = database(f).panes.find((item) => item.pane_id === paneId)!;
-    const session: string | null = pane.agent_session?.value ?? null;
-    expect(state.failure?.reason).toBe(
-      `prompt undelivered to seat A after 3 passes: agent_prompt_stalled stalled (pane ${paneId}, session ${session})`,
-    );
+    expect(state.phase).toBe('plan.synthesis');
+    expect(state.attempts.A).toBe(3);
+    expect(state.failure).toBeUndefined();
+    expect(state.delivery_error.A?.code).toBe('agent_prompt_stalled');
+    expect(state.delivery_error.A?.message).toBe('stalled');
+    expect(state.delivery_error.A?.pane).toBe(state.pane.A!);
+    const pane = database(f).panes.find((item) => item.pane_id === state.pane.A!)!;
+    expect(state.delivery_error.A?.session).toBe(pane.agent_session?.value ?? null);
     expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(3);
-    const before: number = calls(f).length;
-    expect((await next(f, ['three-fails'])).code).toBe(1);
-    // Reconciliation may read the pane inventory for cleanup; the contract is
-    // that nothing else happens — no agent action, allocation or tab change.
-    expect(
-      calls(f)
-        .slice(before)
-        .every((args) => args[0] === 'pane' && args[1] === 'list'),
-    ).toBe(true);
+    expect((await next(f, ['three-fails'])).code).toBe(0);
+    expect(readState(path).phase).toBe('plan.synthesis');
+    expect(readState(path).attempts.A).toBe(0);
+    expect(readState(path).delivery_error.A).toBeUndefined();
+    expect(database(f).prompts).toHaveLength(1);
   } finally {
     f.clean();
   }
@@ -3349,7 +3325,91 @@ test('a retryable agent start failure charges once without prompting, then recov
   }
 }, 15000);
 
-test('a non-retryable prompt code fails unreachable without throwing and siblings still dispatch', async () => {
+test('retryable agent start failures keep the leaf in phase until a start succeeds', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'start-fails', 'plan.synthesis');
+    const fail = { code: 'agent_not_ready', message: 'not ready' };
+    saveDatabase(f, { ...database(f), startScript: [{ ...fail }, { ...fail }, { ...fail }] });
+    for (const n of [1, 2, 3]) {
+      expect((await next(f, ['start-fails'])).code).toBe(0);
+      const state: State = readState(path);
+      expect(state.phase).toBe('plan.synthesis');
+      expect(state.attempts.A).toBe(n);
+      expect(state.delivery_error.A?.code).toBe('agent_not_ready');
+      expect(state.failure).toBeUndefined();
+      expect(database(f).prompts).toHaveLength(0);
+    }
+    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'start')).toHaveLength(3);
+    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(0);
+    expect((await next(f, ['start-fails'])).code).toBe(0);
+    const fourth: State = readState(path);
+    expect(fourth.phase).toBe('plan.synthesis');
+    expect(fourth.attempts.A).toBe(0);
+    expect(fourth.delivery_error.A).toBeUndefined();
+    expect(fourth.prompted.A).toBeDefined();
+    expect(database(f).prompts).toHaveLength(1);
+    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'start')).toHaveLength(4);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a session replacement after a timeout resends the prompt instead of settling from the old offset', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const slug: string = 'timeout-replaced';
+    const path: string = leaf(f, slug, 'plan.synthesis');
+    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
+    saveDatabase(f, { ...database(f), blockOnStart: true });
+    expect((await next(f, [slug])).code).toBe(0);
+    const a: string = readState(path).pane.A!;
+    const sessFile1: string = resolve(f.home, 'sess-old.jsonl');
+    writeFileSync(sessFile1, '');
+    const db0: Database = database(f);
+    saveDatabase(f, {
+      ...db0,
+      blockOnStart: false,
+      panes: db0.panes.map((item) =>
+        item.pane_id === a
+          ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile1 } }
+          : item,
+      ),
+      promptScript: [{ code: 'timeout', message: 'wait timed out' }],
+    });
+    expect((await next(f, [slug])).code).toBe(0);
+    expect(readState(path).delivery_error.A?.session).toBe(sessFile1);
+    expect(readState(path).delivery_error.A?.offset).toBe(0);
+    const prompt: string = `plan-issue ${slug} slot=A phase=plan.synthesis leaf=${path}`;
+    const line: string =
+      JSON.stringify({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: prompt }] } }) + '\n';
+    const sessFile2: string = resolve(f.home, 'sess-new.jsonl');
+    writeFileSync(sessFile2, line);
+    const db1: Database = database(f);
+    saveDatabase(f, {
+      ...db1,
+      panes: db1.panes.map((item) =>
+        item.pane_id === a
+          ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile2 } }
+          : item,
+      ),
+      promptScript: [{ code: 'timeout', message: 'wait timed out' }],
+    });
+    expect((await next(f, [slug])).code).toBe(0);
+    const state: State = readState(path);
+    expect(state.phase).toBe('plan.synthesis');
+    expect(state.attempts.A).toBe(2);
+    expect(state.delivery_error.A?.session).toBe(sessFile2);
+    expect(state.delivery_error.A?.code).toBe('timeout');
+    expect(state.failure).toBeUndefined();
+    expect(state.prompted.A).toBeUndefined();
+    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(2);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a non-retryable prompt code records the error without failing, the leaf retries, and siblings still dispatch', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const aPath: string = leaf(f, 'unreach-a', 'plan.synthesis');
@@ -3358,20 +3418,30 @@ test('a non-retryable prompt code fails unreachable without throwing and sibling
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(0);
     const states: State[] = [readState(aPath), readState(bPath)];
-    const failed: State[] = states.filter((item) => item.phase === 'failed');
-    const ok: State[] = states.filter((item) => item.phase === 'plan.synthesis');
-    expect(failed).toHaveLength(1);
+    expect(states.every((item) => item.phase === 'plan.synthesis' && item.failure === undefined)).toBe(true);
+    const recorded: State[] = states.filter((item) => item.delivery_error.A !== undefined);
+    const ok: State[] = states.filter((item) => item.delivery_error.A === undefined);
+    expect(recorded).toHaveLength(1);
     expect(ok).toHaveLength(1);
-    expect(failed[0].failure?.cause).toBe('attempts');
-    expect(failed[0].failure?.reason.startsWith('seat A unreachable: boom bad thing')).toBe(true);
+    expect(recorded[0].delivery_error.A?.code).toBe('boom');
+    expect(recorded[0].delivery_error.A?.message).toBe('bad thing');
+    expect(recorded[0].attempts.A).toBe(1);
     expect(database(f).prompts).toHaveLength(1);
     expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(2);
+    const faulted: string = [aPath, bPath][states.indexOf(recorded[0])];
+    saveDatabase(f, { ...database(f), promptScript: [{ code: 'boom', message: 'bad thing' }] });
+    expect((await next(f, [faulted])).code).toBe(0);
+    expect(readState(faulted).attempts.A).toBe(2);
+    expect(readState(faulted).phase).toBe('plan.synthesis');
+    expect(readState(faulted).failure).toBeUndefined();
+    expect(database(f).prompts).toHaveLength(1);
+    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(3);
   } finally {
     f.clean();
   }
 }, 15000);
 
-test('non-JSON prompt stderr fails unreachable with exit code and trimmed message', async () => {
+test('non-JSON prompt stderr records a delivery error with exit code and trimmed message', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const aPath: string = leaf(f, 'raw-a', 'plan.synthesis');
@@ -3380,16 +3450,19 @@ test('non-JSON prompt stderr fails unreachable with exit code and trimmed messag
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(0);
     const states: State[] = [readState(aPath), readState(bPath)];
-    const failed: State[] = states.filter((item) => item.phase === 'failed');
-    expect(failed).toHaveLength(1);
-    expect(failed[0].failure?.reason.startsWith('seat A unreachable: exit 1 oops not json')).toBe(true);
+    expect(states.every((item) => item.phase === 'plan.synthesis' && item.failure === undefined)).toBe(true);
+    const recorded: State[] = states.filter((item) => item.delivery_error.A !== undefined);
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0].delivery_error.A?.code).toBe('exit 1');
+    expect(recorded[0].delivery_error.A?.message).toBe('oops not json');
+    expect(recorded[0].attempts.A).toBe(1);
     expect(database(f).prompts).toHaveLength(1);
   } finally {
     f.clean();
   }
 }, 15000);
 
-test('malformed prompt error JSON fails unreachable with exit code', async () => {
+test('malformed prompt error JSON records a delivery error with exit code', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const aPath: string = leaf(f, 'mal-a', 'plan.synthesis');
@@ -3398,9 +3471,12 @@ test('malformed prompt error JSON fails unreachable with exit code', async () =>
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(0);
     const states: State[] = [readState(aPath), readState(bPath)];
-    const failed: State[] = states.filter((item) => item.phase === 'failed');
-    expect(failed).toHaveLength(1);
-    expect(failed[0].failure?.reason.startsWith('seat A unreachable: exit 1 {"error":{"code":123}}')).toBe(true);
+    expect(states.every((item) => item.phase === 'plan.synthesis' && item.failure === undefined)).toBe(true);
+    const recorded: State[] = states.filter((item) => item.delivery_error.A !== undefined);
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0].delivery_error.A?.code).toBe('exit 1');
+    expect(recorded[0].delivery_error.A?.message).toBe('{"error":{"code":123}}');
+    expect(recorded[0].attempts.A).toBe(1);
     expect(database(f).prompts).toHaveLength(1);
   } finally {
     f.clean();
