@@ -382,6 +382,11 @@ test.serial(
       const fx: BatchFixture = await batchFixture(f, ['hold', 'mem-a']);
       const env: NodeJS.ProcessEnv = { ...fx.herdr.env, ...fakeAkrogon(f).env };
       const head: string = await headOf(fx);
+      yaml(resolve(f.root, 'issues/config.yaml'), {
+        setup: 'mkdir -p node_modules',
+        checks: { test: 'bun test' },
+        grounding: 'none',
+      });
       const run: Result = await cli(
         f,
         ['base-run', '--base', fx.builtOn, '--attempt', 'a1', '--', ...CHECK],
@@ -409,8 +414,8 @@ test.serial(
       const merged: Result = await cli(f, mergeArgs, f.root, env);
       expect(merged.code).toBe(0);
       expect(await remoteTip(f)).toBe(head);
-      expect(readState(fx.holderPath).phase).toBe('merged');
-      for (const member of fx.members) expect(readState(member.path).phase).toBe('merged');
+      expect(readState(resolve(f.root, 'issues/closed/issue/hold')).phase).toBe('merged');
+      expect(readState(resolve(f.root, 'issues/closed/issue/mem-a')).phase).toBe('merged');
       expect(existsSync(resolve(f.home, 'held.yaml'))).toBe(false);
     } finally {
       f.clean();
@@ -799,6 +804,11 @@ test.serial('a solo record accepts a compared record bound to its built_on and h
     const fx: BatchFixture = await batchFixture(f, ['hold'], true);
     const env: NodeJS.ProcessEnv = { ...fx.herdr.env, ...fakeAkrogon(f).env };
     const head: string = await headOf(fx);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: { test: 'bun test' },
+      grounding: 'none',
+    });
     const run: Result = await cli(
       f,
       ['base-run', '--base', fx.builtOn, '--attempt', 'a1', '--', ...CHECK],
