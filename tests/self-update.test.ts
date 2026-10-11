@@ -149,6 +149,7 @@ test.serial('self-update pushes then reports a pending checkout the next trigger
     const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
     await pushSeed(f, 'file', 'incoming\n');
     await commitRecord(f, 'issues/log.jsonl', '{"ts":"now"}\n');
+    const localTip: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
     writeFileSync(resolve(f.clone, 'file'), 'dirty\n');
     const first: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
     expect(first).toHaveLength(1);
@@ -158,7 +159,7 @@ test.serial('self-update pushes then reports a pending checkout the next trigger
     const pushedTip: string = await remoteHead(f);
     expect(await command(['git', 'merge-base', '--is-ancestor', head, pushedTip], f.remote)).toBe('');
     expect(await command(['git', 'show', `${pushedTip}:issues/log.jsonl`], f.remote)).toBe('{"ts":"now"}');
-    expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
+    expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(localTip);
     expect(readFileSync(resolve(f.clone, 'file'), 'utf8')).toBe('dirty\n');
     expect((await run(['git', 'stash', 'list'], f.clone)).stdout).toBe('');
     expect(await worktreeCount(f)).toBe(1);
@@ -253,15 +254,12 @@ test.serial('an incoming tracked path colliding with an ignored file refuses a b
   const f: SelfUpdateFixture = await selfUpdateFixture();
   try {
     const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
-    writeFileSync(resolve(f.seed, '.gitignore'), 'collision*\n');
-    await command(['git', 'add', '.gitignore'], f.seed);
-    await command(['git', 'commit', '-m', 'ignore operator files'], f.seed);
-    await command(['git', 'push', 'origin', 'HEAD:main'], f.seed);
     const remoteBefore: string = await remoteHead(f);
     writeFileSync(resolve(f.seed, 'collision'), 'remote bytes\n');
     await command(['git', 'add', '-f', 'collision'], f.seed);
     await command(['git', 'commit', '-m', 'track collision'], f.seed);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.seed);
+    writeFileSync(resolve(f.clone, '.gitignore'), 'node_modules/\ncollision*\n');
     writeFileSync(resolve(f.clone, 'collision'), 'operator ignored bytes\n');
     const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
     expect(logs).toHaveLength(1);
