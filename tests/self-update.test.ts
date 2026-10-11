@@ -324,3 +324,30 @@ test.serial('another repo finishes a pending checkout after its records are alre
     f.clean();
   }
 });
+
+test.serial('a content-equal overlap does not report deployment with another incoming file left stale', async () => {
+  const f: SelfUpdateFixture = await selfUpdateFixture();
+  try {
+    await pushSeed(f, 'second', 'old second\n');
+    await command(['git', 'fetch', 'origin', 'main'], f.clone);
+    await command(['git', 'merge', '--ff-only', 'origin/main'], f.clone);
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
+    await pushSeed(f, 'file', 'incoming\n');
+    const incoming: string = await pushSeed(f, 'second', 'incoming second\n');
+    writeFileSync(resolve(f.clone, 'file'), 'incoming\n');
+    await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
+    expect(readFileSync(resolve(f.clone, 'file'), 'utf8')).toBe('incoming\n');
+    expect(readFileSync(resolve(f.clone, 'second'), 'utf8')).toBe('old second\n');
+    expect(await command(['git', 'status', '--porcelain'], f.clone)).toBe(' M file');
+    await command(['git', 'restore', 'file'], f.clone);
+    await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(incoming);
+    expect(readFileSync(resolve(f.clone, 'file'), 'utf8')).toBe('incoming\n');
+    expect(readFileSync(resolve(f.clone, 'second'), 'utf8')).toBe('incoming second\n');
+    expect(await command(['git', 'status', '--porcelain'], f.clone)).toBe('');
+    expect(await remoteHead(f)).toBe(incoming);
+  } finally {
+    f.clean();
+  }
+});
