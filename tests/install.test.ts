@@ -337,8 +337,8 @@ describe('self-update', () => {
       writeFileSync(resolve(f.clone, 'file'), 'dirty\n');
       const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
       expect(logs).toHaveLength(1);
-      expect(logs[0]).toContain('self-update skipped: fast-forward refused');
-      expect(logs[0]).toContain('Your local changes');
+      expect(logs[0]).toContain('checkout pending');
+      expect(logs[0]).toContain("Entry 'file'");
       expect(logs[0]).toContain('1 behind origin/main');
       expect(logs[0]).toContain('commit or finish the overlapping edit');
       expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
@@ -453,13 +453,20 @@ describe('self-update', () => {
     }
   });
 
-  test.serial('is a silent no-op when repo.root is not ownRoot', async () => {
+  test.serial('runs the git stage but skips install and links when repo.root is not ownRoot', async () => {
     const f: SelfUpdateFixture = await selfUpdateFixture();
     try {
+      mkdirSync(resolve(f.clone, 'issues'), { recursive: true });
+      writeFileSync(resolve(f.clone, 'issues/record'), 'local record\n');
+      await command(['git', 'add', '--', 'issues/record'], f.clone);
+      await command(['git', 'commit', '-m', 'record'], f.clone);
+      const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
       const elsewhere: string = mkdtempSync(resolve(f.home, 'elsewhere-'));
-      rmSync(f.remote, { recursive: true, force: true });
       const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, elsewhere, f.home));
-      expect(logs).toEqual([]);
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toContain('pushed');
+      expect(await command(['git', 'rev-parse', 'main'], f.remote)).toBe(head);
+      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
       expect(existsSync(resolve(f.home, '.local/bin'))).toBe(false);
       expect(existsSync(resolve(f.clone, '.git/akrogon-install.lock'))).toBe(false);
     } finally {
