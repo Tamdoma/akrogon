@@ -14,6 +14,7 @@ import { join, resolve } from 'node:path';
 import { base, readGlobal, requireRepo, type Repo } from './config';
 import { allLeaves, readState, type Leaf } from './state';
 import { command, type Result } from './shell';
+import { readBaseRuns, type BaseRun } from './base-run';
 
 const forbidden: readonly string[] = [
   'NODE_PATH',
@@ -79,7 +80,7 @@ async function leafTarget(
   cwd: string,
   leafOverride: string | undefined,
   holder: string | undefined,
-): Promise<{ slug: string; target: string }> {
+): Promise<{ slug: string; target: string; baseSha?: string }> {
   if (leafOverride !== undefined)
     return {
       slug: readState(resolve(cwd, leafOverride)).slug,
@@ -91,6 +92,14 @@ async function leafTarget(
       item.state.worktree !== undefined && existsSync(item.state.worktree) && realpathSync(item.state.worktree) === top,
   );
   if (leaf !== undefined) return { slug: leaf.state.slug, target: resolve(leaf.path, 'implementation') };
+  const run: BaseRun | undefined = readBaseRuns(repo).find(
+    (item) => item.end === undefined && existsSync(item.path) && realpathSync(item.path) === top,
+  );
+  if (run !== undefined) {
+    const caller: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === run.leaf);
+    if (caller === undefined) throw new Error(`No caller leaf for base-run ${run.run}: ${run.leaf}`);
+    return { slug: run.leaf, target: resolve(caller.path, 'implementation'), baseSha: run.base };
+  }
   if (holder === undefined) throw new Error('No leaf worktree matches cwd; pass --leaf or --holder');
   return { slug: 'checkout', target: resolve(cwd, holder) };
 }
@@ -107,7 +116,7 @@ export async function runCheck(
     throw new Error('Usage: akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...');
   refuse();
   const repo: Repo = await requireRepo(readGlobal(), cwd);
-  const { target } = await leafTarget(repo, cwd, leafOverride, holder);
+  const { target, baseSha } = await leafTarget(repo, cwd, leafOverride, holder);
   // Short on purpose: Chrome puts its SingletonSocket under TMPDIR and aborts past the 107-byte socket path limit.
   const runRoot: string = mkdtempSync('/tmp/akr-');
   try {
@@ -119,7 +128,7 @@ export async function runCheck(
       JSON.stringify({ pid: process.pid, boot_id: boot, started: new Date().toISOString() }),
     );
     const env: Record<string, string> = constructedEnv(repo, runRoot);
-    env.AKROGON_BASE = await base(repo, cwd);
+    env.AKROGON_BASE = baseSha ?? (await base(repo, cwd));
     const log: string = join(runRoot, 'out.log');
     const result: Result = await spawnLogged(argv, cwd, env, log);
     process.stdout.write(result.stdout);
