@@ -472,3 +472,24 @@ test('targeted next sweeps unused registered variants', async () => {
     f.clean();
   }
 });
+
+test('configured destination store migrates a clean old managed worktree', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      worktree_root: storeDir(f),
+    });
+    const old: string = resolve(f.root, 'issues/worktrees/configured-migration');
+    await command(['git', 'worktree', 'add', '-b', 'configured-migration', old], f.root);
+    const path: string = leaf(f, 'configured-migration', 'plan.synthesis', { worktree: old });
+    await next(f, ['configured-migration']);
+    expect(existsSync(old)).toBe(false);
+    expect(readState(path).worktree).toBeUndefined();
+    expect((await next(f, ['configured-migration'])).code).toBe(0);
+    expect(readState(path).worktree).toBe(resolve(storeDir(f), 'configured-migration'));
+  } finally {
+    f.clean();
+  }
+});
