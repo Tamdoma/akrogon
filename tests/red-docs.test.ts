@@ -12,49 +12,40 @@ function markdown(dir: string): string[] {
     .map((entry) => resolve(base, entry));
 }
 
-test('the implement and check skills state the retry, comparison record and --compare rules', () => {
-  const implement: string = readFileSync(resolve(root, 'skills/implement-issue/SKILL.md'), 'utf8');
-  const check: string = readFileSync(resolve(root, 'skills/check-issue/SKILL.md'), 'utf8');
-  for (const [name, text] of [
-    ['implement-issue', implement],
-    ['check-issue', check],
-  ] as const) {
-    expect(text, name).toContain('--compare');
-    expect(text, name).toContain('base-run');
-    expect(text, name).toMatch(/retry/i);
-    expect(text, name).toMatch(/known-red/);
-    // The incomplete base-run stop stays; the completed-comparison failed stop is gone.
-    expect(text, name).toContain('incomplete base run');
-    expect(text, name).not.toContain('failed --reason "<command> red on base');
+// Literal contracts only: CLI flags, command strings and record-schema tokens that
+// run verbatim. Rule wording is reviewed by the seats, never asserted here.
+const seatSkills: string[] = [
+  resolve(root, 'skills/implement-issue/SKILL.md'),
+  resolve(root, 'skills/check-issue/SKILL.md'),
+];
+
+test('seat skills carry the literal flag, command and record-token contracts', () => {
+  for (const file of seatSkills) {
+    const text: string = readFileSync(file, 'utf8');
+    expect(text, file).toContain('--compare');
+    expect(text, file).toContain('akrogon base-run --base "$AKROGON_BASE" -- <command>');
+    expect(text, file).toContain('known-red');
+    expect(text, file).toContain('failed --reason "<command> incomplete base run');
+    expect(text, file).not.toContain('failed --reason "<command> red on base');
   }
-  // A failed checks command still blocks unless every failing unit is known-red.
-  expect(check).toMatch(/[Ff]ailed `checks` commands? always block[^.\n]*known-red/);
-});
-
-test('plan.synthesis states that a planned test intended red is never compared', () => {
   const plan: string = readFileSync(resolve(root, 'skills/plan-issue/SKILL.md'), 'utf8');
-  const synthesis: string = plan.slice(plan.indexOf('## plan.synthesis'));
-  expect(synthesis).toContain('--compare');
-  expect(synthesis).toMatch(/(never|not)[^\n.]*compar/i);
+  expect(plan.slice(plan.indexOf('## plan.synthesis'))).toContain('--compare');
 });
 
-test('the guide and README carry the comparison flow, not the retired base-red stop', () => {
+test('the guide and README carry the literal flag and record tokens', () => {
   const phases: string = readFileSync(resolve(root, 'docs/guide/phases.md'), 'utf8');
-  expect(phases).toMatch(/--compare|known-red/);
+  expect(phases).toContain('--compare');
+  expect(phases).toContain('known-red');
   const readme: string = readFileSync(resolve(root, 'README.md'), 'utf8');
   expect(readme).toContain('--compare');
 });
 
-test('no skill or guide tells a pre-merge seat to stop, wait or fail on a base red or to reuse an earlier base result', () => {
-  const retired: RegExp[] = [
-    /failed --reason "<command> red on base/,
-    /one base run at `AKROGON_BASE`/,
-    /still ends the pass `failed`/,
-  ];
+test('no skill or guide retains the retired red-on-base stop command', () => {
+  const retired: RegExp = /failed --reason "<command> red on base/;
   for (const dir of ['skills', 'docs/guide']) {
     for (const file of markdown(dir)) {
       const text: string = readFileSync(file, 'utf8');
-      for (const pattern of retired) expect(text, `${file} contains retired stop ${pattern}`).not.toMatch(pattern);
+      expect(text, `${file} contains the retired stop`).not.toMatch(retired);
     }
   }
 });
