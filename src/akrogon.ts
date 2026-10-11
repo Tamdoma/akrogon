@@ -31,7 +31,9 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
             ? { by: { type: 'string' } }
             : verb === 'run-check'
               ? { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } }
-              : verb === 'status'
+              : verb === 'base-run'
+                ? { base: { type: 'string' }, attempt: { type: 'string' }, cwd: { type: 'string' } }
+                : verb === 'status'
                 ? { charts: { type: 'boolean' } }
                 : {};
 
@@ -160,11 +162,21 @@ switch (verb) {
     );
     break;
   }
+  case 'base-run': {
+    const baseSha: string = z.string().trim().min(1).parse(values.base);
+    if (positionals.length === 0)
+      throw new Error('Usage: akrogon base-run --base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...');
+    const optional: z.ZodOptional<z.ZodString> = z.string().optional();
+    process.exitCode = await (
+      await import('./base-run')
+    ).baseRun(process.cwd(), baseSha, optional.parse(values.attempt), optional.parse(values.cwd), positionals);
+    break;
+  }
   case 'guard':
     process.exitCode = await (await import('./guard')).guard(process.cwd(), positionals);
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|hold-fix|sync|status|run-check|guard>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|hold-fix|sync|status|run-check|base-run|guard>',
     );
 }
