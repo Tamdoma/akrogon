@@ -670,8 +670,10 @@ async function batchCheck(
         };
   saveState(leaf.path, {
     ...readState(leaf.path),
-    batch:
-      compareFiles.length > 0 ? { ...stamp, comparisons: compareFiles.map((file) => resolve(leaf.path, file)) } : stamp,
+    batch: {
+      ...stamp,
+      comparisons: compareFiles.length > 0 ? compareFiles.map((file) => resolve(leaf.path, file)) : undefined,
+    },
   });
   if (compareFiles.length > 0) await recordComparisons(repo, state.slug, compareFiles, comparisons, record.built_on);
 }
