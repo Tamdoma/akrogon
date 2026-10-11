@@ -263,7 +263,8 @@ test.serial('a record commit landed at the branch write is pending, not dropped'
     await commitRecord(f, 'issues/open/late/brief.md', 'late\n');
     const lateTip: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
     await child.exited;
-    const res: Result = { code: child.exitCode ?? 1, stdout: await new Response(child.stdout).text(), stderr: '' };
+    const out: string = await new Response(child.stdout as ReadableStream).text();
+    const res: Result = { code: child.exitCode ?? 1, stdout: out, stderr: '' };
     expect(res.stdout).toContain('checkout pending');
     expect(res.stdout).toContain('the checkout moved to');
     expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(lateTip);

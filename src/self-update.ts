@@ -134,35 +134,54 @@ type Move = { state: 'none' } | { state: 'moved'; old: string } | { state: 'pend
 async function moveCheckout(repo: Repo, moveTo: string, base: string): Promise<Move> {
   const root: string = repo.root;
   const head: string = await command(['git', 'rev-parse', 'HEAD'], root);
-  // reset --keep preserves edits but not committed history: a commit landed
-  // after the replay base would be dropped, so the checkout stays pending.
   if (head !== base)
     return { state: 'pending', detail: `the checkout moved to ${head.slice(0, 12)} during integration` };
   const behind: string = await command(['git', 'rev-list', '--count', `HEAD..${moveTo}`], root);
   if (behind === '0') return { state: 'none' };
-  const refused: Result = await run(['git', 'reset', '--keep', moveTo], root);
-  if (refused.code === 0) return { state: 'moved', old: head };
-  // keep refuses when a colliding path is dirty even if it already carries the
-  // target bytes; adopt the index tree only when every changed path is equal.
-  const changed: Set<string> = new Set(paths(await command(['git', 'diff', '--name-only', '-z', head, moveTo], root)));
-  const dirty: Set<string> = new Set([
-    ...paths(await command(['git', 'diff', '--name-only', '-z'], root)),
-    ...paths(await command(['git', 'ls-files', '--others', '--exclude-standard', '-z'], root)),
-  ]);
-  const colliding: string[] = [...changed].filter((path: string) => dirty.has(path));
-  const staged: string = await command(['git', 'diff', '--cached', '--name-only'], root);
-  let equal: boolean = staged === '';
-  for (const path of colliding) {
-    if (!equal) break;
-    const have: Result = await run(['git', 'hash-object', '--', path], root);
-    const want: Result = await run(['git', 'rev-parse', `${moveTo}:${path}`], root);
-    if (have.code !== 0 || want.code !== 0 || have.stdout !== want.stdout) equal = false;
+  // The branch move is a compare-and-swap: read-tree reconciles worktree and
+  // index to moveTo with the same dirty-file refusal reset --keep uses, then
+  // update-ref moves the ref only when HEAD is still the validated value. A
+  // commit landed anywhere in the window fails the CAS instead of being
+  // silently dropped by an unconditional branch write.
+  const merged: Result = await run(['git', 'read-tree', '-m', '-u', moveTo], root);
+  let indexOnly: boolean = false;
+  if (merged.code !== 0) {
+    // read-tree refuses when a colliding path is dirty even if it already
+    // carries the target bytes; adopt the index tree only when every changed
+    // path is an equal collider.
+    const changed: Set<string> = new Set(
+      paths(await command(['git', 'diff', '--name-only', '-z', head, moveTo], root)),
+    );
+    const dirty: Set<string> = new Set([
+      ...paths(await command(['git', 'diff', '--name-only', '-z'], root)),
+      ...paths(await command(['git', 'ls-files', '--others', '--exclude-standard', '-z'], root)),
+    ]);
+    const colliding: string[] = [...changed].filter((path: string) => dirty.has(path));
+    const staged: string = await command(['git', 'diff', '--cached', '--name-only'], root);
+    let equal: boolean = staged === '';
+    for (const path of colliding) {
+      if (!equal) break;
+      const have: Result = await run(['git', 'hash-object', '--', path], root);
+      const want: Result = await run(['git', 'rev-parse', `${moveTo}:${path}`], root);
+      if (have.code !== 0 || want.code !== 0 || have.stdout !== want.stdout) equal = false;
+    }
+    if (equal && colliding.length > 0 && colliding.length === changed.size) {
+      await command(['git', 'read-tree', moveTo], root);
+      indexOnly = true;
+    } else {
+      return { state: 'pending', detail: errorLine(merged) };
+    }
   }
-  if (equal && colliding.length > 0 && colliding.length === changed.size) {
-    await command(['git', 'reset', '--mixed', moveTo], root);
-    return { state: 'moved', old: head };
-  }
-  return { state: 'pending', detail: errorLine(refused) };
+  const symref: Result = await run(['git', 'symbolic-ref', '--quiet', 'HEAD'], root);
+  const ref: string = symref.code === 0 ? symref.stdout : 'HEAD';
+  const cas: Result = await run(['git', 'update-ref', ref, moveTo, head], root);
+  if (cas.code === 0) return { state: 'moved', old: head };
+  // The checkout committed between validation and the ref write. Put index and
+  // worktree back to the real HEAD and stay pending; the next trigger retries.
+  if (!indexOnly) await run(['git', 'read-tree', '-m', '-u', 'HEAD'], root);
+  await run(['git', 'read-tree', 'HEAD'], root);
+  const now: string = await command(['git', 'rev-parse', 'HEAD'], root);
+  return { state: 'pending', detail: `the checkout moved to ${now.slice(0, 12)} during integration` };
 }
 
 async function installStage(root: string, ownRoot: string, home: string): Promise<string | null> {
