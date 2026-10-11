@@ -1,0 +1,43 @@
+2026-10-08T20:58	akrogon	merge-covers-key	implement	bun test tests/harness-template.test.ts red on base 3e034dee43f0853446c2ba8f97bb72668ab213dc; see implementation/report.
+2026-10-08T21:38	akrogon	named-targets	implement	bun test red on base 3e034dee43f0853446c2ba8f97bb72668ab213dc: harness-template x3; see implementation/report.md
+2026-10-08T21:47	akrogon	seat-a-replacement	implement	bun test tests/harness-template.test.ts red on base 3e034dee43f0853446c2ba8f97bb72668ab213dc; see implementation/report.
+2026-10-09T07:35	akrogon	seat-a-replacement	implement	seat A unreachable: agent_name_taken agent name akrogon-8857cc055e28abfa888fc466 is already used; candidates: terminal_i
+2026-10-09T07:35	akrogon	named-targets	implement	seat A unreachable: agent_name_taken agent name akrogon-685153c22fefa1ac780d3b0e is already used; candidates: terminal_i
+2026-10-10T09:42	akrogon	merge-clean-worktree	check.fix	bun test --timeout=30000 red on base f3199df89b25b4f215df04f8703ef6d71880cd6a: 9 identical failures in tests/dependents-
+2026-10-10T10:48	akrogon	merge-clean-worktree	check.fix	bun test --timeout=30000 red on base f3199df89b25b4f215df04f8703ef6d71880cd6a: 9 identical failures in tests/dependents-
+2026-10-10T22:56	akrogon	leaf-env-file	check.repair	fix rounds exhausted
+2026-10-11T05:20	akrogon	leaf-env-file	check.repair	fix rounds exhausted
+2026-10-11T05:42	akrogon	leaf-env-file	check.repair	fix rounds exhausted
+2026-10-08T03:08	framework	declared-surfaces-contrast	check.fix	merge check bun run framework:verify red on base e077b26b850e1f83bc53cf3be1a7e827193283c1: nested hooks:selftest stall (
+2026-10-08T04:41	framework	declared-surfaces-contrast	check.fix	merge check bun run framework:verify red on base e077b26b850e1f83bc53cf3be1a7e827193283c1: bun test --isolate zombie-rea
+2026-10-08T07:30	framework	csp-effective-policy-check	check.repair	Run bunx wrangler@4.148.0 login and verify whoami grants account 09568a6a845f2c11de5c8160ac5d83b8; O1 blocks F4 account-
+2026-10-08T08:15	framework	variant-count-and-briefs	implement	consumer-variant-count trust missing blocks walk recordings; see implementation/report.md Blocker
+2026-10-08T12:52	framework	business-output-authority	check.repair	Amend brief criterion 3's Bash clause or open a separate Bash-refusal leaf; OA1 remains open; see review-A.md and review
+2026-10-08T12:55	framework	pitch-writing-brief	check.fix	O1: raise readiness grant consumer count 6->7 for one accept recapture; F1 also needs pitch blocked-by landing-writing-b
+2026-10-08T13:17	framework	variant-count-and-briefs	implement	consumer-variant-count trust still missing (dir exists, dialog not accepted); verify+fix in implementation/report.md pas
+2026-10-08T13:39	framework	csp-effective-policy-check	check.repair	Capture an authenticated Workers list for account 09568a6a845f2c11de5c8160ac5d83b8 showing tamdoma-csp-proof-20261008-49
+2026-10-08T17:11	framework	hot-suite-concurrency	implement	bun run test:satellite-content red on base c5cf3bf47; see implementation/report.md
+2026-10-09T02:08	framework	finished-site-review	check.fix	bun run hooks:selftest red on base 2ccc3953415f2d40d2039365692a8c8dd999ebc0
+2026-10-09T02:21	framework	deliverable-obligations	check.fix	hooks:selftest red on base 2ccc3953415f2d40d2039365692a8c8dd999ebc0: 4 composition-spine ENOENT failures identical on le
+2026-10-09T02:49	framework	deliverable-obligations	check.fix	hooks:selftest red on base 2ccc3953415f2d40d2039365692a8c8dd999ebc0 reconfirmed (4 composition-spine ENOENT failures, sa
+2026-10-09T02:51	framework	photo-intake-optimizer	check.repair	fix rounds exhausted
+2026-10-09T04:33	framework	website-writing-brief	implement	criterion 8 red: mockup-refine cannot write the writer page (declared-output window covers only deliverable_dir/log_path
+2026-10-09T11:25	framework	copy-review-step	check.fix	criterion 7 red: stage 5 website (d)/(e) R7 opus/medium reviewer kept the planted repeated parking line as a taste note;
+2026-10-09T12:59	framework	mockup-video-delivery	plan.synthesis	seat A unreachable: agent_not_running agent is no longer running in the target pane (pane wA:pRA)
+2026-10-09T13:00	framework	mockup-video-delivery	plan.synthesis	seat A unreachable: agent_name_taken agent name akrogon-7969f33943685851e20cd4eb is already used; candidates: terminal_i
+2026-10-09T13:35	framework	copy-review-step	check.fix	criterion 7 red: stage 5 R8 and R9 at the P8 pin sonnet/medium both missed plants with no new skill gap; operator decisi
+2026-10-09T15:03	framework	local-area-facts	plan.synthesis	prompt undelivered to seat A after 3 passes: timeout timed out waiting for agent status (pane wA:pRD, session 311e6e3a-d
+2026-10-09T18:30	framework	local-area-facts	check.fix	add grants[0] operation for one SAB local research+prep session on an SAB fixture business to prove review-B F1; see imp
+2026-10-09T23:18	framework	site-media-publisher	check.fix	B-F6 operator action first: re-record fidelity gate via bun .claude/workflow/scripts/run-internal-gate-function-proof.ts
+2026-10-10T13:09	framework	page-measure-full-id	implement	hooks:selftest red on base 5cb74c3c6 (C8 video-intake-optimizer): package hiding defeated by parent-dir node_modules res
+2026-10-10T13:22	framework	fail-fast	implement	bun run hooks:selftest red on base 5cb74c3c6 (C8 video-intake ffmpeg-static test fails identically in nested-worktree co
+2026-10-10T13:29	framework	cheap-checks	check.review	bun run hooks:selftest red on base 5cb74c3c6002f12a5d463e5728dd5763cd828188; see review-B.md
+2026-10-10T13:47	framework	spawn-deadlines	implement	test:motion-probe red on base 5cb74c3c6 (MISMATCH reveal/reveal-section after.visible); base run /tmp/akrogon-1000/spawn
+2026-10-10T13:48	framework	cheap-checks	check.review	bun run hooks:selftest red on base 5cb74c3c6002f12a5d463e5728dd5763cd828188; unchanged head, see review-B.md
+2026-10-10T13:51	framework	fail-fast	check.review	bun run hooks:selftest red on base 5cb74c3c6002f12a5d463e5728dd5763cd828188; see review-B.md
+2026-10-10T14:10	framework	dist-capture-disk	check.fix	test:motion-probe red on base 5cb74c3c6 (identical MISMATCH reveal/reveal-section after.visible), no leaf cause; framewo
+2026-10-10T16:55	framework	spawn-deadlines	implement	test:motion-probe still red on base 5cb74c3c6 (tracked framework#220): MISMATCH reveal/reveal-section after.visible, det
+2026-10-10T17:01	framework	dist-capture-disk	check.fix	test:motion-probe red on base 5cb74c3c6: probe tab flips hidden ~500ms post-nav (foreground slot taken by another page t
+2026-10-10T22:12	framework	copyfile-install	check.fix	F1 blocked by locked decision install-sharing 1a: bun 1.4.2 has no [install] backend bunfig key, so a flagless install c
+2026-10-10T22:51	framework	formspark-build-wiring	check.repair	fix rounds exhausted
+2026-10-11T05:35	framework	copyfile-install	check.review	akrogon guard ancestors red on base 35bd4ce02db82187c70f687f8e65d9fcc378eecf; see review-B.md

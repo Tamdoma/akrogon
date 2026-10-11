@@ -1,0 +1,61 @@
+ 1:  aca5d26 =  1:  29010d4 test: cover akrogon base-run record, checkout, env and cleanup contract
+ 2:  92a466a !  2:  5ee16b4 refactor: extract constructedEnv, spawnLogged and emitEnvFile for base-run
+    @@ src/next.ts: async function writeLeafEnv(repo: Repo, worktree: string, live: boo
+      ## src/run-check.ts ##
+     @@ src/run-check.ts: import { homedir } from 'node:os';
+      import { join, resolve } from 'node:path';
+    - import { base, leafTemp, readGlobal, requireRepo, type Repo } from './config';
+    + import { base, readGlobal, requireRepo, type Repo } from './config';
+      import { allLeaves, readState, type Leaf } from './state';
+     -import { command } from './shell';
+     +import { command, type Result } from './shell';
+ 3:  a23a067 =  3:  cb48aee feat: add akrogon base-run verb for detached base checkouts
+ 4:  7d2cbd0 =  4:  d6d301f docs: register the akrogon base-run verb in the command reference and area files
+ 5:  26c5de8 =  5:  3af9a8b style: format base-run additions
+ 6:  8eb32c0 =  6:  860d724 docs: area file trailer
+ 7:  c3375d4 =  7:  f651c87 test: reproduce base-run temporary directory leak
+ 8:  0a26bc9 =  8:  468497c fix: remove base-run temporary files when the run ends
+ 9:  bdeac90 =  9:  5c6975b test: reproduce configured checks failing on a base checkout
+10:  d9e66d2 ! 10:  aaf721b fix: resolve active base-run context for configured checks
+    @@ Commit message
+     
+      ## src/run-check.ts ##
+     @@ src/run-check.ts: import { join, resolve } from 'node:path';
+    - import { base, leafTemp, readGlobal, requireRepo, type Repo } from './config';
+    + import { base, readGlobal, requireRepo, type Repo } from './config';
+      import { allLeaves, readState, type Leaf } from './state';
+      import { command, type Result } from './shell';
+     +import { readBaseRuns, type BaseRun } from './base-run';
+    @@ src/run-check.ts: export async function runCheck(
+          throw new Error('Usage: akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...');
+        refuse();
+        const repo: Repo = await requireRepo(readGlobal(), cwd);
+    --  const { slug, target } = await leafTarget(repo, cwd, leafOverride, holder);
+    -+  const { slug, target, baseSha } = await leafTarget(repo, cwd, leafOverride, holder);
+    -   const scratch: string = leafTemp(repo, slug);
+    -   mkdirSync(scratch, { recursive: true, mode: 0o700 });
+    -   const runRoot: string = mkdtempSync(resolve(scratch, 'run-'));
+    +-  const { target } = await leafTarget(repo, cwd, leafOverride, holder);
+    ++  const { target, baseSha } = await leafTarget(repo, cwd, leafOverride, holder);
+    +   // Short on purpose: Chrome puts its SingletonSocket under TMPDIR and aborts past the 107-byte socket path limit.
+    +   const runRoot: string = mkdtempSync('/tmp/akr-');
+    +   try {
+     @@ src/run-check.ts: export async function runCheck(
+            JSON.stringify({ pid: process.pid, boot_id: boot, started: new Date().toISOString() }),
+          );
+11:  7e064e2 = 11:  f7a9075 test: reproduce merge base-run cwd escaping the checkout
+12:  616667f = 12:  1d6c542 fix: reject base-run cwd outside the checkout
+13:  097f977 = 13:  2444372 test: parse configured check output at the boundary
+14:  b61fb31 ! 14:  74f1338 fix: capture subprocess output through files, not pipes
+    @@ Commit message
+      ## src/run-check.ts ##
+     @@ src/run-check.ts: import { homedir } from 'node:os';
+      import { join, resolve } from 'node:path';
+    - import { base, leafTemp, readGlobal, requireRepo, type Repo } from './config';
+    + import { base, readGlobal, requireRepo, type Repo } from './config';
+      import { allLeaves, readState, type Leaf } from './state';
+     -import { command, type Result } from './shell';
+     +import { command, spawnCaptured, type Result } from './shell';
+15:  239c730 = 15:  e8fcff4 test: spawn test children through file capture
+16:  8b37b31 = 16:  481e96f test: reproduce capture directory leak on failed check launch
+17:  e99984e = 17:  353a5e4 fix: remove output capture storage when spawning fails

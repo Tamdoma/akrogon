@@ -1,11 +1,44 @@
 slug: known-red-leaf
-phase: plan.synthesis
-created: '2026-10-10'
+phase: implement
+created: 2026-10-10
 repo: akrogon
-debate: 'no'
-blocked-by:
+debate: "no"
+blocked-by: 
   - base-run
   - test-proof-rules
-sources:
-  - Tamdoma/akrogon#76
-  - Tamdoma/akrogon#77
+sources: 
+  - "Tamdoma/akrogon#76"
+  - "Tamdoma/akrogon#77"
+busy_since: 
+  A: 2026-10-11T08:45:55.543Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAV
+worktree: /home/ivan/.akrogon/worktrees/akrogon/known-red-leaf
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pMQ
+  B: w8:pMR
+prompted: 
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-known-red-leaf--/2026-10-11T08-30-27-373Z_01a12a15-b22c-71a2-939c-2c933776dec7.jsonl
+prompted_at: 
+  A: 2026-10-11T08:45:55.543Z
+delivery_error: 
+  {}
+frozen: 
+  tests/base-run.test.ts: e6845550b0c3eceed16f4df31cb16c14280473ed
+  tests/command-reference.test.ts: bdecf8cc4ab10a122de61e696914486c3d7a0b64
+  tests/compare.test.ts: 8b99bbe11bf218eba2f8fc157f6c39b19ec58871
+  tests/red-docs.test.ts: c715e9aa0dab856bc79a31ba9732a9ee72f2771f
+frozen_cited: 
+  []

@@ -1,7 +1,52 @@
 slug: worktree-reconciler
-phase: plan.synthesis
-created: '2026-10-10'
+phase: implement
+created: 2026-10-10
 repo: akrogon
-debate: 'no'
-blocked-by: [worktree-store, check-env, base-run]
-sources: []
+debate: "no"
+blocked-by: 
+  - worktree-store
+  - check-env
+  - base-run
+sources: 
+  []
+busy_since: 
+  A: 2026-10-11T08:44:47.396Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAW
+worktree: /home/ivan/.akrogon/worktrees/akrogon/worktree-reconciler
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pMS
+  B: w8:pMT
+prompted: 
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-worktree-reconciler--/2026-10-11T08-30-31-251Z_01a12a15-c153-7757-a11f-809fb063a980.jsonl
+prompted_at: 
+  A: 2026-10-11T08:44:47.396Z
+delivery_error: 
+  {}
+frozen: 
+  tests/batch-merge.test.ts: a5149d801f3c8fb32d6ab4a44f51c83f842dafd1
+  tests/chart-usage.test.ts: 261b29db3bce43b45ecd3522935a61dff592bc63
+  tests/helpers.ts: 27ec80b2f9d597cb99a85dd1e8c5995e030f8d22
+  tests/hold.test.ts: 88720817cf0598eb463e48bc1d5330374b928b37
+  tests/install.test.ts: 65b58f09a0faeeb7ee676123db83b8c8b564f568
+  tests/merge-attempts.test.ts: b84b0be63319a898c58df0d48617dfa6e3057893
+  tests/next.test.ts: 937a6a7f11f4bed1b55cd3dda74c3daebf36a0af
+  tests/pause-status.test.ts: 38ca4a1cb5117728d2542097bba024965b06070e
+  tests/pause.test.ts: af5ae9307b3f47ee46e031ade5ff5f03f64fbfdd
+  tests/peer-wait.test.ts: 48912e075d8e7209a60adc0411c42bd8d1f5b55c
+  tests/reconcile.test.ts: 1ec6114be786d6603c073e3b21e416af6b139600
+  tests/shell.test.ts: aec2c459b1a6babc0e48629b91da7cc24a6b0a61
+frozen_cited: 
+  []
