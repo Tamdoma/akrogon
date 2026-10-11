@@ -33,7 +33,7 @@ Normal phase moves enforce worktree and artifact conditions. Recording a failure
 
 Sync commits only eligible issue records. It refuses unrelated staged files. It can preserve unrelated unstaged changes during its rebase, but conflicts still need attention.
 
-A blocked or unknown agent is not treated as idle. Repeated failed prompt deliveries count toward failure, while a successful delivery resets that seat's attempts. A permission dialog is not proof of a delivery failure.
+A blocked or unknown agent is not treated as idle. A failed prompt delivery records the error and attempt count and is retried on the next pass, while a successful delivery resets that seat's attempts. A permission dialog is not proof of a delivery failure.
 
 Only the merge seat sends the completion broadcast. A failed notification leaves the code merge complete.
 

@@ -15,7 +15,7 @@ Dispatch also needs the repository's Herdr workspace. Its name must match the re
 
 **The leaf is failed.**
 
-Read the recorded reason. A human-only blocker needs the stated action. A delivery failure needs a usable seat. Repairing either cause does not change the phase automatically.
+Read the recorded reason. A human-only blocker needs the stated action. Repairing it does not change the phase automatically.
 
 After resolving it, resume at the right active phase:
 
