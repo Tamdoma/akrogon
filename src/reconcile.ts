@@ -137,7 +137,7 @@ export function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): boolean {
     if (worktree === undefined || !existsSync(worktree)) continue;
     if (leaf.state.batch !== undefined || memberSlugs.has(leaf.state.slug)) continue;
     if (leaf.state.phase === 'merged' || leaf.state.phase === 'failed') return true;
-    if (repo.config.worktree_root === undefined && !within(worktree, store) && within(worktree, oldRoot)) return true;
+    if (!within(worktree, store) && within(worktree, oldRoot)) return true;
   }
   const recorded: Set<string> = new Set(
     leaves.flatMap((leaf) => (leaf.state.worktree === undefined ? [] : [leaf.state.worktree])),
@@ -319,7 +319,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     }
     // Migration applies only to leaf worktrees recorded under the old in-repo
     // default root; any other outside-store record is an operator's setup.
-    if (repo.config.worktree_root !== undefined || !within(worktree, oldRoot)) {
+    if (!within(worktree, oldRoot)) {
       keep(worktree, 'unmanaged worktree');
       continue;
     }
