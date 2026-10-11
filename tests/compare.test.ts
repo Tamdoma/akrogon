@@ -589,6 +589,40 @@ test('a failing notice does not block the move and is stored apart from the entr
   }
 });
 
+test('a notice timeout is recorded after one delivery attempt without blocking the move', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const herdr: HerdrFixture = fakeHerdr(f);
+    const db: { failNotificationOnce?: boolean } = JSON.parse(readFileSync(herdr.db, 'utf8'));
+    db.failNotificationOnce = true;
+    writeFileSync(herdr.db, JSON.stringify(db));
+    const s: Setup = await setup(f, 'leaf-timeout', 'plan.synthesis', ['A']);
+    const data: Record<string, unknown> = record(s, s.leafPath, {});
+    baseRunLine(f, {
+      leaf: 'leaf-timeout',
+      slot: 'A',
+      base: s.base,
+      command: CHECK,
+      log: (data.base as { log: string }).log,
+    });
+    const file: string = writeRecord(f, s.leafPath, 'compare-1.yaml', data);
+    const moved: Result = await cli(
+      f,
+      ['phase', 'leaf-timeout', 'implement', '--slot', 'A', '--compare', file],
+      f.root,
+      herdr.env,
+    );
+    expect(moved.code).toBe(0);
+    expect(readState(s.leafPath).phase).toBe('implement');
+    expect(noticeCalls(herdr.db)).toBe(1);
+    const events: Record<string, unknown>[] = redRecords(f);
+    expect(events.map((event) => event.event)).toEqual(['opened', 'notice']);
+    expect(events[1].error).toBeDefined();
+  } finally {
+    f.clean();
+  }
+});
+
 test('a base pass resolves only the matching active entry at or below its revision; a recurrence opens a new entry and notice', async () => {
   const f: Fixture = await fixture();
   try {
