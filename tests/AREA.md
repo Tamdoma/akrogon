@@ -16,11 +16,12 @@
 - `tests/base-run.test.ts` checks the base checkout, record line, env and cleanup of `base-run`.
 - `tests/compare.test.ts` checks the comparison record, red record and `--compare` flag.
 - `tests/red-docs.test.ts` checks the skills and guide carry the retry, comparison and `known-red` rules.
+- `tests/reconcile.test.ts` checks reconciler removal, refusal and old-root migration against real worktrees.
 
 ## Non-obvious patterns
 
 - CLI fixtures isolate machine configuration through the environment.
-- Each fixture creates a real Git repository and removes it after the test.
+- Each fixture creates a real Git repository and removes it after the test; registered temp dirs are also swept at process exit.
 - `bunfig.toml` runs every test file concurrently, and tests that share global state use `test.serial`.
 - The 30 s test timeout comes from `--timeout=30000` in the `checks` commands of `issues/config.yaml`.
 

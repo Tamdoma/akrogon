@@ -17,6 +17,7 @@
 - `src/phase.ts` and `src/shell.ts` aggregate slot completion and enforce handoff guards; shell wraps subprocesses, retries, YAML writes and Herdr responses.
 - `src/readiness.ts` owns the readiness contract schema and gap computation.
 - `src/base-run.ts` checks out a base sha detached, logs the run into the leaf and records it in `issues/base-runs.jsonl`; `src/compare.ts` and `src/red-record.ts` validate comparison records and fold `issues/red-records.jsonl` into active entries.
+- `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass and writes the kept report `status` prints.
 
 ## Non-obvious patterns
 
