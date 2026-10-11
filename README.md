@@ -118,7 +118,7 @@ sources: []
 
 Moving a repository or changing its worktree root requires reconciling existing worktree paths and Git metadata. A configuration edit does not move them.
 
-Every `akrogon next` pass reconciles worktrees, scratch and run roots against leaf state: clean, reachable, unused leftovers are removed and everything it keeps is reported by `akrogon status` as `Kept:` lines with path and reason.
+Every `akrogon next` pass reconciles worktrees, scratch and run roots against leaf state: clean, reachable, unused leftovers are removed and everything it keeps is reported by `akrogon status <slug>` as `Kept:` lines with path and reason.
 
 This repository's [reference index](docs/reference-index.md) links its code areas.
 

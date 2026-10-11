@@ -358,6 +358,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     console.log(Bun.YAML.stringify(leaf.state, null, 2).trimEnd());
     if (paused.has(repo.name)) console.log(`paused: ${repo.name}`);
     for (const entry of activeRed(repo)) console.log(redLine(entry));
+    for (const entry of readKept(repo)) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     for (const gap of missing)
       console.log(`Missing: ${repo.name}/${slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`);
     console.log('History:');
@@ -401,10 +402,8 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   }
   for (const scan of scans) {
     if (!scan.ok) continue;
-    for (const entry of readKept(scan.repo)) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     const marks: string[] = [paused.has(scan.repo.name) ? 'paused' : ''].filter((mark) => mark !== '');
     console.log(paint('1;4', `${scan.repo.name}${marks.length > 0 ? ` (${marks.join(') (')})` : ''}`));
-    for (const entry of activeRed(scan.repo)) console.log(`  ${redLine(entry)}`);
     if (charts) {
       const lines: string[][] = chartRows(scan.repo.root, now);
       if (lines.length > 0)

@@ -739,7 +739,7 @@ test('an entry opened on a newer revision than the evidence stays active', async
   }
 });
 
-test('status prints each active entry with unit, command, first-seen revision and notice result', async () => {
+test('status <slug> prints each active entry with unit, command, first-seen revision and notice result; the board does not', async () => {
   const f: Fixture = await fixture();
   try {
     const s: Setup = await setup(f, 'leaf-s', 'implement', ['A']);
@@ -766,7 +766,7 @@ test('status prints each active entry with unit, command, first-seen revision an
     expect(single.stdout).toMatch(/exit 3|sh -c/);
     const board: Result = await cli(f, ['status'], f.root);
     expect(board.code).toBe(0);
-    expect(board.stdout).toMatch(/unit one/);
+    expect(board.stdout).not.toMatch(/unit one/);
   } finally {
     f.clean();
   }

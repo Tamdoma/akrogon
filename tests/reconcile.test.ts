@@ -27,8 +27,8 @@ async function next(
 ): Promise<Result> {
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
-async function status(f: DispatchFixture): Promise<Result> {
-  return cli(f, ['status'], f.home, f.env);
+async function status(f: DispatchFixture, slug: string): Promise<Result> {
+  return cli(f, ['status', slug], f.root, f.env);
 }
 function branchExists(f: DispatchFixture, name: string): Promise<Result> {
   return run(['git', 'show-ref', '--verify', '--quiet', `refs/heads/${name}`], f.root);
@@ -96,7 +96,7 @@ test('failed leaf worktree is removed and its branch is kept', async () => {
   }
 });
 
-// DC2: kept worktrees reported in `akrogon status` with path and reason.
+// DC2: kept worktrees reported in `akrogon status <slug>` with path and reason.
 test('dirty merged worktree is kept and reported with path and reason', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -106,7 +106,7 @@ test('dirty merged worktree is kept and reported with path and reason', async ()
     saveState(path, { ...readState(path), phase: 'merged' });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worktree)).toBe(true);
-    const out: Result = await status(f);
+    const out: Result = await status(f, 'dirty-leaf');
     expect(out.stdout).toContain(worktree);
     expect(out.stdout).toContain('uncommitted');
     expect((await branchExists(f, 'dirty-leaf')).code).toBe(0);
@@ -125,7 +125,7 @@ test('mid-rebase worktree is kept and reported', async () => {
     saveState(path, { ...readState(path), phase: 'merged' });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worktree)).toBe(true);
-    const out: Result = await status(f);
+    const out: Result = await status(f, 'rebase-leaf');
     expect(out.stdout).toContain(worktree);
     expect(out.stdout).toContain('rebase');
   } finally {
@@ -145,7 +145,7 @@ test('worktree with unreachable commits is kept and reported with a count', asyn
     saveState(path, { ...readState(path), phase: 'merged' });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worktree)).toBe(true);
-    const out: Result = await status(f);
+    const out: Result = await status(f, 'lost-leaf');
     expect(out.stdout).toContain(worktree);
     expect(out.stdout).toMatch(/1 unreachable commit/);
   } finally {
@@ -169,7 +169,7 @@ test('worktree with a live pane inside is kept and reported', async () => {
     });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worktree)).toBe(true);
-    const out: Result = await status(f);
+    const out: Result = await status(f, 'pane-leaf');
     expect(out.stdout).toContain(worktree);
     expect(out.stdout).toContain('live pane');
   } finally {
@@ -186,7 +186,7 @@ test('an unknown directory inside the store is reported, never removed', async (
     writeFileSync(resolve(stray, 'file'), 'x');
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(stray)).toBe(true);
-    const out: Result = await status(f);
+    const out: Result = await status(f, 'seed-leaf');
     expect(out.stdout).toContain(stray);
     expect(out.stdout).toContain('unknown');
   } finally {
@@ -220,7 +220,7 @@ test('run root with a dead owner pid is removed, live owner kept', async () => {
     expect(existsSync(dead)).toBe(false);
     expect(existsSync(foreignBoot)).toBe(false);
     expect(existsSync(live)).toBe(true);
-    const out: Result = await status(f);
+    const out: Result = await status(f, 'scratch-leaf');
     expect(out.stdout).toContain(live);
   } finally {
     f.clean();
@@ -297,7 +297,7 @@ for (const refusal of ['dirty', 'mid-rebase', 'live tab', 'live cwd', 'batch'] a
       await next(f, [slug]);
       expect(existsSync(old)).toBe(true);
       expect(readState(path).worktree).toBe(old);
-      const out: Result = await status(f);
+      const out: Result = await status(f, slug);
       expect(out.stdout).toContain(old);
     } finally {
       f.clean();
@@ -314,7 +314,7 @@ test('operator worktree outside managed roots is kept as unmanaged', async () =>
     await command(['git', 'worktree', 'add', '--detach', outside], f.root);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(outside)).toBe(true);
-    const out: Result = await status(f);
+    const out: Result = await status(f, 'seed-leaf');
     expect(out.stdout).toContain(outside);
     expect(out.stdout).toContain('unmanaged');
   } finally {
@@ -332,7 +332,7 @@ test('recorded worktree that is not a registered git worktree is kept, not remov
     leaf(f, 'fake-wt', 'plan.synthesis', { worktree: fake });
     expect((await next(f, ['--all'])).code).not.toBe(0);
     expect(existsSync(fake)).toBe(true);
-    const out: Result = await status(f);
+    const out: Result = await status(f, 'seed-leaf');
     expect(out.stdout).toContain(fake);
   } finally {
     f.clean();
@@ -372,7 +372,7 @@ test('unconfirmed base-run worktree is removed when clean, kept when dirty', asy
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(clean)).toBe(false);
     expect(existsSync(dirty)).toBe(true);
-    const out: Result = await status(f);
+    const out: Result = await status(f, 'holder-leaf');
     expect(out.stdout).toContain(dirty);
     expect(out.stdout).toContain('uncommitted');
   } finally {
@@ -393,12 +393,12 @@ test('store variants survive live or unavailable pane inventories', async () => 
     });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(variant)).toBe(true);
-    expect((await status(f)).stdout).toContain(variant);
-    expect((await status(f)).stdout).toContain('live pane inside');
+    expect((await status(f, 'variant-holder')).stdout).toContain(variant);
+    expect((await status(f, 'variant-holder')).stdout).toContain('live pane inside');
     saveDatabase(f, { ...database(f), paneListStdout: 'unavailable' });
     await next(f, ['--all']);
     expect(existsSync(variant)).toBe(true);
-    expect((await status(f)).stdout).toContain('pane list unavailable');
+    expect((await status(f, 'variant-holder')).stdout).toContain('pane list unavailable');
     saveDatabase(f, { ...db, panes: db.panes });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(variant)).toBe(false);
@@ -450,7 +450,7 @@ test('failed leaf scratch preserves an actual running base command', async () =>
       });
       expect((await next(f, ['--all'])).code).toBe(0);
       expect(existsSync(runRoot)).toBe(true);
-      expect((await status(f)).stdout).toContain(runRoot);
+      expect((await status(f, 'running-base')).stdout).toContain(runRoot);
     } finally {
       writeFileSync(release, 'release');
       expect((await running).code).toBe(0);

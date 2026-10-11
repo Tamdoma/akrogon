@@ -116,7 +116,7 @@ akrogon unpause
 
 Pause differs from park: park removes whole unallocated issues from the open queue until unparked, while pause freezes automatic work for the entire repo including allocated leaves, and unpause dispatches again right away. `akrogon status` marks paused repos.
 
-A base-red merge run no longer stops the turn: the merge seat compares the failing units against the batch's base and records each `known-red` one as a repo red entry `akrogon status` lists, while the batch keeps moving. A recorded entry resolves when a green run covering that unit lands on main.
+A base-red merge run no longer stops the turn: the merge seat compares the failing units against the batch's base and records each `known-red` one as a repo red entry `akrogon status <slug>` lists, while the batch keeps moving. A recorded entry resolves when a green run covering that unit lands on main.
 
 ## How order is decided
 
