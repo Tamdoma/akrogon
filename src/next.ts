@@ -370,10 +370,17 @@ async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promis
   // verbatim except a literal \r (normalized to \n); double quotes unescape
   // \n and \r only (\\ stays literal). Emission reproduces the parsed value.
   const emit = (name: string, v: string): string | null => {
-    if (!/[#\n\r]/.test(v) && v === v.trim() && !['"', "'", '`'].includes(v[0] ?? '')) return `${name}=${v}`;
-    if (!v.includes("'") && !v.includes('\r')) return `${name}='${v}'`;
-    if (!v.includes('`') && !v.includes('\r')) return `${name}=\`${v}\``;
-    if (!v.includes('"') && !/\\[nr]/.test(v)) return `${name}="${v.replace(/\r/g, '\\r')}"`;
+    const noTrail: boolean = !v.endsWith('\\');
+    if (!/[#\n\r]/.test(v) && v === v.trim() && !['"', "'", '`'].includes(v[0] ?? '') && noTrail) return `${name}=${v}`;
+    if (!v.includes("'") && !v.includes('\r') && noTrail) return `${name}='${v}'`;
+    if (!v.includes('`') && !v.includes('\r') && noTrail) return `${name}=\`${v}\``;
+    // Double quotes accept everything except a bare " (a quote not preceded
+    // by \), a trailing \ and backslash sequences adjacent to a real \r.
+    const hasBareQuote: boolean = [...v].some((c, i) => c === '"' && (i === 0 || v[i - 1] !== '\\'));
+    const crBlocked: boolean =
+      v.includes('\r') &&
+      (/\\[nr]*\r/.test(v) || /\r\\+$/.test(v) || /\\[nr]/.test(v.slice(v.indexOf('\r')).replace(/\\"/g, '')));
+    if (!hasBareQuote && !crBlocked && noTrail) return `${name}="${v.replace(/\r/g, '\\r')}"`;
     return null;
   };
   const emitted: (string | null)[] = repo.config.env.map((name) => emit(name, parsed[name]!));
