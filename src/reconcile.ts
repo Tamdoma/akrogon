@@ -406,19 +406,11 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       if (!entry.isDirectory()) continue;
       const dir: string = resolve(scratchRoot, entry.name);
       const leaf: Leaf | undefined = scratchByDir.get(entry.name);
-      if (leaf === undefined && entry.name !== checkoutScratch) keep(dir, 'unknown scratch directory');
-      else if (leaf !== undefined && (leaf.state.phase === 'merged' || leaf.state.phase === 'failed')) {
-        if (live === null) keep(dir, 'pane list unavailable');
-        else if ((leaf.state.phase === 'merged' && tabLive(live, leaf.state.tab)) || livePaneInside(live, dir))
-          keep(dir, 'live pane inside');
-        else {
-          rmSync(dir, { recursive: true, force: true });
-          removed.push(dir);
-          continue;
-        }
-      }
-      for (const child of readdirSync(dir, { withFileTypes: true })) {
-        if (!child.isDirectory() || !child.name.startsWith('run-')) continue;
+      const runEntries: Dirent[] = readdirSync(dir, { withFileTypes: true }).filter(
+        (child) => child.isDirectory() && child.name.startsWith('run-'),
+      );
+      const keptBefore: number = kept.length;
+      for (const child of runEntries) {
         const runRoot: string = resolve(dir, child.name);
         const ownerFile: string = resolve(runRoot, '.owner');
         if (!existsSync(ownerFile)) {
@@ -436,6 +428,17 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
           rmSync(runRoot, { recursive: true, force: true });
           removed.push(runRoot);
         } else keep(runRoot, 'run in progress');
+      }
+      if (leaf === undefined && entry.name !== checkoutScratch) keep(dir, 'unknown scratch directory');
+      else if (leaf !== undefined && (leaf.state.phase === 'merged' || leaf.state.phase === 'failed')) {
+        if (live === null) keep(dir, 'pane list unavailable');
+        else if ((leaf.state.phase === 'merged' && tabLive(live, leaf.state.tab)) || livePaneInside(live, dir))
+          keep(dir, 'live pane inside');
+        else if (kept.length === keptBefore) {
+          rmSync(dir, { recursive: true, force: true });
+          removed.push(dir);
+          continue;
+        }
       }
     }
   }
