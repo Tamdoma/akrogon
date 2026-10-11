@@ -379,3 +379,33 @@ test('unconfirmed base-run worktree is removed when clean, kept when dirty', asy
     f.clean();
   }
 });
+
+test('store variants survive live or unavailable pane inventories', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    await dispatchLeaf(f, 'variant-holder');
+    const variant: string = resolve(storeDir(f), 'variant-holder-v0');
+    await command(['git', 'worktree', 'add', '--detach', variant], f.root);
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      panes: [
+        ...db.panes,
+        { pane_id: 'w1:p999', tab_id: 'w1:t999', cwd: variant, agent: null, agent_status: 'idle' },
+      ],
+    });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(variant)).toBe(true);
+    expect((await status(f)).stdout).toContain(variant);
+    expect((await status(f)).stdout).toContain('live pane inside');
+    saveDatabase(f, { ...database(f), paneListStdout: 'unavailable' });
+    await next(f, ['--all']);
+    expect(existsSync(variant)).toBe(true);
+    expect((await status(f)).stdout).toContain('pane list unavailable');
+    saveDatabase(f, { ...db, panes: db.panes });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(variant)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
