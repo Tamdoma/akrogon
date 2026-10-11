@@ -853,3 +853,27 @@ test.serial('a later merge check without comparisons clears the prior accepted r
     f.clean();
   }
 });
+
+test.serial('restack reruns an accepted known-red record even when its counterpart unit passed', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const fx: BatchFixture = await batchFixture(f, ['hold']);
+    const baseLog: string = logFile(fx.holderPath, 'passing-counterpart.log');
+    baseRunLine(f, { base: fx.builtOn, log: baseLog });
+    const record: Record<string, unknown> = mergeRecord(fx.holderPath, {
+      leafRevision: await headOf(fx),
+      counterpart: fx.builtOn,
+      baseLog,
+    });
+    (record.units as Record<string, unknown>[])[0].base = { outcome: 'pass', log: baseLog };
+    const file: string = writeRecord(fx.holderPath, 'known-red-passing-base.yaml', record);
+    expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
+    await advanceRemote(f, { 'issues/notes.md': 'another issue record landed\n' });
+    const merged: Result = await cli(f, mergeArgs, f.root, fx.herdr.env);
+    expect(merged.code).toBe(0);
+    expect(readState(fx.holderPath).batch!.decision).toBe('rerun');
+    expect(readState(fx.holderPath).batch!.comparisons).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
