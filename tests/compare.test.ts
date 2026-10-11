@@ -19,6 +19,11 @@ async function setup(
   slots: readonly string[],
   extra: object = {},
 ): Promise<Setup> {
+  yaml(resolve(f.root, 'issues/config.yaml'), {
+    setup: 'mkdir -p node_modules',
+    checks: { test: 'bun test' },
+    grounding: 'none',
+  });
   const worktree: string = resolve(storeDir(f), slug);
   await command(['git', 'worktree', 'add', worktree, '-b', slug], f.root);
   writeFileSync(resolve(worktree, 'leaf-change'), 'change\n');
