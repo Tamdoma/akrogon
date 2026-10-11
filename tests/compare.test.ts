@@ -315,6 +315,17 @@ type Refusal = {
 
 const refusals: Refusal[] = [
   {
+    name: 'marks a red retry inconsistent without a counterpart',
+    line: false,
+    mutate: (data) => {
+      data.state = 'inconsistent';
+      data.units = [];
+      delete data.counterpart_revision;
+      delete data.base;
+    },
+    match: /retry/,
+  },
+  {
     name: 'does not parse',
     write: (f, s, leafPath) => {
       const path: string = resolve(leafPath, 'broken.yaml');
