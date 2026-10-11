@@ -353,3 +353,20 @@ test('printed checks refuse before setup and isolate both setup and check enviro
     f.clean();
   }
 });
+
+test('run-check preserves failed executable errors and removes their capture directories', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree } = await leafWorktree(f, 'missing-executable');
+    const captureRoot: string = resolve(f.home, 'capture');
+    const executable: string = resolve(f.home, 'unavailable-check-executable');
+    mkdirSync(captureRoot);
+    const result: Result = await cli(f, ['run-check', '--', executable], worktree, baseEnv(f, { TMPDIR: captureRoot }));
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain(executable);
+    expect(readdirSync(captureRoot)).toEqual([]);
+    expect(scratchRuns(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
