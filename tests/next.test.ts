@@ -4372,25 +4372,27 @@ test('a dispatched .env file round-trips mixed quotes, backticks and escape-look
     writeFileSync(
       root,
       'SYNTHETIC_MIXED=a\'b"c\n' +
-        'SYNTHETIC_TICK=`literal`\n' +
+        "SYNTHETIC_TICK='`literal`'\n" +
         "SYNTHETIC_BS='a\\\\nb'\n" +
-        'SYNTHETIC_ESC="x\\ry"\n',
+        'SYNTHETIC_ESC="x\\ry"\n' +
+        'SYNTHETIC_DQESC="a\\r\\"b"\n',
     );
     yaml(resolve(f.root, 'issues/config.yaml'), {
       checks: { test: 'bun test' },
       grounding: 'none',
-      env: ['SYNTHETIC_MIXED', 'SYNTHETIC_TICK', 'SYNTHETIC_BS', 'SYNTHETIC_ESC'],
+      env: ['SYNTHETIC_MIXED', 'SYNTHETIC_TICK', 'SYNTHETIC_BS', 'SYNTHETIC_ESC', 'SYNTHETIC_DQESC'],
     });
     leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
     const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
     const copied: Record<string, string | undefined> = parseEnv(readFileSync(envFile, 'utf8'));
     const original: Record<string, string | undefined> = parseEnv(readFileSync(root, 'utf8'));
-    for (const name of ['SYNTHETIC_MIXED', 'SYNTHETIC_TICK', 'SYNTHETIC_BS', 'SYNTHETIC_ESC'])
+    for (const name of ['SYNTHETIC_MIXED', 'SYNTHETIC_TICK', 'SYNTHETIC_BS', 'SYNTHETIC_ESC', 'SYNTHETIC_DQESC'])
       expect(copied[name]).toBe(original[name]);
     expect(copied.SYNTHETIC_MIXED).toBe('a\'b"c');
-    expect(copied.SYNTHETIC_TICK).toBe('literal');
+    expect(copied.SYNTHETIC_TICK).toBe('`literal`');
     expect(copied.SYNTHETIC_ESC).toBe('x\ry');
+    expect(copied.SYNTHETIC_DQESC).toBe('a\r\\"b');
   } finally {
     f.clean();
   }
@@ -4399,7 +4401,7 @@ test('a dispatched .env file round-trips mixed quotes, backticks and escape-look
 test('next refuses a declared value that cannot be written as dotenv', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_HARD="a\\r\\"b"\n');
+    writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_HARD="a\'b`c\\"d\\r"\n');
     yaml(resolve(f.root, 'issues/config.yaml'), {
       checks: { test: 'bun test' },
       grounding: 'none',
