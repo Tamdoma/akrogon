@@ -33,11 +33,11 @@ bun src/akrogon.ts install
 
 Installation links the command, skills and Herdr plugin. It also installs the configured harness integrations. If a destination conflicts with an existing file, installation stops and prints removal commands for you to review.
 
-The links point back to this checkout, so this checkout is the program you run. Landed work deploys itself: after a merge lands, and on `akrogon next`, `next --all` and `next --resume` runs that select or cover the Akrogon repository, one step fetches the default branch, fast-forwards the checkout when it is strictly behind, runs `bun install --frozen-lockfile` and reconciles the skill links.
+The links point back to this checkout, so this checkout is the program you run. Landed work deploys itself: after a merge lands, and on `akrogon next`, `next --all` and `next --resume` runs, one step updates every registered checkout the run covers. It fetches the default branch and, when every commit not yet on the remote touches only issue records, replays those commits onto the fetched tip in a temporary worktree and pushes them, then moves the checkout with `git reset --keep`, which keeps uncommitted edits. Nothing is staged and nothing is stashed. On the Akrogon checkout it also runs `bun install --frozen-lockfile` and reconciles the skill links.
 
-The step prints one line: `deployed <old>..<new>` on a fast-forward, `current <sha>` when already up to date, otherwise the failing step, the git or bun error, the lag count and the remedy. A failed step retries at the next trigger; nothing else changes.
+The step prints one line per checkout: `deployed <old>..<new>` when the checkout moved, `pushed <n> record commit(s)` when replayed commits went to the remote, `checkout pending` with the dirty path when an incoming change touches an uncommitted edit, `record conflict: <paths>; run akrogon sync` when a record changed on both sides, `current <sha>` when already up to date, or the failing step, the git or bun error, the lag count and the remedy. `checkout pending` keeps the local commits and the edit; finishing the edit lets the next trigger move. A refused or failed step retries at the next trigger; nothing else changes.
 
-You still act when the line reports the checkout is on another branch or detached, ahead of or diverged from the remote (run `akrogon sync`), or blocked by an uncommitted edit that overlaps incoming changes (commit or finish that edit).
+You still act when the line reports the checkout is on another branch or detached, holds a local commit that touches more than the issue records (run `akrogon sync`), or is blocked by an uncommitted edit that overlaps incoming changes (commit or finish that edit). Incoming active coordination lock paths and ignored operator paths colliding with the incoming tree refuse the move with the `akrogon sync` refusal wording.
 
 Make sure your shell can find the command directory:
 

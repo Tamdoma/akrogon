@@ -79,9 +79,9 @@ The command directory must be on PATH. The installed paths are:
 ~/.pi/agent/skills/
 ```
 
-The links use this checkout. Landed work deploys itself after an Akrogon merge landing and on `akrogon next`, `next --all` and `next --resume` runs that select or cover the Akrogon repository. The step fetches the default branch, fast-forwards when strictly behind, installs dependencies and reconciles skill links. It prints one line and retries failures at the next trigger.
+The links use this checkout. Landed work deploys itself after a merge landing and on `akrogon next`, `next --all` and `next --resume` runs: the step fetches the default branch of every registered checkout the run covers, replays local commits onto the fetched tip and pushes them when they touch only issue records, then moves the checkout with `git reset --keep`. Installing dependencies and reconciling skill links stay on the Akrogon checkout only. It prints one line per checkout and retries failures at the next trigger.
 
-Follow the reported remedy when the checkout is on another branch or detached, ahead or diverged (`akrogon sync`), or blocked by an overlapping edit (commit or finish the edit). See the [install guide](docs/guide/install.md) for details.
+Follow the reported remedy when the checkout is on another branch or detached, ahead with commits touching more than issue records (`akrogon sync`), or blocked by an overlapping edit (commit or finish the edit). See the [install guide](docs/guide/install.md) for details.
 
 ## Initialize a repository
 
