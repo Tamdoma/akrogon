@@ -607,26 +607,7 @@ async function dispatchSlot(
       },
       attempts: { ...base.attempts, [slot]: base.attempts[slot] + 1 },
     };
-    if (next.attempts[slot] >= 3) {
-      await commitMove(repo, leaf, next, 'failed', slot, {
-        cause: 'attempts',
-        phase: next.phase,
-        slot,
-        reason: `prompt undelivered to seat ${slot} after 3 passes: ${error.code} ${error.message} (pane ${pane.pane_id}, session ${pane.agent_session?.value ?? null})`,
-      });
-    } else {
-      saveState(leaf.path, next);
-    }
-  }
-
-  async function unreachable(error: { code: string; message: string }, pane: Pane): Promise<void> {
-    const current: State = readState(leaf.path);
-    await commitMove(repo, leaf, current, 'failed', slot, {
-      cause: 'attempts',
-      phase: current.phase,
-      slot,
-      reason: `seat ${slot} unreachable: ${error.code} ${error.message} (pane ${pane.pane_id})`,
-    });
+    saveState(leaf.path, next);
   }
 
   const recorded: State = readState(leaf.path);
@@ -645,7 +626,12 @@ async function dispatchSlot(
     `${routing[state.phase].skill} ${state.slug} slot=${slot} phase=${state.phase} leaf=${leaf.path}` +
     (mergeContext === undefined ? '' : ` ${mergeContext}`);
   const pendingOffset: number | undefined = state.delivery_error[slot]?.offset;
-  if (pendingOffset !== undefined && pane.agent_session !== null && pane.agent_session !== undefined) {
+  if (
+    pendingOffset !== undefined &&
+    pane.agent_session !== null &&
+    pane.agent_session !== undefined &&
+    pane.agent_session.value === state.delivery_error[slot]!.session
+  ) {
     const resettleFile: string | undefined = sessionFile(pane.agent_session, process.env.HOME ?? '');
     if (resettleFile !== undefined && deliveredAfter(resettleFile, pendingOffset, prompt)) {
       await recordDelivery();
@@ -672,8 +658,7 @@ async function dispatchSlot(
     const started: Result = await run(startArgv);
     if (started.code !== 0) {
       const error: { code: string; message: string } = herdrError(started);
-      if (retryable(started)) await recordFailure(startArgv, error, pane, undefined);
-      else await unreachable(error, pane);
+      await recordFailure(startArgv, error, pane, undefined);
       return;
     }
   }
@@ -713,11 +698,8 @@ async function dispatchSlot(
     await recordDelivery();
     return;
   }
-  if (retryable(result)) {
-    await recordFailure(args, error, ready, error.code === 'timeout' ? offset : undefined);
-    return;
-  }
-  await unreachable(error, ready);
+  await recordFailure(args, error, ready, error.code === 'timeout' ? offset : undefined);
+  return;
 }
 
 async function dispatchLeaf(
