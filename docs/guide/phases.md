@@ -15,7 +15,7 @@ A phase is one step in a leaf's workflow. Seats report completion through Akrogo
 | merged | Nobody | Completed leaf. |
 | failed | Nobody | Stopped work that needs a decision or recovery. |
 
-Review verdicts are ready, nits or fix. Ready and nits allow merge. Fix sends the leaf to B's repair. Only a handoff to A counts against the configured repair-round limit.
+Review verdicts are ready, nits or fix. Ready and nits allow merge. Fix sends the leaf to B's repair. Only a handoff to A increments the recorded repair count.
 
 ```text
 plan.positions -> plan.rebuttal -> plan.synthesis
@@ -73,7 +73,7 @@ akrogon phase export-csv plan.synthesis
 akrogon next export-csv
 ```
 
-Failed can resume at any active phase. It cannot jump directly to merged. Recovery resets the recorded pass and delivery bookkeeping. Recovery keeps the repair count (`fix_rounds`), so a leaf failed at the cap gets one more A repair and a B-only re-check on each recovery. It does not repair code or resolve the blocker for you. A call carrying `--slot` cannot move a failed leaf; recovery omits `--slot`.
+Failed can resume at any active phase. It cannot jump directly to merged. Recovery resets the recorded pass and delivery bookkeeping. Recovery keeps the repair count (`fix_rounds`), so a re-check after a repair round stays B-only. It does not repair code or resolve the blocker for you. A call carrying `--slot` cannot move a failed leaf; recovery omits `--slot`.
 
 ## plan-issue: turn the contract into steps
 
@@ -105,6 +105,6 @@ Suppose a CSV field with a newline pasted from a user spreadsheet creates an ext
 
 B re-checks only A's repair diff. That pass confirms the earlier findings and can block a new defect introduced by the repair. It does not restart an unrestricted review of the whole feature.
 
-The configured repair cap prevents an endless review cycle and counts handoffs to A. Merge `check.fix` bounces count toward `fix_rounds` as well. If the cap is exhausted, the leaf fails with a recorded cause.
+Handoffs to A and merge `check.fix` bounces count toward `fix_rounds`. The count stays visible in `akrogon status`. No cap fails the leaf.
 
 Previous: [Next](next.md) · Next: [Files](files.md) · [Home](../../README.md)
