@@ -13,6 +13,7 @@
 - `tests/docs-links.test.ts` checks relative links and heading anchors in README and the guide.
 - `tests/watch-issues-scripts.test.ts` is the `skills/watch-issues` gate, running its scripts tests and typecheck.
 - `tests/guard.test.ts` checks the `akrogon guard` ancestor and own-modules refusals.
+- `tests/base-run.test.ts` checks the base checkout, record line, env and cleanup of `base-run`.
 
 ## Non-obvious patterns
 

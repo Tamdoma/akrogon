@@ -144,6 +144,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon hold-fix <slug>` | Name one merge leaf that takes the merge turn solo while the repository's hold stands. |
 | `akrogon unhold` | Clear a base-red merge hold for the current repository. |
 | `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Run a command under the constructed check environment and log output into the leaf. |
+| `akrogon base-run --base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...` | Run a command on a base checkout in the worktree store under the constructed environment, log into the leaf, write a record line and remove the worktree. |
 | `akrogon guard <ancestors\|own-modules>` | Refuse when a canonical ancestor holds node_modules or package.json, or the checkout's own node_modules is missing. |
 ```
 

@@ -26,6 +26,7 @@ const contracts: Record<string, string> = {
   unpause: '',
   status: '[<slug>|--charts]',
   'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
+  'base-run': '--base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...',
   guard: '<ancestors|own-modules>',
 };
 
