@@ -44,6 +44,8 @@ import {
   restoreHolder,
   restoreMembers,
 } from './batch';
+import { type Comparison, validateComparisons } from './compare';
+import { applyComparison, appendNotice, resolveComparison, type RedEntry } from './red-record';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
   try {
@@ -225,6 +227,46 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   renameSync(owner, destination);
 }
 
+async function recordComparisons(
+  repo: Repo,
+  slug: string,
+  compareFiles: string[],
+  comparisons: Comparison[],
+): Promise<void> {
+  for (const [index, file] of compareFiles.entries()) {
+    const comparison: Comparison = comparisons[index];
+    await resolveComparison(repo, file, comparison);
+    const opened: RedEntry[] = applyComparison(repo, file, comparison);
+    for (const entry of opened) {
+      try {
+        const shown = await herdrCall(
+          [
+            'notification',
+            'show',
+            `${repo.name} red on base: ${entry.unit.name}`,
+            '--body',
+            entry.provenance.command.join(' '),
+            '--sound',
+            'request',
+          ],
+          z.object({ shown: z.boolean(), reason: z.string() }),
+          slug,
+        );
+        appendNotice(repo, entry.id, shown);
+      } catch (error) {
+        appendNotice(repo, entry.id, { error: error instanceof Error ? error.message : String(error) });
+        console.warn(
+          JSON.stringify({
+            warning: 'red notice failed',
+            slug,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
+    }
+  }
+}
+
 export async function transition(
   repo: Repo,
   leaf: Leaf,
@@ -234,6 +276,7 @@ export async function transition(
   reason: string | undefined,
   checkOnly: boolean,
   onCommitted?: () => void,
+  compareFiles: string[] = [],
 ): Promise<void> {
   const state: State = readState(leaf.path);
   if (checkOnly && requested === 'failed') throw new Error('--check cannot move to failed');
@@ -285,6 +328,12 @@ export async function transition(
   if (requested === 'check.review' && state.worktree !== undefined) await requireNonEmpty(repo, state.worktree);
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
+  let comparisons: Comparison[] = [];
+  if (compareFiles.length > 0) {
+    if (state.worktree === undefined) throw new Error('--compare requires a leaf worktree');
+    if (slot === undefined) throw new Error('--compare requires a slot');
+    comparisons = await validateComparisons(repo, leaf, state, slot, state.worktree, compareFiles, requested);
+  }
   if (checkOnly) {
     console.log('ok');
     return;
@@ -297,6 +346,7 @@ export async function transition(
   if (!required.every((requiredSlot) => recorded.done.includes(requiredSlot))) {
     saveState(leaf.path, recorded);
     console.log('recorded');
+    await recordComparisons(repo, state.slug, compareFiles, comparisons);
     return;
   }
   const destination: Phase =
@@ -328,6 +378,7 @@ export async function transition(
       : undefined,
     onCommitted,
   );
+  await recordComparisons(repo, state.slug, compareFiles, comparisons);
 }
 
 export async function requireClean(worktree: string): Promise<void> {
@@ -894,6 +945,7 @@ export async function phaseCommand(
   rawCommand: string | boolean | undefined,
   rawCulprit: string | boolean | undefined,
   pressureDir: string = '/proc/pressure',
+  rawCompare: string[] | undefined = undefined,
 ): Promise<{ repo: Repo; committed: boolean; to?: Phase }> {
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
@@ -904,6 +956,7 @@ export async function phaseCommand(
   const redOnBase: string | undefined = z.string().trim().min(1).optional().parse(rawRedOnBase);
   const cmd: string | undefined = z.string().trim().min(1).optional().parse(rawCommand);
   const culprit: string | undefined = z.string().trim().min(1).optional().parse(rawCulprit);
+  const compareFiles: string[] = z.array(z.string().trim().min(1)).parse(rawCompare ?? []);
   if (cmd !== undefined && redOnBase === undefined) throw new Error('--command requires --red-on-base');
   if (redOnBase !== undefined) {
     if (check) throw new Error('--check cannot combine with --red-on-base');
@@ -928,6 +981,10 @@ export async function phaseCommand(
   };
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
+    if (compareFiles.length > 0) {
+      if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);
+      if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);
+    }
     if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
     if (leaf.state.phase === 'merge' && (requested === 'merged' || requested === 'check.fix')) {
       const holder: QueueEntry | undefined = mergeHolder(repo.name, global, allLeaves(repo), () => readLog(repo.root));
@@ -1055,7 +1112,7 @@ export async function phaseCommand(
           });
       }
     } else {
-      await transition(repo, leaf, requested, slot, verdict, reason, check, onCommitted);
+      await transition(repo, leaf, requested, slot, verdict, reason, check, onCommitted, compareFiles);
     }
   });
   if (pending.kind !== 'none')

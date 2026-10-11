@@ -19,6 +19,7 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
           reason: { type: 'string' },
           check: { type: 'boolean' },
           attempt: { type: 'string' },
+          compare: { type: 'string', multiple: true } as { type: 'string' },
           'red-on-base': { type: 'string' },
           command: { type: 'string' },
           culprit: { type: 'string' },
@@ -78,6 +79,8 @@ switch (verb) {
         values['red-on-base'],
         values.command,
         values.culprit,
+        undefined,
+        z.array(z.string()).optional().parse(values.compare),
       );
       if (result.committed) committed = result;
     } catch (error) {
