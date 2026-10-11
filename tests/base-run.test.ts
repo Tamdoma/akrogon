@@ -78,6 +78,7 @@ test('a base-run logs output, prints status, removes the checkout and records st
     expect(log).toContain('no-issues');
     expect(log).toContain(`akbase=${sha}`);
     const run: BaseRun = records(f)[0];
+    expect(run.log).toBe(logPath);
     expect(run.base).toBe(sha);
     expect(run.leaf).toBe('caller');
     expect(run.slot).toBe('A');
