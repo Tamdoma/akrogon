@@ -369,19 +369,22 @@ async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promis
   // and a leading quote char opens quoting; single quotes and backticks are
   // verbatim except a literal \r (normalized to \n); double quotes unescape
   // \n and \r only (\\ stays literal). Emission reproduces the parsed value.
+  // Emit the first encoding the same parseEnv reparses to the parsed value:
+  // unquoted, single-quoted, backticks, then double-quoted escapes. Refusal
+  // can only fire for a value no encoding round-trips.
   const emit = (name: string, v: string): string | null => {
-    const noTrail: boolean = !v.endsWith('\\');
-    if (!/[#\n\r]/.test(v) && v === v.trim() && !['"', "'", '`'].includes(v[0] ?? '') && noTrail) return `${name}=${v}`;
-    if (!v.includes("'") && !v.includes('\r') && noTrail) return `${name}='${v}'`;
-    if (!v.includes('`') && !v.includes('\r') && noTrail) return `${name}=\`${v}\``;
-    // Double quotes accept everything except a bare " (a quote not preceded
-    // by \), a trailing \ and backslash sequences adjacent to a real \r.
-    const hasBareQuote: boolean = [...v].some((c, i) => c === '"' && (i === 0 || v[i - 1] !== '\\'));
-    const crBlocked: boolean =
-      v.includes('\r') &&
-      (/\\[nr]*\r/.test(v) || /\r\\+$/.test(v) || /\\[nr]/.test(v.slice(v.indexOf('\r')).replace(/\\"/g, '')));
-    if (!hasBareQuote && !crBlocked && noTrail) return `${name}="${v.replace(/\r/g, '\\r')}"`;
-    return null;
+    const candidates: string[] = [
+      `${name}=${v}`,
+      `${name}='${v}'`,
+      `${name}=\`${v}\``,
+      `${name}="${v}"`,
+      `${name}="${v.replace(/\r/g, '\\r')}"`,
+      `${name}="${v.replace(/\\/g, '\\\\').replace(/\r/g, '\\r')}"`,
+      `${name}="${v.replace(/\\/g, '\\\\')}"`,
+      `${name}="${v.replace(/\\/g, '\\\\').replace(/\r/g, '\\\r')}"`,
+      `${name}="${v.replace(/\\/g, '\\\\').replace(/\r/g, '\\\\r')}"`,
+    ];
+    return candidates.find((line) => parseEnv(line)[name] === v) ?? null;
   };
   const emitted: (string | null)[] = repo.config.env.map((name) => emit(name, parsed[name]!));
   const unwritable: string[] = repo.config.env.filter((_, i) => emitted[i] === null);
