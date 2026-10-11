@@ -651,7 +651,7 @@ test('a base pass resolves only the matching active entry at or below its revisi
     );
     expect(moved2.code).toBe(0);
     const reopened = redRecords(f).filter(
-      (event) => event.event === 'opened' && event.file === 'compare-2.yaml',
+      (event) => event.event === 'opened' && !String(event.id).startsWith('entry-'),
     );
     expect(reopened.length).toBe(1);
     expect(noticeCalls(herdr.db)).toBe(1);
