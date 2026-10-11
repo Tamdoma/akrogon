@@ -139,7 +139,16 @@ export function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): boolean {
     if (leaf.state.phase === 'merged' || leaf.state.phase === 'failed') return true;
     if (repo.config.worktree_root === undefined && !within(worktree, store) && within(worktree, oldRoot)) return true;
   }
-  return false;
+  const recorded: Set<string> = new Set(
+    leaves.flatMap((leaf) => (leaf.state.worktree === undefined ? [] : [leaf.state.worktree])),
+  );
+  return [store, oldRoot].some(
+    (root) =>
+      existsSync(root) &&
+      readdirSync(root, { withFileTypes: true }).some(
+        (entry) => entry.isDirectory() && !recorded.has(resolve(root, entry.name)),
+      ),
+  );
 }
 
 export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null): Promise<Reconciled> {
@@ -376,15 +385,15 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
           keep(path, `base-run ${record.run} in progress`);
           continue;
         }
-        await removeWorktree(path);
-        continue;
       }
     }
     if (name.startsWith('batch-') && batchAttempts.has(name.slice('batch-'.length))) {
       keep(path, 'state.batch');
       continue;
     }
-    await removeWorktree(path);
+    if (live === null) keep(path, 'pane list unavailable');
+    else if (livePaneInside(panes, path)) keep(path, 'live pane inside');
+    else await removeWorktree(path);
   }
 
   const scratchRoot: string = resolve(leafTemp(repo, 'x'), '..');
