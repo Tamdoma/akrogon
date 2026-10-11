@@ -34,8 +34,8 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
               : verb === 'base-run'
                 ? { base: { type: 'string' }, attempt: { type: 'string' }, cwd: { type: 'string' } }
                 : verb === 'status'
-                ? { charts: { type: 'boolean' } }
-                : {};
+                  ? { charts: { type: 'boolean' } }
+                  : {};
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(3),

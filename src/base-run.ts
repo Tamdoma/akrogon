@@ -87,8 +87,7 @@ function runCwd(leaf: Leaf, cwd: string, prefix: string, override: string | unde
 function pickSlot(leaf: Leaf): Slot {
   const pane: string = process.env.HERDR_PANE_ID ?? '';
   if (pane !== '') {
-    for (const [slot, id] of Object.entries(leaf.state.pane))
-      if (id === pane) return slotSchema.parse(slot);
+    for (const [slot, id] of Object.entries(leaf.state.pane)) if (id === pane) return slotSchema.parse(slot);
   }
   const pending: readonly Slot[] = requiredSlots(leaf.state.phase, leaf.state.fix_rounds).filter(
     (slot) => !leaf.state.done.includes(slot),
@@ -159,12 +158,7 @@ export async function baseRun(
     mkdirSync(implementation, { recursive: true });
     if (inside !== '') mkdirSync(resolve(target, inside), { recursive: true });
     const log: string = resolve(implementation, `base-${id}.log`);
-    const ran: Result = await spawnLogged(
-      ['sh', '-c', script, 'akrogon-base-run', ...argv],
-      target,
-      env,
-      log,
-    );
+    const ran: Result = await spawnLogged(['sh', '-c', script, 'akrogon-base-run', ...argv], target, env, log);
     code = ran.code;
     process.stdout.write(`log: ${log}\nstatus: ${ran.code}\n`);
   } finally {
@@ -181,7 +175,12 @@ export async function baseRun(
         .map((line) => baseRunSchema.parse(JSON.parse(line)));
       const index: number = runs.findIndex((run) => run.run === id);
       if (index === -1) return;
-      runs[index] = { ...runs[index], end: new Date().toISOString(), exit: code, ...(removed === undefined ? {} : { removed }) };
+      runs[index] = {
+        ...runs[index],
+        end: new Date().toISOString(),
+        exit: code,
+        ...(removed === undefined ? {} : { removed }),
+      };
       const temporary: string = `${file}.${process.pid}.tmp`;
       writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
       renameSync(temporary, file);
