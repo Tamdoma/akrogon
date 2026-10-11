@@ -1550,7 +1550,6 @@ export async function nextCommand(input: string | undefined, pressureDir: string
     const touched: Map<string, { repo: Repo; isAutomatic: boolean }> = new Map();
     await withLock(resolve(globalHome(), '.lock'), async () => {
       if (selection !== undefined) {
-        let reconcileNow: boolean = input === undefined;
         if (selection.leaves.length === 1) {
           const completedSlug: string = selection.leaves[0].state.slug;
           const outcome: DispatchOutcome = await dispatchLeaf(
@@ -1564,10 +1563,9 @@ export async function nextCommand(input: string | undefined, pressureDir: string
           );
           if (outcome === 'completed')
             await dispatchDependents(global, selection.repo, completedSlug, invocation, false);
-          reconcileNow = reconcileNow || (outcome === 'skipped' && selection.leaves[0].state.phase !== 'failed');
         } else await sweep(global, selection.repo, selection.leaves, invocation, true, false);
         touched.set(selection.repo.name, { repo: selection.repo, isAutomatic: false });
-        if (reconcileNow) await reconcileRepos([selection.repo], invocation, false);
+        await reconcileRepos([selection.repo], invocation, false);
       } else if (input === '--all') {
         const current: Repo | null = await currentRepo(global, process.cwd());
         if (current === null) {
