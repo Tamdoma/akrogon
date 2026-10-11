@@ -4,10 +4,13 @@ import { z } from 'zod';
 import { effectiveConfig, readGlobal, requireRepo, type Repo } from './config';
 import { initialize } from './init';
 import { sourcePattern } from './state';
-import { type Hold } from './hold';
 import { type Phase } from './routing';
 
+const RETIRED_MERGE_HOLD: string =
+  'Merge hold commands are retired; a base-red merge run follows the known-red comparison rule in skills/merge-issue/SKILL.md';
+
 const verb: string | undefined = process.argv[2];
+if (verb === 'unhold' || verb === 'hold-fix') throw new Error(RETIRED_MERGE_HOLD);
 
 const options: Record<string, { type: 'string' | 'boolean' }> =
   verb === 'init'
@@ -118,15 +121,6 @@ switch (verb) {
     if (values.all !== true && positionals.length === 0) throw new Error('Name at least one issue or pass --all');
     await (await import('./park')).parkCommand(verb, positionals, values.all === true, process.cwd());
     break;
-  case 'unhold':
-    z.tuple([]).parse(positionals);
-    await (await import('./hold')).unholdCommand(process.cwd());
-    break;
-  case 'hold-fix': {
-    const [slug]: [string] = z.tuple([z.string().trim().min(1)]).parse(positionals);
-    await (await import('./hold')).holdFixCommand(process.cwd(), slug);
-    break;
-  }
   case 'pause':
     z.tuple([]).parse(positionals);
     await (await import('./pause')).pauseCommand(verb, process.cwd());
@@ -135,11 +129,6 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./pause')).pauseCommand(verb, process.cwd());
     const repo: Repo = await requireRepo(readGlobal(), process.cwd());
-    const hold: Hold | undefined = (await import('./hold')).heldFor(repo.name);
-    if (hold !== undefined)
-      console.log(
-        `held ${repo.name} on ${hold.sha}: ${hold.command}${hold.fix === undefined ? '' : ` fix ${hold.fix}`}`,
-      );
     await (await import('./next')).unpausePass(repo);
     break;
   }
@@ -180,6 +169,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|unhold|hold-fix|sync|status|run-check|base-run|guard>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|sync|status|run-check|base-run|guard>',
     );
 }

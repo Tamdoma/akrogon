@@ -29,11 +29,10 @@ import {
 import { command, run, herdr, herdrError, retryable, CommandError, type Result } from './shell';
 import { logMove, readLog } from './log';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
-import { type QueueEntry } from './turn';
+import { mergeQueue } from './turn';
 import { closeSources } from './pull';
 import { testFile } from './test-files';
-import { localBase, trackingRef } from './preflight';
-import { mergeHolder, writeHeld } from './hold';
+import { trackingRef } from './preflight';
 import { retiredLessonsPresent } from './lessons';
 import {
   applyStack,
@@ -44,8 +43,11 @@ import {
   restoreHolder,
   restoreMembers,
 } from './batch';
-import { type Comparison, validateComparisons } from './compare';
-import { applyComparison, appendNotice, resolveComparison, type RedEntry } from './red-record';
+import { parseComparison, type Comparison, ComparisonError, validateComparisons } from './compare';
+import { appendNotice, hasKnownRed, mergeRecords, resolveGreen, type RedEntry } from './red-record';
+
+const RETIRED_MERGE_HOLD: string =
+  'Merge hold options are retired; a base-red merge run follows the known-red comparison rule in skills/merge-issue/SKILL.md';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
   try {
@@ -227,43 +229,101 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   renameSync(owner, destination);
 }
 
+async function noticeEntry(repo: Repo, slug: string, entry: RedEntry): Promise<void> {
+  try {
+    const shown = await herdr(
+      [
+        'notification',
+        'show',
+        `${repo.name} red on base: ${entry.unit.name}`,
+        '--body',
+        entry.provenance.command.join(' '),
+        '--sound',
+        'request',
+      ],
+      z.object({ shown: z.boolean(), reason: z.string() }),
+    );
+    appendNotice(repo, entry.id, shown);
+  } catch (error) {
+    appendNotice(repo, entry.id, { error: error instanceof Error ? error.message : String(error) });
+    console.warn(
+      JSON.stringify({
+        warning: 'red notice failed',
+        slug,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
+}
+
 async function recordComparisons(
   repo: Repo,
   slug: string,
   compareFiles: string[],
   comparisons: Comparison[],
+  builtOn?: string,
 ): Promise<void> {
+  const reopened: Set<string> = new Set();
+  const resolvedNames: Set<string> = new Set();
+  let passing: number = 0;
   for (const [index, file] of compareFiles.entries()) {
     const comparison: Comparison = comparisons[index];
-    await resolveComparison(repo, file, comparison);
-    const opened: RedEntry[] = applyComparison(repo, file, comparison);
-    for (const entry of opened) {
-      try {
-        const shown = await herdr(
-          [
-            'notification',
-            'show',
-            `${repo.name} red on base: ${entry.unit.name}`,
-            '--body',
-            entry.provenance.command.join(' '),
-            '--sound',
-            'request',
-          ],
-          z.object({ shown: z.boolean(), reason: z.string() }),
-        );
-        appendNotice(repo, entry.id, shown);
-      } catch (error) {
-        appendNotice(repo, entry.id, { error: error instanceof Error ? error.message : String(error) });
-        console.warn(
-          JSON.stringify({
-            warning: 'red notice failed',
-            slug,
-            error: error instanceof Error ? error.message : String(error),
-          }),
-        );
-      }
+    const merged: Awaited<ReturnType<typeof mergeRecords>> = await mergeRecords(repo, file, [comparison]);
+    for (const name of merged.resolved) {
+      resolvedNames.add(name);
+      console.log(`Repo red entry resolved: ${name} in ${file}`);
+    }
+    for (const entry of merged.applied) {
+      reopened.add(entry.unit.name);
+      console.log(`Repo red entry opened: ${entry.unit.name} in ${file}`);
+      await noticeEntry(repo, slug, entry);
+    }
+    for (const unit of comparison.units) {
+      if ('leaf' in unit && unit.leaf.outcome === 'pass') passing += 1;
+      if (
+        'verdict' in unit &&
+        unit.verdict === 'known-red' &&
+        !reopened.has(unit.name) &&
+        !resolvedNames.has(unit.name)
+      )
+        console.log(`Existing repo red entry confirmed: ${unit.name} in ${file}`);
     }
   }
+  if (builtOn !== undefined)
+    console.log(`compared: ${passing} unit(s) pass under the same leaf code on batch base ${builtOn}`);
+}
+
+export async function resolveGreenComparisons(repo: Repo, batch: Batch, landed: string): Promise<void> {
+  for (const file of batch.comparisons ?? []) {
+    let comparison: Comparison;
+    try {
+      comparison = await parseComparison(file);
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          warning: 'green resolve skipped: comparison record unreadable',
+          file,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      continue;
+    }
+    for (const name of await resolveGreen(repo, file, comparison, landed))
+      console.log(`Repo red entry resolved: ${name} in ${file}`);
+  }
+}
+
+async function comparisonsCarryRed(repo: Repo, record: Batch): Promise<boolean> {
+  const files: string[] = record.comparisons ?? [];
+  if (files.length === 0) return false;
+  for (const file of files)
+    try {
+      await parseComparison(file);
+    } catch (error) {
+      if (!(error instanceof ComparisonError)) throw error;
+      return true;
+    }
+  return hasKnownRed(repo, files, record.built_on);
 }
 
 export async function transition(
@@ -559,6 +619,7 @@ async function batchCheck(
   verdict: Verdict | undefined,
   reason: string | undefined,
   record: Batch,
+  compareFiles: string[],
 ): Promise<void> {
   const state: State = readState(leaf.path);
   const worktree: string = state.worktree ?? repo.root;
@@ -592,14 +653,27 @@ async function batchCheck(
         retired.join(', ') +
         '. Remove the learnings/LESSONS.md line(s) and commit before pushing.',
     );
-  await transition(repo, leaf, requested, slot, verdict, reason, true);
-  if (record.decision !== 'reuse') {
-    const testedMain: string = await command(['git', 'merge-base', head, trackingRef(repo)], repo.root);
-    saveState(leaf.path, {
-      ...readState(leaf.path),
-      batch: { ...record, tested_top: head, tested_main: testedMain },
+  let comparisons: Comparison[] = [];
+  if (compareFiles.length > 0)
+    comparisons = await validateComparisons(repo, leaf, state, slot ?? 'B', worktree, compareFiles, requested, {
+      attempt: record.attempt,
+      built_on: record.built_on,
     });
-  }
+  await transition(repo, leaf, requested, slot, verdict, reason, true);
+  const stamp: Batch =
+    record.decision === 'reuse'
+      ? record
+      : {
+          ...record,
+          tested_top: head,
+          tested_main: await command(['git', 'merge-base', head, trackingRef(repo)], repo.root),
+        };
+  saveState(leaf.path, {
+    ...readState(leaf.path),
+    batch:
+      compareFiles.length > 0 ? { ...stamp, comparisons: compareFiles.map((file) => resolve(leaf.path, file)) } : stamp,
+  });
+  if (compareFiles.length > 0) await recordComparisons(repo, state.slug, compareFiles, comparisons, record.built_on);
 }
 
 type BatchPending =
@@ -649,6 +723,7 @@ async function batchPush(
   if (pushed.code === 0) {
     appendAttempt(repo, leaf.state.slug, record, record.decision === 'reuse' ? 'reuse' : 'merged', undefined, end);
     saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head, recorded: true } });
+    await resolveGreenComparisons(repo, record, head);
     for (const entry of members)
       await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
     await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted, [], record.built_on);
@@ -709,7 +784,8 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
         tested !== undefined &&
         (await equalOutsideRecordFolders(repo, tested.main, builtOn)) &&
         (await equalOutsideRecordFolders(repo, tested.top, staged.top)) &&
-        (await recordConfigEqual(repo, tested.main, builtOn));
+        ((await recordConfigEqual(repo, tested.main, builtOn)) || (record.comparisons ?? []).length > 0) &&
+        !(await comparisonsCarryRed(repo, record));
       const applied: boolean | 'rebuild' | 'dirty-holder' = await withLock(resolve(globalHome(), '.lock'), async () => {
         const current: Leaf = findLeaf(repo, leaf.state.slug);
         const batch: Batch | undefined = current.state.batch;
@@ -738,7 +814,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
           members = batch.members.filter((member) => !dirty.includes(member.slug));
           saveState(current.path, {
             ...current.state,
-            batch: { ...batch, holder: { base: builtOn, head: holderHead }, members },
+            batch: { ...batch, holder: { base: builtOn, head: holderHead }, members, comparisons: undefined },
           });
           return 'rebuild';
         }
@@ -758,6 +834,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
               members: [],
               tested_top: undefined,
               tested_main: undefined,
+              comparisons: undefined,
               decision: 'rerun',
             },
           });
@@ -792,6 +869,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
               top: undefined,
               tested_top: undefined,
               tested_main: undefined,
+              comparisons: undefined,
               decision: 'rerun',
               candidate: undefined,
             },
@@ -810,6 +888,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
             candidate: undefined,
             tested_top: reuse ? tested!.top : undefined,
             tested_main: reuse ? tested!.main : undefined,
+            comparisons: undefined,
             decision: reuse ? 'reuse' : 'rerun',
           },
         });
@@ -847,6 +926,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
             members: [],
             tested_top: undefined,
             tested_main: undefined,
+            comparisons: undefined,
             decision: 'rerun',
           },
         });
@@ -876,6 +956,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
           excluded: [...(batch.excluded ?? []), conflictedSlug],
           tested_top: undefined,
           tested_main: undefined,
+          comparisons: undefined,
           decision: 'rerun',
         },
       });
@@ -913,6 +994,7 @@ async function finishPush(
         ...leaf.state,
         batch: { ...batch, applied: true, top: pending.candidate, recorded: true },
       });
+      await resolveGreenComparisons(repo, batch, pending.candidate);
       const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
       for (const entry of members)
         await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
@@ -945,20 +1027,13 @@ export async function phaseCommand(
   const reason: string | undefined = z.string().trim().min(1).optional().parse(rawReason);
   const check: boolean = z.literal(true).optional().parse(rawCheck) === true;
   const attempt: string | undefined = z.string().trim().min(1).optional().parse(rawAttempt);
-  const redOnBase: string | undefined = z.string().trim().min(1).optional().parse(rawRedOnBase);
-  const cmd: string | undefined = z.string().trim().min(1).optional().parse(rawCommand);
   const culprit: string | undefined = z.string().trim().min(1).optional().parse(rawCulprit);
   const compareFiles: string[] = z.array(z.string().trim().min(1)).parse(rawCompare ?? []);
-  if (cmd !== undefined && redOnBase === undefined) throw new Error('--command requires --red-on-base');
-  if (redOnBase !== undefined) {
-    if (check) throw new Error('--check cannot combine with --red-on-base');
-    if (requested !== 'check.fix') throw new Error('--red-on-base is only valid for check.fix');
-    if (cmd === undefined) throw new Error('--red-on-base requires --command');
-    if (slot !== 'B') throw new Error('--red-on-base requires --slot B');
-  }
   if (check && culprit !== undefined) throw new Error('--check cannot combine with --culprit');
   if (culprit !== undefined && requested !== 'check.fix') throw new Error('--culprit is only valid for check.fix');
-  if (culprit !== undefined && redOnBase !== undefined) throw new Error('--culprit cannot combine with --red-on-base');
+  if (culprit !== undefined && rawRedOnBase !== undefined)
+    throw new Error('--culprit cannot combine with --red-on-base');
+  if (rawRedOnBase !== undefined || rawCommand !== undefined) throw new Error(RETIRED_MERGE_HOLD);
   if (culprit !== undefined && slot !== 'B') throw new Error('--culprit requires --slot B');
   if (culprit !== undefined && verdict !== undefined) throw new Error('--verdict is only valid for check.review');
   if (culprit !== undefined && reason !== undefined) throw new Error('--reason is only valid for failed');
@@ -975,21 +1050,20 @@ export async function phaseCommand(
     const leaf: Leaf = findLeaf(repo, slug);
     if (compareFiles.length > 0) {
       if (requested === 'failed') throw new Error(`'--compare' is not valid for a failed move`);
-      if (leaf.state.phase === 'merge') throw new Error(`'--compare' is not valid during merge`);
+      if (leaf.state.phase === 'merge' && !(requested === 'merged' && check))
+        throw new Error(`'--compare' is not valid during merge`);
     }
     if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
     if (leaf.state.phase === 'merge' && (requested === 'merged' || requested === 'check.fix')) {
-      const holder: QueueEntry | undefined = mergeHolder(repo.name, global, allLeaves(repo), () => readLog(repo.root));
-      if (holder === undefined || holder.leaf.state.slug !== leaf.state.slug)
+      const holder: Leaf | undefined = mergeQueue(global, allLeaves(repo), () => readLog(repo.root))[0]?.leaf;
+      if (holder === undefined || holder.state.slug !== leaf.state.slug)
         throw new Error(
           holder === undefined
             ? `Merge turn refused: ${slug} is not eligible and no merge leaf in ${repo.name} is`
-            : `Merge turn refused for ${slug}: holder is ${holder.leaf.state.slug}`,
+            : `Merge turn refused for ${slug}: holder is ${holder.state.slug}`,
         );
     }
     const record: Batch | undefined = leaf.state.batch;
-    if (redOnBase !== undefined && record === undefined)
-      throw new Error(`--red-on-base requires a batch record: ${slug} holds none`);
     if (culprit !== undefined && record === undefined)
       throw new Error(`--culprit requires a batch record: ${slug} holds none`);
     if (leaf.state.phase === 'merge' && record !== undefined && (requested === 'merged' || requested === 'check.fix')) {
@@ -997,57 +1071,11 @@ export async function phaseCommand(
         throw new Error(
           `Stale attempt ${attempt === undefined ? 'missing' : JSON.stringify(attempt)}: current batch attempt is ${record.attempt}`,
         );
-      if (check) await batchCheck(repo, leaf, requested, slot, verdict, reason, record);
+      if (check) await batchCheck(repo, leaf, requested, slot, verdict, reason, record, compareFiles);
       else {
         const end: PressureSnapshot | undefined =
           record.pressure_start === undefined ? undefined : readPressure(pressureDir);
-        if (redOnBase !== undefined) {
-          await command(['git', 'fetch', repo.config.remote], repo.root);
-          const baseSha: string = await localBase(repo);
-          if (redOnBase !== baseSha)
-            throw new Error(`--red-on-base ${redOnBase} is not fetched ${trackingRef(repo)} ${baseSha}`);
-          const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
-          await restoreMembers(
-            repo,
-            members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-          );
-          await restoreHolder(repo, leaf, record);
-          appendAttempt(repo, leaf.state.slug, record, 'held', undefined, end);
-          saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
-          writeHeld(repo.name, {
-            sha: redOnBase,
-            command: cmd!,
-            holder: leaf.state.slug,
-            attempt: record.attempt,
-            at: new Date().toISOString(),
-            evidence: resolve(leaf.path, 'review-B.md'),
-          });
-          console.log(`held ${repo.name} on ${redOnBase}: ${cmd}`);
-          committed = true;
-          try {
-            await herdrCall(
-              [
-                'notification',
-                'show',
-                `${repo.name} merge held on ${redOnBase.slice(0, 12)}`,
-                '--body',
-                cmd!,
-                '--sound',
-                'request',
-              ],
-              z.object({ shown: z.boolean(), reason: z.string() }),
-              slug,
-            );
-          } catch (error) {
-            console.warn(
-              JSON.stringify({
-                warning: 'hold notice failed',
-                slug,
-                error: error instanceof Error ? error.message : String(error),
-              }),
-            );
-          }
-        } else if (culprit !== undefined) {
+        if (culprit !== undefined) {
           const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
           const entry: { member: BatchMember; leaf: Leaf } | undefined = members.find(
             (item) => item.member.slug === culprit,

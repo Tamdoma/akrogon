@@ -73,18 +73,15 @@ import {
   applyStack,
   batchMemberSlugs,
   buildStack,
-  equalOutsideRecordFolders,
   isAncestor,
   memberBase,
-  recordConfigEqual,
   removeEmptyUntrackedDirs,
   restoreHolder,
   restoreMembers,
 } from './batch';
-import { commitMove, completeOwner } from './phase';
+import { commitMove, completeOwner, resolveGreenComparisons } from './phase';
 import { appendAttempt, readPressure, resolveTools, type PressureSnapshot } from './attempts';
 import { sessionFile, deliveredAfter } from './session-file';
-import { heldFor, dropHeld, mergeHolder, type Hold } from './hold';
 import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
 import { selfUpdate } from './self-update';
@@ -773,7 +770,7 @@ async function dispatchLeaf(
     }
     if (
       state.phase === 'merge' &&
-      (mergeHolder(repo.name, global, inventory.leaves, () => readLog(repo.root))?.leaf.state.slug !== slug ||
+      (mergeQueue(global, inventory.leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== slug ||
         mergeContext === undefined)
     )
       return 'waiting';
@@ -944,9 +941,12 @@ async function reconcileBatch(
       return;
     const end: PressureSnapshot | undefined =
       batch.pressure_start === undefined ? undefined : readPressure(pressureDir);
-    const landed: boolean =
-      batch.candidate !== undefined && (await isAncestor(repo.root, batch.candidate, trackingRef(repo)));
-    if (landed) {
+    const landed: string | undefined =
+      batch.candidate !== undefined && (await isAncestor(repo.root, batch.candidate, trackingRef(repo)))
+        ? batch.candidate
+        : undefined;
+    if (landed !== undefined) {
+      await resolveGreenComparisons(repo, batch, landed);
       for (const member of batch.members) {
         const item: Leaf | undefined = allLeaves(repo).find((entry) => entry.state.slug === member.slug);
         if (item?.state.phase === 'merge' && (await isAncestor(repo.root, member.tip, trackingRef(repo)))) {
@@ -1047,9 +1047,8 @@ async function mergeTurn(
       report(invocation, repo.name, leaf.path, error, leaf.state.slug);
     }
   }
-  const holder: Leaf | undefined = mergeHolder(repo.name, global, discover(repo, invocation).leaves, () =>
-    readLog(repo.root),
-  )?.leaf;
+  const holder: Leaf | undefined = mergeQueue(global, discover(repo, invocation).leaves, () => readLog(repo.root))[0]
+    ?.leaf;
   if (holder === undefined) return;
   const recorded: Batch | undefined = holder.state.batch;
   if (recorded !== undefined && recorded.applied === true) {
@@ -1084,58 +1083,28 @@ async function mergeTurn(
         stderr: fetched.stderr,
       }),
     );
-  const heldBefore: Hold | undefined = heldFor(repo.name);
-  if (heldBefore !== undefined) {
-    const baseSha: string = await localBase(repo);
-    if (
-      (await equalOutsideRecordFolders(repo, heldBefore.sha, baseSha)) &&
-      (await recordConfigEqual(repo, heldBefore.sha, baseSha)) &&
-      heldBefore.fix !== holder.state.slug
-    ) {
-      console.log(`held ${repo.name} on ${heldBefore.sha}: ${heldBefore.command}`);
-      return;
-    }
-  }
   let batch: Batch | undefined;
   await withLock(resolve(globalHome(), '.lock'), async () => {
     if (isAutomatic && isPaused(repo.name)) return;
     const leaves: Leaf[] = allLeaves(repo);
     const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
     if (fresh?.state.phase !== 'merge' || fresh.state.batch !== undefined) return;
-    if (mergeHolder(repo.name, global, leaves, () => readLog(repo.root))?.leaf.state.slug !== holder.state.slug) return;
+    if (mergeQueue(global, leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== holder.state.slug) return;
     const start: PressureSnapshot | undefined = readPressure(pressureDir);
     const builtOn: string = await localBase(repo);
-    let fixHeld: boolean = false;
-    const heldNow: Hold | undefined = heldFor(repo.name);
-    if (heldNow !== undefined) {
-      if (
-        (await equalOutsideRecordFolders(repo, heldNow.sha, builtOn)) &&
-        (await recordConfigEqual(repo, heldNow.sha, builtOn))
-      ) {
-        if (heldNow.fix !== fresh.state.slug) {
-          console.log(`held ${repo.name} on ${heldNow.sha}: ${heldNow.command}`);
-          return;
-        }
-        fixHeld = true;
-      } else {
-        dropHeld(repo.name);
-        if (mergeQueue(global, leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== fresh.state.slug) return;
-      }
-    }
     const members: BatchMember[] = [];
-    if (!fixHeld)
-      for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root))
-        .slice(1)
-        .slice(0, Math.min(repo.config.batch_limit - 1, fresh.state.batch_limit ?? Number.POSITIVE_INFINITY))) {
-        const sha: string | undefined = await branchSha(repo, candidate.leaf.state.slug);
-        const head: string = sha ?? builtOn;
-        members.push({
-          slug: candidate.leaf.state.slug,
-          base: sha === undefined || head === builtOn ? head : await memberBase(repo, builtOn, head),
-          head,
-          tip: head,
-        });
-      }
+    for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root))
+      .slice(1)
+      .slice(0, Math.min(repo.config.batch_limit - 1, fresh.state.batch_limit ?? Number.POSITIVE_INFINITY))) {
+      const sha: string | undefined = await branchSha(repo, candidate.leaf.state.slug);
+      const head: string = sha ?? builtOn;
+      members.push({
+        slug: candidate.leaf.state.slug,
+        base: sha === undefined || head === builtOn ? head : await memberBase(repo, builtOn, head),
+        head,
+        tip: head,
+      });
+    }
     const holderSha: string | undefined = await branchSha(repo, holder.state.slug);
     const holderHead: string = holderSha ?? builtOn;
     const tools: Tool[] | undefined = repo.config.tools.length > 0 ? await resolveTools(repo) : undefined;

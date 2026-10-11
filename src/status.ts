@@ -30,7 +30,6 @@ import { mergeQueue, type QueueEntry } from './turn';
 import { issueFolders } from './park';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 import { readPaused } from './pause';
-import { heldFor, readHeld, type Hold } from './hold';
 import { activeRed, type RedEntry } from './red-record';
 import { readKept } from './reconcile';
 
@@ -349,7 +348,6 @@ function redLine(entry: RedEntry): string {
 export async function statusCommand(slug: string | undefined, charts: boolean = false): Promise<void> {
   const global: GlobalConfig = readGlobal();
   const paused: Set<string> = readPaused();
-  const held: Record<string, Hold> = readHeld();
   if (slug !== undefined) {
     const repo: Repo = await requireRepo(global, process.cwd());
     const leaf: Leaf = findLeaf(repo, slug);
@@ -359,9 +357,6 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     const missing: Gap[] = leafGaps(global, leaf);
     console.log(Bun.YAML.stringify(leaf.state, null, 2).trimEnd());
     if (paused.has(repo.name)) console.log(`paused: ${repo.name}`);
-    const hold: Hold | undefined = heldFor(repo.name);
-    if (hold !== undefined)
-      console.log(`held: ${hold.sha} ${hold.command}${hold.fix === undefined ? '' : ` fix ${hold.fix}`}`);
     for (const entry of activeRed(repo)) console.log(redLine(entry));
     for (const gap of missing)
       console.log(`Missing: ${repo.name}/${slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`);
@@ -407,11 +402,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   for (const scan of scans) {
     if (!scan.ok) continue;
     for (const entry of readKept(scan.repo)) console.log(`Kept: ${entry.path} — ${entry.reason}`);
-    const hold: Hold | undefined = held[scan.repo.name];
-    const marks: string[] = [
-      paused.has(scan.repo.name) ? 'paused' : '',
-      hold === undefined ? '' : hold.fix === undefined ? 'held' : `held fix ${hold.fix}`,
-    ].filter((mark) => mark !== '');
+    const marks: string[] = [paused.has(scan.repo.name) ? 'paused' : ''].filter((mark) => mark !== '');
     console.log(paint('1;4', `${scan.repo.name}${marks.length > 0 ? ` (${marks.join(') (')})` : ''}`));
     for (const entry of activeRed(scan.repo)) console.log(`  ${redLine(entry)}`);
     if (charts) {
