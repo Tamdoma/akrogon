@@ -459,3 +459,16 @@ test('failed leaf scratch preserves an actual running base command', async () =>
     f.clean();
   }
 });
+
+test('targeted next sweeps unused registered variants', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    await dispatchLeaf(f, 'typed-holder');
+    const variant: string = resolve(storeDir(f), 'typed-holder-v1');
+    await command(['git', 'worktree', 'add', '--detach', variant], f.root);
+    expect((await next(f, ['typed-holder'])).code).toBe(0);
+    expect(existsSync(variant)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
