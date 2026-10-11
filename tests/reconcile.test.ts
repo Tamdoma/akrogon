@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { fixture, cli, leaf, fakeHerdr, leafTempRoot, storeDir, type Fixture } from './helpers';
+import { fixture, cli, leaf, fakeHerdr, fakeAkrogon, yaml, leafTempRoot, storeDir, type Fixture } from './helpers';
 import { readState, saveState } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import { z } from 'zod';
@@ -389,10 +389,7 @@ test('store variants survive live or unavailable pane inventories', async () => 
     const db: Database = database(f);
     saveDatabase(f, {
       ...db,
-      panes: [
-        ...db.panes,
-        { pane_id: 'w1:p999', tab_id: 'w1:t999', cwd: variant, agent: null, agent_status: 'idle' },
-      ],
+      panes: [...db.panes, { pane_id: 'w1:p999', tab_id: 'w1:t999', cwd: variant, agent: null, agent_status: 'idle' }],
     });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(variant)).toBe(true);
@@ -405,6 +402,59 @@ test('store variants survive live or unavailable pane inventories', async () => 
     saveDatabase(f, { ...db, panes: db.panes });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(variant)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('failed leaf scratch preserves an actual running base command', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const akrogon: { env: NodeJS.ProcessEnv } = fakeAkrogon(f);
+    const env: NodeJS.ProcessEnv = { ...f.env, ...akrogon.env };
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      setup: 'mkdir -p node_modules',
+    });
+    const path: string = await dispatchLeaf(f, 'running-base');
+    const base: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    const marker: string = resolve(f.home, 'running');
+    const release: string = resolve(f.home, 'release');
+    const running: Promise<Result> = cli(
+      f,
+      [
+        'base-run',
+        '--base',
+        base,
+        '--',
+        'sh',
+        '-c',
+        'printf "%s" "$TMPDIR" > "$1"; while [ ! -f "$2" ]; do sleep 0.01; done; test -d "$TMPDIR"',
+        'running-base',
+        marker,
+        release,
+      ],
+      readState(path).worktree!,
+      env,
+    );
+    try {
+      for (let i: number = 0; i < 500 && !existsSync(marker); i++) await Bun.sleep(10);
+      expect(existsSync(marker)).toBe(true);
+      const runRoot: string = readFileSync(marker, 'utf8');
+      closeTab(f, readState(path).tab!);
+      saveState(path, {
+        ...readState(path),
+        phase: 'failed',
+        failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'operator stop' },
+      });
+      expect((await next(f, ['--all'])).code).toBe(0);
+      expect(existsSync(runRoot)).toBe(true);
+      expect((await status(f)).stdout).toContain(runRoot);
+    } finally {
+      writeFileSync(release, 'release');
+      expect((await running).code).toBe(0);
+    }
   } finally {
     f.clean();
   }
