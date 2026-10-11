@@ -13,9 +13,7 @@ const contracts: Record<string, string> = {
   config: '',
   preflight: '',
   phase:
-    '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>] [--compare <file>] [--red-on-base <sha> --command <command>] [--culprit <slug>]',
-  unhold: '',
-  'hold-fix': '<slug>',
+    '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>] [--compare <file>] [--culprit <slug>]',
   next: '[<slug>|<path>|--all|--resume]',
   pull: '[--all]',
   close: '<owner/repo#n> --by <text>',
