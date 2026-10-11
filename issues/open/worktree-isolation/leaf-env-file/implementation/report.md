@@ -64,6 +64,54 @@ Review-B F3: the encoder treated quote chars as quoters anywhere — `a'b"c` was
 
 Evidence: `tests/next.test.ts` 231 pass / 0 fail; typecheck clean; format clean; changed tests 576 pass / 0 fail; full suite 721 pass / 0 fail (72.40s). New head: `a7f589b`.
 
+## check.fix repair 4 — F3 completion (2026-10-11)
+
+B's re-check proved the `"`+`\r` refusal wrong: `a\r\"b` round-trips in double quotes because `\"` parses literally. Also, the backtick regression fixture needed literal backticks single-quoted, and emission had unguarded trailing-backslash and `\r`-adjacency edges. Repairs:
+
+- `4d2384d` — failing test: `a\r\"b` preservation (red: dispatch refused it), literal-backtick regression corrected, refusal repointed to all-quotes+`\r`.
+- `f860f00` — fix: dq emits `\r` as `\\r` with `"` allowed when preceded by `\`; guards for bare `"`, trailing `\`, and `[nr]`-adjacency around a real `\r`. Verified against a ~1900-value brute-force round-trip matrix: zero mismatches.
+- `787867a` — refusal fixture repointed to `'\``+`\`+`\r` (truly unwritable: every emission path fails) after the all-quotes value proved representable.
+
+Evidence: `tests/next.test.ts` 231 pass / 0 fail; typecheck clean; format clean; changed tests 576 pass / 0 fail; full suite 721 pass / 0 fail (70.11s). New head: `787867a`.
+
+## check.fix repair 5 — F4 (2026-10-11)
+
+B's re-check proved the hand-written grammar guards wrong three ways: a trailing backslash was refused though unquoted emission round-trips (S6), supplementary Unicode broke the bare-quote scan's UTF-16/code-point index arithmetic (S7), and the all-quoters refusal fixture is representable by its own root assignment (S8). Repairs:
+
+- `b82c1e6` — failing tests: `path\` and `😀a\r\"b` preservation, refusal rewritten as the representable `a'b\`c\\<CR>` success case. Both red against `787867a`.
+- `6e90af7` — the emitter now tries each encoding and keeps the first that `parseEnv` itself reparses to the value; verification is done by the parser, not a handwritten grammar. All guards removed.
+- `1e3bc35` — candidates verified sandwiched between context lines (an unclosed quote cannot swallow the next emitted line), plus a whole-file reparse deep-equal before writing. Aligned with revised D3, whose candidate order is bare-first so `SYNTHETIC_ONE=1` stays unquoted.
+
+Evidence: `tests/next.test.ts` 231 pass / 0 fail; typecheck and format clean; changed tests 576 pass / 0 fail; full suite 721 pass / 0 fail (76.75s). New head: `1e3bc35`.
+
+## Merge repair — herdrless log append (2026-10-11)
+
+Merge attempt `3cf418ba` went red on `tests/phase.test.ts` merge-turn refusal: `phase aa merged` exited 1 after committing because `logMove`'s pane-session lookup crashed when `herdr` was unreachable (run-check copies only HOME/PATH/XDG_CACHE_HOME/NODE_DISABLE_COMPILE_CACHE plus AKROGON_BASE, stripping `HERDR_SOCKET_PATH`).
+
+### Rejected runs
+
+- B's configured run: base `525161df04420b2dfa5c45971d26b6ba65fc8362`, head `cd6ef1301c724c0c9e5f6d60dfee7b3eebf8e0d6`. Command: `akrogon run-check --name 'test' -- sh -c 'akrogon guard ancestors && akrogon guard own-modules && sh -c '\''bun test --timeout=30000'\'''` with `AKROGON_BASE=525161df04420b2dfa5c45971d26b6ba65fc8362`. Result: exit 1, 741 pass / 2 fail (the two failures, incl. the fixture break B later repaired as `8e3b75e`). Log: `implementation/check-test-1791700113376-1125125.log`.
+- A's rerun of the same command at head `8e3b75e66104fd9a10cd9fe757081a46cf738042`, same base and `AKROGON_BASE`: exit 1, 742 pass / 1 fail — only `merge turn refusal names the holder...` remained after `8e3b75e` fixed the fixture. Logs: `check-test-1791700360618-1563338.log`, `check-test-1791700649206-2191494.log`.
+
+### Base-red proof
+
+B's detached-base run never started tests (`No leaf worktree matches cwd`), so it did not establish base-red. A's proof ran on detached checkout `525161df04420b2dfa5c45971d26b6ba65fc8362` (worktree `$TMPDIR/base-wt`, since removed) under a stripped env mirroring run-check: `env -i HOME="$HOME" PATH="$PATH" TMPDIR=<scratch> bun test tests/phase.test.ts --test-name-pattern 'merge turn refusal names' --timeout=30000`. Result: 1 fail — the same test fails on base, so the defect is inherited from `525161d`, not introduced by the leaf. A manual reproduction driving the same `cli` sequence against the base entry point also exited 1 at the logMove pane lookup.
+
+### Repair commits
+
+- `cd1aad2` — failing test: a `check.review -> merge` move with a recorded pane and an absent `HERDR_SOCKET_PATH` must still move, log `session: null`. Red at `8e3b75e` (moved code 1), green after fix.
+- `01ca1fb` — fix: `logMove` catches `CommandError` from `panes()` and logs `session: null`; schema or parse failures still propagate. The pane lookup already tolerated a missing pane.
+
+### Rerun
+
+Base `525161df04420b2dfa5c45971d26b6ba65fc8362`, head `01ca1fbe8654b11b3cec04e56d6ec498dae87196`. Exact rejected command replayed verbatim:
+
+```sh
+AKROGON_BASE=525161df04420b2dfa5c45971d26b6ba65fc8362 akrogon run-check --name 'test' -- sh -c 'akrogon guard ancestors && akrogon guard own-modules && sh -c '\''bun test --timeout=30000'\'''
+```
+
+Result: exit 0, 744 pass / 0 fail, 7774 assertions (72.47s). Log: `implementation/check-test-1791700910513-2646622.log`. `format` and `typecheck` under the same wrapper exited 0; `test_changed` exited 0 (590 pass / 0 fail, 5425 assertions; logs `check-test_changed-1791700922596-2850852.log`, `check-test_changed-1791700978250-2851122.log`). Targeted stripped-env rerun at `01ca1fb`: `merge turn refusal` and `herdr is unreachable` tests 2 pass / 0 fail.
+
 ## Known limitations
 
 - A live tab with absent `.env` gets no file until the tab dies and dispatch reruns (locked D8).

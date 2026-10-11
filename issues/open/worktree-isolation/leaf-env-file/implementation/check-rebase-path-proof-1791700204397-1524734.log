@@ -1,0 +1,11 @@
+bun test v1.4.2 (744846f84)
+
+tests/next.test.ts:
+(pass) changed worktree root reports recorded and expected worktrees without creating or prompting [125.83ms]
+(pass) changed repo root reports recorded and expected worktrees without creating or prompting [127.27ms]
+
+ 2 pass
+ 230 filtered out
+ 0 fail
+ 26 expect() calls
+Ran 2 tests across 1 file. [157.00ms]

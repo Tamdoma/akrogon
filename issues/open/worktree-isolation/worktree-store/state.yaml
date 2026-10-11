@@ -20,7 +20,7 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tAQ
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/worktree-store
+worktree: /home/ivan/.akrogon/worktrees/akrogon/worktree-store
 pane: 
   A: w8:pMG
   B: w8:pMH

@@ -1,7 +1,38 @@
 slug: base-run
-phase: plan.synthesis
-created: '2026-10-10'
+phase: implement
+created: 2026-10-10
 repo: akrogon
-debate: 'no'
-blocked-by: [worktree-store, check-env, leaf-env-file]
-sources: []
+debate: "no"
+blocked-by: 
+  - worktree-store
+  - check-env
+  - leaf-env-file
+sources: 
+  []
+busy_since: 
+  A: 2026-10-11T06:57:57.183Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAS
+worktree: /home/ivan/.akrogon/worktrees/akrogon/base-run
+pane: 
+  A: w8:pMM
+  B: w8:pMN
+prompted: 
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-base-run--/2026-10-11T06-50-50-824Z_01a129ba-8048-70f4-9dfc-88c08365c8b6.jsonl
+prompted_at: 
+  A: 2026-10-11T06:57:57.183Z
+delivery_error: 
+  {}
+frozen: 
+  tests/base-run.test.ts: 26772b60beca80fcc1928992039c094b1f7d75bb
+frozen_cited: 
+  []

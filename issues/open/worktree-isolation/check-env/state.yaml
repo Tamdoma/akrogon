@@ -20,7 +20,7 @@ fix_rounds: 0
 verdict: 
   {}
 tab: w8:tAM
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/check-env
+worktree: /home/ivan/.akrogon/worktrees/akrogon/check-env
 pane: 
   A: w8:pMA
   B: w8:pMB

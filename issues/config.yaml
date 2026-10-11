@@ -1,8 +1,7 @@
 remote: origin
 default_branch: main
-worktree_root: issues/worktrees
 rebuttal: true
-fix_rounds: 3
+fix_rounds: 8
 implement: subagents
 checks: 
   format: bun run format

@@ -1,5 +1,5 @@
 slug: leaf-env-file
-phase: failed
+phase: merged
 created: 2026-10-10
 repo: akrogon
 debate: "no"
@@ -16,11 +16,11 @@ attempts:
   B: 0
 done: 
   []
-fix_rounds: 3
+fix_rounds: 7
 verdict: 
   {}
 tab: w8:tAR
-worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/leaf-env-file
+worktree: /home/ivan/.akrogon/worktrees/akrogon/leaf-env-file
 pane: 
   A: w8:pMJ
   B: w8:pMK
@@ -30,9 +30,4 @@ prompted_at:
   {}
 delivery_error: 
   {}
-failure: 
-  cause: attempts
-  phase: check.repair
-  slot: B
-  reason: fix rounds exhausted
-  delivery: shown
+merge_stamp: 2026-10-11T06:47:50.718Z

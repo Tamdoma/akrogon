@@ -1,0 +1,215 @@
+ 1:  17ad882 !  1:  5059bdb test: cover dispatch-written leaf .env file
+    @@ tests/next.test.ts: import {
+        mkdtempSync,
+      } from 'node:fs';
+      import { resolve } from 'node:path';
+    +@@ tests/next.test.ts: for (const moved of ['worktree root', 'repo root'] as const) {
+    +   test(`changed ${moved} reports recorded and expected worktrees without creating or prompting`, async () => {
+    +     const f: DispatchFixture = await dispatchFixture();
+    +     try {
+    +-      const recorded: string = resolve(f.root, 'issues/worktrees/relocated');
+    ++      const recorded: string = resolve(storeDir(f), 'relocated');
+    +       await command(['git', 'worktree', 'add', '-b', 'relocated', recorded], f.root);
+    +       leaf(f, 'relocated', 'plan.synthesis', { worktree: recorded });
+    +       const root: string = moved === 'repo root' ? resolve(f.home, 'moved-repo') : f.root;
+     @@ tests/next.test.ts: test('an invalid readiness.yaml skips the leaf and names the file path', async (
+        }
+      }, 15000);
+    @@ tests/next.test.ts: test('an invalid readiness.yaml skips the leaf and names the
+     +    });
+     +    const path: string = leaf(f, 'build', 'plan.synthesis');
+          expect((await next(f, ['build'])).code).toBe(0);
+    --    const link: string = resolve(f.root, 'issues/worktrees/build/.env');
+    +-    const link: string = resolve(storeDir(f), 'build/.env');
+     -    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+     -    expect(readlinkSync(link)).toBe(target);
+     -    appendFileSync(target, 'SYNTHETIC_TWO=2\n');
+     -    expect(readFileSync(link, 'utf8')).toBe('SYNTHETIC_ONE=1\nSYNTHETIC_TWO=2\n');
+    -+    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    ++    const envFile: string = resolve(storeDir(f), 'build/.env');
+     +    expect(lstatSync(envFile).isFile()).toBe(true);
+     +    expect(statSync(envFile).mode & 0o777).toBe(0o600);
+     +    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="1"\nSYNTHETIC_TWO="two words"\n');
+    @@ tests/next.test.ts: test('an invalid readiness.yaml skips the leaf and names the
+     +    });
+     +    const path: string = leaf(f, 'build', 'plan.synthesis');
+          expect((await next(f, ['build'])).code).toBe(0);
+    --    const link: string = resolve(f.root, 'issues/worktrees/build/.env');
+    +-    const link: string = resolve(storeDir(f), 'build/.env');
+     -    rmSync(link);
+    -+    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    ++    const envFile: string = resolve(storeDir(f), 'build/.env');
+     +    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="1"\n');
+     +    appendFileSync(root, 'SYNTHETIC_ONE=2\n');
+          expect((await next(f, ['build'])).code).toBe(0);
+    @@ tests/next.test.ts: test('an invalid readiness.yaml skips the leaf and names the
+     +    expect(result.stdout).not.toContain('S3NTINEL-VALUE-9f8e');
+     +    expect(result.stderr).not.toContain('S3NTINEL-VALUE-9f8e');
+     +    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).not.toContain('S3NTINEL-VALUE-9f8e');
+    -+    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    ++    const envFile: string = resolve(storeDir(f), 'build/.env');
+     +    expect(() => lstatSync(envFile)).toThrow(/ENOENT/);
+     +    expect(database(f).tabs).toHaveLength(0);
+     +    expect(database(f).prompts).toHaveLength(0);
+    @@ tests/next.test.ts: test('an invalid readiness.yaml skips the leaf and names the
+     +    });
+     +    const path: string = leaf(f, 'build', 'plan.synthesis');
+     +    expect((await next(f, ['build'])).code).toBe(0);
+    -+    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    ++    const envFile: string = resolve(storeDir(f), 'build/.env');
+     +    rmSync(envFile);
+     +    const tab: string = readState(path).tab!;
+     +    const db: Database = database(f);
+    @@ tests/next.test.ts: test('an invalid readiness.yaml skips the leaf and names the
+     +      grounding: 'none',
+     +      env: ['SYNTHETIC_ONE'],
+     +    });
+    -     const worktree: string = resolve(f.root, 'issues/worktrees/build');
+    +     const worktree: string = resolve(storeDir(f), 'build');
+          await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
+     -    const link: string = resolve(worktree, '.env');
+     -    symlinkSync(resolve(f.root, '.env'), link);
+    @@ tests/next.test.ts: test('an invalid readiness.yaml skips the leaf and names the
+     -  try {
+     -    leaf(f, 'build', 'plan.synthesis');
+     -    expect((await next(f, ['build'])).code).toBe(0);
+    --    const link: string = resolve(f.root, 'issues/worktrees/build/.env');
+    +-    const link: string = resolve(storeDir(f), 'build/.env');
+     -    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+     -    expect(existsSync(resolve(f.root, '.env'))).toBe(false);
+     -  } finally {
+    @@ tests/next.test.ts: test('an invalid readiness.yaml skips the leaf and names the
+     +      if (registered) writeFileSync(root, 'SYNTHETIC_ONE=1\n');
+     +      leaf(f, 'build', 'plan.synthesis');
+     +      expect((await next(f, ['build'])).code).toBe(0);
+    -+      const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    ++      const envFile: string = resolve(storeDir(f), 'build/.env');
+     +      expect(lstatSync(envFile).isFile()).toBe(true);
+     +      expect(statSync(envFile).mode & 0o777).toBe(0o600);
+     +      expect(readFileSync(envFile, 'utf8')).toBe('');
+    @@ tests/next.test.ts: test('an invalid readiness.yaml skips the leaf and names the
+     +  test(`next refuses an .env write over ${kind}`, async () => {
+          const f: DispatchFixture = await dispatchFixture();
+          try {
+    -       const worktree: string = resolve(f.root, 'issues/worktrees/build');
+    +       const worktree: string = resolve(storeDir(f), 'build');
+            await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
+            const link: string = resolve(worktree, '.env');
+     -      if (kind === 'real file') writeFileSync(link, 'SYNTHETIC_SECRET=1\n');
+    @@ tests/next.test.ts: for (const kind of ['real file', 'tracked file', 'stale link
+     +        grounding: 'none',
+     +        env: ['SYNTHETIC_ONE'],
+     +      });
+    -+      const worktree: string = resolve(f.root, 'issues/worktrees/build');
+    ++      const worktree: string = resolve(storeDir(f), 'build');
+     +      await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
+     +      const envFile: string = resolve(worktree, '.env');
+     +      if (kind === 'real file') writeFileSync(envFile, 'SYNTHETIC_SECRET=1\n');
+    @@ tests/next.test.ts: test('next refuses to link .env not ignored in the registere
+          const target: string = resolve(f.root, '.env');
+          const error: string = skips(result)[0].error;
+     +    expect(error).toContain('Refusing .env');
+    -     expect(error).toContain(resolve(f.root, 'issues/worktrees/build/.env'));
+    +     expect(error).toContain(resolve(storeDir(f), 'build/.env'));
+          expect(error).toContain(`path is not ignored in the registered checkout ${f.root}`);
+          expect(existsSync(target)).toBe(false);
+     @@ tests/next.test.ts: test('next refuses to link .env not ignored in the registered checkout, keeps th
+ 2:  f23c7ee =  2:  e8365bf test: expect dispatch-written leaf .env file in merge-clean test
+ 3:  6573c84 !  3:  c4a9ffd feat: write declared leaf .env file at dispatch
+    @@ src/AREA.md
+     -- A leaf worktree's `.env` is a symlink to the registered checkout's file; dispatch refuses a real file, tracked path, foreign link or missing ignore rule.
+     +- A leaf worktree's `.env` is a written file (mode 0600) holding only declared `env:` names copied from the registered checkout; dispatch rewrites it when no tab is live and refuses a tracked path or missing ignore rule.
+      - `buildStack` removes resurrected retired lesson lines as a fixup commit on the stack top, and `merged --check` refuses a pushed range still holding one.
+    + - The `plan.synthesis` to `implement` move records each branch-changed path's blob id in state `frozen`; a later move refuses a recorded path changed or gone, or an added test-file-matched path outside the record, until the last commit touching it or a later one carries a `Test-Change` trailer naming it, and a path no commit touches needs a later trailer-only commit new since the record, not a replayed planning-era trailer.
+      
+    - ## See also
+     
+      ## src/next.ts ##
+     @@ src/next.ts: import {
+    @@ src/next.ts: import {
+      import { z } from 'zod';
+      import { parse } from 'shell-quote';
+      import {
+    -@@ src/next.ts: function launch(global: GlobalConfig, repo: Repo, slot: Slot, leafPath?: string)
+    -   return { kind: config.harness, args: argv.slice(1) };
+    +@@ src/next.ts: export async function createSparseWorktree(
+    +   }
+      }
+      
+     -async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
+    @@ src/next.ts: function launch(global: GlobalConfig, repo: Repo, slot: Slot, leafP
+        if (leaf.state.worktree !== undefined && leaf.state.worktree !== path)
+          throw new Error(
+     @@ src/next.ts: async function ensureWorktree(repo: Repo, leaf: Leaf): Promise<State> {
+    -       repo.root,
+    -     );
+    +       branch: branch.code === 0 ? undefined : leaf.state.slug,
+    +     });
+        }
+     -  await linkEnv(repo, path);
+     -  const state: State = { ...leaf.state, worktree: path };
+ 4:  6055590 !  4:  4dd64ce test: reproduce .env quote and backslash corruption on dispatch
+    @@ tests/next.test.ts: import {
+      import type { GhStep } from './fake-gh';
+      import type { Database } from './fake-herdr';
+     @@ tests/next.test.ts: test('a dispatched worktree gets a real .env file with the declared subset', asy
+    -     const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    +     const envFile: string = resolve(storeDir(f), 'build/.env');
+          expect(lstatSync(envFile).isFile()).toBe(true);
+          expect(statSync(envFile).mode & 0o777).toBe(0o600);
+     -    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="1"\nSYNTHETIC_TWO="two words"\n');
+ 5:  d1e9c10 !  5:  f376131 fix: copy declared .env values verbatim from the root file
+    @@ tests/next.test.ts: test('a dispatched worktree gets a real .env file with the d
+            checks: { test: 'bun test' },
+            grounding: 'none',
+     @@ tests/next.test.ts: test('a dispatched .env file round-trips quotes and backslashes through dotenv p
+    -     const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    +     });
+    +     leaf(f, 'build', 'plan.synthesis');
+    +     expect((await next(f, ['build'])).code).toBe(0);
+    +-    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    ++    const envFile: string = resolve(storeDir(f), 'build/.env');
+          const copied: Record<string, string | undefined> = parseEnv(readFileSync(envFile, 'utf8'));
+          expect(copied.SYNTHETIC_QUOTE).toBe('has"quote');
+     -    expect(copied.SYNTHETIC_PATH).toBe('path\\segment');
+    @@ tests/next.test.ts: test('a dispatched .env file round-trips quotes and backslas
+     @@ tests/next.test.ts: test('a live tab freezes .env while a dead tab lets the next dispatch rewrite it
+          const path: string = leaf(f, 'build', 'plan.synthesis');
+          expect((await next(f, ['build'])).code).toBe(0);
+    -     const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    +     const envFile: string = resolve(storeDir(f), 'build/.env');
+     -    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE="1"\n');
+     +    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
+          appendFileSync(root, 'SYNTHETIC_ONE=2\n');
+ 6:  41097c7 !  6:  fd55294 test: reproduce .env scanner dropping valid dotenv forms
+    @@ Commit message
+     
+      ## tests/next.test.ts ##
+     @@ tests/next.test.ts: test('a dispatched worktree gets a real .env file with the declared subset', asy
+    -     const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    +     const envFile: string = resolve(storeDir(f), 'build/.env');
+          expect(lstatSync(envFile).isFile()).toBe(true);
+          expect(statSync(envFile).mode & 0o777).toBe(0o600);
+     -    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\nSYNTHETIC_TWO=two words\n');
+ 7:  2c92c02 !  7:  32b7447 fix: re-encode parsed .env values for a parseEnv consumer
+    @@ src/next.ts: async function writeLeafEnv(repo: Repo, worktree: string, live: boo
+     
+      ## tests/next.test.ts ##
+     @@ tests/next.test.ts: test('a dispatched worktree gets a real .env file with the declared subset', asy
+    -     const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    +     const envFile: string = resolve(storeDir(f), 'build/.env');
+          expect(lstatSync(envFile).isFile()).toBe(true);
+          expect(statSync(envFile).mode & 0o777).toBe(0o600);
+     -    expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\nSYNTHETIC_TWO=' + "'two words'" + '\n');
+ 8:  1a072ba =  8:  47850aa test: reproduce .env encoder rejecting backticks and interior quotes
+ 9:  a7f589b =  9:  89dbe59 fix: emit .env values under parseEnv's full quote grammar
+10:  4d2384d = 10:  c83756f test: reproduce .env refusal of a representable escaped-quote value
+11:  f860f00 = 11:  d476dcb fix: cover parseEnv's full quote grammar in .env emission
+12:  787867a = 12:  ccd4471 test: repoint unwritable .env refusal at a value with no valid encoding
+13:  b82c1e6 = 13:  31a37ed test: reproduce .env drops for valid trailing-backslash and escaped values
+14:  6e90af7 = 14:  c155f66 fix: emit .env values by verified round-trip instead of grammar guards
+15:  1e3bc35 = 15:  725a922 fix: verify emitted .env lines against context and the whole file
+16:  c07b208 = 16:  f75d412 test: reproduce leaf env context name collision
+17:  3c0531c = 17:  100218a fix: isolate dotenv candidate checks from declared names
+ -:  ------- > 18:  cd6ef13 test: use migrated worktree store in env repair cases
+ -:  ------- > 19:  8e3b75e test: preserve repo move fixture during rebase
