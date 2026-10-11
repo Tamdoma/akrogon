@@ -23,7 +23,7 @@ Propose every repo key below, using inspected values or these defaults, includin
 remote: origin
 default_branch: main
 rebuttal: true
-fix_rounds: 3
+fix_rounds: 3 # bounds the chart door's direct-route repair rounds
 implement: subagents
 # setup: bun install --frozen-lockfile — proposed only when a lockfile is committed in HEAD
 checks: {}

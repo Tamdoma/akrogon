@@ -28,4 +28,4 @@ A red criterion proof or `checks` command becomes one more sub-brief with failin
 
 A conflicting pick is aborted with `git cherry-pick --abort` and that worker's worktree kept so its commit stays reachable; A resolves the conflict itself or delegates only the remainder, whose sub-brief reads its starting state from the retained worktree. After a crash A inspects and resumes a retained worktree. A failure between briefs, a wrong shared interface or incompatible worker choices belongs to A to fix in the brief and rerun the affected worker; a one- or two-line repair may be edited directly by A.
 
-On the last allowed leaf repair round A repairs itself without a worker, while standalone self-repair is A's responsibility without lifecycle counters.
+Leaf repair rounds delegate by the same wave rule; standalone self-repair is A's responsibility without lifecycle counters.
