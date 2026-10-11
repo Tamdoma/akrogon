@@ -1,8 +1,8 @@
 import { test, expect } from 'bun:test';
 import { z } from 'zod';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
-import { fixture, cli, leaf, yaml, fakeAkrogon, printedChecks, type Fixture } from './helpers';
+import { fixture, cli, leaf, yaml, fakeAkrogon, printedChecks, leafTempRoot, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
 
 const sh = (script: string): string[] => ['sh', '-c', script];
@@ -33,6 +33,19 @@ const baseEnv = (f: Fixture, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv =
   HOME: f.home,
   ...extra,
 });
+
+function scratchRuns(f: Fixture): string[] {
+  const root: string = leafTempRoot(f);
+  return existsSync(root)
+    ? readdirSync(root, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .flatMap((entry) =>
+          readdirSync(resolve(root, entry.name), { withFileTypes: true })
+            .filter((run) => run.isDirectory() && run.name.startsWith('run-'))
+            .map((run) => resolve(root, entry.name, run.name)),
+        )
+    : [];
+}
 
 test('run-check builds an allowlisted env, copies declared names and omits undeclared ones', async () => {
   const f: Fixture = await fixture();
@@ -87,17 +100,19 @@ test('run-check sets AKROGON_BASE to the merge base', async () => {
   }
 });
 
-test('run-check TMPDIR is a fresh short /tmp run root and is removed on success and failure', async () => {
+test('run-check TMPDIR is a fresh run root under the leaf temp dir and is removed on success and failure', async () => {
   const f: Fixture = await fixture();
   try {
     const { worktree } = await leafWorktree(f, 'tmpdir-leaf');
     const ok = await cli(f, ['run-check', '--', ...sh('printf %s "$TMPDIR"')], worktree, baseEnv(f));
     expect(ok.code).toBe(0);
-    expect(ok.stdout.startsWith('/tmp/akr-')).toBe(true);
+    expect(ok.stdout.startsWith(leafTempRoot(f))).toBe(true);
+    expect(basename(ok.stdout).startsWith('run-')).toBe(true);
     expect(existsSync(ok.stdout)).toBe(false);
     const bad = await cli(f, ['run-check', '--', ...sh('printf %s "$TMPDIR" >&2; exit 7')], worktree, baseEnv(f));
     expect(bad.code).toBe(7);
     expect(existsSync(bad.stderr)).toBe(false);
+    expect(scratchRuns(f)).toEqual([]);
   } finally {
     f.clean();
   }
@@ -143,6 +158,7 @@ test('run-check refuses a forbidden caller env before the command runs', async (
       expect(result.stderr).toContain(name);
       expect(result.stderr).toContain('Refusing');
       expect(existsSync(marker)).toBe(false);
+      expect(scratchRuns(f)).toEqual([]);
     }
   } finally {
     f.clean();
@@ -346,7 +362,7 @@ test('printed checks refuse before setup and isolate both setup and check enviro
     const [token, extra, root]: string[] = lines[0].split('|');
     expect(token).toBe('declared');
     expect(extra).toBe('');
-    expect(root.startsWith('/tmp/akr-')).toBe(true);
+    expect(root.startsWith(leafTempRoot(f) + '/')).toBe(true);
     expect(existsSync(root)).toBe(false);
     expect(readdirSync(resolve(leafPath, 'implementation'))).toHaveLength(1);
   } finally {

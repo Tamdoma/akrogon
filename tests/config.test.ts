@@ -1,11 +1,22 @@
 import { test, expect } from 'bun:test';
-import { basename, isAbsolute, resolve, sep } from 'node:path';
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { dirname, isAbsolute, resolve } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fixture, cli, leaf, yaml, printedChecks, type Fixture } from './helpers';
 import { command, quote, run, spawnCaptured, type Result } from '../src/shell';
 import {
   SeatIndexError,
+  ensureLeafTemp,
   leafTemp,
   readGlobal,
   readRepo,
@@ -826,14 +837,32 @@ test('config accepts env and tools lists and refuses bad and reserved env names'
   }
 });
 
-test('leafTemp defaults to the home scratch root and keeps the override', () => {
+test('ensureLeafTemp creates every level private and refuses a symlinked root', () => {
+  const previous: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'leaf-temp-'));
+  const repo: Repo = { name: 'repo', root: '/r', config: repoSchema.parse({ grounding: 'none' }) };
+  try {
+    process.env.AKROGON_LEAF_TEMP_ROOT = resolve(dir, 'root');
+    const leaf: string = ensureLeafTemp(repo, 's');
+    for (const path of [resolve(dir, 'root'), dirname(leaf), leaf]) expect(statSync(path).mode & 0o777).toBe(0o700);
+    symlinkSync(resolve(dir, 'root'), resolve(dir, 'link'));
+    process.env.AKROGON_LEAF_TEMP_ROOT = resolve(dir, 'link');
+    expect(() => ensureLeafTemp(repo, 's')).toThrow('Refusing leaf temp path (not a directory)');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    if (previous === undefined) delete process.env.AKROGON_LEAF_TEMP_ROOT;
+    else process.env.AKROGON_LEAF_TEMP_ROOT = previous;
+  }
+});
+
+test('leafTemp defaults to a per-user /tmp root with hashed repo and leaf folders and keeps the override', () => {
   const previous: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
   const repo: Repo = { name: 'repo', root: '/r', config: repoSchema.parse({ grounding: 'none' }) };
   try {
     delete process.env.AKROGON_LEAF_TEMP_ROOT;
     const path: string = leafTemp(repo, 'long-slug');
-    expect(path.startsWith(resolve(homedir(), '.akrogon/scratch/repo') + sep)).toBe(true);
-    expect(basename(path)).toMatch(/^long-slug-[0-9a-f]{12}$/);
+    expect(path).toMatch(new RegExp(`^/tmp/akr-${process.getuid!()}/[0-9a-f]{4}/[0-9a-f]{8}$`));
+    expect(dirname(leafTemp(repo, 'other'))).toBe(dirname(path));
     process.env.AKROGON_LEAF_TEMP_ROOT = '/x/leaf-temp';
     expect(leafTemp(repo, 's').startsWith('/x/leaf-temp/')).toBe(true);
   } finally {

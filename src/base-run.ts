@@ -12,7 +12,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { leafTemp, readGlobal, requireRepo, within, worktreeStore, type Repo } from './config';
+import { ensureLeafTemp, readGlobal, requireRepo, within, worktreeStore, type Repo } from './config';
 import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { constructedEnv, spawnLogged } from './run-check';
@@ -140,9 +140,7 @@ export async function baseRun(
   await withLock(lock, async () => {
     appendFileSync(recordsPath(repo), JSON.stringify(record) + '\n');
   });
-  const scratch: string = leafTemp(repo, leaf.state.slug);
-  mkdirSync(scratch, { recursive: true, mode: 0o700 });
-  const runRoot: string = mkdtempSync(resolve(scratch, 'run-'));
+  const runRoot: string = mkdtempSync(resolve(ensureLeafTemp(repo, leaf.state.slug), 'run-'));
   let code: number = 1;
   let removed: string | undefined;
   try {

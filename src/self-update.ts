@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, realpathSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, resolve } from 'node:path';
-import { leafTemp, toolRoot, worktreeStore, type Repo } from './config';
+import { resolve } from 'node:path';
+import { ensureLeafTemp, leafTemp, toolRoot, worktreeStore, type Repo } from './config';
 import { applySkillLinks, planSkillLinks, type Link } from './install';
 import { eligibleRecord, integrate } from './sync';
 import { command, run, CommandError, type Result } from './shell';
@@ -104,7 +104,7 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
       rmSync(scratch, { recursive: true, force: true });
       await command(['git', 'worktree', 'prune'], root);
       try {
-        mkdirSync(dirname(scratch), { recursive: true });
+        ensureLeafTemp(repo, 'self-update');
         await command(['git', 'worktree', 'add', '--detach', scratch, incoming], root);
         const rebaseArgs: string[] = ['git', 'rebase', incoming, base];
         const rebased: Result = await run(rebaseArgs, scratch);

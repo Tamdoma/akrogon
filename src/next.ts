@@ -1,7 +1,5 @@
 import {
-  chmodSync,
   existsSync,
-  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -28,7 +26,7 @@ import {
   within,
   seats,
   worktreeStore,
-  leafTemp,
+  ensureLeafTemp,
   type Repo,
   type GlobalConfig,
   type SlotConfig,
@@ -444,38 +442,10 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     if (total >= global.max_active) return null;
   }
   const state: State = await ensureWorktree(repo, leaf, matches.length === 1);
-  const scratch: string = leafTemp(repo, state.slug);
-  function ensurePrivateDir(path: string): void {
-    function validate(): void {
-      const existing = lstatSync(path);
-      if (existing.isSymbolicLink() || !existing.isDirectory())
-        throw new Error(`Refusing leaf temp path (not a directory): ${path}`);
-      if (statSync(path).uid !== process.getuid!()) throw new Error(`Refusing foreign-owned leaf temp path: ${path}`);
-    }
-    try {
-      validate();
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-      try {
-        mkdirSync(path, { recursive: true, mode: 0o700 });
-      } catch (mkdirError) {
-        if ((mkdirError as NodeJS.ErrnoException).code !== 'EEXIST') throw mkdirError;
-        validate();
-      }
-      chmodSync(path, 0o700);
-      return;
-    }
-    try {
-      mkdirSync(path, { recursive: true, mode: 0o700 });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-    }
-    chmodSync(path, 0o700);
-  }
-  ensurePrivateDir(resolve(scratch, '..'));
+  const scratch: string = ensureLeafTemp(repo, state.slug);
   // No live tab means no seat uses the scratch, so a new tab starts from an empty one.
-  if (matches.length === 0) rmSync(scratch, { recursive: true, force: true });
-  ensurePrivateDir(scratch);
+  if (matches.length === 0)
+    for (const entry of readdirSync(scratch)) rmSync(resolve(scratch, entry), { recursive: true, force: true });
   const worktree: string = z.string().parse(state.worktree);
   const workspace: Workspace | undefined = (await workspaces()).find((item) => item.label === repo.name);
   if (workspace === undefined) throw new Error(`No herdr workspace labeled ${repo.name}`);

@@ -130,9 +130,7 @@ export function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): boolean {
     leaves.flatMap((leaf) => (leaf.state.batch?.members ?? []).map((member) => member.slug)),
   );
   for (const leaf of leaves) {
-    if (leaf.state.phase === 'merged' || leaf.state.phase === 'failed') {
-      if (existsSync(leafTemp(repo, leaf.state.slug))) return true;
-    }
+    if (existsSync(leafTemp(repo, leaf.state.slug))) return true;
     const worktree: string | undefined = leaf.state.worktree;
     if (worktree === undefined || !existsSync(worktree)) continue;
     if (leaf.state.batch !== undefined || memberSlugs.has(leaf.state.slug)) continue;
@@ -434,11 +432,14 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         } else keep(runRoot, 'run in progress');
       }
       if (leaf === undefined && entry.name !== checkoutScratch) keep(dir, 'unknown scratch directory');
-      else if (leaf !== undefined && (leaf.state.phase === 'merged' || leaf.state.phase === 'failed')) {
-        if (live === null) keep(dir, 'pane list unavailable');
-        else if ((leaf.state.phase === 'merged' && tabLive(live, leaf.state.tab)) || livePaneInside(live, dir))
-          keep(dir, 'live pane inside');
-        else if (kept.length === keptBefore) {
+      else if (leaf !== undefined) {
+        // A leaf's temp lives only while its seat or a check uses it. Only finished leaves report what stays.
+        const finished: boolean = leaf.state.phase === 'merged' || leaf.state.phase === 'failed';
+        if (live === null) {
+          if (finished) keep(dir, 'pane list unavailable');
+        } else if ((leaf.state.phase !== 'failed' && tabLive(live, leaf.state.tab)) || livePaneInside(live, dir)) {
+          if (finished) keep(dir, 'live pane inside');
+        } else if (kept.length === keptBefore) {
           rmSync(dir, { recursive: true, force: true });
           removed.push(dir);
           continue;

@@ -227,6 +227,24 @@ test('run root with a dead owner pid is removed, live owner kept', async () => {
   }
 });
 
+test('an unfinished leaf temp is removed once its tab is gone and kept silently while its tab lives', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const idle: string = await dispatchLeaf(f, 'idle-leaf');
+    const idleScratch: string = scratchFor(f, 'idle-leaf');
+    writeFileSync(resolve(idleScratch, 'left'), 'x');
+    closeTab(f, readState(idle).tab!);
+    await dispatchLeaf(f, 'busy-leaf');
+    const busyScratch: string = scratchFor(f, 'busy-leaf');
+    expect(readState(idle).phase).toBe('plan.synthesis');
+    expect(existsSync(idleScratch)).toBe(false);
+    expect(existsSync(busyScratch)).toBe(true);
+    expect((await status(f, 'busy-leaf')).stdout).not.toContain(busyScratch);
+  } finally {
+    f.clean();
+  }
+});
+
 // DC4: old in-repo worktree of an active leaf is migrated; refusals keep it.
 test('clean old-location worktree of an active leaf is removed and recreated sparse at the store', async () => {
   const f: DispatchFixture = await dispatchFixture();

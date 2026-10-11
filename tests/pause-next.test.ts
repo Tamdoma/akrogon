@@ -334,11 +334,8 @@ test('unpause runs deferred merged cleanup', async () => {
     db.panes = [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'unknown' }];
     saveDatabase(f, db);
     const { createHash } = await import('node:crypto');
-    const hex: string = createHash('sha256')
-      .update(f.root + '\n' + 'dead')
-      .digest('hex')
-      .slice(0, 12);
-    const temp: string = resolve(leafTempRoot(f), `dead-${hex}`);
+    const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
+    const temp: string = resolve(leafTempRoot(f), hex(f.root).slice(0, 4), hex(f.root + '\n' + 'dead').slice(0, 8));
     mkdirSync(temp, { recursive: true });
     writeFileSync(resolve(temp, 'scratch'), 'x');
     expect((await cli(f, ['pause'])).code).toBe(0);

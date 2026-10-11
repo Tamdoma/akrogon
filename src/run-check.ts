@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { base, readGlobal, requireRepo, type Repo } from './config';
+import { base, ensureLeafTemp, readGlobal, requireRepo, type Repo } from './config';
 import { allLeaves, readState, type Leaf } from './state';
 import { command, spawnCaptured, type Result } from './shell';
 import { readBaseRuns, type BaseRun } from './base-run';
@@ -105,9 +105,8 @@ export async function runCheck(
     throw new Error('Usage: akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...');
   refuse();
   const repo: Repo = await requireRepo(readGlobal(), cwd);
-  const { target, baseSha } = await leafTarget(repo, cwd, leafOverride, holder);
-  // Short on purpose: Chrome puts its SingletonSocket under TMPDIR and aborts past the 107-byte socket path limit.
-  const runRoot: string = mkdtempSync('/tmp/akr-');
+  const { slug, target, baseSha } = await leafTarget(repo, cwd, leafOverride, holder);
+  const runRoot: string = mkdtempSync(resolve(ensureLeafTemp(repo, slug), 'run-'));
   try {
     const boot: string = existsSync('/proc/sys/kernel/random/boot_id')
       ? readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()

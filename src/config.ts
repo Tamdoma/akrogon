@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -260,16 +260,43 @@ export function worktreeStore(repo: Repo): string {
     : expandPath(repo.config.worktree_root, repo.root);
 }
 
+// Short on purpose: Chrome puts its SingletonSocket under TMPDIR and aborts past the 107-byte socket path limit.
+// Fixed /tmp, not tmpdir(), because a seat's TMPDIR is itself a leaf temp folder.
 export function leafTemp(repo: Repo, slug: string): string {
   const override: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
   if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
     throw new Error(`Invalid AKROGON_LEAF_TEMP_ROOT: must be a non-blank absolute path`);
-  const root: string = override ?? resolve(homedir(), '.akrogon/scratch', repo.name);
-  const hex: string = createHash('sha256')
-    .update(repo.root + '\n' + slug)
-    .digest('hex')
-    .slice(0, 12);
-  return resolve(root, `${slug.slice(0, 20)}-${hex}`);
+  const root: string = override ?? `/tmp/akr-${process.getuid!()}`;
+  const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
+  return resolve(root, hex(repo.root).slice(0, 4), hex(repo.root + '\n' + slug).slice(0, 8));
+}
+
+export function ensureLeafTemp(repo: Repo, slug: string): string {
+  const leaf: string = leafTemp(repo, slug);
+  const repoTemp: string = dirname(leaf);
+  for (const path of [dirname(repoTemp), repoTemp, leaf]) ensurePrivateDir(path);
+  return leaf;
+}
+
+function ensurePrivateDir(path: string): void {
+  function validate(): void {
+    const existing = lstatSync(path);
+    if (existing.isSymbolicLink() || !existing.isDirectory())
+      throw new Error(`Refusing leaf temp path (not a directory): ${path}`);
+    if (statSync(path).uid !== process.getuid!()) throw new Error(`Refusing foreign-owned leaf temp path: ${path}`);
+  }
+  try {
+    validate();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    try {
+      mkdirSync(path, { recursive: true, mode: 0o700 });
+    } catch (mkdirError) {
+      if ((mkdirError as NodeJS.ErrnoException).code !== 'EEXIST') throw mkdirError;
+      validate();
+    }
+  }
+  chmodSync(path, 0o700);
 }
 
 export function target(repo: Repo): string {

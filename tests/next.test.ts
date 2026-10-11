@@ -15,7 +15,7 @@ import {
   mkdtempSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import {
   fixture,
   cli,
@@ -3979,7 +3979,7 @@ test('allocation carries TMPDIR corrects permissive owned dirs to 0700', async (
     f.clean();
   }
 }, 15000);
-test('leaf temp path bounds stay short under the home scratch root', async () => {
+test('leaf temp path stays inside the socket budget under /tmp for any slug and repo root', async () => {
   const f: Fixture = await fixture();
   try {
     const slug: string = 'a'.repeat(200);
@@ -4004,10 +4004,7 @@ test('leaf temp path bounds stay short under the home scratch root', async () =>
       ', root: ' +
       JSON.stringify(rootTwo) +
       ', config: {} }, slug); ' +
-      'const { basename } = await import(' +
-      JSON.stringify('node:path') +
-      '); ' +
-      'console.log(JSON.stringify({ p1: p1, p2: p2, len: Buffer.byteLength(p1), base: basename(p1), prefix: slug.slice(0, 20) }));';
+      'console.log(JSON.stringify({ p1: p1, p2: p2, len: Buffer.byteLength(p1) }));';
     const env: NodeJS.ProcessEnv = { ...process.env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) };
     delete env.AKROGON_LEAF_TEMP_ROOT;
     const {
@@ -4020,11 +4017,10 @@ test('leaf temp path bounds stay short under the home scratch root', async () =>
     });
     expect(stderr.trim()).toBe('');
     expect(exited).toBe(0);
-    const out: { p1: string; p2: string; len: number; base: string; prefix: string } = JSON.parse(stdout.trim());
-    expect(Buffer.byteLength(out.base)).toBeLessThanOrEqual(33);
-    expect(out.base.startsWith(out.prefix)).toBe(true);
+    const out: { p1: string; p2: string; len: number } = JSON.parse(stdout.trim());
+    expect(out.len).toBeLessThanOrEqual(33);
     expect(out.p1).not.toBe(out.p2);
-    expect(out.p1.startsWith(`${homedir()}/.akrogon/scratch/repo/`)).toBe(true);
+    expect(out.p1.startsWith(`/tmp/akr-${process.getuid!()}/`)).toBe(true);
     expect(existsSync(out.p1)).toBe(false);
     expect(existsSync(out.p2)).toBe(false);
     expect(existsSync(leafTempRoot(f))).toBe(false);
