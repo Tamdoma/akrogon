@@ -673,7 +673,9 @@ for (const path of ['targeted', 'tab_closed', 'pane_hook'] as const) {
         });
         expect(exited.code).toBe(0);
       }
-      const expected: string[] = path === 'tab_closed' ? ['second'] : ['first', 'second'];
+      // Targeted and tab_closed passes close the merged tab via reconciliation;
+      // the pane hooks keep it (seat-A hook never reconciles the owner).
+      const expected: string[] = path === 'targeted' || path === 'tab_closed' ? ['second'] : ['first', 'second'];
       expect(database(f).tabs.map((item) => item.label)).toEqual(expected);
       expect(readState(second).attempts.A).toBe(0);
       for (const untouched of [loose, other]) {
@@ -700,7 +702,8 @@ test('a dependent still blocked by an unmerged leaf stays unallocated after its 
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
     expect((await next(f, ['first'])).code).toBe(0);
-    expect(database(f).tabs.map((item) => item.label)).toEqual(['first']);
+    // Targeted reconciliation closes the merged leaf's tab in the same pass.
+    expect(database(f).tabs.map((item) => item.label)).toEqual([]);
     expect(readState(second).tab).toBeUndefined();
     expect(readState(second).worktree).toBeUndefined();
     expect(readState(second).pane).toEqual({});
@@ -1141,7 +1144,9 @@ test('next awaits sourced completion after a failed rename before removing the w
         .trim()
         .split('\n'),
     ).toHaveLength(2);
-    expect(existsSync(worktree)).toBe(true);
+    // Completion landed inside the targeted pass; reconciliation removes the
+    // closed leaf's worktree in the same pass and a later pass leaves it gone.
+    expect(existsSync(worktree)).toBe(false);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worktree)).toBe(false);
     expect(database(f).tabs).toHaveLength(0);
@@ -1582,9 +1587,17 @@ for (const moved of ['worktree root', 'repo root'] as const) {
       expect(error).toMatch(/expected/i);
       expect(error).toMatch(/move/i);
       expect(error).toMatch(/restore/i);
-      expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
-      expect(existsSync(expected)).toBe(existing);
-      expect(await command(['git', 'worktree', 'list', '--porcelain'], root)).toBe(worktrees);
+      if (moved === 'repo root') {
+        expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
+        expect(existsSync(expected)).toBe(existing);
+        expect(await command(['git', 'worktree', 'list', '--porcelain'], root)).toBe(worktrees);
+      } else {
+        // DC4: the pass migrates the clean old-root worktree even with a
+        // configured destination store, then clears the recorded path.
+        expect(existsSync(recorded)).toBe(false);
+        expect(readState(path).worktree).toBeUndefined();
+        expect(await command(['git', 'worktree', 'list', '--porcelain'], root)).not.toContain(recorded);
+      }
       expect(database(f).prompts).toHaveLength(0);
       expect(database(f).tabs).toHaveLength(0);
     } finally {
@@ -2971,7 +2984,13 @@ test('three consecutive prompt failures fail the leaf during the third pass', as
     expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(3);
     const before: number = calls(f).length;
     expect((await next(f, ['three-fails'])).code).toBe(1);
-    expect(calls(f).length).toBe(before);
+    // Reconciliation may read the pane inventory for cleanup; the contract is
+    // that nothing else happens — no agent action, allocation or tab change.
+    expect(
+      calls(f)
+        .slice(before)
+        .every((args) => args[0] === 'pane' && args[1] === 'list'),
+    ).toBe(true);
   } finally {
     f.clean();
   }
