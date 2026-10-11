@@ -4401,7 +4401,7 @@ test('a dispatched .env file round-trips mixed quotes, backticks and escape-look
 test('next refuses a declared value that cannot be written as dotenv', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_HARD="a\'b`c\\"d\\r"\n');
+    writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_HARD="a\'b`c\\\\\\r"\n');
     yaml(resolve(f.root, 'issues/config.yaml'), {
       checks: { test: 'bun test' },
       grounding: 'none',
