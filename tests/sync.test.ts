@@ -121,6 +121,27 @@ test('sync scopes eligible issue records with the default home worktree store', 
   }
 });
 
+test('sync stages eligible records beside ignored seeds and worktree paths', async () => {
+  const f: Fixture = await remoteFixture();
+  try {
+    put(f, '.gitignore', '.env\nissues/seeds/\nissues/worktrees/\n');
+    await command(['git', 'add', '.gitignore'], f.root);
+    await command(['git', 'commit', '-m', 'ignore'], f.root);
+    await command(['git', 'push'], f.root);
+    put(f, 'issues/seeds/note');
+    put(f, 'issues/worktrees/branch/file');
+    put(f, 'issues/log.jsonl');
+    const result: Result = await cli(f, ['sync']);
+    expect(result.code, result.stderr).toBe(0);
+    expect(await command(['git', 'show', '--format=', '--name-only', 'HEAD'], resolve(f.home, 'remote.git'))).toBe(
+      'issues/log.jsonl',
+    );
+    await locksFree(f);
+  } finally {
+    f.clean();
+  }
+});
+
 test('autostash restoration conflict refuses push and preserves recovery stash', async () => {
   const f: Fixture = await remoteFixture();
   try {

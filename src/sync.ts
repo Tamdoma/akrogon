@@ -3,6 +3,15 @@ import { globalHome, readGlobal, requireRepo, within, worktreeStore, type Global
 import { CommandError, command, run, type Result } from './shell';
 import { withLock } from './state';
 
+function eligibleRecord(root: string, worktree: string, path: string): boolean {
+  return (
+    path.startsWith('issues/') &&
+    !within(resolve(root, path), resolve(root, 'issues/seeds')) &&
+    basename(path) !== '.lock' &&
+    !(within(worktree, root) && within(resolve(root, path), worktree))
+  );
+}
+
 export async function syncCommand(cwd: string): Promise<void> {
   const global: GlobalConfig = readGlobal();
   const repo: Repo = await requireRepo(global, cwd);
@@ -21,14 +30,7 @@ export async function syncCommand(cwd: string): Promise<void> {
     );
     const excluded: string[] = stagedPaths
       .split('\0')
-      .filter(
-        (path: string) =>
-          path !== '' &&
-          (!path.startsWith('issues/') ||
-            within(resolve(repo.root, path), resolve(repo.root, 'issues/seeds')) ||
-            basename(path) === '.lock' ||
-            (within(worktree, repo.root) && within(resolve(repo.root, path), worktree))),
-      );
+      .filter((path: string) => path !== '' && !eligibleRecord(repo.root, worktree, path));
     if (excluded.length > 0)
       throw new Error(`Cannot sync with staged paths outside eligible issue records:\n${excluded.join('\n')}`);
 
@@ -106,15 +108,29 @@ export async function syncCommand(cwd: string): Promise<void> {
       if (collisions.length > 0) throw new Error(`Cannot sync over ignored operator paths:\n${collisions.join('\n')}`);
     }
 
-    if (worktree !== repo.root) {
-      const paths: string[] = [
+    const changed: string = await command(
+      [
+        'git',
+        'ls-files',
+        '-z',
+        '--modified',
+        '--deleted',
+        '--others',
+        '--exclude-standard',
+        '--',
         ':(top,literal)issues',
-        ':(top,exclude,literal)issues/seeds',
-        ':(top,exclude,glob)**/.lock',
-        ...(within(worktree, repo.root) ? [`:(top,exclude,literal)${relative(repo.root, worktree)}`] : []),
-      ];
-      await command(['git', 'add', '-A', '--', ...paths], repo.root);
-    }
+      ],
+      repo.root,
+    );
+    const records: string[] = [...new Set(changed.split('\0'))].filter(
+      (path: string) => path !== '' && eligibleRecord(repo.root, worktree, path),
+    );
+    if (records.length > 0)
+      await command(
+        ['git', '--literal-pathspecs', 'add', '-A', '--pathspec-from-file=-', '--pathspec-file-nul'],
+        repo.root,
+        records.join('\0'),
+      );
     const diffArgs: string[] = ['git', 'diff', '--cached', '--quiet'];
     const staged: Result = await run(diffArgs, repo.root);
     if (staged.code === 1) await command(['git', 'commit', '-m', 'sync issues'], repo.root);
