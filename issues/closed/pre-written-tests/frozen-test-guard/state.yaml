@@ -1,0 +1,33 @@
+slug: frozen-test-guard
+phase: merged
+created: 2026-10-10
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#78"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 3
+verdict: 
+  {}
+tab: w8:tAN
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/frozen-test-guard
+pane: 
+  A: w8:pMC
+  B: w8:pMD
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-10T22:28:20.554Z

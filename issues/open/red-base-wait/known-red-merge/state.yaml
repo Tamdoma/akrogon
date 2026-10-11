@@ -1,0 +1,11 @@
+slug: known-red-merge
+phase: plan.synthesis
+created: '2026-10-10'
+repo: akrogon
+debate: 'no'
+blocked-by:
+  - known-red-leaf
+  - base-run
+sources:
+  - Tamdoma/akrogon#76
+  - Tamdoma/akrogon#77

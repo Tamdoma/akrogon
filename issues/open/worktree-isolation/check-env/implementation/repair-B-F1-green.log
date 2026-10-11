@@ -1,0 +1,11 @@
+bun test v1.4.2 (744846f84)
+
+tests/merge-attempts.test.ts:
+(pass) a merge turn records the FFmpeg version using its real version option [367.84ms]
+(pass) a failed or empty version probe fails dispatch with command context [126.68ms]
+
+ 2 pass
+ 26 filtered out
+ 0 fail
+ 11 expect() calls
+Ran 2 tests across 1 file. [516.00ms]

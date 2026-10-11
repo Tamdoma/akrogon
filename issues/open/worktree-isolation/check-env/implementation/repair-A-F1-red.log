@@ -1,0 +1,46 @@
+bun test v1.4.2 (744846f84)
+
+tests/check-names.test.ts:
+24 |       const [stdout, stderr, code]: [string, string, number] = await Promise.all([
+25 |         new Response(child.stdout).text(),
+26 |         new Response(child.stderr).text(),
+27 |         child.exited,
+28 |       ]);
+29 |       expect({ code, stderr }).toEqual({ code: 0, stderr: '' });
+                                    ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "code": 0,
+-   "stderr": "",
++   "code": 1,
++   "stderr": 
++ "91 |     env.AKROGON_BASE = await base(repo, cwd);
++ 92 |     for (const key of repo.config.env) {
++ 93 |       const value: string | undefined = process.env[key];
++ 94 |       if (value !== undefined) env[key] = value;
++ 95 |     }
++ 96 |     const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(argv, {
++                                                                      ^
++ error: Executable not found in $PATH: "words"
++   path: "words",
++  errno: -2,
++   code: "ENOENT"
++ 
++       at runCheck (/home/ivan/Work/infra/akrogon/issues/worktrees/check-env/src/run-check.ts:96:65)
++ 
++ Bun v1.4.2 (Linux x64)
++ "
++ ,
+  }
+
+- Expected  - 2
++ Received  + 19
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/check-env/tests/check-names.test.ts:29:32)
+(fail) printed checks preserve names containing spaces and slashes in argv and log filenames [114.74ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [133.00ms]

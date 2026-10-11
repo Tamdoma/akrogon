@@ -1,0 +1,17 @@
+frozen-test-guard: F1. `design.md:23` accepts any trailer in `<target>..HEAD`, so a planning trailer for an existing test already authorizes every later edit to that recorded path (`src/phase.ts:355-366`). Tie the citation to the change since the recorded content, rather than reuse an earlier citation, or the freeze does not enforce Taken Q1.
+
+frozen-test-guard: F2. Recording only paths changed during planning (`brief.md:4,12`; `design.md:22`) leaves unchanged custom proof scripts, expected fixtures and skip configuration outside the record. An unchanged `scripts/proof.ts` later modified is neither recorded nor matched by `src/test-files.ts:19-26`. Specify how all declared frozen paths enter the record, including unchanged ones, and which leaf supplies that declaration (Taken Q1, `forks/test-authorship.md:28`).
+
+frozen-test-guard: F3. `design.md:25` leaves stack checks state-blind, but carried members enter `merged` through `commitMove`, bypassing `transition` (`src/phase.ts:498-500,763-765`). Their recorded paths and added tests therefore miss the promised later-move guard (`brief.md:13-15`). Apply the new check to each member's applied range/head before push, while retaining the existing citation checks.
+
+frozen-test-guard: F4. `design.md:22` records planning deletions as absent, while `brief.md:12` requires every entry to have a content id and `:13` refuses any missing recorded path. Define an explicit absence value and compare absence with that value, or exclude these paths consistently. The current contract gives an implementer conflicting rules for a valid planning deletion.
+
+frozen-test-guard: F5. `design.md:22` requires adding the command-owned field to the shapes list, which is actually `skills/chart-issues/assets/shapes.md:276`; `brief.md:6` does not own that file, and no-leaf-rigs owns only its audit region. Assign this required edit an owner.
+
+no-leaf-rigs: F6. `brief.md:14` and `design.md:22` require each proof command to exist at `AKROGON_BASE`, but planner-written-tests creates new test files after that base (`planner-written-tests/brief.md:12`). Distinguish an existing reusable runner from the newly committed planned tests and inputs it runs, or an ordinary planned `bun test <new-file>` conflicts with the other leaf.
+
+no-leaf-rigs: F7. “No leaf builds its own proof machinery” (`brief.md:4`) conflicts with the prerequisite machinery leaf required by `:13`. Scope the prohibition to machinery invented to prove a product leaf, explicitly permitting a leaf whose delivered product is that reusable machinery and naming how it is independently proved.
+
+no-leaf-rigs: F8. The one-file test definition and classification of fixture/cleanup orchestration as machinery (`brief.md:4`; `design.md:20`) add a file-count restriction absent from Taken Q1. They also leave ordinary temporary-repo tests ambiguous (`frozen-test-guard/design.md:18`; `tests/phase.test.ts:13-23`). Define the prohibited runner by its function, while allowing planned tests to use existing fixture and cleanup helpers.
+
+frozen-test-guard: F9. Criterion 7 (`brief.md:18`, also `planner-written-tests/brief.md:18` and `no-leaf-rigs/brief.md:18`) makes repository-wide format/typecheck/test success a done-criterion without naming the property no smaller proof establishes. `skills/chart-issues/assets/shapes.md:286` refuses repository-health criteria outside ownership. Keep required commands as validation, or name the owned property requiring each whole-repository run.

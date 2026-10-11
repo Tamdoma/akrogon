@@ -1,0 +1,34 @@
+bun test v1.4.2 (744846f84)
+
+tests/config.test.ts:
+(pass) seats throws SeatIndexError naming the file and seat for malformed indexes [47.66ms]
+(pass) seats resolves index seats nearest-first and reports each seat source [48.56ms]
+(pass) config printed check skips both sides of a || b when the frozen lockfile mismatches [133.34ms]
+(pass) leafTemp defaults to the home scratch root and keeps the override [0.61ms]
+(pass) config reports merge_checks separately from checks [141.12ms]
+(pass) config runs all of setup inside the install lock [144.00ms]
+(pass) config leaves merge_covers unwrapped when setup is set [95.68ms]
+(pass) config defaults merge_covers to empty and prints it [143.88ms]
+(pass) config requires explicit grounding [150.23ms]
+(pass) config printed check installs into a fresh worktree without a separate install step [154.70ms]
+(pass) config printed check resolves the worktree lockfile version over the root install [156.53ms]
+(pass) commonDirectory spawns git once per call and reports failures with cwd [160.36ms]
+(pass) config refuses unknown merge_covers names and empty merge_checks with covers [154.80ms]
+(pass) config printed checks run concurrently in one worktree and leave it clean [163.84ms]
+(pass) config prints merged slots from root, linked worktree, and global outside [191.29ms]
+(pass) config prints per-repo merged slots with two overrides [193.78ms]
+(pass) config composes setup into printed checks, merge_checks and advisory identically from worktree [193.30ms]
+(pass) config prints worktree_store matching the leaf path for every root shape and caller [267.91ms]
+(pass) config prints direct, defaults it to false, and rejects non-boolean values [306.14ms]
+(pass) config rejects invalid slots shapes and accepts empty slots [398.16ms]
+(pass) config combines defaults and repo values, reports none, and recalculates worktree base [467.70ms]
+(pass) config prints leaf-resolved slots in a managed leaf worktree only [468.78ms]
+(pass) config accepts env and tools lists and refuses bad and reserved env names [506.37ms]
+
+tests/check-names.test.ts:
+(pass) printed checks preserve names containing spaces and slashes in argv and log filenames [178.21ms]
+
+ 24 pass
+ 0 fail
+ 216 expect() calls
+Ran 24 tests across 2 files. [763.00ms]

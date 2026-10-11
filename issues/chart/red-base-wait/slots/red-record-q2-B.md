@@ -1,0 +1,57 @@
+# red-record Q2 reopened: blind notes, Slot B
+
+Operator correction is binding: no manual triage, owner assignment or charting step. This replaces B's prior notice/operator-owned recommendation. No red-record-q2-A read. All inspected sources below dated 2026-10-10. No implementation, issue filing or lifecycle mutation performed.
+
+## Q2. Exactly one automatic fixer using the existing lifecycle
+
+1. Pick, reason and cost
+
+Recommend one dedicated automatically opened repair leaf for each active incident, assigned by the command under the existing mutation lock, then executed by the normal leaf seats. The detecting leaf continues under the accepted differential policy. The repair leaf is the owner, not a GitHub seed, the detecting seat session or an arbitrary unrelated leaf. Its scope is the observed defect and its necessary directly related repair, with existing evidence and the exact failing command/unit as its input. It must preserve the intended test contract, prove the repair and undergo normal review before normal merge. No change to the finding leaf's original contract is needed.
+
+Minimal new addition: a narrow command-owned incident-to-repair-leaf operation, with an idempotent claim and persistent owner generation, plus reconciliation on existing lifecycle events. It creates the normal owner/brief/design/state files from a defined incident repair contract, state last, and dispatches the ordinary planning phase. This automatic contract-opening operation does not exist today. It is necessary to guarantee a runnable repair owner when no suitable original leaf remains. Reusing the lifecycle is feasible; claiming that seed/pull/watch already opens and assigns the leaf would be false.
+
+Creation/claim protocol: while locked, reread the incident and current owner, reuse a valid owner or reserve one deterministic leaf identity for that incident generation. Never create another because a seat session changed. Complete the small local contract write with recovery for a reserved/incomplete creation, publish valid state last, then dispatch outside the lock. Two concurrent reporters obtain the same owner. Existing max_active, pause, inputs and seat availability still govern execution. Claims authorize only that incident's repair, not arbitrary cleanup or new external permissions.
+
+Cost: this adds automatic opening of a constrained repair contract and its reconciliation, and usually another lifecycle run. It is more code than adding a claim field to a reporting leaf, but isolates repair from unrelated feature failures, permits work after the reporter completes and avoids a second implementation/review/merge system.
+
+2. Rejected alternatives
+
+- O1: automatically file a seed. It creates intake, not an executable fixer. Even perfect issue deduplication would leave the manual chart/assignment step the operator rejected.
+- O2: first reporting seat fixes in its current branch. A claim is smaller, but check.review cannot commit while its peer reads the same head; merge stacks cannot accept arbitrary commits; unrelated scope, failures and repair caps become coupled. Transferring ownership after that leaf fails leaves stale repair edits in a feature branch. A mandatory safe transfer/rebase protocol erodes the claimed simplicity.
+- O3: assign some existing idle leaf. Idle is not permission to widen that leaf's contract, and there may be no suitable leaf. This cannot ensure automatic repair after all reporters merge or fail.
+- O4: make the watch edit issue files or conduct repairs directly. Its current role excludes writing state/worktrees and it has no independent reviewed landing contract. That creates a second lifecycle authority.
+- O5: lease expiry/time-based takeover. It violates the no-clock decision and can duplicate a slow but valid fixer. Ownership changes follow actual state transitions and fenced generations instead.
+
+3. Evidence: what already exists
+
+- Operator tier: red-record.md Taken reopens Q2 with “I'm not touching anything manually” and asks for existing mechanisms. waiting-leaf/comparison/merge-gate Taken retains normal leaf progress, proof, review, single merge turn and landed-target resolution. These require automatic owner creation/assignment, not automatic reporting alone.
+- better-than-training: src/state.ts:194 onward provides exclusive flock-backed withLock. src/phase.ts:818-819 already rereads a leaf within the mutation lock. Use that boundary to decide/reserve owner identity, not just protect a write after choosing outside it.
+- better-than-training: src/state.ts:129-150 discovers valid open/closed leaf folders; skills/plan-issue/SKILL.md:10-18 consumes normal brief/design and resumes pass artifacts. src/routing.ts:27-54 supplies planning, implementation, blind review, B repair, A fix and merge phases. Normal repair execution need not be invented.
+- better-than-training: src/phase.ts:290-305 aggregates review verdicts and routes Fixes to check.repair; skills/check-issue/SKILL.md:73-89 already repairs, hands larger work to A, proves checks and records scoped commits. src/phase.ts:307-320 enforces the existing repair cap. Keep independent review and test-change citations, not a self-approved fix.
+- better-than-training: src/turn.ts:81-103 orders the eligible merge queue; src/phase.ts:487-499 pushes the tested candidate and completes members; src/next.ts:1291-1302 performs merge wake, and :1309-1323 dispatches dependents. Add repair reconciliation to existing event/phase/dispatch paths; red incidents are not blocked-by dependencies for unrelated leaves.
+- better-than-training: src/park.ts:47-68 performs parking under the lock and refuses allocated running leaves (:22-25,54-56). src/phase.ts:142-180 commits failed/merged states and records transitions. These are concrete invalidation triggers, not elapsed time.
+- better-than-training: skills/seed-issue/SKILL.md:67-84 searches/files reports but creates no lifecycle owner. src/pull.ts:64-75 mirrors GitHub bodies into seeds. skills/watch-issues/SKILL.md:38 currently requires operator charting, and :49-56 prohibits editing state/worktrees or opening jobs from a tick. None is an existing automatic contract opener.
+- Operator tier: learnings/history/2026-10-10-red-main-hold-stale-clear.md:6-8 demonstrates why claim/release must reread and compare identity inside the lock.
+
+4. Pitfalls and what removes each
+
+Exactly one means one current authorized fixer per incident, not one historical attempt forever. Store incident identity, owner leaf and monotonically changing claim generation. Prompts, repair proof and merge authorization reference that generation. Recheck ownership before accepting repair completion or allowing an obsolete repair owner's push. A stale seat cannot regain authority by resuming old artifacts. Fencing controls accepted lifecycle mutations; it cannot stop an already-running agent from making local edits. Preserve those edits as evidence and never submit them under an expired repair grant.
+
+Failed holder: on the committed failure transition, fence/release its claim and retain cause, partial work and attempts; the event-driven coordinator selects the successor automatically. Do not reopen or silently clean the failed leaf. Successors may reuse reviewed/proven partial work only through their explicit repair contract and review. Do not reset the incident's attempt history by creating a fresh leaf. Retry/reassignment limits must be a settled incident policy, not unlimited fresh fix_rounds. A permanent missing permission cannot be solved by endlessly assigning another identical identity.
+
+Parked holder: a successful park transition releases/fences ownership and chooses a successor; an attempted park that is refused changes nothing. If parking was intended to suspend the incident repair itself rather than just that failed attempt, automatic recreation would defeat the operator's action. Define that distinction; preserve explicit repo pause. No clock is used.
+
+Merged holder: merge alone never resolves the incident. After the exact candidate lands, perform the required green proof against landed main with equivalent conditions and the recorded full command/scope, accounting for this unit explicitly. Persist a verification-pending job in the incident before completion/cleanup can lose the obligation. Run it through an existing seat/event-driven dispatch path, outside the mutation lock. This post-landing obligation is an addition; today's merged phase has no seats (src/routing.ts:36). Do not pretend a pre-push green result or a merge notification is the requested post-landing run. A completed matching landed-target green proof resolves under lock. A completed red proof releases/fences the ineffective owner and creates the next repair attempt automatically. Missing/crashed verification is unverified and retries/recovery follow a declared bounded policy, never false resolution.
+
+The owner must not land a claimed repair leaf whose designated test remains only known-red-on-base: the repair outcome is its own required criterion. Differential acceptance still applies to other unrelated base reds. If a successor or unrelated fix resolves the unit, stale owners must reconcile their contract before push rather than keep making an already-solved repair. Do not globally hold other merges while repair or post-landing verification runs.
+
+Liveness is event-driven. Claim loss is reconciled on phase/park/merge and subsequent next/startup passes, and optionally the already-started watch invokes that command path. If all event sources are silent or the repo is paused, no no-clock design can guarantee immediate execution. This limits scheduling, not assignment. Status must show the current owner, verification pending or a concrete exhausted/permission blocker without asking for manual triage as the normal path.
+
+5. Questions still needed before handoff
+
+- Q1: authorize the narrow automatic repair contract opener and define its complete brief/design/criteria shape. Without that addition, existing tools cannot guarantee an independent runnable fixer. The chart must settle this, not let implementation invent a general issue generator.
+- Q2: choose the incident-wide recovery bound and treatment of permanent capability failures. Existing per-leaf caps cannot prevent endless replacement leaves. “No operator action” cannot grant absent external permissions or prove an unknown failure safe to repair. Specify the supported automatic repair boundary and report unsupported capability without pretending it was fixed.
+- Q3: choose where the persisted post-landing verification executes using existing seats, how interruption resumes it and which landed revision/conditions it must test. Its execution must be a real criterion with event-driven recovery, not just a record field.
+- Q4: define parking semantics for an automatically created repair and the fencing behavior of expired repair branches, including whether a successor explicitly adopts useful partial commits. Ordinary feature leaves never inherit a repair obligation merely because they are idle.
+
+These are material extensions of automatic ownership, not requests for the operator to perform manual fixes. If the door instead selects attaching repair to an existing reporter, it must explicitly solve the no-eligible-leaf case, blind-review/stack mutation rules, expired branch handling and post-landing proof before claiming exactly one automatic fixer.

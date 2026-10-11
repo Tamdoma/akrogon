@@ -1,0 +1,10 @@
+bun test v1.4.2 (744846f84)
+
+tests/run-check.test.ts:
+(pass) printed checks refuse before setup and isolate both setup and check environments [124.14ms]
+
+ 1 pass
+ 13 filtered out
+ 0 fail
+ 11 expect() calls
+Ran 1 test across 1 file. [139.00ms]

@@ -1,0 +1,7 @@
+# Focused final check, Slot B
+
+Disagreements/gaps only. Evidence read 2026-10-10.
+
+- F1 · CHART.md Destination's unconditional “A red main never stops, parks or fails a leaf” exceeds waiting-leaf/comparison Taken. Missing required coverage, incomplete runs and unmet leaf criteria still block, even when broken base prevents their proof. Qualify the destination to completed, attributed known-red-on-base outcomes and retain those explicit boundaries. Evidence: operator tier, CHART.md Destination; waiting-leaf Taken F1/F2; comparison Taken Q2.
+
+- F2 · No-reuse must explicitly settle merge's existing `reuse` route. That route preserves the older tested pair after restacking (src/phase.ts:553-558,657-659, inspected 2026-10-10). Its comparison can contain old negative counterpart evidence. An implementer must not infer that code/config equivalence permits reusing that evidence after the operator cut. State whether a restacked candidate carrying an accepted known-red comparison must rerun the changed-side checks/retry and its counterpart, while ordinary green-only merge reuse remains under its existing rule. If the cut also removes green-only reuse, say so explicitly. Evidence: operator tier, base-evidence-reuse Taken forbids earlier counterpart evidence; merge-gate Taken preserves normal tested-top/check/push flow but does not settle this existing reuse branch. This is a required contract decision, not a new cache or ownership feature.

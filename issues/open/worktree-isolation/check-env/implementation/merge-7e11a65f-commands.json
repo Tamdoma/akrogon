@@ -1,0 +1,22 @@
+{
+  "base": "b8826604744a37152eba9769f065beab42cba4ad",
+  "top": "309d742605a0516067840863ffdf3be29b03fc0c",
+  "commands": [
+    [
+      "format",
+      "akrogon run-check --name 'format' -- sh -c 'bun run format'"
+    ],
+    [
+      "test",
+      "akrogon run-check --name 'test' -- sh -c 'bun test --timeout=30000'"
+    ],
+    [
+      "typecheck",
+      "akrogon run-check --name 'typecheck' -- sh -c 'bun run typecheck'"
+    ],
+    [
+      "test_changed",
+      "akrogon run-check --name 'test_changed' -- sh -c ': \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\" --timeout=30000'"
+    ]
+  ]
+}

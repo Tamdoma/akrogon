@@ -1,7 +1,33 @@
 slug: check-env
-phase: plan.synthesis
-created: '2026-10-10'
+phase: merged
+created: 2026-10-10
 repo: akrogon
-debate: 'no'
-blocked-by: []
-sources: []
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  []
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAM
+worktree: /home/ivan/Work/infra/akrogon/issues/worktrees/check-env
+pane: 
+  A: w8:pMA
+  B: w8:pMB
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-10T21:57:59.239Z

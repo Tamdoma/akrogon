@@ -1,1 +1,7 @@
-{}
+framework: 
+  sha: caa617ec986c15fe9d79fe1a427bdf2fd21bb8a7
+  command: "flock \"$(git rev-parse --git-path akrogon-install.lock)\" sh -c 'bun install --frozen-lockfile' && sh -c 'bun run framework:verify'"
+  holder: recording-consumers
+  attempt: 45faa16c-c6e2-4edd-aacf-50a88f54c741
+  at: 2026-10-10T22:21:44.206Z
+  evidence: /home/ivan/Work/infra/tamdoma/framework/issues/open/worktree-isolation/recording-consumers/review-B.md

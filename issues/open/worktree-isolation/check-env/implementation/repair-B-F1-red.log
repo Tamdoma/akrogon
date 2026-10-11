@@ -1,0 +1,45 @@
+bun test v1.4.2 (744846f84)
+
+tests/merge-attempts.test.ts:
+1008 |     chmodSync(tool, 0o755);
+1009 |     yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', tools: ['ffmpeg'] });
+1010 |     const holder: string = leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
+1011 |     const result: Result = await cli(f, ['next'], f.root, herdr.env);
+1012 |     expect(result.code).toBe(0);
+1013 |     expect(readState(holder).batch?.tools).toEqual([{ name: 'ffmpeg', path: tool, version: 'ffmpeg version n9.0.2' }]);
+                                                  ^
+error: expect(received).toEqual(expected)
+
+  [
+    {
+      "name": "ffmpeg",
+      "path": "/tmp/akrogon-1000/check-env-c5b0ad06f37f/akrogon-mU37Pe/bin/ffmpeg",
+-     "version": "ffmpeg version n9.0.2",
++     "version": "unknown",
+    },
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/check-env/tests/merge-attempts.test.ts:1013:44)
+(fail) a merge turn records the FFmpeg version using its real version option [480.24ms]
+1025 |       writeFileSync(tool, `#!/bin/sh\n${script}\n`);
+1026 |       chmodSync(tool, 0o755);
+1027 |       yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', tools: ['tool-a'] });
+1028 |       const holder: string = leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
+1029 |       const result: Result = await cli(f, ['next'], f.root, herdr.env);
+1030 |       expect(result.code).not.toBe(0);
+                                     ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/issues/worktrees/check-env/tests/merge-attempts.test.ts:1030:31)
+(fail) a failed or empty version probe fails dispatch with command context [502.49ms]
+
+ 0 pass
+ 26 filtered out
+ 2 fail
+ 3 expect() calls
+Ran 2 tests across 1 file. [1017.00ms]

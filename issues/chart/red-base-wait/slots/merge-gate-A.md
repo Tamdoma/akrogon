@@ -1,0 +1,12 @@
+# Merge gate, slot A notes
+
+## Q1 does the merge turn adopt the same rule
+- Pick: yes. A red merge run (every uncovered `checks` command then every `merge_checks` command on the rebased stack, skills/merge-issue/SKILL.md:41,51,71) takes comparison's rule: one same-command retry, then per-test comparison against the fetched-main target the stack is rebased on. Failures red on both sides are known-red, recorded, and the stack pushes when nothing is new. New failures keep today's culprit/split path (:73). The `--red-on-base` ending that holds every merge (src/phase.ts:797-801,844-877) is removed. Reason: a leaf that may continue to merge but then stops at merge only moves the pile-up; waiting-leaf removed waiting. Cost: main can stay red longer, since merges do not force the fix; red-record must give the red an owner. A new failure inside an already-red test is still hidden (accepted, same as per-test granularity anywhere).
+- Rejected: keep the hold at merge (leaves pile at merge, the #67 machinery and its stale-clear lesson stay); hold only stacks whose diff touches the red test's files (file overlap is not causality).
+- Evidence: better-than-training, skills/merge-issue/SKILL.md:41-73, src/next.ts:1044-1072, src/hold.ts read 2026-10-10. Practitioner: Chromium CQ ignores failures that also fail without the patch (cq.md, read 2026-10-10). B's earlier note: Chromium separately closes the tree for build breakage; our pause command stays the manual freeze.
+- Pitfalls: target moves between run and push: today's fetch/refusal path already reruns on a new base; the comparison must name the exact target sha (comparison Taken F4).
+
+## Q2 existing held.yaml and hold-fix/unhold
+- Pick: delete the hold (src/hold.ts, `hold-fix`, `unhold` hold printing, status hold line, mergeHolder fix routing). A held.yaml found at upgrade is reported once by `akrogon status` and ignored, never read for gating. None exists on this machine today (~/.config/akrogon holds only env, checked 2026-10-10). The red record (red-record fork) is a new record, not the hold reshaped, because the hold's fields (holder, attempt, fix) are merge coordination.
+- Rejected: reshape held.yaml into the red record (mixes two meanings in one file, migration of old shape).
+- Pitfall: lesson 2026-10-10 red-main-hold stale clear: its guard retires with the hold; the lesson line is retired with a criterion naming the history path.
