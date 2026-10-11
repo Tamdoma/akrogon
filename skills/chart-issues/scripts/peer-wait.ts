@@ -69,7 +69,15 @@ const IDLE_GRACE_MS: number = 10000;
 async function runWait(pane: string, timeoutMs: number, until: string[]): Promise<RunResult | null> {
   try {
     const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(
-      ['herdr', 'agent', 'wait', pane, '--timeout', String(timeoutMs), ...until.flatMap((u: string): string[] => ['--until', u])],
+      [
+        'herdr',
+        'agent',
+        'wait',
+        pane,
+        '--timeout',
+        String(timeoutMs),
+        ...until.flatMap((u: string): string[] => ['--until', u]),
+      ],
       { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
     );
     const [stdout, stderr, code]: [string, string, number] = await Promise.all([
@@ -106,7 +114,8 @@ function claudeTurnOpen(session: string): boolean {
   const matches: string[] = Array.from(
     new Bun.Glob(`*/${session}.jsonl`).scanSync({ cwd: `${homedir()}/.claude/projects`, absolute: true }),
   );
-  if (matches.length !== 1) throw new Error(`Expected one Claude transcript for session ${session}, found ${matches.length}`);
+  if (matches.length !== 1)
+    throw new Error(`Expected one Claude transcript for session ${session}, found ${matches.length}`);
   const lines: string[] = readFileSync(matches[0], 'utf8').trimEnd().split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
     const parsed = transcriptLineSchema.safeParse(parseJson(lines[i]));

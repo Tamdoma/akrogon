@@ -198,7 +198,14 @@ function paint(code: string, text: string): string {
   return colorEnabled && code !== '' && text !== '' ? `\x1b[${code}m${text}\x1b[0m` : text;
 }
 
-const phaseColor: Record<string, string> = { plan: '34', implement: '33', check: '35', merge: '32', failed: '31', parked: '2' };
+const phaseColor: Record<string, string> = {
+  plan: '34',
+  implement: '33',
+  check: '35',
+  merge: '32',
+  failed: '31',
+  parked: '2',
+};
 
 const stageColor: Record<string, string> = { 'handed off': '32', charting: '33', empty: '2' };
 
