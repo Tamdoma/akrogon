@@ -276,6 +276,7 @@ export async function transition(
   checkOnly: boolean,
   onCommitted?: () => void,
   compareFiles: string[] = [],
+  from?: string,
 ): Promise<void> {
   const state: State = readState(leaf.path);
   if (checkOnly && requested === 'failed') throw new Error('--check cannot move to failed');
@@ -320,10 +321,10 @@ export async function transition(
   }
   if (state.worktree !== undefined && !(state.phase === 'failed' && state.failure?.cause === 'blocked'))
     await requireClean(state.worktree);
-  if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path);
-  if (state.worktree !== undefined) await requireTestChangeCitations(repo, state.worktree);
+  if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path, from);
+  if (state.worktree !== undefined) await requireTestChangeCitations(repo, state.worktree, from);
   if (state.worktree !== undefined && state.frozen !== undefined)
-    await requireFrozenCitations(repo, state.worktree, state.frozen, state.frozen_cited);
+    await requireFrozenCitations(repo, state.worktree, state.frozen, state.frozen_cited, from);
   if (requested === 'check.review' && state.worktree !== undefined) await requireNonEmpty(repo, state.worktree);
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
@@ -650,7 +651,7 @@ async function batchPush(
     saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head, recorded: true } });
     for (const entry of members)
       await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
-    await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted);
+    await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted, [], record.built_on);
     return { kind: 'none' };
   }
   if (pushed.stderr.includes('non-fast-forward') || pushed.stderr.includes('[rejected]')) {
@@ -915,7 +916,7 @@ async function finishPush(
       const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
       for (const entry of members)
         await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
-      await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted);
+      await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted, [], batch.built_on);
     });
     return;
   }
