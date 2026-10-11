@@ -6,6 +6,7 @@ import {
   readFileSync,
   realpathSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -133,13 +134,13 @@ export async function baseRun(
     appendFileSync(recordsPath(repo), JSON.stringify(record) + '\n');
   });
   const scratch: string = leafTemp(repo, leaf.state.slug);
+  mkdirSync(scratch, { recursive: true, mode: 0o700 });
+  const runRoot: string = mkdtempSync(resolve(scratch, 'run-'));
   let code: number = 1;
   let removed: string | undefined;
   try {
     await createSparseWorktree(repo, target, baseSha, { detach: true });
     await emitEnvFile(repo, target, leaf.state.env_names);
-    mkdirSync(scratch, { recursive: true, mode: 0o700 });
-    const runRoot: string = mkdtempSync(resolve(scratch, 'run-'));
     writeFileSync(
       join(runRoot, '.owner'),
       JSON.stringify({ pid: process.pid, boot_id: record.boot_id, started: record.start }),
@@ -162,6 +163,7 @@ export async function baseRun(
     code = ran.code;
     process.stdout.write(`log: ${log}\nstatus: ${ran.code}\n`);
   } finally {
+    rmSync(runRoot, { recursive: true, force: true });
     if (existsSync(target)) {
       await command(['git', 'worktree', 'remove', '--force', target], repo.root);
       removed = new Date().toISOString();
