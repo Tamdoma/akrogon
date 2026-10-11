@@ -17,6 +17,7 @@ export async function integrate(
   opts: {
     checkStaged?: boolean;
     pre?: (incoming: string) => Promise<string | null>;
+    after?: (pushed: string | null, incoming: string) => Promise<void>;
   },
   move: (incoming: string) => Promise<{ tip: string | null } | { conflict: { paths: string[] } }>,
 ): Promise<{ pushed: string | null; incoming: string; skip: string | null }> {
@@ -121,8 +122,12 @@ export async function integrate(
 
     const moved: { tip: string | null } | { conflict: { paths: string[] } } = await move(incoming);
     if ('conflict' in moved) throw new Error(`record conflict: ${moved.conflict.paths.join(', ')}; run akrogon sync`);
-    if (moved.tip === null) return { pushed: null, incoming, skip: null };
+    if (moved.tip === null) {
+      if (opts.after !== undefined) await opts.after(null, incoming);
+      return { pushed: null, incoming, skip: null };
+    }
     await command(['git', 'push', repo.config.remote, `${moved.tip}:${repo.config.default_branch}`], repo.root);
+    if (opts.after !== undefined) await opts.after(moved.tip, incoming);
     return { pushed: moved.tip, incoming, skip: null };
   });
 }

@@ -24,19 +24,23 @@ function paths(output: string): string[] {
 }
 
 type GitResult =
-  | { kind: 'failed'; line: string }
-  | { kind: 'skipped'; skip: string }
-  | { kind: 'done'; pushed: string | null; incoming: string };
+  { kind: 'skipped'; skip: string } | { kind: 'done'; pushed: string | null; incoming: string; move: Move };
 
-async function gitStage(repo: Repo, target: string, lag: () => Promise<string>): Promise<GitResult> {
+async function gitStage(repo: Repo, own: boolean, target: string, lag: () => Promise<string>): Promise<GitResult> {
   const root: string = repo.root;
-  const fetched: Result = await run(['git', 'fetch', repo.config.remote, repo.config.default_branch], root);
-  if (fetched.code !== 0)
-    return { kind: 'failed', line: `fetch failed: ${errorLine(fetched)}; ${await lag()}; retried at the next trigger` };
   const symbolic: Result = await run(['git', 'symbolic-ref', '--short', 'HEAD'], root);
-  if (symbolic.code !== 0) return { kind: 'skipped', skip: `detached HEAD; ${await lag()}` };
-  if (symbolic.stdout !== repo.config.default_branch)
-    return { kind: 'skipped', skip: `on ${symbolic.stdout}, not ${repo.config.default_branch}; ${await lag()}` };
+  if (symbolic.code !== 0 || symbolic.stdout !== repo.config.default_branch) {
+    // The pass's single fetch (integrate's) is unreachable from here; refresh
+    // the tracking ref so the skip line reports a current lag.
+    await command(['git', 'fetch', repo.config.remote, repo.config.default_branch], root);
+    return {
+      kind: 'skipped',
+      skip:
+        symbolic.code !== 0
+          ? `detached HEAD; ${await lag()}`
+          : `on ${symbolic.stdout}, not ${repo.config.default_branch}; ${await lag()}`,
+    };
+  }
   const local: string = await command(['git', 'rev-parse', 'HEAD'], root);
   const scratch: string = leafTemp(repo, 'self-update');
   const store: string = worktreeStore(repo);
@@ -46,6 +50,10 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
     ).split('\t');
     return `${counts[1] === '0' ? 'ahead of' : 'diverged from'} ${target}; ${counts[1]} behind ${target}; run akrogon sync`;
   };
+  // Other checkouts only move after a push of their own record commits:
+  // pulling remote changes into a repo akrogon does not own is not this
+  // path's job (and remote record shapes must not reach discover here).
+  let move: Move = { state: 'none' };
   const integrated: { pushed: string | null; incoming: string; skip: string | null } = await integrate(
     repo,
     {
@@ -65,6 +73,9 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
           if (changed.some((path: string) => !eligibleRecord(root, store, path))) return await skipAhead(incoming);
         }
         return null;
+      },
+      after: async (pushed: string | null, incoming: string): Promise<void> => {
+        move = own || pushed !== null ? await moveCheckout(repo, pushed ?? incoming) : { state: 'none' };
       },
     },
     async (incoming: string) => {
@@ -95,76 +106,37 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
     },
   );
   if (integrated.skip !== null) return { kind: 'skipped', skip: integrated.skip };
-  return { kind: 'done', pushed: integrated.pushed, incoming: integrated.incoming };
+  return { kind: 'done', pushed: integrated.pushed, incoming: integrated.incoming, move };
 }
 
 type Move = { state: 'none' } | { state: 'moved'; old: string } | { state: 'pending'; detail: string };
 
-async function ignoredAt(repo: Repo, ref: string, candidates: string[]): Promise<string[]> {
-  if (candidates.length === 0) return [];
-  const root: string = repo.root;
-  const probe: string = leafTemp(repo, 'self-update');
-  rmSync(probe, { recursive: true, force: true });
-  await command(['git', 'worktree', 'prune'], root);
-  try {
-    mkdirSync(dirname(probe), { recursive: true });
-    await command(['git', 'worktree', 'add', '--detach', probe, ref], root);
-    const ignored: string[] = [];
-    for (const path of candidates)
-      if ((await run(['git', 'check-ignore', '--no-index', '-q', '--', path], probe)).code === 0) ignored.push(path);
-    return ignored;
-  } finally {
-    await run(['git', 'worktree', 'remove', '--force', probe], root);
-    rmSync(probe, { recursive: true, force: true });
-    await command(['git', 'worktree', 'prune'], root);
-  }
-}
-
-async function moveCheckout(repo: Repo, moveTo: string, dropLocal: boolean): Promise<Move> {
+async function moveCheckout(repo: Repo, moveTo: string): Promise<Move> {
   const root: string = repo.root;
   const behind: string = await command(['git', 'rev-list', '--count', `HEAD..${moveTo}`], root);
   if (behind === '0') return { state: 'none' };
   const head: string = await command(['git', 'rev-parse', 'HEAD'], root);
   const refused: Result = await run(['git', 'reset', '--keep', moveTo], root);
   if (refused.code === 0) return { state: 'moved', old: head };
+  // keep refuses when a colliding path is dirty even if it already carries the
+  // target bytes; adopt the index tree when every collider is content-equal.
   const changed: Set<string> = new Set(paths(await command(['git', 'diff', '--name-only', '-z', head, moveTo], root)));
-  const staged: Set<string> = new Set(paths(await command(['git', 'diff', '--cached', '--name-only', '-z'], root)));
-  const untracked: Set<string> = new Set(
-    paths(await command(['git', 'ls-files', '--others', '--exclude-standard', '-z'], root)),
-  );
-  const blocked: Set<string> = new Set([
+  const dirty: Set<string> = new Set([
     ...paths(await command(['git', 'diff', '--name-only', '-z'], root)),
-    ...untracked,
+    ...paths(await command(['git', 'ls-files', '--others', '--exclude-standard', '-z'], root)),
   ]);
-  const colliding: string[] = [...changed].filter((path: string) => blocked.has(path) || staged.has(path));
-  const ignoredColliders: string[] = await ignoredAt(
-    repo,
-    moveTo,
-    colliding.filter((path: string) => untracked.has(path)),
-  );
-  if (ignoredColliders.length > 0)
-    throw new Error(`Cannot sync over ignored operator paths:\n${ignoredColliders.join('\n')}`);
-  const mismatched: string[] = [];
+  const colliding: string[] = [...changed].filter((path: string) => dirty.has(path));
+  const staged: string = await command(['git', 'diff', '--cached', '--name-only'], root);
+  let equal: boolean = staged === '';
   for (const path of colliding) {
+    if (!equal) break;
     const have: Result = await run(['git', 'hash-object', '--', path], root);
     const want: Result = await run(['git', 'rev-parse', `${moveTo}:${path}`], root);
-    if (staged.has(path) || have.code !== 0 || want.code !== 0 || have.stdout !== want.stdout) mismatched.push(path);
+    if (have.code !== 0 || want.code !== 0 || have.stdout !== want.stdout) equal = false;
   }
-  if (mismatched.length === 0) {
-    // reset --keep refuses on stat alone even when the worktree already carries the
-    // target bytes: adopt the tree without rewriting the worktree, then restore
-    // only the paths the move itself deletes (absent at the old head).
-    await command(['git', 'reset', '--quiet', moveTo], root);
-    const missing: string[] = paths(await command(['git', 'ls-files', '--deleted', '-z'], root));
-    const dropped: string[] = [];
-    for (const path of missing)
-      if ((await run(['git', 'cat-file', '-e', `${head}:${path}`], root)).code !== 0) dropped.push(path);
-    if (dropped.length > 0) await command(['git', '--literal-pathspecs', 'checkout', '--', ...dropped], root);
+  if (equal && colliding.length > 0) {
+    await command(['git', 'reset', '--mixed', moveTo], root);
     return { state: 'moved', old: head };
-  }
-  if (dropLocal) {
-    const base: string = await command(['git', 'merge-base', head, moveTo], root);
-    if (base !== head) await run(['git', 'reset', '--keep', base], root);
   }
   return { state: 'pending', detail: errorLine(refused) };
 }
@@ -196,15 +168,16 @@ export async function selfUpdate(repo: Repo, ownRoot: string = toolRoot, home: s
       return `${behind} behind ${target}`;
     };
     const body = async (): Promise<string | null> => {
-      const git: GitResult = await gitStage(repo, target, lag);
-      if (git.kind === 'failed') return git.line;
-      // Other checkouts only move after a push of their own record commits:
-      // pulling remote changes into a repo akrogon does not own is not this
-      // path's job (and remote record shapes must not reach discover here).
-      const move: Move =
-        git.kind === 'done' && (own || git.pushed !== null)
-          ? await moveCheckout(repo, git.pushed ?? git.incoming, git.pushed !== null)
-          : { state: 'none' };
+      let git: GitResult;
+      try {
+        git = await gitStage(repo, own, target, lag);
+      } catch (error) {
+        if (error instanceof CommandError && (error.argv[1] === 'fetch' || error.argv[1] === 'push'))
+          return `${error.argv[1]} failed: ${errorLine(error.result)}; ${await lag()}; retried at the next trigger`;
+        if (error instanceof Error && error.message.startsWith('record conflict:')) return error.message;
+        throw error;
+      }
+      const move: Move = git.kind === 'done' ? git.move : { state: 'none' };
       const failure: string | null = own ? await installStage(root, ownRoot, home) : null;
       if (git.kind === 'skipped') return `self-update skipped: ${git.skip}`;
       if (failure !== null) return `${failure}; ${await lag()}; retried at the next trigger`;
