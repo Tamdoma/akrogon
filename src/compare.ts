@@ -57,7 +57,12 @@ export const comparisonSchema = z.discriminatedUnion('state', [
     base: z.strictObject({ log: nonBlank, complete: z.union([z.literal(true), nonBlank]) }),
     units: z.array(comparedUnitSchema).min(1),
   }),
-  z.strictObject({ ...recordCore, state: z.literal('inconsistent'), units: z.array(inconsistentUnitSchema) }),
+  z.strictObject({
+    ...recordCore,
+    state: z.literal('inconsistent'),
+    retry: z.strictObject({ log: nonBlank, complete: z.literal(true), outcome: z.literal('pass') }),
+    units: z.array(inconsistentUnitSchema),
+  }),
 ]);
 
 export type Comparison = z.infer<typeof comparisonSchema>;
