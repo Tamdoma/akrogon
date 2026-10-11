@@ -75,7 +75,7 @@ Use this order:
 4. Choose an active phase.
 5. Dispatch again.
 
-For CSV export, missing permission may need an operator action. Broken quoting needs code repair. A failed prompt needs delivery diagnosis. Repeating the same recovery without new evidence does not resolve any of those causes.
+For CSV export, missing permission may need an operator action. Broken quoting needs code repair. Repeating the same recovery without new evidence does not resolve any of those causes.
 
 Execution skills record human-only blockers and end the pass. They do not keep a conversation open waiting for an answer.
 
