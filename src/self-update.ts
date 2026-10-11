@@ -48,7 +48,9 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
   );
   // No tracking ref means no remote state to sync against; the preflight C3
   // refusal owns that repair path, so leave the ref absent instead of healing.
-  if (tracking.code !== 0) return { kind: 'done', pushed: null, incoming: local, move: { state: 'none' } };
+  const preLocal: string = await command(['git', 'rev-parse', 'HEAD'], root);
+  if (tracking.code !== 0)
+    return { kind: 'done', pushed: null, incoming: preLocal, move: { state: 'none' } };
   const fetched: Result = await run(['git', 'fetch', repo.config.remote, repo.config.default_branch], root);
   if (fetched.code !== 0)
     throw new CommandError(['git', 'fetch', repo.config.remote, repo.config.default_branch], root, fetched);
@@ -58,7 +60,7 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
   // An up-to-date checkout needs no integration and must not take the global
   // lock: serializing unrelated commands behind a held .lock is not its job.
   if (counts[0] === '0' && counts[1] === '0')
-    return { kind: 'done', pushed: null, incoming: local, move: { state: 'none' } };
+    return { kind: 'done', pushed: null, incoming: preLocal, move: { state: 'none' } };
   const scratch: string = leafTemp(repo, 'self-update');
   const store: string = worktreeStore(repo);
   const skipAhead = async (incoming: string): Promise<string> => {
@@ -68,10 +70,14 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
     return `${counts[1] === '0' ? 'ahead of' : 'diverged from'} ${target}; ${counts[1]} behind ${target}; run akrogon sync`;
   };
   let move: Move = { state: 'none' };
+  // The replay base is captured inside the lock so a commit landed while the
+  // lock was waited on is still replayed instead of overwritten by the move.
+  let base: string = '';
   const integrated: { pushed: string | null; incoming: string; skip: string | null } = await integrate(
     repo,
     {
       pre: async (incoming: string): Promise<string | null> => {
+        base = await command(['git', 'rev-parse', 'HEAD'], root);
         const commits: string[] = (await command(['git', 'rev-list', '--parents', `${incoming}..HEAD`], root))
           .split('\n')
           .filter((line: string) => line !== '');
@@ -90,7 +96,7 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
         return null;
       },
       after: async (pushed: string | null, incoming: string): Promise<void> => {
-        move = await moveCheckout(repo, pushed ?? incoming);
+        move = await moveCheckout(repo, pushed ?? incoming, base);
       },
     },
     async (incoming: string) => {
@@ -101,7 +107,7 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
       try {
         mkdirSync(dirname(scratch), { recursive: true });
         await command(['git', 'worktree', 'add', '--detach', scratch, incoming], root);
-        const rebaseArgs: string[] = ['git', 'rebase', incoming, local];
+        const rebaseArgs: string[] = ['git', 'rebase', incoming, base];
         const rebased: Result = await run(rebaseArgs, scratch);
         if (rebased.code !== 0) {
           const unmerged: string[] = paths(
@@ -126,11 +132,15 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
 
 type Move = { state: 'none' } | { state: 'moved'; old: string } | { state: 'pending'; detail: string };
 
-async function moveCheckout(repo: Repo, moveTo: string): Promise<Move> {
+async function moveCheckout(repo: Repo, moveTo: string, base: string): Promise<Move> {
   const root: string = repo.root;
+  const head: string = await command(['git', 'rev-parse', 'HEAD'], root);
+  // reset --keep preserves edits but not committed history: a commit landed
+  // after the replay base would be dropped, so the checkout stays pending.
+  if (head !== base)
+    return { state: 'pending', detail: `the checkout moved to ${head.slice(0, 12)} during integration` };
   const behind: string = await command(['git', 'rev-list', '--count', `HEAD..${moveTo}`], root);
   if (behind === '0') return { state: 'none' };
-  const head: string = await command(['git', 'rev-parse', 'HEAD'], root);
   const refused: Result = await run(['git', 'reset', '--keep', moveTo], root);
   if (refused.code === 0) return { state: 'moved', old: head };
   // keep refuses when a colliding path is dirty even if it already carries the
