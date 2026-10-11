@@ -4887,7 +4887,7 @@ for (const exit of [
   'seat merged',
   'seat check.fix',
   'seat failed',
-  'capped prompt failure',
+  'prompt delivery fault',
   'operator merged',
 ] as const) {
   test(`the ${exit} holder exit wakes the next merge leaf without a manual next`, async () => {
@@ -4901,12 +4901,14 @@ for (const exit of [
       saveDatabase(f, {
         ...database(f),
         prompts: [],
-        promptScript: exit === 'capped prompt failure' ? [stalled, stalled, stalled] : [],
+        promptScript: exit === 'prompt delivery fault' ? [stalled, stalled, stalled] : [],
       });
-      if (exit === 'capped prompt failure') {
+      if (exit === 'prompt delivery fault') {
         for (let pass = 0; pass < 3; pass++) expect((await next(f, ['--all'])).code).toBe(0);
-        expect(readState(aa.path).failure?.cause).toBe('attempts');
-        expect(readState(aa.path).failure?.reason).toContain('after 3 passes');
+        expect(readState(aa.path).phase).toBe('merge');
+        expect(readState(aa.path).attempts.B).toBe(3);
+        expect(readState(aa.path).delivery_error.B?.code).toBe('agent_prompt_stalled');
+        expect(readState(aa.path).failure).toBeUndefined();
       } else {
         const args: string[] =
           exit === 'seat merged'
@@ -4923,11 +4925,16 @@ for (const exit of [
           ? 'check.fix'
           : exit === 'seat merged' || exit === 'operator merged'
             ? 'merged'
-            : 'failed',
+            : exit === 'prompt delivery fault'
+              ? 'merge'
+              : 'failed',
       );
-      expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
-      expect((await next(f, ['--all'])).code).toBe(exit === 'seat failed' || exit === 'capped prompt failure' ? 1 : 0);
-      expect(mergePrompts(f).filter((prompt) => prompt.pane === bb.b)).toHaveLength(1);
+      if (exit === 'prompt delivery fault') expect(mergePrompts(f)).toEqual([]);
+      else expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
+      expect((await next(f, ['--all'])).code).toBe(exit === 'seat failed' ? 1 : 0);
+      if (exit === 'prompt delivery fault')
+        expect(mergePrompts(f)).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
+      else expect(mergePrompts(f).filter((prompt) => prompt.pane === bb.b)).toHaveLength(1);
     } finally {
       f.clean();
     }
@@ -5008,26 +5015,31 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
   }
 }, 15000);
 
-test('a merge seat consumes only one failed delivery attempt per next pass', async () => {
+test('a merge seat consumes one delivery attempt per pass and retries instead of failing', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
     toMerge(holder.path, '2026-09-11T00:00:00.000Z');
     const stalled: { code: string; message: string } = { code: 'agent_prompt_stalled', message: 'stalled' };
     saveDatabase(f, { ...database(f), prompts: [], promptScript: [stalled, stalled, stalled] });
-    for (const attempts of [1, 2]) {
+    for (const attempts of [1, 2, 3]) {
       expect((await next(f, ['--all'])).code).toBe(0);
       expect(readState(holder.path).attempts.B).toBe(attempts);
       expect(readState(holder.path).phase).toBe('merge');
     }
+    expect(readState(holder.path).delivery_error.B?.code).toBe('agent_prompt_stalled');
+    expect(readState(holder.path).failure).toBeUndefined();
     expect((await next(f, ['--all'])).code).toBe(0);
-    expect(readState(holder.path).phase).toBe('failed');
+    expect(readState(holder.path).attempts.B).toBe(0);
+    expect(readState(holder.path).delivery_error.B).toBeUndefined();
+    expect(readState(holder.path).phase).toBe('merge');
+    expect(mergePrompts(f)).toEqual([{ pane: holder.b, text: mergeText(holder.path) }]);
   } finally {
     f.clean();
   }
 }, 15000);
 
-test('an idle hook advances past a capped holder after visiting its waiter', async () => {
+test('an idle hook retries a faulted merge holder before its waiter', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
@@ -5052,10 +5064,15 @@ test('an idle hook advances past a capped holder after visiting its waiter', asy
       }),
     };
     expect((await next(f, [], env)).code).toBe(0);
-    expect(readState(holder.path).phase).toBe('failed');
-    expect(mergePrompts(f)).toEqual([{ pane: waiter.b, text: mergeText(waiter.path) }]);
+    expect(readState(holder.path).phase).toBe('merge');
+    expect(readState(holder.path).attempts.B).toBe(3);
+    expect(readState(holder.path).delivery_error.B?.code).toBe('agent_prompt_stalled');
+    expect(readState(holder.path).failure).toBeUndefined();
+    expect(mergePrompts(f)).toEqual([]);
     expect((await next(f, [], env)).code).toBe(0);
-    expect(mergePrompts(f)).toHaveLength(1);
+    expect(mergePrompts(f)).toEqual([{ pane: holder.b, text: mergeText(holder.path) }]);
+    expect(readState(waiter.path).phase).toBe('merge');
+    expect(mergePrompts(f).filter((prompt) => prompt.pane === waiter.b)).toHaveLength(0);
   } finally {
     f.clean();
   }
