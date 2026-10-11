@@ -369,28 +369,36 @@ async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promis
   // and a leading quote char opens quoting; single quotes and backticks are
   // verbatim except a literal \r (normalized to \n); double quotes unescape
   // \n and \r only (\\ stays literal). Emission reproduces the parsed value.
-  // Emit the first encoding the same parseEnv reparses to the parsed value:
-  // unquoted, single-quoted, backticks, then double-quoted escapes. Refusal
-  // can only fire for a value no encoding round-trips.
+  // Emit the first encoding the same parseEnv reparses to the parsed value.
+  // The candidate is sandwiched between context lines so an unclosed quote
+  // that would swallow a neighbour also fails the check. Refusal can only
+  // fire for a value no encoding round-trips.
+  const context: string[] = ["Z1='x'", 'Z2="x"', 'Z3=`x`', 'Z4=x', "Y1='x'", 'Y2="x"', 'Y3=`x`', 'Y4=x'];
   const emit = (name: string, v: string): string | null => {
     const candidates: string[] = [
-      `${name}=${v}`,
-      `${name}='${v}'`,
-      `${name}=\`${v}\``,
-      `${name}="${v}"`,
-      `${name}="${v.replace(/\r/g, '\\r')}"`,
-      `${name}="${v.replace(/\\/g, '\\\\').replace(/\r/g, '\\r')}"`,
-      `${name}="${v.replace(/\\/g, '\\\\')}"`,
-      `${name}="${v.replace(/\\/g, '\\\\').replace(/\r/g, '\\\r')}"`,
-      `${name}="${v.replace(/\\/g, '\\\\').replace(/\r/g, '\\\\r')}"`,
+      v,
+      `'${v}'`,
+      `\`${v}\``,
+      `"${v.replace(/\r/g, '\\r')}"`,
+      `"${v.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}"`,
     ];
-    return candidates.find((line) => parseEnv(line)[name] === v) ?? null;
+    for (const c of candidates) {
+      const lines: string[] = [...context.slice(0, 4), `${name}=${c}`, ...context.slice(4)];
+      const check: Record<string, string | undefined> = parseEnv(lines.join('\n') + '\n');
+      const keys: string[] = Object.keys(check);
+      if (keys.length === 9 && keys.every((k) => check[k] === (k === name ? v : 'x'))) return `${name}=${c}`;
+    }
+    return null;
   };
   const emitted: (string | null)[] = repo.config.env.map((name) => emit(name, parsed[name]!));
   const unwritable: string[] = repo.config.env.filter((_, i) => emitted[i] === null);
   if (unwritable.length > 0)
     throw new Error(`Refusing .env write at ${link}: unwritable declared values in ${root}: ${unwritable.join(', ')}`);
   const content: string = emitted.length > 0 ? emitted.join('\n') + '\n' : '';
+  const rewritten: Record<string, string | undefined> = parseEnv(content);
+  const differing: string[] = repo.config.env.filter((name) => rewritten[name] !== parsed[name]);
+  if (differing.length > 0)
+    throw new Error(`Refusing .env write at ${link}: unwritable declared values in ${root}: ${differing.join(', ')}`);
   const gitDir: string = resolve(worktree, await command(['git', 'rev-parse', '--git-dir'], worktree));
   const temp: string = resolve(gitDir, `akrogon-env-${process.pid}`);
   writeFileSync(temp, content, { mode: 0o600 });
