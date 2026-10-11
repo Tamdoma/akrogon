@@ -835,3 +835,21 @@ test.serial('a solo record accepts a compared record bound to its built_on and h
     f.clean();
   }
 });
+
+test.serial('a later merge check without comparisons clears the prior accepted records', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const fx: BatchFixture = await batchFixture(f, ['hold']);
+    const file: string = writeRecord(
+      fx.holderPath,
+      'green-clear.yaml',
+      mergeRecord(fx.holderPath, { state: 'green', leafRevision: await headOf(fx) }),
+    );
+    expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
+    expect(readState(fx.holderPath).batch!.comparisons).toEqual([file]);
+    expect((await cli(f, [...mergeArgs, '--check'], f.root, fx.herdr.env)).code).toBe(0);
+    expect(readState(fx.holderPath).batch!.comparisons).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
