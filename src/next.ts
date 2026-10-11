@@ -89,6 +89,7 @@ import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
 import { selfUpdate } from './self-update';
 import { blockDetail, dependentCounts, mergeQueue } from './turn';
+import { closeMergedTab, reconcile, reconcileNeedsPanes } from './reconcile';
 
 const hookEventSchema = z.discriminatedUnion('event', [
   z.object({
@@ -751,7 +752,15 @@ async function dispatchLeaf(
       return 'completed';
     }
     if (state.phase === 'failed') {
-      if (picked) throw new Error(`Leaf is failed and needs phase recovery: ${slug}`);
+      const live: boolean =
+        state.tab !== undefined &&
+        state.failure?.cause !== 'attempts' &&
+        (await panes()).some((pane) => pane.tab_id === state.tab);
+      if (
+        picked &&
+        ((state.tab === undefined && state.worktree === undefined) || live || state.failure?.cause === 'attempts')
+      )
+        throw new Error(`Leaf is failed and needs phase recovery: ${slug}`);
       return 'waiting';
     }
     if (
@@ -803,33 +812,6 @@ async function dispatchLeaf(
     if (!(error instanceof Error)) throw error;
     report(invocation, repo.name, leaf.path, error, slug);
     return 'skipped';
-  }
-}
-
-async function removeLeafTemp(repo: Repo, slug: string): Promise<void> {
-  const path: string = leafTemp(repo, slug);
-  if (!existsSync(path)) return;
-  rmSync(path, { recursive: true, force: true });
-  await command(['git', 'worktree', 'prune'], repo.root);
-}
-
-async function closeMergedTab(repo: Repo, leaf: Leaf): Promise<boolean> {
-  if ((await batchMemberSlugs(repo)).has(leaf.state.slug)) return false;
-  if (leaf.state.tab === undefined) return false;
-  const tab: string = leaf.state.tab;
-  if (!(await panes()).some((pane) => pane.tab_id === tab)) return false;
-  await command(['herdr', 'tab', 'close', tab]);
-  return true;
-}
-
-async function cleanupMerged(repo: Repo, leaf: Leaf): Promise<void> {
-  if ((await batchMemberSlugs(repo)).has(leaf.state.slug)) return;
-  const hadLive: boolean = await closeMergedTab(repo, leaf);
-  if (!hadLive) await removeLeafTemp(repo, leaf.state.slug);
-  if (within(leaf.path, resolve(repo.root, 'issues/open'))) return;
-  if (leaf.state.worktree !== undefined && existsSync(leaf.state.worktree)) {
-    await command(['git', 'worktree', 'remove', '--force', leaf.state.worktree], repo.root);
-    await command(['git', 'branch', '-d', leaf.state.slug], repo.root);
   }
 }
 
@@ -1059,10 +1041,10 @@ async function reconcileBatch(
   await withLock(resolve(globalHome(), '.lock'), async () => {
     if (isAutomatic && isPaused(repo.name)) return;
     for (const leaf of moved) {
-      await closeMergedTab(repo, leaf);
+      await closeMergedTab(repo, leaf, await panes());
       await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
     }
-    for (const leaf of closable) await closeMergedTab(repo, leaf);
+    for (const leaf of closable) await closeMergedTab(repo, leaf, await panes());
   });
 }
 
@@ -1497,16 +1479,24 @@ async function selectLeaves(
   return { repo, leaves: selected };
 }
 
-async function cleanupRepos(repos: Repo[], invocation: Invocation, isAutomatic: boolean): Promise<void> {
+async function reconcileRepos(repos: Repo[], invocation: Invocation, isAutomatic: boolean): Promise<void> {
+  let panesRequested: boolean = false;
+  let live: Pane[] | null = null;
+  const panesOnce = async (): Promise<Pane[] | null> => {
+    if (!panesRequested) {
+      panesRequested = true;
+      live = await panes().catch(() => null);
+    }
+    return live;
+  };
   for (const repo of repos) {
     if (isAutomatic && isPaused(repo.name)) continue;
-    for (const leaf of discover(repo, invocation).leaves.filter((leaf) => leaf.state.phase === 'merged')) {
-      try {
-        await cleanupMerged(repo, leaf);
-      } catch (error) {
-        if (!(error instanceof Error)) throw error;
-        report(invocation, repo.name, leaf.path, error, leaf.state.slug);
-      }
+    const leaves: Leaf[] = discover(repo, invocation).leaves;
+    try {
+      await reconcile(repo, leaves, reconcileNeedsPanes(repo, leaves) ? await panesOnce() : []);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, repo.name, repo.root, error);
     }
   }
 }
@@ -1560,6 +1550,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
     const touched: Map<string, { repo: Repo; isAutomatic: boolean }> = new Map();
     await withLock(resolve(globalHome(), '.lock'), async () => {
       if (selection !== undefined) {
+        let reconcileNow: boolean = input === undefined;
         if (selection.leaves.length === 1) {
           const completedSlug: string = selection.leaves[0].state.slug;
           const outcome: DispatchOutcome = await dispatchLeaf(
@@ -1573,20 +1564,21 @@ export async function nextCommand(input: string | undefined, pressureDir: string
           );
           if (outcome === 'completed')
             await dispatchDependents(global, selection.repo, completedSlug, invocation, false);
+          reconcileNow = reconcileNow || (outcome === 'skipped' && selection.leaves[0].state.phase !== 'failed');
         } else await sweep(global, selection.repo, selection.leaves, invocation, true, false);
         touched.set(selection.repo.name, { repo: selection.repo, isAutomatic: false });
-        if (input === undefined) await cleanupRepos([selection.repo], invocation, false);
+        if (reconcileNow) await reconcileRepos([selection.repo], invocation, false);
       } else if (input === '--all') {
         const current: Repo | null = await currentRepo(global, process.cwd());
         if (current === null) {
           await sweepAll(global, invocation, false);
           const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
           for (const repo of registered.repos) touched.set(repo.name, { repo, isAutomatic: false });
-          await cleanupRepos(registered.repos, invocation, false);
+          await reconcileRepos(registered.repos, invocation, false);
         } else {
           await sweep(global, current, discover(current, invocation).leaves, invocation, true, false);
           touched.set(current.name, { repo: current, isAutomatic: false });
-          await cleanupRepos([current], invocation, false);
+          await reconcileRepos([current], invocation, false);
         }
       } else if (input === '--resume') {
         const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
@@ -1604,7 +1596,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
             true,
           );
         for (const repo of active) touched.set(repo.name, { repo, isAutomatic: true });
-        await cleanupRepos(active, invocation, true);
+        await reconcileRepos(active, invocation, true);
       } else if (event?.event === 'tab_closed') {
         const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
           discover(repo, invocation)
@@ -1615,13 +1607,17 @@ export async function nextCommand(input: string | undefined, pressureDir: string
         if (owners.length === 0) return;
         if (isPaused(owners[0].repo.name)) return;
         const completedSlug: string = owners[0].leaf.state.slug;
-        if (owners[0].leaf.state.phase === 'merged')
-          try {
-            await removeLeafTemp(owners[0].repo, completedSlug);
-          } catch (error) {
-            if (!(error instanceof Error)) throw error;
-            report(invocation, owners[0].repo.name, owners[0].leaf.path, error, completedSlug);
-          }
+        try {
+          const leaves: Leaf[] = discover(owners[0].repo, invocation).leaves;
+          await reconcile(
+            owners[0].repo,
+            leaves,
+            reconcileNeedsPanes(owners[0].repo, leaves) ? await panes().catch(() => null) : [],
+          );
+        } catch (error) {
+          if (!(error instanceof Error)) throw error;
+          report(invocation, owners[0].repo.name, owners[0].leaf.path, error, completedSlug);
+        }
         const outcome: DispatchOutcome = await dispatchLeaf(
           global,
           owners[0].repo,
@@ -1661,7 +1657,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
               event.event !== 'pane_agent_status_changed' ||
               (event.data.agent_status !== 'blocked' && event.data.agent_status !== 'unknown'))
           )
-            await closeMergedTab(owner.repo, rediscovered);
+            await closeMergedTab(owner.repo, rediscovered, await panes());
         } catch (error) {
           if (!(error instanceof Error)) throw error;
           report(invocation, owner.repo.name, rediscovered?.path ?? owner.leaf.path, error, completedSlug);
@@ -1695,7 +1691,7 @@ export async function unpausePass(repo: Repo, pressureDir: string = '/proc/press
       false,
       false,
     );
-    await cleanupRepos([repo], invocation, false);
+    await reconcileRepos([repo], invocation, false);
   });
   await mergePass(global, repo, invocation, false, pressureDir);
   if (invocation.skipped.size > 0)

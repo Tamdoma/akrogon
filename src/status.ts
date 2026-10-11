@@ -32,6 +32,7 @@ import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 import { readPaused } from './pause';
 import { heldFor, readHeld, type Hold } from './hold';
 import { activeRed, type RedEntry } from './red-record';
+import { readKept } from './reconcile';
 
 type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
 type Scan =
@@ -405,6 +406,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   }
   for (const scan of scans) {
     if (!scan.ok) continue;
+    for (const entry of readKept(scan.repo)) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     const hold: Hold | undefined = held[scan.repo.name];
     const marks: string[] = [
       paused.has(scan.repo.name) ? 'paused' : '',
