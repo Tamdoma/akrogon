@@ -354,12 +354,6 @@ export async function transition(
         ? 'check.repair'
         : 'merge'
       : requested;
-  const capped: Phase =
-    destination === 'check.fix' &&
-    (state.phase === 'check.repair' || state.phase === 'merge') &&
-    state.fix_rounds >= repo.config.fix_rounds
-      ? 'failed'
-      : destination;
   await commitMove(
     repo,
     leaf,
@@ -370,11 +364,9 @@ export async function transition(
           frozen_cited: state.worktree === undefined ? [] : await frozenCitedRecord(repo, state.worktree),
         }
       : recorded,
-    capped,
+    destination,
     slot ?? null,
-    capped === 'failed'
-      ? { cause: 'attempts', phase: state.phase, slot: slot ?? required[0], reason: 'fix rounds exhausted' }
-      : undefined,
+    undefined,
     onCommitted,
   );
   await recordComparisons(repo, state.slug, compareFiles, comparisons);
