@@ -3,7 +3,7 @@ import { globalHome, readGlobal, requireRepo, within, worktreeStore, type Global
 import { CommandError, command, run, type Result } from './shell';
 import { withLock } from './state';
 
-function eligibleRecord(root: string, worktree: string, path: string): boolean {
+export function eligibleRecord(root: string, worktree: string, path: string): boolean {
   return (
     path.startsWith('issues/') &&
     !within(resolve(root, path), resolve(root, 'issues/seeds')) &&
@@ -12,10 +12,15 @@ function eligibleRecord(root: string, worktree: string, path: string): boolean {
   );
 }
 
-export async function syncCommand(cwd: string): Promise<void> {
-  const global: GlobalConfig = readGlobal();
-  const repo: Repo = await requireRepo(global, cwd);
-  await withLock(resolve(globalHome(), '.lock'), async () => {
+export async function integrate(
+  repo: Repo,
+  opts: {
+    checkStaged?: boolean;
+    pre?: (incoming: string) => Promise<string | null>;
+  },
+  move: (incoming: string) => Promise<{ tip: string } | { conflict: { paths: string[] } }>,
+): Promise<{ pushed: string | null; incoming: string; skip: string | null }> {
+  return withLock(resolve(globalHome(), '.lock'), async () => {
     const branchArgs: string[] = ['git', 'symbolic-ref', '--quiet', '--short', 'HEAD'];
     const branch: Result = await run(branchArgs, repo.root);
     if (branch.code !== 0 && branch.code !== 1) throw new CommandError(branchArgs, repo.root, branch);
@@ -24,15 +29,17 @@ export async function syncCommand(cwd: string): Promise<void> {
       throw new Error(`Cannot sync from ${actual}; required branch: ${repo.config.default_branch}`);
 
     const worktree: string = worktreeStore(repo);
-    const stagedPaths: string = await command(
-      ['git', 'diff', '--cached', '--name-only', '--no-renames', '-z'],
-      repo.root,
-    );
-    const excluded: string[] = stagedPaths
-      .split('\0')
-      .filter((path: string) => path !== '' && !eligibleRecord(repo.root, worktree, path));
-    if (excluded.length > 0)
-      throw new Error(`Cannot sync with staged paths outside eligible issue records:\n${excluded.join('\n')}`);
+    if (opts.checkStaged === true) {
+      const stagedPaths: string = await command(
+        ['git', 'diff', '--cached', '--name-only', '--no-renames', '-z'],
+        repo.root,
+      );
+      const excluded: string[] = stagedPaths
+        .split('\0')
+        .filter((path: string) => path !== '' && !eligibleRecord(repo.root, worktree, path));
+      if (excluded.length > 0)
+        throw new Error(`Cannot sync with staged paths outside eligible issue records:\n${excluded.join('\n')}`);
+    }
 
     const lockPaths: string[] = [resolve(globalHome(), '.lock')]
       .filter((path: string) => within(path, repo.root))
@@ -47,6 +54,10 @@ export async function syncCommand(cwd: string): Promise<void> {
     }
     await command(['git', 'fetch', repo.config.remote, repo.config.default_branch], repo.root);
     const incoming: string = await command(['git', 'rev-parse', '--verify', 'FETCH_HEAD^{commit}'], repo.root);
+    if (opts.pre !== undefined) {
+      const skip: string | null = await opts.pre(incoming);
+      if (skip !== null) return { pushed: null, incoming, skip };
+    }
     if (lockPaths.length > 0) {
       const incomingLocks: string = await command(
         ['git', '--literal-pathspecs', 'ls-tree', '-r', '--name-only', '-z', incoming, '--', ...lockPaths],
@@ -108,6 +119,18 @@ export async function syncCommand(cwd: string): Promise<void> {
       if (collisions.length > 0) throw new Error(`Cannot sync over ignored operator paths:\n${collisions.join('\n')}`);
     }
 
+    const moved: { tip: string } | { conflict: { paths: string[] } } = await move(incoming);
+    if ('conflict' in moved) throw new Error(`record conflict: ${moved.conflict.paths.join(', ')}; run akrogon sync`);
+    await command(['git', 'push', repo.config.remote, `${moved.tip}:${repo.config.default_branch}`], repo.root);
+    return { pushed: moved.tip, incoming, skip: null };
+  });
+}
+
+export async function syncCommand(cwd: string): Promise<void> {
+  const global: GlobalConfig = readGlobal();
+  const repo: Repo = await requireRepo(global, cwd);
+  await integrate(repo, { checkStaged: true }, async (incoming: string) => {
+    const worktree: string = worktreeStore(repo);
     const changed: string = await command(
       [
         'git',
@@ -149,6 +172,6 @@ export async function syncCommand(cwd: string): Promise<void> {
           ...rebase,
         }),
       );
-    await command(['git', 'push', repo.config.remote, `HEAD:${repo.config.default_branch}`], repo.root);
+    return { tip: await command(['git', 'rev-parse', 'HEAD'], repo.root) };
   });
 }
