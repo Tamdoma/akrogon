@@ -171,7 +171,7 @@ test.serial('a member culprit ejects to check.fix and the next batch carries onl
   }
 });
 
-test.serial('a culprit at the fix-rounds cap ends failed with the shared attempts outcome', async () => {
+test.serial('a culprit at the configured round count ejects to check.fix and the count rises', async () => {
   const f: Fixture = await fixture();
   try {
     const { holder, members, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
@@ -186,12 +186,11 @@ test.serial('a culprit at the fix-rounds cap ends failed with the shared attempt
     );
     expect(res.code).toBe(0);
     expect(res.stdout).toContain('ejected mem-a');
-    expect(res.stdout).toContain('moved failed');
+    expect(res.stdout).toContain('moved check.fix');
     const culprit: State = readState(members[0].path);
-    expect(culprit.phase).toBe('failed');
-    expect(culprit.failure?.cause).toBe('attempts');
-    expect(culprit.failure?.phase).toBe('merge');
-    expect(culprit.failure?.reason).toBe('fix rounds exhausted');
+    expect(culprit.phase).toBe('check.fix');
+    expect(culprit.failure).toBeUndefined();
+    expect(culprit.fix_rounds).toBe(2);
     const holderState: State = readState(holder.path);
     expect(holderState.phase).toBe('merge');
     expect(holderState.batch).toBeUndefined();

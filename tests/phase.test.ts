@@ -120,23 +120,24 @@ test('review fix routes to check.repair, B hands to A, rechecks only B, caps han
     );
     expect(readState(path).fix_rounds).toBe(1);
     expect((await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'B'], f.root, herdr.env)).stdout).toBe(
-      'moved failed',
+      'moved check.fix',
     );
-    expect(readState(path)).toMatchObject({
-      failure: { cause: 'attempts', phase: 'check.repair', slot: 'B', reason: 'fix rounds exhausted' },
-      fix_rounds: 1,
-    });
+    expect(readState(path)).toMatchObject({ phase: 'check.fix', fix_rounds: 2, failure: undefined });
+    expect(
+      (await cli(f, ['phase', 'repair', 'failed', '--slot', 'A', '--reason', 'needs a decision'], f.root, herdr.env))
+        .stdout,
+    ).toBe('moved failed');
     expect((await cli(f, ['phase', 'repair', 'implement'], f.root, herdr.env)).code).toBe(0);
-    expect(readState(path)).toMatchObject({ phase: 'implement', fix_rounds: 1 });
+    expect(readState(path)).toMatchObject({ phase: 'implement', fix_rounds: 2 });
     const mergePath: string = leaf(f, 'conflict', 'merge');
     expect((await cli(f, ['phase', 'conflict', 'check.fix'])).code).toBe(0);
     expect(readState(mergePath).fix_rounds).toBe(1);
     const cappedPath: string = leaf(f, 'capped', 'merge', { fix_rounds: 1 });
-    expect((await cli(f, ['phase', 'capped', 'check.fix'], f.root, herdr.env)).stdout).toBe('moved failed');
+    expect((await cli(f, ['phase', 'capped', 'check.fix'], f.root, herdr.env)).stdout).toBe('moved check.fix');
     expect(readState(cappedPath)).toMatchObject({
-      phase: 'failed',
-      failure: { cause: 'attempts', phase: 'merge', slot: 'B', reason: 'fix rounds exhausted', delivery: 'shown' },
-      fix_rounds: 1,
+      phase: 'check.fix',
+      failure: undefined,
+      fix_rounds: 2,
     });
     const log = JSON.parse(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').split('\n')[0]);
     expect(log).toMatchObject({
@@ -1190,21 +1191,15 @@ test('merge to merged clears busy fields', async () => {
   }
 });
 
-test('fix cap records attempts failure', async () => {
+test('check.fix request at the configured round count moves and increments', async () => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1, grounding: 'none' });
     const path: string = leaf(f, 'cap', 'check.repair', { fix_rounds: 1 });
     const herdr = fakeHerdr(f);
     const result: Result = await cli(f, ['phase', 'cap', 'check.fix', '--slot', 'B'], f.root, herdr.env);
-    expect(result.stdout).toBe('moved failed');
-    expect(readState(path).failure).toEqual({
-      cause: 'attempts',
-      phase: 'check.repair',
-      slot: 'B',
-      reason: 'fix rounds exhausted',
-      delivery: 'shown',
-    });
+    expect(result.stdout).toBe('moved check.fix');
+    expect(readState(path)).toMatchObject({ phase: 'check.fix', fix_rounds: 2, failure: undefined });
   } finally {
     f.clean();
   }
