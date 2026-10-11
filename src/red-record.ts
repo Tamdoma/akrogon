@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { type Repo } from './config';
 import { isAncestor } from './batch';
-import { type Comparison } from './compare';
+import { parseComparison, type Comparison } from './compare';
 
 const unitIdentitySchema = z.strictObject({
   runner: z.string(),
@@ -161,32 +161,138 @@ export function applyComparison(repo: Repo, file: string, record: Comparison): R
   return entries;
 }
 
-export async function resolveComparison(repo: Repo, file: string, record: Comparison): Promise<void> {
-  if (record.state !== 'compared') return;
+async function resolveUnit(
+  repo: Repo,
+  file: string,
+  unit: { runner: string; file: string; name: string },
+  provenance: { command: string[]; cwd: string; scope: string; material: string },
+  resolving: string,
+  resolved: Set<string>,
+): Promise<RedEntry | undefined> {
+  const entry: RedEntry | undefined = activeRed(repo).find(
+    (candidate) =>
+      !resolved.has(candidate.id) && sameIdentity(candidate, unit) && sameProvenance(candidate, provenance),
+  );
+  if (entry === undefined) return undefined;
+  if (entry.first_seen !== resolving && !(await isAncestor(repo.root, entry.first_seen, resolving)))
+    return undefined;
+  const event: RedEvent = redEventSchema.parse({
+    event: 'resolved',
+    id: entry.id,
+    resolving,
+    at: new Date().toISOString(),
+    file,
+  });
+  appendFileSync(redRecordsPath(repo), JSON.stringify(event) + '\n');
+  resolved.add(entry.id);
+  return entry;
+}
+
+export async function resolveComparison(repo: Repo, file: string, record: Comparison): Promise<RedEntry[]> {
+  const entries: RedEntry[] = [];
+  if (record.state !== 'compared') return entries;
   const provenance: { command: string[]; cwd: string; scope: string; material: string } = provenanceOf(record);
   const resolved: Set<string> = new Set();
   for (const unit of record.units) {
     if (unit.base.outcome !== 'pass') continue;
-    const entry: RedEntry | undefined = activeRed(repo).find(
-      (candidate) =>
-        !resolved.has(candidate.id) && sameIdentity(candidate, unit) && sameProvenance(candidate, provenance),
-    );
-    if (entry === undefined) continue;
-    if (
-      entry.first_seen !== record.counterpart_revision &&
-      !(await isAncestor(repo.root, entry.first_seen, record.counterpart_revision))
-    )
-      continue;
-    const event: RedEvent = redEventSchema.parse({
-      event: 'resolved',
-      id: entry.id,
-      resolving: record.counterpart_revision,
-      at: new Date().toISOString(),
+    const entry: RedEntry | undefined = await resolveUnit(
+      repo,
       file,
-    });
-    appendFileSync(redRecordsPath(repo), JSON.stringify(event) + '\n');
-    resolved.add(entry.id);
+      unit,
+      provenance,
+      record.counterpart_revision,
+      resolved,
+    );
+    if (entry !== undefined) entries.push(entry);
   }
+  return entries;
+}
+
+export async function resolveGreen(
+  repo: Repo,
+  file: string,
+  record: Comparison,
+  landed: string,
+): Promise<string[]> {
+  const names: string[] = [];
+  if (record.state !== 'green') {
+    console.warn(JSON.stringify({ warning: 'green resolve skipped: record is not green', file, state: record.state }));
+    return names;
+  }
+  if (landed !== record.leaf_revision) {
+    console.warn(
+      JSON.stringify({
+        warning: 'green resolve skipped: landed revision differs from leaf revision',
+        file,
+        leaf_revision: record.leaf_revision,
+        landed,
+      }),
+    );
+    return names;
+  }
+  const provenance: { command: string[]; cwd: string; scope: string; material: string } = provenanceOf(record);
+  const resolved: Set<string> = new Set();
+  for (const unit of record.units) {
+    if (unit.leaf.outcome !== 'pass') continue;
+    const entry: RedEntry | undefined = await resolveUnit(repo, file, unit, provenance, landed, resolved);
+    if (entry !== undefined) names.push(entry.unit.name);
+  }
+  return names;
+}
+
+export type MergedRecords = {
+  resolved: string[];
+  newResolved: RedEntry[];
+  applied: RedEntry[];
+  byUnit: Record<string, RedEntry[]>;
+};
+
+export async function mergeRecords(repo: Repo, file: string, records: Comparison[]): Promise<MergedRecords> {
+  const resolved: string[] = [];
+  const newResolved: RedEntry[] = [];
+  const applied: RedEntry[] = [];
+  const byUnit: Record<string, RedEntry[]> = {};
+  for (const record of records) {
+    for (const entry of await resolveComparison(repo, file, record)) {
+      newResolved.push(entry);
+      resolved.push(entry.unit.name);
+    }
+    for (const entry of applyComparison(repo, file, record)) {
+      applied.push(entry);
+      (byUnit[entry.unit.name] ??= []).push(entry);
+    }
+  }
+  return { resolved, newResolved, applied, byUnit };
+}
+
+export async function hasKnownRed(repo: Repo, files: string[], builtOn?: string): Promise<boolean> {
+  for (const file of files) {
+    let record: Comparison;
+    try {
+      record = await parseComparison(file);
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          warning: 'comparison record unreadable',
+          repo: repo.name,
+          file,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      continue;
+    }
+    for (const unit of record.units) {
+      if (!('verdict' in unit) || unit.verdict !== 'known-red' || unit.leaf.outcome !== 'fail') continue;
+      if ('base' in unit) {
+        if (unit.base.outcome === 'fail') return true;
+        continue;
+      }
+      const counterpart: string | undefined =
+        'counterpart_revision' in record ? (record.counterpart_revision ?? builtOn) : builtOn;
+      if (counterpart !== undefined) return true;
+    }
+  }
+  return false;
 }
 
 export function appendNotice(repo: Repo, id: string, result: NoticeResult): void {
