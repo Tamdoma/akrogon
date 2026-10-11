@@ -1,0 +1,10 @@
+bun test v1.4.2 (744846f84)
+
+tests/compare.test.ts:
+(pass) a record is refused when it marks a red retry inconsistent without a counterpart [71.02ms]
+
+ 1 pass
+ 26 filtered out
+ 0 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [91.00ms]

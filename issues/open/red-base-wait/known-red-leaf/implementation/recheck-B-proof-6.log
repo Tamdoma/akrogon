@@ -1,0 +1,10 @@
+bun test v1.4.2 (744846f84)
+
+tests/compare.test.ts:
+(pass) status prints each active entry with unit, command, first-seen revision and notice result [105.59ms]
+
+ 1 pass
+ 27 filtered out
+ 0 fail
+ 7 expect() calls
+Ran 1 test across 1 file. [125.00ms]

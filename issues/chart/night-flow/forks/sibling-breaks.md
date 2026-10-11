@@ -16,7 +16,8 @@ Q3 A leaf's own check can skip cheap checks that only the merge check runs (fram
 - framework chart merge-flow (`/home/ivan/Work/infra/tamdoma/framework/issues/chart/merge-flow/CHART.md`) owns framework-side test, sandbox and root-state-guard specifics; weakening the root-state guard is off route there.
 - Operator-forwarded chart-framework notes F1–F7 (INTAKE.md): "the testing for these should come first, not wait till the end" (in substance); "If akrogon should enforce 'every merge check either runs in the leaf check or is declared slow', that belongs to your chart."
 - A repo's `issues/config.yaml` change is an operator step on main, never a leaf (`skills/chart-issues/assets/shapes.md:284`).
-- Stopgap, 2026-10-11: framework `issues/config.yaml` `fix_rounds` 3 → 8 edited in the root checkout, not yet pushed (the door's `akrogon sync` was refused by the harness permission check).
+- Stopgap, 2026-10-11: framework `issues/config.yaml` `fix_rounds` 3 → 8, pushed in framework `c45d6693f`.
+- Operator decision via chart-framework, 2026-10-11 (INTAKE.md): "that should be akrogon rule too". Framework adds `framework:verify:cheap` to its own `checks` as its leaf L9; akrogon is to require for every repo that a merge check cheap enough for the leaf's own check runs there, before review. Q3's framework config part leaves this chart.
 
 ## Findings
 Merged notes: slots/sibling-breaks-merged.md (B: slots/sibling-breaks-B.md, C: slots/sibling-breaks-C.md). Rebuttals: slots/sibling-breaks-rebuttal-B.md, slots/sibling-breaks-rebuttal-C.md. Q3 blind notes: slots/sibling-breaks-q3-B.md, slots/sibling-breaks-q3-C.md.
@@ -30,3 +31,30 @@ Merged notes: slots/sibling-breaks-merged.md (B: slots/sibling-breaks-B.md, C: s
 - Off route: `mdcny-ghl-data-pulls` and `lingua-relay` run no checks; clinique-la-roya copies framework's leaf checks without typecheck or lint (C Q3a, B audit). check-scratch's scratch-root design as a plan correction belongs to framework merge-flow (C Q2a).
 - Dropped: stale-tip fallback on a failed fetch (C R5 withdrawn by A after B F9: no unrequested fallback); green no-commit replay straight to merge (A: one-minute saving, new routing exception); rebasing running worktrees on each landing, serializing by blocked-by, weakening guards, a separate counter (A,B,C).
 - Peer positions before the answer: Q1 rebase at start and end of every A pass (A,C) vs end only (B F8); merge reds to A's check.fix as today (A,C) vs B's check.repair (B). Q2 no new naming rule (A,C) vs name known affected leaves with obligations (B F11). Q3 config fix (B,C), plus one placement sentence in init and setup guidance (B) vs no text change (C O5).
+
+## Taken
+Operator, 2026-10-11, verbatim: "1a, 2a, 3a".
+
+The round as read: slots/sibling-breaks-final-shape.md:6-9. Final shape checked by B and C: slots/sibling-breaks-final-check-B.md (F12–F15), slots/sibling-breaks-final-check-C.md (F1–F7).
+
+### Q1 pass-refresh (1a)
+- A refreshes (fetch, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE`) at the start of `implement` and of every `check.fix`, and again before the final proof once every worker worktree is removed and its scoped work is committed, never stashed or discarded (A,B; B F12).
+- Conflicts are resolved inside the rebase under the solo rule. A conflict needing a plan correction uses plan-not-cap's plan-correction rule while the rebase stays in progress, since `plan.md` lives in the registered checkout. It never ends the pass `failed` (A,B,C). The locked-decision stop (`skills/implement-issue/SKILL.md:34`) stays as it is and is not restated (C F4).
+- A failed fetch or other terminal refresh error is recorded with its original error. A aborts only an active rebase and ends with no phase move. The next dispatch prompts A again (`src/next.ts:631-645`), and that pass resumes at the recorded refresh (A,B,C; B F14, C F1).
+- A records the prior reviewed and handed-off base and head. B computes the range-diff itself and reviews as repair only the commits it shows added or changed, conflict resolutions included (A,B,C; B F13, C F3).
+- Merge reds stay with A's `check.fix` (`src/phase.ts:1025`). Skill text only. Blocked by plan-not-cap (C F2).
+- Reason: the start refresh makes a repair against current code. The end refresh proves the handed-off head on the main it meets (A,C). The cost of a return is A's repair, not the hop (C RB3).
+
+### Q2 no sibling-naming rule (2a)
+- Nothing is added to chart-issues or shapes. Reason: Q1 catches a sibling's change at A's next pass boundary, whether or not a contract predicted it. Tonight's `dispose` was in no brief or design (C, B E8).
+- Declined: B F11, naming known affected siblings with obligations in the contract.
+
+### Q3 cheap-check-placement (3a)
+- One rule in `skills/init-akrogon/SKILL.md`, `docs/guide/setup.md` and `skills/check-issue/SKILL.md`: a cheap check runs in `checks`, before review, and never only at merge. A merge command may also rerun it on the integrated candidate (A,B; B F15).
+- In review, a leaf diff leaving a cheap check reachable only at merge is a Fix when a script edit within the leaf can route it through `checks`. Otherwise it is an `Operator actions` item naming the config line, which gates no done-criterion (A,C; C F5, `check-issue/SKILL.md:29`).
+- Agents follow it. No code, config key, timer or slow flag enforces it.
+- Existing configs: B's audit of all ten registered repos (slots/sibling-breaks-q3-B.md, RC1–RC10, 2026-10-11) found `merge_checks` only in framework. framework fixes its own config as its leaf L9 (C F6).
+- framework `fix_rounds: 8` (`c45d6693f`) needs no revert: framework has no `direct` setting, so after plan-not-cap the value bounds nothing there (C F7).
+
+### Foreclosed
+Merge reds to B's `check.repair` (1b); a refresh only before handoff (B F8); proceeding on the last fetched tip after a failed fetch; a green no-commit replay going straight to merge; rebasing running worktrees when a sibling lands; ordering leaves by file overlap; weakening guards; a separate bounce counter; aborting the rebase to correct the plan (B F14, `plan.md` is outside the worktree); running every `merge_checks` command in the leaf (3b); a timer, duration threshold, `slow` label or new config key; matching command strings between `checks` and `merge_checks`.

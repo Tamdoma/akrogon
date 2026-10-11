@@ -49,14 +49,14 @@ Affected docs: `README.md`, `src/AREA.md`, `tests/AREA.md`, `skills/AREA.md`, `s
 | # | Criterion | Proof command | Catches | Size | Rerun trigger |
 |---|---|---|---|---|---|
 | 1 | valid records move like green; no base-red `failed` | `bun test tests/compare.test.ts` | move refused, entries lost, wrong phase | minutes | src/compare, src/phase change |
-| 2 | per-field refusals naming field/file | `bun test tests/compare.test.ts -t refusal` | silent accept, bad message | seconds | schema/validation change |
-| 3 | new/unverified/own-criterion refused to implement, check.review, merge | `bun test tests/compare.test.ts -t verdict` | wrong destination admitted | seconds | D3 rule change |
-| 4 | open+notice once, join silent, notice stored apart | `bun test tests/compare.test.ts -t record` | duplicate entry or notice, missing notice record | seconds | red-record change |
-| 5 | resolve only on base pass, same provenance, ancestor rule; partial; recurrence new entry+notice | `bun test tests/compare.test.ts -t resolve` | stale-close class, wrong provenance close, lost recurrence | minutes (rebases) | red-record/ancestor change |
+| 2 | per-field refusals naming field/file | `bun test tests/compare.test.ts -t 'refused'` | silent accept, bad message | seconds | schema/validation change |
+| 3 | new/unverified/own-criterion refused to implement, check.review, merge | `bun test tests/compare.test.ts -t 'refuses|admitted'` | wrong destination admitted | seconds | D3 rule change |
+| 4 | open+notice once, join silent, notice stored apart | `bun test tests/compare.test.ts -t 'notice'` | duplicate entry or notice, missing notice record | seconds | red-record change |
+| 5 | resolve only on base pass, same provenance, ancestor rule; partial; recurrence new entry+notice | `bun test tests/compare.test.ts -t 'resolves|newer revision'` | stale-close class, wrong provenance close, lost recurrence | minutes (rebases) | red-record/ancestor change |
 | 6 | reread+compare inside the existing lock | code inspection + resolve tests (entry newer than evidence stays active) | nested `withLock` deadlock, stale decision | — | lock path change |
-| 7 | `akrogon status` prints unit, command, first-seen, notice result | `bun test tests/compare.test.ts -t status` | missing or malformed line | seconds | status change |
-| 8 | skill files carry retry/compare/`--compare`, drop the red-on-base `failed` stop, keep incomplete stop, known-red exception | `bun test tests/red-docs.test.ts` | retired stop survives, missing rule | seconds | skill text change |
-| 9 | sweep: no pre-merge seat stop/wait/fail-on-base-red or base-result reuse; out-of-scope hits listed | `bun test tests/red-docs.test.ts` + sweep report below | leftover stop text | seconds | skills/docs change |
+| 7 | `akrogon status` prints unit, command, first-seen, notice result | `bun test tests/compare.test.ts -t 'status'` | missing or malformed line | seconds | status change |
+| 8 | skill files carry the literal `--compare`/`base-run`/known-red contracts and drop the retired stop | `bun test tests/red-docs.test.ts` + semantic review (F3) | retired stop survives, missing contract | seconds | skill text change |
+| 9 | sweep: no retired stop string; out-of-scope hits listed | `bun test tests/red-docs.test.ts` + sweep report below + semantic review (F3) | leftover stop text | seconds | skills/docs change |
 
 `checks` (format, typecheck, test, test_changed) also run per the repo config; the new tests above are the leaf's own proofs. No criterion needs `merge_checks` or a live run; no new proof machinery.
 

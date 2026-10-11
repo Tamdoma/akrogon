@@ -1,0 +1,23 @@
+bun test v1.4.2 (744846f84)
+
+tests/reconcile.test.ts:
+393 |         ...db.panes,
+394 |         { pane_id: 'w1:p999', tab_id: 'w1:t999', cwd: variant, agent: null, agent_status: 'idle' },
+395 |       ],
+396 |     });
+397 |     expect((await next(f, ['--all'])).code).toBe(0);
+398 |     expect(existsSync(variant)).toBe(true);
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/worktree-reconciler/tests/reconcile.test.ts:398:33)
+(fail) store variants survive live or unavailable pane inventories [482.16ms]
+
+ 0 pass
+ 16 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [502.00ms]

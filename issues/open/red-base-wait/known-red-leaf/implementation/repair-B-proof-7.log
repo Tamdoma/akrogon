@@ -1,0 +1,12 @@
+bun test v1.4.2 (744846f84)
+
+tests/red-docs.test.ts:
+(pass) the implement and check skills state the retry, comparison record and --compare rules [0.21ms]
+(pass) plan.synthesis states that a planned test intended red is never compared [0.05ms]
+(pass) the guide and README carry the comparison flow, not the retired base-red stop [0.03ms]
+(pass) no skill or guide tells a pre-merge seat to stop, wait or fail on a base red or to reuse an earlier base result [0.62ms]
+
+ 4 pass
+ 0 fail
+ 125 expect() calls
+Ran 4 tests across 1 file. [4.00ms]

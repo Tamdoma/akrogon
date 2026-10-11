@@ -1,0 +1,25 @@
+bun test v1.4.2 (744846f84)
+
+tests/compare.test.ts:
+(pass) a record is refused when it more than one retry is recorded [140.98ms]
+(pass) a record is refused when it marks a red retry inconsistent without a counterpart [143.55ms]
+(pass) a record is refused when it a missing log file [154.54ms]
+(pass) a record is refused when it a blank required field [154.89ms]
+(pass) a record is refused when it the record file is outside the leaf folder [151.01ms]
+(pass) a record is refused when it state outside the allowed set [155.10ms]
+(pass) a record is refused when it does not parse [155.27ms]
+(pass) a record is refused when it the base-run started before this pass [151.90ms]
+(pass) a record is refused when it leaf revision differs from HEAD [162.60ms]
+(pass) a record is refused when it the retry run is missing [162.04ms]
+(pass) a record is refused when it the base-run command differs [159.85ms]
+(pass) a slot-mismatched base-run line is refused [159.24ms]
+(pass) a record is refused when it the base log is not from a base-run record line [160.79ms]
+(pass) a record is refused when it the base-run line records no end and exit [160.10ms]
+(pass) a record is refused when it counterpart differs from the leaf base [162.37ms]
+(pass) --compare is refused on failed moves and from the merge phase [184.58ms]
+
+ 16 pass
+ 12 filtered out
+ 0 fail
+ 78 expect() calls
+Ran 16 tests across 1 file. [205.00ms]

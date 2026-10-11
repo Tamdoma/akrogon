@@ -1,0 +1,11 @@
+bun test v1.4.2 (744846f84)
+
+tests/red-docs.test.ts:
+(pass) seat skills carry the literal flag, command and record-token contracts [0.13ms]
+(pass) the guide and README carry the literal flag and record tokens [0.03ms]
+(pass) no skill or guide retains the retired red-on-base stop command [0.56ms]
+
+ 3 pass
+ 0 fail
+ 50 expect() calls
+Ran 3 tests across 1 file. [3.00ms]

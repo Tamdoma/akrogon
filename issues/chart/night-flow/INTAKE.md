@@ -342,5 +342,18 @@ error: {"command":["git","add","-A","--",":(top,literal)issues",":(top,exclude,l
       at async syncCommand (/home/ivan/Work/infra/akrogon/src/sync.ts:9:9)
 ```
 
+Operator, verbatim: "Why not use gacp then, fix akrogon sync now."
+
+## Source: operator-forwarded chart-framework decision, 2026-10-11
+Operator message: "Operator decision from chart-framework: cheap merge checks (typecheck, lint) in the leaf's own check should be an akrogon rule for every repo, not only a framework config line. See the last section of issues/chart/red-base-wait/slots/from-chart-framework.md."
+
+Forwarded text, verbatim from `issues/chart/red-base-wait/slots/from-chart-framework.md:48-50`:
+
+> ## Operator decision, 2026-10-11: cheap checks in the leaf check as an akrogon rule
+>
+> Operator, verbatim: "that should be akrogon rule too". Framework adds framework:verify:cheap to its `checks` as leaf L9. The operator also wants akrogon to require this for every repo: a merge check cheap enough to run in the leaf's own check must run there, before review.
+
 ## Agent findings
 Territory map: slots/map-merged.md (A: slots/map-A.md, B: slots/map-B.md, C: slots/map-C.md; rebuttals slots/rebuttal-B.md, slots/rebuttal-C.md). Failure ledger since 2026-10-08: slots/failed-exits.tsv (43 transitions: 21 base-red, 5 round cap, 5 seat delivery, 11 human boundary, 1 seat misreading). Night findings F1-F7 and the 48h verdict are in the map; #79 is covered by test-proof-rules `732c896` (A,B,C).
+
+`akrogon sync` failed in every repo with an `issues/seeds` folder since `fec7bc6` (2026-09-14): git refuses an exclude pathspec naming an ignored path. Fixed directly at the operator's request in `b5a8d11` (sync stages eligible records by path through `eligibleRecord`, `src/sync.ts:6-13`), pushed in `ec08dec`; framework synced in `c45d6693f`, carrying `fix_rounds: 8`. The records-sync draft's references to `src/sync.ts:22-31` now mean `eligibleRecord` (A).

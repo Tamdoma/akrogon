@@ -1,0 +1,36 @@
+bun test v1.4.2 (744846f84)
+
+tests/compare.test.ts:
+(pass) a record is refused when it does not parse [160.93ms]
+(pass) a record is refused when it the retry run is missing [167.18ms]
+(pass) a record is refused when it a missing log file [168.25ms]
+(pass) a record is refused when it a blank required field [185.09ms]
+(pass) a record is refused when it counterpart differs from the leaf base [183.61ms]
+(pass) a record is refused when it state outside the allowed set [186.03ms]
+(pass) a record is refused when it marks a red retry inconsistent without a counterpart [187.00ms]
+(pass) a record is refused when it more than one retry is recorded [185.23ms]
+(pass) a record is refused when it leaf revision differs from HEAD [186.34ms]
+(pass) a record is refused when it the base log is not from a base-run record line [184.86ms]
+(pass) a slot-mismatched base-run line is refused [182.38ms]
+(pass) a record is refused when it the base-run started before this pass [184.48ms]
+(pass) a record is refused when it the base-run command differs [183.28ms]
+(pass) a record is refused when it the base-run line records no end and exit [190.83ms]
+(pass) a new unit refuses a move to implement [189.13ms]
+(pass) a record is refused when it the record file is outside the leaf folder [190.15ms]
+(pass) an unverified unit refuses a move to check.review [188.67ms]
+(pass) --compare is refused on failed moves and from the merge phase [199.25ms]
+(pass) an inconsistent record needs no base run and a check-only move validates without effects [234.99ms]
+(pass) a new unit refuses a move to merge [128.42ms]
+(pass) a unit of the leaf own criteria refuses a move to check.review [139.32ms]
+(pass) a new unit is admitted on a move to check.fix [131.34ms]
+(pass) an entry opened on a newer revision than the evidence stays active [138.05ms]
+(pass) a failing notice does not block the move and is stored apart from the entry [140.93ms]
+(pass) a notice timeout is recorded after one delivery attempt without blocking the move [144.07ms]
+(pass) status prints each active entry with unit, command, first-seen revision and notice result [145.77ms]
+(pass) a base pass resolves only the matching active entry at or below its revision; a recurrence opens a new entry and notice [228.14ms]
+(pass) a valid compared record opens one red entry, sends one notice and moves like green [487.86ms]
+
+ 28 pass
+ 0 fail
+ 140 expect() calls
+Ran 28 tests across 1 file. [511.00ms]

@@ -1,0 +1,14 @@
+bun test v1.4.2 (744846f84)
+
+tests/compare.test.ts:
+(pass) a new unit refuses a move to implement [79.53ms]
+(pass) an unverified unit refuses a move to check.review [81.91ms]
+(pass) a new unit refuses a move to merge [84.44ms]
+(pass) a unit of the leaf own criteria refuses a move to check.review [88.10ms]
+(pass) a new unit is admitted on a move to check.fix [94.59ms]
+
+ 5 pass
+ 23 filtered out
+ 0 fail
+ 18 expect() calls
+Ran 5 tests across 1 file. [114.00ms]

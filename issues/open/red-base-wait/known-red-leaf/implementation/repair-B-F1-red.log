@@ -1,0 +1,22 @@
+bun test v1.4.2 (744846f84)
+
+tests/compare.test.ts:
+435 |         });
+436 |       const file: string = refusal.write
+437 |         ? refusal.write(f, s, s.leafPath, data)
+438 |         : writeRecord(f, s.leafPath, 'compare-1.yaml', data);
+439 |       const result: Result = await cli(f, ['phase', 'leaf-r', 'implement', '--slot', 'A', '--compare', file], f.root);
+440 |       expect(result.code).not.toBe(0);
+                                    ^
+error: expect(received).not.toBe(expected)
+
+Expected: not 0
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/known-red-leaf/tests/compare.test.ts:440:31)
+(fail) a record is refused when it marks a red retry inconsistent without a counterpart [167.30ms]
+
+ 0 pass
+ 26 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [199.00ms]

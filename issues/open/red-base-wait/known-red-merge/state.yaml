@@ -1,11 +1,37 @@
 slug: known-red-merge
 phase: plan.synthesis
-created: '2026-10-10'
+created: 2026-10-10
 repo: akrogon
-debate: 'no'
-blocked-by:
+debate: "no"
+blocked-by: 
   - known-red-leaf
   - base-run
-sources:
-  - Tamdoma/akrogon#76
-  - Tamdoma/akrogon#77
+sources: 
+  - "Tamdoma/akrogon#76"
+  - "Tamdoma/akrogon#77"
+busy_since: 
+  A: 2026-10-11T09:43:57.062Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tAX
+worktree: /home/ivan/.akrogon/worktrees/akrogon/known-red-merge
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pMV
+  B: w8:pMW
+prompted: 
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-known-red-merge--/2026-10-11T09-43-53-783Z_01a12a58-eeb7-7696-b7ee-1c6197b20e79.jsonl
+prompted_at: 
+  A: 2026-10-11T09:43:57.062Z
+delivery_error: 
+  {}

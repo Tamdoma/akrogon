@@ -3,7 +3,8 @@ default_branch: main
 rebuttal: true
 fix_rounds: 8
 implement: subagents
-checks: 
+setup: bun install --frozen-lockfile
+checks:
   format: bun run format
   test: bun test --timeout=30000
   typecheck: bun run typecheck

@@ -1,5 +1,5 @@
 slug: worktree-reconciler
-phase: implement
+phase: check.repair
 created: 2026-10-10
 repo: akrogon
 debate: "no"
@@ -10,7 +10,7 @@ blocked-by:
 sources: 
   []
 busy_since: 
-  A: 2026-10-11T08:44:47.396Z
+  B: 2026-10-11T09:44:13.364Z
 busy_notified: 
   {}
 attempts: 
@@ -30,9 +30,9 @@ pane:
   A: w8:pMS
   B: w8:pMT
 prompted: 
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-worktree-reconciler--/2026-10-11T08-30-31-251Z_01a12a15-c153-7757-a11f-809fb063a980.jsonl
+  B: 01a12a54-2a5e-7fd3-bff2-91891683dc02
 prompted_at: 
-  A: 2026-10-11T08:44:47.396Z
+  B: 2026-10-11T09:44:13.365Z
 delivery_error: 
   {}
 frozen: 
