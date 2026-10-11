@@ -34,6 +34,7 @@ export const baseRunSchema = z.strictObject({
   pid: z.number().int(),
   boot_id: z.string(),
   start: z.string(),
+  log: z.string().optional(),
   end: z.string().optional(),
   exit: z.number().int().optional(),
   removed: z.string().optional(),
@@ -115,6 +116,9 @@ export async function baseRun(
     throw new Error(`Refusing base-run cwd outside checkout ${target}: ${inside}`);
   checkLocation(target);
   const lock: string = await recordLock(repo);
+  const implementation: string = resolve(leaf.path, 'implementation');
+  mkdirSync(implementation, { recursive: true });
+  const log: string = resolve(implementation, `base-${id}.log`);
   const record: BaseRun = {
     run: id,
     repo: repo.name,
@@ -131,6 +135,7 @@ export async function baseRun(
       ? readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
       : '',
     start: new Date().toISOString(),
+    log,
   };
   await withLock(lock, async () => {
     appendFileSync(recordsPath(repo), JSON.stringify(record) + '\n');
@@ -157,10 +162,7 @@ export async function baseRun(
         : `akrogon guard ancestors && flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(
             setup,
           )} && akrogon guard own-modules && ${enter}exec "$@"`;
-    const implementation: string = resolve(leaf.path, 'implementation');
-    mkdirSync(implementation, { recursive: true });
     if (inside !== '') mkdirSync(resolve(target, inside), { recursive: true });
-    const log: string = resolve(implementation, `base-${id}.log`);
     const ran: Result = await spawnLogged(['sh', '-c', script, 'akrogon-base-run', ...argv], target, env, log);
     code = ran.code;
     process.stdout.write(`log: ${log}\nstatus: ${ran.code}\n`);
