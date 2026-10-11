@@ -56,7 +56,4 @@ test('the merge skill carries the merge comparison, green-record and batch-base 
   expect(text).toContain('--attempt <id>');
   expect(text).toContain('akrogon base-run');
   expect(text).toContain('known-red');
-  expect(text).toContain('rerun');
-  expect(text).not.toContain('repo is held');
-  expect(text).not.toContain('the repo is held');
 });

@@ -766,7 +766,7 @@ test.serial('a restack holding a known-red record prints rerun and drops the rec
       }),
     );
     expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
-    await advanceRemote(f, { 'issues/config.yaml': 'checks: {test: "bun test"}\nextra: true\n' });
+    await advanceRemote(f, { 'issues/notes.md': 'moved\n' });
     const merged: Result = await cli(f, mergeArgs, f.root, fx.herdr.env);
     expect(merged.code).toBe(0);
     expect(merged.stdout).toContain('rerun');
@@ -791,7 +791,7 @@ test.serial('a restack holding only a green record keeps reuse and resolves noth
       mergeRecord(fx.holderPath, { state: 'green', leafRevision: head }),
     );
     expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
-    await advanceRemote(f, { 'issues/config.yaml': 'checks: {test: "bun test"}\nextra: true\n' });
+    await advanceRemote(f, { 'issues/notes.md': 'moved\n' });
     const refused: Result = await cli(f, mergeArgs, f.root, fx.herdr.env);
     expect(refused.code).toBe(0);
     expect(refused.stdout).toContain('reuse');
@@ -801,6 +801,30 @@ test.serial('a restack holding only a green record keeps reuse and resolves noth
     const merged: Result = await cli(f, mergeArgs, f.root, fx.herdr.env);
     expect(merged.code).toBe(0);
     expect(redRecords(f).filter((e) => e.event === 'resolved')).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a restack with a green record still reruns when issues/config.yaml changed', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const fx: BatchFixture = await batchFixture(f, ['hold', 'mem-a']);
+    const head: string = await headOf(fx);
+    const file: string = writeRecord(
+      fx.holderPath,
+      'green-1.yaml',
+      mergeRecord(fx.holderPath, { state: 'green', leafRevision: head }),
+    );
+    expect((await cli(f, checkArgs(file), f.root, fx.herdr.env)).code).toBe(0);
+    await advanceRemote(f, { 'issues/config.yaml': 'checks: {test: "bun test"}\nextra: true\n' });
+    const refused: Result = await cli(f, mergeArgs, f.root, fx.herdr.env);
+    expect(refused.code).toBe(0);
+    expect(refused.stdout).toContain('rerun');
+    expect(refused.stdout).not.toContain('reuse');
+    const after: Batch = readState(fx.holderPath).batch!;
+    expect(after.comparisons).toBeUndefined();
+    expect(after.decision).toBe('rerun');
   } finally {
     f.clean();
   }
