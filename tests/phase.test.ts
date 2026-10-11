@@ -1811,6 +1811,27 @@ test('phase --check runs the move guards without recording, moving or closing th
   }
 });
 
+test('a phase move still logs and succeeds when herdr is unreachable', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'solo', 'check.review', {
+      pane: { A: 'w1:p9' },
+      done: ['B'],
+      verdict: { B: 'ready' },
+    });
+    const moved: Result = await cli(f, ['phase', 'solo', 'merge', '--slot', 'A', '--verdict', 'ready'], f.root, {
+      HERDR_SOCKET_PATH: resolve(f.home, 'missing.sock'),
+    });
+    expect(moved.code).toBe(0);
+    expect(moved.stdout).toBe('moved merge');
+    expect(readState(path).phase).toBe('merge');
+    const entry = JSON.parse(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n').at(-1)!);
+    expect(entry).toMatchObject({ slug: 'solo', to: 'merge', slot: 'A', session: null });
+  } finally {
+    f.clean();
+  }
+});
+
 test('merge turn refusal names the holder for merged and check.fix while failed is never refused', async () => {
   const f: Fixture = await fixture();
   try {
