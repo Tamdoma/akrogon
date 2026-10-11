@@ -4375,32 +4375,55 @@ test('a dispatched .env file round-trips mixed quotes, backticks and escape-look
         "SYNTHETIC_TICK='`literal`'\n" +
         "SYNTHETIC_BS='a\\\\nb'\n" +
         'SYNTHETIC_ESC="x\\ry"\n' +
-        'SYNTHETIC_DQESC="a\\r\\"b"\n',
+        'SYNTHETIC_DQESC="a\\r\\"b"\n' +
+        'SYNTHETIC_TRAIL=path\\\n' +
+        'SYNTHETIC_UNI="\u{1F600}a\\r\\"b"\n',
     );
     yaml(resolve(f.root, 'issues/config.yaml'), {
       checks: { test: 'bun test' },
       grounding: 'none',
-      env: ['SYNTHETIC_MIXED', 'SYNTHETIC_TICK', 'SYNTHETIC_BS', 'SYNTHETIC_ESC', 'SYNTHETIC_DQESC'],
+      env: [
+        'SYNTHETIC_MIXED',
+        'SYNTHETIC_TICK',
+        'SYNTHETIC_BS',
+        'SYNTHETIC_ESC',
+        'SYNTHETIC_DQESC',
+        'SYNTHETIC_TRAIL',
+        'SYNTHETIC_UNI',
+      ],
     });
     leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
     const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
     const copied: Record<string, string | undefined> = parseEnv(readFileSync(envFile, 'utf8'));
     const original: Record<string, string | undefined> = parseEnv(readFileSync(root, 'utf8'));
-    for (const name of ['SYNTHETIC_MIXED', 'SYNTHETIC_TICK', 'SYNTHETIC_BS', 'SYNTHETIC_ESC', 'SYNTHETIC_DQESC'])
+    for (const name of [
+      'SYNTHETIC_MIXED',
+      'SYNTHETIC_TICK',
+      'SYNTHETIC_BS',
+      'SYNTHETIC_ESC',
+      'SYNTHETIC_DQESC',
+      'SYNTHETIC_TRAIL',
+      'SYNTHETIC_UNI',
+    ])
       expect(copied[name]).toBe(original[name]);
     expect(copied.SYNTHETIC_MIXED).toBe('a\'b"c');
     expect(copied.SYNTHETIC_TICK).toBe('`literal`');
     expect(copied.SYNTHETIC_ESC).toBe('x\ry');
     expect(copied.SYNTHETIC_DQESC).toBe('a\r\\"b');
+    expect(copied.SYNTHETIC_TRAIL).toBe('path\\');
+    expect(copied.SYNTHETIC_UNI).toBe('\u{1F600}a\r\\"b');
   } finally {
     f.clean();
   }
 }, 15000);
 
-test('next refuses a declared value that cannot be written as dotenv', async () => {
+test('next preserves a declared value that escapes every quoting form', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
+    // parseEnv reads this as a'b`c\<CR>: quoters plus a backslash-carriage
+    // sequence. The accepted root assignment is itself a valid encoding, so
+    // the dispatch must emit a line that preserves the value.
     writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_HARD="a\'b`c\\\\\\r"\n');
     yaml(resolve(f.root, 'issues/config.yaml'), {
       checks: { test: 'bun test' },
@@ -4409,11 +4432,11 @@ test('next refuses a declared value that cannot be written as dotenv', async () 
     });
     const path: string = leaf(f, 'build', 'plan.synthesis');
     const result: Result = await next(f, ['build']);
-    expect(result.code).not.toBe(0);
-    const error: string = skips(result)[0].error;
-    expect(error).toContain('unwritable declared values');
-    expect(error).toContain('SYNTHETIC_HARD');
-    expect(() => lstatSync(resolve(f.root, 'issues/worktrees/build/.env'))).toThrow(/ENOENT/);
+    expect(result.code).toBe(0);
+    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const emitted: string = readFileSync(envFile, 'utf8');
+    expect(emitted).toContain('SYNTHETIC_HARD=');
+    expect(parseEnv(emitted).SYNTHETIC_HARD).toBe("a'b`c\\\\\r");
   } finally {
     f.clean();
   }
