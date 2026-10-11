@@ -354,6 +354,29 @@ test('printed checks refuse before setup and isolate both setup and check enviro
   }
 });
 
+test('pass_env names reach printed checks from the session without a .env entry', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      pass_env: ['SESSION_TOKEN'],
+      grounding: 'none',
+      setup: 'mkdir -p node_modules',
+      checks: { probe: `printf '%s|%s' "$SESSION_TOKEN" "$EXTRA_TOKEN"` },
+    });
+    const { worktree } = await leafWorktree(f, 'session');
+    const check: ReturnType<typeof printedChecks> = printedChecks(f);
+    const printed: string = z
+      .object({ checks: z.record(z.string(), z.string()) })
+      .parse(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout)).checks.probe;
+    const passed: Result = await check(printed, worktree, { SESSION_TOKEN: 'session', EXTRA_TOKEN: 'omit' });
+    expect(passed.stderr).toBe('');
+    expect(passed.code).toBe(0);
+    expect(passed.stdout).toBe('session|');
+  } finally {
+    f.clean();
+  }
+});
+
 test('run-check preserves failed executable errors and removes their capture directories', async () => {
   const f: Fixture = await fixture();
   try {

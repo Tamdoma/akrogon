@@ -4506,6 +4506,24 @@ test('next refuses a declared name missing from the registered .env without leak
   }
 }, 15000);
 
+test('pass_env names are not copied from the registered .env', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_ONE=1\n');
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      env: ['SYNTHETIC_ONE'],
+      pass_env: ['SESSION_ONLY'],
+    });
+    leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    expect(readFileSync(resolve(storeDir(f), 'build/.env'), 'utf8')).toBe('SYNTHETIC_ONE=1\n');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('dispatch recreates a deleted .env file in a reused worktree once its tab is gone', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {

@@ -51,6 +51,7 @@ export const repoSchema = z
     merge_covers: z.array(text).default([]),
     advisory: z.array(text).default([]),
     env: z.array(text).default([]),
+    pass_env: z.array(text).default([]),
     tools: z.array(text).default([]),
     grounding: z.union([
       z.literal('none'),
@@ -76,10 +77,16 @@ export const repoSchema = z
       'CDP_BROWSER_BINARY',
     ]);
     const envName: RegExp = /^[A-Z_][A-Z0-9_]*$/;
-    for (const name of config.env) {
-      if (!envName.test(name)) ctx.addIssue({ code: 'custom', path: ['env'], message: `Invalid env entry: ${name}` });
-      else if (constructed.has(name))
-        ctx.addIssue({ code: 'custom', path: ['env'], message: `Reserved env entry: ${name}` });
+    for (const [field, names] of [
+      ['env', config.env],
+      ['pass_env', config.pass_env],
+    ] as const) {
+      for (const name of names) {
+        if (!envName.test(name))
+          ctx.addIssue({ code: 'custom', path: [field], message: `Invalid ${field} entry: ${name}` });
+        else if (constructed.has(name))
+          ctx.addIssue({ code: 'custom', path: [field], message: `Reserved ${field} entry: ${name}` });
+      }
     }
     for (const name of config.merge_covers) {
       if (!Object.hasOwn(config.checks, name))

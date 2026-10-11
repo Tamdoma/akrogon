@@ -61,7 +61,8 @@ Check these choices:
 - **batch_limit** (integer at least 1, default 4) caps the whole merge batch including the holder.
 - **slots** optionally replaces a machine seat for this repo — a full {harness, model, effort} per seat (a or b); it applies at the next agent start.
 - **setup** optionally runs before your checks, usually to install dependencies.
-- **env** lists environment variable names copied into each check command's constructed environment; a name that is unset stays unset.
+- **env** lists names copied from the registered checkout's `.env` into each leaf's `.env` and into each check command's constructed environment. Dispatch refuses a leaf when a listed name is missing from that `.env`.
+- **pass_env** lists session variables, such as `DISPLAY`, passed from the caller into each check command's constructed environment. They are never read from or written to `.env`; a name that is unset stays unset.
 - **tools** lists PATH tools resolved at merge dispatch and recorded on merge attempts.
 
 Check commands must not read tracked files under `issues/` (except `issues/config.yaml`, the check list itself) or `learnings/` — a green batch run is reused when only those folders moved on the default branch.
