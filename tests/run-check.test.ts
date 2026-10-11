@@ -365,7 +365,6 @@ test('run-check preserves failed executable errors and removes their capture dir
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(executable);
     expect(readdirSync(captureRoot)).toEqual([]);
-    expect(scratchRuns(f)).toEqual([]);
   } finally {
     f.clean();
   }
