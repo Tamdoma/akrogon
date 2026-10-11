@@ -1553,7 +1553,7 @@ for (const moved of ['worktree root', 'repo root'] as const) {
   test(`changed ${moved} reports recorded and expected worktrees without creating or prompting`, async () => {
     const f: DispatchFixture = await dispatchFixture();
     try {
-      const recorded: string = resolve(storeDir(f), 'relocated');
+      const recorded: string = resolve(f.root, 'issues/worktrees/relocated');
       await command(['git', 'worktree', 'add', '-b', 'relocated', recorded], f.root);
       leaf(f, 'relocated', 'plan.synthesis', { worktree: recorded });
       const root: string = moved === 'repo root' ? resolve(f.home, 'moved-repo') : f.root;
