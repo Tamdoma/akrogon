@@ -285,3 +285,32 @@ test('no skill text instructs a seat to create a base checkout by hand', () => {
     expect(text).not.toContain('git worktree remove --force "$base_worktree"');
   }
 });
+
+test('base-run removes its TMPDIR and command temporary files on success and failure', async () => {
+  const f: Fixture = await fixture();
+  try {
+    withSetup(f);
+    const { worktree } = await callerWorktree(f);
+    const sha: string = await baseSha(f);
+    for (const code of [0, 7]) {
+      const result: Result = await baseRun(
+        f,
+        [
+          'base-run',
+          '--base',
+          sha,
+          '--',
+          'sh',
+          '-c',
+          `printf '%s' "$TMPDIR"; touch "$TMPDIR/command-temp"; exit ${code}`,
+        ],
+        worktree,
+      );
+      expect(result.code).toBe(code);
+      const runRoot: string = readFileSync(result.stdout.split('\n')[0].replace(/^log: /, ''), 'utf8');
+      expect(existsSync(runRoot)).toBe(false);
+    }
+  } finally {
+    f.clean();
+  }
+});
