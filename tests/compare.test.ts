@@ -412,7 +412,7 @@ for (const refusal of refusals) {
           leaf: 'leaf-r',
           slot: slots[0],
           base: s.base,
-          command: (data.command as string[]) ?? CHECK,
+          command: CHECK,
           log: (data.base as { log: string }).log,
           ...refusal.mutateLine,
         });
