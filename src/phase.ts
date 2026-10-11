@@ -239,7 +239,7 @@ async function recordComparisons(
     const opened: RedEntry[] = applyComparison(repo, file, comparison);
     for (const entry of opened) {
       try {
-        const shown = await herdrCall(
+        const shown = await herdr(
           [
             'notification',
             'show',
@@ -250,7 +250,6 @@ async function recordComparisons(
             'request',
           ],
           z.object({ shown: z.boolean(), reason: z.string() }),
-          slug,
         );
         appendNotice(repo, entry.id, shown);
       } catch (error) {
