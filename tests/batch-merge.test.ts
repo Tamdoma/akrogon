@@ -311,6 +311,7 @@ test.serial(
       expect(readState(holder.path).batch?.tested_top).toBe(record.top);
       const checkRun: Result = await run(['sh', '-c', 'echo x >> ' + countFile]);
       expect(checkRun.code).toBe(0);
+      const oldHead: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
       const merged: Result = await cli(
         f,
         ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
@@ -318,7 +319,10 @@ test.serial(
         herdr.env,
       );
       expect(merged.code).toBe(0);
-      expect(merged.stdout).toBe('moved merged\nmoved merged\nmoved merged\nissue complete issue');
+      expect(merged.stdout).toBe(
+        'moved merged\nmoved merged\nmoved merged\nissue complete issue\n' +
+          `deployed ${oldHead.slice(0, 12)}..${record.top!.slice(0, 12)}`,
+      );
       expect(await remoteTip(f)).toBe(record.top!);
       expect(await remoteSubjects(f, 3)).toEqual(['hold', 'mem-b', 'mem-a']);
       for (const slug of ['hold', 'mem-a', 'mem-b'])
