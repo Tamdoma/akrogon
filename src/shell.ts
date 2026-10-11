@@ -33,16 +33,22 @@ export function spawnFiles(
 ): { child: Bun.Subprocess; captured: Captured } {
   const dir: string = mkdtempSync(resolve(tmpdir(), 'akrogon-io-'));
   const captured: Captured = { dir, outPath: resolve(dir, 'out'), errPath: resolve(dir, 'err') };
-  const child = Bun.spawn(argv, {
-    cwd: options.cwd ?? process.cwd(),
-    env: options.env,
-    stdin: options.stdin === undefined ? 'ignore' : new Blob([options.stdin]),
-    stdout: Bun.file(captured.outPath),
-    stderr: Bun.file(captured.errPath),
-    timeout: options.timeout,
-    killSignal: options.killSignal,
-  });
-  return { child, captured };
+  let launched: boolean = false;
+  try {
+    const child: Bun.Subprocess = Bun.spawn(argv, {
+      cwd: options.cwd ?? process.cwd(),
+      env: options.env,
+      stdin: options.stdin === undefined ? 'ignore' : new Blob([options.stdin]),
+      stdout: Bun.file(captured.outPath),
+      stderr: Bun.file(captured.errPath),
+      timeout: options.timeout,
+      killSignal: options.killSignal,
+    });
+    launched = true;
+    return { child, captured };
+  } finally {
+    if (!launched) rmSync(captured.dir, { recursive: true, force: true });
+  }
 }
 
 export async function finishCaptured(child: Bun.Subprocess, captured: Captured): Promise<SpawnResult> {
