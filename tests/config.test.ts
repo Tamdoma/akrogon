@@ -15,7 +15,7 @@ import {
   type Repo,
 } from '../src/config';
 
-const guarded = (cmd: string): string => `akrogon guard ancestors && akrogon guard own-modules && sh -c ${quote(cmd)}`;
+const guarded = (cmd: string): string => `akrogon guard own-modules && sh -c ${quote(cmd)}`;
 
 const runCheck = (name: string, inner: string): string =>
   `akrogon run-check --name ${quote(name)} -- sh -c ${quote(inner)}`;
@@ -380,7 +380,7 @@ test('config composes setup into printed checks, merge_checks and advisory ident
       grounding: 'none',
     });
     const composed = (cmd: string): string =>
-      `akrogon guard ancestors && flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c 'bun install --frozen-lockfile' && akrogon guard own-modules && sh -c ${quote(cmd)}`;
+      `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c 'bun install --frozen-lockfile' && akrogon guard own-modules && sh -c ${quote(cmd)}`;
     type Printed = { checks: Record<string, string>; merge_checks: Record<string, string>; advisory: string[] };
     const atRoot = Bun.YAML.parse((await cli(f, ['config'])).stdout) as Printed;
     expect(atRoot).toMatchObject({

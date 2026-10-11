@@ -1,7 +1,7 @@
 import { test, expect, afterEach } from 'bun:test';
 import { resolve } from 'node:path';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { fixture, leaf, leafTempRoot, storeDir, type Fixture } from './helpers';
+import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { fixture, leaf, leafTempRoot, storeDir, yaml, type Fixture } from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, stateSchema, type Leaf, type State } from '../src/state';
 import { command, CommandError } from '../src/shell';
@@ -309,6 +309,24 @@ test.serial('buildStack rebases member ranges in order then the holder range', a
     expect(await command(['git', 'rev-parse', 'holder'], f.root)).toBe(holder.sha);
     expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).not.toContain('batch-');
     noLeftoverWorktrees(f);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('buildStack refuses a store path under an ancestor holding node_modules', async () => {
+  const { f, builtOn } = await batchFixture();
+  try {
+    const bad: string = resolve(f.home, 'bad');
+    mkdirSync(resolve(bad, 'node_modules'), { recursive: true });
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      worktree_root: resolve(f.home, 'bad/trees'),
+      grounding: 'none',
+    });
+    const dirty: Repo = readRepo('repo', f.root);
+    await expect(buildStack(dirty, builtOn, [], builtOn)).rejects.toThrow(realpathSync(bad));
+    expect(existsSync(resolve(bad, 'trees'))).toBe(false);
+    expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).not.toContain('batch-');
   } finally {
     f.clean();
   }

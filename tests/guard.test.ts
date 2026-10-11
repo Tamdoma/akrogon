@@ -74,28 +74,35 @@ test('guard with missing or unknown arguments exits non-zero printing usage', as
   }
 });
 
-test('printed check refuses at a worktree with a dirty ancestor before setup runs', async () => {
+test('printed check runs to completion under a dirty ancestor with and without setup', async () => {
   const f: Fixture = await fixture();
   try {
     const check: ReturnType<typeof printedChecks> = printedChecks(f);
     const marker: string = resolve(f.home, 'setup-ran');
+    const ran: string = resolve(f.home, 'check-ran');
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: `touch ${marker}`,
-      checks: { t: 'true' },
+      checks: { t: `test -f ${marker}` },
       grounding: 'none',
     });
     const parent: string = resolve(f.home, 'bad');
     mkdirSync(resolve(parent, 'node_modules'), { recursive: true });
     const worktree: string = resolve(parent, 'wt');
     await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    mkdirSync(resolve(worktree, 'node_modules'));
     leaf(f, 'check', 'implement', { worktree });
-    const printed: string = (
-      Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }
-    ).checks.t;
-    const result: Result = await check(printed, worktree);
-    expect(result.code).not.toBe(0);
-    expect(result.stderr).toContain(realpathSync(parent));
-    expect(existsSync(marker)).toBe(false);
+    const checks = async (): Promise<Record<string, string>> =>
+      (Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }).checks;
+    const result: Result = await check((await checks()).t, worktree);
+    expect(result.code).toBe(0);
+    expect(existsSync(marker)).toBe(true);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { t: `touch ${ran}` },
+      grounding: 'none',
+    });
+    const again: Result = await check((await checks()).t, worktree);
+    expect(again.code).toBe(0);
+    expect(existsSync(ran)).toBe(true);
   } finally {
     f.clean();
   }
