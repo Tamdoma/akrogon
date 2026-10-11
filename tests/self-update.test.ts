@@ -278,6 +278,29 @@ test.serial('a record commit landed at the branch write is pending, not dropped'
   }
 });
 
+test.serial('a staged edit on an unrelated path survives the checkout move', async () => {
+  const f: SelfUpdateFixture = await selfUpdateFixture();
+  try {
+    writeFileSync(resolve(f.clone, 'code.ts'), 'export const x = 1;\n');
+    await command(['git', 'add', 'code.ts'], f.clone);
+    await command(['git', 'commit', '-m', 'code.ts'], f.clone);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.clone);
+    await command(['git', 'fetch', 'origin'], f.seed);
+    await command(['git', 'reset', '--hard', 'origin/main'], f.seed);
+    await pushSeed(f, 'other.ts', 'incoming\n');
+    writeFileSync(resolve(f.clone, 'code.ts'), 'export const x = 2;\n');
+    await command(['git', 'add', 'code.ts'], f.clone);
+    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    expect(logs.join(' ')).toContain('deployed');
+    expect(readFileSync(resolve(f.clone, 'code.ts'), 'utf8')).toBe('export const x = 2;\n');
+    expect(await command(['git', 'status', '--porcelain'], f.clone)).toBe('M  code.ts');
+    expect(await command(['git', 'diff', '--cached', '--name-only'], f.clone)).toBe('code.ts');
+    expect(await worktreeCount(f)).toBe(1);
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('a local code commit ahead leaves the checkout and remote unchanged', async () => {
   const f: SelfUpdateFixture = await selfUpdateFixture();
   try {
