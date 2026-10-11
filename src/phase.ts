@@ -786,7 +786,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
         tested !== undefined &&
         (await equalOutsideRecordFolders(repo, tested.main, builtOn)) &&
         (await equalOutsideRecordFolders(repo, tested.top, staged.top)) &&
-        ((await recordConfigEqual(repo, tested.main, builtOn)) || (record.comparisons ?? []).length > 0) &&
+        (await recordConfigEqual(repo, tested.main, builtOn)) &&
         !(await comparisonsCarryRed(repo, record));
       const applied: boolean | 'rebuild' | 'dirty-holder' = await withLock(resolve(globalHome(), '.lock'), async () => {
         const current: Leaf = findLeaf(repo, leaf.state.slug);
