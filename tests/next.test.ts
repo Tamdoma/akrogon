@@ -4352,7 +4352,7 @@ test('a dispatched .env file preserves spaced assignments, multiline values and 
     });
     leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
-    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const envFile: string = resolve(storeDir(f), 'build/.env');
     const copied: Record<string, string | undefined> = parseEnv(readFileSync(envFile, 'utf8'));
     const original: Record<string, string | undefined> = parseEnv(readFileSync(root, 'utf8'));
     expect(copied.SYNTHETIC_SPACED).toBe(original.SYNTHETIC_SPACED);
@@ -4394,7 +4394,7 @@ test('a dispatched .env file round-trips mixed quotes, backticks and escape-look
     });
     leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
-    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const envFile: string = resolve(storeDir(f), 'build/.env');
     const copied: Record<string, string | undefined> = parseEnv(readFileSync(envFile, 'utf8'));
     const original: Record<string, string | undefined> = parseEnv(readFileSync(root, 'utf8'));
     for (const name of [
@@ -4433,7 +4433,7 @@ test('next preserves a declared value that escapes every quoting form', async ()
     const path: string = leaf(f, 'build', 'plan.synthesis');
     const result: Result = await next(f, ['build']);
     expect(result.code).toBe(0);
-    const envFile: string = resolve(f.root, 'issues/worktrees/build/.env');
+    const envFile: string = resolve(storeDir(f), 'build/.env');
     const emitted: string = readFileSync(envFile, 'utf8');
     expect(emitted).toContain('SYNTHETIC_HARD=');
     expect(parseEnv(emitted).SYNTHETIC_HARD).toBe("a'b`c\\\\\r");
@@ -4454,7 +4454,7 @@ test('a dispatched .env file preserves declared names matching encoding context 
     leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
     const copied: Record<string, string | undefined> = parseEnv(
-      readFileSync(resolve(f.root, 'issues/worktrees/build/.env'), 'utf8'),
+      readFileSync(resolve(storeDir(f), 'build/.env'), 'utf8'),
     );
     expect(copied).toEqual({ Z1: 'x', Y4: 'y' });
   } finally {
