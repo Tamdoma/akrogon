@@ -42,6 +42,23 @@ async function gitStage(repo: Repo, own: boolean, target: string, lag: () => Pro
     };
   }
   const local: string = await command(['git', 'rev-parse', 'HEAD'], root);
+  const tracking: Result = await run(
+    ['git', 'rev-parse', '--verify', '--quiet', `refs/remotes/${target}^{commit}`],
+    root,
+  );
+  // No tracking ref means no remote state to sync against; the preflight C3
+  // refusal owns that repair path, so leave the ref absent instead of healing.
+  if (tracking.code !== 0) return { kind: 'done', pushed: null, incoming: local, move: { state: 'none' } };
+  const fetched: Result = await run(['git', 'fetch', repo.config.remote, repo.config.default_branch], root);
+  if (fetched.code !== 0)
+    throw new CommandError(['git', 'fetch', repo.config.remote, repo.config.default_branch], root, fetched);
+  const counts: string[] = (
+    await command(['git', 'rev-list', '--left-right', '--count', 'HEAD...FETCH_HEAD^{commit}'], root)
+  ).split('\t');
+  // An up-to-date checkout needs no integration and must not take the global
+  // lock: serializing unrelated commands behind a held .lock is not its job.
+  if (counts[0] === '0' && counts[1] === '0')
+    return { kind: 'done', pushed: null, incoming: local, move: { state: 'none' } };
   const scratch: string = leafTemp(repo, 'self-update');
   const store: string = worktreeStore(repo);
   const skipAhead = async (incoming: string): Promise<string> => {
@@ -70,7 +87,8 @@ async function gitStage(repo: Repo, own: boolean, target: string, lag: () => Pro
               root,
             ),
           );
-          if (changed.some((path: string) => !eligibleRecord(root, store, path))) return await skipAhead(incoming);
+          if (changed.length === 0 || changed.some((path: string) => !eligibleRecord(root, store, path)))
+            return await skipAhead(incoming);
         }
         return null;
       },
