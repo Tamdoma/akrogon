@@ -18,7 +18,7 @@ export async function integrate(
     checkStaged?: boolean;
     pre?: (incoming: string) => Promise<string | null>;
   },
-  move: (incoming: string) => Promise<{ tip: string } | { conflict: { paths: string[] } }>,
+  move: (incoming: string) => Promise<{ tip: string | null } | { conflict: { paths: string[] } }>,
 ): Promise<{ pushed: string | null; incoming: string; skip: string | null }> {
   return withLock(resolve(globalHome(), '.lock'), async () => {
     const branchArgs: string[] = ['git', 'symbolic-ref', '--quiet', '--short', 'HEAD'];
@@ -119,8 +119,9 @@ export async function integrate(
       if (collisions.length > 0) throw new Error(`Cannot sync over ignored operator paths:\n${collisions.join('\n')}`);
     }
 
-    const moved: { tip: string } | { conflict: { paths: string[] } } = await move(incoming);
+    const moved: { tip: string | null } | { conflict: { paths: string[] } } = await move(incoming);
     if ('conflict' in moved) throw new Error(`record conflict: ${moved.conflict.paths.join(', ')}; run akrogon sync`);
+    if (moved.tip === null) return { pushed: null, incoming, skip: null };
     await command(['git', 'push', repo.config.remote, `${moved.tip}:${repo.config.default_branch}`], repo.root);
     return { pushed: moved.tip, incoming, skip: null };
   });
