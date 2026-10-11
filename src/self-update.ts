@@ -49,8 +49,7 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
   // No tracking ref means no remote state to sync against; the preflight C3
   // refusal owns that repair path, so leave the ref absent instead of healing.
   const preLocal: string = await command(['git', 'rev-parse', 'HEAD'], root);
-  if (tracking.code !== 0)
-    return { kind: 'done', pushed: null, incoming: preLocal, move: { state: 'none' } };
+  if (tracking.code !== 0) return { kind: 'done', pushed: null, incoming: preLocal, move: { state: 'none' } };
   const fetched: Result = await run(['git', 'fetch', repo.config.remote, repo.config.default_branch], root);
   if (fetched.code !== 0)
     throw new CommandError(['git', 'fetch', repo.config.remote, repo.config.default_branch], root, fetched);
