@@ -1,0 +1,10 @@
+bun test v1.4.2 (744846f84)
+
+tests/reconcile.test.ts:
+(pass) targeted next sweeps unused registered variants [1499.05ms]
+
+ 1 pass
+ 18 filtered out
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [1.54s]

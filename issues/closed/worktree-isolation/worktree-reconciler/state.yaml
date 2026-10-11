@@ -1,5 +1,5 @@
 slug: worktree-reconciler
-phase: check.repair
+phase: merged
 created: 2026-10-10
 repo: akrogon
 debate: "no"
@@ -10,7 +10,7 @@ blocked-by:
 sources: 
   []
 busy_since: 
-  B: 2026-10-11T09:44:13.364Z
+  {}
 busy_notified: 
   {}
 attempts: 
@@ -18,7 +18,7 @@ attempts:
   B: 0
 done: 
   []
-fix_rounds: 0
+fix_rounds: 1
 verdict: 
   {}
 tab: w8:tAW
@@ -30,11 +30,12 @@ pane:
   A: w8:pMS
   B: w8:pMT
 prompted: 
-  B: 01a12a54-2a5e-7fd3-bff2-91891683dc02
+  {}
 prompted_at: 
-  B: 2026-10-11T09:44:13.365Z
+  {}
 delivery_error: 
   {}
+merge_stamp: 2026-10-11T10:01:15.997Z
 frozen: 
   tests/batch-merge.test.ts: a5149d801f3c8fb32d6ab4a44f51c83f842dafd1
   tests/chart-usage.test.ts: 261b29db3bce43b45ecd3522935a61dff592bc63

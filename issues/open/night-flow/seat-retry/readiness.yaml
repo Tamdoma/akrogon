@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr report of a dead agent and agent-name reuse
+    command: herdr agent start door-probe-dead --kind claude --pane w8:pMP; kill -9 <pid>; herdr pane get w8:pMP; herdr agent list; herdr agent start (same name); herdr tab close w8:tAT
+    identity: operator's local herdr session, no credentials
+    target: local herdr server, throwaway tab w8:tAT
+    version: herdr 0.9.3
+    date: '2026-10-11'
+    result: after kill the pane reads agent null, agent_status unknown, agent_session null, and agent list omits it; the same name starts again
+    cleanup: agents killed, tab closed, absence confirmed by herdr tab list
+    limits: one kill of an idle claude agent; a hung agent herdr still reports and other harness kinds are not covered
+    record: issues/chart/night-flow/forks/failed-exits.md

@@ -49,3 +49,18 @@ Head: `46952bf docs: reconciler entry in area files and README`
 ## Unverified criteria
 
 None — every done-criterion has a green planned test or a recorded command result above.
+
+## check.fix (2026-10-11)
+
+B's repair landed `431f2b4`..`3d40038` (live-variant pane protection, run-owner ordering before scratch removal, per-pass targeted reconciliation, configured-store migration, adopted batch-member keep). Handed to A: A-F2 report location and T1–T5 expectation corrections.
+
+Repair commits after B's head:
+- `a3aed5e` fix: ignore the reconcile state dir and update pass-cleanup expectations — `.gitignore` gains `reconcile/` (tool-root default report location, matching `.lock`/`paused.yaml` convention; `tests` always set `AKROGON_HOME`); `src/AREA.md` line updated; five `tests/next.test.ts` expectations corrected for per-pass reconciliation, each cited: merged tab closes inside the targeted pass (D6/closeTab), closed-leaf worktree removed in the completing pass (DC1/DC6 semantics), old-root migration under configured `worktree_root` (DC4/B-F4), pane-inventory reads allowed during failed-leaf cleanup (B-F3).
+
+Post-repair proof:
+- `akrogon run-check --name format` — exit 0 (peer-wait.ts drift on base reverted again).
+- `akrogon run-check --name typecheck` — exit 0.
+- `akrogon run-check --name test` — 779 pass, 0 fail, 40 files [80.5s]; log `implementation/check-test-*.log`.
+- `akrogon run-check --name test_changed` — 765 pass, 0 fail [87s].
+- DC7 leak diff — zero `/tmp/akrogon-*` newer than marker after the suite.
+- `bun test tests/next.test.ts` — 232 pass, 0 fail (the five corrected expectations plus the pane_hook tab-survival case).

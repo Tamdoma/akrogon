@@ -1,0 +1,23 @@
+bun test v1.4.2 (744846f84)
+
+tests/reconcile.test.ts:
+451 |       expect((await next(f, ['--all'])).code).toBe(0);
+452 |       expect(existsSync(runRoot)).toBe(true);
+453 |       expect((await status(f)).stdout).toContain(runRoot);
+454 |     } finally {
+455 |       writeFileSync(release, 'release');
+456 |       expect((await running).code).toBe(0);
+                                         ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/worktree-reconciler/tests/reconcile.test.ts:456:36)
+(fail) failed leaf scratch preserves an actual running base command [511.69ms]
+
+ 0 pass
+ 17 filtered out
+ 1 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [532.00ms]

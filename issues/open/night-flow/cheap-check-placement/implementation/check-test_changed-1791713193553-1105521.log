@@ -1,0 +1,6 @@
+bun install v1.4.2 (744846f84)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+bun test v1.4.2 (744846f84)
+[0.00ms] ".env"
+error: --changed: fatal: bad revision '"c53f6196533289555518577f08907ec9c713721c"'

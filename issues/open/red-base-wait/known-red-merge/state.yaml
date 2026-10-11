@@ -1,5 +1,5 @@
 slug: known-red-merge
-phase: plan.synthesis
+phase: implement
 created: 2026-10-10
 repo: akrogon
 debate: "no"
@@ -10,7 +10,7 @@ sources:
   - "Tamdoma/akrogon#76"
   - "Tamdoma/akrogon#77"
 busy_since: 
-  A: 2026-10-11T09:43:57.062Z
+  A: 2026-10-11T10:06:38.427Z
 busy_notified: 
   {}
 attempts: 
@@ -32,6 +32,16 @@ pane:
 prompted: 
   A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-known-red-merge--/2026-10-11T09-43-53-783Z_01a12a58-eeb7-7696-b7ee-1c6197b20e79.jsonl
 prompted_at: 
-  A: 2026-10-11T09:43:57.062Z
+  A: 2026-10-11T10:06:38.427Z
 delivery_error: 
   {}
+frozen: 
+  tests/command-reference.test.ts: a63811a2f5d27b6bd3d925768fd85da6e93cd11e
+  tests/hold-retired.test.ts: 7756625646a424495c2fa95c5c705bdb617919cc
+  tests/hold.test.ts: null
+  tests/merge-attempts.test.ts: db5b3c169f3bd9fb20c0a0e3d906a59b7da5e235
+  tests/merge-compare.test.ts: f95b45b4a7e4ece68a14d04d5a0262841d04f62c
+  tests/pause-status.test.ts: 58596971808786ac1586d8c52bf342123d3dd28c
+  tests/red-docs.test.ts: dac1d320dae85941db7847f7265c19141e898ef2
+frozen_cited: 
+  []

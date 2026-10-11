@@ -1,0 +1,997 @@
+bun test v1.4.2 (744846f84)
+moved merged
+issue complete member-issue
+Install filesystem evidence: /home/ivan/.akrogon/worktrees/akrogon/worktree-reconciler/.evidence/install-prune-links/home-listing.json
+plan-issue build slot=A phase=plan.synthesis leaf=/tmp/akr-gNsOdn/akrogon-MAZVWv/repo/issues/open/issue/build
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-sTEbMC/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-sTEbMC/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-sTEbMC/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-sTEbMC/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-Lroic5/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-Lroic5/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-6t7EKm/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-6t7EKm/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-5iMXx5/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-5iMXx5/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-zF0S7U/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-zF0S7U/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-5m1Gqm/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-5m1Gqm/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-Lroic5/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-Lroic5/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-6t7EKm/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-6t7EKm/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-5iMXx5/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-5iMXx5/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-zF0S7U/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-zF0S7U/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akr-gNsOdn/akrogon-5m1Gqm/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akr-gNsOdn/akrogon-5m1Gqm/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+error: Missing leaf: resting (parked)
+error: Missing leaf: resting (parked)
+
+tests/base-run.test.ts:
+(pass) no skill text instructs a seat to create a base checkout by hand [0.23ms]
+(pass) a store target under an ancestor holding package.json is refused before allocation [85.05ms]
+(pass) merge base-run refuses relative and absolute cwd values outside its checkout before allocation [150.01ms]
+(pass) a merge-time run with --attempt logs under the attempt leaf folder and records the parent attempt [180.46ms]
+(pass) a checkout missing its own node_modules after setup is refused and named in the log [181.80ms]
+(pass) the base checkout .env carries the leaf generation of declared names and the record the generation and cwd [183.09ms]
+(pass) a base-run logs output, prints status, removes the checkout and records start, end, exit and removal [190.08ms]
+(pass) a failing command keeps the same record and cleanup contract [189.94ms]
+(pass) two runs of the same command and base create two fresh checkouts [299.39ms]
+(pass) base-run removes its TMPDIR and command temporary files on success and failure [300.07ms]
+(pass) base-run replays an exact configured check with its supplied base and relative cwd [342.91ms]
+(pass) a run killed during setup leaves a record with start and no end or removal [6027.52ms]
+
+tests/batch-dispatch.test.ts:
+(pass) holder-seat commits survive the check.fix handoff [1754.44ms]
+(pass) a failed holder with a landed candidate is told to move back, then reconciles without run or push [1988.74ms]
+(pass) a merged holder keeps the record while a member is still in merge, then finishes it [2070.50ms]
+(pass) a failed published holder receives one recovery notice across repeated passes [2093.36ms]
+(pass) the holder gets a batch record, members are applied, and only the holder is prompted [2351.57ms]
+(pass) a dirty holder worktree drops the batch to solo and restores carried members [2347.51ms]
+(pass) an interrupted build restores drifted members and rebuilds under a new attempt [2494.21ms]
+(pass) a dirty member worktree is dropped from the apply unmarked and keeps its uncommitted files [2495.33ms]
+(pass) a leaf leaving merge and returning joins the next holder batch [2580.04ms]
+(pass) a fetch failure keeps the record, restores nothing and reports the error [2641.73ms]
+(pass) cleanup retains a closed carried worktree while publication recovery is blocked [2694.88ms]
+(pass) the default batch_limit caps carried members at three [3113.84ms]
+(pass) holder-seat commits survive the failed handoff [1603.88ms]
+(pass) empty untracked folders are removed before an applied merge prompt [1351.56ms]
+(pass) unreadable ignored folders do not stop empty-folder cleanup before merge [1239.81ms]
+(pass) empty untracked folders are removed before a solo merge prompt [1301.16ms]
+(pass) a failed removal stops the merge prompt [1221.69ms]
+(pass) a memberless applied holder retains its checked integration head on red [1492.29ms]
+(pass) a green batch clears the record and closes member tabs once the holder lands [3856.69ms]
+(pass) a failed holder keeps carried members, and the move-back clears the record and member tabs [3905.10ms]
+(pass) a conflicted member is excluded from the attempt and eligible for the next batch [4136.17ms]
+(pass) a leaf entering merge after the record was written is excluded and becomes the next holder [4147.06ms]
+(pass) an edit arriving after the move status read survives the Git reset [2105.18ms]
+(pass) a red-batch member carries a later waiter when it next holds the turn [4302.13ms]
+(pass) late holder dirt during initial apply is isolated and survives cleanup [2352.94ms]
+(pass) a member conflict excludes it from the attempt, rewrites the record without it and leaves its branch untouched [4529.38ms]
+(pass) a landed batch moves member and holder once, closes member tabs with the record, and wakes dependents [4625.55ms]
+(pass) late member dirt during initial apply is isolated and survives cleanup [3074.93ms]
+(pass) batch_limit and a holder split limit cap carried members [6767.52ms]
+
+tests/batch-merge.test.ts:
+(pass) restack preserves a retirement when an unrelated member predates the lesson [442.08ms]
+(pass) a green batch checks once, pushes once, moves members before the holder and closes the issue [216.58ms]
+(pass) a member leaving merge before merged refuses the push and dissolves the batch [353.27ms]
+(pass) a stale or missing attempt is refused, changes nothing, and the current attempt still lands [419.26ms]
+(pass) a refused push restacks onto the new remote, prints rerun and the rerun pushes the new top [382.62ms]
+(pass) a red check.fix halves the batch until the holder alone moves to check.fix [552.57ms]
+(pass) the batch prints issue complete once for a standalone issue and no epic complete for an unfinished epic [158.13ms]
+(pass) merged --check refuses a member test change without a citation, naming the file [111.22ms]
+(pass) a solo record checks and pushes the worktree HEAD [149.29ms]
+(pass) an operator merged without --slot skips the attempt and tested_top gates but still pushes the batch [109.47ms]
+(pass) check.fix on a memberless record moves the holder to check.fix [85.22ms]
+(pass) operator completion refuses a holder commit outside the applied stack [93.04ms]
+(pass) a member failing during restack is not reset by the locked apply [253.09ms]
+(pass) a dissolved batch restores the holder to its own range and the solo push carries no member commits [416.36ms]
+(pass) a member conflict during restack drops the member and keeps its commits out of the rebuilt stack [224.08ms]
+(pass) a dirty member worktree keeps its files and branch at head when the batch dissolves [195.67ms]
+(pass) a carried package installs on the batch top and the restored member resolves its own lockfile [631.91ms]
+(pass) a solo restack conflict preserves commits made during the solo pass [157.82ms]
+(pass) late holder dirt during restack is isolated [215.54ms]
+(pass) late member dirt during restack is isolated [231.17ms]
+(pass) a record-only advance reuses the green run: prints reuse, keeps the tested pair and pushes the restacked top [364.28ms]
+(pass) a code advance forces a rerun: the seat rechecks and the restacked top lands [339.70ms]
+(pass) a main commit matching part of a member change fails the main-side equality and reruns [167.96ms]
+(pass) a change to issues/config.yaml on main forces a rerun [179.73ms]
+(pass) a restack conflict under learnings/history forces rerun and pushes nothing until a green rerun [419.91ms]
+(pass) a second refusal after reuse still compares against the original tested pair [372.81ms]
+(pass) a dirty holder during restack records rerun and preserves the operator edit [182.92ms]
+(pass) the reuse decision is identical when the command runs from a subdirectory [173.91ms]
+
+tests/batch.test.ts:
+(pass) stateSchema accepts a state with a batch record carrying solo and excluded [0.30ms]
+(pass) readState drops a legacy solo key left in state.yaml [11.83ms]
+(pass) stateSchema rejects unknown or missing-required batch fields [1.58ms]
+(pass) attemptId returns unique nonempty strings [0.24ms]
+(pass) buildStack re-removes a retired lesson line the union merge resurrects [60.48ms]
+(pass) buildStack keeps a same-stem lesson main added while the retiring member was in flight [68.97ms]
+(pass) buildStack adds no fixup commit when no retired lesson is resurrected [56.61ms]
+(pass) buildStack rebases member ranges in order then the holder range [56.31ms]
+(pass) empty member and holder ranges produce their heads without a rebase [60.87ms]
+(pass) a member conflict reports the slug and leaves no live branch changed [40.95ms]
+(pass) a holder conflict reports the holder and leaves member branches unchanged [41.90ms]
+(pass) applyStack resets worktrees and bare branches, restoreMembers reverts both [70.18ms]
+(pass) isAncestor returns the merge-base verdict and throws on other codes [29.50ms]
+(pass) batchMemberSlugs returns member slugs across every leaf carrying a batch record [21.16ms]
+
+tests/chart-shapes.test.ts:
+(pass) shapes.md readiness.yaml example parses against readinessSchema [2.88ms]
+(pass) draft readiness.yaml gaps without state.yaml [15.20ms]
+
+tests/chart-usage.test.ts:
+(pass) USAGE.md states the required limits [35.29ms]
+(pass) non-operator user records start no turn and an unfinished turn is incomplete [31.90ms]
+(pass) Codex door associates operator messages with completed turns and excludes injected context [35.23ms]
+(pass) a counter reset wholly inside the window is reported instead of losing earlier usage [34.08ms]
+(pass) writes USAGE.md, counts transcripts exactly, prints summary and outcome done [40.33ms]
+(pass) operator rows use seat A when the peer is recorded first [38.76ms]
+(pass) a codex counter reset marks the seat usage unmeasured and partial [37.54ms]
+(pass) unmeasured seats name the file or field; other seats still measure [39.04ms]
+(pass) second run replaces USAGE.md and prints sibling first lines sorted [51.54ms]
+(pass) records outside the window are excluded on both sides [52.91ms]
+(pass) two sessions of one seat are added and an ended session shows whole-session dollars [65.89ms]
+(pass) missing chart folder or bad seats.yaml exit non-zero with no USAGE.md [88.40ms]
+
+tests/check-names.test.ts:
+(pass) printed checks preserve names containing spaces and slashes in argv and log filenames [276.11ms]
+
+tests/close.test.ts:
+(pass) close on an already closed issue succeeds without a close call [73.98ms]
+(pass) close posts the exact delivered comment and closes an open issue [103.49ms]
+(pass) close retry finds the posted comment and closes without duplicating it [184.04ms]
+(pass) close rejects blank by, invalid identity and extra positional without a gh call [213.56ms]
+
+tests/command-reference.test.ts:
+(pass) README covers every dispatched command and its argument contract [0.55ms]
+(pass) coverage rejects missing, extra and duplicate rows and newly dispatched verbs [0.37ms]
+(pass) argument contracts reject lost values, requiredness and exclusive alternatives [1.56ms]
+(pass) escaped alternatives and reordered rows preserve argument semantics [0.11ms]
+
+tests/config.test.ts:
+(pass) seats throws SeatIndexError naming the file and seat for malformed indexes [27.94ms]
+(pass) seats resolves index seats nearest-first and reports each seat source [28.55ms]
+(pass) config leaves merge_covers unwrapped when setup is set [95.20ms]
+(pass) leafTemp defaults to the home scratch root and keeps the override [0.60ms]
+(pass) config requires explicit grounding [129.37ms]
+(pass) config defaults merge_covers to empty and prints it [129.17ms]
+(pass) commonDirectory spawns git once per call and reports failures with cwd [139.48ms]
+(pass) config reports merge_checks separately from checks [140.07ms]
+(pass) config refuses unknown merge_covers names and empty merge_checks with covers [148.55ms]
+(pass) config composes setup into printed checks, merge_checks and advisory identically from worktree [186.47ms]
+(pass) config prints per-repo merged slots with two overrides [188.10ms]
+(pass) config prints merged slots from root, linked worktree, and global outside [214.75ms]
+(pass) config printed check skips both sides of a || b when the frozen lockfile mismatches [255.01ms]
+(pass) config printed checks run concurrently in one worktree and leave it clean [256.11ms]
+(pass) config printed check installs into a fresh worktree without a separate install step [266.20ms]
+(pass) config runs all of setup inside the install lock [279.01ms]
+(pass) config printed check resolves the worktree lockfile version over the root install [287.31ms]
+(pass) config prints direct, defaults it to false, and rejects non-boolean values [305.32ms]
+(pass) config prints worktree_store matching the leaf path for every root shape and caller [338.89ms]
+(pass) config rejects invalid slots shapes and accepts empty slots [398.35ms]
+(pass) config prints leaf-resolved slots in a managed leaf worktree only [432.99ms]
+(pass) config combines defaults and repo values, reports none, and recalculates worktree base [466.51ms]
+(pass) config accepts env and tools lists and refuses bad and reserved env names [517.35ms]
+
+tests/culprit.test.ts:
+(pass) a member culprit ejects to check.fix and the next batch carries only the survivors [1160.74ms]
+(pass) a culprit at the fix-rounds cap ends failed with the shared attempts outcome [181.62ms]
+(pass) a holder culprit ejects itself and the members stay in merge at saved heads [161.70ms]
+(pass) refused --culprit calls exit nonzero, name the reason and change nothing [540.89ms]
+(pass) --culprit on a merge leaf without a batch record is refused [47.53ms]
+
+tests/dependents-first.test.ts:
+(pass) TURN ignores merged leaves when counting dependents [56.43ms]
+(pass) TURN keeps the batch record holder first ahead of a leaf with more dependents [57.25ms]
+(pass) TURN places the merge leaf with more unmerged dependents first despite the later stamp [57.44ms]
+(pass) next --all dispatches a leaf with unmerged dependents before an earlier leaf with none [630.41ms]
+
+tests/direct-guards.test.ts:
+(pass) refuses an empty branch [66.63ms]
+(pass) refuses changed test files without a citation [68.60ms]
+(pass) refuses uncommitted work [69.59ms]
+(pass) refuses issue files on the branch [70.21ms]
+(pass) passes a clean, cited, non-empty branch [77.13ms]
+
+tests/docs-links.test.ts:
+(pass) README and guide links resolve to files and anchors [1.69ms]
+(pass) lesson write sites link the shared lesson rule [0.08ms]
+(pass) broken relative link is reported [0.06ms]
+(pass) missing anchors with and without a path part are reported [0.07ms]
+
+tests/guard.test.ts:
+(pass) checkLocation accepts a nonexistent target under clean ancestors and refuses it under a dirty one [20.37ms]
+(pass) guard ancestors accepts package.json at the toplevel and refuses a parent holding it [89.59ms]
+(pass) guard ancestors accepts a clean chain then refuses naming the ancestor holding node_modules [93.17ms]
+(pass) guard with missing or unknown arguments exits non-zero printing usage [93.05ms]
+(pass) guard own-modules refuses naming the missing node_modules and accepts it once created [94.35ms]
+(pass) printed check refuses at a worktree with a dirty ancestor before setup runs [144.75ms]
+(pass) printed check refuses naming missing own node_modules and never runs the check command [174.73ms]
+
+tests/harness-template.test.ts:
+(pass) claude template carries no literal subagent model inside --settings [0.96ms]
+(pass) claude template substitutes opus into the subagent model env [0.28ms]
+(pass) claude template substitutes claude-opus-5-5 into the subagent model env [0.19ms]
+
+tests/hold.test.ts:
+(pass) a batch --red-on-base holds the repo: heads restored, record cleared, held line and one notification [172.28ms]
+(pass) a solo --red-on-base holds the repo with members [] [129.03ms]
+(pass) refused --red-on-base calls exit nonzero, name the reason and change nothing [320.40ms]
+(pass) --red-on-base on a merge leaf without a batch record is refused [58.73ms]
+(pass) --red-on-base requires slot B even with a missing or stale attempt [167.92ms]
+(pass) unhold clears the hold from root, a subfolder and a leaf worktree; absent hold fails naming the repo [453.80ms]
+(pass) a notification failure still leaves the hold, attempt line and state committed [136.40ms]
+(pass) a hold at the fetched sha blocks next: held line, no batch record, no mutating herdr calls [78.31ms]
+(pass) a hold survives a main advance confined to record folders [89.16ms]
+(pass) a main advance outside record folders clears the hold and starts a normal attempt [399.50ms]
+(pass) a main advance changing issues/config.yaml clears the hold and starts a normal attempt [399.54ms]
+(pass) unhold then next starts a normal attempt [436.37ms]
+(pass) overlapping next calls preserve a newer red-on-base hold [633.19ms]
+(pass) hold-fix names a queued merge leaf: next builds its stack attempt while the queue head stays idle [483.25ms]
+(pass) changing the named fix preserves the active batch holder and its authorization [1284.04ms]
+(pass) the fix leaf is authorized to merge while the queue head is refused, then order returns [1570.78ms]
+(pass) hold-fix refusals change nothing: no hold, missing leaf, leaf outside the merge queue [154.05ms]
+(pass) unhold mid-attempt still lets the batch record authorize the fix merge [882.61ms]
+(pass) status surfaces the fix name on the board and the targeted held line [197.63ms]
+
+tests/init.test.ts:
+(pass) init resolves absolute external worktree root from nested cwd [80.94ms]
+(pass) init resolves normalized relative internal worktree root from nested cwd [82.27ms]
+(pass) init refuses missing grounding index without changing files [82.68ms]
+(pass) init resolves relative external worktree root from nested cwd [88.15ms]
+(pass) init resolves relative repo-equal worktree root from nested cwd [89.15ms]
+(pass) init resolves absolute internal worktree root from nested cwd [89.28ms]
+(pass) init refuses directory grounding index without changing files [90.57ms]
+(pass) init creates .gitattributes with the lessons union merge rule [91.11ms]
+(pass) init writes no lessons rule to the repo info attributes file [97.11ms]
+(pass) init resolves repo-prefix sibling worktree root from nested cwd [100.13ms]
+(pass) init resolves absolute repo-equal worktree root from nested cwd [100.94ms]
+(pass) init refuses unknown harness in slots without changing files [100.47ms]
+(pass) init resolves tilde external worktree root from nested cwd [106.21ms]
+(pass) init appends the union rule to .gitattributes after unterminated content and repeats byte-identical [126.16ms]
+(pass) init preserves stored slots override on repeat [128.72ms]
+(pass) init succeeds with non-empty grounding index and preserves it on repeat [131.12ms]
+(pass) init ignores the custom worktree root and preserves user rules on repeated init [133.89ms]
+(pass) init refuses empty and whitespace-only grounding index without changing files [132.13ms]
+(pass) init union attribute merges concurrent lesson appends and still flags unrelated conflicts on rebase [159.47ms]
+(pass) init writes proposal, registration and toolkit and preserves repeated user files [190.37ms]
+(pass) init with explicit none succeeds and preserves choices on repeat [135.95ms]
+
+tests/install.test.ts:
+(pass) install prunes before refusing wrong-owned-link at .codex/skills without installing links or calling herdr [74.28ms]
+(pass) install prunes before refusing wrong-owned-link at .pi/agent/skills without installing links or calling herdr [75.69ms]
+(pass) install prunes before refusing directory at .claude/skills without installing links or calling herdr [78.06ms]
+(pass) install prunes before refusing wrong-owned-link at .claude/skills without installing links or calling herdr [78.06ms]
+(pass) install prunes before refusing directory at .pi/agent/skills without installing links or calling herdr [78.57ms]
+(pass) install prunes before refusing foreign-link at .agents/skills without installing links or calling herdr [79.74ms]
+(pass) install prunes before refusing directory at .agents/skills without installing links or calling herdr [81.50ms]
+(pass) install prunes before refusing foreign-link at .codex/skills without installing links or calling herdr [81.64ms]
+(pass) install prunes before refusing foreign-link at .pi/agent/skills without installing links or calling herdr [81.71ms]
+(pass) install prunes before refusing directory at .codex/skills without installing links or calling herdr [83.07ms]
+(pass) install still refuses an executable destination conflict before linking or herdr calls [83.20ms]
+(pass) install prunes before refusing wrong-owned-link at .agents/skills without installing links or calling herdr [84.13ms]
+(pass) install prunes before refusing foreign-link at .claude/skills without installing links or calling herdr [85.02ms]
+(pass) install prunes only dangling owned links and preserves real entries and foreign links in every root [186.52ms]
+(pass) install creates all four absent harness roots and repeats without changing links or herdr arguments [314.99ms]
+(pass) self-update > fast-forwards a behind checkout, keeps an unrelated dirty file and prints deployed [58.40ms]
+(pass) self-update > refuses a fast-forward overlapping a dirty edit and reports step, error, lag and remedy [51.96ms]
+(pass) self-update > skips a checkout on another branch and reports the branch [47.45ms]
+(pass) self-update > skips a detached HEAD checkout and reports it [47.79ms]
+(pass) self-update > skips a checkout ahead of the remote and names akrogon sync [42.78ms]
+(pass) self-update > skips a checkout diverged from the remote and names akrogon sync [47.03ms]
+(pass) self-update > reports a failed install and reports current once the lockfile is restored [44.88ms]
+(pass) self-update > is a silent no-op when repo.root is not ownRoot [22.92ms]
+(pass) self-update > links a skill added on the remote and prunes links to a removed skill after deploying [57.69ms]
+(pass) self-update > names a conflicting directory in the line and still creates the other links [48.14ms]
+
+tests/lessons.test.ts:
+(pass) retiredLessonsPresent flags a half-retired lesson while removal leaves it alone [50.02ms]
+(pass) re-removal keeps a new main lesson line whose stem is a superstring of the retired one [50.86ms]
+(pass) re-removal keeps a same-stem lesson line main added while the retiring leaf was in flight [51.79ms]
+(pass) solo cleanup command retires a union-resurrected lesson in a consumer repository [83.19ms]
+
+tests/merge-attempts.test.ts:
+(pass) a green batch appends one merged attempt line and log.jsonl keeps its move-line shape [195.97ms]
+(pass) a landed candidate reconciles to exactly one merged attempt line [190.03ms]
+(pass) a solo check.fix appends exactly one red attempt line [92.99ms]
+(pass) a batch check.fix appends exactly one split attempt line [218.91ms]
+(pass) a refused push restacked to reuse appends exactly one reuse line at the landing push [299.46ms]
+(pass) an unlanded candidate discards to exactly one red attempt line [496.16ms]
+(pass) a failed unlanded holder records one red attempt before recovery discards its batch [1029.64ms]
+(pass) stale-attempt and non-holder phase calls write no attempt line [128.41ms]
+(pass) a merged line carries PSI stall deltas from batch creation [170.37ms]
+(pass) a restacked reuse line carries PSI stall deltas from batch creation [285.40ms]
+(pass) a solo red line carries PSI stall deltas from batch creation [79.47ms]
+(pass) a split line carries PSI stall deltas from batch creation [109.77ms]
+(pass) a held line carries PSI stall deltas from batch creation [149.55ms]
+(pass) an ejected line carries PSI stall deltas from batch creation [124.44ms]
+(pass) a reconciled merged line carries PSI stall deltas from batch creation [204.46ms]
+(pass) a merged line without pressure_start keeps no pressure key even with a malformed dir [185.00ms]
+(pass) a merged line with an absent pressure dir keeps no pressure key [173.84ms]
+(pass) a merged line with a changed boot id keeps no pressure key [187.17ms]
+(pass) a malformed pressure file stops the ending call before any push or state change [110.68ms]
+(pass) a malformed pressure file stops batch creation before any batch or line exists [72.05ms]
+(pass) a decimal pressure total stops the ending call before any push or state change [188.45ms]
+(pass) a decimal pressure total stops batch creation before any batch or line exists [72.33ms]
+(pass) a created batch preserves PSI counters through rerun then reuse [618.49ms]
+(pass) a merge turn records declared tools on the batch and the attempt line [469.80ms]
+(pass) a declared tool absent from PATH fails the dispatch before any batch record [77.40ms]
+(pass) a stored tools list lands on the solo red line [87.90ms]
+(pass) a merge turn records the FFmpeg version using its real version option [385.67ms]
+(pass) a failed or empty version probe fails dispatch with command context [145.38ms]
+
+tests/next.test.ts:
+(pass) next rejects absolute file before dispatch or leaf mutation [97.10ms]
+(pass) next rejects file symlink before dispatch or leaf mutation [109.18ms]
+(pass) next rejects relative file before dispatch or leaf mutation [115.62ms]
+(pass) next reports Herdr response context for not-json-response [178.25ms]
+(pass) next reports Herdr response context for {"result":{"panes":"invalid-panes"}} [246.86ms]
+(pass) failed leaves never notify on dispatch [364.00ms]
+(pass) next dispatches an explicit worktree path [674.98ms]
+(pass) next dispatches an explicit leaf folder [688.01ms]
+(pass) next from an operator pane owning no leaf dispatches by cwd instead of returning silently [699.15ms]
+(pass) one unreadable leaf blocks all capacity at max_active 1 [252.06ms]
+(pass) next --all inside a checkout sweeps only that repo [742.22ms]
+(pass) next waits on a blocked agent instead of counting attempts or flipping seats [1145.22ms]
+698 |     saveState(first, { ...readState(first), phase: 'merge' });
+699 |     expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
+700 |     const db: Database = database(f);
+701 |     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
+702 |     expect((await next(f, ['first'])).code).toBe(0);
+703 |     expect(database(f).tabs.map((item) => item.label)).toEqual(['first']);
+                                                             ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "first",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/worktree-reconciler/tests/next.test.ts:703:56)
+(fail) a dependent still blocked by an unmerged leaf stays unallocated after its first blocker merges [973.01ms]
+(pass) next refuses unmerged dependencies, respects capacity, and waits on unknown panes [1332.24ms]
+(pass) next creates one worktree/tab under concurrent hooks, prompts configured A, ignores working events and resolves hook cwd [1399.61ms]
+(pass) next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session [1573.69ms]
+(pass) next re-prompts an idle seat whose prompt is older than the grace period and the phase never moved [1577.13ms]
+(pass) a closed tab hook from a merged leaf starts the dependent [1578.95ms]
+(pass) machine-wide capacity includes another registered repo and folder selection respects it [885.29ms]
+(pass) completing a leaf via tab_closed starts only same-repo dependents [1600.53ms]
+(pass) completing a leaf via pane_hook starts only same-repo dependents [1641.30ms]
+672 |           }),
+673 |         });
+674 |         expect(exited.code).toBe(0);
+675 |       }
+676 |       const expected: string[] = path === 'tab_closed' ? ['second'] : ['first', 'second'];
+677 |       expect(database(f).tabs.map((item) => item.label)).toEqual(expected);
+                                                               ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "first",
+    "second",
+  ]
+
+- Expected  - 1
++ Received  + 0
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/worktree-reconciler/tests/next.test.ts:677:58)
+(fail) completing a leaf via targeted starts only same-repo dependents [1724.59ms]
+(pass) a merged leaf with its tab still open does not count toward max_active [1867.35ms]
+(pass) unknown panes wait, warn after an hour and keep busy observations [2015.31ms]
+(pass) next resumes interrupted tab creation, fails after three failing passes [2290.51ms]
+(pass) unreadable state reserves its capacity and reports its path [1824.05ms]
+(pass) delayed working and idle notifications from the prompted session never consume retries [1299.84ms]
+(pass) missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch [799.75ms]
+(pass) global lock acquisition failure is fatal [132.58ms]
+(pass) merged leaves do not reserve capacity for other waiting leaves [1767.61ms]
+(pass) merged phase closes tab on typed next and starts the dependent [2653.65ms]
+(pass) uncommitted work in a merge worktree is left to the merge seat [1431.98ms]
+(pass) a worktree parked mid-rebase is still dispatched [1415.06ms]
+(pass) foreign leaves summarize once per repo with count and paths [124.63ms]
+(pass) missing registration is isolated during startup [1405.53ms]
+(pass) agent names support identical repo-local slugs and long numeric-leading slugs [1451.32ms]
+(pass) missing registration is isolated during hook [1351.01ms]
+(pass) foreign slugs are missing for lookup and dispatch [245.47ms]
+1139 |     expect(
+1140 |       readFileSync(gh.db + '.probes', 'utf8')
+1141 |         .trim()
+1142 |         .split('\n'),
+1143 |     ).toHaveLength(2);
+1144 |     expect(existsSync(worktree)).toBe(true);
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/worktree-reconciler/tests/next.test.ts:1144:34)
+(fail) next awaits sourced completion after a failed rename before removing the worktree [1562.29ms]
+(pass) exited hooks resolve persisted pane hints and preserve the surviving slot [2017.44ms]
+(pass) missing registration is isolated during cwd [1411.27ms]
+(pass) a live merge retains its completion call after pushing, including a peer retry [1731.94ms]
+(pass) two repos summarize once per repo on every invocation [272.07ms]
+(pass) duplicate leaf identity never dispatches an arbitrary leaf [734.91ms]
+(pass) non-Error throws cross the scoped discovery boundary unchanged [105.79ms]
+(pass) next recovers only merge-phase work by ancestry against a non-default remote target [2343.72ms]
+1580 |       expect(error).toContain(expected);
+1581 |       expect(error).toMatch(/recorded/i);
+1582 |       expect(error).toMatch(/expected/i);
+1583 |       expect(error).toMatch(/move/i);
+1584 |       expect(error).toMatch(/restore/i);
+1585 |       expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
+                                                                       ^
+error: expect(received).toBe(expected)
+
+- "{slug: relocated,phase: plan.synthesis,created: 2026-09-10,repo: repo,debate: "no",blocked-by: [],worktree: /tmp/akr-gNsOdn/akrogon-nkoYpk/repo/issues/worktrees/relocated}"
++ "slug: relocated
++ phase: plan.synthesis
++ created: 2026-09-10
++ repo: repo
++ debate: "no"
++ blocked-by: 
++   []
++ busy_since: 
++   {}
++ busy_notified: 
++   {}
++ attempts: 
++   A: 0
++   B: 0
++ done: 
++   []
++ fix_rounds: 0
++ verdict: 
++   {}
++ env_names: 
++   []
++ env_generation: 0
++ pane: 
++   {}
++ prompted: 
++   {}
++ prompted_at: 
++   {}
++ delivery_error: 
++   {}"
+
+- Expected  - 1
++ Received  + 30
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/worktree-reconciler/tests/next.test.ts:1585:65)
+(fail) changed worktree root reports recorded and expected worktrees without creating or prompting [333.26ms]
+(pass) mismatch leaf identity never dispatches an arbitrary leaf [764.12ms]
+(pass) lock finalization failures and invalid hook events remain fatal [842.54ms]
+(pass) changed repo root reports recorded and expected worktrees without creating or prompting [342.51ms]
+(pass) a selected leaf removed before its global lock is reported as skipped [117.26ms]
+(pass) next selection and sweep report both repo keys without dispatching or changing the mismatched leaf [850.41ms]
+(pass) explicit unreadable targets retain the original error without a missing-target stack [278.79ms]
+(pass) unreadable leaves reserve capacity while foreign leaves summarize separately [764.28ms]
+(pass) merged foreign leaves survive cleanup with worktree branch and tab intact [861.75ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 4 [1952.91ms]
+(pass) moving a repo with the same registered key supports status, phase and dispatch without a recorded worktree [914.01ms]
+(pass) bad YAML and invalid states reserve occupancy at capacity 3 [2247.55ms]
+(pass) foreign leaves do not consume capacity while healthy leaves in both repos dispatch [1331.63ms]
+(pass) bare next from inside the repo cleans up its merged leaves [1689.43ms]
+(pass) dirty merged worktree is kept while its tab lives, then removed once clean [2079.18ms]
+(pass) unknown directory population reserves all new capacity but allows existing tabs [1363.72ms]
+(pass) next prompts an idle agent with null session data [1282.25ms]
+(pass) recorded seats stay authoritative with an extra pane first and neither missing allocation carries TMPDIR [1228.99ms]
+(pass) next prompts an idle agent with omitted session data [1291.25ms]
+(pass) blocked merge seat B prevents fetch and clean checks in a dirty worktree [1288.20ms]
+(pass) a blocked non-merge seat does not stall a merge leaf [1291.99ms]
+(pass) recorded seats stay authoritative with an extra pane first and B missing allocation carries TMPDIR [1229.37ms]
+(pass) allocation handles an interrupted tab [1076.07ms]
+(pass) recorded seats stay authoritative with an extra pane first and A missing allocation carries TMPDIR [1437.90ms]
+(pass) allocation handles an empty tab [1064.17ms]
+(pass) recorded seats stay authoritative with an extra pane first and both missing allocation carries TMPDIR [1373.18ms]
+(pass) a stale prompt never re-prompts a busy or done seat, succeeds without failing, and three failing passes fail the leaf [5031.04ms]
+(pass) allocation paths unchanged: new tab keeps A left with no swap or focus [781.35ms]
+(pass) agent start allows 30 seconds while prompt wait remains 5 seconds [712.50ms]
+(pass) allocation handles an recreated tab [1533.76ms]
+(pass) missing A beside surviving B puts A left of B [1482.65ms]
+(pass) restores operator tab focus from another workspace [1528.46ms]
+(pass) restores operator tab focus within the leaf tab [1520.04ms]
+(pass) explicit next rejects open/ before any flock [183.23ms]
+(pass) a leaf tab survives the seat-B blocked hook [1035.19ms]
+(pass) startup retains a merged leaf's worktree and branch while closing its tab as an epic sibling stays unfinished (--resume) [1112.25ms]
+(pass) startup retains a merged leaf's worktree and branch while closing its tab as an epic sibling stays unfinished (--all) [1084.21ms]
+(pass) busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes [5913.07ms]
+(pass) a leaf tab survives the seat-B unknown hook [1014.56ms]
+(pass) a leaf tab survives the seat-A idle hook [1026.49ms]
+(pass) a leaf tab survives the seat-A exited hook [1000.55ms]
+(pass) explicit next rejects open/invalid before any flock [194.61ms]
+(pass) explicit next rejects open/epic/issue/extra/invalid before any flock [180.76ms]
+(pass) explicit next rejects closed/ before any flock [209.28ms]
+(pass) swap failure keeps A recorded and reports the leaf [1902.09ms]
+(pass) explicit next rejects closed/epic/issue/extra/invalid before any flock [212.16ms]
+(pass) explicit next rejects closed/invalid before any flock [225.98ms]
+(pass) a leaf tab survives the unmerged idle hook [1173.16ms]
+(pass) startup retries closure before cleanup and retains failed owners with their worktree and branch while the tab closes [1668.59ms]
+(pass) merge, check.fix, check.repair and post-repair review dispatch to their swapped seats [3361.26ms]
+(pass) a seat-B idle hook closes the merged leaf tab while the worktree and branch stay [1429.00ms]
+(pass) a merged leaf whose tab is already gone makes no tab close call and a driven tab_closed hook stays quiet [1785.70ms]
+(pass) invalid merged depth stays excluded during --all with healthy work [1009.55ms]
+(pass) allocation paths unchanged: extra panes keep position while missing A still repairs [2261.18ms]
+(pass) invalid merged depth stays excluded during . with healthy work [1013.79ms]
+(pass) a merged leaf whose closure failed during phase merged closes its tab on the seat-B idle hook after moving [1563.86ms]
+(pass) spaced repo root dispatches leaf= with the complete spaced authoritative folder [1020.49ms]
+(pass) debate leaf without positions files refuses dispatch until positions exist [1087.38ms]
+(pass) next --resume completes and cleans a merged leaf and starts its dependent [1744.79ms]
+(pass) invalid merged depth stays excluded during hook with healthy work [1531.53ms]
+(pass) a pass that starts the agent then observes it not idle charges nothing [554.31ms]
+(pass) retryable prompt failure charges one attempt, records delivery_error, and sends one prompt [605.70ms]
+(pass) allocation paths unchanged: bootstrap and B-only keep A left with no swap or focus [2973.70ms]
+(pass) allocation paths unchanged: present and reversed seats keep IDs and positions [2886.69ms]
+(pass) next identifies dormant issue/resting without parsing and prefers active leaves [1550.54ms]
+(pass) next identifies dormant epic/issue/resting without parsing and prefers active leaves [1662.35ms]
+(pass) merge leaf with landed branch re-prompts its idle seat instead of auto-recovering [1665.66ms]
+(pass) a failed leaf with its tab still open does not count toward max_active [1621.69ms]
+(pass) a failed leaf with a blocked pane is not seat-observed [1033.28ms]
+(pass) a failed leaf does not reserve capacity in the unreadable branch [1477.44ms]
+(pass) timeout settlement ignores the same text before the offset [993.32ms]
+(pass) next refuses unknown harness override before allocation [132.30ms]
+(pass) timeout settlement records delivery when exact user text lands after the offset [1089.07ms]
+(pass) next refuses an ISSUE.md index with unparseable front matter before any allocation [122.61ms]
+(pass) timeout settlement ignores prompt text inside assistant and tool records [1092.38ms]
+(pass) typed next from a leaf pane sweeps and removes merged worktrees [2142.28ms]
+(pass) next --resume re-prompts allocated idle leaves in every registered repo without allocating new work [2711.07ms]
+(pass) timeout settlement ignores a trailing partial line but keeps earlier records [1096.92ms]
+(pass) next refuses an ISSUE.md index with a key other than slots before any allocation [134.51ms]
+(pass) next refuses an ISSUE.md index with a seat other than a or b before any allocation [120.69ms]
+(pass) next refuses an ISSUE.md index with a quoted seat value before any allocation [110.86ms]
+(pass) next refuses an ISSUE.md index with a missing seat field before any allocation [117.51ms]
+(pass) next refuses an ISSUE.md index with a blank seat value before any allocation [115.91ms]
+(pass) next refuses an ISSUE.md index whose harness has no template before any allocation [127.62ms]
+(pass) next refuses a new leaf with a missing base (C1) before worktree creation [102.40ms]
+(pass) a successful prompt between failures resets attempts [1525.58ms]
+(pass) next refuses a new leaf with a missing base (C2) before worktree creation [126.24ms]
+(pass) next refuses a leaf branch without a worktree when the remote branch is gone [131.18ms]
+(pass) next refuses a new leaf with a missing base (C3) before worktree creation [135.04ms]
+(pass) timeout with a missing session file records a plain error without offset [1073.16ms]
+(pass) timeout settlement resolves id-kind references under HOME [1063.90ms]
+(pass) next refuses an existing worktree whose tracking ref is deleted while the remote branch lives [131.36ms]
+(pass) timeout with an unresolvable id records a plain error without offset [1071.25ms]
+(pass) next refuses to create a worktree while the remote is unreachable [109.96ms]
+(pass) next refuses an existing worktree whose tracking ref is deleted when the remote branch is gone [148.00ms]
+(pass) a retryable agent start failure charges once without prompting, then recovers [1071.12ms]
+(pass) next uses repo seat overrides for both seats with spaced model as one argv element [867.57ms]
+(pass) leaf temp path bounds stay short under the home scratch root [79.51ms]
+(pass) next inherits non-overridden seat from global slots [902.35ms]
+(pass) a record appended after a timeout is recognized by the next pass without resending [1433.46ms]
+2969 |       `prompt undelivered to seat A after 3 passes: agent_prompt_stalled stalled (pane ${paneId}, session ${session})`,
+2970 |     );
+2971 |     expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(3);
+2972 |     const before: number = calls(f).length;
+2973 |     expect((await next(f, ['three-fails'])).code).toBe(1);
+2974 |     expect(calls(f).length).toBe(before);
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 31
+Received: 32
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/worktree-reconciler/tests/next.test.ts:2974:29)
+(fail) three consecutive prompt failures fail the leaf during the third pass [1911.54ms]
+(pass) allocation carries TMPDIR refuses file override with no tab or split [264.74ms]
+(pass) allocation carries TMPDIR refuses symlink override with no tab or split [283.02ms]
+(pass) a successful prompt clears delivery_error and resets attempts [1148.98ms]
+(pass) next resolves seats from EPIC.md front matter and falls back per seat [934.53ms]
+(pass) a non-retryable prompt code fails unreachable without throwing and siblings still dispatch [1373.11ms]
+(pass) non-JSON prompt stderr fails unreachable with exit code and trimmed message [1370.77ms]
+(pass) malformed prompt error JSON fails unreachable with exit code [1393.57ms]
+(pass) an invalid readiness.yaml skips the leaf and names the file path [205.88ms]
+(pass) fresh allocation carries TMPDIR on create and B split with 0700 scratch [650.67ms]
+(pass) next dispatches an existing worktree without querying an unreachable remote [689.83ms]
+(pass) next branches a new worktree from the tracking commit, never a same-named local ref [715.54ms]
+(pass) closed tab scratch deletes merged folder and prunes inner worktree [736.04ms]
+(pass) closed tab scratch sweeps a failed leaf, keeps its branch [784.19ms]
+(pass) next --all leaves a gapped leaf undispatched while its ungapped sibling dispatches [615.21ms]
+(pass) a dispatched worktree gets a real .env file with the declared subset [659.92ms]
+(pass) allocation carries TMPDIR corrects permissive owned dirs to 0700 [1067.75ms]
+(pass) an input held by an unregistered absolute directory checks that directory .env [778.52ms]
+(pass) next refuses a leaf whose declared file input is absent or empty [895.60ms]
+(pass) next prefers ISSUE.md seats over EPIC.md and applies a standalone issue block [1763.51ms]
+(pass) a dispatched .env file round-trips quotes and backslashes through dotenv parsing [707.01ms]
+(pass) a dispatched .env file round-trips mixed quotes, backticks and escape-looking text [656.91ms]
+(pass) next refuses a declared name missing from the registered .env without leaking its values [359.56ms]
+(pass) next preserves a declared value that escapes every quoting form [677.42ms]
+(pass) a dispatched .env file preserves spaced assignments, multiline values and nested assignment text [718.58ms]
+(pass) dispatch recreates missing scratch with same tab and seats [1060.32ms]
+(pass) next refuses an env-gapped leaf in every missing .env state and dispatches when set [1051.06ms]
+(pass) a dispatched .env file preserves declared names matching encoding context names [715.99ms]
+(pass) allocation creates missing leaf temp ancestors and recreates deleted intermediate parents [1360.44ms]
+(pass) sweep scratch catch-up keeps sentinel with live panes then deletes on later sweep [1210.99ms]
+(pass) next refuses an .env write over tracked file [309.99ms]
+(pass) next refuses an .env write over unignored [303.92ms]
+(pass) a pre-linked worktree has its .env symlink replaced by a real file on dispatch [642.50ms]
+(pass) new tab empties stale scratch, live tab keeps it, and seats disable the node compile cache [1675.58ms]
+(pass) an empty env list writes an empty .env file without a registered .env [668.21ms]
+(pass) an empty env list writes an empty .env file with a registered .env [679.65ms]
+(pass) dispatch replaces an .env real file with a real file [603.97ms]
+(pass) sweep scratch catch-up deletes open and closed folders with no live panes [1769.44ms]
+(pass) dispatch replaces an .env stale link with a real file [657.66ms]
+(pass) blocked-report dep detail labels parked, missing, unreadable and skips merged [126.41ms]
+(pass) next refuses to write .env not ignored in the registered checkout, keeps the worktree, and reuses it after the ignore rule returns [818.67ms]
+(pass) blocked-report a failed dependency stays an error [135.48ms]
+(pass) blocked-report input detail names gaps without values and defers to deps [224.87ms]
+(pass) fixture temp root isolates every TMPDIR and envs carry override [1989.49ms]
+(pass) merged leaf cleanup removes the worktree and leaves the registered .env untouched [1022.12ms]
+(pass) dispatch recreates a deleted .env file in a reused worktree once its tab is gone [1388.57ms]
+(pass) blocked-report failed and merged share a folder without a merged line [140.60ms]
+(pass) blocked-report dependent not picked when started by completion [118.21ms]
+(pass) a live tab freezes .env while a dead tab lets the next dispatch rewrite it [1760.63ms]
+(pass) blocked-report epic folder starts ready and reports dep, input, failed [722.64ms]
+(pass) blocked-report same line by slug, leaf path, and epic path [827.16ms]
+(pass) an ineligible merge leaf never holds the turn (blocked-by) [2001.97ms]
+(pass) blocked-report no line for capacity waits [793.21ms]
+(pass) only the earlier-stamped merge leaf is prompted while the waiting leaf keeps its tab and panes [2102.64ms]
+(pass) blocked-report manual forms stay manual with pane and event set [1289.10ms]
+(pass) blocked-report automatic silence on hook, resume, and merge wake [1270.46ms]
+(pass) a committed merge whose log append fails still wakes the next leaf [2092.05ms]
+(pass) ambiguous name refuses an epic and its same-name issue [83.22ms]
+(pass) blocked-report manual forms bare, all inside, all outside match [1432.65ms]
+(pass) ambiguous name refuses two same-name issues under different epics [104.21ms]
+(pass) ambiguous name refuses an issue and its same-name leaf [106.85ms]
+(pass) ambiguous name refuses an owner and an unrelated leaf [95.55ms]
+(pass) the seat merged holder exit wakes the next merge leaf without a manual next [2483.76ms]
+(pass) unreadable leaf under a named issue reports its read error [112.88ms]
+(pass) empty folder and unknown names give the missing-leaf message [210.37ms]
+(pass) the seat failed holder exit wakes the next merge leaf without a manual next [2579.14ms]
+(pass) phase merged records one self-update call for the repo [144.75ms]
+(pass) blocked-report real errors still report on automatic paths [1504.55ms]
+(pass) a saved holder failure wakes the stamped queue when the log is a directory [2167.34ms]
+(pass) the operator merged holder exit wakes the next merge leaf without a manual next [2484.96ms]
+(pass) phase failed commits without a self-update call [166.87ms]
+(pass) unstamped merge dispatch uses log order and refuses unreadable history [2256.04ms]
+(pass) the seat check.fix holder exit wakes the next merge leaf without a manual next [2737.12ms]
+(pass) a merge seat consumes only one failed delivery attempt per next pass [2461.04ms]
+(pass) existing folder shadows a same-named owner or leaf [751.41ms]
+(pass) blocked-report no line for merge turn waits [1872.92ms]
+(pass) a throwing self-update still lets phase merged commit and next dispatch [586.96ms]
+(pass) leaf slug selection keeps open and closed behavior [1168.86ms]
+(pass) blocked-report no line for busy seats [1435.84ms]
+(pass) closed owner name does not block an open same-name owner [1051.65ms]
+(pass) the capped prompt failure holder exit wakes the next merge leaf without a manual next [3711.75ms]
+(pass) owners resolve without ISSUE.md or EPIC.md [1376.70ms]
+(pass) an idle hook advances past a capped holder after visiting its waiter [3550.46ms]
+(pass) next --all, --resume and manual next record the registered or selected repos before dispatch [1672.77ms]
+(pass) a leaf re-entering merge queues behind the two leaves stamped earlier [4190.41ms]
+(pass) named target equivalence: owner name matches folder path from root, subfolder and worktree [15338.77ms]
+
+tests/park.test.ts:
+(pass) park --all skips running issues and unpark --all restores everything [132.17ms]
+(pass) park keeps prerequisites that open leaves still depend on, and unpark refuses dependents of parked work [552.21ms]
+(pass) park and unpark move whole issues by name, refuse running ones, and keep the loop blind to parked work [617.36ms]
+
+tests/pause-next.test.ts:
+(pass) invalid pause file fails an automatic working event naming the file [95.37ms]
+(pass) unpause failure exits non-zero with the pause cleared [207.03ms]
+(pass) invalid pause file fails automatic and manual next naming the file [263.80ms]
+(pass) unpause runs deferred merged cleanup [279.07ms]
+(pass) manual next target completes a leaf and dispatches its dependent while paused [603.80ms]
+(pass) manual next all dispatches a paused repo with an inherited event and stays paused [620.09ms]
+(pass) bare manual next with a pane id dispatches a paused repo and stays paused [621.10ms]
+(pass) manual next target dispatches a paused repo with an inherited event and stays paused [646.53ms]
+(pass) unpause starts tab-less leaves only through the dependent cascade [678.96ms]
+(pass) phase move in a paused repo commits while its merge wake prompts nothing [805.58ms]
+(pass) race A: pause recorded before the locked merge section suppresses the launch [893.28ms]
+(pass) manual next target prompts the waiting merge holder while paused [1057.57ms]
+(pass) automatic tab_closed does nothing for a paused repo [1060.41ms]
+(pass) automatic pane_exited does nothing for a paused repo [1111.12ms]
+(pass) automatic pane_closed does nothing for a paused repo [1111.54ms]
+(pass) automatic pane_agent_status_changed does nothing for a paused repo [1120.98ms]
+(pass) unpause relaunches closed seats with the current seat config [1133.95ms]
+(pass) resume skips the paused repo and still dispatches the unpaused repo [1395.06ms]
+(pass) race B: pause waits for a held launch lock, later automatic work is suppressed [1608.67ms]
+(pass) race: pause waits for landed-batch dependent dispatch, later automatic work is suppressed [2554.14ms]
+
+tests/pause-status.test.ts:
+(pass) unpaused repos print as before with phases and blockers unchanged [77.30ms]
+(pass) invalid held file fails status naming the file [109.41ms]
+(pass) invalid pause file fails status naming the file [111.63ms]
+(pass) status charts marks the paused repo heading [119.92ms]
+(pass) targeted status names the pause for a leaf of a paused repo [161.00ms]
+(pass) targeted status prints the held line while the repo is held [207.09ms]
+(pass) unpause prints the hold after unpausing a held repo [215.41ms]
+(pass) status marks the paused repo beside its heading, including an empty repo [249.45ms]
+(pass) status marks the held repo beside its heading, alone and with paused, until unhold [288.26ms]
+
+tests/pause.test.ts:
+(pass) pause and unpause refuse folders outside every registered repo [85.84ms]
+(pass) pause and unpause record repo state from root, idempotent [202.67ms]
+(pass) pause resolves the repo from a subfolder and a leaf worktree [212.16ms]
+(pass) missing pause file means nothing paused, invalid file fails naming the path [373.24ms]
+
+tests/peer-wait.test.ts:
+(pass) rejects missing args and a non-numeric budget [46.82ms]
+(pass) done when the return file is written during a timed-out wait [72.18ms]
+(pass) done while herdr still reports working [72.82ms]
+(pass) blocked wins over a non-empty return file [73.26ms]
+(pass) passes a non-timeout herdr failure through unchanged [81.41ms]
+(pass) budget keeps the last status herdr returned [349.02ms]
+(pass) budget clamps each wait timeout to the remaining budget [548.98ms]
+(pass) failure on idle with the return file missing [10094.46ms]
+(pass) failure on done with a 0-byte return file [10097.62ms]
+
+tests/phase.test.ts:
+(pass) phase implement fails with Missing worktree when the recorded folder is gone [106.41ms]
+(pass) sourced completion without worktree context fails before rename without a fabricated commit [114.06ms]
+(pass) valid phase transition rejects a mismatched repo key without changing state or history [119.53ms]
+(pass) failed log diagnostics report committed state without replay [190.49ms]
+(pass) empty branch refuses review naming target [129.15ms]
+(pass) invalid sources and empty worktree fail at load without state, log or gh changes [254.49ms]
+(pass) standalone completion closes the union of asymmetric leaf sources [344.44ms]
+(pass) a failed move logs the state failure object while a moved record omits failure and prints in status [365.48ms]
+(pass) failed exits by command reset attempts and keep fix_rounds [253.55ms]
+(pass) handoff to review refuses a dirty worktree at every move and issue files on the branch, then passes [382.71ms]
+(pass) partial commented close success retries without duplicating a merged comment on a later page [387.31ms]
+(pass) planning synthesis with empty branch moves to implement [149.25ms]
+(pass) failed log preserves committed state and failed container rename retries without replay [411.24ms]
+(pass) planning move refuses issue files on branch naming leaf path, then records when clean [251.73ms]
+(pass) check.repair hands B to merge uncounted and failed recovers to check.repair [344.61ms]
+(pass) real same-slot and different-slot races record once and refuse stale moves unchanged [458.75ms]
+(pass) stop from implement on dirty worktree records blocked failure and clears busy fields [221.42ms]
+(pass) merge to merged clears busy fields [134.66ms]
+(pass) completion leaves a chart holding a same-slug draft in place and keeps the inventory readable [525.90ms]
+(pass) blocked restart skips clean check and removes failure while attempts restart refuses dirty [224.50ms]
+(pass) fix cap records attempts failure [221.28ms]
+(pass) rename on a missing tab warns once and continues (stale-resume clean) [173.87ms]
+(pass) failed restart refuses issue files on branch but allows move without worktree [236.77ms]
+(pass) asymmetric and empty leaf sources defer until epic completion under open locks [640.54ms]
+(pass) failed move logs persisted delivery after failNotification [245.32ms]
+(pass) epic closure failure retries outstanding sources on next without replaying completion [660.92ms]
+(pass) standalone closure failure retries outstanding sources on next without replaying completion [676.57ms]
+(pass) rename on a missing tab warns once and continues (stale-fail clean) [215.90ms]
+(pass) phase move clears delivery_error [126.53ms]
+(pass) failed move logs persisted delivery after failRename [295.94ms]
+(pass) rename failure other than tab_not_found keeps existing handling [216.14ms]
+(pass) plan.synthesis refuses a --slot B move without changing state or log [135.22ms]
+(pass) implement refuses a --slot B move without changing state or log [130.09ms]
+(pass) check.fix refuses a --slot B move without changing state or log [132.28ms]
+(pass) check.review refuses a --slot A move without changing state or log [107.59ms]
+(pass) merge refuses a --slot A move without changing state or log [123.39ms]
+(pass) rename on a missing tab warns once and continues (stale-fail notification error) [256.74ms]
+(pass) check.repair refuses a --slot A move without changing state or log [110.70ms]
+(pass) each completed issue closes only its all-leaf private sources before the final epic closure [810.26ms]
+(pass) completion prints only when the owner finishes, stays silent on inner issues and retries [910.94ms]
+(pass) in-flight seat move after stop stays failed [246.58ms]
+(pass) a phase move still logs and succeeds when herdr is unreachable [190.81ms]
+(pass) merge turn refusal fires before worktree guards on a missing worktree [191.48ms]
+(pass) modified old test files need a Test-Change trailer on every guarded move [260.23ms]
+(pass) deleted and typechanged old test files need one trailer each naming the file [282.91ms]
+(pass) failed routing and reason misuse are guarded [657.66ms]
+(pass) source retries recheck state, skip CLOSED, and continue after final failures without moving [1112.93ms]
+(pass) stops land in failed immediately without phase advance and validate slots [768.64ms]
+(pass) a trailer naming a different path does not cite and the old path of a rename is the citation [374.63ms]
+(pass) merged --check refuses an applied stack whose top still contains a retired lesson line [309.48ms]
+(pass) added-only test files and non-test diffs move without a trailer, and recovery re-runs the guard [380.95ms]
+(pass) failed leaf with explicit slot is refused without effect [447.83ms]
+(pass) an earlier merge_stamp takes the turn over slug order [368.11ms]
+(pass) review fix routes to check.repair, B hands to A, rechecks only B, caps handoffs and permits operator restart [1151.26ms]
+(pass) merged --check refuses a solo record whose rebased head contains a retired lesson line [280.29ms]
+(pass) moving into merge writes merge_stamp and re-entering refreshes it [458.26ms]
+(pass) failed or malformed retry comment listing prevents another close and continues later sources [1239.43ms]
+(pass) phase --check runs the move guards without recording, moving or closing the owner [503.56ms]
+(pass) frozen guard refuses a rebase-replayed empty planning cite until a new trailer-only commit [365.90ms]
+(pass) frozen guard ignores a rebase-replayed planning trailer for a path no leaf commit touches [444.91ms]
+(pass) plan.synthesis move writes a frozen record of every changed path and rewrites it on replan [579.11ms]
+(pass) failed announce renames tabs, tolerates missing tabs, and retries herdr calls [1082.48ms]
+(pass) frozen record refuses unrecorded added test files and edited recorded non-test files [591.13ms]
+(pass) frozen guard holds after fetch and rebase including a recorded path no leaf commit touches [634.50ms]
+(pass) merge turn refusal names the holder for merged and check.fix while failed is never refused [920.99ms]
+(pass) frozen record refuses drifted, reappearing, deleted and renamed paths until a citing trailer [1296.46ms]
+
+tests/preflight.test.ts:
+(pass) preflight reports unproven on transport failure without C2 text [56.28ms]
+(pass) preflight refuses C1 when no remote is configured [57.88ms]
+(pass) preflight refuses C3 when the tracking ref is absent locally [57.97ms]
+(pass) preflight prints remote branch and sha when remote branch and tracking ref resolve [59.43ms]
+(pass) preflight refuses C2 when the remote branch is absent [59.50ms]
+(pass) AKROGON_BASE resolves the tracking ref over a same-named divergent branch [64.14ms]
+(pass) preflight resolves the tracking ref, never a same-named branch or tag [97.66ms]
+(pass) preflight refuses unregistered and non-repo cwd without writes and accepts zero leaves [122.15ms]
+
+tests/pull.test.ts:
+(pass) startup runs pull all before next resume and wrappers forward arguments [20.36ms]
+(pass) pull caps slugs at word boundaries and hard cuts oversized first words [90.78ms]
+(pass) pull --all from a registered repo pulls the healthy repos and exits non-zero naming the failed repo [108.36ms]
+(pass) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [215.44ms]
+(pass) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [224.68ms]
+(pass) pull --all pulls every registered repo from a repo root, a linked worktree, and an unregistered directory [301.88ms]
+(pass) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [309.00ms]
+(pass) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [387.78ms]
+
+tests/readiness.test.ts:
+(pass) schema accepts a complete holding with every section non-empty [0.34ms]
+(pass) schema refuses an unknown top-level key [0.34ms]
+(pass) schema refuses a whitespace-only text field [0.24ms]
+(pass) schema refuses a fixture without a cleanup step [0.15ms]
+(pass) schema refuses a retained record without exposure [0.14ms]
+(pass) schema refuses an unknown input kind [0.10ms]
+(pass) readReadiness returns null without readiness.yaml [16.16ms]
+(pass) readReadiness returns the parsed readiness for a valid file [16.65ms]
+(pass) readReadiness throws an error naming the file for schema failure [18.15ms]
+(pass) holderRoot resolves registered keys and absolute paths, refuses the rest [19.10ms]
+(pass) produces, grants, retained and proofs never produce gaps [17.48ms]
+(pass) gaps reports a file input when the file is absent or zero bytes [17.76ms]
+(pass) gaps reports an env input when .env is absent, the name is missing or the value is blank [18.00ms]
+(pass) readReadiness throws an error naming the file for malformed yaml [18.63ms]
+
+tests/run-check.test.ts:
+(pass) run-check refuses forbidden env for a repo without setup [80.41ms]
+(pass) run-check --leaf overrides the derived leaf and defaults name to run [94.54ms]
+(pass) run-check preserves failed executable errors and removes their capture directories [93.65ms]
+(pass) run-check writes .owner with pid, boot_id and started while the command runs [97.22ms]
+(pass) run-check builds an allowlisted env, copies declared names and omits undeclared ones [99.98ms]
+(pass) run-check echoes child output, returns its exit code and lands the log in the leaf on failure [99.13ms]
+(pass) run-check drops an exported but undeclared variable [100.94ms]
+(pass) concurrent run-check invocations get distinct TMPDIR roots [101.32ms]
+(pass) run-check sets AKROGON_BASE to the merge base [109.51ms]
+(pass) run-check refuses a caller-side global bunfig before the command runs [119.16ms]
+(pass) run-check TMPDIR is a fresh short /tmp run root and is removed on success and failure [142.65ms]
+(pass) constructed PATH can dispatch akrogon itself [149.86ms]
+(pass) run-check on the registered checkout requires --holder and writes the log there [205.47ms]
+(pass) printed checks refuse before setup and isolate both setup and check environments [235.32ms]
+(pass) run-check refuses a forbidden caller env before the command runs [267.12ms]
+
+tests/shell.test.ts:
+(pass) deadline kills sleeping attempt after no failures [113.95ms]
+(pass) deadline kills sleeping attempt after one failure [112.26ms]
+(pass) ordinary retry preserves warning and second result with optional deadlines [8.15ms]
+(pass) herdrError decodes structured stderr [0.84ms]
+(pass) herdrError maps unstructured stderr to exit code [0.15ms]
+(pass) herdrError truncates long stderr to 500 chars [0.05ms]
+(pass) retryable is false on non-JSON stderr without throwing [0.06ms]
+(pass) paneSchema requires kind when agent_session present [1.06ms]
+(pass) standalone command clears long deadline on exit 7 [24.03ms]
+(pass) standalone command clears long deadline on exit 0 [24.68ms]
+(pass) Herdr response retains native cause for {"result":{"panes":"invalid-panes"}} [91.84ms]
+(pass) Herdr response retains native cause for not-json-response [95.31ms]
+
+tests/state.test.ts:
+(pass) strict schema rejects legacy keys priority [0.43ms]
+(pass) strict schema rejects legacy keys slot [0.08ms]
+(pass) strict schema rejects legacy keys priority, slot [0.04ms]
+(pass) strict schema rejects legacy keys failed_notified [0.04ms]
+(pass) open lazily migrates failed_notified regardless of legacy value type [30.98ms]
+(pass) open lazily migrates priority regardless of legacy value type [33.99ms]
+(pass) open lazily migrates priority, slot regardless of legacy value type [33.45ms]
+(pass) canonical states parse and save without retired fields and retain defaults [41.26ms]
+(pass) closed lazily migrates priority, slot regardless of legacy value type [38.68ms]
+(pass) open lazily migrates slot regardless of legacy value type [40.39ms]
+(pass) closed lazily migrates priority regardless of legacy value type [39.55ms]
+(pass) migration retains strict validation of unknown keys, required fields, known values and YAML shapes [38.21ms]
+(pass) parked lazily migrates priority regardless of legacy value type [39.24ms]
+(pass) delivery_error defaults to empty and accepts strict shape [0.49ms]
+(pass) closed lazily migrates slot regardless of legacy value type [40.64ms]
+(pass) parked lazily migrates priority, slot regardless of legacy value type [39.62ms]
+(pass) closed lazily migrates failed_notified regardless of legacy value type [47.35ms]
+(pass) allLeaves validates open depth 2 before reading state [45.19ms]
+(pass) allLeaves validates open depth 0 before reading state [45.77ms]
+(pass) parked lazily migrates slot regardless of legacy value type [46.99ms]
+(pass) allLeaves validates open depth 3 before reading state [45.03ms]
+(pass) parked lazily migrates failed_notified regardless of legacy value type [46.54ms]
+(pass) allLeaves validates open depth 4 before reading state [44.88ms]
+(pass) allLeaves validates open depth 1 before reading state [45.34ms]
+(pass) allLeaves validates closed depth 0 before reading state [44.74ms]
+(pass) allLeaves validates closed depth 1 before reading state [32.63ms]
+(pass) allLeaves validates closed depth 4 before reading state [30.21ms]
+(pass) allLeaves validates closed depth 2 before reading state [36.49ms]
+(pass) findLeaf ignores parked folders without state and unsupported nesting [29.29ms]
+(pass) findLeaf identifies parked issue/leaf without parsing its state [30.07ms]
+(pass) failure record round-trips and rejects unknown keys [29.57ms]
+(pass) allLeaves validates closed depth 3 before reading state [36.21ms]
+(pass) legacy state without delivery_error parses with empty default [28.53ms]
+(pass) findLeaf identifies parked epic/issue/leaf without parsing its state [29.69ms]
+
+tests/status.test.ts:
+(pass) overview reports no open leaves for a empty open directory without writes [90.74ms]
+(pass) overview reports no open leaves for a missing open directory without writes [97.35ms]
+(pass) busy durations appear in NOTE for every recorded seat without writes or herdr calls [113.88ms]
+(pass) failed leaves show cause and reason in NOTE and terminal phases suppress busy [123.26ms]
+(pass) delivery errors surface as prompt tokens unless the seat is busy [139.40ms]
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [151.86ms]
+(pass) a leaf with the removed hand_built key is unreadable while healthy repos remain visible [162.09ms]
+(pass) --charts derives stage from last terminal marker line [169.98ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [188.18ms]
+(pass) status prints Missing lines after Failed lines and before the repo section without env values [208.89ms]
+(pass) TURN names the holder and later stamp places [113.49ms]
+(pass) --charts lists every chart with taken counts, fog items, stage and age [244.26ms]
+(pass) repo mismatch identifies both keys in overview and detail while healthy repos remain visible [255.38ms]
+(pass) TURN is empty for ineligible merge leaves and non-merge leaves [123.27ms]
+(pass) TURN orders unstamped merge leaves by last to: merge record and marks no record last [131.23ms]
+(pass) overview NOTE marks only leaves whose seat comes from an index [101.52ms]
+(pass) status detail prints Missing lines between state and History without env values [196.92ms]
+(pass) status detail prints the seats the next agent start uses with the file each came from [132.55ms]
+(pass) status reports invalid open/invalid while showing another repo without writes [296.44ms]
+(pass) status reports invalid open/epic/issue/extra/invalid while showing another repo without writes [311.35ms]
+(pass) status reports invalid open/ while showing another repo without writes [318.08ms]
+(pass) status rejects malformed epic front matter when the issue overrides both seats [148.58ms]
+(pass) merged leaves show gaps in open and closed detail but not overview [244.24ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [348.89ms]
+(pass) malformed index (unparseable front matter) reports unreadable in overview and fails detail naming the file [158.14ms]
+(pass) invalid readiness.yaml reports its path in overview and detail [257.54ms]
+(pass) malformed index (missing seat field) reports unreadable in overview and fails detail naming the file [157.20ms]
+(pass) status identifies dormant issue/resting and prefers open or closed leaves [413.80ms]
+(pass) status identifies dormant epic/issue/resting and prefers open or closed leaves [425.55ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [439.75ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [757.76ms]
+
+tests/sync.test.ts:
+(pass) sync refuses staged exclusion "issues/worktrees/branch/file" [108.35ms]
+(pass) sync refuses staged exclusion "issues/nested/.lock" [114.76ms]
+(pass) sync refuses staged exclusion "issues/seeds/note" [122.04ms]
+(pass) sync refuses staged exclusion "outside file \n" [130.77ms]
+(pass) sync refuses detached HEAD without touching HEAD or index [132.91ms]
+(pass) sync refuses side without touching HEAD or index [137.47ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from local [143.16ms]
+(pass) sync refuses staged exclusion "rename" [153.96ms]
+(pass) sync scopes eligible issue records with the default home worktree store [155.34ms]
+(pass) sync preserves unrelated edits with advancing remote=false [157.90ms]
+(pass) sync scopes tracked changes and new files with worktree root . [158.66ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/tree[1]* [162.38ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/worktrees [165.73ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from incoming [163.91ms]
+(pass) sync scopes tracked changes and new files with worktree root ../external [168.42ms]
+(pass) sync scopes tracked changes and new files with worktree root issues/custom trees [180.29ms]
+(pass) autostash restoration conflict refuses push and preserves recovery stash [184.15ms]
+(pass) sync preserves unrelated edits with advancing remote=true [185.99ms]
+(pass) sync holds global lock through push while real park waits [210.13ms]
+(pass) sync commits local changes, rebases on the remote and pushes [233.85ms]
+(pass) sync refuses active coordination lock settings [1]*/.lock from replay [152.48ms]
+(pass) sync preserves ignored "collision [1]* \n" against incoming "collision [1]* \n" [148.21ms]
+(pass) sync preserves ignored "collision/file" against incoming "collision" [143.85ms]
+(pass) sync preserves ignored "collision" against incoming "collision/file" [139.07ms]
+(pass) sync preserves ignored "collision/operator" against incoming "collision" [139.86ms]
+(pass) sync preserves ignored "collision [1]* \n" against replay "collision [1]* \n" [139.05ms]
+(pass) sync preserves ignored "collision/file" against replay "collision" [131.80ms]
+(pass) sync preserves ignored "collision/operator" against replay "collision" [133.52ms]
+(pass) sync preserves ignored "collision" against replay "collision/file" [134.57ms]
+(pass) sync permits harmless ignored paths while preserving tracked autostash edits [142.98ms]
+
+tests/test-files.test.ts:
+(pass) test-file rule matches every locked directory segment and stays case-sensitive [0.40ms]
+(pass) test-file rule matches every basename pattern and rejects unrelated names [0.14ms]
+
+tests/watch-issues-scripts.test.ts:
+(pass) watch-issues scripts test and typecheck pass [2521.54ms]
+
+tests/worktree-store.test.ts:
+(pass) buildStack builds a two-leaf stack inside a sparse store checkout that is removed after [130.42ms]
+(pass) dispatch refuses a store path under an ancestor holding node_modules and creates nothing [160.16ms]
+(pass) a repo worktree_root tilde expands to home so the dispatched worktree lands there [401.40ms]
+(pass) a dispatched worktree lands sparse in the home store while the root keeps its issues tree [416.83ms]
+(pass) a sparse store leaf resolves only its own modules: foreign left-pad fails, local vendored resolves [424.36ms]
+(pass) a rebase inside a sparse dispatch worktree crosses an issues change cleanly [435.41ms]
+
+tests/reconcile.test.ts:
+(pass) old-location worktree migration is refused while dirty [375.75ms]
+(pass) old-location worktree migration is refused while live tab [392.14ms]
+(pass) old-location worktree migration is refused while mid-rebase [394.78ms]
+(pass) old-location worktree migration is refused while live cwd [397.31ms]
+(pass) old-location worktree migration is refused while batch [407.15ms]
+(pass) mid-rebase worktree is kept and reported [844.00ms]
+(pass) dirty merged worktree is kept and reported with path and reason [848.42ms]
+(pass) failed leaf worktree is removed and its branch is kept [869.95ms]
+(pass) worktree with a live pane inside is kept and reported [887.29ms]
+(pass) configured destination store migrates a clean old managed worktree [897.72ms]
+(pass) worktree with unreachable commits is kept and reported with a count [912.04ms]
+(pass) clean old-location worktree of an active leaf is removed and recreated sparse at the store [984.56ms]
+(pass) targeted next sweeps unused registered variants [993.70ms]
+(pass) run root with a dead owner pid is removed, live owner kept [1014.13ms]
+(pass) operator worktree outside managed roots is kept as unmanaged [1021.46ms]
+(pass) adopted merged batch members retain their live tabs and worktrees [670.62ms]
+(pass) unconfirmed base-run worktree is removed when clean, kept when dirty [1049.72ms]
+(pass) an unknown directory inside the store is reported, never removed [1061.55ms]
+(pass) failed leaf scratch preserves an actual running base command [1067.86ms]
+(pass) recorded worktree that is not a registered git worktree is kept, not removed [1119.66ms]
+(pass) store variants survive live or unavailable pane inventories [1494.92ms]
+
+5 tests failed:
+(fail) a dependent still blocked by an unmerged leaf stays unallocated after its first blocker merges [973.01ms]
+(fail) completing a leaf via targeted starts only same-repo dependents [1724.59ms]
+(fail) next awaits sourced completion after a failed rename before removing the worktree [1562.29ms]
+(fail) changed worktree root reports recorded and expected worktrees without creating or prompting [333.26ms]
+(fail) three consecutive prompt failures fail the leaf during the third pass [1911.54ms]
+
+ 774 pass
+ 5 fail
+ 7963 expect() calls
+Ran 779 tests across 40 files. [90.94s]

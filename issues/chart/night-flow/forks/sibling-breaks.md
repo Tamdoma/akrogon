@@ -53,7 +53,7 @@ The round as read: slots/sibling-breaks-final-shape.md:6-9. Final shape checked 
 - One rule in `skills/init-akrogon/SKILL.md`, `docs/guide/setup.md` and `skills/check-issue/SKILL.md`: a cheap check runs in `checks`, before review, and never only at merge. A merge command may also rerun it on the integrated candidate (A,B; B F15).
 - In review, a leaf diff leaving a cheap check reachable only at merge is a Fix when a script edit within the leaf can route it through `checks`. Otherwise it is an `Operator actions` item naming the config line, which gates no done-criterion (A,C; C F5, `check-issue/SKILL.md:29`).
 - Agents follow it. No code, config key, timer or slow flag enforces it.
-- Existing configs: B's audit of all ten registered repos (slots/sibling-breaks-q3-B.md, RC1–RC10, 2026-10-11) found `merge_checks` only in framework. framework fixes its own config as its leaf L9 (C F6).
+- Existing configs: B's audit of all ten registered repos (slots/sibling-breaks-q3-B.md, RC1–RC10, 2026-10-11) found `merge_checks` only in framework. framework fixed its own config as an operator step on main, `c45d6693f` (C F6, B H5).
 - framework `fix_rounds: 8` (`c45d6693f`) needs no revert: framework has no `direct` setting, so after plan-not-cap the value bounds nothing there (C F7).
 
 ### Foreclosed

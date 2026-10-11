@@ -37,3 +37,7 @@ Foreclosed: pre-merge wait for main; keeping failed for seat delivery faults; a 
 - Cleanup: both agent processes killed, tab closed, `herdr tab list` shows no `w8:tAT`, scratch directory removed.
 - Limits: one kill -9 of an idle claude agent; does not cover a hung agent that herdr still reports, or other harness kinds.
 - Effect on S5: the relaunch and fresh-name parts need no new code. S5 reduces to deleting the automatic failed moves, now at `src/next.ts:604-610` (attempts) and `:616-624` (unreachable); late delivery is already reconciled by offset at `:641-648`.
+
+## Delivered after Taken
+- S4 pre-merge-red: delivered by known-red-leaf, merged 2026-10-11 (`deec699`, `ca71075`, `327d4bf`). `skills/implement-issue/SKILL.md:38`, `skills/check-issue/SKILL.md:61,65` and `docs/guide/phases.md:94,102` keep only the incomplete-base-run stop. The leaf and the known-red-leaf amendment are dropped (B,C, slots/handoff-review-B.md:5, slots/handoff-review-C.md:5-13).
+- S5 seat-retry also owns the session binding of the delivery offset, which today's reconcile lacks (`src/next.ts:645-652`; B H2).

@@ -1,0 +1,40 @@
+slug: records-sync
+phase: plan.synthesis
+created: 2026-10-11
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#80"
+  - "Tamdoma/akrogon#81"
+  - "Tamdoma/akrogon#82"
+  - "Tamdoma/akrogon#83"
+  - "Tamdoma/akrogon#84"
+  - "Tamdoma/akrogon#85"
+busy_since: 
+  A: 2026-10-11T10:02:32.023Z
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tB1
+worktree: /home/ivan/.akrogon/worktrees/akrogon/records-sync
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pN3
+  B: w8:pN4
+prompted: 
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-records-sync--/2026-10-11T10-02-28-671Z_01a12a69-f1bf-746b-bc21-fb9759dc5ca4.jsonl
+prompted_at: 
+  A: 2026-10-11T10:02:32.023Z
+delivery_error: 
+  {}

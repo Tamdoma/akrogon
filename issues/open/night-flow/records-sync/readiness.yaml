@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: git push <remote> <sha>:refs/heads/<default> to GitHub
+    command: git push origin <tested_top>:refs/heads/main (akrogon merge turn, src/phase.ts:653 on main c53f619); git ls-remote origin refs/heads/main
+    identity: GitHub account ivanjuras through the https credential helper (gh keyring, scopes repo and workflow)
+    target: https://github.com/Tamdoma/akrogon.git and https://github.com/Tamdoma/tamdoma-framework.git
+    version: git 2.56.0
+    date: '2026-10-11'
+    result: akrogon attempt d3c90131 pushed 01ca1fbe8 (merged, 06:50:38Z); framework pushed ee8255d11 (merged, 07:25:36Z); ls-remote reads both
+    cleanup: none, no fixture created
+    limits: other registered remotes, pushes from a temporary worktree and later branch protection changes are not covered; leaf tests use local bare remotes
+    record: issues/chart/night-flow/forks/keep-running.md

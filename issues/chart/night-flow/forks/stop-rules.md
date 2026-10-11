@@ -47,3 +47,13 @@ S3 guard-at-creation (3a)
 - Seat TMPDIR is `/tmp/akrogon-1000/<slug>-<hex>` for all six live seats (`/proc/<pid>/environ`, TMPDIR only), so the `framework/.temp/tmp.*` base copies did not come from seat TMPDIR. Origin still unverified (LC).
 
 Foreclosed: the repo-wide hold and `held.yaml`; raising `fix_rounds` as the fix; a per-check ancestor guard.
+
+## S1 revised at handoff
+Operator, 2026-10-11, verbatim: "4a".
+
+The question as read: known-red-leaf merged and known-red-merge reached `plan.synthesis` during charting. Its live brief already retires the repo hold (`issues/open/red-base-wait/known-red-merge/brief.md:4,17`, red-base-wait merge-gate Q2 2a). 4a: drop hold-retire and leave known-red-merge unchanged. 4b: keep hold-retire and make known-red-merge wait for it.
+
+- hold-retire is not built, and the known-red-merge amendment is not applied. known-red-merge delivers the hold retirement and its deletions (`held.yaml` use, `src/hold.ts`, `hold-fix`, `unhold`, status line, unpause print) and the merge-seat refresh (live brief:17,19,21) (B,C; slots/handoff-review-B.md:9-14, slots/handoff-review-C.md:15-38).
+- Reason: keeping it would park known-red-merge, since `blocked-by` is checked on every dispatch (`src/next.ts:763-772`, `src/turn.ts:10-18`), and would build a wait that known-red-merge then removes (C).
+- Lost, accepted by the operator: S1's interim per-leaf wait and early queue release. Until known-red-merge lands, a merge red also red on main still holds the repo, released by `akrogon unhold` (B; `docs/guide/cheat.md:110-116`).
+- The S1 line "lands after S1, already ordered by its blocked-by chain" was never true on main; known-red-merge's chain is `known-red-leaf, base-run` (C).
