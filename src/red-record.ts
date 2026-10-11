@@ -174,8 +174,7 @@ async function resolveUnit(
       !resolved.has(candidate.id) && sameIdentity(candidate, unit) && sameProvenance(candidate, provenance),
   );
   if (entry === undefined) return undefined;
-  if (entry.first_seen !== resolving && !(await isAncestor(repo.root, entry.first_seen, resolving)))
-    return undefined;
+  if (entry.first_seen !== resolving && !(await isAncestor(repo.root, entry.first_seen, resolving))) return undefined;
   const event: RedEvent = redEventSchema.parse({
     event: 'resolved',
     id: entry.id,
@@ -208,12 +207,7 @@ export async function resolveComparison(repo: Repo, file: string, record: Compar
   return entries;
 }
 
-export async function resolveGreen(
-  repo: Repo,
-  file: string,
-  record: Comparison,
-  landed: string,
-): Promise<string[]> {
+export async function resolveGreen(repo: Repo, file: string, record: Comparison, landed: string): Promise<string[]> {
   const names: string[] = [];
   if (record.state !== 'green') {
     console.warn(JSON.stringify({ warning: 'green resolve skipped: record is not green', file, state: record.state }));

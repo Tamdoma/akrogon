@@ -148,12 +148,7 @@ export async function validateComparisons(
       throw new ComparisonError(
         merge === undefined
           ? 'leaf_revision ' + record.leaf_revision + ' does not match HEAD ' + head
-          : 'Comparison record ' +
-              file +
-              ': leaf_revision ' +
-              record.leaf_revision +
-              ' does not match top ' +
-              head,
+          : 'Comparison record ' + file + ': leaf_revision ' + record.leaf_revision + ' does not match top ' + head,
       );
     if (record.run.complete !== true)
       throw new ComparisonError('Comparison record ' + file + ': leaf run is not complete');

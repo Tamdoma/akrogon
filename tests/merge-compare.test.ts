@@ -503,7 +503,11 @@ for (const refusal of refusals) {
   });
 }
 
-const baseRunRefusals: { name: string; mutate: (line: Parameters<typeof baseRunLine>[1]) => Parameters<typeof baseRunLine>[1]; expect: string }[] = [
+const baseRunRefusals: {
+  name: string;
+  mutate: (line: Parameters<typeof baseRunLine>[1]) => Parameters<typeof baseRunLine>[1];
+  expect: string;
+}[] = [
   { name: 'no base-run line at all', mutate: () => ({ base: '', log: '' }), expect: 'base-run' },
   {
     name: 'a base-run line without the attempt',
@@ -617,7 +621,11 @@ test.serial(
       const resolved = events.filter((e) => e.event === 'resolved') as { id: string; resolving: string }[];
       expect(resolved.map((e) => e.id)).toEqual(['entry-resolve-me']);
       expect(resolved[0].resolving).toBe(fx.builtOn);
-      const opened = events.filter((e) => e.event === 'opened') as { id: string; unit: { name: string }; first_seen: string }[];
+      const opened = events.filter((e) => e.event === 'opened') as {
+        id: string;
+        unit: { name: string };
+        first_seen: string;
+      }[];
       expect(opened).toHaveLength(3);
       // The known-red unit re-adds a fresh entry bound to this run's base.
       const reopened = opened.filter((e) => e.unit.name === 'resolve-me');
