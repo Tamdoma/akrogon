@@ -17,7 +17,7 @@ Run `akrogon config` once per setup pass to read effective global and repo choic
 
 Preserve existing effective repo choices on repeat setup, prefer established commands verified against the installed tools, and batch only questions inspection cannot settle before showing one concrete proposal without another blanket approval when initialization is already authorized.
 
-Propose every repo key below, using inspected values or these defaults, including only real check commands and placing only deliberately nonblocking commands in `advisory` because every `checks` command blocks, and slow full-suite commands in `merge_checks`, which block only at merge, except a `check.fix` pass after a red merge ending replays the exact rejected command:
+Propose every repo key below, using inspected values or these defaults, including only real check commands and placing only deliberately nonblocking commands in `advisory` because every `checks` command blocks, and slow full-suite commands in `merge_checks`, which block only at merge, except a `check.fix` pass after a red merge ending replays the exact rejected command. When proposing `checks` and `merge_checks`, inspect the scripts each proposed merge command runs and place their cheap checks — typecheck, lint, validators and the like — in `checks`, naming an existing cheap group command when the repo has one; a merge command may rerun cheap checks on the integrated candidate but is never the only place they run:
 
 ```yaml
 remote: origin

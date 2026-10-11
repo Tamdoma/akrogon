@@ -51,7 +51,7 @@ Check these choices:
 - **default_branch** is where reviewed work lands.
 - **remote** selects the Git remote used for integration.
 - **checks** lists the commands that must pass before merge.
-- **merge_checks** lists slow commands that run only at merge, on the rebased leaf before push, except a `check.fix` pass after a red merge ending replays the exact rejected command.
+- **merge_checks** lists slow commands that run only at merge, on the rebased leaf before push, except a `check.fix` pass after a red merge ending replays the exact rejected command. A cheap check never runs only at merge, even when a merge command also runs it — a check cheap enough for the leaf's own check belongs in `checks`, and a merge command may rerun it on the integrated candidate but is never its only home.
 - **merge_covers** lists `checks` names skipped at merge because `merge_checks` covers them. Empty by default.
 - **grounding** points agents to the project's reference index, or disables that lookup.
 - **worktree_root** says where leaf checkouts go. Unset defaults to `~/.akrogon/worktrees/<repo name>`; `~` expands to the machine home directory. Only a store inside the checkout is gitignored.
