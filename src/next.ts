@@ -360,10 +360,16 @@ async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promis
     throw new Error(`Refusing .env write at ${link}: path is not ignored in the registered checkout ${repo.root}`);
   if (ignoredAtRoot.code !== 0) throw new CommandError(['git', 'check-ignore', '-q', '.env'], repo.root, ignoredAtRoot);
   if (live) return false;
+  await emitEnvFile(repo, worktree, repo.config.env);
+  return true;
+}
+
+export async function emitEnvFile(repo: Repo, worktree: string, names: string[]): Promise<void> {
+  const link: string = resolve(worktree, '.env');
   const root: string = resolve(repo.root, '.env');
   const text: string = existsSync(root) ? readFileSync(root, 'utf8') : '';
   const parsed: Record<string, string | undefined> = parseEnv(text);
-  const missing: string[] = repo.config.env.filter((name) => parsed[name] === undefined);
+  const missing: string[] = names.filter((name) => parsed[name] === undefined);
   if (missing.length > 0)
     throw new Error(`Refusing .env write at ${link}: missing declared names in ${root}: ${missing.join(', ')}`);
   // parseEnv grammar (probe-verified): unquoted values end at # or a line edge
@@ -391,20 +397,19 @@ async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promis
     }
     return null;
   };
-  const emitted: (string | null)[] = repo.config.env.map((name) => emit(name, parsed[name]!));
-  const unwritable: string[] = repo.config.env.filter((_, i) => emitted[i] === null);
+  const emitted: (string | null)[] = names.map((name) => emit(name, parsed[name]!));
+  const unwritable: string[] = names.filter((_, i) => emitted[i] === null);
   if (unwritable.length > 0)
     throw new Error(`Refusing .env write at ${link}: unwritable declared values in ${root}: ${unwritable.join(', ')}`);
   const content: string = emitted.length > 0 ? emitted.join('\n') + '\n' : '';
   const rewritten: Record<string, string | undefined> = parseEnv(content);
-  const differing: string[] = repo.config.env.filter((name) => rewritten[name] !== parsed[name]);
+  const differing: string[] = names.filter((name) => rewritten[name] !== parsed[name]);
   if (differing.length > 0)
     throw new Error(`Refusing .env write at ${link}: unwritable declared values in ${root}: ${differing.join(', ')}`);
   const gitDir: string = resolve(worktree, await command(['git', 'rev-parse', '--git-dir'], worktree));
   const temp: string = resolve(gitDir, `akrogon-env-${process.pid}`);
   writeFileSync(temp, content, { mode: 0o600 });
   renameSync(temp, link);
-  return true;
 }
 
 async function activeCount(global: GlobalConfig, invocation: Invocation): Promise<number> {

@@ -13,7 +13,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { base, readGlobal, requireRepo, type Repo } from './config';
 import { allLeaves, readState, type Leaf } from './state';
-import { command } from './shell';
+import { command, type Result } from './shell';
 
 const forbidden: readonly string[] = [
   'NODE_PATH',
@@ -35,6 +35,43 @@ function bunfigs(): string[] {
 function refuse(): void {
   for (const name of forbidden) if (process.env[name] !== undefined) throw new Error(`Refusing to run: ${name} is set`);
   for (const file of bunfigs()) if (existsSync(file)) throw new Error(`Refusing to run: global bunfig at ${file}`);
+}
+
+export function constructedEnv(repo: Repo, runRoot: string): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const key of copied) {
+    const value: string | undefined = process.env[key];
+    if (value !== undefined) env[key] = value;
+  }
+  env.TMPDIR = runRoot;
+  for (const key of repo.config.env) {
+    const value: string | undefined = process.env[key];
+    if (value !== undefined) env[key] = value;
+  }
+  return env;
+}
+
+export async function spawnLogged(
+  argv: string[],
+  cwd: string,
+  env: Record<string, string>,
+  log: string,
+): Promise<Result> {
+  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(argv, {
+    cwd,
+    env,
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  appendFileSync(log, stdout);
+  appendFileSync(log, stderr);
+  return { code, stdout, stderr };
 }
 
 async function leafTarget(
@@ -81,37 +118,15 @@ export async function runCheck(
       join(runRoot, '.owner'),
       JSON.stringify({ pid: process.pid, boot_id: boot, started: new Date().toISOString() }),
     );
-    const env: Record<string, string> = {};
-    for (const key of copied) {
-      const value: string | undefined = process.env[key];
-      if (value !== undefined) env[key] = value;
-    }
-    env.TMPDIR = runRoot;
+    const env: Record<string, string> = constructedEnv(repo, runRoot);
     env.AKROGON_BASE = await base(repo, cwd);
-    for (const key of repo.config.env) {
-      const value: string | undefined = process.env[key];
-      if (value !== undefined) env[key] = value;
-    }
-    const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(argv, {
-      cwd,
-      env,
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ]);
     const log: string = join(runRoot, 'out.log');
-    appendFileSync(log, stdout);
-    appendFileSync(log, stderr);
-    process.stdout.write(stdout);
-    process.stderr.write(stderr);
+    const result: Result = await spawnLogged(argv, cwd, env, log);
+    process.stdout.write(result.stdout);
+    process.stderr.write(result.stderr);
     mkdirSync(target, { recursive: true });
     copyFileSync(log, resolve(target, `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`));
-    return code;
+    return result.code;
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
   }
