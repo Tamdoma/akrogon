@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { leafTemp, readGlobal, requireRepo, within, worktreeStore, type Repo } from './config';
 import { checkLocation } from './guard';
@@ -111,6 +111,8 @@ export async function baseRun(
   const slot: Slot = pickSlot(leaf);
   const id: string = randomUUID();
   const target: string = resolve(worktreeStore(repo), `base-${id}`);
+  if (isAbsolute(inside) || !within(resolve(target, inside), target))
+    throw new Error(`Refusing base-run cwd outside checkout ${target}: ${inside}`);
   checkLocation(target);
   const lock: string = await recordLock(repo);
   const record: BaseRun = {
