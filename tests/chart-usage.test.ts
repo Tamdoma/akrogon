@@ -3,6 +3,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
+import { registerTemp } from './helpers';
 
 const script: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/chart-usage.ts');
 const fixtures: string = resolve(import.meta.dir, 'fixtures/chart-usage');
@@ -24,7 +25,7 @@ type World = {
 };
 
 function setup(): World {
-  const dir: string = mkdtempSync(resolve(tmpdir(), 'chart-usage-'));
+  const dir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'chart-usage-')));
   const parent: string = resolve(dir, 'charts');
   const chart: string = resolve(parent, 'c1');
   const claudeHome: string = resolve(dir, 'claude-home');

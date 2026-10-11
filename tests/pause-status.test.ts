@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { command, type Result } from '../src/shell';
-import { cli, fixture, leaf, yaml, type Fixture } from './helpers';
+import { cli, fixture, leaf, registerTemp, yaml, type Fixture } from './helpers';
 
 async function secondRoot(f: Fixture, name: string): Promise<string> {
   const root: string = resolve(f.home, name);
@@ -30,7 +30,7 @@ function heading(output: string, repo: string): string {
 
 test('status marks the paused repo beside its heading, including an empty repo', async () => {
   const f: Fixture = await fixture();
-  const outside: string = mkdtempSync(resolve(tmpdir(), 'akrogon-outside-'));
+  const outside: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-outside-')));
   try {
     leaf(f, 'build', 'plan.synthesis');
     const y: string = await secondRoot(f, 'y');
@@ -55,7 +55,7 @@ test('status marks the paused repo beside its heading, including an empty repo',
 
 test('status charts marks the paused repo heading', async () => {
   const f: Fixture = await fixture();
-  const outside: string = mkdtempSync(resolve(tmpdir(), 'akrogon-outside-'));
+  const outside: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-outside-')));
   try {
     leaf(f, 'build', 'plan.synthesis');
     await secondRoot(f, 'y');

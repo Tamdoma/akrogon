@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { repoSchema, toolRoot, type Repo } from '../src/config';
 import { command, quote, type Result } from '../src/shell';
 import { selfUpdate } from '../src/self-update';
-import { fixture, cli, yaml, type Fixture } from './helpers';
+import { fixture, cli, registerTemp, yaml, type Fixture } from './helpers';
 
 const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
 const skills: string[] = readdirSync(resolve(toolRoot, 'skills'), { withFileTypes: true })
@@ -230,7 +230,7 @@ describe('self-update', () => {
   };
 
   async function selfUpdateFixture(): Promise<SelfUpdateFixture> {
-    const home: string = mkdtempSync(resolve(tmpdir(), 'akrogon-self-update-'));
+    const home: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-self-update-')));
     const seed: string = resolve(home, 'seed');
     const remote: string = resolve(home, 'remote.git');
     const clone: string = resolve(home, 'clone');

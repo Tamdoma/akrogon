@@ -14,10 +14,11 @@ import {
   spawnCaptured,
   type Result,
 } from '../src/shell';
+import { registerTemp } from './helpers';
 
 for (const firstFailure of [false, true]) {
   test.serial(`deadline kills sleeping attempt after ${firstFailure ? 'one failure' : 'no failures'}`, async () => {
-    const cwd: string = mkdtempSync(resolve(tmpdir(), 'deadline-'));
+    const cwd: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'deadline-')));
     const argv: string[] = [
       'sh',
       '-c',
@@ -49,7 +50,7 @@ for (const firstFailure of [false, true]) {
 }
 
 test.serial('ordinary retry preserves warning and second result with optional deadlines', async () => {
-  const cwd: string = mkdtempSync(resolve(tmpdir(), 'retry-'));
+  const cwd: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'retry-')));
   const warning = spyOn(console, 'warn').mockImplementation(() => {});
   try {
     expect(await run(['sh', '-c', 'echo output'])).toEqual({ code: 0, stdout: 'output', stderr: '' });

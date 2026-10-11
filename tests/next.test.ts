@@ -26,6 +26,7 @@ import {
   fakeHerdr,
   leafTempRoot,
   storeDir,
+  registerTemp,
   type GhFixture,
   type Fixture,
 } from './helpers';
@@ -1250,20 +1251,32 @@ for (const capacity of [3, 4]) {
   }, 15000);
 }
 
-test('dirty merged worktree cleanup drops the leftover and removes the worktree', async () => {
+test('dirty merged worktree is kept while its tab lives, then removed once clean', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const dirty: string = leaf(f, 'dirty', 'plan.synthesis', {}, 'dirty-issue');
     expect((await next(f, ['dirty'])).code).toBe(0);
     const worktree: string = readState(dirty).worktree!;
+    const tab: string = readState(dirty).tab!;
     writeFileSync(resolve(worktree, 'untracked'), 'dirty');
     saveState(dirty, { ...readState(dirty), phase: 'merged' });
     leaf(f, 'healthy', 'plan.synthesis', {}, 'healthy-issue');
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
-    expect(existsSync(worktree)).toBe(false);
+    // The pass closed the merged tab; the worktree is kept while the close settles.
+    expect(existsSync(worktree)).toBe(true);
     expect(database(f).prompts.at(-1)?.text).toContain('healthy');
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      tabs: db.tabs.filter((item) => item.tab_id !== tab),
+      panes: db.panes.filter((pane) => pane.tab_id !== tab),
+    });
+    rmSync(resolve(worktree, 'untracked'));
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(worktree)).toBe(false);
+    expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/dirty'], f.root)).code).toBe(1);
   } finally {
     f.clean();
   }
@@ -3961,16 +3974,21 @@ test('closed tab scratch deletes merged folder and prunes inner worktree', async
   }
 }, 15000);
 
-test('closed tab scratch keeps failed folder and sentinel', async () => {
+test('closed tab scratch sweeps a failed leaf, keeps its branch', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'failed-keep', 'plan.synthesis');
     expect((await next(f, ['failed-keep'])).code).toBe(0);
     const tab: string = readState(path).tab!;
+    const worktree: string = readState(path).worktree!;
     const scratch: string = tmpdirOf(calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!);
     const sentinel: string = resolve(scratch, 'sentinel');
     writeFileSync(sentinel, 'stay\n');
-    saveState(path, { ...readState(path), phase: 'failed' });
+    saveState(path, {
+      ...readState(path),
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'test' },
+    });
     const db: Database = database(f);
     saveDatabase(f, {
       ...db,
@@ -3984,9 +4002,10 @@ test('closed tab scratch keeps failed folder and sentinel', async () => {
       }),
     });
     expect(closed.code).toBe(0);
-    expect(existsSync(scratch)).toBe(true);
-    expect(readFileSync(sentinel, 'utf8')).toBe('stay\n');
-    expect(statSync(scratch).mode & 0o777).toBe(0o700);
+    expect(existsSync(scratch)).toBe(false);
+    expect(existsSync(sentinel)).toBe(false);
+    expect(existsSync(worktree)).toBe(false);
+    expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/failed-keep'], f.root)).code).toBe(0);
   } finally {
     f.clean();
   }
@@ -4036,7 +4055,7 @@ test('sweep scratch catch-up deletes open and closed folders with no live panes'
     expect(existsSync(soloSentinel)).toBe(false);
     expect(existsSync(openPath)).toBe(true);
     expect(existsSync(soloClosed)).toBe(true);
-    expect(existsSync(readState(openPath).worktree!)).toBe(true);
+    expect(existsSync(readState(openPath).worktree!)).toBe(false);
     expect(existsSync(readState(soloClosed).worktree!)).toBe(false);
   } finally {
     f.clean();
@@ -4223,7 +4242,7 @@ test('next --all leaves a gapped leaf undispatched while its ungapped sibling di
 
 test('an input held by an unregistered absolute directory checks that directory .env', async () => {
   const f: DispatchFixture = await dispatchFixture();
-  const holder: string = mkdtempSync(resolve(tmpdir(), 'akrogon-holder-'));
+  const holder: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-holder-')));
   try {
     const path: string = leaf(f, 'foreign', 'plan.synthesis');
     readinessInput(path, { ...envFoo, holder });

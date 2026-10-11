@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { fixture, cli, type Fixture } from './helpers';
+import { fixture, cli, registerTemp, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
 
 function pausedFile(f: Fixture): string {
@@ -64,7 +64,7 @@ test('pause resolves the repo from a subfolder and a leaf worktree', async () =>
 
 test('pause and unpause refuse folders outside every registered repo', async () => {
   const f: Fixture = await fixture();
-  const outside: string = mkdtempSync(resolve(tmpdir(), 'akrogon-outside-'));
+  const outside: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-outside-')));
   try {
     const paused: Result = await cli(f, ['pause'], outside);
     expect(paused.code).not.toBe(0);

@@ -13,6 +13,7 @@ import {
   yaml,
   type Fixture,
   type HerdrFixture,
+  registerTemp,
 } from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State, type Tool } from '../src/state';
@@ -170,7 +171,7 @@ async function remoteTip(f: Fixture): Promise<string> {
 }
 
 async function advanceRemote(f: Fixture, files: Record<string, string>): Promise<string> {
-  const dir: string = mkdtempSync(resolve(tmpdir(), 'akrogon-adv-'));
+  const dir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-adv-')));
   await command(['git', 'worktree', 'add', '--detach', dir, 'origin/main'], f.root);
   try {
     for (const [name, content] of Object.entries(files)) {

@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
+import { registerTemp } from './helpers';
 
 const script: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/peer-wait.ts');
 const pane: string = 'w8:pX';
@@ -17,7 +18,7 @@ type Setup = {
 };
 
 function setup(agentStatus: string, waitScript: (file: string) => WaitEntry[] = () => []): Setup {
-  const dir: string = mkdtempSync(resolve(tmpdir(), 'peer-wait-'));
+  const dir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'peer-wait-')));
   const file: string = resolve(dir, 'return.md');
   const bin: string = resolve(dir, 'bin');
   mkdirSync(bin);

@@ -13,6 +13,7 @@ import {
   yaml,
   type Fixture,
   type HerdrFixture,
+  registerTemp,
 } from './helpers';
 import type { Database } from './fake-herdr';
 import { readRepo, type Repo } from '../src/config';
@@ -185,7 +186,7 @@ async function headOf(f: Fixture, slug: string): Promise<string> {
 }
 
 async function advanceRemote(f: Fixture, files: Record<string, string>): Promise<string> {
-  const dir: string = mkdtempSync(resolve(tmpdir(), 'akrogon-adv-'));
+  const dir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-adv-')));
   await command(['git', 'worktree', 'add', '--detach', dir, 'origin/main'], f.root);
   try {
     for (const [name, content] of Object.entries(files)) {

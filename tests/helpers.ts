@@ -4,6 +4,14 @@ import { resolve } from 'node:path';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
+const tempDirs: Set<string> = new Set();
+export function registerTemp(path: string): string {
+  tempDirs.add(path);
+  return path;
+}
+process.on('exit', () => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+});
 export type Fixture = { home: string; root: string; clean: () => void };
 export function leafTempRoot(f: Fixture): string {
   return resolve(f.home, 'leaf-temp');
@@ -15,7 +23,7 @@ export function yaml(path: string, data: object): void {
   writeFileSync(path, Bun.YAML.stringify(data));
 }
 export async function fixture(): Promise<Fixture> {
-  const home: string = mkdtempSync(resolve(tmpdir(), 'akrogon-'));
+  const home: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-')));
   const root: string = resolve(home, 'repo');
   mkdirSync(resolve(root, 'issues/open'), { recursive: true });
   await command(['git', 'init', '-b', 'main', root]);
