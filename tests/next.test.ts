@@ -4932,8 +4932,7 @@ for (const exit of [
       if (exit === 'prompt delivery fault') expect(mergePrompts(f)).toEqual([]);
       else expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
       expect((await next(f, ['--all'])).code).toBe(exit === 'seat failed' ? 1 : 0);
-      if (exit === 'prompt delivery fault')
-        expect(mergePrompts(f)).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
+      if (exit === 'prompt delivery fault') expect(mergePrompts(f)).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
       else expect(mergePrompts(f).filter((prompt) => prompt.pane === bb.b)).toHaveLength(1);
     } finally {
       f.clean();
