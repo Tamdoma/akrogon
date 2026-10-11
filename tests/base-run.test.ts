@@ -1,4 +1,5 @@
 import { test, expect } from 'bun:test';
+import { z } from 'zod';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cli, fakeAkrogon, fixture, leaf, storeDir, yaml, type Fixture } from './helpers';
@@ -330,7 +331,9 @@ test('base-run replays an exact configured check with its supplied base and rela
     const { leafPath, worktree } = await callerWorktree(f);
     const sha: string = await baseSha(f);
     mkdirSync(resolve(worktree, 'src/sub'), { recursive: true });
-    const config: { checks: { test: string } } = Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout);
+    const config: { checks: { test: string } } = z
+      .object({ checks: z.object({ test: z.string() }) })
+      .parse(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout));
     const result: Result = await baseRun(
       f,
       ['base-run', '--base', sha, '--', 'sh', '-c', config.checks.test],
