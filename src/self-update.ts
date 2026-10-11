@@ -138,12 +138,13 @@ async function moveCheckout(repo: Repo, moveTo: string, base: string): Promise<M
     return { state: 'pending', detail: `the checkout moved to ${head.slice(0, 12)} during integration` };
   const behind: string = await command(['git', 'rev-list', '--count', `HEAD..${moveTo}`], root);
   if (behind === '0') return { state: 'none' };
-  // The branch move is a compare-and-swap: read-tree reconciles worktree and
-  // index to moveTo with the same dirty-file refusal reset --keep uses, then
+  // The branch move is a compare-and-swap: the two-tree read-tree merges
+  // head..moveTo into worktree and index carrying local edits forward (the
+  // same machinery reset --keep uses, so staged edits survive too), then
   // update-ref moves the ref only when HEAD is still the validated value. A
   // commit landed anywhere in the window fails the CAS instead of being
   // silently dropped by an unconditional branch write.
-  const merged: Result = await run(['git', 'read-tree', '-m', '-u', moveTo], root);
+  const merged: Result = await run(['git', 'read-tree', '-m', '-u', head, moveTo], root);
   let indexOnly: boolean = false;
   if (merged.code !== 0) {
     // read-tree refuses when a colliding path is dirty even if it already
@@ -176,11 +177,11 @@ async function moveCheckout(repo: Repo, moveTo: string, base: string): Promise<M
   const ref: string = symref.code === 0 ? symref.stdout : 'HEAD';
   const cas: Result = await run(['git', 'update-ref', ref, moveTo, head], root);
   if (cas.code === 0) return { state: 'moved', old: head };
-  // The checkout committed between validation and the ref write. Put index and
-  // worktree back to the real HEAD and stay pending; the next trigger retries.
-  if (!indexOnly) await run(['git', 'read-tree', '-m', '-u', 'HEAD'], root);
-  await run(['git', 'read-tree', 'HEAD'], root);
+  // The checkout committed between validation and the ref write. Restore the
+  // index to the real HEAD without touching worktree bytes so every edit and
+  // commit survives; the next trigger retries the move.
   const now: string = await command(['git', 'rev-parse', 'HEAD'], root);
+  await run(['git', 'read-tree', 'HEAD'], root);
   return { state: 'pending', detail: `the checkout moved to ${now.slice(0, 12)} during integration` };
 }
 
