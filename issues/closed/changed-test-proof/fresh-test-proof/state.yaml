@@ -1,0 +1,39 @@
+slug: fresh-test-proof
+phase: merged
+created: 2026-10-11
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#86"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tB6
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pND
+  B: w8:pNE
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-12T06:57:34.091Z
+frozen: 
+  {}
+frozen_cited: 
+  []

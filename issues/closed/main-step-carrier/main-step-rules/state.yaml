@@ -1,0 +1,39 @@
+slug: main-step-rules
+phase: merged
+created: 2026-10-12
+repo: akrogon
+debate: "no"
+blocked-by: 
+  []
+sources: 
+  - "Tamdoma/akrogon#87"
+busy_since: 
+  {}
+busy_notified: 
+  {}
+attempts: 
+  A: 0
+  B: 0
+done: 
+  []
+fix_rounds: 0
+verdict: 
+  {}
+tab: w8:tB8
+env_names: 
+  []
+env_generation: 0
+pane: 
+  A: w8:pNG
+  B: w8:pNH
+prompted: 
+  {}
+prompted_at: 
+  {}
+delivery_error: 
+  {}
+merge_stamp: 2026-10-12T13:13:10.570Z
+frozen: 
+  {}
+frozen_cited: 
+  []

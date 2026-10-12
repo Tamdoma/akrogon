@@ -1,0 +1,3 @@
+# Rebuttal brief, slot B
+Read only /tmp/claude-1000/-home-ivan-Work-infra-akrogon/08f9bda6-5ef1-4d07-8526-5480cbe29dd6/scratchpad/door/map-merged.md. Return disagreements only (points where the merge misstates you, or where you still disagree with A's position, with evidence). Keep it short. In particular answer: in Fork 1's waiting case, what makes your "open chart item" visible after the chart is marked Handed off, and does seed-issue (an open GitHub issue mirrored by akrogon pull) fail any property you need? In Fork 3, would your rule have caught framework's stub, given framework's test check was the same commands?
+Return path: /tmp/claude-1000/-home-ivan-Work-infra-akrogon/08f9bda6-5ef1-4d07-8526-5480cbe29dd6/scratchpad/door/map-rebuttal-B.md
