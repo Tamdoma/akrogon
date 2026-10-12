@@ -83,7 +83,8 @@ import { sessionFile, deliveredAfter } from './session-file';
 import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
 import { selfUpdate } from './self-update';
-import { blockDetail, dependentCounts, mergeQueue } from './turn';
+import { blockDetail, dependentCounts, mergeQueue, type DepDetail, type QueueEntry } from './turn';
+import { appendTiming, currentVisit, readTimings, recordWait, type WaitReason } from './timing';
 import { closeMergedTab, reconcile, reconcileNeedsPanes } from './reconcile';
 
 const hookEventSchema = z.discriminatedUnion('event', [
@@ -538,6 +539,7 @@ async function dispatchSlot(
   leaf: Leaf,
   slot: Slot,
   mergeContext?: string,
+  attempt?: string,
 ): Promise<void> {
   async function recordDelivery(): Promise<void> {
     const current: Pane = await currentPane(z.string().parse(readState(leaf.path).pane[slot]));
@@ -548,6 +550,16 @@ async function dispatchSlot(
       prompted_at: { ...observed.prompted_at, [slot]: new Date().toISOString() },
       delivery_error: { ...observed.delivery_error, [slot]: undefined },
       attempts: { ...observed.attempts, [slot]: 0 },
+    });
+    appendTiming(repo, {
+      kind: 'prompt',
+      slug: observed.slug,
+      slot,
+      phase: observed.phase,
+      visit: currentVisit(readLog(repo.root), observed.slug, observed.phase),
+      session: current.agent_session?.value ?? null,
+      outcome: 'delivered',
+      ...(attempt === undefined ? {} : { attempt }),
     });
   }
 
@@ -575,6 +587,16 @@ async function dispatchSlot(
       attempts: { ...base.attempts, [slot]: base.attempts[slot] + 1 },
     };
     saveState(leaf.path, next);
+    appendTiming(repo, {
+      kind: 'prompt',
+      slug: base.slug,
+      slot,
+      phase: base.phase,
+      visit: currentVisit(readLog(repo.root), base.slug, base.phase),
+      session: pane.agent_session?.value ?? null,
+      outcome: 'failed',
+      ...(attempt === undefined ? {} : { attempt }),
+    });
   }
 
   const recorded: State = readState(leaf.path);
@@ -677,18 +699,30 @@ async function dispatchLeaf(
   invocation: Invocation,
   mergeContext: string | undefined,
   isAutomatic: boolean,
+  attempt?: string,
 ): Promise<DispatchOutcome> {
   const slug: string = identity.state.slug;
+  const end = (reason: WaitReason, blocking?: string): DispatchOutcome => {
+    recordWait(repo, slug, reason, blocking);
+    return 'waiting';
+  };
   const inventory: Inventory = discover(repo, invocation);
   const leaf: Leaf | undefined = inventory.leaves.find((leaf) => leaf.state.slug === slug);
   if (leaf === undefined) {
     report(invocation, repo.name, identity.path, new Error(`Missing or unreadable leaf: ${slug}`), slug);
     return 'skipped';
   }
-  if (isAutomatic && isPaused(repo.name)) return 'waiting';
+  if (isAutomatic && isPaused(repo.name)) return end('none');
   try {
     let state: State = readState(leaf.path);
     if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
+    if (!readTimings(repo.root).some((event) => event.kind === 'visit_start' && event.slug === slug))
+      appendTiming(repo, {
+        kind: 'visit_start',
+        slug,
+        phase: state.phase,
+        visit: currentVisit(readLog(repo.root), slug, state.phase),
+      });
     if (state.phase !== 'merged' && state.phase !== 'failed' && Object.values(state.pane).length > 0) {
       const live: Pane[] = await panes();
       for (const seat of ['A', 'B'] as const) {
@@ -698,6 +732,7 @@ async function dispatchLeaf(
     }
     if (state.phase === 'merged') {
       await completeOwner(repo, { path: leaf.path, state }, false);
+      recordWait(repo, slug, 'none');
       return 'completed';
     }
     if (state.phase === 'failed') {
@@ -710,7 +745,7 @@ async function dispatchLeaf(
         ((state.tab === undefined && state.worktree === undefined) || live || state.failure?.cause === 'attempts')
       )
         throw new Error(`Leaf is failed and needs phase recovery: ${slug}`);
-      return 'waiting';
+      return end('none');
     }
     if (
       state.debate === 'yes' &&
@@ -726,37 +761,36 @@ async function dispatchLeaf(
     );
     if (detail?.kind === 'deps') {
       const deps: string = detail.deps.map((d) => `${d.slug} (${d.label})`).join(', ');
-      if (picked && detail.deps.some((d) => ['failed', 'parked', 'unreadable', 'missing'].includes(d.label)))
+      if (picked && detail.deps.some((d) => ['failed', 'unreadable', 'missing'].includes(d.label)))
         throw new Error(`Leaf dependencies are not merged: ${slug}: ${deps}`);
       if (picked) console.log(`waiting: ${slug} on ${deps}`);
-      return 'waiting';
+      const parked: DepDetail | undefined = detail.deps.find((d) => d.label === 'parked');
+      return parked === undefined ? end('prerequisite', detail.deps[0].slug) : end('parked', parked.slug);
     }
     if (detail?.kind === 'inputs') {
       if (picked)
         throw new Error(
           `Leaf inputs are missing: ${slug}: ${detail.missing.map((g) => `${g.kind} ${g.name} in ${g.holder}`).join(', ')}`,
         );
-      return 'waiting';
+      return end('none');
     }
-    if (
-      state.phase === 'merge' &&
-      (mergeQueue(global, inventory.leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== slug ||
-        mergeContext === undefined)
-    )
-      return 'waiting';
+    const turn: QueueEntry | undefined =
+      state.phase === 'merge' ? mergeQueue(global, inventory.leaves, () => readLog(repo.root))[0] : undefined;
+    if (state.phase === 'merge' && (turn?.leaf.state.slug !== slug || mergeContext === undefined))
+      return end('merge_turn', turn === undefined || turn.leaf.state.slug === slug ? undefined : turn.leaf.state.slug);
     seats(global, repo, leaf.path);
     // Mirrors ensureWorktree's path: a missing worktree needs remote proof, an existing one only local.
     const mustCreate: boolean = !existsSync(resolve(worktreeStore(repo), slug));
     await checkBase(repo, mustCreate);
     const allocated: State | null = await allocate(global, repo, { path: leaf.path, state }, invocation);
-    if (allocated === null) return 'waiting';
+    if (allocated === null) return end('none');
     for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds)) {
       const delivery: string = `${repo.name}/${slug}/${allocated.phase}/${slot}`;
       if (invocation.dispatched.has(delivery)) continue;
       invocation.dispatched.add(delivery);
-      await dispatchSlot(global, repo, { path: leaf.path, state: allocated }, slot, mergeContext);
+      await dispatchSlot(global, repo, { path: leaf.path, state: allocated }, slot, mergeContext, attempt);
     }
-    return 'waiting';
+    return end('none');
   } catch (error) {
     if (!(error instanceof Error)) throw error;
     report(invocation, repo.name, leaf.path, error, slug);
@@ -1029,6 +1063,7 @@ async function mergeTurn(
       invocation,
       recorded.solo === true ? `attempt=${recorded.attempt} solo` : `attempt=${recorded.attempt} top=${recorded.top}`,
       isAutomatic,
+      recorded.attempt,
     );
     return;
   }
@@ -1089,6 +1124,14 @@ async function mergeTurn(
       applied: false,
     };
     saveState(fresh.path, { ...fresh.state, batch: next });
+    appendTiming(repo, {
+      kind: 'batch',
+      slug: holder.state.slug,
+      attempt: next.attempt,
+      holder: holder.state.slug,
+      members: next.members.map((member) => member.slug),
+      built_on: next.built_on,
+    });
     batch = next;
   });
   if (batch === undefined) return;
@@ -1207,6 +1250,7 @@ async function mergeTurn(
           invocation,
           `attempt=${solo.attempt} solo`,
           isAutomatic,
+          solo.attempt,
         );
       return;
     }
@@ -1236,6 +1280,7 @@ async function mergeTurn(
       invocation,
       prompt.solo === true ? `attempt=${prompt.attempt} solo` : `attempt=${prompt.attempt} top=${prompt.top}`,
       isAutomatic,
+      prompt.attempt,
     );
 }
 
@@ -1246,14 +1291,15 @@ async function dispatchMergeLeaf(
   invocation: Invocation,
   mergeContext: string,
   isAutomatic: boolean,
+  attempt: string,
 ): Promise<void> {
   if (!isAutomatic) {
-    await dispatchLeaf(global, repo, leaf, false, invocation, mergeContext, false);
+    await dispatchLeaf(global, repo, leaf, false, invocation, mergeContext, false, attempt);
     return;
   }
   await withLock(resolve(globalHome(), '.lock'), async () => {
     if (isPaused(repo.name)) return;
-    await dispatchLeaf(global, repo, leaf, false, invocation, mergeContext, true);
+    await dispatchLeaf(global, repo, leaf, false, invocation, mergeContext, true, attempt);
   });
 }
 

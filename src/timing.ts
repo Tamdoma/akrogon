@@ -75,10 +75,15 @@ export function appendTiming(repo: Repo, event: TimingInput): void {
 }
 
 export function readTimings(root: string): TimingEvent[] {
-  const issues: string = resolve(root, 'issues');
-  if (!readdirSync(issues).includes('timings.jsonl')) return [];
-  const content: string = readFileSync(resolve(issues, 'timings.jsonl'), 'utf8').replace(/(?:\r?\n)+$/, '');
-  return content === '' ? [] : content.split('\n').map((text) => timingEventSchema.parse(JSON.parse(text)));
+  try {
+    const issues: string = resolve(root, 'issues');
+    if (!readdirSync(issues).includes('timings.jsonl')) return [];
+    const content: string = readFileSync(resolve(issues, 'timings.jsonl'), 'utf8').replace(/(?:\r?\n)+$/, '');
+    return content === '' ? [] : content.split('\n').map((text) => timingEventSchema.parse(JSON.parse(text)));
+  } catch (error) {
+    console.warn(`timing read failed: ${error instanceof Error ? error.message : String(error)}`);
+    return [];
+  }
 }
 
 export function visitOf(log: LogRecord[], slug: string, phase: Phase): number {
