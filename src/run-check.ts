@@ -9,12 +9,15 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { base, ensureLeafTemp, readGlobal, requireRepo, type Repo } from './config';
-import { allLeaves, readState, type Leaf } from './state';
+import { allLeaves, readState, type Leaf, type State } from './state';
 import { command, spawnCaptured, type Result } from './shell';
 import { readBaseRuns, type BaseRun } from './base-run';
+import { appendTiming } from './timing';
+import { type Phase } from './routing';
 
 const forbidden: readonly string[] = [
   'NODE_PATH',
@@ -64,33 +67,74 @@ export async function spawnLogged(
   return { code, stdout, stderr };
 }
 
+interface LeafTarget {
+  slug: string;
+  target: string;
+  baseSha?: string;
+  scope: 'leaf' | 'worker' | 'base';
+  unit?: string;
+  phase?: Phase;
+  attempt?: string;
+}
+
+function leafFields(
+  state: State,
+  scope: LeafTarget['scope'],
+  unit?: string,
+): Omit<LeafTarget, 'target' | 'baseSha'> {
+  return {
+    slug: state.slug,
+    scope,
+    phase: state.phase,
+    ...(unit === undefined ? {} : { unit }),
+    ...(state.batch?.attempt === undefined ? {} : { attempt: state.batch.attempt }),
+  };
+}
+
 async function leafTarget(
   repo: Repo,
   cwd: string,
   leafOverride: string | undefined,
   holder: string | undefined,
-): Promise<{ slug: string; target: string; baseSha?: string }> {
-  if (leafOverride !== undefined)
-    return {
-      slug: readState(resolve(cwd, leafOverride)).slug,
-      target: resolve(cwd, leafOverride, 'implementation'),
-    };
+): Promise<LeafTarget> {
+  if (leafOverride !== undefined) {
+    const state: State = readState(resolve(cwd, leafOverride));
+    return { ...leafFields(state, 'leaf'), target: resolve(cwd, leafOverride, 'implementation') };
+  }
   const top: string = realpathSync(await command(['git', 'rev-parse', '--show-toplevel'], cwd));
   const leaf: Leaf | undefined = allLeaves(repo).find(
     (item) =>
       item.state.worktree !== undefined && existsSync(item.state.worktree) && realpathSync(item.state.worktree) === top,
   );
-  if (leaf !== undefined) return { slug: leaf.state.slug, target: resolve(leaf.path, 'implementation') };
+  if (leaf !== undefined) return { ...leafFields(leaf.state, 'leaf'), target: resolve(leaf.path, 'implementation') };
+  const worker: RegExpMatchArray | null = basename(top).match(/-u(\d+)$/);
+  if (worker !== null) {
+    const owner: Leaf | undefined = allLeaves(repo).find(
+      (item) => item.state.slug === basename(top).slice(0, -worker[0].length),
+    );
+    if (owner !== undefined)
+      return {
+        ...leafFields(owner.state, 'worker', `u${worker[1]}`),
+        target: resolve(owner.path, 'implementation'),
+      };
+  }
   const run: BaseRun | undefined = readBaseRuns(repo).find(
     (item) => item.end === undefined && existsSync(item.path) && realpathSync(item.path) === top,
   );
   if (run !== undefined) {
     const caller: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === run.leaf);
     if (caller === undefined) throw new Error(`No caller leaf for base-run ${run.run}: ${run.leaf}`);
-    return { slug: run.leaf, target: resolve(caller.path, 'implementation'), baseSha: run.base };
+    return {
+      slug: run.leaf,
+      scope: 'base',
+      phase: caller.state.phase,
+      ...(run.attempt === undefined ? {} : { attempt: run.attempt }),
+      target: resolve(caller.path, 'implementation'),
+      baseSha: run.base,
+    };
   }
   if (holder === undefined) throw new Error('No leaf worktree matches cwd; pass --leaf or --holder');
-  return { slug: 'checkout', target: resolve(cwd, holder) };
+  return { slug: 'checkout', target: resolve(cwd, holder), scope: 'leaf' };
 }
 
 export async function runCheck(
@@ -105,7 +149,12 @@ export async function runCheck(
     throw new Error('Usage: akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...');
   refuse();
   const repo: Repo = await requireRepo(readGlobal(), cwd);
-  const { slug, target, baseSha } = await leafTarget(repo, cwd, leafOverride, holder);
+  const { slug, target, baseSha, scope, unit, phase, attempt } = await leafTarget(
+    repo,
+    cwd,
+    leafOverride,
+    holder,
+  );
   const runRoot: string = mkdtempSync(resolve(ensureLeafTemp(repo, slug), 'run-'));
   try {
     const boot: string = existsSync('/proc/sys/kernel/random/boot_id')
@@ -118,11 +167,34 @@ export async function runCheck(
     const env: Record<string, string> = constructedEnv(repo, runRoot);
     env.AKROGON_BASE = baseSha ?? (await base(repo, cwd));
     const log: string = join(runRoot, 'out.log');
+    const run: string = randomUUID();
+    const check = {
+      slug,
+      run,
+      name: name ?? 'run',
+      scope,
+      ...(phase === undefined ? {} : { phase }),
+      ...(unit === undefined ? {} : { unit }),
+      ...(attempt === undefined ? {} : { attempt }),
+    };
+    appendTiming(repo, { kind: 'check_start', ...check });
+    const started: number = Date.now();
     const result: Result = await spawnLogged(argv, cwd, env, log);
     process.stdout.write(result.stdout);
     process.stderr.write(result.stderr);
     mkdirSync(target, { recursive: true });
-    copyFileSync(log, resolve(target, `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`));
+    const kept: string = resolve(
+      target,
+      `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`,
+    );
+    copyFileSync(log, kept);
+    appendTiming(repo, {
+      kind: 'check_end',
+      ...check,
+      exit: result.code,
+      duration_ms: Date.now() - started,
+      log: kept,
+    });
     return result.code;
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
