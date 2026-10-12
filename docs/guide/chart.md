@@ -125,7 +125,7 @@ Forks are taken one per round. After you answer, the next fork is researched and
 
 Fog is work whose question is not clear yet. “Exports behave strangely on large accounts” may need reproduction before anyone can propose a useful choice.
 
-Ruled-out work goes under Off route with its reason. It is not silently treated as agreed scope. When a mirrored report is already delivered or a duplicate, the door closes it with `akrogon close <owner/repo#n> --by <text>`. The exception is a report confirmed fully covered but still undelivered and unowned: it stays open in `sources` until its completion owner delivers.
+Ruled-out work goes under Off route with its reason. It is not silently treated as agreed scope. A step on main that a taken decision needs is never Off-route work; when its precondition exists the door makes it during the pass and verifies the result. When a mirrored report is already delivered or a duplicate, the door closes it with `akrogon close <owner/repo#n> --by <text>`. The exception is a report confirmed fully covered but still undelivered and unowned: it stays open in `sources` until its completion owner delivers. A needed main step that can only follow a leaf's merge is the other exception: it is withheld from the `sources` of every leaf whose completion could close it, and the door closes it with `akrogon close <owner/repo#n> --by <text>` after making and verifying the edit. A chart without `sources` lists each waiting edit in CHART.md as a pending operator step with the exact edit, owner, prerequisite leaf and the check that proves it done.
 
 ```text
 Unclear in-scope ground
