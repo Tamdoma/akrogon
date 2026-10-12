@@ -332,3 +332,25 @@ test('wait ends when an operator removes a prerequisite and a picked leaf has mi
     f.clean();
   }
 }, 30000);
+
+test('repo pause event is persisted before its state lock is released', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    writeFileSync(
+      resolve(f.home, 'bin/flock'),
+      '#!/bin/sh\n/usr/bin/flock "$@"\nstatus=$?\nif [ -f "$AKROGON_HOME/repo/issues/timings.jsonl" ]; then\n  cp "$AKROGON_HOME/repo/issues/timings.jsonl" "$AKROGON_HOME/timings-at-unlock.jsonl"\nelse\n  : > "$AKROGON_HOME/timings-at-unlock.jsonl"\nfi\nexit "$status"\n',
+      { mode: 0o755 },
+    );
+    expect((await cli(f, ['pause'], f.root, f.env)).code).toBe(0);
+    const snapshot: string = readFileSync(resolve(f.home, 'timings-at-unlock.jsonl'), 'utf8');
+    const events: Event[] = snapshot
+      .trim()
+      .split('\n')
+      .filter((line) => line !== '')
+      .map((line) => JSON.parse(line) as Event);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ kind: 'repo_pause', repo: 'repo', pause: 'on' });
+  } finally {
+    f.clean();
+  }
+}, 30000);
