@@ -20,7 +20,7 @@
 
 - Skills guide agents; the command owns phase changes, counters and dispatch.
 - Leaf artifacts go to the registered checkout, code to the leaf worktree.
-- Implementation mode selects inline work or bounded workers; delegated mode runs each plan wave whole, up to 3 independent units at once, each in its own worktree with results cherry-picked onto the lane.
+- Implementation mode selects inline work, bounded workers or a serial-solo run; delegated mode runs each plan wave whole, up to 3 independent units at once, each in its own worktree with results cherry-picked onto the lane, while a serial-solo run — every wave holding exactly one unit, whatever the reason — has A implement the leaf itself in wave order with no workers, sub-briefs or worker worktrees, and its repair passes keep delegating.
 - Worker returns include changed-test evidence; A refreshes the leaf branch onto current main, then runs criterion proof plus every `checks` command before review, with `merge_checks` only at merge, except a `check.fix` pass after a red merge ending replays the exact rejected command.
 - Lifecycle seats send no questions and pause for nothing; a human-only blocker is recorded and the pass ends with `failed`; a review finding that needs operator access goes under `Operator actions` by the check-issue rule, never as a Fix.
 - `.env`/`.env.*` are never opened, printed or written by a tool; presence is checked with the `Missing:` lines of `akrogon status <slug>` (absent or empty counts as missing); declared checks and live operations consume values through `bun --env-file=<holder file> <script>` printing results, never values.
