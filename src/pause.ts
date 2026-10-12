@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { globalHome, readGlobal, requireRepo, type GlobalConfig, type Repo } from './config';
 import { writeYaml } from './shell';
 import { withLock } from './state';
+import { appendTiming } from './timing';
 
 export type PauseVerb = 'pause' | 'unpause';
 
@@ -60,5 +61,6 @@ export async function pauseCommand(verb: PauseVerb, cwd: string): Promise<void> 
   const repo: Repo = await requireRepo(global, cwd);
   const paused: boolean = verb === 'pause';
   await setPaused(repo.name, paused);
+  appendTiming(repo, { kind: 'repo_pause', pause: paused ? 'on' : 'off' });
   console.log(`${repo.name} ${paused ? 'paused' : 'unpaused'}`);
 }

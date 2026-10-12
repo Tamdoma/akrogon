@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, renameSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { globalHome, readGlobal, requireRepo, type GlobalConfig, type Repo } from './config';
 import { leavesUnder, withLock, type Leaf } from './state';
+import { appendTiming } from './timing';
 
 export type ParkVerb = 'park' | 'unpark';
 
@@ -67,6 +68,9 @@ export async function parkCommand(verb: ParkVerb, names: string[], all: boolean,
       renameSync(resolve(repo.root, from, name), resolve(repo.root, to, name));
       console.log(`${verb === 'park' ? 'parked  ' : 'unparked'} ${name}`);
     }
+    for (const name of moving)
+      for (const leaf of leavesUnder(resolve(repo.root, to, name), resolve(repo.root, to)))
+        appendTiming(repo, { kind: 'wait', slug: leaf.state.slug, reason: verb === 'park' ? 'parked' : 'none' });
   });
 }
 
