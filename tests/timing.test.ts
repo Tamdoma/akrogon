@@ -298,3 +298,37 @@ test('unwritable timings: prompts, checks and moves complete with one warning pe
     f.clean();
   }
 }, 30000);
+
+test('wait ends when an operator removes a prerequisite and a picked leaf has missing inputs', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'dep', 'plan.synthesis');
+    const path: string = leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['dep'] });
+    yaml(resolve(path, 'readiness.yaml'), {
+      inputs: [
+        {
+          kind: 'file',
+          name: 'approval.txt',
+          holder: 'repo',
+          purpose: 'operator approval',
+          consumers: ['waiting'],
+          steps: 'create approval.txt',
+          source: 'operator',
+          done: 'file exists',
+        },
+      ],
+      produces: [],
+      grants: [],
+      retained: [],
+      proofs: [],
+    });
+    expect((await next(f, ['waiting'])).code).toBe(0);
+    saveState(path, { ...readState(path), 'blocked-by': [] });
+    const blocked: Result = await next(f, ['waiting']);
+    expect(blocked.code).toBe(1);
+    expect(blocked.stderr).toContain('Leaf inputs are missing');
+    expect(ofKind(leafEvents(f, 'waiting'), 'wait').map((event) => event.reason)).toEqual(['prerequisite', 'none']);
+  } finally {
+    f.clean();
+  }
+}, 30000);
