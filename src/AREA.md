@@ -11,11 +11,10 @@
 ## Key files
 
 - `src/akrogon.ts` validates CLI arguments and dispatches commands.
-- `src/preflight.ts` verifies the configured base remote branch and local tracking ref.
-- `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
-- `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file.
+- `src/preflight.ts` verifies the configured base remote branch and local tracking ref; `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
+- `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file; `src/readiness.ts` owns the readiness contract schema and gap computation.
 - `src/phase.ts` and `src/shell.ts` aggregate slot completion and enforce handoff guards; shell wraps subprocesses, retries, YAML writes and Herdr responses.
-- `src/readiness.ts` owns the readiness contract schema and gap computation.
+- `src/timing.ts` defines the timing-event schema and appends to `issues/timings.jsonl`; `readTimings` and `visitOf` are exported for the timing readout.
 - `src/base-run.ts` checks out a base sha detached, logs the run into the leaf and records it in `issues/base-runs.jsonl`; `src/compare.ts` and `src/red-record.ts` validate comparison records and fold `issues/red-records.jsonl` into active entries.
 - `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass and writes the kept report `status` prints under the ignored `reconcile/` state dir.
 

@@ -73,6 +73,20 @@ Each line carries:
 
 The command writes `merged`, `red`, `split`, `reuse` and `ejected` now.
 
+## timings.jsonl: record when each stage happens
+
+Timing events append one JSON line each to `issues/timings.jsonl` in the registered repo, beside `issues/log.jsonl`. The two are separate files: `log.jsonl` records lifecycle moves, `timings.jsonl` records when visits, prompts, checks and waits happened. Like other issue records, the lines are committed through `akrogon sync`. A failed append warns on stderr and never changes the outcome of the move, prompt or check.
+
+Each line names its event kind:
+
+- `visit_start` is `akrogon phase` after a move, or `akrogon next` first seeing a leaf.
+- `prompt` is `akrogon next` delivering or failing a seat prompt.
+- `seat_done` is `akrogon phase` finishing a paired seat without a move.
+- `check_start` and `check_end` are `akrogon run-check` starting and ending a check.
+- `batch` is `akrogon next` creating a merge batch.
+- `wait` is `akrogon next` or `akrogon park` opening or closing a wait.
+- `repo_pause` is `akrogon pause` or `akrogon unpause` toggling the repo.
+
 ## sync: save lifecycle records separately from code
 
 You can edit briefs and inspect reviews in the main checkout while agents change code in worktrees. Sync publishes the eligible lifecycle records without treating every local edit as issue data.
