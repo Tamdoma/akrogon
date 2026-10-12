@@ -771,11 +771,12 @@ async function dispatchLeaf(
       return end(reason, parked?.slug ?? detail.deps[0].slug);
     }
     if (detail?.kind === 'inputs') {
+      recordWait(repo, slug, 'none');
       if (picked)
         throw new Error(
           `Leaf inputs are missing: ${slug}: ${detail.missing.map((g) => `${g.kind} ${g.name} in ${g.holder}`).join(', ')}`,
         );
-      return end('none');
+      return 'waiting';
     }
     const turn: QueueEntry | undefined =
       state.phase === 'merge' ? mergeQueue(global, inventory.leaves, () => readLog(repo.root))[0] : undefined;
