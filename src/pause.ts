@@ -46,12 +46,13 @@ export function isPaused(repoName: string): boolean {
   return readPaused().has(repoName);
 }
 
-export async function setPaused(repoName: string, paused: boolean): Promise<Set<string>> {
+export async function setPaused(repo: Repo, paused: boolean): Promise<Set<string>> {
   return withLock(resolve(globalHome(), '.lock'), async () => {
     const current: Set<string> = readPaused();
-    if (paused) current.add(repoName);
-    else current.delete(repoName);
+    if (paused) current.add(repo.name);
+    else current.delete(repo.name);
     writeYaml(pauseFile(), Object.fromEntries([...current].map((name: string): [string, true] => [name, true])));
+    appendTiming(repo, { kind: 'repo_pause', pause: paused ? 'on' : 'off' });
     return current;
   });
 }
@@ -60,7 +61,6 @@ export async function pauseCommand(verb: PauseVerb, cwd: string): Promise<void> 
   const global: GlobalConfig = readGlobal();
   const repo: Repo = await requireRepo(global, cwd);
   const paused: boolean = verb === 'pause';
-  await setPaused(repo.name, paused);
-  appendTiming(repo, { kind: 'repo_pause', pause: paused ? 'on' : 'off' });
+  await setPaused(repo, paused);
   console.log(`${repo.name} ${paused ? 'paused' : 'unpaused'}`);
 }
