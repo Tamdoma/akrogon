@@ -23,6 +23,7 @@ const contracts: Record<string, string> = {
   pause: '',
   unpause: '',
   status: '[<slug>|--charts]',
+  timing: '[<slug>|--cohort --since <iso>]',
   'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
   'base-run': '--base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...',
   guard: '<ancestors|own-modules>',
