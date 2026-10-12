@@ -95,10 +95,10 @@ test('slug report: each closed visit decomposes into priority waits, prompted ti
     expect(result.stdout).toBe(
       [
         'plan.synthesis #0 40m',
-        '  prompted 30m',
         '  wait repo_pause 3m',
         '  wait parked 2m',
-        '  wait none 5m',
+        '  prompted 25m',
+        '  wait none 10m',
         'implement #0 10m',
         '  prompted 9m',
         '    check leaf:unit 5m',
@@ -139,6 +139,7 @@ test('slug report: missing expected events are named per visit while exempt visi
       prompt('t2', 'B', 'check.review', 0, at(22)),
       visitStart('t2', 'check.fix', 0, at(30)),
       prompt('t2', 'A', 'check.fix', 0, at(31)),
+      event({ slug: 't2', kind: 'check_start', run: 'r5', name: 'fixunit', scope: 'leaf', phase: 'check.fix', ts: at(32) }),
       visitStart('t2', 'check.review', 1, at(40)),
       prompt('t2', 'B', 'check.review', 1, at(41)),
       visitStart('t2', 'merge', 0, at(50)),
@@ -163,6 +164,7 @@ test('slug report: missing expected events are named per visit while exempt visi
         'check.fix #0 10m',
         '  prompted 9m',
         '  wait none 1m',
+        '  incomplete check_end fixunit',
         'check.review #1 10m',
         '  prompted 9m',
         '  wait none 1m',
