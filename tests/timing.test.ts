@@ -1,16 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  fixture,
-  cli,
-  fakeHerdr,
-  fakeAkrogon,
-  leaf,
-  storeDir,
-  yaml,
-  type Fixture,
-} from './helpers';
+import { fixture, cli, fakeHerdr, fakeAkrogon, leaf, storeDir, yaml, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, type Result } from '../src/shell';
 import type { Database } from './fake-herdr';
@@ -54,10 +45,7 @@ async function commitFile(f: DispatchFixture, path: string, name: string): Promi
 }
 function idleAll(f: DispatchFixture): void {
   const db: Database = database(f);
-  writeFileSync(
-    f.db,
-    JSON.stringify({ ...db, panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) }),
-  );
+  writeFileSync(f.db, JSON.stringify({ ...db, panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) }));
 }
 function warnings(result: Result): string[] {
   return result.stderr.split('\n').filter((line) => line.includes('timing append failed'));
@@ -76,9 +64,7 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
     idleAll(f);
     expect((await next(f, ['solo'])).code).toBe(0);
     await commitFile(f, path, 'app2.ts');
-    expect((await phase(f, ['solo', 'merge', '--slot', 'A', '--verdict', 'fix'])).stdout).toBe(
-      'recorded',
-    );
+    expect((await phase(f, ['solo', 'merge', '--slot', 'A', '--verdict', 'fix'])).stdout).toBe('recorded');
     expect((await phase(f, ['solo', 'check.repair', '--slot', 'B', '--verdict', 'fix'])).code).toBe(0);
     idleAll(f);
     expect((await next(f, ['solo'])).code).toBe(0);
@@ -121,9 +107,7 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
     expect(delivered).toContainEqual(['A', 'check.fix', 0]);
     expect(delivered).toContainEqual(['B', 'check.review', 1]);
     expect(delivered).toContainEqual(['B', 'merge', 0]);
-    const mergePrompt: Event | undefined = prompts.find(
-      (p) => p.phase === 'merge' && p.outcome === 'delivered',
-    );
+    const mergePrompt: Event | undefined = prompts.find((p) => p.phase === 'merge' && p.outcome === 'delivered');
     expect(mergePrompt?.attempt).toBe(attempt);
     expect(prompts.every((p) => typeof p.session === 'string')).toBe(true);
 
@@ -147,12 +131,7 @@ test('check events: scope, ordering, exit and duration; killed and worker and ba
     expect((await next(f, ['chks'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
 
-    const failed: Result = await cli(
-      f,
-      ['run-check', '--name', 'smoke', '--', 'sh', '-c', 'exit 3'],
-      worktree,
-      f.env,
-    );
+    const failed: Result = await cli(f, ['run-check', '--name', 'smoke', '--', 'sh', '-c', 'exit 3'], worktree, f.env);
     expect(failed.code).toBe(3);
     const events: Event[] = leafEvents(f, 'chks');
     const smokeStart: Event | undefined = ofKind(events, 'check_start').find((e) => e.name === 'smoke');
@@ -163,23 +142,15 @@ test('check events: scope, ordering, exit and duration; killed and worker and ba
     expect(smokeEnd?.log).toContain('check-smoke-');
     expect(smokeEnd?.run).toBe(smokeStart?.run);
 
-    await expect(
-      cli(f, ['run-check', '--name', 'hang', '--', 'sleep', '30'], worktree, f.env, 2000),
-    ).rejects.toThrow();
-    expect(
-      ofKind(leafEvents(f, 'chks'), 'check_start').some((e) => e.name === 'hang'),
-    ).toBe(true);
-    expect(
-      ofKind(leafEvents(f, 'chks'), 'check_end').some((e) => e.name === 'hang'),
-    ).toBe(false);
+    await expect(cli(f, ['run-check', '--name', 'hang', '--', 'sleep', '30'], worktree, f.env, 2000)).rejects.toThrow();
+    expect(ofKind(leafEvents(f, 'chks'), 'check_start').some((e) => e.name === 'hang')).toBe(true);
+    expect(ofKind(leafEvents(f, 'chks'), 'check_end').some((e) => e.name === 'hang')).toBe(false);
 
     const worker: string = resolve(storeDir(f), 'chks-u1');
     await command(['git', 'worktree', 'add', '--detach', worker, 'HEAD'], f.root);
     const workerRun: Result = await cli(f, ['run-check', '--name', 'wrk', '--', 'true'], worker, f.env);
     expect(workerRun.code).toBe(0);
-    const workerStart: Event | undefined = ofKind(leafEvents(f, 'chks'), 'check_start').find(
-      (e) => e.name === 'wrk',
-    );
+    const workerStart: Event | undefined = ofKind(leafEvents(f, 'chks'), 'check_start').find((e) => e.name === 'wrk');
     expect(workerStart).toMatchObject({ scope: 'worker', unit: 'u1' });
     await command(['git', 'worktree', 'remove', '--force', worker], f.root);
 
@@ -198,9 +169,7 @@ test('check events: scope, ordering, exit and duration; killed and worker and ba
       { ...f.env, ...shim.env },
     );
     expect(baseRun.code).toBe(0);
-    const baseStart: Event | undefined = ofKind(leafEvents(f, 'chks'), 'check_start').find(
-      (e) => e.name === 'b',
-    );
+    const baseStart: Event | undefined = ofKind(leafEvents(f, 'chks'), 'check_start').find((e) => e.name === 'b');
     expect(baseStart?.scope).toBe('base');
   } finally {
     f.clean();
@@ -254,8 +223,9 @@ test('waits: pause writes repo_pause on and off; parked, prerequisite and merge 
     expect(ofKind(leafEvents(f, 'dep'), 'wait').map((e) => e.reason)).toEqual(['parked']);
 
     leaf(f, 'w', 'plan.synthesis', { 'blocked-by': ['dep'] });
-    expect((await next(f, ['w'])).code).toBe(0);
-    expect((await next(f, ['w'])).code).toBe(0);
+    // A picked leaf with a parked dependency is refused like other fatal dep labels; the wait is still recorded.
+    expect((await next(f, ['w'])).code).not.toBe(0);
+    expect((await next(f, ['w'])).code).not.toBe(0);
     let waits: Event[] = ofKind(leafEvents(f, 'w'), 'wait');
     expect(waits).toHaveLength(1);
     expect(waits[0]).toMatchObject({ reason: 'parked', blocking: 'dep' });
@@ -286,9 +256,7 @@ test('waits: pause writes repo_pause on and off; parked, prerequisite and merge 
     expect(ofKind(leafEvents(f, 'm1'), 'prompt').some((p) => p.outcome === 'delivered')).toBe(true);
 
     const attempt: string = readState(m1).batch!.attempt;
-    expect((await phase(f, ['m1', 'merged', '--check', '--slot', 'B', '--attempt', attempt])).code).toBe(
-      0,
-    );
+    expect((await phase(f, ['m1', 'merged', '--check', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
     expect((await phase(f, ['m1', 'merged', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
     expect(readState(m1).phase).toBe('merged');
     const m2State: State = readState(resolve(f.root, 'issues/open/issue/m2'));

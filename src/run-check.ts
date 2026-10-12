@@ -77,11 +77,7 @@ interface LeafTarget {
   attempt?: string;
 }
 
-function leafFields(
-  state: State,
-  scope: LeafTarget['scope'],
-  unit?: string,
-): Omit<LeafTarget, 'target' | 'baseSha'> {
+function leafFields(state: State, scope: LeafTarget['scope'], unit?: string): Omit<LeafTarget, 'target' | 'baseSha'> {
   return {
     slug: state.slug,
     scope,
@@ -149,12 +145,7 @@ export async function runCheck(
     throw new Error('Usage: akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...');
   refuse();
   const repo: Repo = await requireRepo(readGlobal(), cwd);
-  const { slug, target, baseSha, scope, unit, phase, attempt } = await leafTarget(
-    repo,
-    cwd,
-    leafOverride,
-    holder,
-  );
+  const { slug, target, baseSha, scope, unit, phase, attempt } = await leafTarget(repo, cwd, leafOverride, holder);
   const runRoot: string = mkdtempSync(resolve(ensureLeafTemp(repo, slug), 'run-'));
   try {
     const boot: string = existsSync('/proc/sys/kernel/random/boot_id')
@@ -183,10 +174,7 @@ export async function runCheck(
     process.stdout.write(result.stdout);
     process.stderr.write(result.stderr);
     mkdirSync(target, { recursive: true });
-    const kept: string = resolve(
-      target,
-      `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`,
-    );
+    const kept: string = resolve(target, `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`);
     copyFileSync(log, kept);
     appendTiming(repo, {
       kind: 'check_end',

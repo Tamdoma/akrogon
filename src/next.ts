@@ -761,11 +761,14 @@ async function dispatchLeaf(
     );
     if (detail?.kind === 'deps') {
       const deps: string = detail.deps.map((d) => `${d.slug} (${d.label})`).join(', ');
-      if (picked && detail.deps.some((d) => ['failed', 'unreadable', 'missing'].includes(d.label)))
-        throw new Error(`Leaf dependencies are not merged: ${slug}: ${deps}`);
-      if (picked) console.log(`waiting: ${slug} on ${deps}`);
       const parked: DepDetail | undefined = detail.deps.find((d) => d.label === 'parked');
-      return parked === undefined ? end('prerequisite', detail.deps[0].slug) : end('parked', parked.slug);
+      const reason: WaitReason = parked === undefined ? 'prerequisite' : 'parked';
+      if (picked && detail.deps.some((d) => ['failed', 'parked', 'unreadable', 'missing'].includes(d.label))) {
+        recordWait(repo, slug, reason, parked?.slug ?? detail.deps[0].slug);
+        throw new Error(`Leaf dependencies are not merged: ${slug}: ${deps}`);
+      }
+      if (picked) console.log(`waiting: ${slug} on ${deps}`);
+      return end(reason, parked?.slug ?? detail.deps[0].slug);
     }
     if (detail?.kind === 'inputs') {
       if (picked)
