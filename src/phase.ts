@@ -28,6 +28,7 @@ import {
 } from './routing';
 import { command, run, herdr, herdrError, retryable, CommandError, type Result } from './shell';
 import { logMove, readLog } from './log';
+import { appendTiming, currentVisit } from './timing';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
 import { mergeQueue } from './turn';
 import { closeSources } from './pull';
@@ -182,6 +183,12 @@ export async function commitMove(
   } finally {
     try {
       await logMove(repo, recorded, to === 'failed' ? readState(leaf.path) : announced, slot);
+      appendTiming(repo, {
+        kind: 'visit_start',
+        slug: recorded.slug,
+        phase: to,
+        visit: currentVisit(readLog(repo.root), recorded.slug, to),
+      });
     } catch (error) {
       const cause: Error = error instanceof Error ? error : new Error(String(error), { cause: error });
       throw new MoveCommittedError(repo, to, `Move to ${to} is committed, but log append failed: ${cause.message}`, {
@@ -405,6 +412,14 @@ export async function transition(
   };
   if (!required.every((requiredSlot) => recorded.done.includes(requiredSlot))) {
     saveState(leaf.path, recorded);
+    if (required.length > 1)
+      appendTiming(repo, {
+        kind: 'seat_done',
+        slug: state.slug,
+        slot: slot!,
+        phase: state.phase,
+        visit: currentVisit(readLog(repo.root), state.slug, state.phase),
+      });
     console.log('recorded');
     await recordComparisons(repo, state.slug, compareFiles, comparisons);
     return;
