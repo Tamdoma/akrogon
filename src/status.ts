@@ -28,6 +28,7 @@ import {
 import { readLog, type LogRecord } from './log';
 import { mergeQueue, type QueueEntry } from './turn';
 import { issueFolders } from './park';
+import { liveHolder, type HolderRecord } from './permit';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 import { readPaused } from './pause';
 import { activeRed, type RedEntry } from './red-record';
@@ -400,6 +401,11 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
       }
     }
   }
+  const holder: HolderRecord | undefined = liveHolder();
+  if (holder !== undefined)
+    console.log(
+      `Run permit: ${holder.repo}/${holder.leaf} ${holder.check} pid ${holder.pid} ${since(now - Date.parse(holder.started))}`,
+    );
   for (const scan of scans) {
     if (!scan.ok) continue;
     const marks: string[] = [paused.has(scan.repo.name) ? 'paused' : ''].filter((mark) => mark !== '');
