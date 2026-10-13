@@ -2,6 +2,7 @@ import { type GlobalConfig, type Repo } from './config';
 import { type LogRecord } from './log';
 import { type Gap, gaps, readReadiness, type Readiness } from './readiness';
 import { hasLeafFolder, isParked, type Leaf } from './state';
+import { isStopped } from './stop';
 
 export type Block = { kind: 'deps' } | { kind: 'inputs'; missing: Gap[] };
 
@@ -80,7 +81,10 @@ export type QueueEntry = { leaf: Leaf; place: number; noRecord: boolean };
 
 export function mergeQueue(global: GlobalConfig, leaves: Leaf[], log: () => LogRecord[]): QueueEntry[] {
   const eligible: Leaf[] = leaves.filter(
-    (leaf) => leaf.state.phase === 'merge' && eligibility(global, leaf, leaves) === null,
+    (leaf) =>
+      leaf.state.phase === 'merge' &&
+      eligibility(global, leaf, leaves) === null &&
+      !isStopped(leaf.state.repo, leaf.state.slug),
   );
   const stamp: Map<string, string> = new Map();
   if (eligible.some((leaf) => leaf.state.merge_stamp === undefined))

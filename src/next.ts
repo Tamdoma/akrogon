@@ -82,6 +82,7 @@ import { appendAttempt, readPressure, resolveTools, type PressureSnapshot } from
 import { sessionFile, deliveredAfter } from './session-file';
 import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
+import { isStopped } from './stop';
 import { selfUpdate } from './self-update';
 import { blockDetail, dependentCounts, mergeQueue, type DepDetail, type QueueEntry } from './turn';
 import { appendTiming, currentVisit, readTimings, recordWait, type WaitReason } from './timing';
@@ -752,6 +753,11 @@ async function dispatchLeaf(
     return 'skipped';
   }
   if (isAutomatic && isPaused(repo.name)) return end('none');
+  if (isStopped(repo.name, slug)) {
+    if (!picked || isAutomatic) return end('none');
+    report(invocation, repo.name, leaf.path, new Error(`Leaf is stopped: ${slug}; run akrogon start ${slug}`), slug);
+    return 'skipped';
+  }
   try {
     let state: State = readState(leaf.path);
     if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
