@@ -10,7 +10,7 @@ The outcome and plan decision IDs; standalone assigns its brief's own decision I
 
 ## 2. Numbered acceptance criteria
 
-Observable outcomes written before code. A test exists only as the proof of a done-criterion or as the red-first reproduction of a proven bug; after planning no seat adds an edge or negative case on a named consequence alone. For a delegated leaf the planned tests and their run command come from `plan.md`, copied in for the tests this unit touches; those tests live in the leaf diff and run under section 7's changed-test command. A worker writes and edits no test: a planned test that is wrong or red returns a mismatch, never a test fix. Standalone has no planned tests and no guard; its only rule is order: tests from the brief first, committed, then code.
+Observable outcomes written before code. A test exists only as the proof of a done-criterion or as the red-first reproduction of a proven bug; after planning no seat adds an edge or negative case on a named consequence alone. For a delegated leaf the planned tests and their run command come from `plan.md`, copied in for the tests this unit touches; those tests live in the leaf diff and run under the commands section 7 names. A worker writes and edits no test: a planned test that is wrong or red returns a mismatch, never a test fix. Standalone has no planned tests and no guard; its only rule is order: tests from the brief first, committed, then code.
 
 ## 3. Read-first list
 
@@ -34,7 +34,7 @@ Advisory size: about N files and under M turns, with M at least four turns per f
 
 ## 7. Commands
 
-The resolved `test_changed` command only, including the supplied `AKROGON_BASE` value for a configured leaf; A runs criterion proof and every `checks` command separately.
+The unit's targeted test commands named from A's plan; when none are named the worker runs no changed-tests command. A runs the resolved changed-tests command, criterion proof and every `checks` command separately.
 
 If the checkout has no changed-test runner, name the actual targeted check derived from its tools rather than substituting the full suite or inventing a command.
 
