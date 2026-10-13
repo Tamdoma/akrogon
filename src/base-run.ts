@@ -16,6 +16,7 @@ import { ensureLeafTemp, readGlobal, requireRepo, within, worktreeStore, type Re
 import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { constructedEnv, spawnLogged } from './run-check';
+import { withPermit } from './permit';
 import { command, quote, type Result } from './shell';
 import { allLeaves, withLock, type Leaf } from './state';
 import { requiredSlots, slotSchema, type Slot } from './routing';
@@ -161,7 +162,13 @@ export async function baseRun(
             setup,
           )} && akrogon guard own-modules && ${enter}exec "$@"`;
     if (inside !== '') mkdirSync(resolve(target, inside), { recursive: true });
-    const ran: Result = await spawnLogged(['sh', '-c', script, 'akrogon-base-run', ...argv], target, env, log);
+    const ran: Result = await withPermit(
+      { repo: repo.name, leaf: leaf.state.slug, check: 'base-run' },
+      async (admission) => {
+        env.AKROGON_RUN = admission.token;
+        return spawnLogged(['sh', '-c', script, 'akrogon-base-run', ...argv], target, env, log);
+      },
+    );
     code = ran.code;
     process.stdout.write(`log: ${log}\nstatus: ${ran.code}\n`);
   } finally {
