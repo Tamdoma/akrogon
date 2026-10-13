@@ -304,6 +304,7 @@ function memberLine(member: Member): string {
 }
 
 function verdict(members: Member[], ejections: number): 'pass' | 'fail' | 'insufficient' {
+  const merged: number = members.filter((member) => member.merged !== null).length;
   const failed: number = members.filter((member) => member.failed).length;
   const over45: number = members.filter(
     (member) => member.failed || member.stalled || (member.f !== null && member.f > F_LIMIT_MS),
@@ -323,7 +324,7 @@ function verdict(members: Member[], ejections: number): 'pass' | 'fail' | 'insuf
     ejections > EJECTION_LIMIT
   )
     return 'fail';
-  if (members.length < COHORT_SIZE || unresolved > 0) return 'insufficient';
+  if (members.length < COHORT_SIZE || unresolved > 0 || merged < MERGED_MIN) return 'insufficient';
   return 'pass';
 }
 
