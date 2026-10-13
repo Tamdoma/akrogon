@@ -367,3 +367,24 @@ test('cohort gate: fails when the two central F values average above 35 minutes'
     f.clean();
   }
 });
+
+test('cohort gate: remains insufficient with 17 merged and three stalled members', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const log: Row[] = [];
+    const timings: Row[] = [];
+    for (let index = 0; index < 20; index++) {
+      const part: { log: Row[]; timings: Row[] } = member(`stalled${index}`, at(index + 1), 20, {
+        stalled: index >= 17,
+      });
+      log.push(...part.log);
+      timings.push(...part.timings);
+    }
+    cohortFixture(f, log, timings);
+    const result: { code: number; stdout: string; stderr: string } = await timing(f, ['--cohort', '--since', SINCE]);
+    expect(result.code).toBe(0);
+    expect(result.stdout.split('\n')[0]).toBe('insufficient');
+  } finally {
+    f.clean();
+  }
+});
