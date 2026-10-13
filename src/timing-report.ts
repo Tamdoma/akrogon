@@ -273,7 +273,7 @@ function memberOf(slug: string, joined: number, timings: TimingEvent[], log: Log
     .filter((visit) => visit.phase === 'implement')
     .map((visit) => promptedTotal(timings, slug, visit))
     .reduce((sum, span) => sum + span, 0);
-  const outcome: number = merged ?? (last === undefined ? now : ms(last.ts));
+  const outcome: number = merged ?? (failed ? ms((last as Move).ts) : now);
   return {
     slug,
     joined,
