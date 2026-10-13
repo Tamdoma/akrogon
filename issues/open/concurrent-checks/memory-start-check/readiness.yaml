@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: read akrogon.slice memory.stat (anon, shmem, file)
+    command: awk on /sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/akrogon.slice/memory.stat
+    identity: ivan uid 1000
+    target: akrogon.slice
+    version: kernel 7.2.8, cgroup v2
+    date: 2026-10-13
+    result: anon 26.1 GB, shmem 11.6 GB, file 25.8 GB at 11 leaves; memory.current 57 GB; memory.events all 0
+    cleanup: none, read-only
+    limits: one read; does not show behavior near 48 GiB
+    record: issues/chart/permit-bypass/forks/load-guard.md

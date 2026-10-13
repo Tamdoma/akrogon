@@ -1,0 +1,59 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: 2026-10-13
+      answer: cross-leaf-kill "1a 2a"; handoff "ok, go"
+    principal: leaf seats of run-units
+    account: local user ivan uid 1000, systemd user manager
+    credential:
+      name: none
+      holder: none
+    targets: [systemd user manager]
+    fixtures:
+      - account: ivan uid 1000
+        purpose: transient test units for run-unit tests
+        marker: akrogon-test prefix
+        naming: akrogon-test-*.slice, units beneath it
+        count: 1
+        cleanup:
+          - step: systemctl --user stop akrogon-test-<id>.slice
+            identity: the test process that created it
+        absence_check: systemctl --user list-units --all 'akrogon-test*' prints nothing
+    operations: [StartTransientUnit scope and service, systemctl --user stop, read cgroup files]
+    effects: local processes and transient units only; no public, billing, DNS or retention effect
+    bounds: test units only under akrogon-test-*.slice; never stop or signal another leaf's units
+    stop_line: no stop, kill or signal on any unit or process the leaf did not create
+retained: []
+proofs:
+  - operation: read akrogon.slice memory.stat (anon, shmem, file)
+    command: awk on /sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/akrogon.slice/memory.stat
+    identity: ivan uid 1000
+    target: akrogon.slice
+    version: kernel 7.2.8, cgroup v2
+    date: 2026-10-13
+    result: anon 26.1 GB, shmem 11.6 GB, file 25.8 GB at 11 leaves; memory.current 57 GB; memory.events all 0
+    cleanup: none, read-only
+    limits: one read; does not show behavior near 48 GiB
+    record: issues/chart/permit-bypass/forks/load-guard.md
+  - operation: StartTransientUnit and systemctl --user stop from a shell with the seat bus cut
+    command: busctl --user call org.freedesktop.systemd1 ... StartTransientUnit with DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus on that subprocess; systemctl --user stop <slice>
+    identity: ivan uid 1000
+    target: transient scopes under akrogon-proof.slice
+    version: systemd 262 (262-1-arch)
+    date: 2026-10-13
+    result: PID moved into the nested scope; systemctl stop exit 0 under the cut, process died
+    cleanup: proof slices stopped, no unit or process left
+    limits: one process, busctl CLI only; does not prove SIGKILL-of-wrapper cleanup or a transient service, which the leaf proves in its own tests
+    record: issues/chart/host-test-load/proofs.md
+  - operation: run scope plus guard service stopping it when the wrapper dies
+    command: systemd-run --user --scope --unit=akrogon-proof-run-<n> --slice=akrogon-proof-run.slice ...; systemd-run --user --unit=akrogon-proof-guard-<n> sh -c "tail --pid=$W -f /dev/null; systemctl --user stop akrogon-proof-run-<n>.scope"
+    identity: ivan uid 1000, seat bus cut with per-call bus
+    target: transient units under akrogon-proof-run.slice
+    version: systemd 262 (262-1-arch)
+    date: 2026-10-13
+    result: SIGKILL and SIGTERM of the wrapper left the run scope and guard inactive within 3 s, 0 processes; sibling pair kept running
+    cleanup: akrogon-proof.slice stopped, no proof unit or process left
+    limits: bash stand-in wrapper; stdio and exit status through the scope not exercised
+    record: issues/chart/permit-bypass/forks/cross-leaf-kill.md

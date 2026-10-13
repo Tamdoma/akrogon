@@ -1,0 +1,1 @@
+Read issues/chart/permit-bypass/slots/ship-merged.md. Write only disagreements with evidence (path:line), or "none", to slots/ship-rebuttal-<your slot>.md. Max 12 lines. Flag any merge tag that cites a line you did not write.

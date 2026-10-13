@@ -15,3 +15,6 @@ None.
 
 ## Off route
 - Heavy-run slot and base-red rule: chart test-runs (destination akrogon).
+
+Folded into /home/ivan/Work/infra/tamdoma/framework/issues/chart/test-cost on 2026-10-13 (operator 2a); its forks continue there.
+Held 2026-10-13

@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: background whole-command run with mktemp dir, nohup, pid and exit file across tool calls
+    command: d=$(mktemp -d "$TMPDIR/run.XXXXXX"); nohup sh -c '<cmd>; echo $? > "$0/exit"' "$d" > "$d/log" 2>&1 & echo $! > "$d/pid"
+    identity: ivan uid 1000, Claude Code bash tool
+    target: door scratchpad TMPDIR
+    version: bash, coreutils on host 2026-10-13
+    date: 2026-10-13
+    result: exit file held 3 for an exiting command; SIGKILLed wrapper left no exit file and a dead PID; its child survived as an orphan
+    cleanup: run dirs removed, orphan stopped by PID
+    limits: Claude Code harness only, pi not run; orphan child is left to run-units
+    record: issues/chart/permit-bypass/forks/long-run-path.md
