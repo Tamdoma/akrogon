@@ -1,12 +1,12 @@
 import { test, expect } from 'bun:test';
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { command, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
 import { readState, saveState, type State } from '../src/state';
 import type { Database } from './fake-herdr';
-import { cli, fakeHerdr, fixture, leaf, type Fixture } from './helpers';
+import { cli, fakeHerdr, fixture, leaf, yaml, type Fixture } from './helpers';
 
 type StopFixture = Fixture & { db: string; env: NodeJS.ProcessEnv; systemctlLog: string };
 
@@ -276,3 +276,28 @@ test('stopping the holder of an applied batch builds no second batch and prompts
     f.clean();
   }
 }, 15000);
+
+test('stop --all skips merged and closed leaves that keep their tab', async () => {
+  const f: StopFixture = await stopFixture();
+  try {
+    const live: string = await allocatedIdle(f, 'live');
+    leaf(f, 'landed', 'merged', { tab: 'w1:t9' });
+    const closed: string = resolve(f.root, 'issues/closed/old/done');
+    mkdirSync(closed, { recursive: true });
+    yaml(resolve(closed, 'state.yaml'), {
+      slug: 'done',
+      phase: 'merged',
+      created: '2026-09-10',
+      repo: 'repo',
+      debate: 'no',
+      'blocked-by': [],
+      tab: 'w1:t8',
+    });
+    const all: Result = await run(f, ['stop', '--all']);
+    expect(all.code).toBe(0);
+    expect(stoppedKeys(f)).toEqual(['repo/live']);
+    expect(systemctlCalls(f)).toEqual([`--user stop ${slice(live)}`]);
+  } finally {
+    f.clean();
+  }
+});
