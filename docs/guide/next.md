@@ -118,6 +118,36 @@ Pause differs from park: park removes whole unallocated issues from the open que
 
 A base-red merge run no longer stops the turn: the merge seat compares the failing units against the batch's base and records each `known-red` one as a repo red entry `akrogon status <slug>` lists, while the batch keeps moving. A recorded entry resolves when a green run covering that unit lands on main.
 
+## Stopping a leaf
+
+Stop ends every process a leaf's seats started, including browsers and worker scripts:
+
+```sh
+akrogon stop <slug>
+```
+
+Stop records the leaf as stopped in `stopped.yaml` in the akrogon home on this host, then stops the leaf's systemd slice. Herdr closes the leaf's panes. The worktree and saved harness sessions stay. If the slice stop fails, the leaf stays stopped, the error prints and the command exits non-zero. Run stop again to retry.
+
+Stop every allocated leaf of the current repository:
+
+```sh
+akrogon stop --all
+```
+
+It prints one result line per leaf. One failure does not stop the others, and the command exits non-zero if any leaf failed.
+
+While a leaf is stopped, automatic passes skip it quietly. A typed `akrogon next <slug>`, bare `akrogon next` or `akrogon next --all` reports the leaf with an error naming `akrogon start <slug>` and exits non-zero. The merge turn builds no stack and prompts no merge seat for it. `akrogon status` shows stopped in the NOTE column, and `akrogon status <slug>` prints a `stopped:` line.
+
+Start removes the stopped record and runs `akrogon next <slug>`:
+
+```sh
+akrogon start <slug>
+```
+
+Start exits non-zero on a leaf that is not stopped.
+
+Panes you split by hand in a leaf tab are outside the slice and survive a stop. Pause kills nothing: it only freezes automatic dispatch.
+
 ## How order is decided
 
 A leaf must have valid state and satisfied dependencies. Failed leaves are skipped.
