@@ -76,6 +76,7 @@ export const repoSchema = z
       'FFMPEG_BIN',
       'CHROME_PATH',
       'CDP_BROWSER_BINARY',
+      'DBUS_SESSION_BUS_ADDRESS',
     ]);
     const envName: RegExp = /^[A-Z_][A-Z0-9_]*$/;
     for (const [field, names] of [

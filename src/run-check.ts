@@ -53,6 +53,7 @@ export function constructedEnv(repo: Repo, runRoot: string): Record<string, stri
     const value: string | undefined = process.env[key];
     if (value !== undefined) env[key] = value;
   }
+  env.DBUS_SESSION_BUS_ADDRESS = 'unix:path=/nonexistent';
   return env;
 }
 
