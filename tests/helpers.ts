@@ -1,6 +1,6 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
@@ -21,6 +21,21 @@ export function storeDir(f: Fixture, repo: string = 'repo'): string {
 }
 export function yaml(path: string, data: object): void {
   writeFileSync(path, Bun.YAML.stringify(data));
+}
+export function cgroupRoot(f: Fixture): string {
+  return resolve(f.home, 'cgroup');
+}
+export function statPath(f: Fixture): string {
+  const uid: number = process.getuid!();
+  return resolve(cgroupRoot(f), `user.slice/user-${uid}.slice/user@${uid}.service/akrogon.slice/memory.stat`);
+}
+export function seedStat(f: Fixture, anon: number, shmem: number = 0): void {
+  const file: string = statPath(f);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, `anon ${anon}\nfile 0\nshmem ${shmem}\n`);
+}
+function admissionEnv(f: Fixture): NodeJS.ProcessEnv {
+  return { AKROGON_CGROUP_ROOT: cgroupRoot(f), AKROGON_SPACING_MS: '0' };
 }
 export async function fixture(): Promise<Fixture> {
   const home: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-')));
@@ -45,7 +60,9 @@ export async function fixture(): Promise<Fixture> {
     harnesses: { fake: 'fake --model {model} --effort {effort}' },
     repos: { repo: root },
   });
-  return { home, root, clean: () => rmSync(home, { recursive: true, force: true }) };
+  const f: Fixture = { home, root, clean: () => rmSync(home, { recursive: true, force: true }) };
+  seedStat(f, 1024 * 1024 * 1024);
+  return f;
 }
 export async function cli(
   f: Fixture,
@@ -58,7 +75,14 @@ export async function cli(
     'AKROGON_LEAF_TEMP_ROOT' in env ? env : { ...env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) };
   const result: SpawnResult = await spawnCaptured([process.execPath, entry, ...args], {
     cwd,
-    env: { ...process.env, AKROGON_HOME: f.home, HERDR_PANE_ID: '', HOME: f.home, ...withDefault },
+    env: {
+      ...process.env,
+      AKROGON_HOME: f.home,
+      HERDR_PANE_ID: '',
+      HOME: f.home,
+      ...admissionEnv(f),
+      ...withDefault,
+    },
     timeout,
     killSignal: 'SIGKILL',
   });
@@ -105,6 +129,7 @@ export function fakeHerdr(f: Fixture): HerdrFixture {
       AKROGON_PROC_ROOT: procRoot(f),
       XDG_RUNTIME_DIR: resolve(f.home, 'run'),
       AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+      ...admissionEnv(f),
     },
   };
 }
@@ -113,7 +138,9 @@ export function fakeAkrogon(f: Fixture): { env: NodeJS.ProcessEnv } {
   const bin: string = resolve(f.home, 'bin');
   mkdirSync(bin, { recursive: true });
   symlinkSync(entry, resolve(bin, 'akrogon'));
-  return { env: { PATH: `${bin}:${process.env.PATH}`, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) } };
+  return {
+    env: { PATH: `${bin}:${process.env.PATH}`, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f), ...admissionEnv(f) },
+  };
 }
 
 export type GhFixture = { db: string; env: NodeJS.ProcessEnv };
