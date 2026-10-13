@@ -13,6 +13,7 @@ import {
   seedStat,
   statPath,
   storeDir,
+  unitBin,
   yaml,
   type Fixture,
 } from './helpers';
@@ -34,7 +35,9 @@ function run(f: Fixture, args: string[], cwd: string, env: NodeJS.ProcessEnv = {
     HOME: f.home,
     AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
     AKROGON_CGROUP_ROOT: cgroupRoot(f),
+    AKROGON_RUN: '',
     ...env,
+    PATH: `${unitBin(f)}:${env.PATH ?? process.env.PATH}`,
   };
   if (env.AKROGON_SPACING_MS === undefined) delete spawnEnv.AKROGON_SPACING_MS;
   const proc: Proc = Bun.spawn([process.execPath, entry, ...args], {

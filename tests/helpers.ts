@@ -37,6 +37,9 @@ export function seedStat(f: Fixture, anon: number, shmem: number = 0): void {
 function admissionEnv(f: Fixture): NodeJS.ProcessEnv {
   return { AKROGON_CGROUP_ROOT: cgroupRoot(f), AKROGON_SPACING_MS: '0' };
 }
+export function unitBin(f: Fixture): string {
+  return resolve(f.home, 'unitbin');
+}
 export async function fixture(): Promise<Fixture> {
   const home: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-')));
   const root: string = resolve(home, 'repo');
@@ -62,6 +65,9 @@ export async function fixture(): Promise<Fixture> {
   });
   const f: Fixture = { home, root, clean: () => rmSync(home, { recursive: true, force: true }) };
   seedStat(f, 1024 * 1024 * 1024);
+  const units: string = unitBin(f);
+  mkdirSync(units);
+  symlinkSync(resolve(import.meta.dir, 'fake-systemd-run.sh'), resolve(units, 'systemd-run'));
   return f;
 }
 export async function cli(
@@ -82,6 +88,8 @@ export async function cli(
       HOME: f.home,
       ...admissionEnv(f),
       ...withDefault,
+      ...('AKROGON_RUN' in env ? {} : { AKROGON_RUN: '' }),
+      PATH: `${unitBin(f)}:${env.PATH ?? process.env.PATH}`,
     },
     timeout,
     killSignal: 'SIGKILL',
@@ -139,7 +147,11 @@ export function fakeAkrogon(f: Fixture): { env: NodeJS.ProcessEnv } {
   mkdirSync(bin, { recursive: true });
   symlinkSync(entry, resolve(bin, 'akrogon'));
   return {
-    env: { PATH: `${bin}:${process.env.PATH}`, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f), ...admissionEnv(f) },
+    env: {
+      PATH: `${bin}:${unitBin(f)}:${process.env.PATH}`,
+      AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+      ...admissionEnv(f),
+    },
   };
 }
 

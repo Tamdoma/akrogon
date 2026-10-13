@@ -28,6 +28,7 @@ const contracts: Record<string, string> = {
   timing: '[<slug>|--cohort --since <iso>]',
   'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
   'base-run': '--base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...',
+  'stop-run': '[<run-id>]',
   guard: '<ancestors|own-modules>',
 };
 
