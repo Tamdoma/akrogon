@@ -388,3 +388,22 @@ test('cohort gate: remains insufficient with 17 merged and three stalled members
     f.clean();
   }
 });
+
+test('cohort member: parked waiting continues after the last phase move', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const joined: string = new Date(Date.now() - 48 * 60 * 60000).toISOString();
+    const part: { log: Row[]; timings: Row[] } = member('parked', joined, 20, {
+      stalled: true,
+      waitRows: [event({ slug: 'parked', kind: 'wait', reason: 'parked', ts: at(25, 0, joined) })],
+    });
+    cohortFixture(f, part.log, part.timings);
+    const result: { code: number; stdout: string; stderr: string } = await timing(f, ['--cohort', '--since', SINCE]);
+    expect(result.code).toBe(0);
+    const hours: RegExpMatchArray | null = /wait parked (\d+)h/.exec(result.stdout);
+    expect(hours).not.toBeNull();
+    expect(Number(hours![1])).toBeGreaterThanOrEqual(47);
+  } finally {
+    f.clean();
+  }
+});
