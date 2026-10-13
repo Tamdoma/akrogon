@@ -69,6 +69,7 @@ export const repoSchema = z
     const constructed: Set<string> = new Set([
       'TMPDIR',
       'AKROGON_BASE',
+      'AKROGON_RUN',
       'NODE_PATH',
       'BUN_OPTIONS',
       'BUN_INSTALL_CACHE_DIR',

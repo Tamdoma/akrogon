@@ -33,7 +33,12 @@ export const timingEventSchema = z.discriminatedUnion('kind', [
     attempt: attempt.optional(),
   }),
   z.strictObject({ ...slugged, kind: z.literal('seat_done'), ...seat }),
-  z.strictObject({ ...slugged, kind: z.literal('check_start'), ...checkCore }),
+  z.strictObject({
+    ...slugged,
+    kind: z.literal('check_start'),
+    ...checkCore,
+    wait_ms: z.number().int().nonnegative().optional(),
+  }),
   z.strictObject({
     ...slugged,
     kind: z.literal('check_end'),

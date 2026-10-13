@@ -144,8 +144,8 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon unpark <issue>... \| --all` | Restore whole issues to the open queue. |
 | `akrogon pause` | Pause automatic dispatch for the current repository. |
 | `akrogon unpause` | Resume automatic dispatch with one pass for the current repository. |
-| `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Run a command under the constructed check environment and log output into the leaf. |
-| `akrogon base-run --base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...` | Run a command on a base checkout in the worktree store under the constructed environment, log into the leaf, write a record line and remove the worktree. |
+| `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Run a command under the constructed check environment, holding one host-wide run permit while it runs, and log output into the leaf. |
+| `akrogon base-run --base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...` | Run a command on a base checkout in the worktree store under the constructed environment, holding one host-wide run permit while it runs, log into the leaf, write a record line and remove the worktree. |
 | `akrogon guard <ancestors\|own-modules>` | Refuse when a canonical ancestor holds node_modules or package.json, or the checkout's own node_modules is missing. |
 ```
 

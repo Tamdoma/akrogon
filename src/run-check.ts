@@ -17,6 +17,7 @@ import { allLeaves, readState, type Leaf, type State } from './state';
 import { command, spawnCaptured, type Result } from './shell';
 import { readBaseRuns, type BaseRun } from './base-run';
 import { appendTiming } from './timing';
+import { withPermit } from './permit';
 import { type Phase } from './routing';
 
 const forbidden: readonly string[] = [
@@ -168,22 +169,32 @@ export async function runCheck(
       ...(unit === undefined ? {} : { unit }),
       ...(attempt === undefined ? {} : { attempt }),
     };
-    appendTiming(repo, { kind: 'check_start', ...check });
-    const started: number = Date.now();
-    const result: Result = await spawnLogged(argv, cwd, env, log);
-    process.stdout.write(result.stdout);
-    process.stderr.write(result.stderr);
-    mkdirSync(target, { recursive: true });
-    const kept: string = resolve(target, `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`);
-    copyFileSync(log, kept);
-    appendTiming(repo, {
-      kind: 'check_end',
-      ...check,
-      exit: result.code,
-      duration_ms: Date.now() - started,
-      log: kept,
+    return await withPermit({ repo: repo.name, leaf: slug, check: name ?? 'run' }, async (admission) => {
+      env.AKROGON_RUN = admission.token;
+      appendTiming(repo, {
+        kind: 'check_start',
+        ...check,
+        ...(admission.kind === 'held' ? { wait_ms: admission.wait_ms } : {}),
+      });
+      const started: number = Date.now();
+      const result: Result = await spawnLogged(argv, cwd, env, log);
+      process.stdout.write(result.stdout);
+      process.stderr.write(result.stderr);
+      mkdirSync(target, { recursive: true });
+      const kept: string = resolve(
+        target,
+        `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`,
+      );
+      copyFileSync(log, kept);
+      appendTiming(repo, {
+        kind: 'check_end',
+        ...check,
+        exit: result.code,
+        duration_ms: Date.now() - started,
+        log: kept,
+      });
+      return result.code;
     });
-    return result.code;
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
   }

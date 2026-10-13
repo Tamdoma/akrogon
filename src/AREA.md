@@ -14,9 +14,9 @@
 - `src/preflight.ts` verifies the configured base remote branch and local tracking ref; `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
 - `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file; `src/readiness.ts` owns the readiness contract schema and gap computation.
 - `src/phase.ts` and `src/shell.ts` aggregate slot completion and enforce handoff guards; shell wraps subprocesses, retries, YAML writes and Herdr responses.
-- `src/timing.ts` defines the timing-event schema and appends to `issues/timings.jsonl`; `readTimings` and `visitOf` are exported for the timing readout.
-- `src/timing-report.ts` implements `akrogon timing`: per-visit time decomposition from `timings.jsonl` and `log.jsonl`, plus the 20-leaf cohort gate from `merge-attempts.jsonl`.
+- `src/timing.ts` defines the timing-event schema and appends to `issues/timings.jsonl`, exporting `readTimings` and `visitOf` for the timing readout; `src/timing-report.ts` implements `akrogon timing`: per-visit time decomposition from `timings.jsonl` and `log.jsonl`, plus the 20-leaf cohort gate from `merge-attempts.jsonl`.
 - `src/base-run.ts` checks out a base sha detached, logs the run into the leaf and records it in `issues/base-runs.jsonl`; `src/compare.ts` and `src/red-record.ts` validate comparison records and fold `issues/red-records.jsonl` into active entries.
+- `src/permit.ts` holds the host-wide run permit: a non-blocking `flock` on `run.lock` polled every 250 ms, the `run-holder.yaml` sidecar `liveHolder` validates by pid start time and boot id, and nested reuse through `AKROGON_RUN`.
 - `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass and writes the kept report `status` prints under the ignored `reconcile/` state dir.
 
 ## Non-obvious patterns
@@ -26,7 +26,6 @@
 - Phase moves reject a dirty worktree and branch changes under `issues/`; a stop into `failed` skips both, a `cause: blocked` restart skips only the dirty check, and the empty-branch refusal applies only at review handoff.
 - External command retries warn once, then preserve the last failure context.
 - Foreign leaves are summarized once per repo and excluded from capacity and dispatch; prompt delivery is one attempt per pass per seat, with a timeout settling against the seat session file on the next pass.
-- Init refuses a declared grounding index that is not a readable non-empty file without changing files.
 - `base-run` appends its record line before checkout, then rewrites `base-runs.jsonl` under the same lock with end, exit and removal time.
 - `phase` validates `--compare` records inside `transition`; red entries fold from `issues/red-records.jsonl`, updates re-read inside the global lock.
 - `akrogon config` composes a repo's `setup` key into every printed `checks`, `merge_checks` and `advisory` command as a `flock`ed `sh -c <setup> && sh -c <command>`.

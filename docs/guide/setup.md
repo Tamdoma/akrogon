@@ -67,7 +67,7 @@ Check these choices:
 
 Check commands must not read tracked files under `issues/` (except `issues/config.yaml`, the check list itself) or `learnings/` — a green batch run is reused when only those folders moved on the default branch.
 
-`setup` runs before every `checks`, `merge_checks` and `advisory` command that `akrogon config` prints. It runs under a per-worktree lock kept under the git dir, so the lock never shows in `git status` and is removed with the worktree. The setup skill proposes it only when a lockfile is committed. Every printed check command runs under `akrogon run-check`, which refuses forbidden caller environment (`NODE_PATH`, `BUN_OPTIONS`, `BUN_INSTALL_CACHE_DIR`, `FFMPEG_BIN`, `CHROME_PATH`, `CDP_BROWSER_BINARY`, a global bunfig) and runs the command in a constructed environment.
+`setup` runs before every `checks`, `merge_checks` and `advisory` command that `akrogon config` prints. It runs under a per-worktree lock kept under the git dir, so the lock never shows in `git status` and is removed with the worktree. The setup skill proposes it only when a lockfile is committed. Every printed check command runs under `akrogon run-check`, which refuses forbidden caller environment (`NODE_PATH`, `BUN_OPTIONS`, `BUN_INSTALL_CACHE_DIR`, `FFMPEG_BIN`, `CHROME_PATH`, `CDP_BROWSER_BINARY`, a global bunfig) and runs the command in a constructed environment. Only one check command runs at a time on the host: `run-check` holds a host-wide run permit while its command runs, and a second caller waits after printing `akrogon: waiting for run permit held by <repo>/<leaf> <check> pid <pid>` to stderr. A `run-check` started inside an admitted run (matching `AKROGON_RUN`) does not wait.
 
 Use the effective configuration to check the result:
 

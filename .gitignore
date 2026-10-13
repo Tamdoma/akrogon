@@ -4,6 +4,8 @@ node_modules/
 issues/seeds/
 .lock
 paused.yaml
+run.lock
+run-holder.yaml
 reconcile/
 .pi-command-logs/
 .env
