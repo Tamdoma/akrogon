@@ -227,3 +227,21 @@ test('status marks a stopped leaf on the board and in its leaf view', async () =
     f.clean();
   }
 });
+
+test('start runs the targeted pass for a leaf whose issue shares its name', async () => {
+  const f: StopFixture = await stopFixture();
+  try {
+    const path: string = leaf(f, 'build', 'plan.synthesis', {}, 'build');
+    expect((await run(f, ['next', 'issues/open/build/build'])).code).toBe(0);
+    idle(f, path);
+    expect((await run(f, ['stop', 'build'])).code).toBe(0);
+    idle(f, path);
+    const started: Result = await run(f, ['start', 'build']);
+    expect(started.stderr).not.toContain('Ambiguous');
+    expect(started.code).toBe(0);
+    expect(stoppedKeys(f)).toEqual([]);
+    expect(database(f).prompts.length).toBeGreaterThan(0);
+  } finally {
+    f.clean();
+  }
+});
