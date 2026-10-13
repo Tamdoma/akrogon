@@ -1,0 +1,43 @@
+{
+  "state": "inconsistent",
+  "attempt": "ebb22465-78ee-4702-b743-98dd35ae796f",
+  "leaf_revision": "3429266319d9dcd59624e8f8e95cd8c338b7ae55",
+  "cwd": "/home/ivan/.akrogon/worktrees/akrogon/memory-start-check",
+  "scope": "whole changed test set",
+  "material": "Configured setup and own-modules; unchanged code and base; host has concurrent framework checks. First terminal exit 1 after 207.92s: 871 pass, one next.test.ts timeout. One exact-command retry allowed.",
+  "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/memory-start-check/implementation/check-test_changed-1791922667206-3555966.log",
+  "run": {
+    "complete": true
+  },
+  "units": [
+    {
+      "runner": "bun test",
+      "file": "tests/next.test.ts",
+      "name": "named target equivalence: owner name matches folder path from root, subfolder and worktree",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/memory-start-check/implementation/check-test_changed-1791922667206-3555966.log"
+      },
+      "retry": {
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/memory-start-check/implementation/check-test_changed-1791922874805-686816.log",
+        "outcome": "pass"
+      },
+      "verdict": "unverified"
+    }
+  ],
+  "command": [
+    "akrogon",
+    "run-check",
+    "--name",
+    "test_changed",
+    "--",
+    "sh",
+    "-c",
+    "flock \"$(git rev-parse --git-path akrogon-install.lock)\" sh -c 'bun install --frozen-lockfile' && akrogon guard own-modules && sh -c ': \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\" --timeout=30000'"
+  ],
+  "retry": {
+    "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/memory-start-check/implementation/check-test_changed-1791922874805-686816.log",
+    "complete": true,
+    "outcome": "pass"
+  }
+}

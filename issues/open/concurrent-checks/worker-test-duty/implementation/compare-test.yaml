@@ -1,0 +1,23 @@
+check: test
+command: akrogon run-check --name 'test' -- sh -c 'flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c '"'"'bun install --frozen-lockfile'"'"' && akrogon guard own-modules && sh -c '"'"'bun test --timeout=30000'"'"''
+cwd: /home/ivan/.akrogon/worktrees/akrogon/worker-test-duty
+scope: whole suite
+material_conditions: no leaf diff (plan.synthesis, zero commits over base); several other leaf test runs active on host during run 1; retry ran with fewer concurrent loads
+leaf_revision: a7c9115 (worktree HEAD, == AKROGON_BASE)
+counterpart_revision: a7c9115 (same head; retry, not base-run)
+result: inconsistent — retry fully green, no base run per the retry rule
+first_run:
+  log: implementation/test-check-first-run.log
+  terminal: exit 1, 881 pass / 8 fail, 889 tests, 270.88s wall
+retry:
+  log: implementation/test-check-retry.log
+  terminal: exit 0, 889 pass / 0 fail, 889 tests, 162.09s wall
+units:
+  - {runner: bun test, file: tests/next.test.ts, name: "a stale prompt never re-prompts a busy or done seat, and repeated delivery failures keep the leaf in phase", first_run: "timed out after 20000ms", retry: pass, disposition: inconsistent}
+  - {runner: bun test, file: tests/next.test.ts, name: "busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes", first_run: "timed out after 30000ms", retry: pass, disposition: inconsistent}
+  - {runner: bun test, file: tests/next.test.ts, name: "merge, check.fix, check.repair and post-repair review dispatch to their swapped seats", first_run: "timed out after 15000ms", retry: pass, disposition: inconsistent}
+  - {runner: bun test, file: tests/next.test.ts, name: "next --resume re-prompts allocated idle leaves in every registered repo without allocating new work", first_run: "timed out after 15000ms", retry: pass, disposition: inconsistent}
+  - {runner: bun test, file: tests/worktree-store.test.ts, name: "the prompt delivery fault holder exit wakes the next merge leaf without a manual next", first_run: "timed out after 15000ms", retry: pass, disposition: inconsistent}
+  - {runner: bun test, file: tests/worktree-store.test.ts, name: "a leaf re-entering merge queues behind the two leaves stamped earlier", first_run: "timed out after 15000ms", retry: pass, disposition: inconsistent}
+  - {runner: bun test, file: tests/worktree-store.test.ts, name: "a merge seat consumes one delivery attempt per pass and retries instead of failing", first_run: "timed out after 15000ms", retry: pass, disposition: inconsistent}
+  - {runner: bun test, file: tests/worktree-store.test.ts, name: "an idle hook retries a faulted merge holder before its waiter", first_run: "timed out after 15000ms", retry: pass, disposition: inconsistent}

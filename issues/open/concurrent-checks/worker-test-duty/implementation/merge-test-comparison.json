@@ -1,0 +1,28 @@
+{
+  "attempt": "a6d39480-5dc0-48c6-b682-df12a04166e4",
+  "command": [
+    "akrogon",
+    "run-check",
+    "--name",
+    "test",
+    "--",
+    "sh",
+    "-c",
+    "flock \"$(git rev-parse --git-path akrogon-install.lock)\" sh -c 'bun install --frozen-lockfile' && akrogon guard own-modules && sh -c 'bun test --timeout=30000'"
+  ],
+  "cwd": "/home/ivan/.akrogon/worktrees/akrogon/worker-test-duty",
+  "scope": "whole suite",
+  "material": "Same host, command and whole-suite scope. Markdown-only stack; no code, tests or configuration changed. First run completed with one unchanged named-target timing test timeout.",
+  "leaf_revision": "d9ab2361dfc033f8b90b778686548832615a7dad",
+  "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/merge-test.log",
+  "run": {
+    "complete": true
+  },
+  "state": "inconsistent",
+  "retry": {
+    "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/merge-test-retry.log",
+    "complete": true,
+    "outcome": "pass"
+  },
+  "units": []
+}

@@ -1,0 +1,10 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [8.00ms]
+bun test v1.4.3 (c6da4a4d3)
+[0.01ms] ".env"
+--changed: 3 changed files, but no test files are affected
+
+ 0 pass
+ 0 fail
+Ran 0 tests across 0 files. [94.00ms]

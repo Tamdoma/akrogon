@@ -1,0 +1,7 @@
+# Keep or remove per-pane scopes + bus cut, slot A (written before reading B, C)
+Pick: keep both. Fix the one observed side effect (gh/git auth) in akrogon (04577a4, src/shell.ts credentialEnv).
+1. Slowdown causes found 2026-10-13 are independent of scopes: CPUQuota=1600% (removed, 51f9a67), single run permit (memory-start-check replaces), leaked page-measure browsers (page-measure.mjs:309/:392 leak on any runner kill, scope or not), pi spinner redraw (~0.4-0.9 core per working seat).
+2. Scopes are what place seats in akrogon.slice (next.ts:508-527 adoptShell, scope.ts:53-95). Without them: MemoryHigh/Max and CPUWeight=20 stop applying to seat work; `akrogon stop` (stop.ts:52 stops the leaf slice) reaches nothing; memory-start-check's anon+shmem admission reads an almost empty slice; run-units and stop-run (run-units/brief.md:4) lose the leaf slice and launching pane scope.
+3. Bus cut (next.ts:482) keeps Chrome from moving itself out of the scope via D-Bus (host-test-load forks/seat-scope.md:15-16, proof T7). Removing it reopens invisible, unkillable browsers.
+4. Only observed cost: keyring-backed gh token unreachable -> merge pushes failed since ~13:00. Fixed for akrogon's own git/gh calls (04577a4, test passes, deliberate break fails, real gh auth status + git ls-remote under the cut both 0). Operator's other session also changed ~/.gitconfig credential helper (redundant after 04577a4).
+Weakest point: I have no before/after measurement showing the scopes cost nothing in speed; the claim rests on the causes found, not a controlled comparison.

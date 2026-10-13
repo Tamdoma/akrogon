@@ -1,0 +1,17 @@
+check: test
+command: akrogon run-check --name 'test' -- sh -c 'flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c '"'"'bun install --frozen-lockfile'"'"' && akrogon guard own-modules && sh -c '"'"'bun test --timeout=30000'"'"''
+cwd: /home/ivan/.akrogon/worktrees/akrogon/worker-test-duty
+scope: whole suite
+material_conditions: leaf diff is docs-only (4 markdown files, no src/tests code); several other leaf test runs active on host during run 1; retry ran under lighter load
+leaf_revision: 419f930 (committed leaf head)
+counterpart_revision: 419f930 (same head; retry, not base-run)
+result: inconsistent — retry fully green, no base run per the retry rule
+first_run:
+  log: implementation/test-check-head-first-run.log
+  terminal: exit 1, 854 pass / 35 fail, 889 tests, 454.37s wall
+retry:
+  log: implementation/test-check-head-retry.log
+  terminal: exit 0, 889 pass / 0 fail, 889 tests, 206.65s wall
+units:
+  note: all 35 first-run failures are bun-test timeouts in tests/next.test.ts and tests/worktree-store.test.ts (herdr/dispatch timing tests); no assertion failures; every unit passed on retry
+  disposition: inconsistent for all 35 units

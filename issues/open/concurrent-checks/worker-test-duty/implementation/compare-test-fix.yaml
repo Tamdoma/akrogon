@@ -1,0 +1,2067 @@
+state: compared
+command:
+- akrogon
+- run-check
+- --name
+- test
+- --
+- sh
+- -c
+- flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c 'bun install --frozen-lockfile' && akrogon guard own-modules && sh -c 'bun test --timeout=30000'
+cwd: /home/ivan/.akrogon/worktrees/akrogon/worker-test-duty
+scope: whole suite
+material: leaf diff is markdown-only (skills docs) with no plausible cause; host load average ~130-175 from a concurrent leaf check fleet during all three runs; all failing units are bun-test timeouts
+leaf_revision: d9ab2361dfc033f8b90b778686548832615a7dad
+counterpart_revision: a7c911522773d29d7d2be5b30cce6788268aea50
+log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+run:
+  complete: true
+retry:
+  log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  complete: true
+  outcome: fail
+base:
+  log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  complete: true
+units:
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a blocked non-merge seat does not stall a merge leaf
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a closed tab hook from a merged leaf starts the dependent
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a committed merge whose log append fails still wakes the next leaf
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a conflicted member is excluded from the attempt and eligible for the next batch
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a dirty holder worktree drops the batch to solo and restores carried members
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a dirty member worktree is dropped from the apply unmarked and keeps its uncommitted files
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a dispatched .env file preserves spaced assignments, multiline values and nested assignment text
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a dispatched .env file round-trips mixed quotes, backticks and escape-looking text
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a dispatched .env file round-trips quotes and backslashes through dotenv parsing
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a dispatched worktree gets a real .env file with the declared subset
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a failed holder keeps carried members, and the move-back clears the record and member tabs
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a failed holder with a landed candidate is told to move back, then reconciles without run or push
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a failed leaf does not reserve capacity in the unreadable branch
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a failed leaf with a blocked pane is not seat-observed
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a failed leaf with its tab still open does not count toward max_active
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a failed removal stops the merge prompt
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a fetch failure keeps the record, restores nothing and reports the error
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a green batch clears the record and closes member tabs once the holder lands
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a landed batch moves member and holder once, closes member tabs with the record, and wakes dependents
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a leaf entering merge after the record was written is excluded and becomes the next holder
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a leaf leaving merge and returning joins the next holder batch
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a leaf re-entering merge queues behind the two leaves stamped earlier
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a leaf tab survives the seat-A exited hook
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a leaf tab survives the seat-A idle hook
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a leaf tab survives the seat-B blocked hook
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a leaf tab survives the seat-B unknown hook
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a leaf tab survives the unmerged idle hook
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a live merge retains its completion call after pushing, including a peer retry
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a live tab freezes .env while a dead tab lets the next dispatch rewrite it
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a member conflict excludes it from the attempt, rewrites the record without it and leaves its branch untouched
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a merge seat consumes one delivery attempt per pass and retries instead of failing
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a merged leaf whose closure failed during phase merged closes its tab on the seat-B idle hook after moving
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a merged leaf whose tab is already gone makes no tab close call and a driven tab_closed hook stays quiet
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a merged leaf with its tab still open does not count toward max_active
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a non-retryable prompt code records the error without failing, the leaf retries, and siblings still dispatch
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a pre-linked worktree has its .env symlink replaced by a real file on dispatch
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a record appended after a timeout is recognized by the next pass without resending
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a red-batch member carries a later waiter when it next holds the turn
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a retryable agent start failure charges once without prompting, then recovers
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a saved holder failure wakes the stamped queue when the log is a directory
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a seat-B idle hook closes the merged leaf tab while the worktree and branch stay
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a second run-check waits for the holder to exit, names the holder once and records its wait
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a session replacement after a timeout resends the prompt instead of settling from the old offset
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a stale prompt never re-prompts a busy or done seat, and repeated delivery failures keep the leaf in phase
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a successful prompt between failures resets attempts
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a successful prompt clears delivery_error and resets attempts
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: a worktree parked mid-rebase is still dispatched
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: agent names support identical repo-local slugs and long numeric-leading slugs
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: allocation carries TMPDIR corrects permissive owned dirs to 0700
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: allocation creates missing leaf temp ancestors and recreates deleted intermediate parents
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: 'allocation paths unchanged: bootstrap and B-only keep A left with no swap or focus'
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: 'allocation paths unchanged: extra panes keep position while missing A still repairs'
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: 'allocation paths unchanged: present and reversed seats keep IDs and positions'
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: an idle hook retries a faulted merge holder before its waiter
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: an ineligible merge leaf never holds the turn (blocked-by)
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: an input held by an unregistered absolute directory checks that directory .env
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: an interrupted build restores drifted members and rebuilds under a new attempt
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: bad YAML and invalid states reserve occupancy at capacity 3
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: bad YAML and invalid states reserve occupancy at capacity 4
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: bare next from inside the repo cleans up its merged leaves
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: batch_limit and a holder split limit cap carried members
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: blocked-report automatic silence on hook, resume, and merge wake
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: blocked-report manual forms bare, all inside, all outside match
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: blocked-report manual forms stay manual with pane and event set
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: blocked-report no line for busy seats
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: blocked-report no line for merge turn waits
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: blocked-report real errors still report on automatic paths
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: budget keeps the last status herdr returned
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: cleanup retains a closed carried worktree while publication recovery is blocked
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: closed owner name does not block an open same-name owner
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: closed tab scratch deletes merged folder and prunes inner worktree
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: closed tab scratch sweeps a failed leaf, keeps its branch
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: completing a leaf via pane_hook starts only same-repo dependents
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: completing a leaf via tab_closed starts only same-repo dependents
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: completing a leaf via targeted starts only same-repo dependents
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: debate leaf without positions files refuses dispatch until positions exist
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: delayed working and idle notifications from the prompted session never consume retries
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: dirty merged worktree is kept while its tab lives, then removed once clean
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: dispatch recreates a deleted .env file in a reused worktree once its tab is gone
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: dispatch recreates missing scratch with same tab and seats
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: empty untracked folders are removed before a solo merge prompt
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: empty untracked folders are removed before an applied merge prompt
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: exited hooks resolve persisted pane hints and preserve the surviving slot
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: fixture temp root isolates every TMPDIR and envs carry override
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: foreign leaves do not consume capacity while healthy leaves in both repos dispatch
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: fresh allocation carries TMPDIR on create and B split with 0700 scratch
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: late holder dirt during initial apply is isolated and survives cleanup
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: late member dirt during initial apply is isolated and survives cleanup
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: leaf slug selection keeps open and closed behavior
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: malformed prompt error JSON records a delivery error with exit code
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: merge leaf with landed branch re-prompts its idle seat instead of auto-recovering
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: merge, check.fix, check.repair and post-repair review dispatch to their swapped seats
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: merged foreign leaves survive cleanup with worktree branch and tab intact
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: merged leaf cleanup removes the worktree and leaves the registered .env untouched
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: merged leaves do not reserve capacity for other waiting leaves
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: merged phase closes tab on typed next and starts the dependent
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: missing registration is isolated during cwd
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: missing registration is isolated during hook
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: missing registration is isolated during startup
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: 'named target equivalence: owner name matches folder path from root, subfolder and worktree'
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: new tab empties stale scratch, live tab keeps it, and seats disable the node compile cache
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next --all leaves a gapped leaf undispatched while its ungapped sibling dispatches
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next --all, --resume and manual next record the registered or selected repos before dispatch
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next --resume completes and cleans a merged leaf and starts its dependent
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next --resume re-prompts allocated idle leaves in every registered repo without allocating new work
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next awaits sourced completion after a failed rename before removing the worktree
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next creates one worktree/tab under concurrent hooks, prompts configured A, ignores working events and resolves hook cwd
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next does not re-prompt a slot whose prompted session is still alive, and re-prompts a new session
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next inherits non-overridden seat from global slots
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next prefers ISSUE.md seats over EPIC.md and applies a standalone issue block
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next re-prompts an idle seat whose prompt is older than the grace period and the phase never moved
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next recovers only merge-phase work by ancestry against a non-default remote target
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next refuses a leaf whose declared file input is absent or empty
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next refuses an env-gapped leaf in every missing .env state and dispatches when set
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next refuses to write .env not ignored in the registered checkout, keeps the worktree, and reuses it after the ignore rule returns
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next refuses unmerged dependencies, respects capacity, and waits on unknown panes
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next resolves seats from EPIC.md front matter and falls back per seat
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next resumes interrupted tab creation, then retries every failing pass without failing
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next uses repo seat overrides for both seats with spaced model as one argv element
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: next waits on a blocked agent instead of counting attempts or flipping seats
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: non-JSON prompt stderr records a delivery error with exit code and trimmed message
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: only the earlier-stamped merge leaf is prompted while the waiting leaf keeps its tab and panes
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: owners resolve without ISSUE.md or EPIC.md
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: 'race: pause waits for landed-batch dependent dispatch, later automatic work is suppressed'
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: retryable agent start failures keep the leaf in phase until a start succeeds
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: spaced repo root dispatches leaf= with the complete spaced authoritative folder
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: startup retains a merged leaf's worktree and branch while closing its tab as an epic sibling stays unfinished (--all)
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: startup retains a merged leaf's worktree and branch while closing its tab as an epic sibling stays unfinished (--resume)
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: startup retries closure before cleanup and retains failed owners with their worktree and branch while the tab closes
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: stopping the holder of an applied batch builds no second batch and prompts no merge seat
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: sweep scratch catch-up deletes open and closed folders with no live panes
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: sweep scratch catch-up keeps sentinel with live panes then deletes on later sweep
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: the default batch_limit caps carried members at three
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: the holder gets a batch record, members are applied, and only the holder is prompted
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: the merge path builds no stack and starts no merge seat for a stopped leaf
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: the operator merged holder exit wakes the next merge leaf without a manual next
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: the prompt delivery fault holder exit wakes the next merge leaf without a manual next
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: the seat check.fix holder exit wakes the next merge leaf without a manual next
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: the seat failed holder exit wakes the next merge leaf without a manual next
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: the seat merged holder exit wakes the next merge leaf without a manual next
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: three consecutive prompt failures keep the leaf in phase, record each error, and retry on the next pass
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: timeout settlement ignores a trailing partial line but keeps earlier records
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: timeout settlement ignores prompt text inside assistant and tool records
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: timeout settlement ignores the same text before the offset
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: timeout settlement records delivery when exact user text lands after the offset
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: timeout settlement resolves id-kind references under HOME
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: timeout with a missing session file records a plain error without offset
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: timeout with an unresolvable id records a plain error without offset
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: typed next from a leaf pane sweeps and removes merged worktrees
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: uncommitted work in a merge worktree is left to the merge seat
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: unknown panes wait, warn after an hour and keep busy observations
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: unreadable ignored folders do not stop empty-folder cleanup before merge
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: unreadable leaves reserve capacity while foreign leaves summarize separately
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: unreadable state reserves its capacity and reports its path
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: unstamped merge dispatch uses log order and refuses unreadable history
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
+- runner: bun test
+  file: tests/worktree-store.test.ts
+  name: watch-issues scripts test and typecheck pass
+  leaf:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-first-run.log
+  retry:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/test-check-fix-retry.log
+  base:
+    outcome: fail
+    log: /home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/worker-test-duty/implementation/base-b2249ebc-7744-4506-972d-b247c99a95b8.log
+  verdict: known-red
