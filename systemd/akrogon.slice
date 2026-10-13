@@ -1,0 +1,10 @@
+[Unit]
+Description=Akrogon leaves, seats and test runs
+Before=slices.target
+
+[Slice]
+CPUWeight=20
+CPUQuota=1600%
+MemoryHigh=64G
+MemoryMax=96G
+MemorySwapMax=0

@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { ensureLeafTemp, leafTemp, toolRoot, worktreeStore, type Repo } from './config';
 import { applySkillLinks, planSkillLinks, type Link } from './install';
 import { eligibleRecord, integrate } from './sync';
-import { command, run, CommandError, type Result } from './shell';
+import { command, run, spawnCaptured, CommandError, type Result } from './shell';
 import { withLock } from './state';
 
 function errorLine(result: Result): string {
@@ -192,8 +192,13 @@ async function installStage(root: string, ownRoot: string, home: string): Promis
     const planned: { links: Link[]; conflicts: Link[] } = planSkillLinks(home, ownRoot);
     const blocked: Set<string> = new Set(planned.conflicts.map((link: Link) => link.destination));
     applySkillLinks(planned.links.filter((link: Link) => !blocked.has(link.destination)));
+    const reloaded: Result = await spawnCaptured(['systemctl', '--user', 'daemon-reload'], {
+      cwd: root,
+      env: process.env,
+    });
     if (planned.conflicts.length > 0)
       return `links failed: ${planned.conflicts.map((link: Link) => link.destination).join(', ')}; remove the conflicting paths`;
+    if (reloaded.code !== 0) return `reload failed: ${errorLine(reloaded)}`;
   } catch (error) {
     return `links failed: ${describeError(error)}`;
   }

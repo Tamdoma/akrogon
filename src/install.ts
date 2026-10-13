@@ -13,6 +13,10 @@ export function planSkillLinks(home: string, sourceRoot: string): { links: Link[
     .map((entry) => entry.name);
   const links: Link[] = [
     { source: resolve(sourceRoot, 'src/akrogon.ts'), destination: resolve(home, '.local/bin/akrogon') },
+    {
+      source: resolve(sourceRoot, 'systemd/akrogon.slice'),
+      destination: resolve(home, '.config/systemd/user/akrogon.slice'),
+    },
     ...roots.flatMap((root) =>
       skills.map((skill) => ({
         source: resolve(sourceRoot, 'skills', skill),
@@ -57,6 +61,7 @@ export async function install(): Promise<void> {
     throw new Error('Install destinations conflict. Remove the listed paths before installing.');
   }
   applySkillLinks(links);
+  await command(['systemctl', '--user', 'daemon-reload']);
   for (const kind of Object.keys(global.harnesses)) await command(['herdr', 'integration', 'install', kind]);
   await command(['herdr', 'plugin', 'link', resolve(toolRoot, 'plugin')]);
 }
