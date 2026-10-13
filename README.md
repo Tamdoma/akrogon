@@ -138,6 +138,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon pull [--all]` | Import open GitHub issues as seeds. With --all, pull every registered repository from any directory. |
 | `akrogon close <owner/repo#n> --by <text>` | Close one unowned GitHub issue with a delivered-by note. |
 | `akrogon status [<slug>\|--charts]` | Show the board, leaf history or chart store. |
+| `akrogon timing [<slug>\|--cohort --since <iso>]` | Report per-visit time from the timing record, or evaluate the 20-leaf cohort gate since a marker. |
 | `akrogon sync` | Commit eligible issue records, rebase and push. |
 | `akrogon park <issue>... \| --all` | Set aside whole eligible issues. |
 | `akrogon unpark <issue>... \| --all` | Restore whole issues to the open queue. |

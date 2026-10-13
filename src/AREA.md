@@ -15,6 +15,7 @@
 - `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file; `src/readiness.ts` owns the readiness contract schema and gap computation.
 - `src/phase.ts` and `src/shell.ts` aggregate slot completion and enforce handoff guards; shell wraps subprocesses, retries, YAML writes and Herdr responses.
 - `src/timing.ts` defines the timing-event schema and appends to `issues/timings.jsonl`; `readTimings` and `visitOf` are exported for the timing readout.
+- `src/timing-report.ts` implements `akrogon timing`: per-visit time decomposition from `timings.jsonl` and `log.jsonl`, plus the 20-leaf cohort gate from `merge-attempts.jsonl`.
 - `src/base-run.ts` checks out a base sha detached, logs the run into the leaf and records it in `issues/base-runs.jsonl`; `src/compare.ts` and `src/red-record.ts` validate comparison records and fold `issues/red-records.jsonl` into active entries.
 - `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass and writes the kept report `status` prints under the ignored `reconcile/` state dir.
 

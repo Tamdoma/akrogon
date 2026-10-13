@@ -87,6 +87,12 @@ Each line names its event kind:
 - `wait` is `akrogon next` or `akrogon park` opening or closing a wait.
 - `repo_pause` is `akrogon pause` or `akrogon unpause` toggling the repo.
 
+## akrogon timing: read where each leaf's time went
+
+`akrogon timing <slug>` reads `timings.jsonl` and `log.jsonl` and prints one line per closed phase visit. Each visit's elapsed time splits into waiting by reason (`repo_pause`, `parked`, `prerequisite`, `merge_turn`), prompted time (first delivered prompt to phase exit), and unattributed `wait none`; the components sum to the elapsed time. Paired `check_start`/`check_end` runs print inside prompted time. A closed visit missing an expected record, such as a delivered prompt, a paired review's `seat_done`, or a check's end, prints an `incomplete` line naming it.
+
+`akrogon timing --cohort --since <iso>` evaluates the leaves-as-chunks gate over the records: the first 20 leaves whose first delivered plan prompt follows the marker, excluding any whose first implement exit exceeds 600 changed lines, and prints `pass`, `fail` or `insufficient` with one line per member. The gate bounds live in `src/timing-report.ts` with the decision they encode. The command is read-only; it never mutates records or takes action on the result.
+
 ## sync: save lifecycle records separately from code
 
 You can edit briefs and inspect reviews in the main checkout while agents change code in worktrees. Sync publishes the eligible lifecycle records without treating every local edit as issue data.

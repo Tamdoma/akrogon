@@ -20,6 +20,7 @@
 
 - `tests/merge-attempts.test.ts` checks `issues/merge-attempts.jsonl` lines per ending, including a legacy `held` line that still parses.
 - `tests/timing.test.ts` checks the timing record end to end through real `next`/`phase`/`run-check` calls, worker and base scopes, wait dedup and the unwritable-file negative case.
+- `tests/timing-report.test.ts` checks `akrogon timing` against fixture records: visit decomposition, expected-event flags and cohort verdicts.
 - `tests/merge-compare.test.ts` checks the merge `--compare` binding, red-entry notices and resolve on landing.
 - `tests/pause-status.test.ts` checks pause marks on the board, targeted status and chart headings.
 - `tests/hold-retired.test.ts` checks the retired merge verbs and flags refuse, a legacy hold record stays inert, and the docs carry no retired surface.

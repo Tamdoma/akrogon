@@ -39,7 +39,9 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
                 ? { base: { type: 'string' }, attempt: { type: 'string' }, cwd: { type: 'string' } }
                 : verb === 'status'
                   ? { charts: { type: 'boolean' } }
-                  : {};
+                  : verb === 'timing'
+                    ? { cohort: { type: 'boolean' }, since: { type: 'string' } }
+                    : {};
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(3),
@@ -141,6 +143,19 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./install')).install();
     break;
+  case 'timing': {
+    if (values.cohort === true && (values.since === undefined || positionals.length !== 0))
+      throw new Error('Usage: akrogon timing --cohort --since <iso>');
+    if (values.cohort !== true && (values.since !== undefined || positionals.length !== 1))
+      throw new Error('Usage: akrogon timing <slug>');
+    await (
+      await import('./timing-report')
+    ).timingCommand(
+      process.cwd(),
+      values.cohort === true ? { since: z.iso.datetime().parse(values.since) } : { slug: positionals[0] },
+    );
+    break;
+  }
   case 'run-check': {
     const optional: z.ZodOptional<z.ZodString> = z.string().optional();
     process.exitCode = await (
@@ -169,6 +184,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|sync|status|run-check|base-run|guard>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|sync|status|timing|run-check|base-run|guard>',
     );
 }
