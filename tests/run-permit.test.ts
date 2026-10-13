@@ -27,21 +27,22 @@ type Cap = { proc: Proc; text: () => Promise<string> };
 type Event = { kind: string; name?: string; wait_ms?: number };
 
 function run(f: Fixture, args: string[], cwd: string, env: NodeJS.ProcessEnv = {}): Cap {
+  const spawnEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    AKROGON_HOME: f.home,
+    HERDR_PANE_ID: '',
+    HOME: f.home,
+    AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+    AKROGON_CGROUP_ROOT: cgroupRoot(f),
+    ...env,
+  };
+  if (env.AKROGON_SPACING_MS === undefined) delete spawnEnv.AKROGON_SPACING_MS;
   const proc: Proc = Bun.spawn([process.execPath, entry, ...args], {
     cwd,
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
-    env: {
-      ...process.env,
-      AKROGON_HOME: f.home,
-      HERDR_PANE_ID: '',
-      HOME: f.home,
-      AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
-      AKROGON_CGROUP_ROOT: cgroupRoot(f),
-      AKROGON_SPACING_MS: '30000',
-      ...env,
-    },
+    env: spawnEnv,
   });
   const chunks: Buffer[] = [];
   void (async () => {
@@ -163,7 +164,7 @@ test('a run at or over the threshold waits printing reading and reason, and a co
   try {
     const dir: string = marks(f);
     const worktree: string = await leafWorktree(f, 'hot');
-    seedStat(f, HIGH);
+    seedStat(f, 40 * GIB, 9 * GIB);
     const w1: Cap = run(f, ['run-check', '--name', 'w1', '--', ...hold(dir, 'w1')], worktree);
     const w2: Cap = run(f, ['run-check', '--name', 'w2', '--', ...hold(dir, 'w2')], worktree);
     caps.push(w1, w2);
