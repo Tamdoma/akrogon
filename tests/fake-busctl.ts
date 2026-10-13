@@ -33,7 +33,7 @@ let i: number = 0;
 for (let n: number = 0; n < Number(count); n += 1) {
   const name: string = rest[i];
   const signature: string = rest[i + 1];
-  const width: number = signature === 'au' ? 2 + Number(rest[i + 2]) : 1;
+  const width: number = signature === 'au' ? 1 + Number(rest[i + 2]) : 1;
   properties.set(name, [signature, ...rest.slice(i + 2, i + 2 + width)]);
   i += 2 + width;
 }
