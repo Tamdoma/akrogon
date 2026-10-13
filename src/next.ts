@@ -478,8 +478,6 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     `TMPDIR=${scratch}`,
     '--env',
     'NODE_DISABLE_COMPILE_CACHE=1',
-    '--env',
-    'DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent',
     '--no-focus',
   ];
   const target: string[] = ['--workspace', workspace.workspace_id];

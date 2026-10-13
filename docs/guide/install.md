@@ -10,7 +10,7 @@ You need:
 - Herdr.
 - The harness CLIs named in your machine configuration.
 - The flock command for locking.
-- An authenticated GitHub CLI for GitHub intake and issue closure. Seats run with the session bus cut, so gh must store its token in its own file (`gh auth login -h github.com -p https -w --insecure-storage`), not the keyring.
+- An authenticated GitHub CLI for GitHub intake and issue closure.
 - A systemd user manager (`systemctl --user`).
 
 Check that the commands are available:

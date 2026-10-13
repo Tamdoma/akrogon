@@ -9,8 +9,6 @@ import type { Database } from './fake-herdr';
 import type { BusctlCall } from './fake-busctl';
 import { OUTSIDE_CGROUP, expectedScope, expectedSlice, procDir, shellPid } from './fake-proc';
 
-const BUS_CUT: string = 'DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent';
-
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 async function dispatchFixture(): Promise<DispatchFixture> {
   const f: Fixture = await fixture();
@@ -86,7 +84,7 @@ test('next boxes every pane shell in its own scope under the leaf slice before t
   }
 }, 20000);
 
-test('new leaf pane shells get the session bus cut', async () => {
+test('new leaf pane shells keep the session bus; only check runs cut it', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     leaf(f, 'build', 'plan.synthesis');
@@ -95,7 +93,7 @@ test('new leaf pane shells get the session bus cut', async () => {
       (args) => (args[0] === 'tab' && args[1] === 'create') || (args[0] === 'pane' && args[1] === 'split'),
     );
     expect(created.length).toBeGreaterThanOrEqual(2);
-    for (const args of created) expect(args.some((arg, i) => arg === '--env' && args[i + 1] === BUS_CUT)).toBe(true);
+    for (const args of created) expect(args.some((arg) => arg.startsWith('DBUS_SESSION_BUS_ADDRESS='))).toBe(false);
   } finally {
     f.clean();
   }
