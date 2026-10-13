@@ -77,12 +77,12 @@ export async function stopCommand(target: string | undefined, all: boolean, cwd:
 
 export async function startCommand(slug: string, cwd: string): Promise<void> {
   const repo: Repo = await requireRepo(readGlobal(), cwd);
-  findLeaf(repo, slug);
+  const leaf: Leaf = findLeaf(repo, slug);
   const key: string = `${repo.name}/${slug}`;
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const current: Set<string> = readStopped();
     if (!current.delete(key)) throw new Error(`Leaf is not stopped: ${key}`);
     writeStopped(current);
   });
-  await (await import('./next')).nextCommand(slug);
+  await (await import('./next')).nextCommand(leaf.path);
 }
