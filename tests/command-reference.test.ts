@@ -22,6 +22,8 @@ const contracts: Record<string, string> = {
   unpark: '<issue>... | --all',
   pause: '',
   unpause: '',
+  stop: '<slug> | --all',
+  start: '<slug>',
   status: '[<slug>|--charts]',
   timing: '[<slug>|--cohort --since <iso>]',
   'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
@@ -80,6 +82,13 @@ function reference(invocations: Record<string, string> = contracts): string {
 
 test('README covers every dispatched command and its argument contract', () => {
   checkReference(readme, source);
+});
+
+test('the next guide describes stop and start', () => {
+  const guide: string = readFileSync(resolve(import.meta.dir, '../docs/guide/next.md'), 'utf8');
+  expect(guide).toContain('akrogon stop <slug>');
+  expect(guide).toContain('akrogon stop --all');
+  expect(guide).toContain('akrogon start <slug>');
 });
 
 test('coverage rejects missing, extra and duplicate rows and newly dispatched verbs', () => {
