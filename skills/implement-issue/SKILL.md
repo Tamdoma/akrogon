@@ -87,7 +87,7 @@ Do required work for Fixes only; Nits get no separate work or test and may only 
 
 ## Standalone
 
-Use the prompt as the task, plan briefly in `implementation/brief.md`, derive changed-test commands from the checkout, delegate through the same template/protocol, check the report and changed-test evidence, and repair yourself before returning. Standalone has no leaf state or phase guard, so its only test rule is order: tests from the brief first, committed, then code.
+Use the prompt as the task, plan briefly in `implementation/brief.md`, derive the brief's targeted test commands from the checkout, delegate through the same template/protocol, check the report and targeted-test evidence, and repair yourself before returning. Standalone has no leaf state or phase guard, so its only test rule is order: tests from the brief first, committed, then code.
 
 Except for the direct form, standalone has no config or leaf reads, lifecycle state/log writes, phase call or checker; its template and protocol are entirely skill-local, and its footer reports completion or the concrete unresolved task limitation. Standalone takes the prompt and the checkout as its full input and sends no questions back.
 
