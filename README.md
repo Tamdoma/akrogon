@@ -129,7 +129,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 ```text
 | Invocation | Effect |
 | --- | --- |
-| `akrogon install` | Link the command, skills and Herdr integration. |
+| `akrogon install` | Link the command, skills, Herdr integration and `akrogon.slice`, then reload the systemd user manager. |
 | `akrogon init [--from <proposal.yaml>] [--toolkit <lang>=<runner>]` | Initialize or update repository setup. |
 | `akrogon config` | Print effective configuration. |
 | `akrogon preflight` | Verify the configured base remote branch and local tracking ref. |

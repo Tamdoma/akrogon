@@ -10,7 +10,8 @@ You need:
 - Herdr.
 - The harness CLIs named in your machine configuration.
 - The flock command for locking.
-- An authenticated GitHub CLI for GitHub intake and issue closure.
+- An authenticated GitHub CLI for GitHub intake and issue closure. Seats run with the session bus cut, so gh must store its token in its own file (`gh auth login -h github.com -p https -w --insecure-storage`), not the keyring.
+- A systemd user manager (`systemctl --user`).
 
 Check that the commands are available:
 
@@ -31,9 +32,11 @@ bun install
 bun src/akrogon.ts install
 ```
 
-Installation links the command, skills and Herdr plugin. It also installs the configured harness integrations. If a destination conflicts with an existing file, installation stops and prints removal commands for you to review.
+Installation links the command, skills and Herdr plugin, links `systemd/akrogon.slice` to `~/.config/systemd/user/akrogon.slice` and runs `systemctl --user daemon-reload`. The slice caps everything akrogon runs: CPUWeight=20, a 1600% CPU quota, MemoryHigh=64G, MemoryMax=96G and no swap. It also installs the configured harness integrations. If a destination conflicts with an existing file, installation stops and prints removal commands for you to review.
 
-The links point back to this checkout, so this checkout is the program you run. Landed work deploys itself: after a merge lands, and on `akrogon next`, `next --all` and `next --resume` runs, one step updates every registered checkout the run covers. It fetches the default branch and, when every commit not yet on the remote touches only issue records, replays those commits onto the fetched tip in a temporary worktree and pushes them, then moves the checkout with `git reset --keep`, which keeps uncommitted edits. Nothing is staged and nothing is stashed. On the Akrogon checkout it also runs `bun install --frozen-lockfile` and reconciles the skill links.
+The links point back to this checkout, so this checkout is the program you run. Landed work deploys itself: after a merge lands, and on `akrogon next`, `next --all` and `next --resume` runs, one step updates every registered checkout the run covers. It fetches the default branch and, when every commit not yet on the remote touches only issue records, replays those commits onto the fetched tip in a temporary worktree and pushes them, then moves the checkout with `git reset --keep`, which keeps uncommitted edits. Nothing is staged and nothing is stashed. On the Akrogon checkout it also runs `bun install --frozen-lockfile` and reconciles the skill links and the slice link, then reloads the systemd user manager.
+
+When this containment first ships, close every running leaf tab once. The next `akrogon next` recreates them boxed.
 
 The step prints one line per checkout: `deployed <old>..<new>` when the checkout moved, `pushed <n> record commit(s)` when replayed commits went to the remote, `checkout pending` with the dirty path when an incoming change touches an uncommitted edit, `record conflict: <paths>; run akrogon sync` when a record changed on both sides, `current <sha>` when already up to date, or the failing step, the git or bun error, the lag count and the remedy. `checkout pending` keeps the local commits and the edit; finishing the edit lets the next trigger move. A refused or failed step retries at the next trigger; nothing else changes.
 

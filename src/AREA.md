@@ -3,8 +3,7 @@
 ## Commands
 
 - `bun src/akrogon.ts close <owner/repo#n> --by <text>` closes one unowned GitHub issue; `bun src/akrogon.ts config` prints effective settings and the worktree base.
-- `bun src/akrogon.ts run-check -- <argv>...` runs a command under the constructed check environment.
-- `bun src/akrogon.ts base-run --base <sha> -- <argv>...` runs a command on a detached base checkout in the worktree store.
+- `bun src/akrogon.ts run-check -- <argv>...` runs a command under the constructed check environment, and `base-run --base <sha> -- <argv>...` runs one on a detached base checkout in the worktree store. Both cut the session bus (`DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent`).
 - `bun src/akrogon.ts guard <ancestors|own-modules>` refuses a checkout under foreign `node_modules`/`package.json` or a worktree missing its own `node_modules`; composed check commands run `own-modules` while `ancestors` runs at worktree creation through `checkLocation`.
 - `bun run typecheck` checks the TypeScript command and tests; `bun test tests/phase.test.ts` exercises lifecycle transitions and guards.
 
@@ -14,9 +13,10 @@
 - `src/preflight.ts` verifies the configured base remote branch and local tracking ref; `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
 - `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file; `src/readiness.ts` owns the readiness contract schema and gap computation.
 - `src/phase.ts` and `src/shell.ts` aggregate slot completion and enforce handoff guards; shell wraps subprocesses, retries, YAML writes and Herdr responses.
-- `src/timing.ts` defines the timing-event schema and appends to `issues/timings.jsonl`, exporting `readTimings` and `visitOf` for the timing readout; `src/timing-report.ts` implements `akrogon timing`: per-visit time decomposition from `timings.jsonl` and `log.jsonl`, plus the 20-leaf cohort gate from `merge-attempts.jsonl`.
+- `src/timing.ts` defines the timing-event schema and appends to `issues/timings.jsonl` (`readTimings` and `visitOf` feed the readout); `src/timing-report.ts` implements `akrogon timing`: per-visit time decomposition from `timings.jsonl` and `log.jsonl`, plus the 20-leaf cohort gate from `merge-attempts.jsonl`.
 - `src/base-run.ts` checks out a base sha detached, logs the run into the leaf and records it in `issues/base-runs.jsonl`; `src/compare.ts` and `src/red-record.ts` validate comparison records and fold `issues/red-records.jsonl` into active entries.
 - `src/permit.ts` holds the host-wide run permit: a non-blocking `flock` on `run.lock` polled every 250 ms, the `run-holder.yaml` sidecar `liveHolder` validates by pid start time and boot id, and nested reuse through `AKROGON_RUN`.
+- `src/scope.ts` names the per-leaf slice (`leafSlice`, used by leaf-stop) and pane scopes, moves a pane shell into its scope with busctl `StartTransientUnit`, and checks it read-only through `AKROGON_PROC_ROOT` (default `/proc`); `allocate` in `src/next.ts` closes a recorded pane outside its scope and boxes every pane before the seat starts.
 - `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass and writes the kept report `status` prints under the ignored `reconcile/` state dir.
 
 ## Non-obvious patterns

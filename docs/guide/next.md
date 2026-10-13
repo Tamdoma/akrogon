@@ -126,6 +126,8 @@ The global max_active setting limits new leaf allocations across repositories. E
 
 Leaves in `merge` take their repository's single merge turn: the merge pass writes a batch record on the holder, builds the stacked branches outside the global lock, applies them under the lock, and prompts only the holder's B while the rest wait. Every committed `phase` move and the end of each pass re-sweep `merge` leaves, so the next holder is prompted as soon as the turn frees.
 
+Each leaf pane shell runs in its own systemd scope under a per-leaf slice under `akrogon.slice`, with the session bus cut, before a seat starts in it. A recorded pane found outside its scope, as after a Herdr restore, is closed and recreated before any prompt. A pane whose cgroup cannot be read is left open, and the leaf is skipped that pass with the error. A failed boxing also skips the leaf. Panes you split by hand in a leaf tab are not boxed.
+
 A working, blocked or unknown seat is not treated as idle. A recently delivered prompt also gets a grace period.
 
 A dispatch pass attempts leaves with more unmerged leaves waiting on them through `blocked-by`, directly or transitively, before leaves with fewer; ties keep the previous visit order with merged leaves first.

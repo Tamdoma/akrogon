@@ -17,6 +17,7 @@
 - `tests/base-run.test.ts` checks the base checkout, record line, env and cleanup of `base-run`.
 - `tests/compare.test.ts` checks the comparison record, red record and `--compare` flag.
 - `tests/red-docs.test.ts` checks the skills and guide carry the retry, comparison and `known-red` rules, the merge skill's `--compare` contract and the retired `red on base` stop wording's absence.
+- `tests/seat-containment.test.ts` checks pane boxing, restore replacement and the bus cut through `next`, with `tests/fake-busctl.ts`, the fake proc root in `tests/fake-proc.ts` and fake herdr `pane process-info`/`pane close`.
 - `tests/reconcile.test.ts` checks reconciler removal, refusal and old-root migration against real worktrees.
 
 - `tests/merge-attempts.test.ts` checks `issues/merge-attempts.jsonl` lines per ending, including a legacy `held` line that still parses.
