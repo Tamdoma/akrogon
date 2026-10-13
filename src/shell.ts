@@ -78,13 +78,27 @@ export async function spawnCaptured(
   return finishCaptured(child, captured);
 }
 
+// Seat shells cut the session bus so test browsers cannot leave their scope (next.ts placement env).
+// akrogon's own git and gh calls reach the gh token in the keyring over that bus, so they get it back.
+function credentialEnv(argv: string[]): NodeJS.ProcessEnv | undefined {
+  const program: string | undefined = argv.find((arg: string) => arg !== 'env' && !arg.includes('='));
+  const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;
+  return (program === 'git' || program === 'gh') && runtime !== undefined && runtime.trim() !== ''
+    ? { ...process.env, DBUS_SESSION_BUS_ADDRESS: `unix:path=${runtime}/bus` }
+    : undefined;
+}
+
 export async function run(
   argv: string[],
   cwd: string = process.cwd(),
   deadlineMs?: number,
   stdin?: string,
 ): Promise<Result> {
-  const { child, captured }: { child: Bun.Subprocess; captured: Captured } = spawnFiles(argv, { cwd, stdin });
+  const { child, captured }: { child: Bun.Subprocess; captured: Captured } = spawnFiles(argv, {
+    cwd,
+    stdin,
+    env: credentialEnv(argv),
+  });
   const finished: Promise<SpawnResult> = finishCaptured(child, captured);
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {

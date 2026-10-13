@@ -179,3 +179,16 @@ test('paneSchema requires kind when agent_session present', () => {
     }).agent_session,
   ).toEqual({ kind: 'id', value: 's' });
 });
+
+test('git and gh get the user session bus back under the seat bus cut; other programs keep the cut', async () => {
+  const script: string = `
+import {run} from ${JSON.stringify(resolve(import.meta.dir, '../src/shell.ts'))};
+const git = await run(['git', '-c', 'alias.bus=!printenv DBUS_SESSION_BUS_ADDRESS', 'bus']);
+const other = await run(['sh', '-c', 'printenv DBUS_SESSION_BUS_ADDRESS']);
+console.log(JSON.stringify([git.stdout, other.stdout]));
+`;
+  const child: Result = await spawnCaptured([process.execPath, '-e', script], {
+    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: 'unix:path=/nonexistent', XDG_RUNTIME_DIR: '/run/user/test' },
+  });
+  expect(JSON.parse(child.stdout)).toEqual(['unix:path=/run/user/test/bus', 'unix:path=/nonexistent']);
+});
