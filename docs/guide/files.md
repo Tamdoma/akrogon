@@ -82,7 +82,7 @@ Each line names its event kind:
 - `visit_start` is `akrogon phase` after a move, or `akrogon next` first seeing a leaf.
 - `prompt` is `akrogon next` delivering or failing a seat prompt.
 - `seat_done` is `akrogon phase` finishing a paired seat without a move.
-- `check_start` and `check_end` are `akrogon run-check` starting and ending a check; `check_start` carries optional `wait_ms`, the time spent waiting for the run permit.
+- `check_start` and `check_end` are `akrogon run-check` starting and ending a check; `check_start` carries optional `wait_ms`, the time spent waiting for the start check.
 - `batch` is `akrogon next` creating a merge batch.
 - `wait` is `akrogon next` or `akrogon park` opening or closing a wait.
 - `repo_pause` is `akrogon pause` or `akrogon unpause` toggling the repo.
