@@ -339,6 +339,29 @@ test('a run-check fails naming the path when memory.stat is missing or lacks the
   }
 });
 
+test('blank spacing overrides fail instead of disabling admission spacing', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const dir: string = marks(f);
+    const worktree: string = await leafWorktree(f, 'blank-spacing');
+    mkdirSync(resolve(f.home, 'runs'), { recursive: true });
+    writeFileSync(resolve(f.home, 'runs/last-start'), String(Date.now()));
+    for (const spacing of ['', ' ']) {
+      const result: Result = await cli(
+        f,
+        ['run-check', '--name', 'blank', '--', ...touch(dir, 'blank')],
+        worktree,
+        { AKROGON_SPACING_MS: spacing },
+      );
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('Invalid AKROGON_SPACING_MS');
+      expect(existsSync(resolve(dir, 'blank'))).toBe(false);
+    }
+  } finally {
+    f.clean();
+  }
+});
+
 test('an AKROGON_RUN matching no live record goes through admission like any start', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
