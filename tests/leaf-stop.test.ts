@@ -245,3 +245,34 @@ test('start runs the targeted pass for a leaf whose issue shares its name', asyn
     f.clean();
   }
 });
+
+test('stopping the holder of an applied batch builds no second batch and prompts no merge seat', async () => {
+  const f: StopFixture = await stopFixture();
+  try {
+    const aa: string = await allocatedIdle(f, 'aa');
+    const bb: string = await allocatedIdle(f, 'bb');
+    for (const [path, name] of [
+      [aa, 'aa-file'],
+      [bb, 'bb-file'],
+    ] as const) {
+      const worktree: string = z.string().parse(readState(path).worktree);
+      writeFileSync(resolve(worktree, name), `${name}\n`);
+      await command(['git', 'add', name], worktree);
+      await command(['git', 'commit', '-m', name], worktree);
+    }
+    saveState(aa, { ...readState(aa), phase: 'merge', merge_stamp: '2026-09-11T00:00:00.000Z' });
+    saveState(bb, { ...readState(bb), phase: 'merge', merge_stamp: '2026-09-12T00:00:00.000Z' });
+    await run(f, ['next']);
+    const applied: State['batch'] = readState(aa).batch;
+    expect(applied?.applied).toBe(true);
+    expect(applied?.members.map((member) => member.slug)).toEqual(['bb']);
+    expect((await run(f, ['stop', 'aa'])).code).toBe(0);
+    saveDatabase(f, { ...database(f), prompts: [] });
+    await run(f, ['next']);
+    expect(readState(bb).batch).toBeUndefined();
+    expect(readState(aa).batch?.attempt).toBe(applied?.attempt);
+    expect(database(f).prompts.filter((prompt) => prompt.text.startsWith('merge-issue'))).toEqual([]);
+  } finally {
+    f.clean();
+  }
+}, 15000);
