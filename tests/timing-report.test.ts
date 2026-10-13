@@ -347,3 +347,23 @@ test('cohort gate: insufficient while a member is unmerged and younger than 24 h
     f.clean();
   }
 });
+
+test('cohort gate: fails when the two central F values average above 35 minutes', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const log: Row[] = [];
+    const timings: Row[] = [];
+    for (let index = 0; index < 20; index++) {
+      const fMin: number = index < 10 ? 30 : index < 15 ? 42 : 60;
+      const part: { log: Row[]; timings: Row[] } = member(`median${index}`, at(index + 1), fMin);
+      log.push(...part.log);
+      timings.push(...part.timings);
+    }
+    cohortFixture(f, log, timings);
+    const result: { code: number; stdout: string; stderr: string } = await timing(f, ['--cohort', '--since', SINCE]);
+    expect(result.code).toBe(0);
+    expect(result.stdout.split('\n')[0]).toBe('fail');
+  } finally {
+    f.clean();
+  }
+});
