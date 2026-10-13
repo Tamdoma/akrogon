@@ -347,12 +347,9 @@ test('blank spacing overrides fail instead of disabling admission spacing', asyn
     mkdirSync(resolve(f.home, 'runs'), { recursive: true });
     writeFileSync(resolve(f.home, 'runs/last-start'), String(Date.now()));
     for (const spacing of ['', ' ']) {
-      const result: Result = await cli(
-        f,
-        ['run-check', '--name', 'blank', '--', ...touch(dir, 'blank')],
-        worktree,
-        { AKROGON_SPACING_MS: spacing },
-      );
+      const result: Result = await cli(f, ['run-check', '--name', 'blank', '--', ...touch(dir, 'blank')], worktree, {
+        AKROGON_SPACING_MS: spacing,
+      });
       expect(result.code).not.toBe(0);
       expect(result.stderr).toContain('Invalid AKROGON_SPACING_MS');
       expect(existsSync(resolve(dir, 'blank'))).toBe(false);

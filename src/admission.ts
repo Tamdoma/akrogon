@@ -61,7 +61,7 @@ function spacingMs(): number {
   const override: string | undefined = process.env.AKROGON_SPACING_MS;
   if (override === undefined) return 30000;
   const ms: number = Number(override);
-  if (!Number.isInteger(ms) || ms < 0)
+  if (override.trim() === '' || !Number.isInteger(ms) || ms < 0)
     throw new Error('Invalid AKROGON_SPACING_MS: must be a non-negative integer of milliseconds');
   return ms;
 }
