@@ -101,6 +101,25 @@ test('a base-run logs output, prints status, removes the checkout and records st
   }
 });
 
+test('a base-run command runs with the session bus cut', async () => {
+  const f: Fixture = await fixture();
+  try {
+    withSetup(f);
+    const { worktree } = await callerWorktree(f);
+    const sha: string = await baseSha(f);
+    const result: Result = await baseRun(
+      f,
+      ['base-run', '--base', sha, '--', 'sh', '-c', 'printf "bus=%s\\n" "$DBUS_SESSION_BUS_ADDRESS"'],
+      worktree,
+    );
+    expect(result.code).toBe(0);
+    const logPath: string = result.stdout.split('\n')[0].replace(/^log: /, '');
+    expect(readFileSync(logPath, 'utf8')).toContain('bus=unix:path=/nonexistent');
+  } finally {
+    f.clean();
+  }
+});
+
 test('a failing command keeps the same record and cleanup contract', async () => {
   const f: Fixture = await fixture();
   try {

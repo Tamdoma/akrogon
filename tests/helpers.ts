@@ -82,14 +82,31 @@ export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}
   return path;
 }
 
+export function procRoot(f: Fixture): string {
+  return resolve(f.home, 'proc');
+}
+
 export type HerdrFixture = { db: string; env: NodeJS.ProcessEnv };
 export function fakeHerdr(f: Fixture): HerdrFixture {
   const bin: string = resolve(f.home, 'bin');
   mkdirSync(bin);
   symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
+  symlinkSync(resolve(import.meta.dir, 'fake-busctl.ts'), resolve(bin, 'busctl'));
   const db: string = resolve(f.home, 'herdr.json');
   writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, prompts: [], starts: [] }));
-  return { db, env: { PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) } };
+  mkdirSync(procRoot(f));
+  mkdirSync(resolve(f.home, 'run'));
+  return {
+    db,
+    env: {
+      PATH: `${bin}:${process.env.PATH}`,
+      FAKE_HERDR: db,
+      FAKE_BUSCTL_HOME: f.home,
+      AKROGON_PROC_ROOT: procRoot(f),
+      XDG_RUNTIME_DIR: resolve(f.home, 'run'),
+      AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+    },
+  };
 }
 
 export function fakeAkrogon(f: Fixture): { env: NodeJS.ProcessEnv } {

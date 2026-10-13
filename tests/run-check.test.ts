@@ -62,6 +62,7 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
       'TMPDIR',
       'AKROGON_BASE',
       'AKROGON_RUN',
+      'DBUS_SESSION_BUS_ADDRESS',
       'CHECK_TOKEN',
       'PWD',
       'SHLVL',
@@ -71,6 +72,24 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
     expect(names.has('CHECK_TOKEN')).toBe(true);
     expect(names.has('TMPDIR')).toBe(true);
     expect(names.has('AKROGON_BASE')).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+test('run-check cuts the session bus even when the caller has one', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { pass_env: ['DISPLAY'], checks: {}, grounding: 'none' });
+    const { worktree } = await leafWorktree(f, 'bus-cut');
+    const result: Result = await cli(
+      f,
+      ['run-check', '--', ...sh('printf "bus=%s\\n" "$DBUS_SESSION_BUS_ADDRESS"')],
+      worktree,
+      baseEnv(f, { DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus', DISPLAY: ':0' }),
+    );
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('bus=unix:path=/nonexistent');
   } finally {
     f.clean();
   }

@@ -30,6 +30,7 @@ function installEnv(f: Fixture): NodeJS.ProcessEnv {
   const bin: string = resolve(f.home, 'bin');
   mkdirSync(bin);
   symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
+  symlinkSync(resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(bin, 'systemctl'));
   const db: string = resolve(f.home, 'herdr.json');
   writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0 }));
   yaml(resolve(f.home, 'config.yaml'), {
@@ -39,7 +40,13 @@ function installEnv(f: Fixture): NodeJS.ProcessEnv {
     },
     harnesses: { claude: 'claude', codex: 'codex', pi: 'pi' },
   });
-  return { HOME: f.home, PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db };
+  return {
+    HOME: f.home,
+    PATH: `${bin}:${process.env.PATH}`,
+    FAKE_HERDR: db,
+    FAKE_SYSTEMCTL_LOG: resolve(f.home, 'systemctl.log'),
+    FAKE_SLICE_LINK: resolve(f.home, '.config/systemd/user/akrogon.slice'),
+  };
 }
 
 function calls(f: Fixture): string[][] {
@@ -57,6 +64,44 @@ function expectedCalls(): string[][] {
     ['plugin', 'link', resolve(toolRoot, 'plugin')],
   ];
 }
+
+test('install links akrogon.slice with the ceiling values and reloads the user manager after linking', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const env: NodeJS.ProcessEnv = installEnv(f);
+    expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0 });
+    const link: string = resolve(f.home, '.config/systemd/user/akrogon.slice');
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(realpathSync(link)).toBe(resolve(toolRoot, 'systemd/akrogon.slice'));
+    const unit: string[] = readFileSync(link, 'utf8')
+      .split('\n')
+      .map((line) => line.trim());
+    for (const line of ['CPUWeight=20', 'CPUQuota=1600%', 'MemoryHigh=64G', 'MemoryMax=96G', 'MemorySwapMax=0'])
+      expect(unit).toContain(line);
+    expect(unit.some((line) => line.startsWith('TasksMax'))).toBe(false);
+    expect(readFileSync(resolve(f.home, 'systemctl.log'), 'utf8').trim().split('\n')).toContain(
+      '--user daemon-reload linked=yes',
+    );
+  } finally {
+    f.clean();
+  }
+});
+
+test('install reports a non-link akrogon.slice path as a conflict', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const env: NodeJS.ProcessEnv = installEnv(f);
+    const link: string = resolve(f.home, '.config/systemd/user/akrogon.slice');
+    mkdirSync(dirname(link), { recursive: true });
+    writeFileSync(link, '[Slice]\n');
+    const result: Result = await cli(f, ['install'], f.root, env);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain(quote(link));
+    expect(lstatSync(link).isSymbolicLink()).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
 
 test('install creates all four absent harness roots and repeats without changing links or herdr arguments', async () => {
   const f: Fixture = await fixture();

@@ -825,6 +825,7 @@ test('config accepts env and tools lists and refuses bad and reserved env names'
       'FFMPEG_BIN',
       'CHROME_PATH',
       'CDP_BROWSER_BINARY',
+      'DBUS_SESSION_BUS_ADDRESS',
     ]) {
       yaml(path, { grounding: 'none', env: [name] });
       const reserved = await cli(f, ['config']);
@@ -832,6 +833,19 @@ test('config accepts env and tools lists and refuses bad and reserved env names'
       expect(reserved.stderr).toContain('env');
       expect(reserved.stderr).toContain(name);
     }
+  } finally {
+    f.clean();
+  }
+});
+
+test('config refuses DBUS_SESSION_BUS_ADDRESS in pass_env', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', pass_env: ['DBUS_SESSION_BUS_ADDRESS'] });
+    const reserved = await cli(f, ['config']);
+    expect(reserved.code).not.toBe(0);
+    expect(reserved.stderr).toContain('pass_env');
+    expect(reserved.stderr).toContain('DBUS_SESSION_BUS_ADDRESS');
   } finally {
     f.clean();
   }

@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
-import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 import { paneSchema, tabSchema, workspaceSchema } from '../src/shell';
+import { OUTSIDE_CGROUP, boxedCgroup, expectedScope, expectedSlice, procDir, seedShell, shellPid } from './fake-proc';
 
 const rectSchema = z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() });
 type Rect = z.infer<typeof rectSchema>;
@@ -41,6 +43,7 @@ const databaseSchema = z.object({
   failRename: z.boolean().default(false),
   prompts: z.array(z.object({ pane: z.string(), text: z.string() })).default([]),
   starts: z.array(z.array(z.string())).default([]),
+  startCgroups: z.array(z.object({ pane: z.string(), cgroup: z.string() })).default([]),
   startScript: z.array(scriptEntrySchema).default([]),
   promptScript: z.array(scriptEntrySchema).default([]),
   renameScript: z.array(scriptEntrySchema).default([]),
@@ -85,6 +88,17 @@ function pane(id: string): FakePane {
   const found: FakePane | undefined = db.panes.find((p) => p.pane_id === id);
   if (found === undefined) throw new Error(`Missing pane ${id}`);
   return found;
+}
+function procRoot(): string {
+  return z.string().parse(process.env.AKROGON_PROC_ROOT);
+}
+// A pane seeded straight into the db stands for a shell an earlier pass already boxed.
+function ownCgroup(target: FakePane): string {
+  const tab = db.tabs.find((t) => t.tab_id === target.tab_id);
+  const workspace = db.workspaces.find((w) => w.workspace_id === (tab?.workspace_id ?? 'w1'));
+  if (tab === undefined || workspace === undefined) return OUTSIDE_CGROUP;
+  const slice: string = expectedSlice(workspace.label, tab.label);
+  return boxedCgroup(slice, expectedScope(slice, target.pane_id));
 }
 if (args[0] === 'notification' && args[1] === 'show') {
   z.string().min(1).parse(args[2]);
@@ -133,6 +147,7 @@ if (args[0] === 'tab' && args[1] === 'create') {
   };
   db.tabs.push(tab);
   db.panes.push(root);
+  seedShell(procRoot(), root.pane_id, OUTSIDE_CGROUP);
   result({ tab, root_pane: root });
 }
 if (args[0] === 'pane' && args[1] === 'split') {
@@ -155,6 +170,7 @@ if (args[0] === 'pane' && args[1] === 'split') {
     focused: false,
   };
   db.panes.push(sibling);
+  seedShell(procRoot(), sibling.pane_id, OUTSIDE_CGROUP);
   result({ pane: sibling });
 }
 if (args[0] === 'pane' && args[1] === 'swap') {
@@ -203,6 +219,11 @@ if (args[0] === 'agent' && args[1] === 'start') {
   target.agent_status = db.blockOnStart ? 'blocked' : 'idle';
   target.agent_session = { kind: 'id', value: `session-${++db.serial}` };
   db.starts.push(args);
+  const cgroupPath: string = resolve(procDir(procRoot(), shellPid(target.pane_id)), 'cgroup');
+  db.startCgroups.push({
+    pane: target.pane_id,
+    cgroup: existsSync(cgroupPath) ? readFileSync(cgroupPath, 'utf8').trim() : '',
+  });
   result({ agent: target });
 }
 if (args[0] === 'agent' && args[1] === 'prompt') {
@@ -252,6 +273,26 @@ if (args[0] === 'agent' && args[1] === 'list') {
         : [{ pane_id: p.pane_id, agent: p.agent, ...(p.agent_session ? { agent_session: p.agent_session } : {}) }],
     ),
   });
+}
+if (args[0] === 'pane' && args[1] === 'process-info') {
+  const target: FakePane = pane(flag('--pane'));
+  const pid: number = shellPid(target.pane_id);
+  if (!existsSync(procDir(procRoot(), pid))) seedShell(procRoot(), target.pane_id, ownCgroup(target));
+  result({
+    process_info: {
+      pane_id: target.pane_id,
+      shell_pid: pid,
+      foreground_process_group_id: pid,
+      foreground_processes: [],
+    },
+    type: 'pane_process_info',
+  });
+}
+if (args[0] === 'pane' && args[1] === 'close') {
+  const target: FakePane = pane(args[2]);
+  db.panes = db.panes.filter((p) => p.pane_id !== target.pane_id);
+  if (!db.panes.some((p) => p.tab_id === target.tab_id)) db.tabs = db.tabs.filter((t) => t.tab_id !== target.tab_id);
+  result({});
 }
 if (args[0] === 'tab' && args[1] === 'close') {
   db.panes = db.panes.filter((p) => p.tab_id !== args[2]);
