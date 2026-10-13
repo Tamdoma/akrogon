@@ -308,16 +308,18 @@ function verdict(members: Member[], ejections: number): 'pass' | 'fail' | 'insuf
   const over45: number = members.filter(
     (member) => member.failed || member.stalled || (member.f !== null && member.f > F_LIMIT_MS),
   ).length;
-  const over35: number = members.filter(
-    (member) => member.failed || member.stalled || (member.f !== null && member.f > F_MEDIAN_MAX_MS),
-  ).length;
+  const bestF: number[] = [
+    ...members.map((member): number => (member.failed || member.stalled ? Infinity : (member.f ?? 0))),
+    ...Array<number>(COHORT_SIZE - members.length).fill(0),
+  ].sort((a, b) => a - b);
+  const bestMedian: number = (bestF[COHORT_SIZE / 2 - 1] + bestF[COHORT_SIZE / 2]) / 2;
   const unresolved: number = members.filter(
     (member) => member.merged === null && !member.failed && !member.stalled,
   ).length;
   if (
     failed > COHORT_SIZE - MERGED_MIN ||
     over45 > COHORT_SIZE - F_LIMIT_COUNT ||
-    over35 > COHORT_SIZE / 2 ||
+    bestMedian > F_MEDIAN_MAX_MS ||
     ejections > EJECTION_LIMIT
   )
     return 'fail';
