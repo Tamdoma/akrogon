@@ -28,7 +28,7 @@ import {
 import { readLog, type LogRecord } from './log';
 import { mergeQueue, type QueueEntry } from './turn';
 import { issueFolders } from './park';
-import { liveHolder, type HolderRecord } from './permit';
+import { waitingRuns } from './admission';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 import { readPaused } from './pause';
 import { readStopped } from './stop';
@@ -406,10 +406,9 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
       }
     }
   }
-  const holder: HolderRecord | undefined = liveHolder();
-  if (holder !== undefined)
+  for (const record of waitingRuns())
     console.log(
-      `Run permit: ${holder.repo}/${holder.leaf} ${holder.check} pid ${holder.pid} ${since(now - Date.parse(holder.started))}`,
+      `Run waiting: ${record.repo}/${record.leaf} ${record.check} ${record.wait_reason ?? 'checking'} ${since(now - Date.parse(record.since))}`,
     );
   for (const scan of scans) {
     if (!scan.ok) continue;

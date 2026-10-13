@@ -17,7 +17,7 @@ import { allLeaves, readState, type Leaf, type State } from './state';
 import { command, spawnCaptured, type Result } from './shell';
 import { readBaseRuns, type BaseRun } from './base-run';
 import { appendTiming } from './timing';
-import { withPermit } from './permit';
+import { withAdmission } from './admission';
 import { type Phase } from './routing';
 
 const forbidden: readonly string[] = [
@@ -170,7 +170,7 @@ export async function runCheck(
       ...(unit === undefined ? {} : { unit }),
       ...(attempt === undefined ? {} : { attempt }),
     };
-    return await withPermit({ repo: repo.name, leaf: slug, check: name ?? 'run' }, async (admission) => {
+    return await withAdmission({ repo: repo.name, leaf: slug, check: name ?? 'run' }, async (admission) => {
       env.AKROGON_RUN = admission.token;
       appendTiming(repo, {
         kind: 'check_start',
