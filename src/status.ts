@@ -31,6 +31,7 @@ import { issueFolders } from './park';
 import { liveHolder, type HolderRecord } from './permit';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 import { readPaused } from './pause';
+import { readStopped } from './stop';
 import { activeRed, type RedEntry } from './red-record';
 import { readKept } from './reconcile';
 
@@ -149,6 +150,7 @@ function cells(
   now: number,
   indent: string,
   queue: Map<string, QueueEntry>,
+  stopped: boolean,
 ): string[] {
   const state: State = leaf.state;
   const last: LogRecord | undefined = log.findLast(
@@ -157,6 +159,7 @@ function cells(
   const elapsed: number | undefined = last === undefined ? undefined : now - Date.parse(last.record.ts);
   const age: string = elapsed === undefined || elapsed < 0 ? '-' : `${Math.floor(elapsed / 60000)}m`;
   const entry: QueueEntry | undefined = queue.get(state.slug);
+  const detail: string = note(state, now, leaf.seatSources);
   const turn: string =
     entry === undefined
       ? ''
@@ -166,12 +169,12 @@ function cells(
     state.phase,
     age,
     state['blocked-by'].join(' '),
-    note(state, now, leaf.seatSources),
+    stopped ? (detail === '' ? 'stopped' : `stopped; ${detail}`) : detail,
     turn,
   ];
 }
 
-function rows(scan: Scan & { ok: true }, now: number): string[][] {
+function rows(scan: Scan & { ok: true }, now: number, stopped: Set<string>): string[][] {
   const queue: Map<string, QueueEntry> = new Map(scan.queue.map((entry) => [entry.leaf.state.slug, entry]));
   let previous: string[] = [];
   return scan.leaves.flatMap((leaf) => {
@@ -183,7 +186,7 @@ function rows(scan: Scan & { ok: true }, now: number): string[][] {
     return [
       ...separator,
       ...groups.slice(shared).map((group, offset) => [`${indent(shared + offset)}${group}`, '', '', '', '', '']),
-      cells(leaf, scan.log, now, indent(groups.length), queue),
+      cells(leaf, scan.log, now, indent(groups.length), queue, stopped.has(`${scan.repo.name}/${leaf.state.slug}`)),
     ];
   });
 }
@@ -349,6 +352,7 @@ function redLine(entry: RedEntry): string {
 export async function statusCommand(slug: string | undefined, charts: boolean = false): Promise<void> {
   const global: GlobalConfig = readGlobal();
   const paused: Set<string> = readPaused();
+  const stopped: Set<string> = readStopped();
   if (slug !== undefined) {
     const repo: Repo = await requireRepo(global, process.cwd());
     const leaf: Leaf = findLeaf(repo, slug);
@@ -358,6 +362,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     const missing: Gap[] = leafGaps(global, leaf);
     console.log(Bun.YAML.stringify(leaf.state, null, 2).trimEnd());
     if (paused.has(repo.name)) console.log(`paused: ${repo.name}`);
+    if (stopped.has(`${repo.name}/${slug}`)) console.log(`stopped: ${repo.name}/${slug}`);
     for (const entry of activeRed(repo)) console.log(redLine(entry));
     for (const entry of readKept(repo)) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     for (const gap of missing)
@@ -419,7 +424,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     }
     const parked: string[][] = scan.parked.map((name) => [`${indent(0)}${name}`, 'parked', '', '', '', '']);
     const separator: string[][] = scan.leaves.length > 0 && parked.length > 0 ? [['', '', '', '', '', '']] : [];
-    const lines: string[][] = [...rows(scan, now), ...separator, ...parked];
+    const lines: string[][] = [...rows(scan, now, stopped), ...separator, ...parked];
     if (lines.length > 0) console.log(render(header, [['  LEAF', ...header.slice(1)], ...lines]).join('\n'));
     else console.log('  no open leaves');
   }
