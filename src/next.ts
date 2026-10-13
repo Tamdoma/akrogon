@@ -512,7 +512,13 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
       throw new Error(`Cannot read the scope of pane ${pane.pane_id} for leaf ${state.slug}: ${place.error}`);
     if (place.place === 'inside') return;
     await adoptShell(slice, pane.pane_id);
-    const adopted: ScopePlace = await inOwnScope(slice, pane.pane_id);
+    // StartTransientUnit returns once systemd queues the job, so the shell lands in its scope a moment later.
+    const deadline: number = Date.now() + 5000;
+    let adopted: ScopePlace = await inOwnScope(slice, pane.pane_id);
+    while (adopted.place === 'outside' && Date.now() < deadline) {
+      await Bun.sleep(50);
+      adopted = await inOwnScope(slice, pane.pane_id);
+    }
     if (adopted.place !== 'inside')
       throw new Error(
         `Pane ${pane.pane_id} for leaf ${state.slug} is not in its own scope after adoption: ${adopted.place === 'outside' ? adopted.cgroup : adopted.error}`,
