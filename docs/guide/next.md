@@ -136,7 +136,7 @@ akrogon stop --all
 
 It prints one result line per leaf. One failure does not stop the others, and the command exits non-zero if any leaf failed.
 
-While a leaf is stopped, automatic passes skip it quietly. A typed `akrogon next <slug>`, bare `akrogon next` or `akrogon next --all` reports the leaf with an error naming `akrogon start <slug>` and exits non-zero. The merge turn builds no stack and prompts no merge seat for it. `akrogon status` shows stopped in the NOTE column, and `akrogon status <slug>` prints a `stopped:` line.
+While a leaf is stopped, automatic passes skip it quietly. A typed `akrogon next <slug>`, bare `akrogon next` or `akrogon next --all` reports the leaf with an error naming `akrogon start <slug>` and exits non-zero. The merge turn builds no stack and prompts no merge seat for it. A stopped leaf that already holds the merge turn keeps it, so the repository's other merge leaves wait until it is started. `akrogon status` shows stopped in the NOTE column, and `akrogon status <slug>` prints a `stopped:` line.
 
 Start removes the stopped record and runs the targeted next pass for that leaf by its folder path:
 
