@@ -5,7 +5,8 @@ import { z } from 'zod';
 import type { Repo } from './config';
 import { CommandError, herdr, spawnCaptured, type SpawnResult } from './shell';
 
-export type ScopePlace = { place: 'inside' } | { place: 'outside'; cgroup: string } | { place: 'unreadable'; error: string };
+export type ScopePlace =
+  { place: 'inside' } | { place: 'outside'; cgroup: string } | { place: 'unreadable'; error: string };
 
 type Shell = { pid: number; start: string };
 
@@ -36,7 +37,12 @@ async function shellPid(paneId: string): Promise<number> {
 // Field 22 of /proc/<pid>/stat. The command name in field 2 may hold spaces, so split after the last ')'.
 function startTime(pid: number): string {
   const stat: string = readFileSync(resolve(procRoot(), String(pid), 'stat'), 'utf8');
-  return z.string().parse(stat.slice(stat.lastIndexOf(')') + 1).trim().split(' ')[19]);
+  return z.string().parse(
+    stat
+      .slice(stat.lastIndexOf(')') + 1)
+      .trim()
+      .split(' ')[19],
+  );
 }
 
 async function shell(paneId: string): Promise<Shell> {

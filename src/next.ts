@@ -505,6 +505,20 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
             z.object({ pane: paneSchema }),
           )
         ).pane);
+  // Boxed before any save records it, so a later throw never leaves an unboxed recorded pane.
+  async function box(pane: Pane): Promise<void> {
+    const place: ScopePlace = await inOwnScope(slice, pane.pane_id);
+    if (place.place === 'unreadable')
+      throw new Error(`Cannot read the scope of pane ${pane.pane_id} for leaf ${state.slug}: ${place.error}`);
+    if (place.place === 'inside') return;
+    await adoptShell(slice, pane.pane_id);
+    const adopted: ScopePlace = await inOwnScope(slice, pane.pane_id);
+    if (adopted.place !== 'inside')
+      throw new Error(
+        `Pane ${pane.pane_id} for leaf ${state.slug} is not in its own scope after adoption: ${adopted.place === 'outside' ? adopted.cgroup : adopted.error}`,
+      );
+  }
+  await box(first);
   if (repairB !== undefined) {
     saveState(leaf.path, { ...tabState, pane: { A: first.pane_id, B: repairB.pane_id } });
     const prev: string | undefined = (await tabs()).find((tab) => tab.focused === true)?.tab_id;
@@ -546,19 +560,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
         z.object({ pane: paneSchema }),
       )
     ).pane;
-  for (const pane of [first, second]) {
-    const place: ScopePlace = await inOwnScope(slice, pane.pane_id);
-    if (place.place === 'unreadable')
-      throw new Error(`Cannot read the scope of pane ${pane.pane_id} for leaf ${state.slug}: ${place.error}`);
-    if (place.place === 'outside') {
-      await adoptShell(slice, pane.pane_id);
-      const adopted: ScopePlace = await inOwnScope(slice, pane.pane_id);
-      if (adopted.place !== 'inside')
-        throw new Error(
-          `Pane ${pane.pane_id} for leaf ${state.slug} is not in its own scope after adoption: ${adopted.place === 'outside' ? adopted.cgroup : adopted.error}`,
-        );
-    }
-  }
+  await box(second);
   const allocated: State = { ...tabState, pane: { A: first.pane_id, B: second.pane_id } };
   saveState(leaf.path, allocated);
   return allocated;
