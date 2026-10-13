@@ -1103,6 +1103,7 @@ async function mergeTurn(
   const holder: Leaf | undefined = mergeQueue(global, discover(repo, invocation).leaves, () => readLog(repo.root))[0]
     ?.leaf;
   if (holder === undefined) return;
+  if (isStopped(repo.name, holder.state.slug)) return;
   const recorded: Batch | undefined = holder.state.batch;
   if (recorded !== undefined && recorded.applied === true) {
     await dispatchMergeLeaf(

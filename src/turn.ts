@@ -84,7 +84,7 @@ export function mergeQueue(global: GlobalConfig, leaves: Leaf[], log: () => LogR
     (leaf) =>
       leaf.state.phase === 'merge' &&
       eligibility(global, leaf, leaves) === null &&
-      !isStopped(leaf.state.repo, leaf.state.slug),
+      (leaf.state.batch !== undefined || !isStopped(leaf.state.repo, leaf.state.slug)),
   );
   const stamp: Map<string, string> = new Map();
   if (eligible.some((leaf) => leaf.state.merge_stamp === undefined))
