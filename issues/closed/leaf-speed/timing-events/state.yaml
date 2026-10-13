@@ -1,0 +1,28 @@
+slug: timing-events
+phase: merged
+created: 2026-10-13
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tBF
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pNT
+  B: w8:pNV
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-12T23:38:33.606Z
+frozen:
+  tests/timing.test.ts: e91573560f1404a3df9de550742bd8e939147b67
+frozen_cited: []

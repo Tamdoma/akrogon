@@ -1,0 +1,4 @@
+# Brief for B: ceiling-values (blind)
+Chart: /home/ivan/Work/infra/akrogon/issues/chart/host-test-load. Read INTAKE.md, CHART.md, all Taken sections in forks/, forks/ceiling-values.md including Measurement 2 in forks/limit-boundary.md. The operator wants low total complexity. Host: 32 threads, see free -g.
+Question: forks/ceiling-values.md Q1. Which properties akrogon.slice carries (CPUWeight value, MemoryHigh and/or MemoryMax or none, anything else) and where they live (installed slice unit file vs transient), given one run at a time and the operator's own desktop must stay usable. Use systemd 262 docs and measurement 2.
+Write blind notes (do not read other seats' ceiling-values files) to slots/ceiling-values-B.md: pick with values and cost, rejected options, evidence with source and date, pitfalls and what removes each, missing questions. Read only, no live units.

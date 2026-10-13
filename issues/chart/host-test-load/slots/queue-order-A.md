@@ -1,0 +1,7 @@
+# Notes A: queue-order (before reading B/C)
+Pick: whatever order the kernel grants flock waiters, no wait bound in akrogon, waiting made visible. A run blocks in LOCK_EX until its turn. No priority for merge verification.
+Visibility: run-check appends a `check_wait` timing record before blocking and `check_start` after the grant (check_start already moves inside the permit, permit-release Taken), so `akrogon timing` shows queue time separately. The holder sidecar (permit-release Taken) lets `akrogon status` print one line: which leaf/check holds the permit since when. Waiter count is optional.
+No bound: a timed-out wait would come back as a failing check, which seats read as a red test and try to fix. Seats and stop already bound how long anything runs. A killed waiter holds nothing.
+Rejected merge-first: needs a priority mechanism on top of flock (ticket files or a queue owner), more parts for a gain of minutes. Six leaves put the last about 20 min out (measurement 2), within normal seat patience.
+Rejected arrival-order tickets: same extra parts. flock order is close to FIFO in practice but not guaranteed (flock(2) makes no fairness promise), so starvation under constant contention is possible in theory. Accept and watch timing.
+Pitfalls: the waiting process is silent for minutes, so a seat may think the check hung. Print one stderr line "waiting for the run permit, held by <leaf>/<check>" before blocking. Blocking FFI call keeps the event loop stuck, but the process has nothing else to do and signals still kill it.

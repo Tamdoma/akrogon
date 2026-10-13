@@ -1,0 +1,9 @@
+Misquote, agreed swap tag (B,C): B did not claim a runaway exhausts swap “before any memory limit acts”. MemoryHigh and MemoryMax act on charged memory independently of a swap cap. My reason for MemorySwapMax=0 is a separate bound on boxed swap growth (`ceiling-values-B.md`, O5 and E5), not an observed ordering of failures.
+
+Agreed line rejected: measurement 2 proves a 239-second pass under CPUWeight=20, not “normal speed” against a matched unrestricted baseline (`forks/limit-boundary.md:45-49`). Keep the measured result and distinguish it from an unmeasured slowdown claim. I retain CPUWeight=20.
+
+D1: Retain CPUQuota=1600% for an absolute aggregate CPU ceiling. Weight permits full CPU use when competing siblings are idle, while direct scripts and surviving browsers can overlap the admitted run. Accept throttling as its cost. Measurement 1's 30 seconds of throttling is real, but its TasksMax crashes prevent a quota-only wall-time comparison (`forks/limit-boundary.md:26-29`). Prove the exact bundle before handoff.
+
+D2: Retain MemoryHigh=48G and MemoryMax=64G provisionally, pending the aggregate seats-plus-suite proof. The inspected host has about 123 GiB RAM (`ceiling-values-B.md`, E3). Max 96G would leave only about 27 GiB outside that allowance, without measured evidence that the higher budget is needed. The 15.9 GB suite peak establishes neither proposal's adequacy for all seats and cache.
+
+D3: Retain a transient parent created with full properties in allocate's containment ensure path. Settled scope placement already needs StartTransientUnit; v262 supports transient slices and these properties (`ceiling-values-B.md`, E7). A static file removes explicit root creation but adds installer/link/reload deployment work absent from `src/install.ts:52-61`. Recreate before adoption when absent and fail closed on conflicting policy, rather than adding another deployment prerequisite.

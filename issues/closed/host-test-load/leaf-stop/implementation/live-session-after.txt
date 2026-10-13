@@ -1,0 +1,12 @@
+stopped.yaml: live/live: true
+slice: inactive
+units left: 0
+pids left: 0
+chrome left: 0
+pi left: 0
+panes: "pane_id":"w1:p1" 
+tabs: "tab_id":"w1:t1" 
+worktree: /tmp/akls.DW3Y/wt/live
+-rw-r--r-- 1 ivan ivan 107427 2026-10-13 13:53:47.711236297 +0200 /home/ivan/.pi/agent/sessions/--tmp-akls.DW3Y-wt-live--/2026-10-13T11-53-30-020Z_01a1351c-4ea4-717b-90e2-07854fa44140.jsonl
+1ad50e5eac002e74eb454ee863ef2fbace742ba6e334e8f7aaa57e476f0318f8  /home/ivan/.pi/agent/sessions/--tmp-akls.DW3Y-wt-live--/2026-10-13T11-53-30-020Z_01a1351c-4ea4-717b-90e2-07854fa44140.jsonl
+session lines: 24

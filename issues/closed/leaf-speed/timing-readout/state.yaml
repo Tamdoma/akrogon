@@ -1,0 +1,30 @@
+slug: timing-readout
+phase: merged
+created: 2026-10-13
+repo: akrogon
+debate: "no"
+blocked-by:
+  - timing-events
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tBJ
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pNZ
+  B: w8:pN0
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-13T00:11:46.951Z
+frozen:
+  tests/command-reference.test.ts: af994b30ac4b5f256df3661c6d4b7bddc6c4d89b
+  tests/timing-report.test.ts: 848e85bfc76969e44bb29823342e4b19bf99854f
+frozen_cited: []

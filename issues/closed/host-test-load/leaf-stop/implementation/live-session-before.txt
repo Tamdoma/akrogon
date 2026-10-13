@@ -1,0 +1,28 @@
+slice akrogon-l9a3c59ec67a3.slice
+session /home/ivan/.pi/agent/sessions/--tmp-akls.DW3Y-wt-live--/2026-10-13T11-53-30-020Z_01a1351c-4ea4-717b-90e2-07854fa44140.jsonl
+-rw-r--r-- 1 ivan ivan 80330 2026-10-13 13:53:42.012159399 +0200 /home/ivan/.pi/agent/sessions/--tmp-akls.DW3Y-wt-live--/2026-10-13T11-53-30-020Z_01a1351c-4ea4-717b-90e2-07854fa44140.jsonl
+44ba9a83a500ddbf663e3b65f0d572c6f06ff74627df8f17e2aa98ea8bf35828  /home/ivan/.pi/agent/sessions/--tmp-akls.DW3Y-wt-live--/2026-10-13T11-53-30-020Z_01a1351c-4ea4-717b-90e2-07854fa44140.jsonl
+80330
+akrogon-l9a3c59ec67a3-pw1p2-1308597-504869.scope 1308597 bash
+akrogon-l9a3c59ec67a3-pw1p2-1308597-504869.scope 1309004 pi
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1308791 bash
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1326898 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1326899 sleep
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1326998 chrome_crashpad
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327000 chrome_crashpad
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327008 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327011 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327034 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327062 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327065 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327111 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327166 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327190 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327212 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1327295 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1328673 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1328784 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1330018 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1331258 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1331265 chrome
+akrogon-l9a3c59ec67a3-pw1p3-1308791-504875.scope 1331294 chrome

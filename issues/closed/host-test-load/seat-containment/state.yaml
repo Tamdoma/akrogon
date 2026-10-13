@@ -1,0 +1,39 @@
+slug: seat-containment
+phase: merged
+created: 2026-10-13
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#88"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tBP
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pP4
+  B: w8:pP5
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-13T11:20:32.637Z
+frozen:
+  tests/base-run.test.ts: 5e7350698ab0647b0e2c3a94c523b759eb7d32ae
+  tests/config.test.ts: 21dceab2f1ce02fc7375418a30c67a2271fb3ae4
+  tests/fake-busctl.ts: 97cd04f9362264fb2a71e8ba9376935029041bf5
+  tests/fake-herdr.ts: 62ef0a91c970969b65d51c2e7fb36bbe0a8539ac
+  tests/fake-proc.ts: 2878d05dd2321abc7dc9700d812ee3e01f346a72
+  tests/fake-systemctl.sh: 3decba9889ecffb8623728699da3bfecf05c5ec8
+  tests/helpers.ts: 4d78716705700f7689856916616501556f180f93
+  tests/install.test.ts: 9a40079b0a5300268f4229ed2eb3e0df37b38142
+  tests/run-check.test.ts: 91f408ce9b211c1fb2b2655aa70453d56fe1f99b
+  tests/seat-containment.test.ts: c7874e7ccc194f8c256b2a3674eacf923bf7fe74
+  tests/self-update.test.ts: 311381b33f97ab7289d8a26d518951f4a85a3a0f
+frozen_cited: []

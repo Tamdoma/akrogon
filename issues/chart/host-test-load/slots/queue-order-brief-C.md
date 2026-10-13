@@ -1,0 +1,4 @@
+# Brief for C: queue-order (blind)
+Chart: /home/ivan/Work/infra/akrogon/issues/chart/host-test-load. Read INTAKE.md, CHART.md, all Taken sections in forks/, forks/queue-order.md. The operator wants low total complexity.
+Question: forks/queue-order.md Q1. Order of waiting runs (whatever flock gives, arrival order, or merge verification first), whether the wait is bounded and what a timed-out wait means for the seat, and how waiting shows in akrogon status and timing. Inspect src/run-check.ts, src/base-run.ts, the merge path in src/next.ts (mergeTurn), src/timing.ts, akrogon status, and seat/run timeouts in config.
+Write blind notes (do not read other seats' queue-order files) to slots/queue-order-C.md: pick and cost, rejected options, evidence with path:line or source and date, pitfalls and what removes each, missing questions. Read only.

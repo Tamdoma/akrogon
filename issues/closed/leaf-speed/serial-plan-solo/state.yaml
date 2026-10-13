@@ -1,0 +1,27 @@
+slug: serial-plan-solo
+phase: merged
+created: 2026-10-13
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tBG
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pNW
+  B: w8:pNX
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-12T22:24:29.935Z
+frozen: {}
+frozen_cited: []

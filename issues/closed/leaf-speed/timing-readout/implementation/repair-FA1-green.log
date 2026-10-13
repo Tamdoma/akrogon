@@ -1,0 +1,10 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/timing-report.test.ts:
+(pass) cohort member: parked waiting continues after the last phase move [41.89ms]
+
+ 1 pass
+ 7 filtered out
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [55.00ms]

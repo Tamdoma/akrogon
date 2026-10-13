@@ -1,0 +1,4 @@
+# Brief for B: framework-fanout (blind)
+Chart: /home/ivan/Work/infra/akrogon/issues/chart/host-test-load. Read CHART.md, all Taken sections in forks/ (note ceiling-values Taken: 16-thread quota with a pending rerun proof), forks/framework-fanout.md. The operator wants low total complexity.
+Question: forks/framework-fanout.md Q1, given the taken permit, weight 20 and 16-thread quota. Does framework still need a chart capping browser and branch fan-out inside one run, now, later on evidence, or never? Inspect framework (/home/ivan/Work/tamdoma/framework or the registered root from akrogon config) site-nav-e2e-run.ts:550-563 and package.json:165.
+Write blind notes, at most 30 lines (do not read other seats' framework-fanout files), to slots/framework-fanout-B.md: pick and cost, rejected options, evidence with path:line, pitfalls, missing questions. Read only.

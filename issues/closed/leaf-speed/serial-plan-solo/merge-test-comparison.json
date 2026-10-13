@@ -1,0 +1,28 @@
+{
+  "state": "inconsistent",
+  "attempt": "808411c1-8e2d-4150-908e-1c42c0c31cfe",
+  "command": [
+    "akrogon",
+    "run-check",
+    "--name",
+    "test",
+    "--",
+    "sh",
+    "-c",
+    "flock \"$(git rev-parse --git-path akrogon-install.lock)\" sh -c 'bun install --frozen-lockfile' && akrogon guard own-modules && sh -c 'bun test --timeout=30000'"
+  ],
+  "cwd": "/home/ivan/.akrogon/worktrees/akrogon/serial-plan-solo",
+  "scope": "whole suite: bun test --timeout=30000",
+  "material": "Bun 1.4.3; configured frozen-lockfile setup and own-modules guard; same worktree and configured run-check environment; no code changes between runs.",
+  "leaf_revision": "df8868911100bf863224f71a51e70bb489d3b5d9",
+  "log": "/home/ivan/Work/infra/akrogon/issues/open/leaf-speed/serial-plan-solo/implementation/check-test-1791844236191-3290551.log",
+  "run": {
+    "complete": true
+  },
+  "units": [],
+  "retry": {
+    "log": "/home/ivan/Work/infra/akrogon/issues/open/leaf-speed/serial-plan-solo/implementation/check-test-1791844365747-32171.log",
+    "complete": true,
+    "outcome": "pass"
+  }
+}

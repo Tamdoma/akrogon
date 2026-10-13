@@ -1,0 +1,6 @@
+{"command":"akrogon run-check --name 'typecheck' -- sh -c 'flock \"$(git rev-parse --git-path akrogon-install.lock)\" sh -c '\\''bun install --frozen-lockfile'\\'' && akrogon guard own-modules && sh -c '\\''bun run typecheck'\\'''","base":"99a5ada582267e92d227c005eb1705ce7dc80576","status":0,"signal":null}
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+[0.01ms] ".env"
+$ tsc --noEmit

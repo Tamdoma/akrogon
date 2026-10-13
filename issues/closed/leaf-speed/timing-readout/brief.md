@@ -1,0 +1,15 @@
+# Brief: timing-readout
+
+## What
+New read-only command `akrogon timing`, consuming `readTimings` and `visitOf` from timing-events plus `log.jsonl` and `merge-attempts.jsonl`:
+- `akrogon timing <slug>` prints, per closed phase visit, exclusive components that sum to the visit's elapsed time (`visit_start` to the next `log.jsonl` move): waiting by reason (repo paused, parked, prerequisite, merge turn, overlaps assigned by that priority), waiting with no recorded reason, and prompted time (first delivered prompt to phase exit, labelled prompted, not work). Configured-check time by scope is printed as a part of prompted time, never added (A,B,C). Overlapping A and B prompts count once.
+- Expected-event rules, applied to closed visits only, using `log.jsonl` as the independent record: a visit whose phase routes a slot expects a delivered prompt for it, a paired review expects one `seat_done`, a B-only re-check (`fix_rounds > 0`) expects none, a `failed` visit expects nothing, and every `check_start` expects a `check_end` once its visit is closed. A missing event is printed by name (B,C).
+- `akrogon timing --cohort --since <iso>` applies the recorded gate. A leaf joins the cohort, in order of its first delivered plan prompt after `<iso>`, and leaves it only when its first implement-exit diff exceeds 600 changed lines; leaves that fail or stall before an implement exit stay in (B,C). The first 20 members are the cohort. F = first plan prompt to merged minus implement prompted time. A failed leaf or one unmerged 24 h after its first plan prompt counts as F above 45 min. A merge ejection is a merge attempt with outcome `ejected` or `red` naming the leaf as holder or member. Result `pass` needs median F <= 35 min, at least 15 of 20 with F <= 45 min, at most 2 ejections and at least 18 merged; `fail` when any of these can no longer be met; otherwise `insufficient`, including while a member is unmerged, not failed and younger than 24 h (C). Each member line shows F or `over 45 (failed|stalled)`, coverage gaps, and paused, parked and prerequisite waiting beside it.
+
+## Why
+Measure-and-revisit 1a: the operator reads where each leaf's time goes, and the leaves-as-chunks gate is applied by a rule fixed before results exist.
+
+## Done-criteria
+1. For a leaf with a complete event set, `akrogon timing <slug>` prints per closed visit waiting by reason, unattributed waiting and prompted time that sum to the visit's elapsed time, check time shown within prompted time, overlapping review prompts counted once, and the initial plan visit starting at its `visit_start`.
+2. A closed visit missing an expected event under the rules above is printed incomplete with the event named; an open visit, a running check, a `failed` visit and a B-only re-check are not reported missing.
+3. `akrogon timing --cohort --since <iso>` over fixture records prints `pass`, `fail` and `insufficient` exactly per the rule above, including a cohort holding a leaf failed in planning, a leaf stalled past 24 h, a leaf above 600 lines that is replaced, and a leaf unmerged under 24 h.

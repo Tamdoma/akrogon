@@ -1,0 +1,4 @@
+# Brief for C: restore (blind)
+Chart: /home/ivan/Work/infra/akrogon/issues/chart/host-test-load. Read INTAKE.md, CHART.md, forks/limit-boundary.md Taken, forks/seat-scope.md Taken (operator took 1a: pane shell boxed inside allocate before agent start, one manual tab close at rollout, operator wants low complexity), forks/restore.md.
+Question: forks/restore.md Q1. When herdr restores a session (server restart, reboot), what must happen to akrogon leaf panes so no seat or descendant runs outside its box or without the bus cut?
+Write blind notes (do not read other seats' restore files) to slots/restore-C.md: your pick and its cost, rejected options with reasons, evidence with path:line or source and date, pitfalls and what removes each, missing questions. Inspect herdr source at /home/ivan/Work/infra/herdrdev/herdr (installed 0.9.1) and akrogon src/next.ts, including the --resume path. Prefer the option with the fewest moving parts. Read only, no live herdr restarts.

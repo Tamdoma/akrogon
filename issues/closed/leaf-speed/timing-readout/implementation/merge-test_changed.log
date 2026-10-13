@@ -1,0 +1,27 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [0.00ms]
+bun test v1.4.3 (c6da4a4d3)
+[0.00ms] ".env"
+--changed: 8 changed files, running 2/46 test files
+
+tests/command-reference.test.ts:
+(pass) README covers every dispatched command and its argument contract [0.81ms]
+(pass) coverage rejects missing, extra and duplicate rows and newly dispatched verbs [0.32ms]
+(pass) argument contracts reject lost values, requiredness and exclusive alternatives [1.21ms]
+(pass) escaped alternatives and reordered rows preserve argument semantics [0.12ms]
+
+tests/timing-report.test.ts:
+(pass) cohort gate: pass applies membership, 600-line exit, stall and failure accounting in prompt order [66.76ms]
+(pass) cohort gate: fails when the two central F values average above 35 minutes [66.67ms]
+(pass) slug report: missing expected events are named per visit while exempt visits stay clean [69.92ms]
+(pass) slug report: each closed visit decomposes into priority waits, prompted time and unattributed waiting [71.84ms]
+(pass) cohort gate: fail when fewer than 18 members merge [70.69ms]
+(pass) cohort member: parked waiting continues after the last phase move [71.45ms]
+(pass) cohort gate: insufficient while a member is unmerged and younger than 24 hours [77.19ms]
+(pass) cohort gate: remains insufficient with 17 merged and three stalled members [76.90ms]
+
+ 12 pass
+ 0 fail
+ 1220 expect() calls
+Ran 12 tests across 2 files. [105.00ms]

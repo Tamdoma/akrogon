@@ -1,0 +1,5 @@
+- F1. The “4 min per extra unit” estimate does not establish a 12-minute savings cap. Observed worker counts and elapsed time do not isolate causal chunk overhead. Serial inter-worker gaps had median 0.9 minutes and p90 14.2 minutes, and parent time includes necessary proof. Removing workers may remove coordination but cannot remove all that work. Do not use this estimate as evidence that leaves-as-chunks has no merit.
+
+- F2. “Each extra leaf pays about 55 to 60 min fixed cost” treats an elapsed-time residual as a marginal cost. Planning, review, repair, fix and waiting vary with scope, dependencies and defects. The earlier rebuttal explicitly rejected that inference. The timing command can measure those components, but their sum should be labelled non-implementation elapsed time, not a proven repeatable cost per extra leaf.
+
+- F3. “Dropped, not deferred” is stronger than the quoted operator replies. The operator rejects revisiting an option with no merit and then requests stopwatches and future testing. Neither reply explicitly cancels the earlier 20-leaf review. Record the timing decision without claiming permanent rejection from these quotes.

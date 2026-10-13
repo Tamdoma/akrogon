@@ -1,0 +1,31 @@
+slug: run-permit
+phase: merged
+created: 2026-10-13
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#88"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tBQ
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pP6
+  B: w8:pP7
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-13T10:58:36.408Z
+frozen:
+  tests/AREA.md: c38c6223109c04c286341d186c020291e1ffdd0d
+  tests/run-check.test.ts: 76a10e97d6a0d61f8c80231a05a0a3b061564d1e
+  tests/run-permit.test.ts: a79b356e8b7c7bfe76848b7590813869c47fb2ef
+frozen_cited: []

@@ -1,0 +1,5 @@
+# Final-shape check C (disagreements only)
+
+- “Dropped, not deferred” is stronger than the operator's words. “If it has no merit” is conditional, and “start testing it for the future” does not unambiguously cancel a future trial. The cited 55-60 min is a current proxy (post-implement 50.2 plus estimated plan; B's baseline was 42.7), before the loop fixes meant to reduce it. The record supports “no merit at current cost, no revisit gate”, not a settled permanent drop.
+- The 12 min “cap” also overstates the arithmetic. About 4 min per extra unit is median seat overhead; larger leaves carry more, and splitting changes parallelism and possible batch sharing. It shows a chained median leaf loses at today's fixed cost, not that every future shape must.
+- Q2's purpose promises “waiting by kind”, but the adopted O1 events plus the two additions do not record waiting-reason changes, pause intervals, prerequisite changes or operator holds. Phase and queue waiting can be derived; those kinds cannot. Either add reason-change events or narrow the stated purpose.

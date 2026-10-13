@@ -1,0 +1,49 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-10-13'
+      answer: '1a | 2a | 3a (handoff review: tree, contracts and live-change grants approved)'
+    principal: leaf seat processes running as ivan uid 1000
+    account: local user ivan (uid 1000), user systemd manager user@1000
+    credential:
+      name: none (local user session)
+      holder: none
+    targets: [user systemd manager user@1000, an isolated herdr server under a temporary XDG_CONFIG_HOME, a temporary AKROGON_HOME and temporary git repo]
+    fixtures:
+      - account: local user ivan
+        purpose: live proof that stop ends a dispatched leaf's processes and closes its panes (criterion 1)
+        marker: leaf slug prefix live-stop
+        naming: herdr tab and leaf slug live-stop-<n>, slice from leafSlice(repo, slug), pane scopes under it
+        count: 1
+        cleanup:
+          - step: systemctl --user stop the fixture leaf slice and the isolated server unit, reset-failed, remove the temporary config, home, repo and any pi or codex session folders the fixture seat created
+            identity: leaf seat as ivan uid 1000
+        absence_check: systemctl --user list-units --all 'akrogon-l*' shows none of the fixture slices, the isolated server unit is inactive, the temporary paths are gone
+    operations: [herdr server start and stop under the temporary config, herdr workspace, tab and pane create, split and close there, herdr agent start, StartTransientUnit via busctl, systemctl --user stop, show, reset-failed and daemon-reload]
+    effects: local only, no public, billing, DNS or retention effects
+    bounds: at most 3 live attempts, each cleaned up before the next
+    stop_line: never touch the operator's herdr sessions, real akrogon home or registered repos, Chrome, other leaves' slices, or any ~/.config/systemd/user file
+retained: []
+proofs:
+  - operation: slice stop closes a boxed herdr pane
+    command: systemctl --user stop akrogon-proof-t2.slice
+    identity: ivan uid 1000, user systemd manager
+    target: throwaway herdr tab with pi
+    version: herdr 0.9.1, systemd 262
+    date: '2026-10-13'
+    result: processes ended, pane and tab closed, 19 ms with SendSIGHUP, 5217 ms and a failed unit without
+    cleanup: reset-failed, no units or tabs left
+    limits: idle seat, no browser in that pass
+    record: issues/chart/host-test-load/proofs.md
+  - operation: systemctl stop from a bus-cut shell
+    command: DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent systemctl --user stop akrogon-proof.slice
+    identity: ivan uid 1000, user systemd manager
+    target: transient scope
+    version: systemd 262
+    date: '2026-10-13'
+    result: exit 0, process ended
+    cleanup: none left
+    limits: one process
+    record: issues/chart/host-test-load/proofs.md

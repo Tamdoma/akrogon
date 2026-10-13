@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: flock(2) through bun:ffi with SIGKILL release
+    command: bun script dlopen libc.so.6 flock LOCK_EX|LOCK_NB, holder SIGKILLed with a setsid child alive
+    identity: ivan uid 1000, user systemd manager
+    target: temporary lock file
+    version: Bun on host, Linux 7.2
+    date: '2026-10-13'
+    result: second holder acquired 3004 ms after start, when the first was SIGKILLed, child alive
+    cleanup: scratch removed
+    limits: one host, one kernel, two processes
+    record: issues/chart/host-test-load/proofs.md

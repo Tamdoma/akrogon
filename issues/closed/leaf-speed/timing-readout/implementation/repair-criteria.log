@@ -1,0 +1,22 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/command-reference.test.ts:
+(pass) README covers every dispatched command and its argument contract [0.78ms]
+(pass) coverage rejects missing, extra and duplicate rows and newly dispatched verbs [0.30ms]
+(pass) argument contracts reject lost values, requiredness and exclusive alternatives [1.20ms]
+(pass) escaped alternatives and reordered rows preserve argument semantics [0.11ms]
+
+tests/timing-report.test.ts:
+(pass) cohort member: parked waiting continues after the last phase move [48.46ms]
+(pass) cohort gate: pass applies membership, 600-line exit, stall and failure accounting in prompt order [51.36ms]
+(pass) slug report: missing expected events are named per visit while exempt visits stay clean [52.21ms]
+(pass) slug report: each closed visit decomposes into priority waits, prompted time and unattributed waiting [52.90ms]
+(pass) cohort gate: fails when the two central F values average above 35 minutes [51.64ms]
+(pass) cohort gate: fail when fewer than 18 members merge [52.49ms]
+(pass) cohort gate: insufficient while a member is unmerged and younger than 24 hours [52.60ms]
+(pass) cohort gate: remains insufficient with 17 merged and three stalled members [52.87ms]
+
+ 12 pass
+ 0 fail
+ 1220 expect() calls
+Ran 12 tests across 2 files. [70.00ms]

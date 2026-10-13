@@ -1,0 +1,89 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-10-13'
+      answer: '1a | 2a | 3a (handoff review), then 1a 2026-10-13 (live run may link akrogon.slice into ~/.config/systemd/user and remove it after)'
+    principal: leaf seat processes running as ivan uid 1000
+    account: local user ivan (uid 1000), user systemd manager user@1000
+    credential:
+      name: none (local user session)
+      holder: none
+    targets: [user systemd manager user@1000, an isolated herdr server under a temporary XDG_CONFIG_HOME, a temporary AKROGON_HOME and temporary git repo]
+    fixtures:
+      - account: local user ivan
+        purpose: live proof of pane boxing and restore replacement (criteria 2, 5)
+        marker: leaf slug prefix live-seat
+        naming: herdr tab and leaf slug live-seat-<n>, slice from leafSlice(repo, slug), pane scopes under it
+        count: 1
+        cleanup:
+          - step: remove the live ~/.config/systemd/user/akrogon.slice link and run systemctl --user daemon-reload, systemctl --user stop the fixture leaf slice and the isolated server unit, reset-failed, remove the temporary config, home, repo and any pi or codex session folders the fixture seat created
+            identity: leaf seat as ivan uid 1000
+        absence_check: systemctl --user list-units --all 'akrogon-l*' shows none of the fixture slices, the isolated server unit is inactive, the temporary paths are gone
+    operations: [herdr server start and stop under the temporary config, herdr workspace, tab and pane create, split and close there, herdr agent start, StartTransientUnit via busctl, systemctl --user stop, show, reset-failed and daemon-reload]
+    effects: local only, no public, billing, DNS or retention effects
+    bounds: at most 3 live attempts, each cleaned up before the next
+    stop_line: never touch the operator's herdr sessions, real akrogon home or registered repos, Chrome, other leaves' slices, or any ~/.config/systemd/user file other than the akrogon.slice link, which is removed after the live run
+retained: []
+proofs:
+  - operation: akrogon.slice unit file
+    command: systemctl --user daemon-reload, systemctl --user show akrogon.slice
+    identity: ivan uid 1000, user systemd manager
+    target: ~/.config/systemd/user/akrogon.slice
+    version: systemd 262
+    date: '2026-10-13'
+    result: CPUQuotaPerSecUSec=16s MemoryHigh=64G MemoryMax=96G MemorySwapMax=0, cpu.max 1600000 100000
+    cleanup: file removed, daemon-reload
+    limits: values read back, not load behavior
+    record: issues/chart/host-test-load/proofs.md
+  - operation: seat smoke under the bus cut
+    command: DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent systemd-run --user --scope ... pi -p, codex exec, gh api user, git ls-remote private
+    identity: ivan uid 1000, user systemd manager
+    target: GitHub account ivanjuras, Tamdoma/tamdoma-framework
+    version: gh 2.100.0
+    date: '2026-10-13'
+    result: pi, codex, gh and private git work with gh file-stored token
+    cleanup: scope exited
+    limits: read-only calls, no push
+    record: issues/chart/host-test-load/proofs.md
+  - operation: StartTransientUnit PIDs adoption of a herdr pane shell and slice stop
+    command: herdr pane process-info, busctl --user call ... StartTransientUnit PIDs Slice TimeoutStopUSec SendSIGHUP, herdr agent start --kind pi, systemctl --user stop
+    identity: ivan uid 1000, user systemd manager
+    target: throwaway herdr tab
+    version: herdr 0.9.1, systemd 262
+    date: '2026-10-13'
+    result: shell and pi in the scope, stop 19 ms with SendSIGHUP, pane and tab closed
+    cleanup: reset-failed, no units or tabs left
+    limits: idle pi seat
+    record: issues/chart/host-test-load/proofs.md
+  - operation: cold herdr restore of a boxed seat
+    command: isolated herdr server under XDG_CONFIG_HOME, server stop and start
+    identity: ivan uid 1000, user systemd manager
+    target: disposable herdr server, no plugins
+    version: herdr 0.9.1
+    date: '2026-10-13'
+    result: seat resumed with same pane id, outside its scope, bus cut lost, idle before prompt
+    cleanup: server stopped, slices stopped, temp files and pi sessions removed
+    limits: replacement code not yet written
+    record: issues/chart/host-test-load/proofs.md
+  - operation: scope call from a bus-cut shell
+    command: busctl --user with and without DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus, systemctl --user stop
+    identity: ivan uid 1000, user systemd manager
+    target: tail child, transient scopes
+    version: systemd 262
+    date: '2026-10-13'
+    result: busctl needs the real bus address on its own subprocess, systemctl works under the cut
+    cleanup: slices stopped
+    limits: busctl CLI only
+    record: issues/chart/host-test-load/proofs.md
+  - operation: framework core under the slice limits
+    command: bun run framework:verify:core in akrogon-proof.slice under akrogon.slice with the bus cut
+    identity: ivan uid 1000, user systemd manager
+    target: framework scratch worktree d09a6f323
+    version: framework d09a6f323
+    date: '2026-10-13'
+    result: 265 s with known flake, 256 s pass
+    cleanup: worktree removed
+    limits: two runs, idle desktop
+    record: issues/chart/host-test-load/proofs.md

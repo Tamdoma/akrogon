@@ -1,0 +1,4 @@
+# Brief for C: stop (blind)
+Chart: /home/ivan/Work/infra/akrogon/issues/chart/host-test-load. Read INTAKE.md, CHART.md, forks/limit-boundary.md, seat-scope.md, restore.md, permit-release.md (all Taken), forks/stop.md. The operator wants low total complexity.
+Question: forks/stop.md Q1. What does the operator use to stop a leaf's running work, how is redispatch fenced after it, and does pi Esc change? Inspect akrogon pause/resume code and docs (grep isPaused, paused.yaml, docs/guide), src/next.ts dispatch gates, and the pi tamdoma-subagents wait-abort behavior (manager.test.ts:1652).
+Write blind notes (do not read other seats' stop files) to slots/stop-C.md: pick and cost, rejected options with reasons, evidence with path:line or source and date, pitfalls and what removes each, missing questions. Read only.

@@ -1,0 +1,7 @@
+Correct the cost attribution: B says the previous conversation is not automatically resumed, not that its saved history is deleted. Fresh dispatch uses artifacts, while harness files and work remain.
+
+**D1 — Mechanism:** Given the low-complexity preference, I accept A's existing global-disable plus pane-recreation route if the operator explicitly accepts disabling native auto-resume for unrelated agents too. Otherwise retain B's per-tab exclusion prerequisite. The global switch suppresses native restore plans (herdr/src/persist/restore.rs:781-789), but fresh leaf panes still need allocation's environment and adoption.
+
+**D2 — Startup window:** Reject C's enabled-resume route. “Idles until prompted” does not satisfy the locked requirement that the seat is boxed before launch. Herdr creates the shell and submits the resume command before akrogon's barrier (herdr/src/app/agent_resume.rs:219-246,264-281). A's global-disable route needs proof that no leaf harness starts before recreation, not a delay-based assumption.
+
+**D3 — Detection:** Neither predicate alone is sufficient. After validating leaf/pane ownership, reuse requires both the expected shell-generation scope and the locked bus cut. C's “foreign scope AND missing bus” misses either invariant failing alone. A scope check alone misses a wrong bus environment. On uncertain evidence, skip dispatch and report it. Recreate cold-restored panes before any start or prompt, including paths that otherwise return early for busy agents (src/next.ts:604-612).

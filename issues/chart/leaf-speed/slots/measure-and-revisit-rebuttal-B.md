@@ -1,0 +1,9 @@
+# Slot B rebuttal
+
+- F1. “F … is the cost a new leaf repeats” is unsupported. Created-to-merged minus implement prompted time includes planning, necessary review, dependency waits and operator holds. Prompted time also includes idle time and implementation validation. The merged notes themselves say it is not proven work. F is a residual elapsed-time metric, not an estimate of the marginal cost of another leaf. Report its components and measure the equal-scope trial before claiming repeatable overhead or a required 20-minute saving.
+
+- F2. “Adoption needs the trial or about 50 to 60 leaves (B,C)” misattributes B. I proposed at least 60 comparable leaves per assessed stratum for a tail trend, not adoption and not an alternative to a trial. A healthy whole-leaf cohort cannot show that splitting saves time. The trial must compare equal scope and dependency structure, measuring delivery time, validation rounds and integration defects.
+
+- F3. “First 20 leaves with first-implement-exit diff <= 600” conflicts with including failed and stalled leaves unless eligibility handles leaves that never reach that exit. They have neither the qualifying diff nor a completed F. Predeclare how those leaves enter the denominator and report unfinished elapsed time separately. Do not replace them with later successful leaves to obtain 20 measurable completions.
+
+- F4. “A timing append failure … reader marks that leaf’s coverage incomplete” lacks a detectable signal. A failed append leaves no event to read. State fields are overwritten or cleared, and first-seat completion has no transition row (`src/phase.ts`, `src/log.ts`). Specify a durable failure signal or independently checkable expected-event inventory before promising coverage detection. Otherwise missing retries and seat completions can look complete.
