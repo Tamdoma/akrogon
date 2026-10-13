@@ -86,6 +86,7 @@ import { selfUpdate } from './self-update';
 import { blockDetail, dependentCounts, mergeQueue, type DepDetail, type QueueEntry } from './turn';
 import { appendTiming, currentVisit, readTimings, recordWait, type WaitReason } from './timing';
 import { closeMergedTab, reconcile, reconcileNeedsPanes } from './reconcile';
+import { adoptShell, inOwnScope, leafSlice, type ScopePlace } from './scope';
 
 const hookEventSchema = z.discriminatedUnion('event', [
   z.object({
@@ -425,7 +426,22 @@ async function activeCount(global: GlobalConfig, invocation: Invocation): Promis
 }
 
 async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation: Invocation): Promise<State | null> {
-  const live: Pane[] = await panes();
+  const slice: string = leafSlice(repo, leaf.state.slug);
+  const listed: Pane[] = await panes();
+  const recorded: string[] = [leaf.state.pane.A, leaf.state.pane.B].filter(
+    (id): id is string => id !== undefined && listed.some((pane) => pane.pane_id === id),
+  );
+  let closed: boolean = false;
+  for (const id of recorded) {
+    const place: ScopePlace = await inOwnScope(slice, id);
+    if (place.place === 'unreadable')
+      throw new Error(`Cannot read the scope of pane ${id} for leaf ${leaf.state.slug}: ${place.error}`);
+    if (place.place === 'outside') {
+      await herdr(['pane', 'close', id], z.object({}));
+      closed = true;
+    }
+  }
+  const live: Pane[] = closed ? await panes() : listed;
   const liveTabs: Tab[] = await tabs();
   const expected: Leaf = {
     ...leaf,
@@ -461,6 +477,8 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     `TMPDIR=${scratch}`,
     '--env',
     'NODE_DISABLE_COMPILE_CACHE=1',
+    '--env',
+    'DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent',
     '--no-focus',
   ];
   const target: string[] = ['--workspace', workspace.workspace_id];
@@ -528,6 +546,19 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
         z.object({ pane: paneSchema }),
       )
     ).pane;
+  for (const pane of [first, second]) {
+    const place: ScopePlace = await inOwnScope(slice, pane.pane_id);
+    if (place.place === 'unreadable')
+      throw new Error(`Cannot read the scope of pane ${pane.pane_id} for leaf ${state.slug}: ${place.error}`);
+    if (place.place === 'outside') {
+      await adoptShell(slice, pane.pane_id);
+      const adopted: ScopePlace = await inOwnScope(slice, pane.pane_id);
+      if (adopted.place !== 'inside')
+        throw new Error(
+          `Pane ${pane.pane_id} for leaf ${state.slug} is not in its own scope after adoption: ${adopted.place === 'outside' ? adopted.cgroup : adopted.error}`,
+        );
+    }
+  }
   const allocated: State = { ...tabState, pane: { A: first.pane_id, B: second.pane_id } };
   saveState(leaf.path, allocated);
   return allocated;
