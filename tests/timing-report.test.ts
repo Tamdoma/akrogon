@@ -64,12 +64,20 @@ test('slug report: each closed visit decomposes into priority waits, prompted ti
       visitStart('t1', 'plan.synthesis', 0, at(0)),
       prompt('t1', 'A', 'plan.synthesis', 0, at(10)),
       event({ slug: 't1', kind: 'wait', reason: 'parked', ts: at(21) }),
-      event({ kind: 'repo_pause', pause: 'on', ts: at(22) }),
-      event({ kind: 'repo_pause', pause: 'off', ts: at(25) }),
+      { ts: at(22), repo: 'repo', kind: 'repo_pause', pause: 'on' },
+      { ts: at(25), repo: 'repo', kind: 'repo_pause', pause: 'off' },
       event({ slug: 't1', kind: 'wait', reason: 'none', ts: at(26) }),
       visitStart('t1', 'implement', 0, at(40)),
       prompt('t1', 'A', 'implement', 0, at(41)),
-      event({ slug: 't1', kind: 'check_start', run: 'r1', name: 'unit', scope: 'leaf', phase: 'implement', ts: at(42) }),
+      event({
+        slug: 't1',
+        kind: 'check_start',
+        run: 'r1',
+        name: 'unit',
+        scope: 'leaf',
+        phase: 'implement',
+        ts: at(42),
+      }),
       event({
         slug: 't1',
         kind: 'check_end',
@@ -139,13 +147,29 @@ test('slug report: missing expected events are named per visit while exempt visi
       prompt('t2', 'B', 'check.review', 0, at(22)),
       visitStart('t2', 'check.fix', 0, at(30)),
       prompt('t2', 'A', 'check.fix', 0, at(31)),
-      event({ slug: 't2', kind: 'check_start', run: 'r5', name: 'fixunit', scope: 'leaf', phase: 'check.fix', ts: at(32) }),
+      event({
+        slug: 't2',
+        kind: 'check_start',
+        run: 'r5',
+        name: 'fixunit',
+        scope: 'leaf',
+        phase: 'check.fix',
+        ts: at(32),
+      }),
       visitStart('t2', 'check.review', 1, at(40)),
       prompt('t2', 'B', 'check.review', 1, at(41)),
       visitStart('t2', 'merge', 0, at(50)),
       event({ slug: 't2', kind: 'check_start', run: 'r9', name: 'lint', scope: 'leaf', phase: 'merge', ts: at(55) }),
       visitStart('t2', 'implement', 1, at(70)),
-      event({ slug: 't2', kind: 'check_start', run: 'r10', name: 'run', scope: 'leaf', phase: 'implement', ts: at(71) }),
+      event({
+        slug: 't2',
+        kind: 'check_start',
+        run: 'r10',
+        name: 'run',
+        scope: 'leaf',
+        phase: 'implement',
+        ts: at(71),
+      }),
     ]);
     const result = await timing(f, ['t2']);
     expect(result.code).toBe(0);
@@ -242,16 +266,16 @@ test('cohort gate: pass applies membership, 600-line exit, stall and failure acc
       if (slug === 'l20') spec.stalled = true;
       if (slug === 'l02')
         spec.waitRows = [
-          event({ slug, kind: 'wait', reason: 'parked', ts: at(index + 1, 10) }),
-          event({ slug, kind: 'wait', reason: 'prerequisite', blocking: 'l01', ts: at(index + 1, 15) }),
-          event({ slug, kind: 'wait', reason: 'none', ts: at(index + 1, 18) }),
+          event({ slug, kind: 'wait', reason: 'parked', ts: at(index + 3) }),
+          event({ slug, kind: 'wait', reason: 'prerequisite', blocking: 'l01', ts: at(index + 8) }),
+          event({ slug, kind: 'wait', reason: 'none', ts: at(index + 11) }),
         ];
       if (slug === 'l03') {
-        spec.extraLog = [move({ slug, from: 'check.review', to: 'merge', ts: at(index + 1, 30) })];
+        spec.extraLog = [move({ slug, from: 'check.review', to: 'merge', ts: at(index + 31) })];
         spec.extraTimings = [
-          visitStart(slug, 'check.review', 0, at(index + 1, 22)),
-          prompt(slug, 'A', 'check.review', 0, at(index + 1, 23)),
-          prompt(slug, 'B', 'check.review', 0, at(index + 1, 24)),
+          visitStart(slug, 'check.review', 0, at(index + 23)),
+          prompt(slug, 'A', 'check.review', 0, at(index + 24)),
+          prompt(slug, 'B', 'check.review', 0, at(index + 25)),
         ];
       }
       const part = member(slug, planTs, 30, spec);
