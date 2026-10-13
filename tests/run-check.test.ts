@@ -61,6 +61,7 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
       'NODE_DISABLE_COMPILE_CACHE',
       'TMPDIR',
       'AKROGON_BASE',
+      'AKROGON_RUN',
       'CHECK_TOKEN',
       'PWD',
       'SHLVL',

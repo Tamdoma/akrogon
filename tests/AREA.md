@@ -13,6 +13,7 @@
 - `tests/docs-links.test.ts` checks relative links and heading anchors in README and the guide.
 - `tests/watch-issues-scripts.test.ts` is the `skills/watch-issues` gate, running its scripts tests and typecheck.
 - `tests/guard.test.ts` checks the `akrogon guard` ancestor and own-modules refusals.
+- `tests/run-permit.test.ts` checks the host-wide run permit: waiting, the holder line, SIGKILL release, nested runs, token mismatches, `status`/`next` while waiting and the status holder line.
 - `tests/base-run.test.ts` checks the base checkout, record line, env and cleanup of `base-run`.
 - `tests/compare.test.ts` checks the comparison record, red record and `--compare` flag.
 - `tests/red-docs.test.ts` checks the skills and guide carry the retry, comparison and `known-red` rules, the merge skill's `--compare` contract and the retired `red on base` stop wording's absence.
