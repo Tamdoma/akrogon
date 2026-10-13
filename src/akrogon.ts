@@ -29,7 +29,7 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
         }
       : verb === 'next'
         ? { all: { type: 'boolean' }, resume: { type: 'boolean' } }
-        : verb === 'pull' || verb === 'park' || verb === 'unpark'
+        : verb === 'pull' || verb === 'park' || verb === 'unpark' || verb === 'stop'
           ? { all: { type: 'boolean' } }
           : verb === 'close'
             ? { by: { type: 'string' } }
@@ -134,6 +134,15 @@ switch (verb) {
     await (await import('./next')).unpausePass(repo);
     break;
   }
+  case 'stop':
+    if (positionals.length + Number(values.all === true) !== 1) throw new Error('Usage: akrogon stop <slug> | --all');
+    await (await import('./stop')).stopCommand(positionals[0], values.all === true, process.cwd());
+    break;
+  case 'start': {
+    const [slug]: [string] = z.tuple([z.string()]).parse(positionals);
+    await (await import('./stop')).startCommand(slug, process.cwd());
+    break;
+  }
   case 'status':
     if (values.charts === true && positionals.length !== 0) throw new Error('Use a slug or --charts, not both');
     z.array(z.string()).max(1).parse(positionals);
@@ -184,6 +193,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|sync|status|timing|run-check|base-run|guard>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|start|sync|status|timing|run-check|base-run|guard>',
     );
 }

@@ -4,6 +4,7 @@ node_modules/
 issues/seeds/
 .lock
 paused.yaml
+stopped.yaml
 run.lock
 run-holder.yaml
 reconcile/
