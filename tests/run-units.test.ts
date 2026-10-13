@@ -276,6 +276,11 @@ test.serial('stop-run stops only the caller pane scope runs', async () => {
   const units = (name: string): string => `akrogon-run-${ids[name]}.scope`;
   for (const name of ['a1', 'a2', 'b1']) await waitPath(unitDir('/sys/fs/cgroup', slice, units(name)));
   try {
+    // No id: list the caller's runs and refuse unless exactly one matches.
+    const two: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run'], worktree).result;
+    expect(two.code).not.toBe(0);
+    expect(two.stdout).toContain(ids.a2);
+    expect((await run(['systemctl', '--user', 'is-active', units('a2')])).code).toBe(0);
     // a1 stopped by the launching pane scope: unit dies; a2 and b1 keep running.
     const stopped: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run', ids.a1], worktree).result;
     expect(stopped.code).toBe(0);
@@ -298,13 +303,14 @@ test.serial('stop-run stops only the caller pane scope runs', async () => {
     ).result;
     expect(plain.code).not.toBe(0);
     expect((await run(['systemctl', '--user', 'is-active', units('a2')])).code).toBe(0);
-    // No id: list the caller's runs and refuse unless exactly one matches.
-    const two: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run'], worktree).result;
-    expect(two.code).not.toBe(0);
-    expect(two.stdout).toContain(ids.a2);
-    expect((await run(['systemctl', '--user', 'is-active', units('a2')])).code).toBe(0);
     const none: SpawnResult = await spawnScoped(f, 'paneC.scope', ['stop-run'], worktree).result;
     expect(none.code).not.toBe(0);
+    // The stopped run's record can linger until its wrapper's finally runs.
+    const cleared: number = Date.now() + 15000;
+    while ((await runRecords(f)).some((record) => record.run === ids.a1)) {
+      if (Date.now() > cleared) throw new Error('a1 record still present after its unit died');
+      await Bun.sleep(50);
+    }
     // paneA has exactly one run left: bare stop-run stops it.
     const last: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run'], worktree).result;
     expect(last.code).toBe(0);
