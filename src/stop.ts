@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { globalHome, readGlobal, requireRepo, type Repo } from './config';
 import { leafSlice } from './scope';
 import { command, CommandError, writeYaml } from './shell';
-import { allLeaves, findLeaf, withLock, type Leaf } from './state';
+import { findLeaf, leavesUnder, withLock, type Leaf } from './state';
 
 const stopSchema = z.record(z.string().min(1), z.literal(true));
 
@@ -55,9 +55,10 @@ async function stopSlice(repo: Repo, slug: string): Promise<void> {
 
 export async function stopCommand(target: string | undefined, all: boolean, cwd: string): Promise<void> {
   const repo: Repo = await requireRepo(readGlobal(), cwd);
+  const open: string = resolve(repo.root, 'issues/open');
   const slugs: string[] = all
-    ? allLeaves(repo)
-        .filter((leaf: Leaf) => leaf.state.tab !== undefined)
+    ? leavesUnder(open, open)
+        .filter((leaf: Leaf) => leaf.state.tab !== undefined && leaf.state.phase !== 'merged')
         .map((leaf: Leaf) => leaf.state.slug)
     : [findLeaf(repo, z.string().parse(target)).state.slug];
   await withLock(resolve(globalHome(), '.lock'), async () => {
