@@ -138,7 +138,7 @@ It prints one result line per leaf. One failure does not stop the others, and th
 
 While a leaf is stopped, automatic passes skip it quietly. A typed `akrogon next <slug>`, bare `akrogon next` or `akrogon next --all` reports the leaf with an error naming `akrogon start <slug>` and exits non-zero. The merge turn builds no stack and prompts no merge seat for it. `akrogon status` shows stopped in the NOTE column, and `akrogon status <slug>` prints a `stopped:` line.
 
-Start removes the stopped record and runs `akrogon next <slug>`:
+Start removes the stopped record and runs the targeted next pass for that leaf by its folder path:
 
 ```sh
 akrogon start <slug>
