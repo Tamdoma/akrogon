@@ -120,6 +120,27 @@ for (const failure of ['busctl.fail', 'busctl.misplace']) {
   }, 20000);
 }
 
+test('a shell systemd moves after the adoption call returns is still boxed', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'build', 'plan.synthesis');
+    writeFileSync(resolve(f.home, 'busctl.delay'), '');
+    const result: Result = await next(f, ['build']);
+    expect(skipped(result)).toEqual([]);
+    expect(result.code).toBe(0);
+    const state = readState(path);
+    const slice: string = expectedSlice('repo', 'build');
+    for (const id of [state.pane.A!, state.pane.B!])
+      expect(
+        readFileSync(cgroupPath(f, id), 'utf8')
+          .trim()
+          .endsWith(`/${slice}/${expectedScope(slice, id)}`),
+      ).toBe(true);
+  } finally {
+    f.clean();
+  }
+}, 20000);
+
 test('an outside pane is closed and recreated boxed before any prompt', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {

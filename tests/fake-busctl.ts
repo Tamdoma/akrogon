@@ -54,8 +54,12 @@ if (existsSync(resolve(home, 'busctl.fail'))) {
   process.exit(1);
 }
 const placed: string = existsSync(resolve(home, 'busctl.misplace')) ? `other-${scope}` : scope;
-writeFileSync(
-  resolve(procDir(procRoot, call.pid), 'cgroup'),
-  `0::/user.slice/user-1000.slice/user@1000.service/akrogon.slice/${call.slice}/${placed}\n`,
-);
+const cgroupFile: string = resolve(procDir(procRoot, call.pid), 'cgroup');
+const cgroup: string = `0::/user.slice/user-1000.slice/user@1000.service/akrogon.slice/${call.slice}/${placed}\n`;
+// Real systemd queues the job and moves the shell after the call returns.
+if (existsSync(resolve(home, 'busctl.delay')))
+  Bun.spawn(['sh', '-c', 'sleep 0.5 && printf %s "$1" > "$2"', 'sh', cgroup, cgroupFile], {
+    stdio: ['ignore', 'ignore', 'ignore'],
+  }).unref();
+else writeFileSync(cgroupFile, cgroup);
 console.log('o "/org/freedesktop/systemd1/job/1"');
