@@ -324,12 +324,24 @@ describe('self-update', () => {
 
   async function withHome(home: string, body: () => Promise<void>): Promise<void> {
     const previous: string | undefined = process.env.AKROGON_HOME;
+    const previousPath: string | undefined = process.env.PATH;
+    const bin: string = resolve(home, 'fake-bin');
+    if (!existsSync(bin)) {
+      mkdirSync(bin);
+      symlinkSync(resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(bin, 'systemctl'));
+    }
     process.env.AKROGON_HOME = home;
+    process.env.PATH = `${bin}:${previousPath}`;
+    process.env.FAKE_SYSTEMCTL_LOG = resolve(home, 'systemctl.log');
+    process.env.FAKE_SLICE_LINK = resolve(home, '.config/systemd/user/akrogon.slice');
     try {
       await body();
     } finally {
       if (previous === undefined) delete process.env.AKROGON_HOME;
       else process.env.AKROGON_HOME = previous;
+      process.env.PATH = previousPath;
+      delete process.env.FAKE_SYSTEMCTL_LOG;
+      delete process.env.FAKE_SLICE_LINK;
     }
   }
 
