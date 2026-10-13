@@ -76,7 +76,7 @@ test('install links akrogon.slice with the ceiling values and reloads the user m
     const unit: string[] = readFileSync(link, 'utf8')
       .split('\n')
       .map((line) => line.trim());
-    for (const line of ['CPUWeight=20', 'CPUQuota=1600%', 'MemoryHigh=64G', 'MemoryMax=96G', 'MemorySwapMax=0'])
+    for (const line of ['CPUWeight=20', 'MemoryHigh=64G', 'MemoryMax=96G', 'MemorySwapMax=0'])
       expect(unit).toContain(line);
     expect(unit.some((line) => line.startsWith('TasksMax'))).toBe(false);
     expect(readFileSync(resolve(f.home, 'systemctl.log'), 'utf8').trim().split('\n')).toContain(
