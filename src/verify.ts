@@ -26,7 +26,6 @@ export const verifyRunSchema = z.strictObject({
   commands: z.array(z.strictObject({ name: z.string(), command: z.string(), exit: z.number().int(), log: z.string() })),
   start: z.string(),
   end: z.string().optional(),
-  removed: z.string().optional(),
 });
 
 export type VerifyRun = z.infer<typeof verifyRunSchema>;
@@ -132,7 +131,6 @@ export async function verify(
   const ran: VerifyRun['commands'] = [];
   let setupExit: number | undefined;
   let end: string | undefined;
-  let removed: string | undefined;
   try {
     await createSparseWorktree(repo, target, sha, { detach: true });
     await emitEnvFile(repo, target, repo.config.env);
@@ -156,10 +154,6 @@ export async function verify(
     }
     end = new Date().toISOString();
   } finally {
-    if (existsSync(target)) {
-      await command(['git', 'worktree', 'remove', '--force', target], repo.root);
-      removed = new Date().toISOString();
-    }
     await withLock(lock, async () => {
       const file: string = recordsPath(repo);
       const runs: VerifyRun[] = readVerifyRuns(repo);
@@ -170,12 +164,12 @@ export async function verify(
         ...(setupExit === undefined ? {} : { setup: setupExit }),
         commands: ran,
         ...(end === undefined ? {} : { end }),
-        ...(removed === undefined ? {} : { removed }),
       };
       const temporary: string = `${file}.${process.pid}.tmp`;
       writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
       renameSync(temporary, file);
     });
+    if (existsSync(target)) await command(['git', 'worktree', 'remove', '--force', target], repo.root);
   }
   const green: boolean = setupExit === 0 && ran.every((item) => item.exit === 0);
   process.stdout.write(`verify ${scope} ${sha}: ${green ? 'green' : 'red'}\n`);

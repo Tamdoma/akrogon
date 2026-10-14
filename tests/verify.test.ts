@@ -79,7 +79,6 @@ test('verify runs every leaf check on a fresh checkout of HEAD, keeps logs and w
     for (const item of run.commands)
       expect(item.log.startsWith(resolve(leafPath, 'implementation') + '/check-')).toBe(true);
     expect(typeof run.end).toBe('string');
-    expect(typeof run.removed).toBe('string');
     expect(existsSync(run.path)).toBe(false);
     expect(readdirSync(storeDir(f)).filter((name) => name.startsWith('verify-'))).toEqual([]);
   } finally {
@@ -196,7 +195,6 @@ test('a run killed during setup leaves a record with start and no end or removal
     const run: VerifyRun = records(f)[0];
     expect(typeof run.start).toBe('string');
     expect(run.end).toBeUndefined();
-    expect(run.removed).toBeUndefined();
   } finally {
     f.clean();
   }
@@ -229,7 +227,7 @@ test('a checkout missing its own node_modules is refused and named in the log', 
     expect(log).toContain('missing own node_modules');
     expect(log).not.toContain('unreached');
     expect(run.commands[0].exit).not.toBe(0);
-    expect(typeof run.removed).toBe('string');
+    expect(existsSync(run.path)).toBe(false);
   } finally {
     f.clean();
   }

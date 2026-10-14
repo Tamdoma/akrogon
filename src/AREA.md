@@ -26,7 +26,7 @@
 - Phase moves reject a dirty worktree and branch changes under `issues/`; a stop into `failed` skips both, a `cause: blocked` restart skips only the dirty check, and the empty-branch refusal applies only at review handoff.
 - External command retries warn once, then preserve the last failure context.
 - Foreign leaves are summarized once per repo and excluded from capacity and dispatch; prompt delivery is one attempt per pass per seat, with a timeout settling against the seat session file on the next pass.
-- `verify` appends its receipt before checkout, then rewrites `verify-runs.jsonl` under the same lock with each command's exit and log, end and removal time; `end` is set only after every command ran, and a receipt matches only its sha, scope and the exact current command set.
+- `verify` appends its receipt before checkout, then rewrites `verify-runs.jsonl` under the same lock with its setup exit, each command's exit and log and its end before removing the checkout; `end` is set only after every command ran, and a receipt matches only its sha, scope and the exact current command set.
 - `akrogon config` composes a repo's `setup` key into every printed `checks`, `merge_checks` and `advisory` command as a `flock`ed `sh -c <setup> && sh -c <command>`.
 - A leaf worktree's `.env` is a written file (mode 0600) holding only declared `env:` names copied from the registered checkout; dispatch rewrites it when no tab is live and refuses a tracked path or missing ignore rule.
 - `buildStack` removes resurrected retired lesson lines as a fixup commit on the stack top, and `merged --check` refuses a pushed range still holding one.

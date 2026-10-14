@@ -216,7 +216,6 @@ export function greenReceipt(
     commands: commands.map((item) => ({ ...item, exit: 0, log: resolve(f.home, 'verified.log') })),
     start: at,
     end: at,
-    removed: at,
   };
   appendFileSync(resolve(f.root, 'issues/verify-runs.jsonl'), JSON.stringify(record) + '\n');
 }

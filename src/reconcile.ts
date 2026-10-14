@@ -379,9 +379,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       continue;
     }
     if (name.startsWith('verify-')) {
-      const record: VerifyRun | undefined = verifyRuns.find(
-        (item) => item.run === name.slice('verify-'.length) && item.removed === undefined,
-      );
+      const record: VerifyRun | undefined = verifyRuns.find((item) => item.run === name.slice('verify-'.length));
       if (record !== undefined) {
         if (record.end === undefined && !ownerDead({ pid: record.pid, boot_id: record.boot_id })) {
           keep(path, `verify ${record.run} in progress`);
