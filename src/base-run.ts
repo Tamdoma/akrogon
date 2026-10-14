@@ -17,7 +17,7 @@ import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { constructedEnv, spawnLogged } from './run-check';
 import { callerScope, withAdmission } from './admission';
-import { runSlice, runUnitArgv, runUnitBase, sessionBusAddress, startRunGuard, stopRunUnits } from './scope';
+import { leafSlice, runSlice, runUnitArgv, runUnitBase, sessionBusAddress, startRunGuard, stopRunUnits } from './scope';
 import { command, quote, type Result } from './shell';
 import { allLeaves, withLock, type Leaf } from './state';
 import { requiredSlots, slotSchema, type Slot } from './routing';
@@ -163,7 +163,7 @@ export async function baseRun(
             setup,
           )} && akrogon guard own-modules && ${enter}exec "$@"`;
     if (inside !== '') mkdirSync(resolve(target, inside), { recursive: true });
-    const slice: string = runSlice('akrogon.slice');
+    const slice: string = runSlice(leafSlice(repo, leaf.state.slug));
     const unit: string = `${runUnitBase(id)}.scope`;
     const ran: Result = await withAdmission(
       {
