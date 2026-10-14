@@ -148,6 +148,8 @@ Start exits non-zero on a leaf that is not stopped.
 
 Panes you split by hand in a leaf tab are outside the slice and survive a stop. Pause kills nothing: it only freezes automatic dispatch.
 
+A single check run stops on its own with `akrogon stop-run [<run-id>]`: the `run <id>` line the run printed at start carries the id, a run started by another pane is refused, and with no id it stops only when the caller has exactly one live run. It stops only runs the caller's pane scope launched, so other seats' and leaves' runs are unaffected.
+
 ## How order is decided
 
 A leaf must have valid state and satisfied dependencies. Failed leaves are skipped.
