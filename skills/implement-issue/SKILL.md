@@ -3,7 +3,7 @@ name: implement-issue
 description: Implement a leaf plan or repair its review findings, using eight-section worker sub-briefs and waves of up to 3 independent workers, configured inline execution, or a serial-solo run when every wave holds one unit; without a leaf, implement the prompt task standalone or, for the chart door's direct route, a charted task in a named worktree.
 ---
 
-Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt. After compaction, standalone re-reads its task brief instead of a leaf.
+At every phase prompt, re-read this file, its references and the leaf's `brief.md` and `design.md` from disk before acting, even when read earlier in this thread. After compaction, standalone re-reads its task brief instead of a leaf.
 
 # Implement issue
 

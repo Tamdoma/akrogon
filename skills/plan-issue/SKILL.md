@@ -3,7 +3,7 @@ name: plan-issue
 description: Write a leaf's execution plan through blind positions, one rebuttal round, or slot A synthesis, including direct synthesis when debate is off.
 ---
 
-Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
+At every phase prompt, re-read this file, its references and the leaf's `brief.md` and `design.md` from disk before acting, even when read earlier in this thread.
 
 # Plan issue
 

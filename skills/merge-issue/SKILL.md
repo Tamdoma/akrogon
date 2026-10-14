@@ -3,7 +3,7 @@ name: merge-issue
 description: Check the rebased merge leaf or rebase a solo leaf in its worktree, run checks, let the command push and move the leaf, gather the completion owner's briefs, and run one broadcast per `issue complete` or `epic complete` line.
 ---
 
-Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
+At every phase prompt, re-read this file, its references and the leaf's `brief.md` and `design.md` from disk before acting, even when read earlier in this thread.
 
 # Merge issue
 

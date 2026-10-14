@@ -3,7 +3,7 @@ name: broadcast-issue
 description: Compose and send one factual update for a completed standalone issue or epic to its configured Discord targets, run by the merge slot itself after `issue complete` or `epic complete`, or by the chart door after a direct landing.
 ---
 
-Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt. After compaction, use the completed issue context supplied by the merger if its folder moved.
+At every phase prompt, re-read this file, its references and the leaf's `brief.md` and `design.md` from disk before acting, even when read earlier in this thread. After compaction, use the completed issue context supplied by the merger if its folder moved.
 
 # Broadcast issue
 

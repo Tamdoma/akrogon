@@ -3,7 +3,7 @@ name: check-issue
 description: Review a leaf implementation with concrete-defect verdicts, repair most Fixes as slot B in check.repair, or re-check A's repair diff as slot B; also review a chart's direct-route implementation as slot B.
 ---
 
-Re-read this file and its references only after compaction. A file already read in this thread and not edited since is not read again for a later phase prompt.
+At every phase prompt, re-read this file, its references and the leaf's `brief.md` and `design.md` from disk before acting, even when read earlier in this thread.
 
 # Check issue
 
