@@ -442,6 +442,25 @@ test.serial('an inconsistent record stamps --check without a base run', async ()
   }
 });
 
+test.serial('an inconsistent record whose failing unit is unverified stamps --check at merge', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const fx: BatchFixture = await batchFixture(f, ['hold']);
+    const head: string = await headOf(fx);
+    const file: string = writeRecord(
+      fx.holderPath,
+      'compare-flaky.yaml',
+      mergeRecord(fx.holderPath, { state: 'inconsistent', leafRevision: head, units: [{ verdict: 'unverified' }] }),
+    );
+    const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
+    expect(checked.code).toBe(0);
+    expect(readState(fx.holderPath).batch!.tested_top).toBe(head);
+    expect(redRecords(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('--compare on merged without --check and on check.fix is refused', async () => {
   const f: Fixture = await fixture();
   try {
@@ -559,10 +578,11 @@ for (const refusal of baseRunRefusals) {
   });
 }
 
-const verdictRefusals: { name: string; unit: Unit; expect: string }[] = [
-  { name: 'a new unit', unit: { verdict: 'new' }, expect: 'new' },
-  { name: 'an unverified unit', unit: { verdict: 'unverified' }, expect: 'unverified' },
-  { name: 'an own-criterion unit', unit: { own_criterion: true }, expect: 'own' },
+// A green retry (inconsistent) continues the merge whatever the verdict, so verdict refusals use a compared record.
+const verdictRefusals: { name: string; unit: Unit; state: 'compared' | 'inconsistent'; expect: string }[] = [
+  { name: 'a new unit', unit: { verdict: 'new' }, state: 'compared', expect: 'new' },
+  { name: 'an unverified unit', unit: { verdict: 'unverified' }, state: 'compared', expect: 'unverified' },
+  { name: 'an own-criterion unit', unit: { own_criterion: true }, state: 'inconsistent', expect: 'own' },
 ];
 
 for (const refusal of verdictRefusals) {
@@ -571,10 +591,18 @@ for (const refusal of verdictRefusals) {
     try {
       const fx: BatchFixture = await batchFixture(f, ['hold']);
       const head: string = await headOf(fx);
+      const baseLog: string = logFile(fx.holderPath, 'merge-base.log');
+      if (refusal.state === 'compared') baseRunLine(f, { base: fx.builtOn, log: baseLog });
       const file: string = writeRecord(
         fx.holderPath,
         'compare-1.yaml',
-        mergeRecord(fx.holderPath, { state: 'inconsistent', leafRevision: head, units: [refusal.unit] }),
+        mergeRecord(fx.holderPath, {
+          state: refusal.state,
+          leafRevision: head,
+          counterpart: fx.builtOn,
+          baseLog,
+          units: [refusal.unit],
+        }),
       );
       const checked: Result = await cli(f, checkArgs(file), f.root, fx.herdr.env);
       expect(checked.code).not.toBe(0);

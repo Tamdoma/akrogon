@@ -199,7 +199,8 @@ export async function validateComparisons(
       (requested === 'implement' || requested === 'check.review' || requested === 'merge' || merge !== undefined)
     )
       for (const unit of record.units) {
-        if (unit.verdict !== 'known-red')
+        // At merge a green retry of the same command lets the merge continue whatever the first run's verdict.
+        if (unit.verdict !== 'known-red' && !(merge !== undefined && record.state === 'inconsistent'))
           throw new ComparisonError(
             'Unit ' + unit.name + ' has verdict ' + unit.verdict + '; only known-red is admissible',
           );
