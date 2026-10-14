@@ -2,20 +2,11 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeF
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import {
-  base,
-  globalHome,
-  readGlobal,
-  requireRepo,
-  setupCommand,
-  worktreeStore,
-  type Repo,
-  type RepoConfig,
-} from './config';
+import { base, readGlobal, requireRepo, setupCommand, worktreeStore, type Repo, type RepoConfig } from './config';
 import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { checkedRun, leafFields, leafTarget, refuse, type LeafTarget } from './run-check';
-import { command, run } from './shell';
+import { command } from './shell';
 import { allLeaves, withLock, type Leaf } from './state';
 
 const verifyScopeSchema = z.enum(['leaf', 'merge']);
@@ -136,73 +127,68 @@ export async function verify(
   checkLocation(target);
   const lock: string = await recordLock(repo);
   mkdirSync(caller.target, { recursive: true });
-  const queue: string = resolve(globalHome(), 'verify.lock');
-  if ((await run(['flock', '-n', queue, 'true'], repo.root)).code !== 0)
-    process.stdout.write(`verify waiting for ${queue}\n`);
-  return withLock(queue, async () => {
-    const record: VerifyRun = {
-      run: id,
-      repo: repo.name,
-      leaf: caller.slug,
-      sha,
-      tree,
-      scope,
-      path: target,
-      pid: process.pid,
-      boot_id: existsSync('/proc/sys/kernel/random/boot_id')
-        ? readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
-        : '',
-      commands: [],
-      start: new Date().toISOString(),
-    };
-    await withLock(lock, async () => {
-      appendFileSync(recordsPath(repo), JSON.stringify(record) + '\n');
-    });
-    const ran: VerifyRun['commands'] = [];
-    let setupExit: number | undefined;
-    let end: string | undefined;
-    try {
-      await createSparseWorktree(repo, target, sha, { detach: true });
-      await emitEnvFile(repo, target, repo.config.env);
-      const setup: { code: number; log: string } = await checkedRun(
-        repo,
-        caller,
-        akrogonBase,
-        'setup',
-        ['sh', '-c', setupCommand(repo.config, 'true')],
-        target,
-      );
-      setupExit = setup.code;
-      process.stdout.write(`verify setup: ${setup.code} ${setup.log}\n`);
-      for (const item of verifyCommands(repo.config, scope)) {
-        const { code, log }: { code: number; log: string } =
-          setup.code === 0
-            ? await checkedRun(repo, caller, akrogonBase, item.name, ['sh', '-c', item.command], target)
-            : setup;
-        ran.push({ ...item, exit: code, log });
-        process.stdout.write(`verify ${item.name}: ${code} ${log}\n`);
-      }
-      end = new Date().toISOString();
-    } finally {
-      await withLock(lock, async () => {
-        const file: string = recordsPath(repo);
-        const runs: VerifyRun[] = readVerifyRuns(repo);
-        const index: number = runs.findIndex((run) => run.run === id);
-        if (index === -1) return;
-        runs[index] = {
-          ...runs[index],
-          ...(setupExit === undefined ? {} : { setup: setupExit }),
-          commands: ran,
-          ...(end === undefined ? {} : { end }),
-        };
-        const temporary: string = `${file}.${process.pid}.tmp`;
-        writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
-        renameSync(temporary, file);
-      });
-      if (existsSync(target)) await command(['git', 'worktree', 'remove', '--force', target], repo.root);
-    }
-    const green: boolean = setupExit === 0 && ran.every((item) => item.exit === 0);
-    process.stdout.write(`verify ${scope} ${sha}: ${green ? 'green' : 'red'}\n`);
-    return green ? 0 : 1;
+  const record: VerifyRun = {
+    run: id,
+    repo: repo.name,
+    leaf: caller.slug,
+    sha,
+    tree,
+    scope,
+    path: target,
+    pid: process.pid,
+    boot_id: existsSync('/proc/sys/kernel/random/boot_id')
+      ? readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
+      : '',
+    commands: [],
+    start: new Date().toISOString(),
+  };
+  await withLock(lock, async () => {
+    appendFileSync(recordsPath(repo), JSON.stringify(record) + '\n');
   });
+  const ran: VerifyRun['commands'] = [];
+  let setupExit: number | undefined;
+  let end: string | undefined;
+  try {
+    await createSparseWorktree(repo, target, sha, { detach: true });
+    await emitEnvFile(repo, target, repo.config.env);
+    const setup: { code: number; log: string } = await checkedRun(
+      repo,
+      caller,
+      akrogonBase,
+      'setup',
+      ['sh', '-c', setupCommand(repo.config, 'true')],
+      target,
+    );
+    setupExit = setup.code;
+    process.stdout.write(`verify setup: ${setup.code} ${setup.log}\n`);
+    for (const item of verifyCommands(repo.config, scope)) {
+      const { code, log }: { code: number; log: string } =
+        setup.code === 0
+          ? await checkedRun(repo, caller, akrogonBase, item.name, ['sh', '-c', item.command], target)
+          : setup;
+      ran.push({ ...item, exit: code, log });
+      process.stdout.write(`verify ${item.name}: ${code} ${log}\n`);
+    }
+    end = new Date().toISOString();
+  } finally {
+    await withLock(lock, async () => {
+      const file: string = recordsPath(repo);
+      const runs: VerifyRun[] = readVerifyRuns(repo);
+      const index: number = runs.findIndex((run) => run.run === id);
+      if (index === -1) return;
+      runs[index] = {
+        ...runs[index],
+        ...(setupExit === undefined ? {} : { setup: setupExit }),
+        commands: ran,
+        ...(end === undefined ? {} : { end }),
+      };
+      const temporary: string = `${file}.${process.pid}.tmp`;
+      writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
+      renameSync(temporary, file);
+    });
+    if (existsSync(target)) await command(['git', 'worktree', 'remove', '--force', target], repo.root);
+  }
+  const green: boolean = setupExit === 0 && ran.every((item) => item.exit === 0);
+  process.stdout.write(`verify ${scope} ${sha}: ${green ? 'green' : 'red'}\n`);
+  return green ? 0 : 1;
 }
