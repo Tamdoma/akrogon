@@ -179,7 +179,7 @@ export async function baseRun(
         env.AKROGON_RUN = admission.token;
         if (admission.kind === 'nested')
           return spawnLogged(['sh', '-c', script, 'akrogon-base-run', ...argv], target, env, log);
-        await startRunGuard(slice, id, process.pid);
+        await startRunGuard(slice, id, process.pid, admission.record_path);
         try {
           return await spawnLogged(
             runUnitArgv(slice, id, ['sh', '-c', script, 'akrogon-base-run', ...argv], env.DBUS_SESSION_BUS_ADDRESS),

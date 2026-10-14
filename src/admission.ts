@@ -28,7 +28,7 @@ export interface AdmissionHolder {
 }
 
 export type Admission =
-  | { kind: 'held'; token: string; wait_ms: number; release: () => void }
+  | { kind: 'held'; token: string; wait_ms: number; record_path: string; release: () => void }
   | { kind: 'nested'; token: string };
 
 const recordSchema = z.object({
@@ -125,13 +125,16 @@ function usage(): number {
   return statBytes(statPath());
 }
 
+// Slices nest by name: a-b-c.slice lives at a.slice/a-b.slice/a-b-c.slice.
+// slicePrefixDir() already ends at akrogon.slice, so that chain link is dropped.
+const sliceDirs = (slice: string): string[] => {
+  const parts: string[] = slice.replace(/\.slice$/, '').split('-');
+  const chain: string[] = parts.map((_, index) => `${parts.slice(0, index + 1).join('-')}.slice`);
+  return parts[0] === 'akrogon' ? chain.slice(1) : chain;
+};
+
 const unitStatPath = (record: RunRecord): string =>
-  resolve(
-    slicePrefixDir(),
-    ...(record.slice === 'akrogon.slice' ? [] : [record.slice]),
-    record.unit,
-    'memory.stat',
-  );
+  resolve(slicePrefixDir(), ...sliceDirs(record.slice), record.unit, 'memory.stat');
 
 // A unit without a readable stat counts 0 toward usage, so its run keeps the
 // full 16 GiB reservation in denied().
@@ -312,6 +315,7 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
           kind: 'held',
           token,
           wait_ms: Date.now() - begun,
+          record_path: recordPath(record.token_hash),
           release: () => {
             if (!ended) writeRecord({ ...record, state: 'ended' });
             ended = true;

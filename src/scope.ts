@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
 import type { Repo } from './config';
-import { CommandError, herdr, run, spawnCaptured, type SpawnResult } from './shell';
+import { CommandError, herdr, quote, run, spawnCaptured, type SpawnResult } from './shell';
 
 export type ScopePlace =
   { place: 'inside' } | { place: 'outside'; cgroup: string } | { place: 'unreadable'; error: string };
@@ -56,9 +56,14 @@ export function runUnitArgv(slice: string, run: string, argv: string[], cutBus: 
   ];
 }
 
-// The guard tracks the wrapper pid: when the wrapper dies the scope cannot be
-// reaped by the dead process, so the guard stops it itself.
-export async function startRunGuard(slice: string, run: string, wpid: number): Promise<void> {
+// The guard tracks the wrapper pid: when the wrapper dies its finally can no
+// longer run, so the guard drops the run record and stops the scope itself.
+export async function startRunGuard(
+  slice: string,
+  run: string,
+  wpid: number,
+  recordPath: string,
+): Promise<void> {
   const base: string = runUnitBase(run);
   const argv: string[] = [
     'systemd-run',
@@ -71,7 +76,7 @@ export async function startRunGuard(slice: string, run: string, wpid: number): P
     '--',
     'sh',
     '-c',
-    `tail --pid=${wpid} -f /dev/null; exec systemctl --user stop ${base}`,
+    `tail --pid=${wpid} -f /dev/null; rm -f ${quote(recordPath)}; exec systemctl --user stop ${base}.scope`,
   ];
   const cwd: string = process.cwd();
   const result: SpawnResult = await spawnCaptured(argv, {

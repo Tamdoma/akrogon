@@ -22,8 +22,15 @@ const GIB: number = 1024 * 1024 * 1024;
 const uid: number = process.getuid!();
 const slicePrefix = (root: string): string =>
   resolve(root, `user.slice/user-${uid}.slice/user@${uid}.service/akrogon.slice`);
+// Slices nest by name: a-b-c.slice lives at a.slice/a-b.slice/a-b-c.slice.
+// slicePrefix() already ends at akrogon.slice, so that chain link is dropped.
+const sliceDirs = (slice: string): string[] => {
+  const parts: string[] = slice.replace(/\.slice$/, '').split('-');
+  const chain: string[] = parts.map((_: string, index: number) => `${parts.slice(0, index + 1).join('-')}.slice`);
+  return parts[0] === 'akrogon' ? chain.slice(1) : chain;
+};
 const unitDir = (root: string, slice: string, unit: string): string =>
-  slice === 'akrogon.slice' ? resolve(slicePrefix(root), unit) : resolve(slicePrefix(root), slice, unit);
+  resolve(slicePrefix(root), ...sliceDirs(slice), unit);
 
 type RealCap = { proc: Bun.Subprocess; result: Promise<SpawnResult> };
 

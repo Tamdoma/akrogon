@@ -202,7 +202,7 @@ export async function runCheck(
         admission.kind === 'nested'
           ? await spawnLogged(argv, cwd, env, log)
           : await (async () => {
-              await startRunGuard(slice, run, process.pid);
+              await startRunGuard(slice, run, process.pid, admission.record_path);
               try {
                 return await spawnLogged(runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS), cwd, { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() }, log);
               } finally {
