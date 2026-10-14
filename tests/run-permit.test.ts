@@ -225,7 +225,7 @@ test('a run-check or verify inside an admitted run starts at once over the thres
   }
 }, 60000);
 
-test('status shows no Run lines while a run holds, and ignores dead waiting records', async () => {
+test('status shows no Run lines while a run holds', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
   try {
@@ -238,30 +238,6 @@ test('status shows no Run lines while a run holds, and ignores dead waiting reco
     const listing: Result = await cli(f, ['status']);
     expect(listing.code).toBe(0);
     expect(listing.stdout.split('\n').filter((line) => /Run/.test(line))).toHaveLength(0);
-    const dead: number = await (async () => {
-      const gone: Bun.Subprocess = Bun.spawn(['true']);
-      await gone.exited;
-      return gone.pid;
-    })();
-    const runsDir: string = resolve(f.home, 'runs');
-    mkdirSync(runsDir, { recursive: true });
-    writeFileSync(
-      resolve(runsDir, 'dead0.yaml'),
-      Bun.YAML.stringify({
-        token_hash: 'dead0',
-        pid: dead,
-        start_time: '1',
-        boot_id: 'x',
-        repo: 'repo',
-        leaf: 'ghost',
-        check: 'phantom',
-        state: 'waiting',
-        wait_reason: 'stale record',
-        since: new Date().toISOString(),
-      }),
-    );
-    const filtered: Result = await cli(f, ['status']);
-    expect(filtered.stdout.split('\n').filter((line) => /Run/.test(line))).toHaveLength(0);
     writeFileSync(resolve(dir, 'release'), '');
     expect(await w.proc.exited).toBe(0);
   } finally {

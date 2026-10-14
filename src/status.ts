@@ -28,7 +28,6 @@ import {
 import { readLog, type LogRecord } from './log';
 import { mergeQueue, type QueueEntry } from './turn';
 import { issueFolders } from './park';
-import { waitingRuns } from './admission';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 import { readPaused } from './pause';
 import { readStopped } from './stop';
@@ -392,10 +391,6 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
       }
     }
   }
-  for (const record of waitingRuns())
-    console.log(
-      `Run waiting: ${record.repo}/${record.leaf} ${record.check} ${record.wait_reason ?? 'checking'} ${since(now - Date.parse(record.since))}`,
-    );
   for (const scan of scans) {
     if (!scan.ok) continue;
     const marks: string[] = [paused.has(scan.repo.name) ? 'paused' : ''].filter((mark) => mark !== '');

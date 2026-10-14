@@ -27,12 +27,11 @@ const recordSchema = z.object({
   repo: z.string(),
   leaf: z.string(),
   check: z.string(),
-  state: z.enum(['waiting', 'live', 'ended']),
+  state: z.enum(['live', 'ended']),
   run: z.string(),
   slice: z.string(),
   scope: z.string(),
   unit: z.string(),
-  wait_reason: z.string().optional(),
   since: z.iso.datetime(),
 });
 export type RunRecord = z.infer<typeof recordSchema>;
@@ -110,18 +109,6 @@ async function sweepStale(skip: ReadonlySet<string>): Promise<void> {
     if (record !== undefined) units.push(record.unit, `${runUnitBase(record.run)}-guard.service`);
   }
   await stopRunUnits(...units);
-}
-
-export function waitingRuns(): RunRecord[] {
-  const dir: string = runsDir();
-  if (!existsSync(dir)) return [];
-  const boot: string = bootId();
-  return readdirSync(dir)
-    .filter((name) => name.endsWith('.yaml'))
-    .flatMap((name) => {
-      const record: RunRecord | undefined = readRecord(resolve(dir, name));
-      return record !== undefined && record.state === 'waiting' && live(record, boot) ? [record] : [];
-    });
 }
 
 export function callerScope(): string {
