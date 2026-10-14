@@ -29,6 +29,7 @@ import {
   registerTemp,
   type GhFixture,
   type Fixture,
+  verified,
 } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { parseEnv } from 'node:util';
@@ -851,6 +852,7 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
       `${f.root}/issues/open/landing/landed`,
     );
     const landedAttempt: string = z.string().parse(readState(path).batch?.attempt);
+    await verified(f, 'landed', 'merge');
     expect(
       (
         await cli(
@@ -1030,6 +1032,7 @@ test('a live merge retains its completion call after pushing, including a peer r
         .at(-1)![2],
     ).toContain('seat B');
     const mergeAttempt: string = z.string().parse(readState(path).batch?.attempt);
+    await verified(f, 'active-merge', 'merge');
     expect(
       (
         await cli(
@@ -4988,6 +4991,7 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
       panes: idle.panes.map((pane) => (pane.pane_id === aa.b ? { ...pane, agent_status: 'idle' } : pane)),
     });
     const bbAttempt: string = z.string().parse(readState(bb.path).batch?.attempt);
+    await verified(f, 'bb', 'merge');
     expect(
       (await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--check', '--attempt', bbAttempt], f.root, f.env)).code,
     ).toBe(0);
@@ -5000,6 +5004,7 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
     expect(readState(cc.path).phase).toBe('merged');
     expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, aa.b]);
     const aaAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
+    await verified(f, 'aa', 'merge');
     expect(
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', aaAttempt], f.root, f.env)).code,
     ).toBe(0);

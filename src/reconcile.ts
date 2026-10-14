@@ -11,7 +11,7 @@ import {
 import { basename, dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { globalHome, leafTemp, within, worktreeStore, type Repo } from './config';
-import { readBaseRuns, type BaseRun } from './base-run';
+import { readVerifyRuns, type VerifyRun } from './verify';
 import { batchMemberSlugs } from './batch';
 import { leavesUnder, readState, saveState, type Leaf, type State } from './state';
 import { command, herdrError, run, type Pane, type Result } from './shell';
@@ -200,7 +200,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   const memberSlugs: Set<string> = new Set(
     leaves.flatMap((leaf) => (leaf.state.batch?.members ?? []).map((member) => member.slug)),
   );
-  const baseRuns: BaseRun[] = readBaseRuns(repo);
+  const verifyRuns: VerifyRun[] = readVerifyRuns(repo);
   const leafBySlug: Map<string, Leaf> = new Map(leaves.map((leaf) => [leaf.state.slug, leaf]));
 
   async function removeWorktree(path: string): Promise<boolean> {
@@ -378,13 +378,13 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(path, 'active leaf');
       continue;
     }
-    if (name.startsWith('base-')) {
-      const record: BaseRun | undefined = baseRuns.find(
-        (item) => item.run === name.slice('base-'.length) && item.removed === undefined,
+    if (name.startsWith('verify-')) {
+      const record: VerifyRun | undefined = verifyRuns.find(
+        (item) => item.run === name.slice('verify-'.length) && item.removed === undefined,
       );
       if (record !== undefined) {
         if (record.end === undefined && !ownerDead({ pid: record.pid, boot_id: record.boot_id })) {
-          keep(path, `base-run ${record.run} in progress`);
+          keep(path, `verify ${record.run} in progress`);
           continue;
         }
       }

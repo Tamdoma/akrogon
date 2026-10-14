@@ -7,7 +7,7 @@ import { sourcePattern } from './state';
 import { type Phase } from './routing';
 
 const RETIRED_MERGE_HOLD: string =
-  'Merge hold commands are retired; a base-red merge run follows the known-red comparison rule in skills/merge-issue/SKILL.md';
+  'Merge hold commands are retired; a red merge run follows the red-run endings in skills/merge-issue/SKILL.md';
 
 const verb: string | undefined = process.argv[2];
 if (verb === 'unhold' || verb === 'hold-fix') throw new Error(RETIRED_MERGE_HOLD);
@@ -22,9 +22,6 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
           reason: { type: 'string' },
           check: { type: 'boolean' },
           attempt: { type: 'string' },
-          compare: { type: 'string', multiple: true } as { type: 'string' },
-          'red-on-base': { type: 'string' },
-          command: { type: 'string' },
           culprit: { type: 'string' },
         }
       : verb === 'next'
@@ -35,8 +32,8 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
             ? { by: { type: 'string' } }
             : verb === 'run-check'
               ? { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } }
-              : verb === 'base-run'
-                ? { base: { type: 'string' }, attempt: { type: 'string' }, cwd: { type: 'string' } }
+              : verb === 'verify'
+                ? { sha: { type: 'string' }, attempt: { type: 'string' }, holder: { type: 'string' } }
                 : verb === 'status'
                   ? { charts: { type: 'boolean' } }
                   : verb === 'timing'
@@ -81,11 +78,7 @@ switch (verb) {
         values.reason,
         values.check,
         values.attempt,
-        values['red-on-base'],
-        values.command,
         values.culprit,
-        undefined,
-        z.array(z.string()).optional().parse(values.compare),
       );
       if (result.committed) committed = result;
     } catch (error) {
@@ -182,14 +175,12 @@ switch (verb) {
     );
     break;
   }
-  case 'base-run': {
-    const baseSha: string = z.string().trim().min(1).parse(values.base);
-    if (positionals.length === 0)
-      throw new Error('Usage: akrogon base-run --base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...');
-    const optional: z.ZodOptional<z.ZodString> = z.string().optional();
+  case 'verify': {
+    z.tuple([]).parse(positionals);
+    const optional: z.ZodOptional<z.ZodString> = z.string().trim().min(1).optional();
     process.exitCode = await (
-      await import('./base-run')
-    ).baseRun(process.cwd(), baseSha, optional.parse(values.attempt), optional.parse(values.cwd), positionals);
+      await import('./verify')
+    ).verify(process.cwd(), optional.parse(values.sha), optional.parse(values.attempt), optional.parse(values.holder));
     break;
   }
   case 'guard':
@@ -197,6 +188,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|timing|run-check|base-run|guard>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|timing|run-check|verify|guard>',
     );
 }

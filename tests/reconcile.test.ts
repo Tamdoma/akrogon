@@ -357,13 +357,13 @@ test('recorded worktree that is not a registered git worktree is kept, not remov
   }
 });
 
-// DC6: an unconfirmed base-run checkout is removed only under the removal rules.
-test('unconfirmed base-run worktree is removed when clean, kept when dirty', async () => {
+// DC6: an unconfirmed verify checkout is removed only under the removal rules.
+test('unconfirmed verify worktree is removed when clean, kept when dirty', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     await dispatchLeaf(f, 'holder-leaf');
-    const clean: string = resolve(storeDir(f), 'base-clean-run');
-    const dirty: string = resolve(storeDir(f), 'base-dirty-run');
+    const clean: string = resolve(storeDir(f), 'verify-clean-run');
+    const dirty: string = resolve(storeDir(f), 'verify-dirty-run');
     await command(['git', 'worktree', 'add', '--detach', clean], f.root);
     await command(['git', 'worktree', 'add', '--detach', dirty], f.root);
     writeFileSync(resolve(dirty, 'untracked'), 'x');
@@ -372,19 +372,17 @@ test('unconfirmed base-run worktree is removed when clean, kept when dirty', asy
         run: id,
         repo: 'repo',
         leaf: 'holder-leaf',
-        slot: 'A',
-        base: 'x',
-        command: ['true'],
-        cwd: '',
+        sha: 'x',
+        scope: 'leaf',
         path,
-        env_generation: 0,
         pid: 1,
         boot_id: 'b',
+        commands: [],
         start: new Date().toISOString(),
         end: new Date().toISOString(),
       });
     writeFileSync(
-      resolve(f.root, 'issues/base-runs.jsonl'),
+      resolve(f.root, 'issues/verify-runs.jsonl'),
       record('clean-run', clean) + '\n' + record('dirty-run', dirty) + '\n',
     );
     expect((await next(f, ['--all'])).code).toBe(0);
@@ -425,37 +423,22 @@ test('store variants survive live or unavailable pane inventories', async () => 
   }
 });
 
-test('failed leaf scratch preserves an actual running base command', async () => {
+test('failed leaf scratch preserves an actual running verify command', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const akrogon: { env: NodeJS.ProcessEnv } = fakeAkrogon(f);
     const env: NodeJS.ProcessEnv = { ...f.env, ...akrogon.env };
+    const marker: string = resolve(f.home, 'running');
+    const release: string = resolve(f.home, 'release');
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      checks: { test: 'bun test' },
+      checks: {
+        test: `printf "%s" "$TMPDIR" > ${marker}; while [ ! -f ${release} ]; do sleep 0.01; done; test -d "$TMPDIR"`,
+      },
       grounding: 'none',
       setup: 'mkdir -p node_modules',
     });
     const path: string = await dispatchLeaf(f, 'running-base');
-    const base: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
-    const marker: string = resolve(f.home, 'running');
-    const release: string = resolve(f.home, 'release');
-    const running: Promise<Result> = cli(
-      f,
-      [
-        'base-run',
-        '--base',
-        base,
-        '--',
-        'sh',
-        '-c',
-        'printf "%s" "$TMPDIR" > "$1"; while [ ! -f "$2" ]; do sleep 0.01; done; test -d "$TMPDIR"',
-        'running-base',
-        marker,
-        release,
-      ],
-      readState(path).worktree!,
-      env,
-    );
+    const running: Promise<Result> = cli(f, ['verify'], readState(path).worktree!, env);
     try {
       for (let i: number = 0; i < 500 && !existsSync(marker); i++) await Bun.sleep(10);
       expect(existsSync(marker)).toBe(true);

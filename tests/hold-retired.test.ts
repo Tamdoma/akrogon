@@ -43,40 +43,18 @@ function legacyHeld(f: Fixture): string {
 }
 
 for (const verb of ['unhold', 'hold-fix']) {
-  test(`retired verb ${verb} fails naming the known-red rule`, async () => {
+  test(`retired verb ${verb} fails naming the merge skill`, async () => {
     const f: Fixture = await fixture();
     try {
       const args: string[] = verb === 'hold-fix' ? [verb, 'hold'] : [verb];
       const res: Result = await cli(f, args);
       expect(res.code).not.toBe(0);
       expect(res.stderr).toContain(POINTER);
-      expect(res.stderr).toContain('known-red');
     } finally {
       f.clean();
     }
   });
 }
-
-test.serial('the retired merge flags fail naming the known-red rule and change nothing', async () => {
-  const f: Fixture = await fixture();
-  try {
-    leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
-    const base: string[] = ['phase', 'hold', 'check.fix', '--slot', 'B'];
-    for (const extra of [
-      ['--red-on-base', 'a'.repeat(40), '--command', 'bun test'],
-      ['--command', 'bun test'],
-    ]) {
-      const res: Result = await cli(f, [...base, ...extra]);
-      expect(res.code).not.toBe(0);
-      expect(res.stderr).toContain(POINTER);
-      expect(res.stderr).toContain('known-red');
-      expect(readState(resolve(f.root, 'issues/open/issue/hold')).batch).toBeUndefined();
-      expect(existsSync(resolve(f.home, 'held.yaml'))).toBe(false);
-    }
-  } finally {
-    f.clean();
-  }
-});
 
 test.serial('a nonempty legacy held.yaml is inert for status, pause, unpause and the merge turn', async () => {
   const f: Fixture = await fixture();

@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { command, spawnCaptured, type Result } from '../src/shell';
-import { fixture, type Fixture } from './helpers';
+import { fixture, greenReceipt, type Fixture } from './helpers';
 
 const script: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/direct-guards.ts');
 
@@ -78,10 +78,11 @@ test('refuses an empty branch', async () => {
 });
 
 test('passes a clean, cited, non-empty branch', async () => {
-  await withBranch(async (_f, wt, run) => {
+  await withBranch(async (f, wt, run) => {
     writeFileSync(resolve(wt, 'tests/a.test.ts'), 'changed\n');
     writeFileSync(resolve(wt, 'code.ts'), 'x\n');
     await commitAll(wt, 'change test and code\n\nTest-Change: tests/a.test.ts reason here');
+    greenReceipt(f, await command(['git', 'rev-parse', 'HEAD'], wt), 'merge');
     const result: RunResult = await run();
     expect(result.stderr).toBe('');
     expect(result.code).toBe(0);

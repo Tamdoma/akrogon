@@ -1,7 +1,11 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
+import { readRepo } from '../src/config';
+import { verifyCommands, type VerifyScope } from '../src/verify';
+import { findLeaf, readState } from '../src/state';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
 const tempDirs: Set<string> = new Set();
@@ -190,4 +194,37 @@ export function printedChecks(f: Fixture): (printed: string, cwd: string, env?: 
     });
     return { code, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
   };
+}
+
+export function greenReceipt(
+  f: Fixture,
+  sha: string,
+  scope: VerifyScope,
+  commands: { name: string; command: string }[] = verifyCommands(readRepo('repo', f.root).config, scope),
+): void {
+  const at: string = new Date().toISOString();
+  const record = {
+    run: randomUUID(),
+    repo: 'repo',
+    leaf: 'seeded',
+    sha,
+    scope,
+    path: resolve(f.home, 'verified'),
+    pid: process.pid,
+    boot_id: '',
+    commands: commands.map((item) => ({ ...item, exit: 0, log: resolve(f.home, 'verified.log') })),
+    start: at,
+    end: at,
+    removed: at,
+  };
+  appendFileSync(resolve(f.root, 'issues/verify-runs.jsonl'), JSON.stringify(record) + '\n');
+}
+
+export async function verified(f: Fixture, slug: string, scope: VerifyScope): Promise<void> {
+  const worktree: string | undefined = readState(findLeaf(readRepo('repo', f.root), slug).path).worktree;
+  greenReceipt(
+    f,
+    await command(['git', 'rev-parse', worktree === undefined ? `refs/heads/${slug}` : 'HEAD'], worktree ?? f.root),
+    scope,
+  );
 }

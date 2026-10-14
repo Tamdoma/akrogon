@@ -14,6 +14,7 @@ import {
   type Fixture,
   type HerdrFixture,
   registerTemp,
+  verified,
 } from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State, type Tool } from '../src/state';
@@ -227,7 +228,7 @@ function argList(args: (string | boolean | undefined)[]): string {
 
 function phaseBody(slug: string, phase: string, args: (string | boolean | undefined)[], dir: string): string {
   const params: (string | boolean | undefined)[] = [slug, phase, ...args];
-  while (params.length < 10) params.push(undefined);
+  while (params.length < 8) params.push(undefined);
   params.push(dir);
   return (
     'import { phaseCommand } from ' +
@@ -278,6 +279,7 @@ test.serial('a green batch appends one merged attempt line and log.jsonl keeps i
   try {
     const { record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
     const logBefore: string | undefined = logBytes(f);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -390,6 +392,7 @@ test.serial('a refused push restacked to reuse appends exactly one reuse line at
   const f: Fixture = await fixture();
   try {
     const { herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -502,6 +505,7 @@ test.serial('a merged line carries PSI stall deltas from batch creation', async 
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }));
     const dir: string = pressureDir(f, { cpu: '60', memory: '90', io: '180' });
+    await verified(f, 'hold', 'merge');
     const checked: Result = await spawn(
       f,
       'check',
@@ -532,6 +536,7 @@ test.serial('a restacked reuse line carries PSI stall deltas from batch creation
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
     saveBatch(holder.path, withStart(record, { cpu: 5, memory: 6, io: 7 }));
     const dir: string = pressureDir(f, { cpu: '15', memory: '26', io: '47' });
+    await verified(f, 'hold', 'merge');
     expect(
       (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), herdr.env))
         .code,
@@ -654,7 +659,7 @@ test.serial('an ejected line carries PSI stall deltas from batch creation', asyn
     const ejected: Result = await spawn(
       f,
       'ejected',
-      phaseBody('hold', 'check.fix', ['B', undefined, undefined, undefined, 'a1', undefined, undefined, 'mem-a'], dir),
+      phaseBody('hold', 'check.fix', ['B', undefined, undefined, undefined, 'a1', 'mem-a'], dir),
       herdr.env,
     );
     expect(ejected.code).toBe(0);
@@ -691,6 +696,7 @@ test.serial('a merged line without pressure_start keeps no pressure key even wit
   try {
     const { herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
     const dir: string = pressureDir(f, { cpu: 'abc', memory: '90', io: '180' });
+    await verified(f, 'hold', 'merge');
     expect(
       (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), herdr.env))
         .code,
@@ -717,6 +723,7 @@ test.serial('a merged line with an absent pressure dir keeps no pressure key', a
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }));
     const dir: string = resolve(f.home, 'psi/proc/pressure');
+    await verified(f, 'hold', 'merge');
     expect(
       (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), herdr.env))
         .code,
@@ -743,6 +750,7 @@ test.serial('a merged line with a changed boot id keeps no pressure key', async 
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }, 'boot-old'));
     const dir: string = pressureDir(f, { cpu: '60', memory: '90', io: '180' }, 'boot-new');
+    await verified(f, 'hold', 'merge');
     expect(
       (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), herdr.env))
         .code,
@@ -813,6 +821,7 @@ test.serial('a decimal pressure total stops the ending call before any push or s
     const batch: Batch = withStart(record, { cpu: 10, memory: 20, io: 30 });
     saveBatch(holder.path, batch);
     const dir: string = pressureDir(f, { cpu: '12.5', memory: '90', io: '180' });
+    await verified(f, 'hold', 'merge');
     const checked: Result = await spawn(
       f,
       'check',
@@ -882,6 +891,7 @@ test.serial('a created batch preserves PSI counters through rerun then reuse', a
     const batch: Batch = readState(holderPath).batch!;
     expect(batch.pressure_start).toEqual({ cpu: 5, memory: 6, io: 7, boot_id: 'boot-1' });
     expect(batch.members.map((entry) => entry.slug)).toEqual(['mem-a']);
+    await verified(f, 'hold', 'merge');
     expect(
       (
         await spawn(
@@ -905,6 +915,7 @@ test.serial('a created batch preserves PSI counters through rerun then reuse', a
     expect(restacked.decision).toBe('rerun');
     expect(restacked.tested_top).toBeUndefined();
     expect(restacked.pressure_start).toEqual(batch.pressure_start);
+    await verified(f, 'hold', 'merge');
     expect(
       (
         await spawn(

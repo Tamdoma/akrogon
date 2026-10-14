@@ -170,21 +170,20 @@ test('a run starts at once over the old 48 GiB reading', async () => {
   }
 }, 60000);
 
-test('a base-run starts at once over the old 48 GiB reading', async () => {
+test('a verify starts at once over the old 48 GiB reading', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
   try {
+    const dir: string = marks(f);
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
-      checks: { test: 'bun test' },
+      checks: { test: `touch ${dir}/base` },
       grounding: 'none',
     });
     const shim: NodeJS.ProcessEnv = fakeAkrogon(f).env;
-    const dir: string = marks(f);
-    const worktree: string = await leafWorktree(f, 'base-wait');
-    const sha: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    const worktree: string = await leafWorktree(f, 'verify-wait');
     seedStat(f, HIGH);
-    const waiter: Cap = run(f, ['base-run', '--base', sha, '--', ...touch(dir, 'base')], worktree, shim);
+    const waiter: Cap = run(f, ['verify'], worktree, shim);
     caps.push(waiter);
     await waitFor(resolve(dir, 'base'), 15000);
     expect(await waiter.proc.exited).toBe(0);
@@ -194,24 +193,24 @@ test('a base-run starts at once over the old 48 GiB reading', async () => {
   }
 }, 60000);
 
-test('a run-check or base-run inside an admitted run starts at once over the threshold', async () => {
+test('a run-check or verify inside an admitted run starts at once over the threshold', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
   try {
+    const dir: string = marks(f);
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
       env: ['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT'],
-      checks: {},
+      checks: { inner: `touch ${dir}/inner-base` },
       grounding: 'none',
     });
+    writeFileSync(resolve(f.root, '.env'), 'AKROGON_HOME=declared\nAKROGON_LEAF_TEMP_ROOT=declared\n');
     const shim: NodeJS.ProcessEnv = fakeAkrogon(f).env;
-    const dir: string = marks(f);
     const worktree: string = await leafWorktree(f, 'nested');
-    const sha: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
     const script: string =
       `printf 'anon 53687091200\\nfile 0\\nshmem 0\\n' > ${statPath(f)};` +
       `akrogon run-check --name inner -- touch ${dir}/inner;` +
-      `akrogon base-run --base ${sha} -- touch ${dir}/inner-base`;
+      `akrogon verify`;
     const outer: Cap = run(f, ['run-check', '--name', 'outer', '--', 'sh', '-c', script], worktree, shim);
     caps.push(outer);
     await waitFor(resolve(dir, 'inner'), 20000);

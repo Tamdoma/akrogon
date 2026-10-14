@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, fakeHerdr, leaf, editOnSecondStatus, yaml, type Fixture } from './helpers';
+import { fixture, cli, fakeHerdr, leaf, editOnSecondStatus, yaml, type Fixture, verified } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { Database } from './fake-herdr';
@@ -146,6 +146,7 @@ test('a member conflict excludes it from the attempt, rewrites the record withou
     // The excluded leaf becomes a holder under a fresh record once the batch finishes.
     idleAll(f);
     const aaAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
+    await verified(f, 'aa', 'merge');
     expect(
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', aaAttempt], f.root, f.env)).code,
     ).toBe(0);
@@ -161,6 +162,7 @@ test('a member conflict excludes it from the attempt, rewrites the record withou
     expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, cc.b]);
     idleAll(f);
     const ccAttempt: string = z.string().parse(readState(cc.path).batch?.attempt);
+    await verified(f, 'cc', 'merge');
     expect(
       (await cli(f, ['phase', 'cc', 'merged', '--slot', 'B', '--check', '--attempt', ccAttempt], f.root, f.env)).code,
     ).toBe(0);
@@ -495,6 +497,7 @@ test('a green batch clears the record and closes member tabs once the holder lan
         .map((args) => args[2]);
     expect(closes()).toEqual([]);
     idleAll(f);
+    await verified(f, 'holder', 'merge');
     expect(
       (await cli(f, ['phase', 'holder', 'merged', '--slot', 'B', '--check', '--attempt', attempt], f.root, f.env)).code,
     ).toBe(0);
@@ -608,6 +611,7 @@ test('a leaf entering merge after the record was written is excluded and becomes
     expect(mergePrompts(f)[0].text).toContain('aa');
     idleAll(f);
     const aaAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
+    await verified(f, 'aa', 'merge');
     expect(
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', aaAttempt], f.root, f.env)).code,
     ).toBe(0);
@@ -823,6 +827,7 @@ for (const edited of ['holder', 'member'] as const) {
         expect(batch.solo).toBe(true);
       } else {
         expect((await run(['git', 'cat-file', '-e', batch.top! + ':member-file'], f.root)).code).not.toBe(0);
+        await verified(f, 'holder', 'merge');
         expect(
           (
             await cli(

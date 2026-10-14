@@ -63,7 +63,6 @@ export const batchSchema = z.strictObject({
   excluded: z.array(z.string()).optional(),
   top: z.string().optional(),
   tested_top: z.string().optional(),
-  comparisons: z.array(z.string()).optional(),
   tested_main: z.string().optional(),
   decision: z.enum(['reuse', 'rerun']).optional(),
   candidate: z.string().optional(),

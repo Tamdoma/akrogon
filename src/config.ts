@@ -309,14 +309,15 @@ export async function base(repo: Repo, cwd: string): Promise<string> {
   return command(['git', 'merge-base', 'HEAD', trackingRef(repo)], cwd);
 }
 
+export function setupCommand(config: RepoConfig, cmd: string): string {
+  return config.setup === undefined
+    ? `akrogon guard own-modules && sh -c ${quote(cmd)}`
+    : `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(config.setup)} && akrogon guard own-modules && sh -c ${quote(cmd)}`;
+}
+
 export function withSetup(config: RepoConfig): RepoConfig {
-  const setup: string | undefined = config.setup;
-  const inner = (cmd: string): string =>
-    setup === undefined
-      ? `akrogon guard own-modules && sh -c ${quote(cmd)}`
-      : `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(setup)} && akrogon guard own-modules && sh -c ${quote(cmd)}`;
   const runCheck = (name: string, cmd: string): string =>
-    `akrogon run-check --name ${quote(name)} -- sh -c ${quote(inner(cmd))}`;
+    `akrogon run-check --name ${quote(name)} -- sh -c ${quote(setupCommand(config, cmd))}`;
   const map = (record: Record<string, string>): Record<string, string> =>
     Object.fromEntries(Object.entries(record).map(([k, v]): [string, string] => [k, runCheck(k, v)]));
   return {

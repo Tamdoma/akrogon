@@ -32,7 +32,6 @@ import { waitingRuns } from './admission';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 import { readPaused } from './pause';
 import { readStopped } from './stop';
-import { activeRed, type RedEntry } from './red-record';
 import { readKept } from './reconcile';
 
 type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
@@ -337,18 +336,6 @@ function chartRows(root: string, now: number): string[][] {
         .map((name) => chartRow(resolve(store, name), name, now));
 }
 
-function redLine(entry: RedEntry): string {
-  const notice: string =
-    entry.notice === undefined
-      ? 'pending'
-      : 'error' in entry.notice
-        ? `failed: ${entry.notice.error}`
-        : entry.notice.shown
-          ? 'shown'
-          : `not shown: ${entry.notice.reason}`;
-  return `red: ${entry.unit.name} (${entry.unit.runner} ${entry.unit.file}) ${entry.provenance.command.join(' ')} first-seen ${entry.first_seen} notice ${notice}`;
-}
-
 export async function statusCommand(slug: string | undefined, charts: boolean = false): Promise<void> {
   const global: GlobalConfig = readGlobal();
   const paused: Set<string> = readPaused();
@@ -363,7 +350,6 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     console.log(Bun.YAML.stringify(leaf.state, null, 2).trimEnd());
     if (paused.has(repo.name)) console.log(`paused: ${repo.name}`);
     if (stopped.has(`${repo.name}/${slug}`)) console.log(`stopped: ${repo.name}/${slug}`);
-    for (const entry of activeRed(repo)) console.log(redLine(entry));
     for (const entry of readKept(repo)) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     for (const gap of missing)
       console.log(`Missing: ${repo.name}/${slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`);

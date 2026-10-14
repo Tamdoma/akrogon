@@ -13,7 +13,7 @@ const contracts: Record<string, string> = {
   config: '',
   preflight: '',
   phase:
-    '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>] [--compare <file>] [--culprit <slug>]',
+    '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>] [--culprit <slug>]',
   next: '[<slug>|<path>|--all|--resume]',
   pull: '[--all]',
   close: '<owner/repo#n> --by <text>',
@@ -27,7 +27,7 @@ const contracts: Record<string, string> = {
   status: '[<slug>|--charts]',
   timing: '[<slug>|--cohort --since <iso>]',
   'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
-  'base-run': '--base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...',
+  verify: '[--sha <rev>] [--attempt <id>] [--holder <dir>]',
   'stop-run': '[<run-id>]',
   guard: '<ancestors|own-modules>',
 };

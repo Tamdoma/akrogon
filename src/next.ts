@@ -76,7 +76,7 @@ import {
   restoreHolder,
   restoreMembers,
 } from './batch';
-import { commitMove, completeOwner, resolveGreenComparisons } from './phase';
+import { commitMove, completeOwner } from './phase';
 import { appendAttempt, readPressure, resolveTools, type PressureSnapshot } from './attempts';
 import { sessionFile, deliveredAfter } from './session-file';
 import { readLog } from './log';
@@ -993,7 +993,6 @@ async function reconcileBatch(
         ? batch.candidate
         : undefined;
     if (landed !== undefined) {
-      await resolveGreenComparisons(repo, batch, landed);
       for (const member of batch.members) {
         const item: Leaf | undefined = allLeaves(repo).find((entry) => entry.state.slug === member.slug);
         if (item?.state.phase === 'merge' && (await isAncestor(repo.root, member.tip, trackingRef(repo)))) {

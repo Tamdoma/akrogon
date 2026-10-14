@@ -15,7 +15,6 @@ import { basename, join, resolve } from 'node:path';
 import { base, ensureLeafTemp, readGlobal, requireRepo, type Repo } from './config';
 import { allLeaves, readState, type Leaf, type State } from './state';
 import { command, spawnCaptured, type Result } from './shell';
-import { readBaseRuns, type BaseRun } from './base-run';
 import { appendTiming } from './timing';
 import { callerScope, withAdmission } from './admission';
 import { leafSlice, runSlice, runUnitArgv, runUnitBase, sessionBusAddress, startRunGuard, stopRunUnits } from './scope';
@@ -45,7 +44,7 @@ function bunfigs(): string[] {
   return files;
 }
 
-function refuse(): void {
+export function refuse(): void {
   for (const name of forbidden) if (process.env[name] !== undefined) throw new Error(`Refusing to run: ${name} is set`);
   for (const file of bunfigs()) if (existsSync(file)) throw new Error(`Refusing to run: global bunfig at ${file}`);
 }
@@ -78,17 +77,16 @@ export async function spawnLogged(
   return { code, stdout, stderr };
 }
 
-interface LeafTarget {
+export interface LeafTarget {
   slug: string;
   target: string;
-  baseSha?: string;
-  scope: 'leaf' | 'worker' | 'base';
+  scope: 'leaf' | 'worker';
   unit?: string;
   phase?: Phase;
   attempt?: string;
 }
 
-function leafFields(state: State, scope: LeafTarget['scope'], unit?: string): Omit<LeafTarget, 'target' | 'baseSha'> {
+export function leafFields(state: State, scope: LeafTarget['scope'], unit?: string): Omit<LeafTarget, 'target'> {
   return {
     slug: state.slug,
     scope,
@@ -98,7 +96,7 @@ function leafFields(state: State, scope: LeafTarget['scope'], unit?: string): Om
   };
 }
 
-async function leafTarget(
+export async function leafTarget(
   repo: Repo,
   cwd: string,
   leafOverride: string | undefined,
@@ -125,21 +123,6 @@ async function leafTarget(
         target: resolve(owner.path, 'implementation'),
       };
   }
-  const run: BaseRun | undefined = readBaseRuns(repo).find(
-    (item) => item.end === undefined && existsSync(item.path) && realpathSync(item.path) === top,
-  );
-  if (run !== undefined) {
-    const caller: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === run.leaf);
-    if (caller === undefined) throw new Error(`No caller leaf for base-run ${run.run}: ${run.leaf}`);
-    return {
-      slug: run.leaf,
-      scope: 'base',
-      phase: caller.state.phase,
-      ...(run.attempt === undefined ? {} : { attempt: run.attempt }),
-      target: resolve(caller.path, 'implementation'),
-      baseSha: run.base,
-    };
-  }
   if (holder === undefined) throw new Error('No leaf worktree matches cwd; pass --leaf or --holder');
   return { slug: 'checkout', target: resolve(cwd, holder), scope: 'leaf' };
 }
@@ -156,7 +139,18 @@ export async function runCheck(
     throw new Error('Usage: akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...');
   refuse();
   const repo: Repo = await requireRepo(readGlobal(), cwd);
-  const { slug, target, baseSha, scope, unit, phase, attempt } = await leafTarget(repo, cwd, leafOverride, holder);
+  const caller: LeafTarget = await leafTarget(repo, cwd, leafOverride, holder);
+  return (await checkedRun(repo, caller, await base(repo, cwd), name ?? 'run', argv, cwd)).code;
+}
+
+export async function checkedRun(
+  repo: Repo,
+  { slug, target, scope, unit, phase, attempt }: LeafTarget,
+  akrogonBase: string,
+  name: string,
+  argv: string[],
+  cwd: string,
+): Promise<{ code: number; log: string }> {
   const runRoot: string = mkdtempSync(resolve(ensureLeafTemp(repo, slug), 'run-'));
   try {
     const boot: string = existsSync('/proc/sys/kernel/random/boot_id')
@@ -167,13 +161,13 @@ export async function runCheck(
       JSON.stringify({ pid: process.pid, boot_id: boot, started: new Date().toISOString() }),
     );
     const env: Record<string, string> = constructedEnv(repo, runRoot);
-    env.AKROGON_BASE = baseSha ?? (await base(repo, cwd));
+    env.AKROGON_BASE = akrogonBase;
     const log: string = join(runRoot, 'out.log');
     const run: string = randomUUID();
     const check = {
       slug,
       run,
-      name: name ?? 'run',
+      name,
       scope,
       ...(phase === undefined ? {} : { phase }),
       ...(unit === undefined ? {} : { unit }),
@@ -182,7 +176,7 @@ export async function runCheck(
     const slice: string = runSlice(slug === 'checkout' ? 'akrogon.slice' : leafSlice(repo, slug));
     const runUnit: string = `${runUnitBase(run)}.scope`;
     return await withAdmission(
-      { repo: repo.name, leaf: slug, check: name ?? 'run', run, slice, scope: callerScope(), unit: runUnit },
+      { repo: repo.name, leaf: slug, check: name, run, slice, scope: callerScope(), unit: runUnit },
       async (admission) => {
         env.AKROGON_RUN = admission.token;
         appendTiming(repo, {
@@ -211,10 +205,7 @@ export async function runCheck(
         process.stdout.write(result.stdout);
         process.stderr.write(result.stderr);
         mkdirSync(target, { recursive: true });
-        const kept: string = resolve(
-          target,
-          `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`,
-        );
+        const kept: string = resolve(target, `check-${encodeURIComponent(name)}-${Date.now()}-${process.pid}.log`);
         copyFileSync(log, kept);
         appendTiming(repo, {
           kind: 'check_end',
@@ -223,7 +214,7 @@ export async function runCheck(
           duration_ms: Date.now() - started,
           log: kept,
         });
-        return result.code;
+        return { code: result.code, log: kept };
       },
     );
   } finally {

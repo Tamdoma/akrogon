@@ -20,6 +20,7 @@ import {
   type GhFixture,
   type HerdrFixture,
   type Fixture,
+  verified,
 } from './helpers';
 import { readState, saveState, type Batch, type Failure } from '../src/state';
 import { command, run, type Result } from '../src/shell';
@@ -214,6 +215,7 @@ test('handoff to review refuses a dirty worktree at every move and issue files o
     await command(['git', 'worktree', 'add', '-b', 'dirty', worktree], f.root);
     const path: string = leaf(f, 'dirty', 'implement', { worktree });
     writeFileSync(resolve(worktree, 'work'), 'done\n');
+    await verified(f, 'dirty', 'leaf');
     const refused: Result = await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('Uncommitted work');
@@ -224,11 +226,13 @@ test('handoff to review refuses a dirty worktree at every move and issue files o
     writeFileSync(resolve(worktree, 'issues/open/issue/dirty/review-B.md'), 'stray artifact\n');
     await command(['git', 'add', 'issues'], worktree);
     await command(['git', 'commit', '-m', 'artifact on branch'], worktree);
+    await verified(f, 'dirty', 'leaf');
     const artifacts: Result = await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'A']);
     expect(artifacts.code).not.toBe(0);
     expect(artifacts.stderr).toContain('Issue files on leaf branch');
     expect(readState(path).phase).toBe('implement');
     await command(['git', 'reset', '--hard', 'HEAD~1'], worktree);
+    await verified(f, 'dirty', 'leaf');
     expect((await cli(f, ['phase', 'dirty', 'check.review', '--slot', 'A'])).code).toBe(0);
     expect(readState(path).phase).toBe('check.review');
     writeFileSync(resolve(worktree, 'lesson'), 'late\n');
@@ -1637,6 +1641,7 @@ test('modified old test files need a Test-Change trailer on every guarded move',
     const before: string = bytes(path);
     writeFileSync(resolve(worktree, 'x.test.ts'), 'edited\n');
     await commitAll(worktree, ['edit test', 'Test-Change: x.test.ts']);
+    await verified(f, 'cite', 'leaf');
     const bare: Result = await cli(f, ['phase', 'cite', 'check.review', '--slot', 'A']);
     expect(bare.code).not.toBe(0);
     expect(bare.stderr).toContain('x.test.ts');
@@ -1648,6 +1653,7 @@ test('modified old test files need a Test-Change trailer on every guarded move',
       ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: x.test.ts src change edited the test'],
       worktree,
     );
+    await verified(f, 'cite', 'leaf');
     const moved: Result = await cli(f, ['phase', 'cite', 'check.review', '--slot', 'A']);
     expect(moved.code).toBe(0);
     expect(moved.stdout).toBe('moved check.review');
@@ -1667,6 +1673,7 @@ test('deleted and typechanged old test files need one trailer each naming the fi
     await command(['git', 'rm', 'x.test.ts'], worktree);
     symlinkSync('file', resolve(worktree, 'x.test.ts'));
     await commitAll(worktree, ['delete spec, link test']);
+    await verified(f, 'cite-both', 'leaf');
     const refused: Result = await cli(f, ['phase', 'cite-both', 'check.review', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('src/x.spec.ts');
@@ -1684,6 +1691,7 @@ test('deleted and typechanged old test files need one trailer each naming the fi
       ],
       worktree,
     );
+    await verified(f, 'cite-both', 'leaf');
     const moved: Result = await cli(f, ['phase', 'cite-both', 'check.review', '--slot', 'A']);
     expect(moved.stdout).toBe('moved check.review');
     expect(readState(path).phase).toBe('check.review');
@@ -1699,6 +1707,7 @@ test('a trailer naming a different path does not cite and the old path of a rena
     const wrongPath: string = leaf(f, 'cite-wrong', 'implement', { worktree: wrong });
     writeFileSync(resolve(wrong, 'x.test.ts'), 'edited\n');
     await commitAll(wrong, ['edit test', 'Test-Change: src/x.spec.ts cited the untouched spec']);
+    await verified(f, 'cite-wrong', 'leaf');
     const refused: Result = await cli(f, ['phase', 'cite-wrong', 'check.review', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('x.test.ts');
@@ -1707,6 +1716,7 @@ test('a trailer naming a different path does not cite and the old path of a rena
     const renamedPath: string = leaf(f, 'cite-rename', 'implement', { worktree: renamed });
     await command(['git', 'mv', 'x.test.ts', 'y.test.ts'], renamed);
     await commitAll(renamed, ['rename test', 'Test-Change: y.test.ts cited the new name']);
+    await verified(f, 'cite-rename', 'leaf');
     const oldRefused: Result = await cli(f, ['phase', 'cite-rename', 'check.review', '--slot', 'A']);
     expect(oldRefused.code).not.toBe(0);
     expect(oldRefused.stderr).toContain('Test-Change: x.test.ts <source and reason>');
@@ -1715,6 +1725,7 @@ test('a trailer naming a different path does not cite and the old path of a rena
       ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: x.test.ts renamed to y.test.ts'],
       renamed,
     );
+    await verified(f, 'cite-rename', 'leaf');
     const moved: Result = await cli(f, ['phase', 'cite-rename', 'check.review', '--slot', 'A']);
     expect(moved.stdout).toBe('moved check.review');
     expect(readState(renamedPath).phase).toBe('check.review');
@@ -1731,6 +1742,7 @@ test('added-only test files and non-test diffs move without a trailer, and recov
     writeFileSync(resolve(worktree, 'new.test.ts'), 'new\n');
     writeFileSync(resolve(worktree, 'file'), 'edited\n');
     await commitAll(worktree, ['add test, edit file']);
+    await verified(f, 'cite-add', 'leaf');
     const added: Result = await cli(f, ['phase', 'cite-add', 'check.review', '--slot', 'A']);
     expect(added.stdout).toBe('moved check.review');
     expect(readState(addPath).phase).toBe('check.review');
@@ -1765,6 +1777,7 @@ test('phase --check runs the move guards without recording, moving or closing th
     writeFileSync(resolve(worktree, 'src/new.ts'), 'code\n');
     await commitAll(worktree, ['code change']);
     const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    await verified(f, 'check', 'leaf');
     const ok: Result = await cli(f, ['phase', 'check', 'check.review', '--slot', 'A', '--check']);
     expect(ok.code).toBe(0);
     expect(ok.stdout).toBe('ok');
@@ -1774,6 +1787,7 @@ test('phase --check runs the move guards without recording, moving or closing th
     expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
     writeFileSync(resolve(worktree, 'x.test.ts'), 'edited\n');
     await commitAll(worktree, ['edit test']);
+    await verified(f, 'check', 'leaf');
     const checkedRefused: Result = await cli(f, ['phase', 'check', 'check.review', '--slot', 'A', '--check']);
     expect(checkedRefused.code).not.toBe(0);
     expect(checkedRefused.stderr).toContain('x.test.ts');
@@ -1784,6 +1798,7 @@ test('phase --check runs the move guards without recording, moving or closing th
     const dirtyPath: string = leaf(f, 'check-dirty', 'implement', { worktree: dirtyWt });
     writeFileSync(resolve(dirtyWt, 'unstaged'), 'x\n');
     const dirtyBefore: string = bytes(dirtyPath);
+    await verified(f, 'check-dirty', 'leaf');
     const dirty: Result = await cli(f, ['phase', 'check-dirty', 'check.review', '--slot', 'A', '--check']);
     expect(dirty.code).not.toBe(0);
     expect(dirty.stderr).toContain('Uncommitted work');
@@ -1963,6 +1978,7 @@ test('merged --check refuses an applied stack whose top still contains a retired
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: HerdrFixture = fakeHerdr(f);
+    await verified(f, 'hold', 'merge');
     const refused: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -1977,6 +1993,7 @@ test('merged --check refuses an applied stack whose top still contains a retired
     await command(['git', 'commit', '-m', 'lessons: retire applied lines'], worktree);
     const fixedTop: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     saveState(path, { ...readState(path), batch: { ...record, top: fixedTop } });
+    await verified(f, 'hold', 'merge');
     const checked: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -2015,6 +2032,7 @@ test('a solo merge push keeps citations valid when the remote ref advanced', asy
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: HerdrFixture = fakeHerdr(f);
+    await verified(f, 'push-cite', 'merge');
     const checked: Result = await cli(
       f,
       ['phase', 'push-cite', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -2064,6 +2082,7 @@ test('merged --check refuses a solo record whose rebased head contains a retired
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: HerdrFixture = fakeHerdr(f);
+    await verified(f, 'hold', 'merge');
     const refused: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -2076,6 +2095,7 @@ test('merged --check refuses a solo record whose rebased head contains a retired
     writeFileSync(resolve(worktree, 'learnings/LESSONS.md'), '- lesson beta. 2026-09-11. [beta](history/beta.md)\n');
     await command(['git', 'add', '.'], worktree);
     await command(['git', 'commit', '-m', 'lessons: retire applied lines'], worktree);
+    await verified(f, 'hold', 'merge');
     const checked: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -2149,6 +2169,7 @@ test('plan.synthesis move writes a frozen record of every changed path and rewri
     expect(readState(againPath).frozen).toEqual(await frozenRecord(againWt));
     writeFileSync(resolve(againWt, 'file'), 'drifted\n');
     await commitAll(againWt, ['post-freeze edit']);
+    await verified(f, 'frozen-again', 'leaf');
     const drift: Result = await cli(f, ['phase', 'frozen-again', 'check.review', '--slot', 'A']);
     expect(drift.code).not.toBe(0);
     expect(drift.stderr).toContain('Test-Change: file <source and reason>');
@@ -2157,6 +2178,7 @@ test('plan.synthesis move writes a frozen record of every changed path and rewri
       ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: file drifted after the freeze'],
       againWt,
     );
+    await verified(f, 'frozen-again', 'leaf');
     expect((await cli(f, ['phase', 'frozen-again', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
   } finally {
     f.clean();
@@ -2173,6 +2195,7 @@ test('frozen record refuses drifted, reappearing, deleted and renamed paths unti
     writeFileSync(resolve(editWt, 'file'), 'edited after the freeze\n');
     await commitAll(editWt, ['edit file']);
     const before: string = bytes(editPath);
+    await verified(f, 'frozen-edit', 'leaf');
     const refused: Result = await cli(f, ['phase', 'frozen-edit', 'check.review', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('file');
@@ -2184,12 +2207,14 @@ test('frozen record refuses drifted, reappearing, deleted and renamed paths unti
       ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: file edited after the freeze'],
       editWt,
     );
+    await verified(f, 'frozen-edit', 'leaf');
     expect((await cli(f, ['phase', 'frozen-edit', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
     const ownWt: string = await frozenBranch(f, 'frozen-own');
     leaf(f, 'frozen-own', 'plan.synthesis', { worktree: ownWt });
     expect((await cli(f, ['phase', 'frozen-own', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
     writeFileSync(resolve(ownWt, 'file'), 'own trailer edit\n');
     await commitAll(ownWt, ['edit file']);
+    await verified(f, 'frozen-own', 'leaf');
     const ownRefused: Result = await cli(f, ['phase', 'frozen-own', 'check.review', '--slot', 'A']);
     expect(ownRefused.code).not.toBe(0);
     expect(ownRefused.stderr).toContain('Test-Change: file <source and reason>');
@@ -2197,12 +2222,14 @@ test('frozen record refuses drifted, reappearing, deleted and renamed paths unti
       ['git', 'commit', '--amend', '-m', 'edit file\n\nTest-Change: file edit carries its own trailer'],
       ownWt,
     );
+    await verified(f, 'frozen-own', 'leaf');
     expect((await cli(f, ['phase', 'frozen-own', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
     const backWt: string = await frozenBranch(f, 'frozen-back');
     leaf(f, 'frozen-back', 'plan.synthesis', { worktree: backWt });
     expect((await cli(f, ['phase', 'frozen-back', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
     writeFileSync(resolve(backWt, 'old.txt'), 'reappeared\n');
     await commitAll(backWt, ['reappear old.txt']);
+    await verified(f, 'frozen-back', 'leaf');
     const backRefused: Result = await cli(f, ['phase', 'frozen-back', 'check.review', '--slot', 'A']);
     expect(backRefused.code).not.toBe(0);
     expect(backRefused.stderr).toContain('Test-Change: old.txt <source and reason>');
@@ -2210,12 +2237,14 @@ test('frozen record refuses drifted, reappearing, deleted and renamed paths unti
       ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: old.txt reappeared after the freeze'],
       backWt,
     );
+    await verified(f, 'frozen-back', 'leaf');
     expect((await cli(f, ['phase', 'frozen-back', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
     const rmWt: string = await frozenBranch(f, 'frozen-rm');
     leaf(f, 'frozen-rm', 'plan.synthesis', { worktree: rmWt });
     expect((await cli(f, ['phase', 'frozen-rm', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
     await command(['git', 'rm', '-q', 'scripts/proof.sh'], rmWt);
     await commitAll(rmWt, ['delete proof']);
+    await verified(f, 'frozen-rm', 'leaf');
     const rmRefused: Result = await cli(f, ['phase', 'frozen-rm', 'check.review', '--slot', 'A']);
     expect(rmRefused.code).not.toBe(0);
     expect(rmRefused.stderr).toContain('Test-Change: scripts/proof.sh <source and reason>');
@@ -2223,12 +2252,14 @@ test('frozen record refuses drifted, reappearing, deleted and renamed paths unti
       ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: scripts/proof.sh deleted after the freeze'],
       rmWt,
     );
+    await verified(f, 'frozen-rm', 'leaf');
     expect((await cli(f, ['phase', 'frozen-rm', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
     const mvWt: string = await frozenBranch(f, 'frozen-mv');
     leaf(f, 'frozen-mv', 'plan.synthesis', { worktree: mvWt });
     expect((await cli(f, ['phase', 'frozen-mv', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
     await command(['git', 'mv', 'scripts/proof.sh', 'scripts/moved.sh'], mvWt);
     await commitAll(mvWt, ['rename proof']);
+    await verified(f, 'frozen-mv', 'leaf');
     const mvRefused: Result = await cli(f, ['phase', 'frozen-mv', 'check.review', '--slot', 'A']);
     expect(mvRefused.code).not.toBe(0);
     expect(mvRefused.stderr).toContain('Test-Change: scripts/proof.sh <source and reason>');
@@ -2237,17 +2268,20 @@ test('frozen record refuses drifted, reappearing, deleted and renamed paths unti
       ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: scripts/proof.sh renamed after the freeze'],
       mvWt,
     );
+    await verified(f, 'frozen-mv', 'leaf');
     expect((await cli(f, ['phase', 'frozen-mv', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
     const mvtWt: string = await frozenBranch(f, 'frozen-mvt');
     leaf(f, 'frozen-mvt', 'plan.synthesis', { worktree: mvtWt });
     expect((await cli(f, ['phase', 'frozen-mvt', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
     await command(['git', 'mv', 'plan.test.ts', 'moved.test.ts'], mvtWt);
     await commitAll(mvtWt, ['rename test', 'Test-Change: plan.test.ts renamed']);
+    await verified(f, 'frozen-mvt', 'leaf');
     const mvtRefused: Result = await cli(f, ['phase', 'frozen-mvt', 'check.review', '--slot', 'A']);
     expect(mvtRefused.code).not.toBe(0);
     expect(mvtRefused.stderr).toContain('Test-Change: moved.test.ts <source and reason>');
     expect(mvtRefused.stderr).not.toContain('plan.test.ts <source and reason>');
     await command(['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: moved.test.ts rename target'], mvtWt);
+    await verified(f, 'frozen-mvt', 'leaf');
     expect((await cli(f, ['phase', 'frozen-mvt', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
   } finally {
     f.clean();
@@ -2262,6 +2296,7 @@ test('frozen record refuses unrecorded added test files and edited recorded non-
     expect((await cli(f, ['phase', 'frozen-add', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
     writeFileSync(resolve(addWt, 'extra.test.ts'), 'late test\n');
     await commitAll(addWt, ['add extra test']);
+    await verified(f, 'frozen-add', 'leaf');
     const addRefused: Result = await cli(f, ['phase', 'frozen-add', 'check.review', '--slot', 'A']);
     expect(addRefused.code).not.toBe(0);
     expect(addRefused.stderr).toContain('Test-Change: extra.test.ts <source and reason>');
@@ -2269,12 +2304,14 @@ test('frozen record refuses unrecorded added test files and edited recorded non-
       ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: extra.test.ts added after the freeze'],
       addWt,
     );
+    await verified(f, 'frozen-add', 'leaf');
     expect((await cli(f, ['phase', 'frozen-add', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
     const proofWt: string = await frozenBranch(f, 'frozen-proof');
     leaf(f, 'frozen-proof', 'plan.synthesis', { worktree: proofWt });
     expect((await cli(f, ['phase', 'frozen-proof', 'implement', '--slot', 'A'])).stdout).toBe('moved implement');
     writeFileSync(resolve(proofWt, 'scripts/proof.sh'), 'better proof\n');
     await commitAll(proofWt, ['edit proof']);
+    await verified(f, 'frozen-proof', 'leaf');
     const proofRefused: Result = await cli(f, ['phase', 'frozen-proof', 'check.review', '--slot', 'A']);
     expect(proofRefused.code).not.toBe(0);
     expect(proofRefused.stderr).toContain('Test-Change: scripts/proof.sh <source and reason>');
@@ -2282,6 +2319,7 @@ test('frozen record refuses unrecorded added test files and edited recorded non-
       ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: scripts/proof.sh edited after the freeze'],
       proofWt,
     );
+    await verified(f, 'frozen-proof', 'leaf');
     expect((await cli(f, ['phase', 'frozen-proof', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
   } finally {
     f.clean();
@@ -2304,6 +2342,7 @@ test('frozen guard holds after fetch and rebase including a recorded path no lea
     writeFileSync(resolve(wt, 'file'), 'rebased resolution\n');
     await command(['git', 'add', 'file'], wt);
     await command(['git', '-c', 'core.editor=true', 'rebase', '--continue'], wt);
+    await verified(f, 'frozen-rb', 'leaf');
     const refused: Result = await cli(f, ['phase', 'frozen-rb', 'check.review', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('Test-Change: file <source and reason>');
@@ -2319,6 +2358,7 @@ test('frozen guard holds after fetch and rebase including a recorded path no lea
       ],
       wt,
     );
+    await verified(f, 'frozen-rb', 'leaf');
     expect((await cli(f, ['phase', 'frozen-rb', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
     const nt: string = await frozenBranch(f, 'frozen-rbnt');
     const ntPath: string = leaf(f, 'frozen-rbnt', 'plan.synthesis', { worktree: nt });
@@ -2335,6 +2375,7 @@ test('frozen guard holds after fetch and rebase including a recorded path no lea
     await command(['git', '-c', 'core.editor=true', 'rebase', '--continue'], nt);
     expect(await command(['git', 'show', 'HEAD:old.txt'], nt)).toBe('main kept');
     expect(await command(['git', 'log', '--format=%s', 'origin/main..HEAD', '--', 'old.txt'], nt)).toBe('');
+    await verified(f, 'frozen-rbnt', 'leaf');
     const ntRefused: Result = await cli(f, ['phase', 'frozen-rbnt', 'check.review', '--slot', 'A']);
     expect(ntRefused.code).not.toBe(0);
     expect(ntRefused.stderr).toContain('Test-Change: old.txt <source and reason>');
@@ -2349,6 +2390,7 @@ test('frozen guard holds after fetch and rebase including a recorded path no lea
       ],
       nt,
     );
+    await verified(f, 'frozen-rbnt', 'leaf');
     expect((await cli(f, ['phase', 'frozen-rbnt', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
   } finally {
     f.clean();
@@ -2374,12 +2416,14 @@ test('frozen guard ignores a rebase-replayed planning trailer for a path no leaf
     await command(['git', '-c', 'core.editor=true', 'rebase', '--continue'], wt);
     expect(await command(['git', 'show', 'HEAD:old.txt'], wt)).toBe('main kept');
     expect(await command(['git', 'log', '--format=%s', 'origin/main..HEAD', '--', 'old.txt'], wt)).toBe('');
+    await verified(f, 'frozen-rbpt', 'leaf');
     const refused: Result = await cli(f, ['phase', 'frozen-rbpt', 'check.review', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('Test-Change: old.txt <source and reason>');
     expect(readState(path).frozen).toBeDefined();
     writeFileSync(resolve(wt, 'notes.txt'), 'non-empty cite\n');
     await commitAll(wt, ['carry trailer on a real change', 'Test-Change: old.txt trailer on a non-empty commit']);
+    await verified(f, 'frozen-rbpt', 'leaf');
     const stillRefused: Result = await cli(f, ['phase', 'frozen-rbpt', 'check.review', '--slot', 'A']);
     expect(stillRefused.code).not.toBe(0);
     expect(stillRefused.stderr).toContain('Test-Change: old.txt <source and reason>');
@@ -2393,6 +2437,7 @@ test('frozen guard ignores a rebase-replayed planning trailer for a path no leaf
       ],
       wt,
     );
+    await verified(f, 'frozen-rbpt', 'leaf');
     expect((await cli(f, ['phase', 'frozen-rbpt', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
   } finally {
     f.clean();
@@ -2435,6 +2480,7 @@ test('frozen guard refuses a rebase-replayed empty planning cite until a new tra
     expect(await command(['git', 'show', 'HEAD:old.test.ts'], wt)).toBe('main version');
     expect(await command(['git', 'log', '--format=%s', 'origin/main..HEAD', '--', 'old.test.ts'], wt)).toBe('');
     expect(readState(path).frozen).toBeDefined();
+    await verified(f, 'frozen-rbec', 'leaf');
     const refused: Result = await cli(f, ['phase', 'frozen-rbec', 'check.review', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('Test-Change: old.test.ts <source and reason>');
@@ -2443,6 +2489,7 @@ test('frozen guard refuses a rebase-replayed empty planning cite until a new tra
       ['git', 'commit', '--allow-empty', '-m', 'cite again\n\nTest-Change: old.test.ts planning deletes obsolete test'],
       wt,
     );
+    await verified(f, 'frozen-rbec', 'leaf');
     expect((await cli(f, ['phase', 'frozen-rbec', 'check.review', '--slot', 'A'])).stdout).toBe('moved check.review');
   } finally {
     f.clean();

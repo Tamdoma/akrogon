@@ -15,6 +15,7 @@ import {
   type Fixture,
   type HerdrFixture,
   registerTemp,
+  verified,
 } from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State } from '../src/state';
@@ -93,6 +94,7 @@ test.serial('restack preserves a retirement when an unrelated member predates th
     );
     const herdr: HerdrFixture = fakeHerdr(f);
     const args: string[] = ['phase', 'holder', 'merged', '--slot', 'B', '--attempt', 'a1'];
+    await verified(f, 'holder', 'merge');
     expect((await cli(f, [...args, '--check'], f.root, herdr.env)).code).toBe(0);
     writeFileSync(resolve(f.root, 'learnings/LESSONS.md'), alpha + gamma + delta + recurrence + beta);
     await command(['git', 'add', '.'], f.root);
@@ -113,6 +115,7 @@ test.serial('restack preserves a retirement when an unrelated member predates th
     expect(refused.stderr).toContain('history/alpha');
     await command(['git', 'reset', '--hard', restacked.top!], held.worktree);
     saveState(holderPath, { ...readState(holderPath), batch: restacked });
+    await verified(f, 'holder', 'merge');
     expect((await cli(f, [...args, '--check'], f.root, herdr.env)).code).toBe(0);
     expect((await cli(f, args, f.root, herdr.env)).code).toBe(0);
     expect(await command(['git', 'show', 'origin/main:learnings/LESSONS.md'], f.root)).toBe(expected.trim());
@@ -300,6 +303,7 @@ test.serial(
         grounding: 'none',
         checks: { count: 'sh -c "echo x >> ' + countFile + '"' },
       });
+      await verified(f, 'hold', 'merge');
       const checked: Result = await cli(
         f,
         ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -339,6 +343,7 @@ test.serial('a member leaving merge before merged refuses the push and dissolves
   try {
     const { record, holder, members, herdr, branches } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
     const remoteBefore: string = await remoteTip(f);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -372,6 +377,7 @@ test.serial('a stale or missing attempt is refused, changes nothing, and the cur
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
     const remoteBefore: string = await remoteTip(f);
     const before: string = stateBytes(holder.path);
+    await verified(f, 'hold', 'merge');
     const refusals: Result[] = [
       await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'old-attempt'], f.root, herdr.env),
       await cli(f, ['phase', 'hold', 'merged', '--slot', 'B'], f.root, herdr.env),
@@ -390,6 +396,7 @@ test.serial('a stale or missing attempt is refused, changes nothing, and the cur
     expect(refusals[0].stderr).toContain('old-attempt');
     expect(stateBytes(holder.path)).toBe(before);
     expect(await remoteTip(f)).toBe(remoteBefore);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -409,6 +416,7 @@ test.serial('a refused push restacks onto the new remote, prints rerun and the r
   const f: Fixture = await fixture();
   try {
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -444,6 +452,7 @@ test.serial('a refused push restacks onto the new remote, prints rerun and the r
     expect(await remoteTip(f)).toBe(advSha);
     for (const member of batch.members)
       expect(await command(['git', 'rev-parse', 'refs/heads/' + member.slug], f.root)).toBe(member.tip);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -516,6 +525,7 @@ test.serial(
     try {
       leaf(f, 'other', 'check.review', {}, 'epic/otherpart');
       const { herdr } = await batchFixture(f, ['hold', 'mem'], { hold: 'epic/part', mem: 'memiss' });
+      await verified(f, 'hold', 'merge');
       expect(
         (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env))
           .code,
@@ -552,6 +562,7 @@ test.serial('merged --check refuses a member test change without a citation, nam
       {},
       { 'mem-a': 'tests/existing.test.ts' },
     );
+    await verified(f, 'hold', 'merge');
     const checked: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -573,6 +584,7 @@ test.serial('a solo record checks and pushes the worktree HEAD', async () => {
   try {
     const { holder, herdr } = await soloFixture(f);
     const head: string = await command(['git', 'rev-parse', 'refs/heads/hold'], f.root);
+    await verified(f, 'hold', 'merge');
     const checked: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -644,6 +656,7 @@ test.serial('a memberless stack checks and pushes a B repair commit past the top
     const { holder, record, herdr } = await batchFixture(f, ['hold']);
     const repaired: string = await repairCommit(holder);
     expect(repaired).not.toBe(record.top);
+    await verified(f, 'hold', 'merge');
     const checked: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -666,6 +679,7 @@ test.serial('a memberless restack keeps the B repair commit', async () => {
   try {
     const { holder, herdr } = await batchFixture(f, ['hold']);
     await repairCommit(holder);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -678,6 +692,7 @@ test.serial('a memberless restack keeps the B repair commit', async () => {
     );
     expect(merged.code).toBe(0);
     expect(merged.stdout).toMatch(/^rerun tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -714,6 +729,7 @@ test.serial('a stack with members refuses a B commit past the top at --check', a
   try {
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
     await repairCommit(holder);
+    await verified(f, 'hold', 'merge');
     const checked: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -734,6 +750,7 @@ test.serial('a memberless stack refuses a HEAD that does not descend from the to
     const { holder, record, herdr } = await batchFixture(f, ['hold']);
     await command(['git', 'reset', '--hard', record.built_on], holder.state.worktree!);
     await repairCommit(holder);
+    await verified(f, 'hold', 'merge');
     const checked: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -785,6 +802,7 @@ test.serial('a member failing during restack is not reset by the locked apply', 
   const f: Fixture = await fixture();
   try {
     const { holder, record, members, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -862,6 +880,7 @@ test.serial(
       ).toBe('hold');
       const solo: State = readState(holder.path);
       const attempt: string = z.string().parse(solo.batch?.attempt);
+      await verified(f, 'hold', 'merge');
       expect(
         (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', attempt, '--check'], f.root, herdr.env))
           .code,
@@ -892,6 +911,7 @@ test.serial(
         {},
         { 'mem-a': 'conflict-file', 'mem-b': 'file-mem-b' },
       );
+      await verified(f, 'hold', 'merge');
       expect(
         (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env))
           .code,
@@ -1029,6 +1049,7 @@ test.serial('a solo restack conflict preserves commits made during the solo pass
     await command(['git', 'add', '.'], holder.state.worktree!);
     await command(['git', 'commit', '-m', 'solo repair'], holder.state.worktree!);
     const repaired: string = await command(['git', 'rev-parse', 'hold'], f.root);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -1056,6 +1077,7 @@ for (const edited of ['holder', 'member'] as const) {
     const f: Fixture = await fixture();
     try {
       const { holder, members, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+      await verified(f, 'hold', 'merge');
       expect(
         (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, herdr.env))
           .code,
@@ -1102,6 +1124,7 @@ test.serial(
         checks: { count: 'sh -c "echo x >> ' + countFile + '"' },
       });
       await command(['sh', '-c', 'echo x >> ' + countFile]);
+      await verified(f, 'hold', 'merge');
       const checked: Result = await cli(
         f,
         ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -1130,6 +1153,7 @@ test.serial(
       expect(reuseBatch.top).toBe(t2);
       expect(reuseBatch.candidate).toBeUndefined();
       expect(readFileSync(countFile, 'utf8').trim().split('\n')).toHaveLength(1);
+      await verified(f, 'hold', 'merge');
       const recheck: Result = await cli(
         f,
         ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
@@ -1183,6 +1207,7 @@ test.serial('a code advance forces a rerun: the seat rechecks and the restacked 
       checks: { count: 'sh -c "echo x >> ' + countFile + '"' },
     });
     await command(['sh', '-c', 'echo x >> ' + countFile]);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -1204,6 +1229,7 @@ test.serial('a code advance forces a rerun: the seat rechecks and the restacked 
     expect(rerunBatch.top).toBe(t2);
     expect(await remoteTip(f)).toBe(m2);
     await command(['sh', '-c', 'echo x >> ' + countFile]);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -1222,6 +1248,7 @@ test.serial('a main commit matching part of a member change fails the main-side 
   try {
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
     const t1: string = record.top!;
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -1250,6 +1277,7 @@ test.serial('a change to issues/config.yaml on main forces a rerun', async () =>
   try {
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
     const t1: string = record.top!;
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -1284,6 +1312,7 @@ test.serial(
         { 'mem-a': 'learnings/history/shared.md' },
       );
       const t1: string = record.top!;
+      await verified(f, 'hold', 'merge');
       expect(
         (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env))
           .code,
@@ -1310,6 +1339,7 @@ test.serial(
       expect(await command(['git', 'rev-parse', 'refs/heads/mem-a'], f.root)).toBe(record.members[0].head);
       expect(await command(['git', 'show', t2 + ':learnings/history/shared.md'], f.root)).toBe('from-main');
       expect(await remoteTip(f)).toBe(m2);
+      await verified(f, 'hold', 'merge');
       expect(
         (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env))
           .code,
@@ -1330,6 +1360,7 @@ test.serial('a second refusal after reuse still compares against the original te
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
     const t1: string = record.top!;
     const m1: string = record.built_on;
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -1372,6 +1403,7 @@ test.serial('a dirty holder during restack records rerun and preserves the opera
   const f: Fixture = await fixture();
   try {
     const { holder, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
     ).toBe(0);
@@ -1405,6 +1437,7 @@ test.serial('the reuse decision is identical when the command runs from a subdir
     const t1: string = record.top!;
     const subdir: string = resolve(holder.state.worktree!, 'subdir');
     mkdirSync(subdir);
+    await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], subdir, herdr.env)).code,
     ).toBe(0);

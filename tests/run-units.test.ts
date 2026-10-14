@@ -402,18 +402,23 @@ for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
 }
 
 test.serial(
-  'a base-run runs setup and command in one run unit under the leaf slice',
+  'a verify runs setup and command in one run unit under the leaf slice',
   async () => {
     const { f, slice } = await realFixture();
     const out: string = outDir(f);
-    const worktree: string = await leafWorktree(f, 'base-units');
-    const sha: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
-    const result: SpawnResult = await spawnReal(
-      f,
-      ['base-run', '--base', sha, '--', 'sh', '-c', `cat /proc/self/cgroup > "${out}/cmd.cg"`],
-      worktree,
-      { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
-    ).result;
+    const worktree: string = await leafWorktree(f, 'verify-units');
+    const config: string = resolve(f.root, 'issues/config.yaml');
+    const before: string = readFileSync(config, 'utf8');
+    yaml(config, { ...(Bun.YAML.parse(before) as object), checks: { cg: `cat /proc/self/cgroup > "${out}/cmd.cg"` } });
+    writeFileSync(
+      resolve(f.root, '.env'),
+      'AKROGON_HOME=declared\nAKROGON_LEAF_TEMP_ROOT=declared\nRUN_UNITS_OUT=declared\n',
+    );
+    const result: SpawnResult = await spawnReal(f, ['verify'], worktree, {
+      RUN_UNITS_OUT: out,
+      AKROGON_RUN_SLICE: slice,
+    }).result;
+    writeFileSync(config, before);
     expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
     expect(result.stderr.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(1);
     const setup: string = readFileSync(resolve(out, 'setup.cg'), 'utf8');
@@ -427,20 +432,24 @@ test.serial(
   45000,
 );
 
-test.serial('a base-run places its scope under the resolved leaf slice by default', async () => {
+test.serial('a verify places its scope under the resolved leaf slice by default', async () => {
   const f: Fixture = await fixture();
   try {
     fakeAkrogon(f);
-    const worktree: string = await leafWorktree(f, 'base-place');
-    const sha: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: { ok: 'true' },
+      grounding: 'none',
+    });
+    const worktree: string = await leafWorktree(f, 'verify-place');
     const log: string = resolve(f.home, 'systemd-run.calls');
-    await cli(f, ['base-run', '--base', sha, '--', 'true'], worktree, {
+    await cli(f, ['verify'], worktree, {
       FAKE_SYSTEMD_RUN_LOG: log,
     });
     const calls: string[] = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
     const scoped: string[] = calls.filter((line) => line.includes('--scope'));
     expect(scoped.length).toBeGreaterThan(0);
-    expect(scoped.some((line) => line.includes(`--slice=${expectedSlice('repo', 'base-place')}`))).toBe(true);
+    expect(scoped.some((line) => line.includes(`--slice=${expectedSlice('repo', 'verify-place')}`))).toBe(true);
   } finally {
     f.clean();
   }

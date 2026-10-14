@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, fakeHerdr, fakeAkrogon, leaf, storeDir, yaml, type Fixture } from './helpers';
+import { fixture, cli, fakeHerdr, fakeAkrogon, leaf, storeDir, yaml, type Fixture, verified } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, type Result } from '../src/shell';
 import type { Database } from './fake-herdr';
@@ -60,6 +60,7 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
     expect((await phase(f, ['solo', 'implement', '--slot', 'A'])).code).toBe(0);
     idleAll(f);
     expect((await next(f, ['solo'])).code).toBe(0);
+    await verified(f, 'solo', 'leaf');
     expect((await phase(f, ['solo', 'check.review', '--slot', 'A'])).code).toBe(0);
     idleAll(f);
     expect((await next(f, ['solo'])).code).toBe(0);
@@ -71,6 +72,7 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
     expect((await phase(f, ['solo', 'check.fix', '--slot', 'B'])).code).toBe(0);
     idleAll(f);
     expect((await next(f, ['solo'])).code).toBe(0);
+    await verified(f, 'solo', 'leaf');
     expect((await phase(f, ['solo', 'check.review', '--slot', 'A'])).code).toBe(0);
     idleAll(f);
     expect((await next(f, ['solo'])).code).toBe(0);
@@ -78,6 +80,7 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
     idleAll(f);
     expect((await next(f, ['solo'])).code).toBe(0);
     const attempt: string = readState(path).batch!.attempt;
+    await verified(f, 'solo', 'merge');
     expect((await phase(f, ['solo', 'merged', '--check', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
     expect((await phase(f, ['solo', 'merged', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
 
@@ -124,7 +127,7 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
   }
 }, 60000);
 
-test('check events: scope, ordering, exit and duration; killed and worker and base runs', async () => {
+test('check events: scope, ordering, exit and duration; killed and worker and verify runs', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'chks', 'implement');
@@ -157,20 +160,17 @@ test('check events: scope, ordering, exit and duration; killed and worker and ba
     yaml(resolve(f.root, 'issues/config.yaml'), {
       env: ['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT'],
       setup: 'mkdir -p node_modules',
-      checks: { test: 'bun test' },
+      checks: { b: 'true' },
       grounding: 'none',
     });
+    writeFileSync(resolve(f.root, '.env'), 'AKROGON_HOME=declared\nAKROGON_LEAF_TEMP_ROOT=declared\n');
     const shim: { env: NodeJS.ProcessEnv } = fakeAkrogon(f);
-    const baseHead: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
-    const baseRun: Result = await cli(
-      f,
-      ['base-run', '--base', baseHead, '--', 'akrogon', 'run-check', '--name', 'b', '--', 'true'],
-      worktree,
-      { ...f.env, ...shim.env },
-    );
-    expect(baseRun.code).toBe(0);
-    const baseStart: Event | undefined = ofKind(leafEvents(f, 'chks'), 'check_start').find((e) => e.name === 'b');
-    expect(baseStart?.scope).toBe('base');
+    const verified: Result = await cli(f, ['verify'], worktree, { ...f.env, ...shim.env });
+    expect(verified.code).toBe(0);
+    const verifyStart: Event | undefined = ofKind(leafEvents(f, 'chks'), 'check_start').find((e) => e.name === 'b');
+    const verifyEnd: Event | undefined = ofKind(leafEvents(f, 'chks'), 'check_end').find((e) => e.name === 'b');
+    expect(verifyStart).toMatchObject({ scope: 'leaf', phase: 'implement' });
+    expect(verifyEnd).toMatchObject({ scope: 'leaf', exit: 0 });
   } finally {
     f.clean();
   }
@@ -256,6 +256,7 @@ test('waits: pause writes repo_pause on and off; parked, prerequisite and merge 
     expect(ofKind(leafEvents(f, 'm1'), 'prompt').some((p) => p.outcome === 'delivered')).toBe(true);
 
     const attempt: string = readState(m1).batch!.attempt;
+    await verified(f, 'm1', 'merge');
     expect((await phase(f, ['m1', 'merged', '--check', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
     expect((await phase(f, ['m1', 'merged', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
     expect(readState(m1).phase).toBe('merged');
