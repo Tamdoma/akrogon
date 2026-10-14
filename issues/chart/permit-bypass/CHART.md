@@ -33,7 +33,7 @@ Route: lifecycle (debate no)
 
 ## Pending steps
 - Before memory-start-check merges: the door reverts the operator's uncommitted 4-lane stopgap in the root checkout (`git checkout src/permit.ts`). Owner: door (A). Waits on: memory-start-check reaching merge. Check: `git status --short src/permit.ts` prints nothing.
-- When every concurrent-checks leaf is merged: the door runs `akrogon close Tamdoma/akrogon#89 --by "concurrent-checks <merge shas>"` and the same for #90. Owner: door (A). Waits on: all three leaves merged. Check: both identities closed on GitHub.
+- When every concurrent-checks leaf is merged: the door runs `akrogon close Tamdoma/akrogon#89 --by "concurrent-checks <merge shas>"` and the same for #90. Owner: door (A). Waits on: all three leaves merged. Check: both identities closed on GitHub. Status: done 2026-10-14, both closed with "concurrent-checks memory-start-check ca02364, worker-test-duty d9ab236, run-units 2dbcf99".
 
 ## Second destination
 framework: /home/ivan/Work/infra/tamdoma/framework/issues/chart/test-cost/ (subset runs in parallel, shrink the 97-always floor).

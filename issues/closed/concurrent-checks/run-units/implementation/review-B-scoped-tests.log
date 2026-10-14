@@ -1,0 +1,55 @@
+run 24f9bc24-7c4b-4680-baa0-4a480aea146a
+bun test v1.4.3 (c6da4a4d3)
+
+tests/run-units.test.ts:
+248 |     const scope: string | undefined = outer.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];
+249 |     expect(scope).toBeDefined();
+250 |     expect(outer).toContain(`/${slice}/${scope}`);
+251 |     expect(child).toBe(outer);
+252 |     expect(inner).toBe(outer);
+253 |     expect(await activeUnits('akrogon-run-*.scope')).toEqual([]);
+                                                           ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "akrogon-run-24f9bc24-7c4b-4680-baa0-4a480aea146a.scope",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/run-units/tests/run-units.test.ts:253:54)
+(fail) a top-level run-check boxes its command, a child forked at once and a nested run-check in one run unit [3118.86ms]
+(pass) stop-run stops only the caller pane scope runs [1090.80ms]
+(pass) SIGTERM of the wrapper leaves the run unit inactive with no descendant [1289.89ms]
+(pass) SIGKILL of the wrapper leaves the run unit inactive with no descendant [1357.53ms]
+406 |     const cmd: string = readFileSync(resolve(out, 'cmd.cg'), 'utf8');
+407 |     const scope: string | undefined = cmd.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];
+408 |     expect(scope).toBeDefined();
+409 |     expect(setup).toBe(cmd);
+410 |     expect(cmd).toContain(`/${slice}/${scope}`);
+411 |     expect(await activeUnits('akrogon-run-*.scope')).toEqual([]);
+                                                           ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "akrogon-run-24f9bc24-7c4b-4680-baa0-4a480aea146a.scope",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/run-units/tests/run-units.test.ts:411:54)
+(fail) a base-run runs setup and command in one run unit under the leaf slice [363.95ms]
+(pass) a top-level run starts at once over the old memory reading and inside the old spacing window [173.22ms]
+(pass) a nested run-check inside a live run adds no record and no reservation [1294.58ms]
+(pass) run-check --leaf and --holder keep working and place units under the leaf slice and akrogon.slice [456.23ms]
+(pass) skills name akrogon stop-run instead of the recorded-PID stop rule [0.57ms]
+(pass) a stale run record and unit are swept by the next run start [280.73ms]
+
+ 8 pass
+ 2 fail
+ 56 expect() calls
+Ran 10 tests across 1 file. [9.47s]

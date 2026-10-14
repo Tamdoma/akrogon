@@ -1,0 +1,38 @@
+{
+  "state": "inconsistent",
+  "command": [
+    "bun",
+    "test",
+    "tests/run-units.test.ts",
+    "tests/command-reference.test.ts"
+  ],
+  "cwd": "/home/ivan/.akrogon/worktrees/akrogon/run-units",
+  "scope": "two planned test files",
+  "material": "Same local user, worktree, command args and inherited environment. Initial inherited TMPDIR /tmp/akr-1000/5d20/358c1156 was absent. Recreated that expected leaf temp directory before the single retry. Both commands exited normally; failure was ENOENT before checks could execute, unrelated to docs-only repair. Exit 1 then exit 0. No base run after green retry.",
+  "leaf_revision": "6bc5faf057a7536f8d5b44f01bcde517a4bff910",
+  "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-planned-proof.first.log",
+  "run": {
+    "complete": true
+  },
+  "retry": {
+    "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-planned-proof.log",
+    "complete": true,
+    "outcome": "pass"
+  },
+  "units": [
+    {
+      "runner": "bun:test fixture setup",
+      "file": "tests/run-units.test.ts",
+      "name": "mkdtemp under inherited missing TMPDIR",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-planned-proof.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-planned-proof.log"
+      },
+      "verdict": "unverified"
+    }
+  ]
+}

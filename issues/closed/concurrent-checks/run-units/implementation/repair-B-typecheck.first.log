@@ -1,0 +1,22 @@
+30 |     timeout?: number;
+31 |     killSignal?: NodeJS.Signals;
+32 |     captureRoot?: string;
+33 |   } = {},
+34 | ): { child: Bun.Subprocess; captured: Captured } {
+35 |   const dir: string = mkdtempSync(resolve(options.captureRoot ?? tmpdir(), 'akrogon-io-'));
+                           ^
+ENOENT: no such file or directory, mkdtemp '/tmp/akr-1000/5d20/358c1156/akrogon-io-V5zVe5'
+    path: "/tmp/akr-1000/5d20/358c1156/akrogon-io-V5zVe5",
+ syscall: "mkdtemp",
+   errno: -2,
+    code: "ENOENT"
+
+      at spawnFiles (/home/ivan/Work/infra/akrogon/src/shell.ts:35:23)
+      at run (/home/ivan/Work/infra/akrogon/src/shell.ts:99:78)
+      at commonDirectory (/home/ivan/Work/infra/akrogon/src/config.ts:232:32)
+      at currentRepo (/home/ivan/Work/infra/akrogon/src/config.ts:241:39)
+      at requireRepo (/home/ivan/Work/infra/akrogon/src/config.ts:254:35)
+      at runCheck (/home/ivan/Work/infra/akrogon/src/run-check.ts:150:28)
+      at /home/ivan/Work/infra/akrogon/src/akrogon.ts:172:7
+
+Bun v1.4.3 (Linux x64)

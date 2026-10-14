@@ -1,0 +1,435 @@
+{
+  "state": "inconsistent",
+  "command": [
+    "akrogon",
+    "run-check",
+    "--name",
+    "test",
+    "--",
+    "sh",
+    "-c",
+    "flock \"$(git rev-parse --git-path akrogon-install.lock)\" sh -c 'bun install --frozen-lockfile' && akrogon guard own-modules && sh -c 'bun test --timeout=30000'"
+  ],
+  "cwd": "/home/ivan/.akrogon/worktrees/akrogon/run-units",
+  "scope": "whole repository",
+  "material": "29 timeouts in unchanged tests/batch-dispatch.test.ts. No changed batch dispatch or owner implementation in stack diff. Whole suite first run 874 pass / 29 fail, 179.44 s. Retry same printed command and args, cwd and scope. Same unchanged candidate, command arguments, cwd, environment, selection and installed CLI on retry. Retry exit 0. No base run after green retry.",
+  "attempt": "3a254162-d709-4e19-8fd2-77d714dd2e81",
+  "leaf_revision": "2dbcf9942afc8c9f06f028dc982953bea639ee16",
+  "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log",
+  "run": {
+    "complete": true
+  },
+  "retry": {
+    "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log",
+    "complete": true,
+    "outcome": "pass"
+  },
+  "units": [
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "the holder gets a batch record, members are applied, and only the holder is prompted",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "an interrupted build restores drifted members and rebuilds under a new attempt",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a dirty member worktree is dropped from the apply unmarked and keeps its uncommitted files",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a dirty holder worktree drops the batch to solo and restores carried members",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a member conflict excludes it from the attempt, rewrites the record without it and leaves its branch untouched",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "the default batch_limit caps carried members at three",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a failed holder with a landed candidate is told to move back, then reconciles without run or push",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a fetch failure keeps the record, restores nothing and reports the error",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a leaf entering merge after the record was written is excluded and becomes the next holder",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a conflicted member is excluded from the attempt and eligible for the next batch",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a failed holder keeps carried members, and the move-back clears the record and member tabs",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a landed batch moves member and holder once, closes member tabs with the record, and wakes dependents",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a green batch clears the record and closes member tabs once the holder lands",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a merged holder keeps the record while a member is still in merge, then finishes it",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a red-batch member carries a later waiter when it next holds the turn",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "cleanup retains a closed carried worktree while publication recovery is blocked",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a failed published holder receives one recovery notice across repeated passes",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a leaf leaving merge and returning joins the next holder batch",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "holder-seat commits survive the check.fix handoff",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "empty untracked folders are removed before an applied merge prompt",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "empty untracked folders are removed before a solo merge prompt",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "unreadable ignored folders do not stop empty-folder cleanup before merge",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a failed removal stops the merge prompt",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "batch_limit and a holder split limit cap carried members",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "holder-seat commits survive the failed handoff",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "late holder dirt during initial apply is isolated and survives cleanup",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "late member dirt during initial apply is isolated and survives cleanup",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "an edit arriving after the move status read survives the Git reset",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    },
+    {
+      "runner": "bun:test",
+      "file": "tests/batch-dispatch.test.ts",
+      "name": "a memberless applied holder retains its checked integration head on red",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/merge-B-test.log"
+      },
+      "verdict": "unverified"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "state": "inconsistent",
+  "command": [
+    "akrogon",
+    "run-check",
+    "--name",
+    "typecheck",
+    "--",
+    "sh",
+    "-c",
+    "flock \"$(git rev-parse --git-path akrogon-install.lock)\" sh -c 'bun install --frozen-lockfile' && akrogon guard own-modules && sh -c 'bun run typecheck'"
+  ],
+  "cwd": "/home/ivan/.akrogon/worktrees/akrogon/run-units",
+  "scope": "whole repository",
+  "material": "Same local user, worktree, command args and inherited environment. Initial inherited TMPDIR /tmp/akr-1000/5d20/358c1156 was absent. Recreated that expected leaf temp directory before the single retry. Both commands exited normally; failure was ENOENT before checks could execute, unrelated to docs-only repair. Exit 1 then exit 0. No base run after green retry.",
+  "leaf_revision": "6bc5faf057a7536f8d5b44f01bcde517a4bff910",
+  "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-typecheck.first.log",
+  "run": {
+    "complete": true
+  },
+  "retry": {
+    "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-typecheck.log",
+    "complete": true,
+    "outcome": "pass"
+  },
+  "units": [
+    {
+      "runner": "akrogon CLI initialization",
+      "file": "",
+      "name": "mkdtemp under inherited missing TMPDIR",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-typecheck.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-typecheck.log"
+      },
+      "verdict": "unverified"
+    }
+  ]
+}

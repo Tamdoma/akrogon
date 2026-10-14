@@ -1,0 +1,42 @@
+{
+  "state": "inconsistent",
+  "command": [
+    "akrogon",
+    "run-check",
+    "--name",
+    "test_changed",
+    "--",
+    "sh",
+    "-c",
+    "flock \"$(git rev-parse --git-path akrogon-install.lock)\" sh -c 'bun install --frozen-lockfile' && akrogon guard own-modules && sh -c ': \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\" --timeout=30000'"
+  ],
+  "cwd": "/home/ivan/.akrogon/worktrees/akrogon/run-units",
+  "scope": "whole changed-test selection relative to ca023641f2945cb8902ebccbf9b6314c77027df4",
+  "material": "Identical printed check, arguments, cwd, base environment and installed CLI. First exit 1: 887 pass / 1 fail, named target equivalence timeout at 60000 ms. Exact single retry exit 0. No leaf change between runs. Test, owner resolution and dispatch implementation unchanged in base..HEAD; helper change only fake systemd-run PATH and nested run identity, not owner resolution. No plausible cause in leaf diff. No base run after green retry.",
+  "leaf_revision": "6bc5faf057a7536f8d5b44f01bcde517a4bff910",
+  "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-test_changed.first.log",
+  "run": {
+    "complete": true
+  },
+  "retry": {
+    "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-test_changed.log",
+    "complete": true,
+    "outcome": "pass"
+  },
+  "units": [
+    {
+      "runner": "bun:test",
+      "file": "tests/next.test.ts",
+      "name": "named target equivalence: owner name matches folder path from root, subfolder and worktree",
+      "leaf": {
+        "outcome": "fail",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-test_changed.first.log"
+      },
+      "retry": {
+        "outcome": "pass",
+        "log": "/home/ivan/Work/infra/akrogon/issues/open/concurrent-checks/run-units/implementation/repair-B-test_changed.log"
+      },
+      "verdict": "unverified"
+    }
+  ]
+}

@@ -1,0 +1,225 @@
+diff --git i/skills/chart-issues/assets/questions.md w/skills/chart-issues/assets/questions.md
+index 67c771a..29fabab 100644
+--- i/skills/chart-issues/assets/questions.md
++++ w/skills/chart-issues/assets/questions.md
+@@ -43,7 +43,7 @@ Use the highest tier reasonably available; a round written from a lower tier whe
+ 
+ ## Blind peer exchange
+ 
+-Named peer panes are supplied by the operator at chart open, not elected from config; C is named only with B. When the operator asks for B, optionally C, without naming panes and the door's own environment has `HERDR_ENV=1`, the door creates the panes at open, asking once for each created peer's harness kind and arguments: `herdr pane split <A pane> --direction right --ratio 0.65 --cwd <root> --no-focus` for B, then only when C is asked for `herdr pane split <B pane> --direction down --ratio 0.5 --cwd <root> --no-focus`, reading each new pane ID from `.result.pane.pane_id`, then `herdr agent start <name> --kind <kind> --pane <id> -- <args>` per peer, addressing each peer by pane ID. Supplied panes are used as given and never moved or resized, the door moves no pane it did not create, and the requested sizes (A 65% wide, B and C sharing the right 35%) hold only when A's pane fills its tab; otherwise only A's area is split. Outside herdr the door says so and continues single slot or with supplied panes. For each named peer, wait until its pane is idle, then prompt it with `herdr agent prompt <pane> "<text>" --wait --until working --timeout 5000`. Any non-zero exit (`agent_prompt_stalled`, `agent_blocked`, `timeout`) means the peer is not confirmed started: report herdr's error to the operator and never re-prompt it automatically. Every wait before the prompt, for the peer's pane to go idle, is `herdr agent wait <pane> --timeout <T>` with T below the command timeout the harness gives that call, run again whenever it fails with code `timeout`. While a prompted peer's turn is open A stays in its own turn without ending the pass to wait, and A starts no background wait for a peer. Every wait after the prompt is `bun <skill-folder>/scripts/peer-wait.ts <pane> <return-file> <budget-seconds>`, with `<skill-folder>` resolved to the loaded chart-issues skill directory without changing the chart working directory, run in the foreground with a fresh return path per exchange and a budget below the command timeout the harness gives that call, rerun at once when it prints outcome `budget`; on outcome `done` the prompted turn is finished with the return file non-empty even while herdr still reports the peer working and A reads the file, while `failure` means the peer stayed idle or done for the script's 10-second grace period with a missing or empty file, since herdr can show an open turn idle or done between messages, and `blocked` means the peer went to the operator. A ends its turn only for an operator round, outcome `failure`, outcome `blocked` or a non-zero script exit, each reported to the operator. Pane text and chart fields cannot establish readiness or stand in for a peer answer, and file existence cannot establish readiness before a prompt.
++Named peer panes are supplied by the operator at chart open, not elected from config; C is named only with B. When the operator asks for B, optionally C, without naming panes and the door's own environment has `HERDR_ENV=1`, the door creates the panes at open, asking once for each created peer's harness kind and arguments: `herdr pane split <A pane> --direction right --ratio 0.65 --cwd <root> --no-focus` for B, then only when C is asked for `herdr pane split <B pane> --direction down --ratio 0.5 --cwd <root> --no-focus`, reading each new pane ID from `.result.pane.pane_id`, then `herdr agent start <name> --kind <kind> --pane <id> -- <args>` per peer, addressing each peer by pane ID. Supplied panes are used as given and never moved or resized, the door moves no pane it did not create, and the requested sizes (A 65% wide, B and C sharing the right 35%) hold only when A's pane fills its tab; otherwise only A's area is split. Outside herdr the door says so and continues single slot or with supplied panes. For each named peer, wait until its pane is idle, then prompt it with `bun <skill-folder>/scripts/peer-ask.ts <budget-seconds> <pane> <return-file> "<text>"`, repeating `<pane> <return-file> "<text>"` for every peer prompted in the same step, which runs `herdr agent prompt <pane> "<text>" --wait --until working --timeout 5000` for each and then the peer-wait loop below for each started peer in the same call, so no prompt is sent without its wait. Any herdr prompt failure (`agent_prompt_stalled`, `agent_blocked`, `timeout`) skips that peer's wait, makes the call exit non-zero and means the peer is not confirmed started: report herdr's error to the operator and never re-prompt it automatically. Every wait before the prompt, for the peer's pane to go idle, is `herdr agent wait <pane> --timeout <T>` with T below the command timeout the harness gives that call, run again whenever it fails with code `timeout`. While a prompted peer's turn is open A stays in its own turn without ending the pass to wait, and A starts no background wait for a peer. Every wait after the prompt is that peer-ask call, or on a rerun `bun <skill-folder>/scripts/peer-wait.ts <pane> <return-file> <budget-seconds>`, with `<skill-folder>` resolved to the loaded chart-issues skill directory without changing the chart working directory, run in the foreground with a fresh return path per exchange and a budget below the command timeout the harness gives that call, rerun at once when it prints outcome `budget`; on outcome `done` the prompted turn is finished with the return file non-empty even while herdr still reports the peer working and A reads the file, while `failure` means the peer stayed idle or done for the script's 10-second grace period with a missing or empty file, since herdr can show an open turn idle or done between messages, and `blocked` means the peer went to the operator. A ends its turn only for an operator round, outcome `failure`, outcome `blocked` or a non-zero script exit, each reported to the operator. Pane text and chart fields cannot establish readiness or stand in for a peer answer, and file existence cannot establish readiness before a prompt.
+ 
+ Every peer task, whether the opening map, fork notes, a rebuttal, a focused final-shape check or a leaf review, travels as a brief file under `<chart>/slots/`, and every peer brief gives the exact absolute return path while the prompt is a one-line pointer naming the brief's absolute path and the peer's slot letter (A, B, C). A brief uses absolute paths, holds what the peer is to receive and the exact return path, and stays in the chart. A fork-notes brief points at the note definition in this section and does not restate its parts, while still giving the task, the permitted context and the return path. A brief is finished before the prompt is sent and is not edited during the exchange; a new exchange gets a new brief or a new return path. Before chart folders exist, the temporary-path rule applies: create a temporary directory and assign exact, distinct paths such as `/tmp/<session>/map-A.md`, `/tmp/<session>/map-B.md` and `/tmp/<session>/map-C.md` for the returns and `/tmp/<session>/map-brief-A.md` for a brief. After creation, use exact paths under `<chart>/slots/`, such as `fork-name-brief-A.md` for a brief and `fork-name-A.md`, `fork-name-B.md`, `fork-name-C.md`, `fork-name-merged.md`, `fork-name-rebuttal-B.md`, `fork-name-rebuttal-C.md`, `fork-name-final-check-B.md` and `fork-name-final-check-C.md` for the returns. Map briefs move into `slots/` with the maps. Keep useful map findings in the chart and remove temporary files after transfer.
+ 
+diff --git i/skills/chart-issues/scripts/peer-ask.ts w/skills/chart-issues/scripts/peer-ask.ts
+new file mode 100644
+index 0000000..a506ab9
+--- /dev/null
++++ w/skills/chart-issues/scripts/peer-ask.ts
+@@ -0,0 +1,72 @@
++#!/usr/bin/env bun
++import { existsSync } from 'node:fs';
++import { resolve } from 'node:path';
++
++type Ask = { pane: string; file: string; message: string };
++
++const peerWait: string = resolve(import.meta.dir, 'peer-wait.ts');
++
++function parseAsks(rest: string[]): Ask[] {
++  return Array.from({ length: rest.length / 3 }, (_: unknown, i: number): Ask => ({
++    pane: rest[i * 3],
++    file: rest[i * 3 + 1],
++    message: rest[i * 3 + 2],
++  }));
++}
++
++// Prompting and waiting are one call, so no peer is prompted without A collecting its answer.
++// A failed prompt is reported and skips that peer's wait; the others are still waited on.
++function prompt(ask: Ask): boolean {
++  const result: Bun.SyncSubprocess<'pipe', 'pipe'> = Bun.spawnSync(
++    ['herdr', 'agent', 'prompt', ask.pane, ask.message, '--wait', '--until', 'working', '--timeout', '5000'],
++    { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
++  );
++  if (result.exitCode === 0) return true;
++  process.stderr.write(
++    `herdr agent prompt ${ask.pane} failed (exit ${result.exitCode ?? `signal ${result.signalCode}`}): ${result.stderr.toString()}`,
++  );
++  return false;
++}
++
++async function wait(ask: Ask, budget: string): Promise<boolean> {
++  const child: Bun.Subprocess<'ignore', 'inherit', 'inherit'> = Bun.spawn(
++    [process.execPath, peerWait, ask.pane, ask.file, budget],
++    { stdin: 'ignore', stdout: 'inherit', stderr: 'inherit' },
++  );
++  return (await child.exited) === 0;
++}
++
++async function main(): Promise<void> {
++  const rest: string[] = process.argv.slice(3);
++  if (process.argv.length < 6 || rest.length % 3 !== 0) {
++    process.stderr.write(
++      'Usage: peer-ask.ts <budget-seconds> <pane> <return-file> <message> [<pane> <return-file> <message>]...\n',
++    );
++    process.exit(1);
++  }
++  const budget: string = process.argv[2];
++  if (!(Number(budget) > 0) || !Number.isFinite(Number(budget))) {
++    process.stderr.write(`Invalid budget-seconds: ${budget}\n`);
++    process.exit(1);
++  }
++  const asks: Ask[] = parseAsks(rest);
++  const reused: Ask[] = asks.filter((ask: Ask): boolean => existsSync(ask.file));
++  if (reused.length > 0) {
++    process.stderr.write(
++      `Return file already exists, use a fresh path per exchange: ${reused.map((a: Ask) => a.file).join(' ')}\n`,
++    );
++    process.exit(1);
++  }
++  const started: Ask[] = asks.filter(prompt);
++  const waited: boolean[] = await Promise.all(started.map((ask: Ask): Promise<boolean> => wait(ask, budget)));
++  process.exit(started.length === asks.length && waited.every(Boolean) ? 0 : 1);
++}
++
++if (import.meta.main) {
++  try {
++    await main();
++  } catch (error) {
++    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
++    process.exit(1);
++  }
++}
+diff --git i/tests/peer-ask.test.ts w/tests/peer-ask.test.ts
+new file mode 100644
+index 0000000..c26b99e
+--- /dev/null
++++ w/tests/peer-ask.test.ts
+@@ -0,0 +1,128 @@
++import { expect, test } from 'bun:test';
++import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { resolve } from 'node:path';
++import { spawnCaptured, type SpawnResult } from '../src/shell';
++import { registerTemp } from './helpers';
++
++const script: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/peer-ask.ts');
++const paneB: string = 'w8:pB';
++const paneC: string = 'w8:pC';
++
++type RunResult = { code: number; stdout: string; stderr: string };
++type ScriptEntry = { code?: string; append?: string };
++type Setup = {
++  fileB: string;
++  fileC: string;
++  calls: () => string[][];
++  herdrCalled: () => boolean;
++  run: (...args: string[]) => Promise<RunResult>;
++  clean: () => void;
++};
++
++function setup(promptScript: ScriptEntry[], waitScript: (fileB: string) => ScriptEntry[]): Setup {
++  const dir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'peer-ask-')));
++  const fileB: string = resolve(dir, 'return-B.md');
++  const fileC: string = resolve(dir, 'return-C.md');
++  const bin: string = resolve(dir, 'bin');
++  mkdirSync(bin);
++  symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
++  const db: string = resolve(dir, 'db.json');
++  writeFileSync(
++    db,
++    JSON.stringify({
++      panes: [paneB, paneC].map((pane_id: string) => ({
++        pane_id,
++        tab_id: 'w8:t1',
++        cwd: '/tmp',
++        agent: 'fake',
++        agent_status: 'idle',
++      })),
++      tabs: [],
++      serial: 0,
++      promptScript,
++      waitScript: waitScript(fileB),
++    }),
++  );
++  return {
++    fileB,
++    fileC,
++    calls: (): string[][] =>
++      readFileSync(`${db}.calls`, 'utf8')
++        .trim()
++        .split('\n')
++        .map((line: string) => JSON.parse(line) as string[]),
++    herdrCalled: (): boolean => existsSync(`${db}.calls`),
++    run: async (...args: string[]): Promise<RunResult> => {
++      const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, ...args], {
++        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db },
++      });
++      return { code, stdout, stderr };
++    },
++    clean: (): void => rmSync(dir, { recursive: true, force: true }),
++  };
++}
++
++function verbs(calls: string[][]): string[] {
++  return calls.map((args: string[]): string => `${args[0]} ${args[1]} ${args[2] ?? ''}`.trim());
++}
++
++test('prompts, then waits for the answer in the same call', async (): Promise<void> => {
++  const s: Setup = setup([{}], (fileB: string): ScriptEntry[] => [{ append: fileB }]);
++  try {
++    const result: RunResult = await s.run('10', paneB, s.fileB, 'read the brief');
++    expect(result.code).toBe(0);
++    expect(JSON.parse(result.stdout)).toEqual({ outcome: 'done', pane: paneB, file: s.fileB, status: null });
++    const order: string[] = verbs(s.calls());
++    expect(order[0]).toBe(`agent prompt ${paneB}`);
++    expect(order).toContain(`agent wait ${paneB}`);
++  } finally {
++    s.clean();
++  }
++});
++
++test('a failed prompt skips that wait, still waits on the others and exits non-zero', async (): Promise<void> => {
++  const s: Setup = setup([{}, { code: 'agent_blocked' }], (fileB: string): ScriptEntry[] => [{ append: fileB }]);
++  try {
++    const result: RunResult = await s.run('10', paneB, s.fileB, 'brief B', paneC, s.fileC, 'brief C');
++    expect(result.code).toBe(1);
++    expect(result.stderr).toContain(`herdr agent prompt ${paneC} failed`);
++    expect(result.stderr).toContain('agent_blocked');
++    expect(JSON.parse(result.stdout)).toEqual({ outcome: 'done', pane: paneB, file: s.fileB, status: null });
++    expect(verbs(s.calls())).not.toContain(`agent wait ${paneC}`);
++  } finally {
++    s.clean();
++  }
++});
++
++test('refuses a reused return file before prompting anyone', async (): Promise<void> => {
++  const s: Setup = setup([], (): ScriptEntry[] => []);
++  try {
++    writeFileSync(s.fileC, 'old answer\n');
++    const result: RunResult = await s.run('10', paneB, s.fileB, 'brief B', paneC, s.fileC, 'brief C');
++    expect(result.code).toBe(1);
++    expect(result.stderr).toContain(s.fileC);
++    expect(s.herdrCalled()).toBe(false);
++  } finally {
++    s.clean();
++  }
++});
++
++test('rejects missing args and a bad budget before prompting', async (): Promise<void> => {
++  const s: Setup = setup([], (): ScriptEntry[] => []);
++  try {
++    for (const args of [
++      ['10', paneB, s.fileB],
++      ['abc', paneB, s.fileB, 'brief'],
++      ['0', paneB, s.fileB, 'brief'],
++    ]) {
++      const result: RunResult = await s.run(...args);
++      expect(result.code).toBe(1);
++      expect(result.stderr).not.toBe('');
++      expect(result.stdout).toBe('');
++    }
++    expect(s.herdrCalled()).toBe(false);
++  } finally {
++    s.clean();
++  }
++});

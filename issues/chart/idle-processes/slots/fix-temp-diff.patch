@@ -1,0 +1,97 @@
+diff --git i/src/config.ts w/src/config.ts
+index 4c7ffcc..efcb22b 100644
+--- i/src/config.ts
++++ w/src/config.ts
+@@ -263,12 +263,13 @@ export function worktreeStore(repo: Repo): string {
+ }
+ 
+ // Short on purpose: Chrome puts its SingletonSocket under TMPDIR and aborts past the 107-byte socket path limit.
+-// Fixed /tmp, not tmpdir(), because a seat's TMPDIR is itself a leaf temp folder.
++// Fixed /var/tmp, not tmpdir(), because a seat's TMPDIR is itself a leaf temp folder.
++// Disk-backed on purpose: /tmp is tmpfs, so test files left there count as memory.
+ export function leafTemp(repo: Repo, slug: string): string {
+   const override: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
+   if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
+     throw new Error(`Invalid AKROGON_LEAF_TEMP_ROOT: must be a non-blank absolute path`);
+-  const root: string = override ?? `/tmp/akr-${process.getuid!()}`;
++  const root: string = override ?? `/var/tmp/akr-${process.getuid!()}`;
+   const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
+   return resolve(root, hex(repo.root).slice(0, 4), hex(repo.root + '\n' + slug).slice(0, 8));
+ }
+diff --git i/src/next.ts w/src/next.ts
+index 3ec1a73..7711a6a 100644
+--- i/src/next.ts
++++ w/src/next.ts
+@@ -462,8 +462,10 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
+   const state: State = await ensureWorktree(repo, leaf, matches.length === 1);
+   const scratch: string = ensureLeafTemp(repo, state.slug);
+   // No live tab means no seat uses the scratch, so a new tab starts from an empty one.
++  // A detached check can outlive its tab, so run roots stay for reconcile, which removes them once their owner is dead.
+   if (matches.length === 0)
+-    for (const entry of readdirSync(scratch)) rmSync(resolve(scratch, entry), { recursive: true, force: true });
++    for (const entry of readdirSync(scratch))
++      if (!entry.startsWith('run-')) rmSync(resolve(scratch, entry), { recursive: true, force: true });
+   const worktree: string = z.string().parse(state.worktree);
+   const workspace: Workspace | undefined = (await workspaces()).find((item) => item.label === repo.name);
+   if (workspace === undefined) throw new Error(`No herdr workspace labeled ${repo.name}`);
+diff --git i/tests/config.test.ts w/tests/config.test.ts
+index 21dceab..3bd8f84 100644
+--- i/tests/config.test.ts
++++ w/tests/config.test.ts
+@@ -869,13 +869,13 @@ test('ensureLeafTemp creates every level private and refuses a symlinked root',
+   }
+ });
+ 
+-test('leafTemp defaults to a per-user /tmp root with hashed repo and leaf folders and keeps the override', () => {
++test('leafTemp defaults to a per-user /var/tmp root with hashed repo and leaf folders and keeps the override', () => {
+   const previous: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
+   const repo: Repo = { name: 'repo', root: '/r', config: repoSchema.parse({ grounding: 'none' }) };
+   try {
+     delete process.env.AKROGON_LEAF_TEMP_ROOT;
+     const path: string = leafTemp(repo, 'long-slug');
+-    expect(path).toMatch(new RegExp(`^/tmp/akr-${process.getuid!()}/[0-9a-f]{4}/[0-9a-f]{8}$`));
++    expect(path).toMatch(new RegExp(`^/var/tmp/akr-${process.getuid!()}/[0-9a-f]{4}/[0-9a-f]{8}$`));
+     expect(dirname(leafTemp(repo, 'other'))).toBe(dirname(path));
+     process.env.AKROGON_LEAF_TEMP_ROOT = '/x/leaf-temp';
+     expect(leafTemp(repo, 's').startsWith('/x/leaf-temp/')).toBe(true);
+diff --git i/tests/next.test.ts w/tests/next.test.ts
+index 8547bd0..39016d3 100644
+--- i/tests/next.test.ts
++++ w/tests/next.test.ts
+@@ -3893,7 +3893,7 @@ test('allocation creates missing leaf temp ancestors and recreates deleted inter
+   }
+ }, 15000);
+ 
+-test('new tab empties stale scratch, live tab keeps it, and seats disable the node compile cache', async () => {
++test('new tab empties stale scratch but keeps run roots, live tab keeps it, and seats disable the node compile cache', async () => {
+   const f: DispatchFixture = await dispatchFixture();
+   try {
+     leaf(f, 'stale-tmp', 'plan.synthesis');
+@@ -3904,11 +3904,18 @@ test('new tab empties stale scratch, live tab keeps it, and seats disable the no
+     writeFileSync(resolve(scratch, 'stale'), 'x\n');
+     expect((await next(f, ['stale-tmp'])).code).toBe(0);
+     expect(existsSync(resolve(scratch, 'stale'))).toBe(true);
++    const running: string = resolve(scratch, 'run-detached');
++    mkdirSync(running);
++    writeFileSync(
++      resolve(running, '.owner'),
++      JSON.stringify({ pid: process.pid, boot_id: '', started: new Date().toISOString() }),
++    );
+     saveDatabase(f, { ...database(f), tabs: [], panes: [] });
+     expect((await next(f, ['stale-tmp'])).code).toBe(0);
+     expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create')).toHaveLength(2);
+     expect(statSync(scratch).mode & 0o777).toBe(0o700);
+     expect(existsSync(resolve(scratch, 'stale'))).toBe(false);
++    expect(existsSync(resolve(running, '.owner'))).toBe(true);
+   } finally {
+     f.clean();
+   }
+@@ -4020,7 +4027,7 @@ test('leaf temp path stays inside the socket budget under /tmp for any slug and
+     const out: { p1: string; p2: string; len: number } = JSON.parse(stdout.trim());
+     expect(out.len).toBeLessThanOrEqual(33);
+     expect(out.p1).not.toBe(out.p2);
+-    expect(out.p1.startsWith(`/tmp/akr-${process.getuid!()}/`)).toBe(true);
++    expect(out.p1.startsWith(`/var/tmp/akr-${process.getuid!()}/`)).toBe(true);
+     expect(existsSync(out.p1)).toBe(false);
+     expect(existsSync(out.p2)).toBe(false);
+     expect(existsSync(leafTempRoot(f))).toBe(false);
