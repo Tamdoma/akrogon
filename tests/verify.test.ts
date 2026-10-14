@@ -267,6 +267,24 @@ test('a failed setup with no configured checks exits red and its receipt is refu
   }
 });
 
+test('two concurrent verifies run one at a time and the second prints that it waits', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const trace: string = resolve(f.home, 'trace');
+    config(f, { checks: { probe: `echo start >> ${trace}; sleep 1; echo end >> ${trace}` } });
+    const first = await callerWorktree(f, 'first');
+    const second = await callerWorktree(f, 'second');
+    await commitIn(first.worktree, 'first.ts');
+    await commitIn(second.worktree, 'second.ts');
+    const results: Result[] = await Promise.all([verify(f, [], first.worktree), verify(f, [], second.worktree)]);
+    expect(results.map((result) => result.code)).toEqual([0, 0]);
+    expect(readFileSync(trace, 'utf8')).toBe('start\nend\nstart\nend\n');
+    expect(results.filter((result) => result.stdout.includes('verify waiting'))).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
 test('a green receipt covers another commit with the same tree and command set without a second run', async () => {
   const f: Fixture = await fixture();
   try {
