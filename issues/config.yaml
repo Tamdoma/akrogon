@@ -5,10 +5,9 @@ fix_rounds: 8
 implement: subagents
 setup: bun install --frozen-lockfile
 checks:
-  format: bun run format
+  format: bunx prettier --check src tests skills/chart-issues/scripts
   test: bun test --timeout=30000
   typecheck: bun run typecheck
-  test_changed: ": \"${AKROGON_BASE:?AKROGON_BASE is required}\" && bun test --changed=\"$AKROGON_BASE\" --timeout=30000"
 advisory: 
   []
 grounding: 
