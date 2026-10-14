@@ -5,7 +5,6 @@ import {
   readFileSync,
   realpathSync,
   renameSync,
-  rmSync,
   statSync,
   writeFileSync,
   type Dirent,
@@ -461,9 +460,6 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   }
   const state: State = await ensureWorktree(repo, leaf, matches.length === 1);
   const scratch: string = ensureLeafTemp(repo, state.slug);
-  // No live tab means no seat uses the scratch, so a new tab starts from an empty one.
-  if (matches.length === 0)
-    for (const entry of readdirSync(scratch)) rmSync(resolve(scratch, entry), { recursive: true, force: true });
   const worktree: string = z.string().parse(state.worktree);
   const workspace: Workspace | undefined = (await workspaces()).find((item) => item.label === repo.name);
   if (workspace === undefined) throw new Error(`No herdr workspace labeled ${repo.name}`);

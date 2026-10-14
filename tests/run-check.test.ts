@@ -138,6 +138,26 @@ test('run-check TMPDIR is a fresh run root under the leaf temp dir and is remove
   }
 });
 
+test('run-check captures the command output inside its run root, not in the caller TMPDIR', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree } = await leafWorktree(f, 'capture-leaf');
+    const callerTmp: string = resolve(f.home, 'caller-tmp');
+    mkdirSync(callerTmp);
+    const result = await cli(
+      f,
+      ['run-check', '--', ...sh('ls "$TMPDIR"')],
+      worktree,
+      baseEnv(f, { TMPDIR: callerTmp }),
+    );
+    expect(result.code).toBe(0);
+    expect(result.stdout).toMatch(/^akrogon-io-/m);
+    expect(readdirSync(callerTmp)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
 test('concurrent run-check invocations get distinct TMPDIR roots', async () => {
   const f: Fixture = await fixture();
   try {

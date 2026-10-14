@@ -71,7 +71,8 @@ export async function spawnLogged(
   env: Record<string, string>,
   log: string,
 ): Promise<Result> {
-  const { code, stdout, stderr }: Result = await spawnCaptured(argv, { cwd, env });
+  // env.TMPDIR is the run root (constructedEnv), so captures share its owner-checked cleanup instead of lying loose in leaf temp.
+  const { code, stdout, stderr }: Result = await spawnCaptured(argv, { cwd, env, captureRoot: env.TMPDIR });
   appendFileSync(log, stdout);
   appendFileSync(log, stderr);
   return { code, stdout, stderr };

@@ -29,9 +29,10 @@ export function spawnFiles(
     stdin?: string;
     timeout?: number;
     killSignal?: NodeJS.Signals;
+    captureRoot?: string;
   } = {},
 ): { child: Bun.Subprocess; captured: Captured } {
-  const dir: string = mkdtempSync(resolve(tmpdir(), 'akrogon-io-'));
+  const dir: string = mkdtempSync(resolve(options.captureRoot ?? tmpdir(), 'akrogon-io-'));
   const captured: Captured = { dir, outPath: resolve(dir, 'out'), errPath: resolve(dir, 'err') };
   let launched: boolean = false;
   try {
@@ -72,6 +73,7 @@ export async function spawnCaptured(
     stdin?: string;
     timeout?: number;
     killSignal?: NodeJS.Signals;
+    captureRoot?: string;
   } = {},
 ): Promise<SpawnResult> {
   const { child, captured }: { child: Bun.Subprocess; captured: Captured } = spawnFiles(argv, options);

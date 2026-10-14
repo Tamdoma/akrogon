@@ -3893,7 +3893,7 @@ test('allocation creates missing leaf temp ancestors and recreates deleted inter
   }
 }, 15000);
 
-test('new tab empties stale scratch, live tab keeps it, and seats disable the node compile cache', async () => {
+test('new tab keeps existing scratch for checks that outlive their tab, and seats disable the node compile cache', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     leaf(f, 'stale-tmp', 'plan.synthesis');
@@ -3904,11 +3904,14 @@ test('new tab empties stale scratch, live tab keeps it, and seats disable the no
     writeFileSync(resolve(scratch, 'stale'), 'x\n');
     expect((await next(f, ['stale-tmp'])).code).toBe(0);
     expect(existsSync(resolve(scratch, 'stale'))).toBe(true);
+    const captured: string = resolve(scratch, 'akrogon-io-detached');
+    mkdirSync(captured);
+    writeFileSync(resolve(captured, 'out'), 'x\n');
     saveDatabase(f, { ...database(f), tabs: [], panes: [] });
     expect((await next(f, ['stale-tmp'])).code).toBe(0);
     expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create')).toHaveLength(2);
     expect(statSync(scratch).mode & 0o777).toBe(0o700);
-    expect(existsSync(resolve(scratch, 'stale'))).toBe(false);
+    expect(existsSync(resolve(captured, 'out'))).toBe(true);
   } finally {
     f.clean();
   }
@@ -4020,7 +4023,7 @@ test('leaf temp path stays inside the socket budget under /tmp for any slug and 
     const out: { p1: string; p2: string; len: number } = JSON.parse(stdout.trim());
     expect(out.len).toBeLessThanOrEqual(33);
     expect(out.p1).not.toBe(out.p2);
-    expect(out.p1.startsWith(`/tmp/akr-${process.getuid!()}/`)).toBe(true);
+    expect(out.p1.startsWith(`/var/tmp/akr-${process.getuid!()}/`)).toBe(true);
     expect(existsSync(out.p1)).toBe(false);
     expect(existsSync(out.p2)).toBe(false);
     expect(existsSync(leafTempRoot(f))).toBe(false);
