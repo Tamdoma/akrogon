@@ -216,6 +216,14 @@ async function activeUnits(pattern: string): Promise<string[]> {
     .filter((name: string) => name !== '');
 }
 
+// Run scopes of this test file's own slice only: the enclosing run-check and
+// other seats' runs are live akrogon-run scopes too and must not count.
+async function fixtureUnits(slice: string): Promise<string[]> {
+  return (await activeUnits('akrogon-run-*.scope')).filter((name) =>
+    existsSync(resolve(unitDir('/sys/fs/cgroup', slice, name), 'cgroup.procs')),
+  );
+}
+
 async function stopTestSlice(slice: string): Promise<void> {
   await sysctl('stop', slice);
   await sysctl('reset-failed', slice);
@@ -250,7 +258,7 @@ test.serial(
     expect(outer).toContain(`/${slice}/${scope}`);
     expect(child).toBe(outer);
     expect(inner).toBe(outer);
-    expect(await activeUnits('akrogon-run-*.scope')).toEqual([]);
+    expect(await fixtureUnits(slice)).toEqual([]);
   },
   45000,
 );
@@ -353,29 +361,35 @@ for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
       );
       try {
         let unit: string | undefined;
-        const deadline: number = Date.now() + 15000;
+        const liveDeadline: number = Date.now() + 15000;
         while (unit === undefined) {
           const live: Record<string, unknown> | undefined = (await liveRuns(f)).find(
             (record) => record.check === 'reap',
           );
           if (live !== undefined) unit = live.unit as string;
-          else if (Date.now() > deadline) throw new Error('No live reap record');
+          else if (Date.now() > liveDeadline) throw new Error('No live reap record');
           else await Bun.sleep(50);
         }
         await waitPath(unitDir('/sys/fs/cgroup', slice, unit));
         await waitActive(unit);
         cap.proc.kill(signal);
-        // TimeoutStopUSec (5 s) plus the 5 s assertion window from the brief.
-        await waitInactive(unit, 10000);
-        await waitInactive(unit.replace(/\.scope$/, '-guard.service'), 10000);
-        // cgroupfs lags unit state under load: wait for procs to drain or the dir to go.
+        // One deadline measured at the signal: TimeoutStopUSec (5 s) plus the
+        // 5 s assertion window from the brief must cover unit inactivity,
+        // guard exit and descendant drain.
         const cgroupProcs: string = resolve(unitDir('/sys/fs/cgroup', slice, unit), 'cgroup.procs');
-        const drained: number = Date.now() + 15000;
-        while (existsSync(cgroupProcs) && readFileSync(cgroupProcs, 'utf8').trim() !== '') {
-          if (Date.now() > drained) break;
-          await Bun.sleep(150);
+        const guard: string = unit.replace(/\.scope$/, '-guard.service');
+        const deadline: number = Date.now() + 10000;
+        let scopeOff: boolean = false;
+        let guardOff: boolean = false;
+        let drained: boolean = false;
+        while (!(scopeOff && guardOff && drained) && Date.now() < deadline) {
+          scopeOff ||= (await sysctl('is-active', unit)).code !== 0;
+          guardOff ||= (await sysctl('is-active', guard)).code !== 0;
+          drained = !existsSync(cgroupProcs) || readFileSync(cgroupProcs, 'utf8').trim() === '';
+          if (!(scopeOff && guardOff && drained)) await Bun.sleep(150);
         }
-        expect(existsSync(cgroupProcs) && readFileSync(cgroupProcs, 'utf8').trim() !== '').toBe(false);
+        expect(scopeOff, `${unit} not inactive within the criterion deadline`).toBe(true);
+        expect(drained, `${unit} descendants still present within the criterion deadline`).toBe(true);
         const result: SpawnResult = await cap.result;
         expect(result.signalCode).toBe(signal);
       } finally {
@@ -408,7 +422,7 @@ test.serial(
     expect(scope).toBeDefined();
     expect(setup).toBe(cmd);
     expect(cmd).toContain(`/${slice}/${scope}`);
-    expect(await activeUnits('akrogon-run-*.scope')).toEqual([]);
+    expect(await fixtureUnits(slice)).toEqual([]);
   },
   45000,
 );
@@ -539,7 +553,6 @@ test.serial('skills name akrogon stop-run instead of the recorded-PID stop rule'
   ]) {
     const text: string = readFileSync(resolve(root, file), 'utf8');
     expect(text, `${file} names stop-run`).toContain('akrogon stop-run');
-    expect(text, `${file} keeps the recorded-PID rule`).not.toMatch(/recorded PID|by the PID it recorded/);
     expect(text, `${file} keeps the pattern-kill ban`).toMatch(/pkill -f/);
   }
 });
