@@ -88,7 +88,7 @@ A repair commit of B's own that changes an existing file matched by the path rul
 
 A red test or check with no cause in the leaf's diff takes the same retry disposition as the check.review paragraph beginning "During check.review, a red test or check".
 
-After repairs, B reruns each done-criterion proof whose test, proof command or inputs (the files it exercises and their helpers, fixtures, config and lockfiles) changed since its last green run on this leaf, counting an unknown dependency as changed and keeping earlier green proof for the rest unless a retry marks it inconsistent, and runs `akrogon verify` on the committed head, and does not run `merge_checks`, because merge runs them; the only other runner of a `merge_checks` command is A's `check.fix` pass after a red merge ending, which replays the exact rejected command.
+After repairs, B reruns each done-criterion proof whose test, proof command or inputs (the files it exercises and their helpers, fixtures, config and lockfiles) changed since its last green run on this leaf, counting an unknown dependency as changed and keeping earlier green proof for the rest unless a retry marks it inconsistent, and runs neither `akrogon verify` nor `merge_checks`, because merge verifies the stack top and its receipt gate enforces it; the only other runner of a `merge_checks` command is A's `check.fix` pass after a red merge ending, which replays the exact rejected command.
 
 B appends a dated `check.repair` entry to `review-B.md` naming each Fix repaired, its commits and its evidence, plus any `Handed to A` list.
 
