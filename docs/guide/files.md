@@ -93,6 +93,10 @@ Each line names its event kind:
 
 `akrogon timing --cohort --since <iso>` evaluates the leaves-as-chunks gate over the records: the first 20 leaves whose first delivered plan prompt follows the marker, excluding any whose first implement exit exceeds 600 changed lines, and prints `pass`, `fail` or `insufficient` with one line per member. The gate bounds live in `src/timing-report.ts` with the decision they encode. The command is read-only; it never mutates records or takes action on the result.
 
+## akrogon flaky: list checks that flipped
+
+`akrogon flaky` reads `issues/verify-runs.jsonl`, the receipt `akrogon verify` writes for every run, and prints one line per verify command and failed test that went red and then green on the same tree: the count, the last time, the check name and the test name parsed from the red log's `(fail)` lines. It skips runs that never finished or whose setup failed. A same-tree flip means the test, not the change under review, decided the result, so each line is a candidate to fix at the next charting pass.
+
 ## sync: save lifecycle records separately from code
 
 You can edit briefs and inspect reviews in the main checkout while agents change code in worktrees. Sync publishes the eligible lifecycle records without treating every local edit as issue data.

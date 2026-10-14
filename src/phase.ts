@@ -286,6 +286,8 @@ export async function transition(
     await requireNonEmpty(repo, state.worktree);
     await requireGreenReceipt(repo, await command(['git', 'rev-parse', 'HEAD'], state.worktree), 'leaf');
   }
+  if (state.phase === 'check.repair' && requested === 'merge' && state.worktree !== undefined)
+    await requireGreenReceipt(repo, await command(['git', 'rev-parse', 'HEAD'], state.worktree), 'leaf');
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
   if (checkOnly) {

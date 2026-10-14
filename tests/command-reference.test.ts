@@ -25,6 +25,7 @@ const contracts: Record<string, string> = {
   start: '<slug>',
   status: '[<slug>|--charts]',
   timing: '[<slug>|--cohort --since <iso>]',
+  flaky: '',
   'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
   verify: '[--sha <rev>] [--attempt <id>] [--holder <dir>]',
   'stop-run': '[<run-id>]',

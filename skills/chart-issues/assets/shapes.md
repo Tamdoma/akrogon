@@ -168,7 +168,7 @@ seats:
 <problem this solves>
 
 ## Done-criteria
-1. <an observable result in this leaf's ownership, never a test file, assertion or test count; proof may be a command in the destination's blocking `checks` (never a `merge_checks` command) or the own-test, end-to-end, real-outside-call and live-run forms standing-design.md allows; no repo-health claim outside leaf ownership>
+1. <an observable result in this leaf's ownership, never a test file, assertion or test count; proof may be a command the destination's `checks` already run (never a `merge_checks` command, and never one the leaf adds to `checks`, which holds only repo-wide invariants) or the own-test, end-to-end, real-outside-call and live-run forms standing-design.md allows; no repo-health claim outside leaf ownership>
 ```
 
 ```markdown

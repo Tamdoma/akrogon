@@ -160,6 +160,10 @@ switch (verb) {
     );
     break;
   }
+  case 'flaky':
+    z.tuple([]).parse(positionals);
+    await (await import('./flaky')).flakyCommand(process.cwd());
+    break;
   case 'run-check': {
     const optional: z.ZodOptional<z.ZodString> = z.string().optional();
     process.exitCode = await (
@@ -186,6 +190,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|timing|run-check|verify|guard>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|timing|flaky|run-check|verify|guard>',
     );
 }
