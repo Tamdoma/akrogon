@@ -41,7 +41,6 @@ export const repoSchema = z
     default_branch: text.default('main'),
     worktree_root: text.optional(),
     rebuttal: z.boolean().default(true),
-    direct: z.boolean().default(false),
     fix_rounds: z.number().int().positive().default(3),
     implement: z.enum(['subagents', 'inline']).default('subagents'),
     batch_limit: z.number().int().positive().default(4),
