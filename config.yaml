@@ -2,7 +2,7 @@ max_active: 12
 slots:
   a:
     harness: pi
-    model: devin/swe-2-max
+    model: openai-codex/gpt-6.1-sol
     effort: high
   b:
     harness: codex
