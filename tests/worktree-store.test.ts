@@ -74,7 +74,7 @@ test('a rebase inside a sparse dispatch worktree crosses an issues change cleanl
   }
 });
 
-test('buildStack builds a two-leaf stack inside a sparse store checkout that is removed after', async () => {
+test('buildStack rebases the holder inside a sparse store checkout that is removed after', async () => {
   const f: Fixture = await fixture();
   try {
     const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
@@ -88,7 +88,10 @@ test('buildStack builds a two-leaf stack inside a sparse store checkout that is 
       await command(['git', 'worktree', 'remove', '--force', dir], f.root);
       return head;
     };
-    const [memA, memB, holder] = [await add('mem-a'), await add('mem-b'), await add('holder')];
+    const holder: string = await add('holder');
+    await command(['git', 'commit', '--allow-empty', '-m', 'main moved'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const moved: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
     const realGit: string = await command(['sh', '-c', 'command -v git']);
     const gitLog: string = resolve(f.home, 'git.calls');
     const shim: string = resolve(f.home, 'bin/git');
@@ -99,13 +102,10 @@ test('buildStack builds a two-leaf stack inside a sparse store checkout that is 
     writeFileSync(
       script,
       `const { readRepo } = await import(${JSON.stringify(resolve(import.meta.dir, '../src/config.ts'))});
-const { buildStack, memberBase } = await import(${JSON.stringify(resolve(import.meta.dir, '../src/batch.ts'))});
+const { buildStack } = await import(${JSON.stringify(resolve(import.meta.dir, '../src/batch.ts'))});
 const repo = readRepo('repo', ${JSON.stringify(f.root)});
-const built = await buildStack(repo, ${JSON.stringify(builtOn)}, [
-  { slug: 'mem-a', base: await memberBase(repo, ${JSON.stringify(builtOn)}, ${JSON.stringify(memA)}), head: ${JSON.stringify(memA)} },
-  { slug: 'mem-b', base: await memberBase(repo, ${JSON.stringify(builtOn)}, ${JSON.stringify(memB)}), head: ${JSON.stringify(memB)} },
-], ${JSON.stringify(holder)});
-if (!built.ok) throw new Error('stack conflict: ' + built.conflict);
+const built = await buildStack(repo, ${JSON.stringify(moved)}, ${JSON.stringify(holder)});
+if (!built.ok) throw new Error('holder does not rebase onto main');
 console.log(built.top);
 `,
     );
@@ -127,7 +127,9 @@ console.log(built.top);
     expect(log.some((line) => line.includes('sparse-checkout set'))).toBe(true);
     expect(existsSync(dir)).toBe(false);
     expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).not.toContain('batch-');
-    expect(await command(['git', 'log', '--format=%s', '-3', top], f.root)).toBe('holder\nmem-b\nmem-a');
+    expect(await command(['git', 'log', '--format=%s', '-3', top], f.root)).toBe(
+      'holder\nmain moved\n' + (await command(['git', 'log', '--format=%s', '-1', builtOn], f.root)),
+    );
   } finally {
     f.clean();
   }
