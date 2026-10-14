@@ -20,6 +20,7 @@ import {
   type GhFixture,
   type HerdrFixture,
   type Fixture,
+  greenReceipt,
   verified,
 } from './helpers';
 import { readState, saveState, type Batch, type Failure } from '../src/state';
@@ -255,6 +256,7 @@ test('completion prints only when the owner finishes, stays silent on inner issu
     leaf(f, 'three', 'merge', { merge_stamp: '2026-10-05T20:00:02Z', batch_limit: 0 }, 'epic/second');
     mkdirSync(resolve(f.root, 'issues/chart/epic'), { recursive: true });
     writeFileSync(resolve(f.root, 'issues/chart/epic/CHART.md'), '# Chart: epic\n');
+    greenReceipt(f, await command(['git', 'rev-parse', 'HEAD'], f.root), 'merge');
     const race: Result[] = [];
     for (const slug of ['one', 'two']) race.push(await cli(f, ['phase', slug, 'merged']));
     expect(race.every((r) => r.code === 0)).toBe(true);
@@ -308,6 +310,7 @@ test('completion leaves a chart holding a same-slug draft in place and keeps the
     writeFileSync(resolve(chart, 'CHART.md'), '# Chart: epic\n');
     writeFileSync(resolve(slot, 'state.yaml'), readFileSync(resolve(alpha, 'state.yaml')));
     const before: Map<string, Buffer> = snapshot(chart);
+    greenReceipt(f, await command(['git', 'rev-parse', 'HEAD'], f.root), 'merge');
     for (const slug of ['alpha', 'beta']) expect((await cli(f, ['phase', slug, 'merged'])).code).toBe(0);
     expect(snapshot(chart)).toEqual(before);
     const all: Result = await cli(f, ['next', '--all'], f.root, fakeHerdr(f).env);
@@ -412,6 +415,7 @@ test('asymmetric and empty leaf sources defer until epic completion under open l
     );
     expect((await cli(f, ['phase', 'one', 'merged'], f.root, gh.env)).code).toBe(0);
     expect(existsSync(gh.db + '.calls')).toBe(false);
+    greenReceipt(f, head, 'merge');
     saveState(second, {
       ...readState(second),
       phase: 'merge',
@@ -754,6 +758,7 @@ test('each completed issue closes only its all-leaf private sources before the f
         },
       ]),
     );
+    greenReceipt(f, lastHead, 'merge');
     const final: Result = await cli(f, ['phase', 'last', 'merged'], f.root, gh.env);
     expect(final.code).toBe(0);
     expect(final.stdout.split('\n').filter((line) => line.includes('complete'))).toEqual(['epic complete epic']);
@@ -1865,6 +1870,7 @@ test('merge turn refusal names the holder for merged and check.fix while failed 
     expect(failed.code).toBe(0);
     expect(readState(nonHolderPath).phase).toBe('failed');
     expect((await cli(f, ['phase', 'aa', 'merged', '--check'])).stdout).toBe('ok');
+    greenReceipt(f, await command(['git', 'rev-parse', 'HEAD'], f.root), 'merge');
     const moved: Result = await cli(f, ['phase', 'aa', 'merged']);
     expect(moved.code).toBe(0);
     expect(readState(holderPath).phase).toBe('merged');
@@ -1898,6 +1904,7 @@ test('an earlier merge_stamp takes the turn over slug order', async () => {
     const refused: Result = await cli(f, ['phase', 'aa', 'merged']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('bb');
+    greenReceipt(f, await command(['git', 'rev-parse', 'HEAD'], f.root), 'merge');
     expect((await cli(f, ['phase', 'bb', 'merged'])).code).toBe(0);
     expect((await cli(f, ['phase', 'aa', 'merged'])).code).toBe(0);
   } finally {
