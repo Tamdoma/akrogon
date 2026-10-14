@@ -15,6 +15,7 @@ import {
   type Fixture,
   type HerdrFixture,
   registerTemp,
+  greenReceipt,
   verified,
 } from './helpers';
 import { readRepo, type Repo } from '../src/config';
@@ -609,11 +610,17 @@ test.serial('a solo record checks and pushes the worktree HEAD', async () => {
 });
 
 test.serial(
-  'an operator merged without --slot skips the attempt and tested_top gates but still pushes the batch',
+  'an operator merged without --slot skips the attempt and tested_top gates but pushes only a verified top',
   async () => {
     const f: Fixture = await fixture();
     try {
       const { record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+      const refused: Result = await cli(f, ['phase', 'hold', 'merged'], f.root, herdr.env);
+      expect(refused.code).not.toBe(0);
+      expect(refused.stderr).toContain(`No green merge verify receipt for ${record.top!}`);
+      expect(await remoteTip(f)).not.toBe(record.top!);
+      expect(readState(resolve(f.root, 'issues/open/issue/mem-a')).phase).toBe('merge');
+      greenReceipt(f, record.top!, 'merge');
       const merged: Result = await cli(f, ['phase', 'hold', 'merged'], f.root, herdr.env);
       expect(merged.code).toBe(0);
       expect(merged.stdout).toContain('moved merged');
@@ -624,6 +631,34 @@ test.serial(
     }
   },
 );
+
+test.serial('a config command change after merged --check refuses the push', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { herdr } = await soloFixture(f);
+    const head: string = await command(['git', 'rev-parse', 'refs/heads/hold'], f.root);
+    await verified(f, 'hold', 'merge');
+    const checked: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
+      f.root,
+      herdr.env,
+    );
+    expect(checked.code).toBe(0);
+    yaml(resolve(f.root, 'issues/config.yaml'), { checks: { test: 'bun test --bail' }, grounding: 'none' });
+    const merged: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(merged.code).not.toBe(0);
+    expect(merged.stderr).toContain(`No green merge verify receipt for ${head}`);
+    expect(await remoteTip(f)).not.toBe(head);
+  } finally {
+    f.clean();
+  }
+});
 
 test.serial('check.fix on a memberless record moves the holder to check.fix', async () => {
   const f: Fixture = await fixture();
