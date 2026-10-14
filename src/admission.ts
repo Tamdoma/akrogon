@@ -309,7 +309,7 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
         closeSync(fd);
       }
       if (reason === undefined) {
-        process.stdout.write(`run ${holder.run}\n`);
+        process.stderr.write(`run ${holder.run}\n`);
         let ended: boolean = false;
         return await fn({
           kind: 'held',

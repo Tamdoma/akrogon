@@ -231,7 +231,7 @@ test.serial(
       { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
     ).result;
     expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
-    expect(result.stdout.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(1);
+    expect(result.stderr.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(1);
     const outer: string = readFileSync(resolve(out, 'outer.cg'), 'utf8');
     const child: string = readFileSync(resolve(out, 'child.cg'), 'utf8');
     const inner: string = readFileSync(resolve(out, 'inner.cg'), 'utf8');
@@ -286,7 +286,7 @@ test.serial('stop-run stops only the caller pane scope runs', async () => {
     // No id: list the caller's runs and refuse unless exactly one matches.
     const two: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run'], worktree).result;
     expect(two.code).not.toBe(0);
-    expect(two.stdout).toContain(ids.a2);
+    expect(two.stderr).toContain(ids.a2);
     expect((await run(['systemctl', '--user', 'is-active', units('a2')])).code).toBe(0);
     // a1 stopped by the launching pane scope: unit dies; a2 and b1 keep running.
     const stopped: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run', ids.a1], worktree).result;
@@ -384,7 +384,7 @@ test.serial('a base-run runs setup and command in one run unit under the leaf sl
     { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
   ).result;
   expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
-  expect(result.stdout.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(1);
+  expect(result.stderr.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(1);
   const setup: string = readFileSync(resolve(out, 'setup.cg'), 'utf8');
   const cmd: string = readFileSync(resolve(out, 'cmd.cg'), 'utf8');
   const scope: string | undefined = cmd.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];

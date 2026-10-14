@@ -13,7 +13,7 @@ export async function stopRunCommand(id: string | undefined): Promise<void> {
   let units: string[];
   if (id === undefined) {
     for (const record of candidates)
-      process.stdout.write(`run ${record.run} ${record.repo}/${record.leaf} ${record.check}\n`);
+      process.stderr.write(`run ${record.run} ${record.repo}/${record.leaf} ${record.check}\n`);
     if (candidates.length === 0) throw new Error(`No runs owned by scope ${scope}`);
     if (candidates.length > 1) throw new Error(`${candidates.length} runs owned by scope ${scope}; name a run id`);
     units = matched(candidates[0]);
