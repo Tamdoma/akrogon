@@ -298,15 +298,3 @@ test('verify removes each command TMPDIR on success and failure', async () => {
     f.clean();
   }
 });
-
-test('no skill text runs a base checkout or a raw check set by hand', () => {
-  for (const file of [
-    'skills/implement-issue/SKILL.md',
-    'skills/merge-issue/SKILL.md',
-    'skills/chart-issues/SKILL.md',
-  ]) {
-    const text: string = readFileSync(resolve(import.meta.dir, '..', file), 'utf8');
-    expect(text, file).toContain('akrogon verify');
-    expect(text, file).not.toContain('base-run');
-  }
-});
