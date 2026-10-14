@@ -117,10 +117,17 @@ async function waitPath(path: string, ms: number = 15000): Promise<void> {
   }
 }
 
-// The suite's run-check cuts DBUS_SESSION_BUS_ADDRESS; env -u drops it so
-// systemctl --user falls back to its private socket.
+// The suite's run-check cuts DBUS_SESSION_BUS_ADDRESS and strips
+// XDG_RUNTIME_DIR; supply both so systemctl --user reaches the manager.
 function sysctl(...args: string[]): Promise<SpawnResult> {
-  const { child, captured } = spawnFiles(['env', '-u', 'DBUS_SESSION_BUS_ADDRESS', 'systemctl', '--user', ...args]);
+  const { child, captured } = spawnFiles([
+    'env',
+    `XDG_RUNTIME_DIR=/run/user/${uid}`,
+    'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/' + uid + '/bus',
+    'systemctl',
+    '--user',
+    ...args,
+  ]);
   return finishCaptured(child, captured);
 }
 
