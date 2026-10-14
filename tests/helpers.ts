@@ -212,6 +212,7 @@ export function greenReceipt(
     path: resolve(f.home, 'verified'),
     pid: process.pid,
     boot_id: '',
+    setup: 0,
     commands: commands.map((item) => ({ ...item, exit: 0, log: resolve(f.home, 'verified.log') })),
     start: at,
     end: at,

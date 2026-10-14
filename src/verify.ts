@@ -22,6 +22,7 @@ export const verifyRunSchema = z.strictObject({
   path: z.string(),
   pid: z.number().int(),
   boot_id: z.string(),
+  setup: z.number().int().optional(),
   commands: z.array(z.strictObject({ name: z.string(), command: z.string(), exit: z.number().int(), log: z.string() })),
   start: z.string(),
   end: z.string().optional(),
@@ -62,6 +63,7 @@ export function requireGreenReceipt(repo: Repo, sha: string, scope: VerifyScope)
       run.sha === sha &&
       run.scope === scope &&
       run.end !== undefined &&
+      run.setup === 0 &&
       run.commands.length === expected.length &&
       run.commands.every(
         (item, index) =>
@@ -128,6 +130,7 @@ export async function verify(
     appendFileSync(recordsPath(repo), JSON.stringify(record) + '\n');
   });
   const ran: VerifyRun['commands'] = [];
+  let setupExit: number | undefined;
   let end: string | undefined;
   let removed: string | undefined;
   try {
@@ -141,6 +144,7 @@ export async function verify(
       ['sh', '-c', setupCommand(repo.config, 'true')],
       target,
     );
+    setupExit = setup.code;
     process.stdout.write(`verify setup: ${setup.code} ${setup.log}\n`);
     for (const item of verifyCommands(repo.config, scope)) {
       const { code, log }: { code: number; log: string } =
@@ -163,6 +167,7 @@ export async function verify(
       if (index === -1) return;
       runs[index] = {
         ...runs[index],
+        ...(setupExit === undefined ? {} : { setup: setupExit }),
         commands: ran,
         ...(end === undefined ? {} : { end }),
         ...(removed === undefined ? {} : { removed }),
@@ -172,7 +177,7 @@ export async function verify(
       renameSync(temporary, file);
     });
   }
-  const green: boolean = ran.every((item) => item.exit === 0);
+  const green: boolean = setupExit === 0 && ran.every((item) => item.exit === 0);
   process.stdout.write(`verify ${scope} ${sha}: ${green ? 'green' : 'red'}\n`);
   return green ? 0 : 1;
 }

@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFi
 import { resolve } from 'node:path';
 import { cli, fakeAkrogon, fixture, leaf, storeDir, yaml, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
-import { verifyRunSchema, type VerifyRun } from '../src/verify';
+import { readRepo } from '../src/config';
+import { requireGreenReceipt, verifyRunSchema, type VerifyRun } from '../src/verify';
 
 function records(f: Fixture): VerifyRun[] {
   const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
@@ -229,6 +230,20 @@ test('a checkout missing its own node_modules is refused and named in the log', 
     expect(log).not.toContain('unreached');
     expect(run.commands[0].exit).not.toBe(0);
     expect(typeof run.removed).toBe('string');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a failed setup with no configured checks exits red and its receipt is refused', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { setup: 'exit 7', checks: {} });
+    const { worktree } = await callerWorktree(f);
+    const sha: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    expect((await verify(f, [], worktree)).code).not.toBe(0);
+    expect(records(f)[0]).toMatchObject({ sha, scope: 'leaf', setup: 7, commands: [] });
+    expect(() => requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).toThrow('No green leaf verify receipt');
   } finally {
     f.clean();
   }
