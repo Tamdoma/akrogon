@@ -147,8 +147,8 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon stop <slug> \| --all` | Mark a leaf stopped and stop its systemd slice, ending every process in its panes. With --all, stop every allocated leaf of the current repository. |
 | `akrogon stop-run [<run-id>]` | Stop a run the caller's pane scope launched, by the id on the `run` line printed at run start. With no id, list matching runs and stop only when exactly one is live. |
 | `akrogon start <slug>` | Clear a leaf's stopped mark and run the targeted next pass for that leaf. |
-| `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Run a command under the constructed check environment, starting it once the start check admits it, and log output into the leaf. |
-| `akrogon base-run --base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...` | Run a command on a base checkout in the worktree store under the constructed environment, starting it once the start check admits it, log into the leaf, write a record line and remove the worktree. |
+| `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Register the run, start a command at once under the constructed check environment, and log output into the leaf. |
+| `akrogon base-run --base <sha> [--attempt <id>] [--cwd <rel>] -- <argv>...` | Register the run, start a command at once on a base checkout in the worktree store under the constructed environment, log into the leaf, write a record line and remove the worktree. |
 | `akrogon guard <ancestors\|own-modules>` | Refuse when a canonical ancestor holds node_modules or package.json, or the checkout's own node_modules is missing. |
 ```
 
