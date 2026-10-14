@@ -253,7 +253,6 @@ if (args[0] === 'agent' && args[1] === 'wait') {
   if (entry?.status !== undefined) result({ agent: { ...target, agent_status: entry.status } });
   const untils: string[] = args.flatMap((a, i) => (a === '--until' ? [args[i + 1]] : []));
   if (untils.length > 0 && !untils.includes(target.agent_status)) {
-    Bun.sleepSync(Number(flag('--timeout')));
     save();
     console.error('{"error":{"code":"timeout","message":"timed out waiting for agent status"},"id":"cli:agent:wait"}');
     process.exit(1);
