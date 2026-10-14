@@ -627,6 +627,15 @@ async function mergeHead(repo: Repo, state: State, record: Batch): Promise<strin
   return record.top;
 }
 
+// With members HEAD is the recorded top; a memberless holder may carry B's repair commits past it.
+async function requireBatchTop(worktree: string, record: Batch, head: string): Promise<void> {
+  const members: boolean = record.members.length > 0;
+  if (record.top === undefined || (members ? head !== record.top : !(await isAncestor(worktree, record.top, head))))
+    throw new Error(
+      `HEAD must ${members ? 'equal' : 'descend from'} the recorded batch top ${record.top}, found ${head}`,
+    );
+}
+
 async function batchCheck(
   repo: Repo,
   leaf: Leaf,
@@ -643,13 +652,8 @@ async function batchCheck(
   if (record.solo === true) {
     await requireNonEmpty(repo, worktree);
   } else {
-    // A memberless holder may carry B's repair commits past the top.
-    if (
-      !record.applied ||
-      record.top === undefined ||
-      (record.members.length > 0 ? head !== record.top : !(await isAncestor(worktree, record.top, head)))
-    )
-      throw new Error(`HEAD must equal the recorded batch top ${record.top}, found ${head}`);
+    if (!record.applied) throw new Error(`HEAD must equal the recorded batch top ${record.top}, found ${head}`);
+    await requireBatchTop(worktree, record, head);
     let predecessor: string = record.built_on;
     for (const member of record.members) {
       if (predecessor !== member.tip) {
@@ -733,8 +737,7 @@ async function batchPush(
   const worktree: string = state.worktree ?? repo.root;
   const head: string = await mergeHead(repo, state, record);
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
-  if (!holderOwnsBranch(record) && head !== record.top)
-    throw new Error(`HEAD must equal the recorded batch top ${record.top}, found ${head}`);
+  if (record.solo !== true) await requireBatchTop(worktree, record, head);
   if (slot !== undefined && head !== record.tested_top && !(record.decision === 'reuse' && head === record.top))
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);
   await command(['git', 'rev-parse', trackingRef(repo)], repo.root);

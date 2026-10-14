@@ -728,6 +728,42 @@ test.serial('a stack with members refuses a B commit past the top at --check', a
   }
 });
 
+test.serial('a memberless stack refuses a HEAD that does not descend from the top at --check', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold']);
+    await command(['git', 'reset', '--hard', record.built_on], holder.state.worktree!);
+    await repairCommit(holder);
+    const checked: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
+      f.root,
+      herdr.env,
+    );
+    expect(checked.code).not.toBe(0);
+    expect(checked.stderr).toContain('HEAD must descend from the recorded batch top ' + record.top);
+    expect(readState(holder.path).batch?.tested_top).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('operator completion refuses a memberless holder reset below the top', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold']);
+    await command(['git', 'reset', '--hard', record.built_on], holder.state.worktree!);
+    const before: string = await remoteTip(f);
+    const result: Result = await cli(f, ['phase', 'hold', 'merged'], f.root, herdr.env);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('HEAD must descend from the recorded batch top ' + record.top);
+    expect(await remoteTip(f)).toBe(before);
+    expect(readState(holder.path).phase).toBe('merge');
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('operator completion refuses a holder commit outside the applied stack', async () => {
   const f: Fixture = await fixture();
   try {
