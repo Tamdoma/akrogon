@@ -85,8 +85,12 @@ export async function startRunGuard(slice: string, run: string, wpid: number, re
 }
 
 // One call per unit: a single stop job fails whole when a unit name is not loaded.
+// Callers may run under a check whose bus is cut, so the address is pinned.
 export async function stopRunUnits(...units: string[]): Promise<void> {
-  for (const unit of units) await run(['systemctl', '--user', 'stop', unit]).catch(() => undefined);
+  for (const unit of units)
+    await spawnCaptured(['systemctl', '--user', 'stop', unit], {
+      env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+    }).catch(() => undefined);
 }
 
 export function procRoot(): string {

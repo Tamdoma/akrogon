@@ -1,6 +1,6 @@
 import { callerScope, liveRuns, type RunRecord } from './admission';
-import { runUnitBase } from './scope';
-import { command } from './shell';
+import { runUnitBase, sessionBusAddress } from './scope';
+import { CommandError, spawnCaptured, type SpawnResult } from './shell';
 
 function matched(record: RunRecord): string[] {
   return [record.unit, `${runUnitBase(record.run)}-guard.service`];
@@ -22,5 +22,9 @@ export async function stopRunCommand(id: string | undefined): Promise<void> {
     if (found === undefined) throw new Error(`No run ${id} owned by scope ${scope}`);
     units = matched(found);
   }
-  await command(['systemctl', '--user', 'stop', ...units]);
+  const argv: string[] = ['systemctl', '--user', 'stop', ...units];
+  const result: SpawnResult = await spawnCaptured(argv, {
+    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+  });
+  if (result.code !== 0) throw new CommandError(argv, process.cwd(), result);
 }

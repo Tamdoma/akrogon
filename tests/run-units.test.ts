@@ -119,10 +119,17 @@ async function waitPath(path: string, ms: number = 15000): Promise<void> {
   }
 }
 
+// The suite's run-check cuts DBUS_SESSION_BUS_ADDRESS; env -u drops it so
+// systemctl --user falls back to its private socket.
+function sysctl(...args: string[]): Promise<SpawnResult> {
+  const { child, captured } = spawnFiles(['env', '-u', 'DBUS_SESSION_BUS_ADDRESS', 'systemctl', '--user', ...args]);
+  return finishCaptured(child, captured);
+}
+
 async function waitInactive(unit: string, ms: number = 12000): Promise<void> {
   const begun: number = Date.now();
   for (;;) {
-    const result: Result = await run(['systemctl', '--user', 'is-active', unit]);
+    const result: Result = await sysctl('is-active', unit);
     if (result.code !== 0) return;
     if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${unit} to become inactive`);
     await Bun.sleep(150);
@@ -135,7 +142,7 @@ async function waitInactive(unit: string, ms: number = 12000): Promise<void> {
 async function waitActive(unit: string, ms: number = 12000): Promise<void> {
   const begun: number = Date.now();
   for (;;) {
-    const result: Result = await run(['systemctl', '--user', 'is-active', unit]);
+    const result: Result = await sysctl('is-active', unit);
     if (result.code === 0) return;
     if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${unit} to become active`);
     await Bun.sleep(150);
@@ -203,7 +210,7 @@ function seedUnitStat(f: Fixture, slice: string, unit: string, anon: number): vo
 }
 
 async function activeUnits(pattern: string): Promise<string[]> {
-  const result: Result = await run(['systemctl', '--user', 'list-units', '--all', '--no-legend', pattern]);
+  const result: Result = await sysctl('list-units', '--all', '--no-legend', pattern);
   return result.stdout
     .split('\n')
     .map((line: string) => line.trim().split(/\s+/)[0] ?? '')
@@ -211,8 +218,8 @@ async function activeUnits(pattern: string): Promise<string[]> {
 }
 
 async function stopTestSlice(slice: string): Promise<void> {
-  await run(['systemctl', '--user', 'stop', slice]);
-  await run(['systemctl', '--user', 'reset-failed', slice]);
+  await sysctl('stop', slice);
+  await sysctl('reset-failed', slice);
 }
 
 test.serial(
@@ -290,17 +297,17 @@ test.serial(
       const two: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run'], worktree).result;
       expect(two.code).not.toBe(0);
       expect(two.stderr).toContain(ids.a2);
-      expect((await run(['systemctl', '--user', 'is-active', units('a2')])).code).toBe(0);
+      expect((await sysctl('is-active', units('a2'))).code).toBe(0);
       // a1 stopped by the launching pane scope: unit dies; a2 and b1 keep running.
       const stopped: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run', ids.a1], worktree).result;
       expect(stopped.code).toBe(0);
       await waitInactive(units('a1'));
-      expect((await run(['systemctl', '--user', 'is-active', units('a2')])).code).toBe(0);
-      expect((await run(['systemctl', '--user', 'is-active', units('b1')])).code).toBe(0);
+      expect((await sysctl('is-active', units('a2'))).code).toBe(0);
+      expect((await sysctl('is-active', units('b1'))).code).toBe(0);
       // A run owned by another pane is refused.
       const refused: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run', ids.b1], worktree).result;
       expect(refused.code).not.toBe(0);
-      expect((await run(['systemctl', '--user', 'is-active', units('b1')])).code).toBe(0);
+      expect((await sysctl('is-active', units('b1'))).code).toBe(0);
       // A caller in no scope can never stop a run.
       const plainRoot: string = resolve(f.home, 'scopes', 'plain');
       mkdirSync(resolve(plainRoot, 'self'), { recursive: true });
@@ -308,7 +315,7 @@ test.serial(
       const plain: SpawnResult = await spawnReal(f, ['stop-run', ids.a2], worktree, { AKROGON_PROC_ROOT: plainRoot })
         .result;
       expect(plain.code).not.toBe(0);
-      expect((await run(['systemctl', '--user', 'is-active', units('a2')])).code).toBe(0);
+      expect((await sysctl('is-active', units('a2'))).code).toBe(0);
       const none: SpawnResult = await spawnScoped(f, 'paneC.scope', ['stop-run'], worktree).result;
       expect(none.code).not.toBe(0);
       // The stopped run's record can linger until its wrapper's finally runs.
@@ -470,15 +477,18 @@ test.serial(
     const worktree: string = await leafWorktree(f, 'nested-res');
     const script: string = [
       `akrogon run-check --name inner -- sh -c 'touch "${out}/inner-held"; sleep 1'`,
-      `ls "${f.home}/runs" | grep -c '\\.yaml$' > "${out}/count"`,
+      `grep -l -e 'check: outer' -e 'check: inner' "${f.home}/runs"/*.yaml | wc -l > "${out}/count"`,
     ].join('; ');
     const cap: RealCap = spawnReal(f, ['run-check', '--name', 'outer', '--', 'sh', '-c', script], worktree, {
       RUN_UNITS_OUT: out,
       AKROGON_RUN_SLICE: slice,
     });
     await waitPath(resolve(out, 'inner-held'));
-    const during: string[] = readdirSync(resolve(f.home, 'runs')).filter((name) => name.endsWith('.yaml'));
-    expect(during).toHaveLength(1);
+    // The criterion is no *new* record and none named for the nested check:
+    // sibling serial tests may leave records behind in the shared fixture.
+    const during: Record<string, unknown>[] = await runRecords(f);
+    expect(during.filter((record) => record.check === 'inner')).toHaveLength(0);
+    expect(during.filter((record) => record.check === 'outer')).toHaveLength(1);
     const result: SpawnResult = await cap.result;
     expect(result.code).toBe(0);
     expect(readFileSync(resolve(out, 'count'), 'utf8').trim()).toBe('1');
@@ -561,7 +571,8 @@ test.serial(
         {
           env: {
             ...process.env,
-            DBUS_SESSION_BUS_ADDRESS: `unix:path=${process.env.XDG_RUNTIME_DIR ?? `/run/user/${uid}`}/bus`,
+            DBUS_SESSION_BUS_ADDRESS: undefined,
+            XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR ?? `/run/user/${uid}`,
           },
         },
       );
