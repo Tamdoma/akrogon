@@ -50,7 +50,7 @@ Check these choices:
 
 - **default_branch** is where reviewed work lands.
 - **remote** selects the Git remote used for integration.
-- **checks** lists the commands that must pass before merge.
+- **checks** lists the commands that must pass before merge. `akrogon verify` runs them on a fresh checkout of a commit and records a receipt; the `check.review` move and the merge and direct routes require a green one for the exact commit and command set.
 - **merge_checks** lists slow commands that run only at merge, on the rebased leaf before push, except a `check.fix` pass after a red merge ending replays the exact rejected command. A cheap check never runs only at merge, even when a merge command also runs it — a check cheap enough for the leaf's own check belongs in `checks`, and a merge command may rerun it on the integrated candidate but is never its only home.
 - **merge_covers** lists `checks` names skipped at merge because `merge_checks` covers them. Empty by default.
 - **grounding** points agents to the project's reference index, or disables that lookup.
@@ -66,7 +66,7 @@ Check these choices:
 
 Check commands must not read tracked files under `issues/` (except `issues/config.yaml`, the check list itself) or `learnings/` — a green batch run is reused when only those folders moved on the default branch.
 
-`setup` runs before every `checks`, `merge_checks` and `advisory` command that `akrogon config` prints. It runs under a per-worktree lock kept under the git dir, so the lock never shows in `git status` and is removed with the worktree. The setup skill proposes it only when a lockfile is committed. Every printed check command runs under `akrogon run-check`, which refuses forbidden caller environment (`NODE_PATH`, `BUN_OPTIONS`, `BUN_INSTALL_CACHE_DIR`, `FFMPEG_BIN`, `CHROME_PATH`, `CDP_BROWSER_BINARY`, a global bunfig) and runs the command in a constructed environment. Many check commands can run at a time on the host; every run registers a record and starts at once. Each run lives in its own `akrogon-run-<id>.scope` systemd scope under the leaf slice and prints a `run <id>` line on stderr; `akrogon stop-run <id>` ends it. A run started inside a live run (matching `AKROGON_RUN`) prints no `run` line and creates no unit.
+`setup` runs before every `checks`, `merge_checks` and `advisory` command that `akrogon config` prints, and before each command `akrogon verify` runs. It runs under a per-worktree lock kept under the git dir, so the lock never shows in `git status` and is removed with the worktree. The setup skill proposes it only when a lockfile is committed. Every printed check command runs under `akrogon run-check`, which refuses forbidden caller environment (`NODE_PATH`, `BUN_OPTIONS`, `BUN_INSTALL_CACHE_DIR`, `FFMPEG_BIN`, `CHROME_PATH`, `CDP_BROWSER_BINARY`, a global bunfig) and runs the command in a constructed environment. Many check commands can run at a time on the host; every run registers a record and starts at once. Each run lives in its own `akrogon-run-<id>.scope` systemd scope under the leaf slice and prints a `run <id>` line on stderr; `akrogon stop-run <id>` ends it. A run started inside a live run (matching `AKROGON_RUN`) prints no `run` line and creates no unit.
 
 Use the effective configuration to check the result:
 
