@@ -133,15 +133,20 @@ export async function verify(
   try {
     await createSparseWorktree(repo, target, sha, { detach: true });
     await emitEnvFile(repo, target, repo.config.env);
+    const setup: { code: number; log: string } = await checkedRun(
+      repo,
+      caller,
+      akrogonBase,
+      'setup',
+      ['sh', '-c', setupCommand(repo.config, 'true')],
+      target,
+    );
+    process.stdout.write(`verify setup: ${setup.code} ${setup.log}\n`);
     for (const item of verifyCommands(repo.config, scope)) {
-      const { code, log }: { code: number; log: string } = await checkedRun(
-        repo,
-        caller,
-        akrogonBase,
-        item.name,
-        ['sh', '-c', setupCommand(repo.config, item.command)],
-        target,
-      );
+      const { code, log }: { code: number; log: string } =
+        setup.code === 0
+          ? await checkedRun(repo, caller, akrogonBase, item.name, ['sh', '-c', item.command], target)
+          : setup;
       ran.push({ ...item, exit: code, log });
       process.stdout.write(`verify ${item.name}: ${code} ${log}\n`);
     }

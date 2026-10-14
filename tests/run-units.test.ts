@@ -402,7 +402,7 @@ for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
 }
 
 test.serial(
-  'a verify runs setup and command in one run unit under the leaf slice',
+  'a verify runs setup and each command in its own run unit under the leaf slice',
   async () => {
     const { f, slice } = await realFixture();
     const out: string = outDir(f);
@@ -420,12 +420,15 @@ test.serial(
     }).result;
     writeFileSync(config, before);
     expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
-    expect(result.stderr.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(1);
+    expect(result.stderr.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(2);
     const setup: string = readFileSync(resolve(out, 'setup.cg'), 'utf8');
     const cmd: string = readFileSync(resolve(out, 'cmd.cg'), 'utf8');
+    const setupScope: string | undefined = setup.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];
     const scope: string | undefined = cmd.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];
+    expect(setupScope).toBeDefined();
     expect(scope).toBeDefined();
-    expect(setup).toBe(cmd);
+    expect(setupScope).not.toBe(scope);
+    expect(setup).toContain(`/${slice}/${setupScope}`);
     expect(cmd).toContain(`/${slice}/${scope}`);
     expect(await fixtureUnits(slice)).toEqual([]);
   },

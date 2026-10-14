@@ -86,6 +86,30 @@ test('verify runs every leaf check on a fresh checkout of HEAD, keeps logs and w
   }
 });
 
+test('verify runs setup once per checkout, then every command in that checkout', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const counter: string = resolve(f.home, 'setup-count');
+    config(f, {
+      setup: `mkdir -p node_modules; echo setup >> ${counter}; touch prepared`,
+      checks: { first: 'test -e prepared && pwd', second: 'test -e prepared && pwd' },
+    });
+    const { worktree } = await callerWorktree(f);
+    expect((await verify(f, [], worktree)).code).toBe(0);
+    expect(readFileSync(counter, 'utf8')).toBe('setup\n');
+    const run: VerifyRun = records(f)[0];
+    expect(run.commands.map((item) => [item.name, item.exit])).toEqual([
+      ['first', 0],
+      ['second', 0],
+    ]);
+    expect(run.commands[0].log).not.toBe(run.commands[1].log);
+    expect(readFileSync(run.commands[0].log, 'utf8')).toContain(run.path);
+    expect(readFileSync(run.commands[1].log, 'utf8')).toContain(run.path);
+  } finally {
+    f.clean();
+  }
+});
+
 test('verify checks out the commit, not the caller tree: an ignored file in the worktree is absent', async () => {
   const f: Fixture = await fixture();
   try {
