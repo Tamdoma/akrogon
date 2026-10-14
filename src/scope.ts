@@ -33,9 +33,7 @@ export function runSlice(slice: string): string {
 export function sessionBusAddress(): string {
   const address: string | undefined = process.env.DBUS_SESSION_BUS_ADDRESS;
   if (address !== undefined && address.trim() !== '') {
-    const path: string | undefined = address.startsWith('unix:path=')
-      ? address.slice('unix:path='.length)
-      : undefined;
+    const path: string | undefined = address.startsWith('unix:path=') ? address.slice('unix:path='.length) : undefined;
     if (path === undefined || existsSync(path)) return address;
   }
   const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;

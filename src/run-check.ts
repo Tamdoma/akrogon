@@ -18,15 +18,7 @@ import { command, spawnCaptured, type Result } from './shell';
 import { readBaseRuns, type BaseRun } from './base-run';
 import { appendTiming } from './timing';
 import { callerScope, withAdmission } from './admission';
-import {
-  leafSlice,
-  runSlice,
-  runUnitArgv,
-  runUnitBase,
-  sessionBusAddress,
-  startRunGuard,
-  stopRunUnits,
-} from './scope';
+import { leafSlice, runSlice, runUnitArgv, runUnitBase, sessionBusAddress, startRunGuard, stopRunUnits } from './scope';
 import { type Phase } from './routing';
 
 const forbidden: readonly string[] = [
@@ -191,42 +183,48 @@ export async function runCheck(
     return await withAdmission(
       { repo: repo.name, leaf: slug, check: name ?? 'run', run, slice, scope: callerScope(), unit: runUnit },
       async (admission) => {
-      env.AKROGON_RUN = admission.token;
-      appendTiming(repo, {
-        kind: 'check_start',
-        ...check,
-        ...(admission.kind === 'held' ? { wait_ms: admission.wait_ms } : {}),
-      });
-      const started: number = Date.now();
-      const result: Result =
-        admission.kind === 'nested'
-          ? await spawnLogged(argv, cwd, env, log)
-          : await (async () => {
-              await startRunGuard(slice, run, process.pid, admission.record_path);
-              try {
-                return await spawnLogged(runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS), cwd, { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() }, log);
-              } finally {
-                admission.release();
-                await stopRunUnits(runUnit, `${runUnitBase(run)}-guard.service`);
-              }
-            })();
-      process.stdout.write(result.stdout);
-      process.stderr.write(result.stderr);
-      mkdirSync(target, { recursive: true });
-      const kept: string = resolve(
-        target,
-        `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`,
-      );
-      copyFileSync(log, kept);
-      appendTiming(repo, {
-        kind: 'check_end',
-        ...check,
-        exit: result.code,
-        duration_ms: Date.now() - started,
-        log: kept,
-      });
-      return result.code;
-    });
+        env.AKROGON_RUN = admission.token;
+        appendTiming(repo, {
+          kind: 'check_start',
+          ...check,
+          ...(admission.kind === 'held' ? { wait_ms: admission.wait_ms } : {}),
+        });
+        const started: number = Date.now();
+        const result: Result =
+          admission.kind === 'nested'
+            ? await spawnLogged(argv, cwd, env, log)
+            : await (async () => {
+                await startRunGuard(slice, run, process.pid, admission.record_path);
+                try {
+                  return await spawnLogged(
+                    runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS),
+                    cwd,
+                    { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+                    log,
+                  );
+                } finally {
+                  admission.release();
+                  await stopRunUnits(runUnit, `${runUnitBase(run)}-guard.service`);
+                }
+              })();
+        process.stdout.write(result.stdout);
+        process.stderr.write(result.stderr);
+        mkdirSync(target, { recursive: true });
+        const kept: string = resolve(
+          target,
+          `check-${encodeURIComponent(name ?? 'run')}-${Date.now()}-${process.pid}.log`,
+        );
+        copyFileSync(log, kept);
+        appendTiming(repo, {
+          kind: 'check_end',
+          ...check,
+          exit: result.code,
+          duration_ms: Date.now() - started,
+          log: kept,
+        });
+        return result.code;
+      },
+    );
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
   }

@@ -79,10 +79,7 @@ function spacingMs(): number {
 }
 
 const slicePrefixDir = (): string =>
-  resolve(
-    cgroupRoot(),
-    `user.slice/user-${process.getuid!()}.slice/user@${process.getuid!()}.service/akrogon.slice`,
-  );
+  resolve(cgroupRoot(), `user.slice/user-${process.getuid!()}.slice/user@${process.getuid!()}.service/akrogon.slice`);
 const statPath = (): string => resolve(slicePrefixDir(), 'memory.stat');
 const runsDir = (): string => resolve(globalHome(), 'runs');
 const lockPath = (): string => resolve(globalHome(), 'admission.lock');
@@ -160,10 +157,7 @@ function lastStart(): number | undefined {
 
 // The 16 GiB a live run has not yet shown as unit usage stays reserved.
 function peerReservations(): number {
-  return liveRuns().reduce(
-    (reserved, record) => reserved + Math.max(0, RUN_GIB * GIB - unitUsage(record)),
-    0,
-  );
+  return liveRuns().reduce((reserved, record) => reserved + Math.max(0, RUN_GIB * GIB - unitUsage(record)), 0);
 }
 
 // Called only while holding admission.lock; returns the wait reason or undefined to admit.
@@ -267,9 +261,7 @@ export function callerScope(): string {
   }
   const selfCgroup: string = resolve(procRoot(), 'self', 'cgroup');
   if (!existsSync(selfCgroup)) return '';
-  const scopes: string[] = [...readFileSync(selfCgroup, 'utf8').matchAll(/\/([^/]+\.scope)/g)].map(
-    (match) => match[1],
-  );
+  const scopes: string[] = [...readFileSync(selfCgroup, 'utf8').matchAll(/\/([^/]+\.scope)/g)].map((match) => match[1]);
   return scopes[scopes.length - 1] ?? '';
 }
 
@@ -280,9 +272,10 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
   const token: string = randomUUID();
   const ownHash: string = createHash('sha256').update(token).digest('hex');
   await sweepStale(
-    new Set(
-      [ownHash, ...(inherited === undefined || inherited === '' ? [] : [createHash('sha256').update(inherited).digest('hex')])],
-    ),
+    new Set([
+      ownHash,
+      ...(inherited === undefined || inherited === '' ? [] : [createHash('sha256').update(inherited).digest('hex')]),
+    ]),
   );
   const record: RunRecord = {
     token_hash: ownHash,
