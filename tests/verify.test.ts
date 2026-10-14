@@ -167,6 +167,24 @@ test('a merge caller runs checks outside merge_covers, then merge_checks', async
   }
 });
 
+test('--attempt from the repo root verifies the merge leaf worktree HEAD', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { checks: { unit: 'echo unit' } });
+    const { worktree } = await callerWorktree(f, 'holder');
+    const sha: string = await commitIn(worktree, 'code.ts');
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    leaf(f, 'holder', 'merge', {
+      worktree,
+      batch: { attempt: 'att-1', built_on: head, holder: { base: head, head: sha }, members: [], applied: true },
+    });
+    expect((await verify(f, ['--attempt', 'att-1'], f.root)).code).toBe(0);
+    expect(records(f)[0]).toMatchObject({ leaf: 'holder', scope: 'merge', sha });
+  } finally {
+    f.clean();
+  }
+});
+
 test('a non-leaf caller with --holder verifies at merge scope and logs into the holder', async () => {
   const f: Fixture = await fixture();
   try {

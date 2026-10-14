@@ -84,13 +84,16 @@ async function verifyCaller(
   cwd: string,
   attempt: string | undefined,
   holder: string | undefined,
-): Promise<LeafTarget> {
-  if (attempt === undefined) return leafTarget(repo, cwd, undefined, holder);
+): Promise<{ caller: LeafTarget; cwd: string }> {
+  if (attempt === undefined) return { caller: await leafTarget(repo, cwd, undefined, holder), cwd };
   const leaf: Leaf | undefined = allLeaves(repo).find(
     (item) => item.state.batch?.attempt === attempt && item.state.phase === 'merge',
   );
   if (leaf === undefined) throw new Error(`No merge leaf for attempt: ${attempt}`);
-  return { ...leafFields(leaf.state, 'leaf'), target: resolve(leaf.path, 'implementation') };
+  return {
+    caller: { ...leafFields(leaf.state, 'leaf'), target: resolve(leaf.path, 'implementation') },
+    cwd: leaf.state.worktree ?? cwd,
+  };
 }
 
 export async function verify(
@@ -102,10 +105,10 @@ export async function verify(
   if (attempt !== undefined && holder !== undefined) throw new Error('Use --attempt or --holder, not both');
   refuse();
   const repo: Repo = await requireRepo(readGlobal(), cwd);
-  const caller: LeafTarget = await verifyCaller(repo, cwd, attempt, holder);
+  const { caller, cwd: at }: { caller: LeafTarget; cwd: string } = await verifyCaller(repo, cwd, attempt, holder);
   const scope: VerifyScope = caller.phase === undefined || caller.phase === 'merge' ? 'merge' : 'leaf';
-  const sha: string = await command(['git', 'rev-parse', '--verify', `${rev ?? 'HEAD'}^{commit}`], cwd);
-  const akrogonBase: string = await base(repo, cwd);
+  const sha: string = await command(['git', 'rev-parse', '--verify', `${rev ?? 'HEAD'}^{commit}`], at);
+  const akrogonBase: string = await base(repo, at);
   const id: string = randomUUID();
   const target: string = resolve(worktreeStore(repo), `verify-${id}`);
   checkLocation(target);
