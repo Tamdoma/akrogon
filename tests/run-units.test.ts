@@ -427,27 +427,24 @@ test.serial(
   45000,
 );
 
-test.serial(
-  'a base-run places its scope under the resolved leaf slice by default',
-  async () => {
-    const f: Fixture = await fixture();
-    try {
-      fakeAkrogon(f);
-      const worktree: string = await leafWorktree(f, 'base-place');
-      const sha: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
-      const log: string = resolve(f.home, 'systemd-run.calls');
-      await cli(f, ['base-run', '--base', sha, '--', 'true'], worktree, {
-        FAKE_SYSTEMD_RUN_LOG: log,
-      });
-      const calls: string[] = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
-      const scoped: string[] = calls.filter((line) => line.includes('--scope'));
-      expect(scoped.length).toBeGreaterThan(0);
-      expect(scoped.some((line) => line.includes(`--slice=${expectedSlice('repo', 'base-place')}`))).toBe(true);
-    } finally {
-      f.clean();
-    }
-  },
-);
+test.serial('a base-run places its scope under the resolved leaf slice by default', async () => {
+  const f: Fixture = await fixture();
+  try {
+    fakeAkrogon(f);
+    const worktree: string = await leafWorktree(f, 'base-place');
+    const sha: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    const log: string = resolve(f.home, 'systemd-run.calls');
+    await cli(f, ['base-run', '--base', sha, '--', 'true'], worktree, {
+      FAKE_SYSTEMD_RUN_LOG: log,
+    });
+    const calls: string[] = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
+    const scoped: string[] = calls.filter((line) => line.includes('--scope'));
+    expect(scoped.length).toBeGreaterThan(0);
+    expect(scoped.some((line) => line.includes(`--slice=${expectedSlice('repo', 'base-place')}`))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
 
 test.serial(
   'a top-level run starts at once over the old memory reading and inside the old spacing window',
