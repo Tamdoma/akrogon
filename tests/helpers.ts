@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 import { readRepo } from '../src/config';
 import { verifyCommands, type VerifyScope } from '../src/verify';
-import { findLeaf, readState } from '../src/state';
+import { findLeaf, readState, type Batch } from '../src/state';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
 const tempDirs: Set<string> = new Set();
@@ -230,4 +230,11 @@ export async function verified(f: Fixture, slug: string, scope: VerifyScope): Pr
     await command(['git', 'rev-parse', worktree === undefined ? `refs/heads/${slug}` : 'HEAD'], worktree ?? f.root),
     scope,
   );
+}
+
+// A merge-turn record and green receipt on the current remote tip, so an operator `merged` pushes nothing new and lands.
+export function holding(f: Fixture): { batch: Batch } {
+  const main: string = Bun.spawnSync(['git', 'rev-parse', 'origin/main'], { cwd: f.root }).stdout.toString().trim();
+  greenReceipt(f, main, 'merge');
+  return { batch: { attempt: 'a1', built_on: main, holder: { base: main, head: main }, applied: true, top: main } };
 }

@@ -30,8 +30,9 @@ import {
   type GhFixture,
   type Fixture,
   verified,
+  holding,
 } from './helpers';
-import { readState, saveState, type State } from '../src/state';
+import { readState, saveState, type Batch, type State } from '../src/state';
 import { parseEnv } from 'node:util';
 import { command, run, type Result, spawnCaptured } from '../src/shell';
 import type { GhStep } from './fake-gh';
@@ -544,7 +545,7 @@ test('a merged leaf with its tab still open does not count toward max_active', a
     yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 1 });
     expect((await next(f, ['first'])).code).toBe(0);
     const a: string = readState(first).pane.A!;
-    saveState(first, { ...readState(first), phase: 'merge' });
+    saveState(first, { ...readState(first), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
@@ -563,7 +564,7 @@ test('a closed tab hook from a merged leaf starts the dependent', async () => {
     const dependent: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
     expect((await next(f, ['first'])).code).toBe(0);
     const tab: string = readState(first).tab!;
-    saveState(first, { ...readState(first), phase: 'merge' });
+    saveState(first, { ...readState(first), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
     const db: Database = database(f);
     saveDatabase(f, {
@@ -594,7 +595,7 @@ test('merged phase closes tab on typed next and starts the dependent', async () 
     const dependent: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
     expect((await next(f, ['first'])).code).toBe(0);
     const a: string = readState(first).pane.A!;
-    saveState(first, { ...readState(first), phase: 'merge' });
+    saveState(first, { ...readState(first), phase: 'merge', ...holding(f) });
     const merged: Result = await cli(f, ['phase', 'first', 'merged'], f.root, f.env);
     expect(merged.code).toBe(0);
     expect(database(f).tabs).toHaveLength(1);
@@ -623,7 +624,7 @@ for (const path of ['targeted', 'tab_closed', 'pane_hook'] as const) {
       expect((await next(f, ['first'])).code).toBe(0);
       const tab: string = readState(first).tab!;
       const a: string = readState(first).pane.A!;
-      saveState(first, { ...readState(first), phase: 'merge' });
+      saveState(first, { ...readState(first), phase: 'merge', ...holding(f) });
       expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
       const db: Database = database(f);
       saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
@@ -679,7 +680,7 @@ test('a dependent still blocked by an unmerged leaf stays unallocated after its 
     leaf(f, 'other', 'plan.synthesis', {}, 'other-issue');
     const second: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first', 'other'] }, 'second-issue');
     expect((await next(f, ['first'])).code).toBe(0);
-    saveState(first, { ...readState(first), phase: 'merge' });
+    saveState(first, { ...readState(first), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => ({ ...p, agent_status: 'idle' })) });
@@ -1090,7 +1091,7 @@ test('next awaits sourced completion after a failed rename before removing the w
     const path: string = leaf(f, 'rename', 'plan.synthesis');
     expect((await next(f, ['rename'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
-    saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#9'] });
+    saveState(path, { ...readState(path), phase: 'merge', ...holding(f), sources: ['team/project#9'] });
     const closed: string = resolve(f.root, 'issues/closed/issue');
     mkdirSync(closed, { recursive: true });
     const gh: GhFixture = fakeGh(f);
@@ -2309,7 +2310,7 @@ test('startup retries closure before cleanup and retains failed owners with thei
     const path: string = leaf(f, 'retry', 'plan.synthesis');
     expect((await next(f, ['retry'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
-    saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#1'] });
+    saveState(path, { ...readState(path), phase: 'merge', ...holding(f), sources: ['team/project#1'] });
     const gh: GhFixture = fakeGh(f);
     f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
     const probe: NonNullable<GhStep['probe']> = {
@@ -2360,7 +2361,7 @@ for (const mode of ['--resume', '--all'] as const) {
       leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['hold'] }, 'epic/second');
       expect((await next(f, ['done'])).code).toBe(0);
       const worktree: string = readState(path).worktree!;
-      saveState(path, { ...readState(path), phase: 'merge' });
+      saveState(path, { ...readState(path), phase: 'merge', ...holding(f) });
       expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
       expect((await next(f, [mode], {}, f.home)).code).toBe(mode === '--all' ? 1 : 0);
       expect(readState(path).phase).toBe('merged');
@@ -2385,7 +2386,7 @@ for (const kind of ['seat-B blocked', 'seat-B unknown', 'seat-A idle', 'seat-A e
       const seat: 'A' | 'B' = kind.startsWith('seat-A') ? 'A' : 'B';
       const pane: string = readState(path).pane[seat]!;
       if (kind !== 'unmerged idle') {
-        saveState(path, { ...readState(path), phase: 'merge' });
+        saveState(path, { ...readState(path), phase: 'merge', ...holding(f) });
         expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
       }
       if (kind === 'seat-A exited') {
@@ -2420,7 +2421,7 @@ test('a merged leaf whose tab is already gone makes no tab close call and a driv
     expect((await next(f, ['gone'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
     const tab: string = readState(path).tab!;
-    saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#1'] });
+    saveState(path, { ...readState(path), phase: 'merge', ...holding(f), sources: ['team/project#1'] });
     const gh: GhFixture = fakeGh(f);
     f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
     const probe: NonNullable<GhStep['probe']> = {
@@ -2476,7 +2477,7 @@ test('a merged leaf whose closure failed during phase merged closes its tab on t
     const path: string = leaf(f, 'late', 'plan.synthesis', {}, 'late-issue');
     expect((await next(f, ['late'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
-    saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#1'] });
+    saveState(path, { ...readState(path), phase: 'merge', ...holding(f), sources: ['team/project#1'] });
     const gh: GhFixture = fakeGh(f);
     f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
     const probe: NonNullable<GhStep['probe']> = {
@@ -2528,7 +2529,7 @@ test('a seat-B idle hook closes the merged leaf tab while the worktree and branc
     leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['hold'] }, 'epic/second');
     expect((await next(f, ['done'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
-    saveState(path, { ...readState(path), phase: 'merge' });
+    saveState(path, { ...readState(path), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
     const b: string = readState(path).pane.B!;
     const result: Result = await next(f, [], {
@@ -4130,9 +4131,9 @@ test('sweep scratch catch-up deletes open and closed folders with no live panes'
     const soloSentinel: string = resolve(soloScratch, 'sentinel');
     writeFileSync(openSentinel, 'open\n');
     writeFileSync(soloSentinel, 'solo\n');
-    saveState(openPath, { ...readState(openPath), phase: 'merge' });
+    saveState(openPath, { ...readState(openPath), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'open-done', 'merged'], f.root, f.env)).code).toBe(0);
-    saveState(soloPath, { ...readState(soloPath), phase: 'merge' });
+    saveState(soloPath, { ...readState(soloPath), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'solo-done', 'merged'], f.root, f.env)).code).toBe(0);
     expect(existsSync(openPath)).toBe(true);
     const soloClosed: string = resolve(f.root, 'issues/closed/solo-issue/solo-done');
@@ -4170,7 +4171,7 @@ test('sweep scratch catch-up keeps sentinel with live panes then deletes on late
     const scratch: string = tmpdirOf(calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!);
     const sentinel: string = resolve(scratch, 'sentinel');
     writeFileSync(sentinel, 'live\n');
-    saveState(donePath, { ...readState(donePath), phase: 'merge' });
+    saveState(donePath, { ...readState(donePath), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'live-done', 'merged'], f.root, f.env)).code).toBe(0);
     expect(existsSync(donePath)).toBe(true);
     expect(database(f).tabs.some((item) => item.tab_id === tab)).toBe(true);
@@ -4808,7 +4809,7 @@ test('merged leaf cleanup removes the worktree and leaves the registered .env un
     expect((await next(f, ['build'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
     expect(lstatSync(resolve(worktree, '.env')).isFile()).toBe(true);
-    saveState(path, { ...readState(path), phase: 'merge' });
+    saveState(path, { ...readState(path), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'build', 'merged'], f.root, f.env)).code).toBe(0);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worktree)).toBe(false);
@@ -4835,12 +4836,17 @@ function mergePrompts(f: DispatchFixture): Database['prompts'] {
   return database(f).prompts.filter((prompt) => prompt.text.startsWith('merge-issue'));
 }
 
+function testedTurn(f: DispatchFixture): { batch: Batch } {
+  const { batch }: { batch: Batch } = holding(f);
+  return { batch: { ...batch, tested_top: batch.top } };
+}
+
 function mergeText(path: string): string {
   const state: State = readState(path);
   const batch = state.batch;
   expect(batch).toBeDefined();
   const context: string =
-    batch!.solo === true ? `attempt=${batch!.attempt} solo` : `attempt=${batch!.attempt} top=${batch!.top}`;
+    batch!.top === undefined ? `attempt=${batch!.attempt} solo` : `attempt=${batch!.attempt} top=${batch!.top}`;
   return `merge-issue ${state.slug} slot=B phase=merge leaf=${path} ${context}`;
 }
 
@@ -4897,7 +4903,7 @@ for (const exit of [
     try {
       const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
       const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
-      toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+      toMerge(aa.path, '2026-09-11T00:00:00.000Z', exit.endsWith('merged') ? testedTurn(f) : {});
       toMerge(bb.path, '2026-09-12T00:00:00.000Z');
       const stalled: { code: string; message: string } = { code: 'agent_prompt_stalled', message: 'stalled' };
       saveDatabase(f, {
@@ -4914,7 +4920,7 @@ for (const exit of [
       } else {
         const args: string[] =
           exit === 'seat merged'
-            ? ['phase', 'aa', 'merged', '--slot', 'B']
+            ? ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', 'a1']
             : exit === 'seat check.fix'
               ? ['phase', 'aa', 'check.fix', '--slot', 'B']
               : exit === 'seat failed'
@@ -4947,13 +4953,13 @@ test('a committed merge whose log append fails still wakes the next leaf', async
   try {
     const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
     const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
-    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z', testedTurn(f));
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     saveDatabase(f, { ...database(f), prompts: [] });
     const log: string = resolve(f.root, 'issues/log.jsonl');
     writeFileSync(log, '');
     chmodSync(log, 0o444);
-    const result: Result = await cli(f, ['phase', 'aa', 'merged', '--slot', 'B'], f.root, f.env);
+    const result: Result = await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, f.env);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('committed');
     expect(result.stderr).toContain('log append failed');
@@ -4998,11 +5004,16 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
     expect((await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--attempt', bbAttempt], f.root, f.env)).code).toBe(
       0,
     );
-    // cc was already carried as a member of bb's batch (recorded while aa sat failed):
-    // carried members are not re-prompted (merge-order Q2, brief criterion 12), so the
-    // third merge prompt goes to the re-entered aa, which queued behind bb and cc.
-    expect(readState(cc.path).phase).toBe('merged');
-    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, aa.b]);
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, cc.b]);
+    const ccAttempt: string = z.string().parse(readState(cc.path).batch?.attempt);
+    await verified(f, 'cc', 'merge');
+    expect(
+      (await cli(f, ['phase', 'cc', 'merged', '--slot', 'B', '--check', '--attempt', ccAttempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect((await cli(f, ['phase', 'cc', 'merged', '--slot', 'B', '--attempt', ccAttempt], f.root, f.env)).code).toBe(
+      0,
+    );
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, cc.b, aa.b]);
     const aaAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
     await verified(f, 'aa', 'merge');
     expect(
@@ -5012,7 +5023,7 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
       0,
     );
     expect(readState(resolve(f.root, 'issues/closed/issue/aa')).phase).toBe('merged');
-    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, aa.b]);
+    expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, cc.b, aa.b]);
   } finally {
     f.clean();
   }
@@ -5807,7 +5818,7 @@ function selfUpdateCalls(f: DispatchFixture): string[] {
 test('phase merged records one self-update call for the repo', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    leaf(f, 'landed', 'merge');
+    leaf(f, 'landed', 'merge', holding(f));
     const result: Result = await selfUpdateCli(f, ['phase', 'landed', 'merged']);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('moved merged');
@@ -5820,7 +5831,7 @@ test('phase merged records one self-update call for the repo', async () => {
 test('phase failed commits without a self-update call', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    leaf(f, 'landed', 'merge');
+    leaf(f, 'landed', 'merge', holding(f));
     const result: Result = await selfUpdateCli(f, ['phase', 'landed', 'failed', '--reason', 'merge broke']);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('moved failed');
@@ -5833,7 +5844,7 @@ test('phase failed commits without a self-update call', async () => {
 test('a throwing self-update still lets phase merged commit and next dispatch', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    leaf(f, 'landed', 'merge');
+    leaf(f, 'landed', 'merge', holding(f));
     leaf(f, 'queued', 'plan.synthesis', {}, 'other-issue');
     const env: NodeJS.ProcessEnv = { SELF_UPDATE_THROW: '1' };
     const merged: Result = await selfUpdateCli(f, ['phase', 'landed', 'merged'], env);

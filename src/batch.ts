@@ -2,7 +2,7 @@ import { existsSync, readdirSync, rmdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
 import { worktreeStore, type Repo } from './config';
-import { allLeaves, type Batch, type Leaf } from './state';
+import { type Leaf } from './state';
 import { command, run, CommandError, type Result } from './shell';
 import { removeRetiredLessons } from './lessons';
 import { createSparseWorktree } from './next';
@@ -66,53 +66,33 @@ export async function isAncestor(cwd: string, a: string, b: string): Promise<boo
   throw new CommandError(['git', 'merge-base', '--is-ancestor', a, b], cwd, result);
 }
 
-export async function batchMemberSlugs(repo: Repo): Promise<Set<string>> {
-  return new Set(allLeaves(repo).flatMap((leaf) => (leaf.state.batch?.members ?? []).map((member) => member.slug)));
-}
-
 export async function buildStack(
   repo: Repo,
   builtOn: string,
-  items: { slug: string; base: string; head: string }[],
   holderHead: string,
-  retirementHeads: string[] = [...items.map((item) => item.head), holderHead],
-): Promise<{ ok: true; tips: Map<string, string>; top: string } | { ok: false; conflict: string }> {
+  retirementHead: string = holderHead,
+): Promise<{ ok: true; top: string } | { ok: false }> {
   const dir: string = resolve(worktreeStore(repo), 'batch-' + attemptId());
   await createSparseWorktree(repo, dir, builtOn, { detach: true });
   try {
     let tip: string = builtOn;
-    const tips: Map<string, string> = new Map();
-    for (const item of items) {
-      if (item.base === item.head) {
-        tips.set(item.slug, tip);
-        continue;
-      }
-      const result: Result = await run(['git', 'rebase', '--onto', tip, item.base, item.head], dir);
-      if (result.code !== 0) {
-        await command(['git', 'rebase', '--abort'], dir);
-        return { ok: false, conflict: item.slug };
-      }
-      tip = await command(['git', 'rev-parse', 'HEAD'], dir);
-      tips.set(item.slug, tip);
-    }
     if (!(await isAncestor(dir, holderHead, tip))) {
       const held: Result = await run(['git', 'rebase', '--onto', tip, tip, holderHead], dir);
       if (held.code !== 0) {
         await command(['git', 'rebase', '--abort'], dir);
-        return { ok: false, conflict: holderHead };
+        return { ok: false };
       }
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
     }
-    const leafRanges: { base: string; head: string }[] = await Promise.all(
-      retirementHeads.map(async (head) => ({ base: await memberBase(repo, builtOn, head), head })),
-    );
-    const removed: string[] = await removeRetiredLessons(dir, builtOn, 'HEAD', leafRanges);
+    const removed: string[] = await removeRetiredLessons(dir, builtOn, 'HEAD', [
+      { base: await memberBase(repo, builtOn, retirementHead), head: retirementHead },
+    ]);
     if (removed.length > 0) {
       await command(['git', 'add', 'learnings/LESSONS.md'], dir);
       await command(['git', 'commit', '-m', 'lessons: retire applied lines'], dir);
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
     }
-    return { ok: true, tips, top: tip };
+    return { ok: true, top: tip };
   } finally {
     await command(['git', 'worktree', 'remove', '--force', dir], repo.root);
   }
@@ -120,8 +100,8 @@ export async function buildStack(
 
 export type MoveResult = { moved: 'worktree' | 'ref' | 'dirty-ref' };
 
-async function move(repo: Repo, slug: string, target: string, leaf?: Leaf): Promise<MoveResult> {
-  if (leaf?.state.worktree !== undefined && existsSync(leaf.state.worktree)) {
+async function move(repo: Repo, slug: string, target: string, leaf: Leaf): Promise<MoveResult> {
+  if (leaf.state.worktree !== undefined && existsSync(leaf.state.worktree)) {
     const status: string = await command(['git', '-C', leaf.state.worktree, 'status', '--porcelain'], repo.root);
     if (status !== '') {
       await command(['git', 'update-ref', 'refs/heads/' + slug, target], repo.root);
@@ -135,40 +115,9 @@ async function move(repo: Repo, slug: string, target: string, leaf?: Leaf): Prom
   return { moved: 'ref' };
 }
 
-export async function applyStack(
-  repo: Repo,
-  top: string,
-  members: { slug: string; tip: string; leaf?: Leaf }[],
-  holder: Leaf,
-): Promise<{ dirty: string[] }> {
-  const dirty: string[] = [];
-  for (const member of members) {
-    const result: MoveResult = await move(repo, member.slug, member.tip, member.leaf);
-    if (result.moved === 'dirty-ref') dirty.push(member.slug);
-  }
-  const held: MoveResult = await move(repo, holder.state.slug, top, holder);
-  if (held.moved === 'dirty-ref') dirty.push(holder.state.slug);
-  return { dirty };
-}
-
-export async function restoreMembers(
-  repo: Repo,
-  members: { slug: string; head: string; leaf?: Leaf }[],
-): Promise<{ dirty: string[] }> {
-  const dirty: string[] = [];
-  for (const member of members) {
-    const result: MoveResult = await move(repo, member.slug, member.head, member.leaf);
-    if (result.moved === 'dirty-ref') dirty.push(member.slug);
-  }
-  return { dirty };
-}
-
-// With no member stacked under it, the holder's branch is its own: B may commit past the top,
-// and restack and restore keep those commits.
-export function holderOwnsBranch(record: Batch): boolean {
-  return record.solo === true || record.members.length === 0;
-}
-
-export async function restoreHolder(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
-  if (!holderOwnsBranch(record)) await move(repo, leaf.state.slug, record.holder.head, leaf);
+// Moves the holder branch to the built top; a dirty worktree puts the branch back at head.
+export async function applyTop(repo: Repo, leaf: Leaf, top: string, head: string): Promise<boolean> {
+  if ((await move(repo, leaf.state.slug, top, leaf)).moved !== 'dirty-ref') return true;
+  await move(repo, leaf.state.slug, head, leaf);
+  return false;
 }

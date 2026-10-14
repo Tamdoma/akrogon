@@ -22,6 +22,7 @@ import {
   type Fixture,
   greenReceipt,
   verified,
+  holding,
 } from './helpers';
 import { readState, saveState, type Batch, type Failure } from '../src/state';
 import { command, run, type Result } from '../src/shell';
@@ -251,9 +252,9 @@ test('completion prints only when the owner finishes, stays silent on inner issu
   try {
     // merge_stamp fixes the queue order the dropped Promise.all race relied on; the
     // one-holder-per-repo rule requires sequential merges.
-    leaf(f, 'one', 'merge', { merge_stamp: '2026-10-05T20:00:00Z', batch_limit: 0 }, 'epic/first');
-    leaf(f, 'two', 'merge', { merge_stamp: '2026-10-05T20:00:01Z', batch_limit: 0 }, 'epic/first');
-    leaf(f, 'three', 'merge', { merge_stamp: '2026-10-05T20:00:02Z', batch_limit: 0 }, 'epic/second');
+    leaf(f, 'one', 'merge', { ...holding(f), merge_stamp: '2026-10-05T20:00:00Z' }, 'epic/first');
+    leaf(f, 'two', 'merge', { ...holding(f), merge_stamp: '2026-10-05T20:00:01Z' }, 'epic/first');
+    leaf(f, 'three', 'merge', { ...holding(f), merge_stamp: '2026-10-05T20:00:02Z' }, 'epic/second');
     mkdirSync(resolve(f.root, 'issues/chart/epic'), { recursive: true });
     writeFileSync(resolve(f.root, 'issues/chart/epic/CHART.md'), '# Chart: epic\n');
     greenReceipt(f, await command(['git', 'rev-parse', 'HEAD'], f.root), 'merge');
@@ -275,8 +276,8 @@ test('completion prints only when the owner finishes, stays silent on inner issu
     const repeated: Result = await cli(f, ['phase', 'three', 'merged']);
     expect(repeated.code).not.toBe(0);
     expect(repeated.stdout).not.toContain('complete');
-    leaf(f, 'penultimate', 'merge', { merge_stamp: '2026-10-05T20:00:03Z', batch_limit: 0 }, 'standalone');
-    leaf(f, 'last', 'merge', { merge_stamp: '2026-10-05T20:00:04Z', batch_limit: 0 }, 'standalone');
+    leaf(f, 'penultimate', 'merge', { ...holding(f), merge_stamp: '2026-10-05T20:00:03Z' }, 'standalone');
+    leaf(f, 'last', 'merge', { ...holding(f), merge_stamp: '2026-10-05T20:00:04Z' }, 'standalone');
     const standalone: Result[] = [];
     for (const slug of ['penultimate', 'last']) standalone.push(await cli(f, ['phase', slug, 'merged']));
     expect(standalone.every((r) => r.code === 0)).toBe(true);
@@ -302,8 +303,8 @@ function snapshot(dir: string, prefix: string = ''): Map<string, Buffer> {
 test('completion leaves a chart holding a same-slug draft in place and keeps the inventory readable', async () => {
   const f: Fixture = await fixture();
   try {
-    const alpha: string = leaf(f, 'alpha', 'merge', { batch_limit: 0 }, 'epic/one');
-    leaf(f, 'beta', 'merge', { batch_limit: 0 }, 'epic/two');
+    const alpha: string = leaf(f, 'alpha', 'merge', holding(f), 'epic/one');
+    leaf(f, 'beta', 'merge', holding(f), 'epic/two');
     const chart: string = resolve(f.root, 'issues/chart/epic');
     const slot: string = resolve(chart, 'slots/leaf-draft/alpha');
     mkdirSync(slot, { recursive: true });
@@ -339,7 +340,7 @@ test('failed log preserves committed state and failed container rename retries w
     expect((await cli(f, ['phase', 'log-error', 'implement'])).code).not.toBe(0);
     expect(bytes(path)).toBe(before);
     rmSync(resolve(f.root, 'issues/log.jsonl'), { recursive: true });
-    leaf(f, 'close-error', 'merge', {}, 'closing');
+    leaf(f, 'close-error', 'merge', holding(f), 'closing');
     mkdirSync(resolve(f.root, 'issues/closed/closing'), { recursive: true });
     expect((await cli(f, ['phase', 'close-error', 'merged'])).code).not.toBe(0);
     rmSync(resolve(f.root, 'issues/closed/closing'), { recursive: true });
@@ -382,9 +383,10 @@ test('failed log diagnostics report committed state without replay', async () =>
 async function sourceWorktree(f: Fixture, name: string): Promise<string> {
   const worktree: string = resolve(f.home, name);
   await command(['git', 'worktree', 'add', '-b', name, worktree], f.root);
-  writeFileSync(resolve(worktree, name), name);
-  await command(['git', 'add', name], worktree);
+  writeFileSync(resolve(worktree, `${name}.txt`), name);
+  await command(['git', 'add', `${name}.txt`], worktree);
   await command(['git', 'commit', '-m', name], worktree);
+  greenReceipt(f, await command(['git', 'rev-parse', 'HEAD'], worktree), 'merge');
   return worktree;
 }
 
@@ -394,14 +396,14 @@ test('asymmetric and empty leaf sources defer until epic completion under open l
     const gh: GhFixture = fakeGh(f);
     const first: string = await sourceWorktree(f, 'earlier');
     const last: string = await sourceWorktree(f, 'trigger');
-    const head: string = await command(['git', 'rev-parse', 'HEAD'], last);
+    let head: string = await command(['git', 'rev-parse', 'HEAD'], last);
     expect(head).not.toBe(await command(['git', 'rev-parse', 'HEAD'], f.root));
     expect(head).not.toBe(await command(['git', 'rev-parse', 'HEAD'], first));
     leaf(
       f,
       'one',
       'merge',
-      { worktree: first, sources: ['team/project#1', 'team/project#2'], batch_limit: 0 },
+      { ...holding(f), worktree: first, sources: ['team/project#1', 'team/project#2'] },
       'epic/first',
     );
     leaf(f, 'empty', 'merged', {}, 'epic/first');
@@ -415,11 +417,13 @@ test('asymmetric and empty leaf sources defer until epic completion under open l
     );
     expect((await cli(f, ['phase', 'one', 'merged'], f.root, gh.env)).code).toBe(0);
     expect(existsSync(gh.db + '.calls')).toBe(false);
+    await command(['git', 'rebase', 'origin/main'], last);
+    head = await command(['git', 'rev-parse', 'HEAD'], last);
     greenReceipt(f, head, 'merge');
     saveState(second, {
       ...readState(second),
       phase: 'merge',
-      batch: { attempt: 'a1', built_on: main, holder: { base: main, head }, applied: true, solo: true, members: [] },
+      batch: { attempt: 'a1', built_on: main, holder: { base: main, head }, applied: true },
     });
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/epic'),
@@ -491,7 +495,7 @@ test('source retries recheck state, skip CLOSED, and continue after final failur
       'team/project#8',
       'team/project#7',
     ];
-    leaf(f, 'source', 'merge', { worktree, sources });
+    leaf(f, 'source', 'merge', { ...holding(f), worktree, sources });
     const view = (n: number, stdout: string = '{"state":"OPEN"}', code: number = 0): GhStep => ({
       args: ['issue', 'view', '-R', 'team/project', String(n), '--json', 'state'],
       stdout,
@@ -563,7 +567,7 @@ test('sourced completion without worktree context fails before rename without a 
   const f: Fixture = await fixture();
   try {
     const gh: GhFixture = fakeGh(f);
-    leaf(f, 'missing', 'merge', { sources: ['team/project#1'] });
+    leaf(f, 'missing', 'merge', { ...holding(f), sources: ['team/project#1'] });
     const result: Result = await cli(f, ['phase', 'missing', 'merged'], f.root, gh.env);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('worktree');
@@ -580,7 +584,7 @@ test('partial commented close success retries without duplicating a merged comme
     const gh: GhFixture = fakeGh(f);
     const worktree: string = await sourceWorktree(f, 'partial');
     const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
-    leaf(f, 'partial', 'merge', { worktree, sources: ['team/project#1'] });
+    leaf(f, 'partial', 'merge', { ...holding(f), worktree, sources: ['team/project#1'] });
     const comments: string[] = Array.from({ length: 100 }, (_, i) => `earlier ${i}`);
     writeFileSync(gh.db + '.state', JSON.stringify({ state: 'OPEN', comments, attempts: 0 }));
     writeFileSync(
@@ -630,7 +634,7 @@ test('failed or malformed retry comment listing prevents another close and conti
       const gh: GhFixture = fakeGh(f);
       const worktree: string = await sourceWorktree(f, 'listing');
       const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
-      leaf(f, 'listing', 'merge', { worktree, sources: ['team/project#1', 'team/project#2'] });
+      leaf(f, 'listing', 'merge', { ...holding(f), worktree, sources: ['team/project#1', 'team/project#2'] });
       const args: string[] = [
         'api',
         '--hostname',
@@ -686,14 +690,14 @@ test('each completed issue closes only its all-leaf private sources before the f
     const first: string = await sourceWorktree(f, 'first');
     const last: string = await sourceWorktree(f, 'last');
     const firstHead: string = await command(['git', 'rev-parse', 'HEAD'], first);
-    const lastHead: string = await command(['git', 'rev-parse', 'HEAD'], last);
+    let lastHead: string = await command(['git', 'rev-parse', 'HEAD'], last);
     for (const [name, worktree, privateSource] of [
       ['first', first, '2'],
       ['last', last, '3'],
     ]) {
       const sources: string[] = ['team/project#1', `team/project#${privateSource}`];
       leaf(f, `${name}-done`, 'merged', { sources }, `epic/${name}`);
-      leaf(f, name, 'merge', { worktree, sources: [...sources, ...sources] }, `epic/${name}`);
+      leaf(f, name, 'merge', { ...holding(f), worktree, sources: [...sources, ...sources] }, `epic/${name}`);
     }
     const firstProbe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/epic'),
@@ -728,6 +732,8 @@ test('each completed issue closes only its all-leaf private sources before the f
     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
     expect(existsSync(firstProbe.open)).toBe(true);
     expect(existsSync(firstProbe.closed)).toBe(false);
+    await command(['git', 'rebase', 'origin/main'], last);
+    lastHead = await command(['git', 'rev-parse', 'HEAD'], last);
     writeFileSync(
       gh.db,
       JSON.stringify([
@@ -781,7 +787,7 @@ for (const scope of ['standalone', 'epic'] as const) {
         f,
         'retry',
         'merge',
-        { worktree, sources: ['team/project#2', 'team/project#1'] },
+        { ...holding(f), worktree, sources: ['team/project#2', 'team/project#1'] },
         container,
       );
       const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
@@ -848,7 +854,7 @@ test('standalone completion closes the union of asymmetric leaf sources', async 
     const gh: GhFixture = fakeGh(f);
     const worktree: string = await sourceWorktree(f, 'union');
     leaf(f, 'earlier', 'merged', { sources: ['team/project#1'] });
-    leaf(f, 'union', 'merge', { worktree, sources: ['team/project#2'] });
+    leaf(f, 'union', 'merge', { ...holding(f), worktree, sources: ['team/project#2'] });
     writeFileSync(
       gh.db,
       JSON.stringify([{ stdout: '{"state":"OPEN"}' }, { stdout: '' }, { stdout: '{"state":"OPEN"}' }, { stdout: '' }]),
@@ -1190,7 +1196,13 @@ test('merge to merged clears busy fields', async () => {
   const f: Fixture = await fixture();
   try {
     const stamp: string = '2026-09-11T12:00:00.000Z';
-    leaf(f, 'busy-merged', 'merge', { busy_since: { A: stamp }, busy_notified: { A: stamp } }, 'standalone');
+    leaf(
+      f,
+      'busy-merged',
+      'merge',
+      { ...holding(f), busy_since: { A: stamp }, busy_notified: { A: stamp } },
+      'standalone',
+    );
     const result: Result = await cli(f, ['phase', 'busy-merged', 'merged']);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('moved merged');
@@ -1853,8 +1865,8 @@ test('merge turn refusal names the holder for merged and check.fix while failed 
   const f: Fixture = await fixture();
   try {
     const herdr: HerdrFixture = fakeHerdr(f);
-    const holderPath: string = leaf(f, 'aa', 'merge');
-    const nonHolderPath: string = leaf(f, 'bb', 'merge');
+    const holderPath: string = leaf(f, 'aa', 'merge', holding(f));
+    const nonHolderPath: string = leaf(f, 'bb', 'merge', holding(f));
     // Unstamped merge leaves take turns in slug order, so aa holds the queue.
     const refuses: Result[] = [
       await cli(f, ['phase', 'bb', 'merged']),
@@ -1882,8 +1894,8 @@ test('merge turn refusal names the holder for merged and check.fix while failed 
 test('merge turn refusal fires before worktree guards on a missing worktree', async () => {
   const f: Fixture = await fixture();
   try {
-    leaf(f, 'aa', 'merge');
-    leaf(f, 'bb', 'merge', { worktree: resolve(f.home, 'gone') });
+    leaf(f, 'aa', 'merge', holding(f));
+    leaf(f, 'bb', 'merge', { ...holding(f), worktree: resolve(f.home, 'gone') });
     const refuses: Result[] = [await cli(f, ['phase', 'bb', 'merged']), await cli(f, ['phase', 'bb', 'check.fix'])];
     for (const result of refuses) {
       expect(result.code).not.toBe(0);
@@ -1899,8 +1911,8 @@ test('merge turn refusal fires before worktree guards on a missing worktree', as
 test('an earlier merge_stamp takes the turn over slug order', async () => {
   const f: Fixture = await fixture();
   try {
-    leaf(f, 'aa', 'merge', { merge_stamp: '2026-10-05T20:00:02Z', batch_limit: 0 }, 'epic/first');
-    leaf(f, 'bb', 'merge', { merge_stamp: '2026-10-05T20:00:01Z', batch_limit: 0 }, 'epic/second');
+    leaf(f, 'aa', 'merge', { ...holding(f), merge_stamp: '2026-10-05T20:00:02Z' }, 'epic/first');
+    leaf(f, 'bb', 'merge', { ...holding(f), merge_stamp: '2026-10-05T20:00:01Z' }, 'epic/second');
     const refused: Result = await cli(f, ['phase', 'aa', 'merged']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('bb');
@@ -1965,7 +1977,6 @@ test('merged --check refuses an applied stack whose top still contains a retired
     writeFileSync(resolve(worktree, 'file-mem-a'), 'a\n');
     await command(['git', 'add', '.'], worktree);
     await command(['git', 'commit', '-m', 'mem-a applies alpha'], worktree);
-    const memberTip: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     writeFileSync(resolve(worktree, 'file-hold'), 'h\n');
     await command(['git', 'add', '.'], worktree);
     await command(['git', 'commit', '-m', 'holder'], worktree);
@@ -1974,14 +1985,12 @@ test('merged --check refuses an applied stack whose top still contains a retired
       worktree,
       merge_stamp: '2026-10-05T00:00:00.000Z',
     });
-    leaf(f, 'mem-a', 'merge', { merge_stamp: '2026-10-05T00:00:01.000Z' });
     const record: Batch = {
       attempt: 'a1',
       built_on: builtOn,
       holder: { base: builtOn, head: top },
       applied: true,
       top,
-      members: [{ slug: 'mem-a', base: builtOn, head: memberTip, tip: memberTip }],
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: HerdrFixture = fakeHerdr(f);
@@ -2034,8 +2043,6 @@ test('a solo merge push keeps citations valid when the remote ref advanced', asy
       built_on: builtOn,
       holder: { base: builtOn, head },
       applied: true,
-      solo: true,
-      members: [],
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: HerdrFixture = fakeHerdr(f);
@@ -2084,8 +2091,6 @@ test('merged --check refuses a solo record whose rebased head contains a retired
       built_on: builtOn,
       holder: { base: builtOn, head: builtOn },
       applied: true,
-      solo: true,
-      members: [],
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: HerdrFixture = fakeHerdr(f);

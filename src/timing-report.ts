@@ -353,11 +353,7 @@ function cohortReport(repo: Repo, since: string): void {
   const memberSet: Set<string> = new Set(joiners);
   const ejections: number = readAttempts(repo.root)
     .filter((attempt) => attempt.outcome === 'ejected' || attempt.outcome === 'red')
-    .reduce(
-      (count, attempt) =>
-        count + (memberSet.has(attempt.holder) ? 1 : 0) + attempt.members.filter((slug) => memberSet.has(slug)).length,
-      0,
-    );
+    .filter((attempt) => memberSet.has(attempt.holder)).length;
   const now: number = Date.now();
   const members: Member[] = joiners.map((slug) => memberOf(slug, firstPlan.get(slug)!, timings, log, now));
   console.log(verdict(members, ejections));

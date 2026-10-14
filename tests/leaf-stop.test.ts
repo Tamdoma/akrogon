@@ -149,7 +149,6 @@ test('the merge path builds no stack and starts no merge seat for a stopped leaf
     expect(readState(aa).batch).toBeUndefined();
     const holder: State = readState(bb);
     expect(holder.batch).toBeDefined();
-    expect(holder.batch?.members.map((member) => member.slug)).toEqual([]);
     expect(database(f).prompts.filter((prompt) => prompt.text.startsWith('merge-issue aa'))).toEqual([]);
     expect(database(f).prompts.filter((prompt) => prompt.text.startsWith('merge-issue bb')).length).toBe(1);
   } finally {
@@ -265,7 +264,6 @@ test('stopping the holder of an applied batch builds no second batch and prompts
     await run(f, ['next']);
     const applied: State['batch'] = readState(aa).batch;
     expect(applied?.applied).toBe(true);
-    expect(applied?.members.map((member) => member.slug)).toEqual(['bb']);
     expect((await run(f, ['stop', 'aa'])).code).toBe(0);
     saveDatabase(f, { ...database(f), prompts: [] });
     await run(f, ['next']);

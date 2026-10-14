@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fixture, cli, leaf, fakeHerdr, fakeAkrogon, yaml, leafTempRoot, storeDir, type Fixture } from './helpers';
 import { readState, saveState } from '../src/state';
-import { command, run, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
+import { command, run, type Result } from '../src/shell';
 import { z } from 'zod';
 import type { Database } from './fake-herdr';
 
@@ -285,7 +285,7 @@ for (const refusal of ['dirty', 'mid-rebase', 'live tab', 'live cwd', 'batch'] a
         refusal === 'batch'
           ? {
               worktree: old,
-              batch: { attempt: 'a1', built_on: 'x', holder: { base: 'x', head: 'x' }, members: [], applied: false },
+              batch: { attempt: 'a1', built_on: 'x', holder: { base: 'x', head: 'x' }, applied: false },
             }
           : { worktree: old };
       const slug: string = `stay-${refusal.replace(' ', '-')}`;
@@ -491,44 +491,6 @@ test('configured destination store migrates a clean old managed worktree', async
     expect(readState(path).worktree).toBeUndefined();
     expect((await next(f, ['configured-migration'])).code).toBe(0);
     expect(readState(path).worktree).toBe(resolve(storeDir(f), 'configured-migration'));
-  } finally {
-    f.clean();
-  }
-});
-
-test('adopted merged batch members retain their live tabs and worktrees', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const path: string = await dispatchLeaf(f, 'carried-member');
-    const worktree: string = readState(path).worktree!;
-    const tab: string = readState(path).tab!;
-    const head: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
-    saveState(path, { ...readState(path), phase: 'merged', worktree: undefined });
-    leaf(f, 'batch-holder', 'merge', {
-      batch: {
-        attempt: 'carrying',
-        built_on: head,
-        holder: { base: head, head },
-        applied: true,
-        members: [{ slug: 'carried-member', base: head, head, tip: head }],
-      },
-    });
-    const script: string = `
-import { readRepo } from ${JSON.stringify(resolve(import.meta.dir, '../src/config.ts'))};
-import { allLeaves } from ${JSON.stringify(resolve(import.meta.dir, '../src/state.ts'))};
-import { panes } from ${JSON.stringify(resolve(import.meta.dir, '../src/shell.ts'))};
-import { reconcile } from ${JSON.stringify(resolve(import.meta.dir, '../src/reconcile.ts'))};
-const repo = readRepo('repo', ${JSON.stringify(f.root)});
-await reconcile(repo, allLeaves(repo), await panes());
-`;
-    const result: SpawnResult = await spawnCaptured([process.execPath, '-e', script], {
-      cwd: f.root,
-      env: { ...process.env, ...f.env, HOME: f.home, AKROGON_HOME: f.home },
-    });
-    expect(result.code).toBe(0);
-    expect(existsSync(worktree)).toBe(true);
-    expect(database(f).panes.some((pane) => pane.tab_id === tab)).toBe(true);
-    expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close' && args[2] === tab)).toBe(false);
   } finally {
     f.clean();
   }

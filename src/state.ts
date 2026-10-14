@@ -33,13 +33,6 @@ export type DeliveryError = z.infer<typeof deliveryErrorSchema>;
 
 export const sourcePattern = /^([a-zA-Z0-9-]+\/(?!\.{1,2}#)[a-zA-Z0-9._-]+)#([1-9][0-9]*)$/;
 
-export const batchMemberSchema = z.strictObject({
-  slug: z.string(),
-  base: z.string(),
-  head: z.string(),
-  tip: z.string(),
-});
-
 export const toolSchema = z.strictObject({ name: text, path: text, version: text });
 
 export type Tool = z.infer<typeof toolSchema>;
@@ -58,9 +51,7 @@ export const batchSchema = z.strictObject({
   recorded: z.boolean().optional(),
   built_on: z.string(),
   holder: z.strictObject({ base: z.string(), head: z.string() }),
-  members: z.array(batchMemberSchema),
   tools: z.array(toolSchema).optional(),
-  excluded: z.array(z.string()).optional(),
   top: z.string().optional(),
   tested_top: z.string().optional(),
   tested_main: z.string().optional(),
@@ -68,11 +59,9 @@ export const batchSchema = z.strictObject({
   candidate: z.string().optional(),
   notified: z.boolean().optional(),
   applied: z.boolean(),
-  solo: z.boolean().optional(),
 });
 
 export type Batch = z.infer<typeof batchSchema>;
-export type BatchMember = z.infer<typeof batchMemberSchema>;
 
 export const stateSchema = z
   .strictObject({
@@ -100,7 +89,6 @@ export const stateSchema = z
     failure: failureSchema.optional(),
     merge_stamp: z.string().optional(),
     batch: batchSchema.optional(),
-    batch_limit: z.number().int().nonnegative().optional(),
     frozen: z.record(z.string(), z.string().nullable()).optional(),
     frozen_cited: z.array(z.string()).optional(),
   })

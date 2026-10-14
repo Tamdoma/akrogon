@@ -11,7 +11,6 @@ import {
   withLock,
   failureSchema,
   type Batch,
-  type BatchMember,
   type Failure,
   type State,
   type Leaf,
@@ -35,7 +34,7 @@ import { closeSources } from './pull';
 import { testFile } from './test-files';
 import { trackingRef } from './preflight';
 import { retiredLessonsPresent } from './lessons';
-import { applyStack, buildStack, isAncestor, holderOwnsBranch, restoreHolder, restoreMembers } from './batch';
+import { applyTop, buildStack, isAncestor } from './batch';
 import { requireGreenReceipt } from './verify';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
@@ -149,7 +148,6 @@ export async function commitMove(
         ? recorded.fix_rounds + 1
         : recorded.fix_rounds,
     merge_stamp: to === 'merge' ? new Date().toISOString() : recorded.merge_stamp,
-    batch_limit: to === 'merge' ? recorded.batch_limit : undefined,
   };
   saveState(leaf.path, after);
   console.log(`moved ${to}`);
@@ -494,14 +492,6 @@ export async function requireNonEmpty(
   if (changes === '') throw new Error(`Empty leaf branch: no changes against ${from}`);
 }
 
-function memberEntries(repo: Repo, record: Batch): { member: BatchMember; leaf: Leaf }[] {
-  const leaves: Leaf[] = allLeaves(repo);
-  return record.members.flatMap((member) => {
-    const leaf: Leaf | undefined = leaves.find((item) => item.state.slug === member.slug);
-    return leaf !== undefined && leaf.state.phase === 'merge' ? [{ member, leaf }] : [];
-  });
-}
-
 async function mergeHead(repo: Repo, state: State, record: Batch): Promise<string> {
   if (state.worktree !== undefined) return command(['git', 'rev-parse', 'HEAD'], state.worktree);
   const ref: Result = await run(['git', 'rev-parse', `refs/heads/${state.slug}`], repo.root);
@@ -511,13 +501,10 @@ async function mergeHead(repo: Repo, state: State, record: Batch): Promise<strin
   return record.top;
 }
 
-// With members HEAD is the recorded top; a memberless holder may carry B's repair commits past it.
-async function requireBatchTop(worktree: string, record: Batch, head: string): Promise<void> {
-  const members: boolean = record.members.length > 0;
-  if (record.top === undefined || (members ? head !== record.top : !(await isAncestor(worktree, record.top, head))))
-    throw new Error(
-      `HEAD must ${members ? 'equal' : 'descend from'} the recorded batch top ${record.top}, found ${head}`,
-    );
+// B may carry repair commits past the recorded top.
+async function requireBatchTop(worktree: string, top: string, head: string): Promise<void> {
+  if (!(await isAncestor(worktree, top, head)))
+    throw new Error(`HEAD must descend from the recorded batch top ${top}, found ${head}`);
 }
 
 async function batchCheck(
@@ -532,29 +519,14 @@ async function batchCheck(
   const state: State = readState(leaf.path);
   const worktree: string = state.worktree ?? repo.root;
   const head: string = await mergeHead(repo, state, record);
-  if (record.solo === true) {
-    await requireNonEmpty(repo, worktree);
-  } else {
-    if (!record.applied) throw new Error(`HEAD must equal the recorded batch top ${record.top}, found ${head}`);
-    await requireBatchTop(worktree, record, head);
-    let predecessor: string = record.built_on;
-    for (const member of record.members) {
-      if (predecessor !== member.tip) {
-        await requireNoIssueFiles(repo, repo.root, findLeaf(repo, member.slug).path, predecessor, member.tip);
-        await requireTestChangeCitations(repo, repo.root, predecessor, member.tip);
-        await requireNonEmpty(repo, repo.root, predecessor, member.tip);
-      }
-      predecessor = member.tip;
-    }
+  if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
+  if (record.top === undefined) await requireNonEmpty(repo, worktree);
+  else {
+    await requireBatchTop(worktree, record.top, head);
     await requireNoIssueFiles(repo, repo.root, leaf.path, record.built_on, head);
     await requireTestChangeCitations(repo, repo.root, record.built_on, head);
   }
-  const leafRanges: { base: string; head: string }[] = record.members.map((member) => ({
-    base: member.base,
-    head: member.head,
-  }));
-  leafRanges.push({ base: record.holder.base, head: record.holder.head });
-  const retired: string[] = await retiredLessonsPresent(worktree, record.built_on, head, leafRanges);
+  const retired: string[] = await retiredLessonsPresent(worktree, record.built_on, head, [record.holder]);
   if (retired.length > 0)
     throw new Error(
       'Retired lesson lines present in push range: ' +
@@ -590,24 +562,11 @@ async function batchPush(
   end: PressureSnapshot | undefined,
   pressureDir: string = '/proc/pressure',
 ): Promise<BatchPending> {
-  const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
-  if (members.length !== record.members.length) {
-    await restoreMembers(
-      repo,
-      members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-    );
-    await restoreHolder(repo, leaf, record);
-    saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
-    const departed: string[] = record.members
-      .filter((member) => !members.some((entry) => entry.member.slug === member.slug))
-      .map((member) => member.slug);
-    throw new Error(`Member left merge, batch dissolved: ${departed.join(', ')}`);
-  }
   const state: State = readState(leaf.path);
   const worktree: string = state.worktree ?? repo.root;
   const head: string = await mergeHead(repo, state, record);
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
-  if (record.solo !== true) await requireBatchTop(worktree, record, head);
+  if (record.top !== undefined) await requireBatchTop(worktree, record.top, head);
   if (slot !== undefined && head !== record.tested_top)
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);
   await requireGreenReceipt(repo, head, 'merge');
@@ -618,10 +577,8 @@ async function batchPush(
     repo.root,
   );
   if (pushed.code === 0) {
-    appendAttempt(repo, leaf.state.slug, record, 'merged', undefined, end);
+    appendAttempt(repo, leaf.state.slug, record, 'merged', end);
     saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head, recorded: true } });
-    for (const entry of members)
-      await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
     await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted, record.built_on);
     return { kind: 'none' };
   }
@@ -643,202 +600,42 @@ async function batchPush(
   return { kind: 'error', record, candidate: head, result: pushed, end };
 }
 
-async function worktreeDirty(repo: Repo, worktree: string | undefined): Promise<boolean> {
-  if (worktree === undefined || !existsSync(worktree)) return false;
-  return (await command(['git', '-C', worktree, 'status', '--porcelain'], repo.root)) !== '';
-}
-
-function memberHead(record: Batch, slug: string): string {
-  return record.members.find((member) => member.slug === slug)!.head;
-}
-
 async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
   const builtOn: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
-  const holderHead: string = holderOwnsBranch(record)
-    ? await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root)
-    : record.holder.head;
-  let members: BatchMember[] = record.members;
-  for (;;) {
-    const items: { slug: string; base: string; head: string }[] = members.map((member) => ({
-      slug: member.slug,
-      base: record.members[record.members.findIndex((entry) => entry.slug === member.slug) - 1]?.tip ?? record.built_on,
-      head: member.tip,
-    }));
-    const staged: Awaited<ReturnType<typeof buildStack>> = await buildStack(repo, builtOn, items, holderHead, [
-      ...members.map((member) => member.head),
-      record.holder.head,
-    ]);
-    if (staged.ok) {
-      const applied: boolean | 'rebuild' | 'dirty-holder' = await withLock(resolve(globalHome(), '.lock'), async () => {
-        const current: Leaf = findLeaf(repo, leaf.state.slug);
-        const batch: Batch | undefined = current.state.batch;
-        if (batch?.attempt !== record.attempt || current.state.phase !== 'merge') return false;
-        if (
-          batch.members.length !== members.length ||
-          !members.every((m) => batch.members.some((b) => b.slug === m.slug))
-        )
-          return false;
-        const staying: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
-        if (staying.length !== batch.members.length) {
-          await restoreMembers(
-            repo,
-            staying.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-          );
-          await restoreHolder(repo, current, batch);
-          saveState(current.path, { ...current.state, batch: undefined });
-          throw new Error('Member left merge during restack, batch dissolved');
-        }
-        const dirty: string[] = [];
-        for (const entry of staying)
-          if (await worktreeDirty(repo, entry.leaf.state.worktree)) dirty.push(entry.member.slug);
-        for (const slug of dirty)
-          await command(['git', 'update-ref', 'refs/heads/' + slug, memberHead(batch, slug)], repo.root);
-        if (dirty.length > 0) {
-          members = batch.members.filter((member) => !dirty.includes(member.slug));
-          saveState(current.path, {
-            ...current.state,
-            batch: { ...batch, holder: { base: builtOn, head: holderHead }, members },
-          });
-          return 'rebuild';
-        }
-        if (await worktreeDirty(repo, current.state.worktree)) {
-          await restoreMembers(
-            repo,
-            staying.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-          );
-          await command(['git', 'update-ref', 'refs/heads/' + current.state.slug, holderHead], repo.root);
-          saveState(current.path, {
-            ...current.state,
-            batch: {
-              ...batch,
-              holder: { base: builtOn, head: holderHead },
-              applied: true,
-              solo: true,
-              members: [],
-              tested_top: undefined,
-              tested_main: undefined,
-              decision: 'rerun',
-            },
-          });
-          return 'dirty-holder';
-        }
-        const appliedMembers: { member: BatchMember; leaf: Leaf }[] = members.map((member) => {
-          const tip: string = staged.tips.get(member.slug)!;
-          return { member: { ...member, tip }, leaf: findLeaf(repo, member.slug) };
-        });
-        const moved: { dirty: string[] } = await applyStack(
-          repo,
-          staged.top,
-          appliedMembers.map((entry) => ({ slug: entry.member.slug, tip: entry.member.tip, leaf: entry.leaf })),
-          current,
-        );
-        if (moved.dirty.length > 0) {
-          const restored: { dirty: string[] } = await restoreMembers(repo, [
-            ...staying.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-            { slug: current.state.slug, head: holderHead, leaf: current },
-          ]);
-          const lateDirty: Set<string> = new Set([...moved.dirty, ...restored.dirty]);
-          members = batch.members.filter((member) => !lateDirty.has(member.slug));
-          const solo: boolean = lateDirty.has(current.state.slug);
-          saveState(current.path, {
-            ...readState(current.path),
-            batch: {
-              ...batch,
-              holder: { base: builtOn, head: holderHead },
-              members: solo ? [] : members,
-              applied: solo,
-              solo: solo ? true : batch.solo,
-              top: undefined,
-              tested_top: undefined,
-              tested_main: undefined,
-              decision: 'rerun',
-              candidate: undefined,
-            },
-          });
-          return solo ? 'dirty-holder' : 'rebuild';
-        }
-        saveState(current.path, {
-          ...current.state,
-          batch: {
-            ...batch,
-            built_on: builtOn,
-            holder: { base: builtOn, head: holderHead },
-            applied: true,
-            top: staged.top,
-            members: appliedMembers.map((entry) => entry.member),
-            candidate: undefined,
-            tested_top: undefined,
-            tested_main: undefined,
-            decision: 'rerun',
-          },
-        });
-        return true;
-      });
-      if (applied === 'rebuild') continue;
-      if (applied === 'dirty-holder') {
-        console.log(`rerun rebase ${leaf.state.slug} onto ${builtOn}`);
-        return;
-      }
-      if (!applied) throw new Error('Batch attempt superseded during restack; record left for the next pass');
-      console.log(`rerun tested=${record.tested_top ?? 'none'} pushed=${staged.top}`);
-      return;
-    }
-    if (staged.conflict === holderHead) {
-      await withLock(resolve(globalHome(), '.lock'), async () => {
-        const current: Leaf = findLeaf(repo, leaf.state.slug);
-        const batch: Batch | undefined = current.state.batch;
-        if (batch?.attempt !== record.attempt || current.state.phase !== 'merge')
-          throw new Error('Batch attempt superseded during restack');
-        const staying: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
-        await restoreMembers(
-          repo,
-          staying.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-        );
-        await restoreHolder(repo, current, batch);
-        saveState(current.path, {
-          ...current.state,
-          batch: {
-            ...batch,
-            holder: { base: builtOn, head: holderHead },
-            applied: true,
-            solo: true,
-            members: [],
-            tested_top: undefined,
-            tested_main: undefined,
-            decision: 'rerun',
-          },
-        });
-      });
-      console.log(`rerun rebase ${leaf.state.slug} onto ${builtOn}`);
-      return;
-    }
-    const conflictedSlug: string = staged.conflict;
-    await withLock(resolve(globalHome(), '.lock'), async () => {
-      const current: Leaf = findLeaf(repo, leaf.state.slug);
-      const batch: Batch | undefined = current.state.batch;
-      if (batch?.attempt !== record.attempt || current.state.phase !== 'merge')
-        throw new Error('Batch attempt superseded during restack');
-      const entries: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
-      await restoreMembers(
-        repo,
-        entries.map((item) => ({ ...item.member, leaf: item.leaf })),
-      );
-      await restoreHolder(repo, current, batch);
-      members = batch.members.filter((member) => member.slug !== conflictedSlug);
-      saveState(current.path, {
-        ...current.state,
-        batch: {
-          ...batch,
-          holder: { base: builtOn, head: holderHead },
-          members,
-          excluded: [...(batch.excluded ?? []), conflictedSlug],
-          tested_top: undefined,
-          tested_main: undefined,
-          decision: 'rerun',
-        },
-      });
+  const holderHead: string = await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root);
+  const staged: Awaited<ReturnType<typeof buildStack>> = await buildStack(
+    repo,
+    builtOn,
+    holderHead,
+    record.holder.head,
+  );
+  const top: string | undefined = await withLock(resolve(globalHome(), '.lock'), async () => {
+    const current: Leaf = findLeaf(repo, leaf.state.slug);
+    const batch: Batch | undefined = current.state.batch;
+    if (batch?.attempt !== record.attempt || current.state.phase !== 'merge')
+      throw new Error('Batch attempt superseded during restack; record left for the next pass');
+    const applied: string | undefined =
+      staged.ok && (await applyTop(repo, current, staged.top, holderHead)) ? staged.top : undefined;
+    saveState(current.path, {
+      ...readState(current.path),
+      batch: {
+        ...batch,
+        built_on: applied === undefined ? batch.built_on : builtOn,
+        applied: true,
+        top: applied,
+        candidate: undefined,
+        tested_top: undefined,
+        tested_main: undefined,
+        decision: 'rerun',
+      },
     });
-  }
+    return applied;
+  });
+  console.log(
+    top === undefined
+      ? `rerun rebase ${leaf.state.slug} onto ${builtOn}`
+      : `rerun tested=${record.tested_top ?? 'none'} pushed=${top}`,
+  );
 }
 
 async function finishPush(
@@ -865,14 +662,11 @@ async function finishPush(
       const batch: Batch | undefined = leaf.state.batch;
       if (batch?.attempt !== pending.record.attempt || leaf.state.phase !== 'merge')
         throw new Error('Batch record changed while verifying the push');
-      if (batch.recorded !== true) appendAttempt(repo, slug, batch, 'merged', undefined, pending.end);
+      if (batch.recorded !== true) appendAttempt(repo, slug, batch, 'merged', pending.end);
       saveState(leaf.path, {
         ...leaf.state,
         batch: { ...batch, applied: true, top: pending.candidate, recorded: true },
       });
-      const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, batch);
-      for (const entry of members)
-        await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
       await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted, batch.built_on);
     });
     return;
@@ -890,7 +684,6 @@ export async function phaseCommand(
   rawReason: string | boolean | undefined,
   rawCheck: string | boolean | undefined,
   rawAttempt: string | boolean | undefined,
-  rawCulprit: string | boolean | undefined,
   pressureDir: string = '/proc/pressure',
 ): Promise<{ repo: Repo; committed: boolean; to?: Phase }> {
   const requested: Phase = phaseSchema.parse(rawPhase);
@@ -899,12 +692,6 @@ export async function phaseCommand(
   const reason: string | undefined = z.string().trim().min(1).optional().parse(rawReason);
   const check: boolean = z.literal(true).optional().parse(rawCheck) === true;
   const attempt: string | undefined = z.string().trim().min(1).optional().parse(rawAttempt);
-  const culprit: string | undefined = z.string().trim().min(1).optional().parse(rawCulprit);
-  if (check && culprit !== undefined) throw new Error('--check cannot combine with --culprit');
-  if (culprit !== undefined && requested !== 'check.fix') throw new Error('--culprit is only valid for check.fix');
-  if (culprit !== undefined && slot !== 'B') throw new Error('--culprit requires --slot B');
-  if (culprit !== undefined && verdict !== undefined) throw new Error('--verdict is only valid for check.review');
-  if (culprit !== undefined && reason !== undefined) throw new Error('--reason is only valid for failed');
   const global: GlobalConfig = readGlobal();
   const repo: Repo = await requireRepo(global, process.cwd());
   let committed: boolean = false;
@@ -927,8 +714,8 @@ export async function phaseCommand(
         );
     }
     const record: Batch | undefined = leaf.state.batch;
-    if (culprit !== undefined && record === undefined)
-      throw new Error(`--culprit requires a batch record: ${slug} holds none`);
+    if (leaf.state.phase === 'merge' && requested === 'merged' && record === undefined)
+      throw new Error(`Merged refused: ${slug} holds no batch record, so nothing was pushed`);
     if (leaf.state.phase === 'merge' && record !== undefined && (requested === 'merged' || requested === 'check.fix')) {
       if (slot !== undefined && attempt !== record.attempt)
         throw new Error(
@@ -938,32 +725,7 @@ export async function phaseCommand(
       else {
         const end: PressureSnapshot | undefined =
           record.pressure_start === undefined ? undefined : readPressure(pressureDir);
-        if (culprit !== undefined) {
-          const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
-          const entry: { member: BatchMember; leaf: Leaf } | undefined = members.find(
-            (item) => item.member.slug === culprit,
-          );
-          if (leaf.state.slug !== culprit && entry === undefined)
-            throw new Error(`--culprit ${culprit} is not the holder or a carried member of ${leaf.state.slug}`);
-          const culpritLeaf: Leaf = entry?.leaf ?? leaf;
-          const savedHead: string =
-            entry !== undefined ? entry.member.head : holderOwnsBranch(record) ? 'HEAD' : record.holder.head;
-          if (culpritLeaf.state.done.includes('B')) throw new Error(`--culprit ${culprit}: slot B already recorded`);
-          if (culpritLeaf.state.worktree !== undefined) {
-            await requireClean(culpritLeaf.state.worktree);
-            await requireNoIssueFiles(repo, culpritLeaf.state.worktree, culpritLeaf.path, target(repo), savedHead);
-            await requireTestChangeCitations(repo, culpritLeaf.state.worktree, target(repo), savedHead);
-          }
-          await restoreMembers(
-            repo,
-            members.map((item) => ({ ...item.member, leaf: item.leaf })),
-          );
-          await restoreHolder(repo, leaf, record);
-          saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
-          appendAttempt(repo, leaf.state.slug, record, 'ejected', culprit, end);
-          console.log(`ejected ${culprit}`);
-          await transition(repo, culpritLeaf, 'check.fix', 'B', undefined, undefined, false, onCommitted);
-        } else if (requested === 'merged')
+        if (requested === 'merged')
           pending = await batchPush(
             repo,
             leaf,
@@ -976,21 +738,9 @@ export async function phaseCommand(
             end,
             pressureDir,
           );
-        else if (record.members.length > 0) {
-          const members: { member: BatchMember; leaf: Leaf }[] = memberEntries(repo, record);
-          await restoreMembers(
-            repo,
-            members.map((entry) => ({ ...entry.member, leaf: entry.leaf })),
-          );
-          await restoreHolder(repo, leaf, record);
-          const limit: number = Math.floor(record.members.length / 2);
-          saveState(leaf.path, { ...readState(leaf.path), batch: undefined, batch_limit: limit });
-          console.log(`batch split, holder keeps ${limit} of ${record.members.length} members`);
-          appendAttempt(repo, leaf.state.slug, record, 'split', undefined, end);
-          committed = true;
-        } else
+        else
           await transition(repo, leaf, requested, slot, verdict, reason, check, () => {
-            appendAttempt(repo, leaf.state.slug, record, 'red', undefined, end);
+            appendAttempt(repo, leaf.state.slug, record, 'red', end);
             onCommitted();
           });
       }

@@ -49,8 +49,6 @@ test('merged --check stamps tested_top only with a green merge receipt for HEAD 
       built_on: builtOn,
       holder: { base: builtOn, head },
       applied: true,
-      solo: true,
-      members: [],
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: { env: NodeJS.ProcessEnv } = fakeHerdr(f);

@@ -52,7 +52,7 @@ export const timingEventSchema = z.discriminatedUnion('kind', [
     kind: z.literal('batch'),
     attempt,
     holder: z.string(),
-    members: z.array(z.string()),
+    members: z.array(z.string()).optional(),
     built_on: z.string(),
   }),
   z.strictObject({

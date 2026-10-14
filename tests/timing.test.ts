@@ -120,7 +120,8 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
 
     const batches: Event[] = ofKind(events, 'batch');
     expect(batches).toHaveLength(1);
-    expect(batches[0]).toMatchObject({ attempt, holder: 'solo', members: [] });
+    expect(batches[0]).toMatchObject({ attempt, holder: 'solo' });
+    expect(batches[0]).not.toHaveProperty('members');
     expect(typeof batches[0].built_on).toBe('string');
   } finally {
     f.clean();
@@ -192,9 +193,7 @@ test('check events carry the merge attempt id inside a merge attempt', async () 
         attempt: 'att-9',
         built_on: head,
         holder: { base: head, head },
-        members: [],
         applied: true,
-        solo: true,
       },
     });
     const run: Result = await cli(f, ['run-check', '--name', 'm', '--', 'true'], worktree, f.env);
@@ -261,11 +260,12 @@ test('waits: pause writes repo_pause on and off; parked, prerequisite and merge 
     expect((await phase(f, ['m1', 'merged', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
     expect(readState(m1).phase).toBe('merged');
     const m2State: State = readState(resolve(f.root, 'issues/open/issue/m2'));
-    expect(m2State.phase).toBe('merged');
+    expect(m2State.phase).toBe('merge');
 
     expect((await next(f, ['m2'])).code).toBe(0);
     const m2All: Event[] = ofKind(leafEvents(f, 'm2'), 'wait');
-    expect(m2All.map((e) => e.reason)).toEqual(['merge_turn', 'none']);
+    expect(m2All.filter((e) => e.blocking === 'm1')).toHaveLength(1);
+    expect(m2All.at(-1)?.reason).toBe('none');
   } finally {
     f.clean();
   }

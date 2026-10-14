@@ -21,7 +21,7 @@ import { readState, saveState, type Batch, type Leaf, type State, type Tool } fr
 import { attemptRecordSchema } from '../src/attempts';
 import { logSchema } from '../src/log';
 import { command, spawnCaptured, type Result } from '../src/shell';
-import { applyStack, buildStack } from '../src/batch';
+import { applyTop, buildStack } from '../src/batch';
 
 const originalTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
 const originalHome: string | undefined = process.env.HOME;
@@ -39,7 +39,6 @@ type BatchFixture = {
   herdr: HerdrFixture;
   builtOn: string;
   holder: Leaf;
-  members: Leaf[];
   record: Batch;
   branches: Map<string, Branch>;
 };
@@ -76,61 +75,31 @@ async function branchAt(
   return { slug, head: await command(['git', 'rev-parse', 'HEAD'], worktree), worktree };
 }
 
-async function batchFixture(f: Fixture, slugs: string[], inStore: boolean = false): Promise<BatchFixture> {
+async function batchFixture(f: Fixture, inStore: boolean = false): Promise<BatchFixture> {
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
   process.env.HOME = f.home;
   const repo: Repo = readRepo('repo', f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
-  const [holderSlug, ...memberSlugs] = slugs;
-  const branches: Map<string, Branch> = new Map();
-  for (const slug of slugs) branches.set(slug, await branchAt(f, slug, builtOn, 'file-' + slug, undefined, inStore));
-  const holderPath: string = leaf(f, holderSlug, 'merge', {
-    worktree: branches.get(holderSlug)!.worktree,
+  const branch: Branch = await branchAt(f, 'hold', builtOn, 'file-hold', undefined, inStore);
+  const holderPath: string = leaf(f, 'hold', 'merge', {
+    worktree: branch.worktree,
     merge_stamp: '2026-10-05T00:00:00.000Z',
   });
-  const members: Leaf[] = memberSlugs.map((slug, index) => {
-    const path: string = leaf(f, slug, 'merge', {
-      worktree: branches.get(slug)!.worktree,
-      merge_stamp: '2026-10-05T00:00:0' + (index + 1) + '.000Z',
-    });
-    return { path, state: readState(path) };
-  });
-  const items: { slug: string; base: string; head: string }[] = memberSlugs.map((slug) => ({
-    slug,
-    base: builtOn,
-    head: branches.get(slug)!.head,
-  }));
-  const built: Awaited<ReturnType<typeof buildStack>> = await buildStack(
-    repo,
-    builtOn,
-    items,
-    branches.get(holderSlug)!.head,
-  );
-  if (!built.ok) throw new Error('fixture stack conflict: ' + built.conflict);
+  const built: Awaited<ReturnType<typeof buildStack>> = await buildStack(repo, builtOn, branch.head);
+  if (!built.ok) throw new Error('fixture holder conflict');
   const record: Batch = {
     attempt: 'a1',
     started: new Date().toISOString(),
     built_on: builtOn,
-    holder: { base: builtOn, head: branches.get(holderSlug)!.head },
+    holder: { base: builtOn, head: branch.head },
     applied: true,
     top: built.top,
-    members: memberSlugs.map((slug) => ({
-      slug,
-      base: builtOn,
-      head: branches.get(slug)!.head,
-      tip: built.tips.get(slug)!,
-    })),
   };
   const holderState: State = { ...readState(holderPath), batch: record };
   saveState(holderPath, holderState);
   const holder: Leaf = { path: holderPath, state: holderState };
-  await applyStack(
-    repo,
-    built.top,
-    record.members.map((member) => ({ ...member, leaf: members.find((l) => l.state.slug === member.slug)! })),
-    holder,
-  );
-  return { repo, herdr: fakeHerdr(f), builtOn, holder, members, record, branches };
+  if (!(await applyTop(repo, holder, built.top, branch.head))) throw new Error('fixture holder worktree dirty');
+  return { repo, herdr: fakeHerdr(f), builtOn, holder, record, branches: new Map([['hold', branch]]) };
 }
 
 async function soloFixture(f: Fixture): Promise<BatchFixture> {
@@ -149,8 +118,6 @@ async function soloFixture(f: Fixture): Promise<BatchFixture> {
     built_on: builtOn,
     holder: { base: builtOn, head: branch.head },
     applied: true,
-    solo: true,
-    members: [],
   };
   saveState(holderPath, { ...readState(holderPath), batch: record });
   return {
@@ -158,7 +125,6 @@ async function soloFixture(f: Fixture): Promise<BatchFixture> {
     herdr: fakeHerdr(f),
     builtOn,
     holder: { path: holderPath, state: readState(holderPath) },
-    members: [],
     record,
     branches: new Map([['hold', branch]]),
   };
@@ -228,7 +194,7 @@ function argList(args: (string | boolean | undefined)[]): string {
 
 function phaseBody(slug: string, phase: string, args: (string | boolean | undefined)[], dir: string): string {
   const params: (string | boolean | undefined)[] = [slug, phase, ...args];
-  while (params.length < 8) params.push(undefined);
+  while (params.length < 7) params.push(undefined);
   params.push(dir);
   return (
     'import { phaseCommand } from ' +
@@ -277,7 +243,7 @@ async function spawn(
 test.serial('a green batch appends one merged attempt line and log.jsonl keeps its move-line shape', async () => {
   const f: Fixture = await fixture();
   try {
-    const { record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { record, herdr } = await batchFixture(f);
     const logBefore: string | undefined = logBytes(f);
     await verified(f, 'hold', 'merge');
     expect(
@@ -296,7 +262,6 @@ test.serial('a green batch appends one merged attempt line and log.jsonl keeps i
     expect(line.outcome).toBe('merged');
     expect(line.repo).toBe('repo');
     expect(line.holder).toBe('hold');
-    expect(line.members).toEqual(['mem-a', 'mem-b']);
     expect(line.attempt).toBe(record.attempt);
     expect(line.built_on).toMatch(/^[0-9a-f]{40}$/);
     expect(line.tested_top).toMatch(/^[0-9a-f]{40}$/);
@@ -327,7 +292,7 @@ test.serial('a green batch appends one merged attempt line and log.jsonl keeps i
 test.serial('a landed candidate reconciles to exactly one merged attempt line', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { holder, record, herdr } = await batchFixture(f);
     await command(['git', 'push', 'origin', 'refs/heads/hold:main'], f.root);
     saveState(holder.path, {
       ...readState(holder.path),
@@ -339,7 +304,6 @@ test.serial('a landed candidate reconciles to exactly one merged attempt line', 
     expect(lines).toHaveLength(1);
     expect(lines[0].outcome).toBe('merged');
     expect(lines[0].holder).toBe('hold');
-    expect(lines[0].members).toEqual(['mem-a', 'mem-b']);
     expect(lines[0].attempt).toBe(record.attempt);
   } finally {
     f.clean();
@@ -361,28 +325,6 @@ test.serial('a solo check.fix appends exactly one red attempt line', async () =>
     expect(lines).toHaveLength(1);
     expect(lines[0].outcome).toBe('red');
     expect(lines[0].holder).toBe('hold');
-    expect(lines[0].members).toEqual([]);
-  } finally {
-    f.clean();
-  }
-});
-
-test.serial('a batch check.fix appends exactly one split attempt line', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const { herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
-    const red: Result = await cli(
-      f,
-      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      herdr.env,
-    );
-    expect(red.code).toBe(0);
-    const lines: Attempt[] = attemptLines(f);
-    expect(lines).toHaveLength(1);
-    expect(lines[0].outcome).toBe('split');
-    expect(lines[0].holder).toBe('hold');
-    expect(lines[0].members).toEqual(['mem-a', 'mem-b']);
   } finally {
     f.clean();
   }
@@ -391,7 +333,7 @@ test.serial('a batch check.fix appends exactly one split attempt line', async ()
 test.serial('a refused push restacked to rerun appends exactly one merged line at the landing push', async () => {
   const f: Fixture = await fixture();
   try {
-    const { herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { herdr } = await batchFixture(f);
     await verified(f, 'hold', 'merge');
     expect(
       (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
@@ -425,7 +367,6 @@ test.serial('a refused push restacked to rerun appends exactly one merged line a
     expect(lines).toHaveLength(1);
     expect(lines[0].outcome).toBe('merged');
     expect(lines[0].holder).toBe('hold');
-    expect(lines[0].members).toEqual(['mem-a', 'mem-b']);
     expect(lines[0].built_on).toBe(advanced);
   } finally {
     f.clean();
@@ -435,7 +376,7 @@ test.serial('a refused push restacked to rerun appends exactly one merged line a
 test.serial('an unlanded candidate discards to exactly one red attempt line', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b'], true);
+    const { holder, record, herdr } = await batchFixture(f, true);
     saveState(holder.path, {
       ...readState(holder.path),
       batch: { ...readState(holder.path).batch!, candidate: record.top },
@@ -446,7 +387,6 @@ test.serial('an unlanded candidate discards to exactly one red attempt line', as
     expect(lines).toHaveLength(1);
     expect(lines[0].outcome).toBe('red');
     expect(lines[0].holder).toBe('hold');
-    expect(lines[0].members).toEqual(['mem-a', 'mem-b']);
     expect(lines[0].attempt).toBe(record.attempt);
   } finally {
     f.clean();
@@ -456,7 +396,7 @@ test.serial('an unlanded candidate discards to exactly one red attempt line', as
 test.serial('a failed unlanded holder records one red attempt before recovery discards its batch', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b'], true);
+    const { holder, record, herdr } = await batchFixture(f, true);
     saveState(holder.path, { ...readState(holder.path), batch: { ...record, candidate: record.top } });
     const failed: Result = await cli(
       f,
@@ -471,7 +411,6 @@ test.serial('a failed unlanded holder records one red attempt before recovery di
     expect(lines).toHaveLength(1);
     expect(lines[0].outcome).toBe('red');
     expect(lines[0].attempt).toBe(record.attempt);
-    expect(lines[0].members).toEqual(['mem-a', 'mem-b']);
     for (let pass: number = 0; pass < 2; pass++) {
       await cli(f, ['next'], f.root, herdr.env);
       expect(attemptLines(f)).toEqual(lines);
@@ -484,7 +423,8 @@ test.serial('a failed unlanded holder records one red attempt before recovery di
 test.serial('stale-attempt and non-holder phase calls write no attempt line', async () => {
   const f: Fixture = await fixture();
   try {
-    const { herdr } = await batchFixture(f, ['hold', 'mem-a']);
+    const { herdr } = await batchFixture(f);
+    leaf(f, 'other', 'merge', { merge_stamp: '2026-10-05T00:00:01.000Z' });
     const stale: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'bogus'],
@@ -493,7 +433,7 @@ test.serial('stale-attempt and non-holder phase calls write no attempt line', as
     );
     expect(stale.code).not.toBe(0);
     expect(stale.stderr).toContain('Stale attempt');
-    const outsider: Result = await cli(f, ['phase', 'mem-a', 'merged', '--slot', 'B'], f.root, herdr.env);
+    const outsider: Result = await cli(f, ['phase', 'other', 'merged', '--slot', 'B'], f.root, herdr.env);
     expect(outsider.code).not.toBe(0);
     expect(outsider.stderr).toContain('Merge turn refused');
     expect(existsSync(resolve(f.root, 'issues/merge-attempts.jsonl'))).toBe(false);
@@ -506,7 +446,7 @@ test.serial('stale-attempt and non-holder phase calls write no attempt line', as
 test.serial('a merged line carries PSI stall deltas from batch creation', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { holder, record, herdr } = await batchFixture(f);
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }));
     const dir: string = pressureDir(f, { cpu: '60', memory: '90', io: '180' });
     await verified(f, 'hold', 'merge');
@@ -537,7 +477,7 @@ test.serial('a merged line carries PSI stall deltas from batch creation', async 
 test.serial('a restacked merged line carries PSI stall deltas from batch creation', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { holder, record, herdr } = await batchFixture(f);
     saveBatch(holder.path, withStart(record, { cpu: 5, memory: 6, io: 7 }));
     const dir: string = pressureDir(f, { cpu: '15', memory: '26', io: '47' });
     await verified(f, 'hold', 'merge');
@@ -602,32 +542,10 @@ test.serial('a solo red line carries PSI stall deltas from batch creation', asyn
   }
 });
 
-test.serial('a split line carries PSI stall deltas from batch creation', async () => {
+test.serial('legacy held, split and ejected lines still parse beside a recorded attempt', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
-    saveBatch(holder.path, withStart(record, { cpu: 1, memory: 2, io: 3 }));
-    const dir: string = pressureDir(f, { cpu: '9', memory: '6', io: '33' });
-    const red: Result = await spawn(
-      f,
-      'split',
-      phaseBody('hold', 'check.fix', ['B', undefined, undefined, undefined, 'a1'], dir),
-      herdr.env,
-    );
-    expect(red.code).toBe(0);
-    const lines: Attempt[] = attemptLines(f);
-    expect(lines).toHaveLength(1);
-    expect(lines[0].outcome).toBe('split');
-    expect(lines[0].pressure).toEqual({ cpu: 8, memory: 4, io: 30 });
-  } finally {
-    f.clean();
-  }
-});
-
-test.serial('a legacy held line still parses beside a recorded attempt', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold']);
+    const { holder, record, herdr } = await batchFixture(f);
     saveBatch(holder.path, withStart(record, { cpu: 2, memory: 3, io: 4 }));
     writeFileSync(
       resolve(f.root, 'issues/merge-attempts.jsonl'),
@@ -639,7 +557,29 @@ test.serial('a legacy held line still parses beside a recorded attempt', async (
         built_on: 'a'.repeat(40),
         outcome: 'held',
         end: '2026-10-10T00:00:00.000Z',
-      }) + '\n',
+      }) +
+        '\n' +
+        JSON.stringify({
+          attempt: 'a0',
+          repo: 'repo',
+          holder: 'hold',
+          members: ['mem-a'],
+          built_on: 'a'.repeat(40),
+          outcome: 'split',
+          end: '2026-10-10T00:00:01.000Z',
+        }) +
+        '\n' +
+        JSON.stringify({
+          attempt: 'a0',
+          repo: 'repo',
+          holder: 'hold',
+          members: ['mem-a'],
+          built_on: 'a'.repeat(40),
+          outcome: 'ejected',
+          culprit: 'mem-a',
+          end: '2026-10-10T00:00:02.000Z',
+        }) +
+        '\n',
     );
     const dir: string = pressureDir(f, { cpu: '6', memory: '8', io: '14' });
     const red: Result = await spawn(
@@ -650,33 +590,10 @@ test.serial('a legacy held line still parses beside a recorded attempt', async (
     );
     expect(red.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
-    expect(lines).toHaveLength(2);
-    expect(lines[0].outcome).toBe('held');
-    expect(lines[1].outcome).toBe('red');
-    expect(lines[1].pressure).toEqual({ cpu: 4, memory: 5, io: 10 });
-  } finally {
-    f.clean();
-  }
-});
-
-test.serial('an ejected line carries PSI stall deltas from batch creation', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b'], true);
-    saveBatch(holder.path, withStart(record, { cpu: 8, memory: 7, io: 6 }));
-    const dir: string = pressureDir(f, { cpu: '18', memory: '12', io: '10' });
-    const ejected: Result = await spawn(
-      f,
-      'ejected',
-      phaseBody('hold', 'check.fix', ['B', undefined, undefined, undefined, 'a1', 'mem-a'], dir),
-      herdr.env,
-    );
-    expect(ejected.code).toBe(0);
-    const lines: Attempt[] = attemptLines(f);
-    expect(lines).toHaveLength(1);
-    expect(lines[0].outcome).toBe('ejected');
-    expect(lines[0].culprit).toBe('mem-a');
-    expect(lines[0].pressure).toEqual({ cpu: 10, memory: 5, io: 4 });
+    expect(lines.map((line) => line.outcome)).toEqual(['held', 'split', 'ejected', 'red']);
+    expect(lines[3].pressure).toEqual({ cpu: 4, memory: 5, io: 10 });
+    const raw: string[] = readFileSync(resolve(f.root, 'issues/merge-attempts.jsonl'), 'utf8').trim().split('\n');
+    expect(JSON.parse(raw[3])).not.toHaveProperty('members');
   } finally {
     f.clean();
   }
@@ -685,7 +602,7 @@ test.serial('an ejected line carries PSI stall deltas from batch creation', asyn
 test.serial('a reconciled merged line carries PSI stall deltas from batch creation', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { holder, record, herdr } = await batchFixture(f);
     await command(['git', 'push', 'origin', 'refs/heads/hold:main'], f.root);
     saveBatch(holder.path, withStart({ ...record, candidate: record.top }, { cpu: 11, memory: 13, io: 17 }));
     const dir: string = pressureDir(f, { cpu: '21', memory: '23', io: '47' });
@@ -703,7 +620,7 @@ test.serial('a reconciled merged line carries PSI stall deltas from batch creati
 test.serial('a merged line without pressure_start keeps no pressure key even with a malformed dir', async () => {
   const f: Fixture = await fixture();
   try {
-    const { herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { herdr } = await batchFixture(f);
     const dir: string = pressureDir(f, { cpu: 'abc', memory: '90', io: '180' });
     await verified(f, 'hold', 'merge');
     expect(
@@ -729,7 +646,7 @@ test.serial('a merged line without pressure_start keeps no pressure key even wit
 test.serial('a merged line with an absent pressure dir keeps no pressure key', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { holder, record, herdr } = await batchFixture(f);
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }));
     const dir: string = resolve(f.home, 'psi/proc/pressure');
     await verified(f, 'hold', 'merge');
@@ -756,7 +673,7 @@ test.serial('a merged line with an absent pressure dir keeps no pressure key', a
 test.serial('a merged line with a changed boot id keeps no pressure key', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { holder, record, herdr } = await batchFixture(f);
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }, 'boot-old'));
     const dir: string = pressureDir(f, { cpu: '60', memory: '90', io: '180' }, 'boot-new');
     await verified(f, 'hold', 'merge');
@@ -783,7 +700,7 @@ test.serial('a merged line with a changed boot id keeps no pressure key', async 
 test.serial('a malformed pressure file stops the ending call before any push or state change', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { holder, record, herdr } = await batchFixture(f);
     const batch: Batch = withStart(record, { cpu: 10, memory: 20, io: 30 });
     saveBatch(holder.path, batch);
     const dir: string = pressureDir(f, { cpu: 'abc', memory: '90', io: '180' });
@@ -826,7 +743,7 @@ test.serial('a malformed pressure file stops batch creation before any batch or 
 test.serial('a decimal pressure total stops the ending call before any push or state change', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
+    const { holder, record, herdr } = await batchFixture(f);
     const batch: Batch = withStart(record, { cpu: 10, memory: 20, io: 30 });
     saveBatch(holder.path, batch);
     const dir: string = pressureDir(f, { cpu: '12.5', memory: '90', io: '180' });
@@ -885,21 +802,16 @@ test.serial('a created batch preserves PSI counters through two reruns', async (
     const herdr: HerdrFixture = fakeHerdr(f);
     const base: string = await remoteTip(f);
     const holder: Branch = await branchAt(f, 'hold', base, 'file-hold');
-    const member: Branch = await branchAt(f, 'mem-a', base, 'file-mem-a');
     const holderPath: string = leaf(f, 'hold', 'merge', {
       worktree: holder.worktree,
       merge_stamp: '2026-10-05T00:00:00.000Z',
-    });
-    leaf(f, 'mem-a', 'merge', {
-      worktree: member.worktree,
-      merge_stamp: '2026-10-05T00:00:01.000Z',
     });
     const dir: string = pressureDir(f, { cpu: '5', memory: '6', io: '7' });
     const created: Result = await spawn(f, 'create', mergePassBody, herdr.env, [dir]);
     expect(created.code).toBe(0);
     const batch: Batch = readState(holderPath).batch!;
     expect(batch.pressure_start).toEqual({ cpu: 5, memory: 6, io: 7, boot_id: 'boot-1' });
-    expect(batch.members.map((entry) => entry.slug)).toEqual(['mem-a']);
+    expect(batch.top).toBeDefined();
     await verified(f, 'hold', 'merge');
     expect(
       (

@@ -29,7 +29,7 @@
 - `verify` appends its receipt before checkout, then rewrites `verify-runs.jsonl` under the same lock with its setup exit, each command's exit and log and its end before removing the checkout; `end` is set only after every command ran, and a receipt matches any commit with its tree under the exact current command set, so `verify` on such a commit prints `reuse receipt <run> tree=<tree>` and runs nothing.
 - `akrogon config` composes a repo's `setup` key into every printed `checks`, `merge_checks` and `advisory` command as a `flock`ed `sh -c <setup> && sh -c <command>`.
 - A leaf worktree's `.env` is a written file (mode 0600) holding only declared `env:` names copied from the registered checkout; dispatch rewrites it when no tab is live and refuses a tracked path or missing ignore rule.
-- `buildStack` removes resurrected retired lesson lines as a fixup commit on the stack top, and `merged --check` refuses a pushed range still holding one.
+- `buildStack` removes resurrected retired lesson lines as a fixup commit on the rebased top, and `merged --check` refuses a pushed range still holding one.
 - The `plan.synthesis` to `implement` move records each branch-changed path's blob id in state `frozen`; a later move refuses a recorded path changed or gone, or an added test-file-matched path outside the record, until the last commit touching it or a later one carries a `Test-Change` trailer naming it, and a path no commit touches needs a later trailer-only commit new since the record, not a replayed planning-era trailer.
 
 ## See also

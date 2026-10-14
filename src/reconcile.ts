@@ -12,7 +12,6 @@ import { basename, dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { globalHome, leafTemp, within, worktreeStore, type Repo } from './config';
 import { readVerifyRuns, type VerifyRun } from './verify';
-import { batchMemberSlugs } from './batch';
 import { leavesUnder, readState, saveState, type Leaf, type State } from './state';
 import { command, herdrError, run, type Pane, type Result } from './shell';
 
@@ -112,7 +111,6 @@ function ownerDead(owner: { pid: number; boot_id: string }): boolean {
 }
 
 export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null): Promise<boolean> {
-  if ((await batchMemberSlugs(repo)).has(leaf.state.slug)) return false;
   if (leaf.state.tab === undefined || live === null) return false;
   const tab: string = leaf.state.tab;
   if (!live.some((pane) => pane.tab_id === tab)) return false;
@@ -126,14 +124,11 @@ export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null
 export function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): boolean {
   const store: string = worktreeStore(repo);
   const oldRoot: string = resolve(repo.root, 'issues/worktrees');
-  const memberSlugs: Set<string> = new Set(
-    leaves.flatMap((leaf) => (leaf.state.batch?.members ?? []).map((member) => member.slug)),
-  );
   for (const leaf of leaves) {
     if (existsSync(leafTemp(repo, leaf.state.slug))) return true;
     const worktree: string | undefined = leaf.state.worktree;
     if (worktree === undefined || !existsSync(worktree)) continue;
-    if (leaf.state.batch !== undefined || memberSlugs.has(leaf.state.slug)) continue;
+    if (leaf.state.batch !== undefined) continue;
     if (leaf.state.phase === 'merged' || leaf.state.phase === 'failed') return true;
     if (!within(worktree, store) && within(worktree, oldRoot)) return true;
   }
@@ -197,9 +192,6 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   const batchAttempts: Set<string> = new Set(
     leaves.flatMap((leaf) => (leaf.state.batch === undefined ? [] : [leaf.state.batch.attempt])),
   );
-  const memberSlugs: Set<string> = new Set(
-    leaves.flatMap((leaf) => (leaf.state.batch?.members ?? []).map((member) => member.slug)),
-  );
   const verifyRuns: VerifyRun[] = readVerifyRuns(repo);
   const leafBySlug: Map<string, Leaf> = new Map(leaves.map((leaf) => [leaf.state.slug, leaf]));
 
@@ -241,7 +233,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   const panes: Pane[] = live ?? [];
 
   async function mergedWorktree(leaf: Leaf, worktree: string, open: boolean): Promise<void> {
-    if (leaf.state.batch !== undefined || memberSlugs.has(leaf.state.slug)) {
+    if (leaf.state.batch !== undefined) {
       keep(worktree, 'state.batch');
       return;
     }
@@ -274,7 +266,6 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       if (
         state.phase === 'merged' &&
         state.batch === undefined &&
-        !memberSlugs.has(state.slug) &&
         live !== null &&
         tabLive(panes, state.tab) &&
         !(within(leaf.path, openRoot) && ownerCompletes(repo, leaf))
@@ -295,7 +286,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(worktree, 'unregistered worktree directory');
       continue;
     }
-    if (state.batch !== undefined || memberSlugs.has(state.slug)) {
+    if (state.batch !== undefined) {
       keep(worktree, 'state.batch');
       continue;
     }
