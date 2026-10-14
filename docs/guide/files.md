@@ -95,7 +95,7 @@ Each line names its event kind:
 
 ## akrogon flaky: list checks that flipped
 
-`akrogon flaky` reads `issues/verify-runs.jsonl`, the receipt `akrogon verify` writes for every run, and prints one line per verify command and failed test that went red and then green on the same tree: the count, the last time, the check name and the test name parsed from the red log's `(fail)` lines. It skips runs that never finished or whose setup failed. A same-tree flip means the test, not the change under review, decided the result, so each line is a candidate to fix at the next charting pass.
+`akrogon flaky` reads `issues/verify-runs.jsonl`, the receipt `akrogon verify` writes for every run, and prints one line per verify command and failed test that went red and then green on the same tree: the count, the last time, the check name and the test name parsed from the red log's `(fail)` lines. It skips runs that never finished or whose setup failed. A same-tree flip shows an inconsistent result on unchanged code; it does not say whether the test, the code or an outside input caused it, so each line is only a candidate for the next charting pass.
 
 ## sync: save lifecycle records separately from code
 
