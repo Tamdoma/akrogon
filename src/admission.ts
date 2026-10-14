@@ -159,7 +159,7 @@ function lastStart(): number | undefined {
 }
 
 // The 16 GiB a live run has not yet shown as unit usage stays reserved.
-function peerReservations(boot: string): number {
+function peerReservations(): number {
   return liveRuns().reduce(
     (reserved, record) => reserved + Math.max(0, RUN_GIB * GIB - unitUsage(record)),
     0,
@@ -169,7 +169,7 @@ function peerReservations(boot: string): number {
 // Called only while holding admission.lock; returns the wait reason or undefined to admit.
 function denied(): string | undefined {
   const bytes: number = usage();
-  const runs: number = peerReservations(bootId()) + RUN_GIB * GIB;
+  const runs: number = peerReservations() + RUN_GIB * GIB;
   if (bytes + runs >= LIMIT_GIB * GIB)
     return `anon+shmem ${bytes / GIB} GiB + runs ${runs / GIB} GiB >= ${LIMIT_GIB} GiB`;
   const last: number | undefined = lastStart();
