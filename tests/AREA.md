@@ -13,7 +13,7 @@
 - `tests/docs-links.test.ts` checks relative links and heading anchors in README and the guide.
 - `tests/watch-issues-scripts.test.ts` is the `skills/watch-issues` gate, running its scripts tests and typecheck.
 - `tests/guard.test.ts` checks the `akrogon guard` ancestor and own-modules refusals.
-- `tests/run-permit.test.ts` checks the run start check: concurrent runs, threshold waiting with reading and reason, spacing, nested `run-check`/`base-run`, `status` waiter lines, missing `memory.stat` and unmatched `AKROGON_RUN` tokens. `tests/run-units.test.ts` checks run-unit boxing, `stop-run` authority, wrapper-death reaping, base-run units, live reservations, the stale sweep and the skills' `stop-run` wording, with real units under `akrogon-test-*.slice`.
+- `tests/run-permit.test.ts` checks runs start at once: concurrent runs, nested `run-check`/`base-run`, `status` showing no waiter lines, missing `memory.stat` ignored and unmatched `AKROGON_RUN` tokens. `tests/run-units.test.ts` checks run-unit boxing, `stop-run` authority, wrapper-death reaping, base-run units, immediate admission, the stale sweep and the skills' `stop-run` wording, with real units under `akrogon-test-*.slice`.
 - `tests/base-run.test.ts` checks the base checkout, record line, env and cleanup of `base-run`.
 - `tests/compare.test.ts` checks the comparison record, red record and `--compare` flag.
 - `tests/red-docs.test.ts` checks the skills and guide carry the retry, comparison and `known-red` rules, the merge skill's `--compare` contract and the retired `red on base` stop wording's absence.

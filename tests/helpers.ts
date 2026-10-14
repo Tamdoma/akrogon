@@ -35,7 +35,7 @@ export function seedStat(f: Fixture, anon: number, shmem: number = 0): void {
   writeFileSync(file, `anon ${anon}\nfile 0\nshmem ${shmem}\n`);
 }
 function admissionEnv(f: Fixture): NodeJS.ProcessEnv {
-  return { AKROGON_CGROUP_ROOT: cgroupRoot(f), AKROGON_SPACING_MS: '0' };
+  return { AKROGON_CGROUP_ROOT: cgroupRoot(f) };
 }
 export function unitBin(f: Fixture): string {
   return resolve(f.home, 'unitbin');

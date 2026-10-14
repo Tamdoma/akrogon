@@ -203,12 +203,6 @@ async function seedRunRecord(f: Fixture, fields: Record<string, unknown> = {}): 
   return runId;
 }
 
-function seedUnitStat(f: Fixture, slice: string, unit: string, anon: number): void {
-  const dir: string = unitDir(cgroupRoot(f), slice, unit);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(resolve(dir, 'memory.stat'), `anon ${anon}\nfile 0\nshmem 0\n`);
-}
-
 async function activeUnits(pattern: string): Promise<string[]> {
   const result: Result = await sysctl('list-units', '--all', '--no-legend', pattern);
   return result.stdout
@@ -270,14 +264,11 @@ test.serial(
           AKROGON_RUN_SLICE: slice,
         }),
       );
-      // Feed the FAKE cgroup root a full unit stat so this run's reservation
-      // drops to ~0 and the next launch is admitted by the 48 GiB accounting.
       const deadline: number = Date.now() + 20000;
       for (;;) {
         const live: Record<string, unknown> | undefined = (await liveRuns(f)).find((record) => record.check === name);
         if (live !== undefined) {
           ids[name] = live.run as string;
-          seedUnitStat(f, slice, live.unit as string, 20 * GIB);
           return;
         }
         if (Date.now() > deadline) throw new Error(`No live record for ${name}`);
@@ -418,50 +409,29 @@ test.serial(
 );
 
 test.serial(
-  'admission counts live per-run reservations under the lock',
+  'a top-level run starts at once over the old memory reading and inside the old spacing window',
   async () => {
     const f: Fixture = await fixture();
     try {
       const out: string = outDir(f);
       yaml(resolve(f.root, 'issues/config.yaml'), { env: ['RUN_UNITS_OUT'], checks: {}, grounding: 'none' });
-      const worktree: string = await leafWorktree(f, 'reserved');
-      seedStat(f, 4 * GIB);
-      // Peer A: live, unit present using 4 GiB -> reservation 12 GiB.
-      const a: string = await seedRunRecord(f, { check: 'peer-a' });
-      seedUnitStat(f, 'akrogon.slice', `akrogon-run-${a}.scope`, 4 * GIB);
-      // Peer B: live, unit absent -> pending, full 16 GiB.
-      await seedRunRecord(f, { check: 'peer-b' });
-      // Waiting, ended and dead-pid records count 0.
-      await seedRunRecord(f, { check: 'peer-c', state: 'waiting' });
-      await seedRunRecord(f, { check: 'peer-d', state: 'ended' });
-      const dead: Bun.Subprocess = Bun.spawn(['true']);
-      await dead.exited;
-      await seedRunRecord(f, { check: 'peer-e', pid: dead.pid, start_time: '1' });
-      // usage 4 + A 12 + B 16 + own 16 = 48 -> denied.
-      const admitted: Promise<Result> = cli(
-        f,
-        ['run-check', '--name', 'cand', '--', 'sh', '-c', `touch "${out}/admitted"`],
-        worktree,
-        { RUN_UNITS_OUT: out },
-      );
-      // Denial is deterministic: the candidate publishes a 'waiting' record and
-      // stays there until A's reservation shrinks.
-      const deadline: number = Date.now() + 20000;
-      for (;;) {
-        if (existsSync(resolve(out, 'admitted')))
-          throw new Error('candidate admitted while reservations reach the limit');
-        const waiting: Record<string, unknown> | undefined = (await runRecords(f)).find(
-          (record) => record.check === 'cand' && record.state === 'waiting',
-        );
-        if (waiting !== undefined) break;
-        if (Date.now() > deadline) throw new Error('candidate never reached a waiting record');
-        await Bun.sleep(50);
-      }
-      // A's unit grows to 20 GiB -> reservation 0: 4 + 0 + 16 + 16 = 36 < 48.
-      seedUnitStat(f, 'akrogon.slice', `akrogon-run-${a}.scope`, 20 * GIB);
-      const result: Result = await admitted;
-      expect(result.code).toBe(0);
-      expect(existsSync(resolve(out, 'admitted'))).toBe(true);
+      const worktree: string = await leafWorktree(f, 'unthrottled');
+      // Seeded above the removed 48 GiB wall; a last-start inside the removed
+      // 30 s spacing window — both must be ignored now (operator 2026-10-14).
+      seedStat(f, 60 * GIB, 4 * GIB);
+      mkdirSync(resolve(f.home, 'runs'), { recursive: true });
+      writeFileSync(resolve(f.home, 'runs', 'last-start'), String(Date.now()));
+      const a: Promise<Result> = cli(f, ['run-check', '--name', 'a', '--', 'sh', '-c', `touch "${out}/a"`], worktree, {
+        RUN_UNITS_OUT: out,
+      });
+      const b: Promise<Result> = cli(f, ['run-check', '--name', 'b', '--', 'sh', '-c', `touch "${out}/b"`], worktree, {
+        RUN_UNITS_OUT: out,
+      });
+      const [ra, rb]: [Result, Result] = await Promise.all([a, b]);
+      expect(ra.code).toBe(0);
+      expect(rb.code).toBe(0);
+      expect(existsSync(resolve(out, 'a'))).toBe(true);
+      expect(existsSync(resolve(out, 'b'))).toBe(true);
     } finally {
       f.clean();
     }
