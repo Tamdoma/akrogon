@@ -245,6 +245,26 @@ test('an unfinished leaf temp is removed once its tab is gone and kept silently 
   }
 });
 
+test('a failed leaf temp stays while its tab lives, because its seats still use it as TMPDIR', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = await dispatchLeaf(f, 'failed-live');
+    const scratch: string = scratchFor(f, 'failed-live');
+    saveState(path, {
+      ...readState(path),
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'criterion red' },
+    });
+    await next(f, ['--all']);
+    expect(existsSync(scratch)).toBe(true);
+    closeTab(f, readState(path).tab!);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(scratch)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
 // DC4: old in-repo worktree of an active leaf is migrated; refusals keep it.
 test('clean old-location worktree of an active leaf is removed and recreated sparse at the store', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -470,6 +490,28 @@ test('targeted next sweeps unused registered variants', async () => {
     await command(['git', 'worktree', 'add', '--detach', variant], f.root);
     expect((await next(f, ['typed-holder'])).code).toBe(0);
     expect(existsSync(variant)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a worker worktree of an active leaf is kept until the leaf fails', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = await dispatchLeaf(f, 'worker-holder');
+    const worker: string = resolve(storeDir(f), 'worker-holder-u1');
+    await command(['git', 'worktree', 'add', '--detach', worker], f.root);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(worker)).toBe(true);
+    expect((await status(f, 'worker-holder')).stdout).toContain('active leaf worker');
+    closeTab(f, readState(path).tab!);
+    saveState(path, {
+      ...readState(path),
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'test' },
+    });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(worker)).toBe(false);
   } finally {
     f.clean();
   }

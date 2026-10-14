@@ -382,6 +382,12 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(path, 'state.batch');
       continue;
     }
+    // A delegated worker runs at <slug>-u<N> from the seat's own pane, so no pane sits inside it.
+    const owner: Leaf | undefined = /-u\d+$/.test(name) ? leafBySlug.get(name.replace(/-u\d+$/, '')) : undefined;
+    if (owner !== undefined && owner.state.phase !== 'merged' && owner.state.phase !== 'failed') {
+      keep(path, 'active leaf worker');
+      continue;
+    }
     if (live === null) keep(path, 'pane list unavailable');
     else if (livePaneInside(panes, path)) keep(path, 'live pane inside');
     else await removeWorktree(path);
@@ -426,7 +432,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         const finished: boolean = leaf.state.phase === 'merged' || leaf.state.phase === 'failed';
         if (live === null) {
           if (finished) keep(dir, 'pane list unavailable');
-        } else if ((leaf.state.phase !== 'failed' && tabLive(live, leaf.state.tab)) || livePaneInside(live, dir)) {
+        } else if (tabLive(live, leaf.state.tab) || livePaneInside(live, dir)) {
           if (finished) keep(dir, 'live pane inside');
         } else if (kept.length === keptBefore) {
           rmSync(dir, { recursive: true, force: true });
