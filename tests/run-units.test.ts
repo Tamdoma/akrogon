@@ -285,9 +285,9 @@ test.serial(
     await launch('paneB.scope', 'b1');
     const units = (name: string): string => `akrogon-run-${ids[name]}.scope`;
     for (const name of ['a1', 'a2', 'b1']) {
-    await waitPath(unitDir('/sys/fs/cgroup', slice, units(name)));
-    await waitActive(units(name));
-  }
+      await waitPath(unitDir('/sys/fs/cgroup', slice, units(name)));
+      await waitActive(units(name));
+    }
     try {
       // No id: list the caller's runs and refuse unless exactly one matches.
       const two: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run'], worktree).result;

@@ -133,9 +133,7 @@ export function callerScope(): string {
   }
   const selfCgroup: string = resolve(procRoot(), 'self', 'cgroup');
   if (!existsSync(selfCgroup)) return '';
-  const scopes: string[] = [...readFileSync(selfCgroup, 'utf8').matchAll(/\/([^/]+\.scope)/g)].map(
-    (match) => match[1],
-  );
+  const scopes: string[] = [...readFileSync(selfCgroup, 'utf8').matchAll(/\/([^/]+\.scope)/g)].map((match) => match[1]);
   return scopes[scopes.length - 1] ?? '';
 }
 
@@ -149,14 +147,10 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
   const token: string = randomUUID();
   const ownHash: string = createHash('sha256').update(token).digest('hex');
   await sweepStale(
-    new Set(
-      [
-        ownHash,
-        ...(inherited === undefined || inherited === ''
-          ? []
-          : [createHash('sha256').update(inherited).digest('hex')]),
-      ],
-    ),
+    new Set([
+      ownHash,
+      ...(inherited === undefined || inherited === '' ? [] : [createHash('sha256').update(inherited).digest('hex')]),
+    ]),
   );
   const record: RunRecord = {
     token_hash: ownHash,
