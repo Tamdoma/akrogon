@@ -58,20 +58,20 @@ Every merge attempt end appends one JSON line to `issues/merge-attempts.jsonl` i
 
 Each line carries:
 
-- `attempt` is the batch attempt id.
+- `attempt` is the merge attempt id.
 - `repo` is the registered repo name.
 - `holder` is the holder leaf slug.
-- `members` lists the carried member slugs in batch order.
-- `built_on` is the remote tip the batch stacked on.
-- `tested_top` is the stack top the checks ran against; it is absent when the attempt ended with no checked top.
-- `outcome` is `merged`, `red`, `split`, `reuse` or `ejected`; `held` appears only on lines written before it was retired and still parses.
-- `culprit` is the leaf slug named as the cause; it is present only on `ejected` lines.
+- `members` lists carried member slugs; it appears only on lines written before batching was removed.
+- `built_on` is the remote tip the holder was rebased onto.
+- `tested_top` is the head the checks ran against; it is absent when the attempt ended with no checked top.
+- `outcome` is `merged` or `red`; `held`, `split`, `reuse` and `ejected` appear only on older lines and still parse.
+- `culprit` appears only on older `ejected` lines.
 - `start` is the batch creation time; it is absent on batches created before this field existed.
 - `end` is the attempt end time.
 - `pressure` holds cpu, memory and io stall in integer microseconds (the `some` `total=` increase over the attempt); it is absent when the batch predates this field, the host has no `/proc/pressure`, or the host rebooted mid-attempt.
 - `tools` lists the repo's declared `tools:` as `{name, path, version}` resolved once when the merge batch is dispatched; it is absent on lines predating this field and when the repo declares no tools.
 
-The command writes `merged`, `red`, `split` and `ejected` now; `reuse` appears only on older lines.
+The command writes `merged` and `red` now.
 
 ## timings.jsonl: record when each stage happens
 
@@ -83,7 +83,7 @@ Each line names its event kind:
 - `prompt` is `akrogon next` delivering or failing a seat prompt.
 - `seat_done` is `akrogon phase` finishing a paired seat without a move.
 - `check_start` and `check_end` are `akrogon run-check` starting and ending a check; `check_start` carries optional `wait_ms`, the time spent registering the run before its immediate start.
-- `batch` is `akrogon next` creating a merge batch.
+- `batch` is `akrogon next` creating a merge batch record; `members` appears only on older lines.
 - `wait` is `akrogon next` or `akrogon park` opening or closing a wait.
 - `repo_pause` is `akrogon pause` or `akrogon unpause` toggling the repo.
 

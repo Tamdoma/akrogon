@@ -57,7 +57,6 @@ Check these choices:
 - **worktree_root** says where leaf checkouts go. Unset defaults to `~/.akrogon/worktrees/<repo name>`; `~` expands to the machine home directory. Only a store inside the checkout is gitignored.
 - **rebuttal** controls the paired planning rebuttal.
 - **fix_rounds** bounds the chart door's direct-route repair rounds. Leaf handoffs and merge bounces are counted in `fix_rounds` and shown in status.
-- **batch_limit** (integer at least 1, default 4) caps the whole merge batch including the holder.
 - **slots** optionally replaces a machine seat for this repo — a full {harness, model, effort} per seat (a or b); it applies at the next agent start.
 - **setup** optionally runs before your checks, usually to install dependencies.
 - **env** lists names copied from the registered checkout's `.env` into each leaf's `.env` and into each check command's constructed environment. Dispatch refuses a leaf when a listed name is missing from that `.env`.

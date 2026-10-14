@@ -154,7 +154,7 @@ A leaf must have valid state and satisfied dependencies. Failed leaves are skipp
 
 The global max_active setting limits new leaf allocations across repositories. Existing tabs can keep progressing at the limit. Each leaf normally has two seats, so this is not a count of agent processes.
 
-Leaves in `merge` take their repository's single merge turn: the merge pass writes a batch record on the holder, builds the stacked branches outside the global lock, applies them under the lock, and prompts only the holder's B while the rest wait. Every committed `phase` move and the end of each pass re-sweep `merge` leaves, so the next holder is prompted as soon as the turn frees.
+Leaves in `merge` take their repository's single merge turn: the merge pass writes a batch record on the holder, rebases its branch outside the global lock, moves the branch under the lock, and prompts only the holder's B while the rest wait. Every committed `phase` move and the end of each pass re-sweep `merge` leaves, so the next holder is prompted as soon as the turn frees.
 
 Each leaf pane shell runs in its own systemd scope under a per-leaf slice under `akrogon.slice` before a seat starts in it. A recorded pane found outside its scope, as after a Herdr restore, is closed and recreated before any prompt. A pane whose cgroup cannot be read is left open, and the leaf is skipped that pass with the error. A failed boxing also skips the leaf. Panes you split by hand in a leaf tab are not boxed.
 
