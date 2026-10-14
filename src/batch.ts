@@ -179,6 +179,12 @@ export async function restoreMembers(
   return { dirty };
 }
 
+// With no member stacked under it, the holder's branch is its own: B may commit past the top,
+// and restack and restore keep those commits.
+export function holderOwnsBranch(record: Batch): boolean {
+  return record.solo === true || record.members.length === 0;
+}
+
 export async function restoreHolder(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
-  if (record.solo !== true) await move(repo, leaf.state.slug, record.holder.head, leaf);
+  if (!holderOwnsBranch(record)) await move(repo, leaf.state.slug, record.holder.head, leaf);
 }

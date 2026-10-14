@@ -40,6 +40,7 @@ import {
   buildStack,
   equalOutsideRecordFolders,
   isAncestor,
+  holderOwnsBranch,
   recordConfigEqual,
   restoreHolder,
   restoreMembers,
@@ -642,7 +643,12 @@ async function batchCheck(
   if (record.solo === true) {
     await requireNonEmpty(repo, worktree);
   } else {
-    if (!record.applied || record.top === undefined || head !== record.top)
+    // A memberless holder may carry B's repair commits past the top.
+    if (
+      !record.applied ||
+      record.top === undefined ||
+      (record.members.length > 0 ? head !== record.top : !(await isAncestor(worktree, record.top, head)))
+    )
       throw new Error(`HEAD must equal the recorded batch top ${record.top}, found ${head}`);
     let predecessor: string = record.built_on;
     for (const member of record.members) {
@@ -727,7 +733,7 @@ async function batchPush(
   const worktree: string = state.worktree ?? repo.root;
   const head: string = await mergeHead(repo, state, record);
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
-  if (record.solo !== true && head !== record.top)
+  if (!holderOwnsBranch(record) && head !== record.top)
     throw new Error(`HEAD must equal the recorded batch top ${record.top}, found ${head}`);
   if (slot !== undefined && head !== record.tested_top && !(record.decision === 'reuse' && head === record.top))
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);
@@ -775,10 +781,9 @@ function memberHead(record: Batch, slug: string): string {
 
 async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
   const builtOn: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
-  const holderHead: string =
-    record.solo === true
-      ? await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root)
-      : record.holder.head;
+  const holderHead: string = holderOwnsBranch(record)
+    ? await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root)
+    : record.holder.head;
   let members: BatchMember[] = record.members;
   let conflicted: boolean = false;
   for (;;) {
@@ -1101,7 +1106,7 @@ export async function phaseCommand(
             throw new Error(`--culprit ${culprit} is not the holder or a carried member of ${leaf.state.slug}`);
           const culpritLeaf: Leaf = entry?.leaf ?? leaf;
           const savedHead: string =
-            entry !== undefined ? entry.member.head : record.solo === true ? 'HEAD' : record.holder.head;
+            entry !== undefined ? entry.member.head : holderOwnsBranch(record) ? 'HEAD' : record.holder.head;
           if (culpritLeaf.state.done.includes('B')) throw new Error(`--culprit ${culprit}: slot B already recorded`);
           if (culpritLeaf.state.worktree !== undefined) {
             await requireClean(culpritLeaf.state.worktree);

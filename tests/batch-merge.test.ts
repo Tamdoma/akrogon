@@ -631,6 +631,103 @@ test.serial('check.fix on a memberless record moves the holder to check.fix', as
   }
 });
 
+async function repairCommit(holder: Leaf): Promise<string> {
+  writeFileSync(resolve(holder.state.worktree!, 'repair'), 'repair\n');
+  await command(['git', 'add', '.'], holder.state.worktree!);
+  await command(['git', 'commit', '-m', 'repair'], holder.state.worktree!);
+  return command(['git', 'rev-parse', 'HEAD'], holder.state.worktree!);
+}
+
+test.serial('a memberless stack checks and pushes a B repair commit past the top', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold']);
+    const repaired: string = await repairCommit(holder);
+    expect(repaired).not.toBe(record.top);
+    const checked: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
+      f.root,
+      herdr.env,
+    );
+    expect(checked.code).toBe(0);
+    expect(readState(holder.path).batch?.tested_top).toBe(repaired);
+    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, herdr.env)).code).toBe(
+      0,
+    );
+    expect(await remoteTip(f)).toBe(repaired);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a memberless restack keeps the B repair commit', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, herdr } = await batchFixture(f, ['hold']);
+    await repairCommit(holder);
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
+    ).toBe(0);
+    await advanceRemote(f, { 'adv-file': 'adv\n' });
+    const merged: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    expect(merged.stdout).toMatch(/^rerun tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
+    ).toBe(0);
+    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, herdr.env)).code).toBe(
+      0,
+    );
+    expect(await remoteSubjects(f, 3)).toEqual(['repair', 'hold', 'adv']);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a memberless culprit eject keeps the B repair commit on the branch', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, herdr } = await batchFixture(f, ['hold']);
+    const repaired: string = await repairCommit(holder);
+    const moved: Result = await cli(
+      f,
+      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1', '--culprit', 'hold'],
+      f.root,
+      herdr.env,
+    );
+    expect(moved.code).toBe(0);
+    expect(readState(holder.path).phase).toBe('check.fix');
+    expect(await command(['git', 'rev-parse', 'refs/heads/hold'], f.root)).toBe(repaired);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a stack with members refuses a B commit past the top at --check', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+    await repairCommit(holder);
+    const checked: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
+      f.root,
+      herdr.env,
+    );
+    expect(checked.code).not.toBe(0);
+    expect(checked.stderr).toContain('HEAD must equal the recorded batch top ' + record.top);
+    expect(readState(holder.path).batch?.tested_top).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
 test.serial('operator completion refuses a holder commit outside the applied stack', async () => {
   const f: Fixture = await fixture();
   try {
