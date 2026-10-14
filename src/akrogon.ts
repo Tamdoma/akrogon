@@ -138,6 +138,10 @@ switch (verb) {
     if (positionals.length + Number(values.all === true) !== 1) throw new Error('Usage: akrogon stop <slug> | --all');
     await (await import('./stop')).stopCommand(positionals[0], values.all === true, process.cwd());
     break;
+  case 'stop-run':
+    z.array(z.string()).max(1).parse(positionals);
+    await (await import('./stop-run')).stopRunCommand(positionals[0]);
+    break;
   case 'start': {
     const [slug]: [string] = z.tuple([z.string()]).parse(positionals);
     await (await import('./stop')).startCommand(slug, process.cwd());
@@ -193,6 +197,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|start|sync|status|timing|run-check|base-run|guard>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|timing|run-check|base-run|guard>',
     );
 }

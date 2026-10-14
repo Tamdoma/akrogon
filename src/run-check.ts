@@ -17,7 +17,16 @@ import { allLeaves, readState, type Leaf, type State } from './state';
 import { command, spawnCaptured, type Result } from './shell';
 import { readBaseRuns, type BaseRun } from './base-run';
 import { appendTiming } from './timing';
-import { withAdmission } from './admission';
+import { callerScope, withAdmission } from './admission';
+import {
+  leafSlice,
+  runSlice,
+  runUnitArgv,
+  runUnitBase,
+  sessionBusAddress,
+  startRunGuard,
+  stopRunUnits,
+} from './scope';
 import { type Phase } from './routing';
 
 const forbidden: readonly string[] = [
@@ -29,7 +38,14 @@ const forbidden: readonly string[] = [
   'CDP_BROWSER_BINARY',
 ];
 
-const copied: readonly string[] = ['HOME', 'PATH', 'XDG_CACHE_HOME', 'NODE_DISABLE_COMPILE_CACHE'];
+// FAKE_SYSTEMD_RUN_LOG rides along so the run-unit seam can log the scope calls a held run makes.
+const copied: readonly string[] = [
+  'HOME',
+  'PATH',
+  'XDG_CACHE_HOME',
+  'NODE_DISABLE_COMPILE_CACHE',
+  'FAKE_SYSTEMD_RUN_LOG',
+];
 
 function bunfigs(): string[] {
   const files: string[] = [resolve(process.env.HOME ?? homedir(), '.bunfig.toml')];
@@ -170,7 +186,11 @@ export async function runCheck(
       ...(unit === undefined ? {} : { unit }),
       ...(attempt === undefined ? {} : { attempt }),
     };
-    return await withAdmission({ repo: repo.name, leaf: slug, check: name ?? 'run' }, async (admission) => {
+    const slice: string = runSlice(slug === 'checkout' ? 'akrogon.slice' : leafSlice(repo, slug));
+    const runUnit: string = `${runUnitBase(run)}.scope`;
+    return await withAdmission(
+      { repo: repo.name, leaf: slug, check: name ?? 'run', run, slice, scope: callerScope(), unit: runUnit },
+      async (admission) => {
       env.AKROGON_RUN = admission.token;
       appendTiming(repo, {
         kind: 'check_start',
@@ -178,7 +198,18 @@ export async function runCheck(
         ...(admission.kind === 'held' ? { wait_ms: admission.wait_ms } : {}),
       });
       const started: number = Date.now();
-      const result: Result = await spawnLogged(argv, cwd, env, log);
+      const result: Result =
+        admission.kind === 'nested'
+          ? await spawnLogged(argv, cwd, env, log)
+          : await (async () => {
+              await startRunGuard(slice, run, process.pid);
+              try {
+                return await spawnLogged(runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS), cwd, { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() }, log);
+              } finally {
+                admission.release();
+                await stopRunUnits(runUnit, `${runUnitBase(run)}-guard.service`);
+              }
+            })();
       process.stdout.write(result.stdout);
       process.stderr.write(result.stderr);
       mkdirSync(target, { recursive: true });

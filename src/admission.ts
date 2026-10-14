@@ -15,14 +15,21 @@ import { isAbsolute, resolve } from 'node:path';
 import { dlopen, read } from 'bun:ffi';
 import { z } from 'zod';
 import { globalHome } from './config';
+import { procRoot, runUnitBase, stopRunUnits } from './scope';
 
 export interface AdmissionHolder {
   repo: string;
   leaf: string;
   check: string;
+  run: string;
+  slice: string;
+  scope: string;
+  unit: string;
 }
 
-export type Admission = { kind: 'held'; token: string; wait_ms: number } | { kind: 'nested'; token: string };
+export type Admission =
+  | { kind: 'held'; token: string; wait_ms: number; release: () => void }
+  | { kind: 'nested'; token: string };
 
 const recordSchema = z.object({
   token_hash: z.string(),
@@ -32,7 +39,11 @@ const recordSchema = z.object({
   repo: z.string(),
   leaf: z.string(),
   check: z.string(),
-  state: z.enum(['waiting', 'live']),
+  state: z.enum(['waiting', 'live', 'ended']),
+  run: z.string(),
+  slice: z.string(),
+  scope: z.string(),
+  unit: z.string(),
   wait_reason: z.string().optional(),
   since: z.iso.datetime(),
 });
@@ -40,6 +51,7 @@ export type RunRecord = z.infer<typeof recordSchema>;
 
 const GIB: number = 1024 * 1024 * 1024;
 const LIMIT_GIB: number = 48;
+const RUN_GIB: number = 16;
 const POLL_MS: number = 5000;
 
 const LOCK_EX: number = 2;
@@ -66,11 +78,12 @@ function spacingMs(): number {
   return ms;
 }
 
-const statPath = (): string =>
+const slicePrefixDir = (): string =>
   resolve(
     cgroupRoot(),
-    `user.slice/user-${process.getuid!()}.slice/user@${process.getuid!()}.service/akrogon.slice/memory.stat`,
+    `user.slice/user-${process.getuid!()}.slice/user@${process.getuid!()}.service/akrogon.slice`,
   );
+const statPath = (): string => resolve(slicePrefixDir(), 'memory.stat');
 const runsDir = (): string => resolve(globalHome(), 'runs');
 const lockPath = (): string => resolve(globalHome(), 'admission.lock');
 const lastStartPath = (): string => resolve(runsDir(), 'last-start');
@@ -91,8 +104,7 @@ function liveStartTime(pid: number): string | undefined {
   }
 }
 
-function usage(): number {
-  const path: string = statPath();
+function statBytes(path: string): number {
   let text: string;
   try {
     text = readFileSync(path, 'utf8');
@@ -109,6 +121,28 @@ function usage(): number {
   return fields.anon + fields.shmem;
 }
 
+function usage(): number {
+  return statBytes(statPath());
+}
+
+const unitStatPath = (record: RunRecord): string =>
+  resolve(
+    slicePrefixDir(),
+    ...(record.slice === 'akrogon.slice' ? [] : [record.slice]),
+    record.unit,
+    'memory.stat',
+  );
+
+// A unit without a readable stat counts 0 toward usage, so its run keeps the
+// full 16 GiB reservation in denied().
+function unitUsage(record: RunRecord): number {
+  try {
+    return statBytes(unitStatPath(record));
+  } catch {
+    return 0;
+  }
+}
+
 function lastStart(): number | undefined {
   let raw: string;
   try {
@@ -121,10 +155,20 @@ function lastStart(): number | undefined {
   return Number.isFinite(ms) ? ms : undefined;
 }
 
+// The 16 GiB a live run has not yet shown as unit usage stays reserved.
+function peerReservations(boot: string): number {
+  return liveRuns().reduce(
+    (reserved, record) => reserved + Math.max(0, RUN_GIB * GIB - unitUsage(record)),
+    0,
+  );
+}
+
 // Called only while holding admission.lock; returns the wait reason or undefined to admit.
 function denied(): string | undefined {
   const bytes: number = usage();
-  if (bytes >= LIMIT_GIB * GIB) return `anon+shmem ${bytes / GIB} GiB >= ${LIMIT_GIB} GiB`;
+  const runs: number = peerReservations(bootId()) + RUN_GIB * GIB;
+  if (bytes + runs >= LIMIT_GIB * GIB)
+    return `anon+shmem ${bytes / GIB} GiB + runs ${runs / GIB} GiB >= ${LIMIT_GIB} GiB`;
   const last: number | undefined = lastStart();
   if (last !== undefined) {
     const spacing: number = spacingMs();
@@ -168,6 +212,37 @@ function nested(token: string): boolean {
   return record !== undefined && record.token_hash === hash && record.state === 'live' && live(record, bootId());
 }
 
+export function liveRuns(): RunRecord[] {
+  const dir: string = runsDir();
+  if (!existsSync(dir)) return [];
+  const boot: string = bootId();
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.yaml'))
+    .flatMap((name) => {
+      const record: RunRecord | undefined = readRecord(resolve(dir, name));
+      return record !== undefined && record.state === 'live' && live(record, boot) ? [record] : [];
+    });
+}
+
+// Records whose writer is gone (or whose file is unreadable) are stale: drop
+// the file and best-effort stop the units it left behind. Hashes in skip name
+// records the caller still owns.
+async function sweepStale(skip: ReadonlySet<string>): Promise<void> {
+  const dir: string = runsDir();
+  if (!existsSync(dir)) return;
+  const boot: string = bootId();
+  const units: string[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.yaml') || skip.has(name.slice(0, -'.yaml'.length))) continue;
+    const path: string = resolve(dir, name);
+    const record: RunRecord | undefined = readRecord(path);
+    if (record !== undefined && live(record, boot)) continue;
+    rmSync(path, { force: true });
+    if (record !== undefined) units.push(record.unit, `${runUnitBase(record.run)}-guard.service`);
+  }
+  await stopRunUnits(...units);
+}
+
 export function waitingRuns(): RunRecord[] {
   const dir: string = runsDir();
   if (!existsSync(dir)) return [];
@@ -180,13 +255,34 @@ export function waitingRuns(): RunRecord[] {
     });
 }
 
+export function callerScope(): string {
+  const token: string | undefined = process.env.AKROGON_RUN;
+  if (token !== undefined && token !== '') {
+    const hash: string = createHash('sha256').update(token).digest('hex');
+    const record: RunRecord | undefined = readRecord(recordPath(hash));
+    if (record !== undefined && live(record, bootId())) return record.scope;
+  }
+  const selfCgroup: string = resolve(procRoot(), 'self', 'cgroup');
+  if (!existsSync(selfCgroup)) return '';
+  const scopes: string[] = [...readFileSync(selfCgroup, 'utf8').matchAll(/\/([^/]+\.scope)/g)].map(
+    (match) => match[1],
+  );
+  return scopes[scopes.length - 1] ?? '';
+}
+
 export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: Admission) => Promise<T>): Promise<T> {
   const inherited: string | undefined = process.env.AKROGON_RUN;
   if (inherited !== undefined && inherited !== '' && nested(inherited)) return fn({ kind: 'nested', token: inherited });
   mkdirSync(runsDir(), { recursive: true });
   const token: string = randomUUID();
+  const ownHash: string = createHash('sha256').update(token).digest('hex');
+  await sweepStale(
+    new Set(
+      [ownHash, ...(inherited === undefined || inherited === '' ? [] : [createHash('sha256').update(inherited).digest('hex')])],
+    ),
+  );
   const record: RunRecord = {
-    token_hash: createHash('sha256').update(token).digest('hex'),
+    token_hash: ownHash,
     pid: process.pid,
     start_time: startTime(process.pid),
     boot_id: bootId(),
@@ -209,7 +305,19 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
       } finally {
         closeSync(fd);
       }
-      if (reason === undefined) return await fn({ kind: 'held', token, wait_ms: Date.now() - begun });
+      if (reason === undefined) {
+        process.stdout.write(`run ${holder.run}\n`);
+        let ended: boolean = false;
+        return await fn({
+          kind: 'held',
+          token,
+          wait_ms: Date.now() - begun,
+          release: () => {
+            if (!ended) writeRecord({ ...record, state: 'ended' });
+            ended = true;
+          },
+        });
+      }
       writeRecord({ ...record, wait_reason: reason });
       process.stderr.write(`akrogon: waiting to start ${holder.repo}/${holder.leaf} ${holder.check}: ${reason}\n`);
       await Bun.sleep(POLL_MS);

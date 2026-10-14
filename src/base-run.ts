@@ -16,7 +16,8 @@ import { ensureLeafTemp, readGlobal, requireRepo, within, worktreeStore, type Re
 import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { constructedEnv, spawnLogged } from './run-check';
-import { withAdmission } from './admission';
+import { callerScope, withAdmission } from './admission';
+import { runSlice, runUnitArgv, runUnitBase, sessionBusAddress, startRunGuard, stopRunUnits } from './scope';
 import { command, quote, type Result } from './shell';
 import { allLeaves, withLock, type Leaf } from './state';
 import { requiredSlots, slotSchema, type Slot } from './routing';
@@ -162,11 +163,34 @@ export async function baseRun(
             setup,
           )} && akrogon guard own-modules && ${enter}exec "$@"`;
     if (inside !== '') mkdirSync(resolve(target, inside), { recursive: true });
+    const slice: string = runSlice('akrogon.slice');
+    const unit: string = `${runUnitBase(id)}.scope`;
     const ran: Result = await withAdmission(
-      { repo: repo.name, leaf: leaf.state.slug, check: 'base-run' },
+      {
+        repo: repo.name,
+        leaf: leaf.state.slug,
+        check: 'base-run',
+        run: id,
+        slice,
+        scope: callerScope(),
+        unit,
+      },
       async (admission) => {
         env.AKROGON_RUN = admission.token;
-        return spawnLogged(['sh', '-c', script, 'akrogon-base-run', ...argv], target, env, log);
+        if (admission.kind === 'nested')
+          return spawnLogged(['sh', '-c', script, 'akrogon-base-run', ...argv], target, env, log);
+        await startRunGuard(slice, id, process.pid);
+        try {
+          return await spawnLogged(
+            runUnitArgv(slice, id, ['sh', '-c', script, 'akrogon-base-run', ...argv], env.DBUS_SESSION_BUS_ADDRESS),
+            target,
+            { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+            log,
+          );
+        } finally {
+          admission.release();
+          await stopRunUnits(unit, `${runUnitBase(id)}-guard.service`);
+        }
       },
     );
     code = ran.code;

@@ -171,8 +171,8 @@ test('a run at or over the threshold waits printing reading and reason, and a co
     const w1: Cap = run(f, ['run-check', '--name', 'w1', '--', ...hold(dir, 'w1')], worktree);
     const w2: Cap = run(f, ['run-check', '--name', 'w2', '--', ...hold(dir, 'w2')], worktree);
     caps.push(w1, w2);
-    await waitText(w1, /anon\+shmem [\d.]+ GiB >= 48 GiB/);
-    await waitText(w2, /anon\+shmem [\d.]+ GiB >= 48 GiB/);
+    await waitText(w1, /anon\+shmem [\d.]+ GiB \+ runs [\d.]+ GiB >= 48 GiB/);
+    await waitText(w2, /anon\+shmem [\d.]+ GiB \+ runs [\d.]+ GiB >= 48 GiB/);
     expect(existsSync(resolve(dir, 'w1.held'))).toBe(false);
     expect(existsSync(resolve(dir, 'w2.held'))).toBe(false);
     seedStat(f, LOW);
@@ -217,7 +217,7 @@ test('a base-run waits at the threshold before its command and admits on the dro
     seedStat(f, HIGH);
     const waiter: Cap = run(f, ['base-run', '--base', sha, '--', ...touch(dir, 'base')], worktree, shim);
     caps.push(waiter);
-    await waitText(waiter, /anon\+shmem [\d.]+ GiB >= 48 GiB/);
+    await waitText(waiter, /anon\+shmem [\d.]+ GiB \+ runs [\d.]+ GiB >= 48 GiB/);
     expect(existsSync(resolve(dir, 'base'))).toBe(false);
     seedStat(f, LOW);
     await waitFor(resolve(dir, 'base'), 15000);
@@ -299,7 +299,7 @@ test('status lists runs waiting to start with leaf, check and reason, and no per
         leaf: 'ghost',
         check: 'phantom',
         state: 'waiting',
-        wait_reason: 'anon+shmem 51 GiB >= 48 GiB',
+        wait_reason: 'anon+shmem 51 GiB + runs 16 GiB >= 48 GiB',
         since: new Date().toISOString(),
       }),
     );

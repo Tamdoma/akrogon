@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
 import type { Repo } from './config';
-import { CommandError, herdr, spawnCaptured, type SpawnResult } from './shell';
+import { CommandError, herdr, run, spawnCaptured, type SpawnResult } from './shell';
 
 export type ScopePlace =
   { place: 'inside' } | { place: 'outside'; cgroup: string } | { place: 'unreadable'; error: string };
@@ -16,6 +16,75 @@ export function leafSlice(repo: Pick<Repo, 'name'>, slug: string): string {
 
 export function paneScope(slice: string, paneId: string, pid: number, start: string): string {
   return `${slice.replace(/\.slice$/, '')}-p${paneId.replace(/[^A-Za-z0-9]/g, '')}-${pid}-${start}.scope`;
+}
+
+export function runUnitBase(run: string): string {
+  return `akrogon-run-${run}`;
+}
+
+export function runSlice(slice: string): string {
+  const override: string | undefined = process.env.AKROGON_RUN_SLICE;
+  if (override === undefined || override.trim() === '') return slice;
+  if (!override.endsWith('.slice'))
+    throw new Error(`Invalid AKROGON_RUN_SLICE: must be a *.slice name, got ${override}`);
+  return override;
+}
+
+export function sessionBusAddress(): string {
+  const address: string | undefined = process.env.DBUS_SESSION_BUS_ADDRESS;
+  if (address !== undefined && address.trim() !== '') return address;
+  const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;
+  return `unix:path=${runtime !== undefined && runtime.trim() !== '' ? runtime : `/run/user/${process.getuid!()}`}/bus`;
+}
+
+export function runUnitArgv(slice: string, run: string, argv: string[], cutBus: string): string[] {
+  return [
+    'systemd-run',
+    '--user',
+    '--scope',
+    '--quiet',
+    `--unit=${runUnitBase(run)}`,
+    `--slice=${slice}`,
+    '-p',
+    'TimeoutStopSec=5',
+    '-p',
+    'CollectMode=inactive-or-failed',
+    '--',
+    'env',
+    `DBUS_SESSION_BUS_ADDRESS=${cutBus}`,
+    ...argv,
+  ];
+}
+
+// The guard tracks the wrapper pid: when the wrapper dies the scope cannot be
+// reaped by the dead process, so the guard stops it itself.
+export async function startRunGuard(slice: string, run: string, wpid: number): Promise<void> {
+  const base: string = runUnitBase(run);
+  const argv: string[] = [
+    'systemd-run',
+    '--user',
+    '--quiet',
+    `--unit=${base}-guard`,
+    `--slice=${slice}`,
+    '-p',
+    'TimeoutStopSec=5',
+    '--',
+    'sh',
+    '-c',
+    `tail --pid=${wpid} -f /dev/null; exec systemctl --user stop ${base}`,
+  ];
+  const cwd: string = process.cwd();
+  const result: SpawnResult = await spawnCaptured(argv, {
+    cwd,
+    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+  });
+  if (result.code !== 0) throw new CommandError(argv, cwd, result);
+}
+
+// One call per unit: a single stop job fails whole when a unit name is not loaded.
+export async function stopRunUnits(...units: string[]): Promise<void> {
+  for (const unit of units)
+    await run(['systemctl', '--user', 'stop', unit]).catch(() => undefined);
 }
 
 export function procRoot(): string {
