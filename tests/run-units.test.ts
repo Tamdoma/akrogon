@@ -4,7 +4,6 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFi
 import { resolve } from 'node:path';
 import {
   cli,
-  cgroupRoot,
   entry,
   fakeAkrogon,
   fixture,
@@ -54,7 +53,6 @@ function spawnReal(f: Fixture, args: string[], cwd: string, env: NodeJS.ProcessE
     HERDR_PANE_ID: '',
     HOME: f.home,
     AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
-    AKROGON_CGROUP_ROOT: cgroupRoot(f),
     AKROGON_SPACING_MS: '0',
     AKROGON_RUN: '',
     XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR ?? `/run/user/${uid}`,

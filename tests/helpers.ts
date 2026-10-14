@@ -34,9 +34,6 @@ export function seedStat(f: Fixture, anon: number, shmem: number = 0): void {
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, `anon ${anon}\nfile 0\nshmem ${shmem}\n`);
 }
-function admissionEnv(f: Fixture): NodeJS.ProcessEnv {
-  return { AKROGON_CGROUP_ROOT: cgroupRoot(f) };
-}
 export function unitBin(f: Fixture): string {
   return resolve(f.home, 'unitbin');
 }
@@ -86,7 +83,6 @@ export async function cli(
       AKROGON_HOME: f.home,
       HERDR_PANE_ID: '',
       HOME: f.home,
-      ...admissionEnv(f),
       ...withDefault,
       ...('AKROGON_RUN' in env ? {} : { AKROGON_RUN: '' }),
       PATH: `${unitBin(f)}:${env.PATH ?? process.env.PATH}`,
@@ -137,7 +133,6 @@ export function fakeHerdr(f: Fixture): HerdrFixture {
       AKROGON_PROC_ROOT: procRoot(f),
       XDG_RUNTIME_DIR: resolve(f.home, 'run'),
       AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
-      ...admissionEnv(f),
     },
   };
 }
@@ -150,7 +145,6 @@ export function fakeAkrogon(f: Fixture): { env: NodeJS.ProcessEnv } {
     env: {
       PATH: `${bin}:${unitBin(f)}:${process.env.PATH}`,
       AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
-      ...admissionEnv(f),
     },
   };
 }

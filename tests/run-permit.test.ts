@@ -4,7 +4,6 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { resolve } from 'node:path';
 import {
   cli,
-  cgroupRoot,
   entry,
   fakeAkrogon,
   fixture,
@@ -34,7 +33,6 @@ function run(f: Fixture, args: string[], cwd: string, env: NodeJS.ProcessEnv = {
     HERDR_PANE_ID: '',
     HOME: f.home,
     AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
-    AKROGON_CGROUP_ROOT: cgroupRoot(f),
     AKROGON_RUN: '',
     ...env,
     PATH: `${unitBin(f)}:${env.PATH ?? process.env.PATH}`,
@@ -203,7 +201,6 @@ test('a run-check or base-run inside an admitted run starts at once over the thr
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
       env: ['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT'],
-      pass_env: ['AKROGON_CGROUP_ROOT'],
       checks: {},
       grounding: 'none',
     });
