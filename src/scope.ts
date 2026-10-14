@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
@@ -32,7 +32,12 @@ export function runSlice(slice: string): string {
 
 export function sessionBusAddress(): string {
   const address: string | undefined = process.env.DBUS_SESSION_BUS_ADDRESS;
-  if (address !== undefined && address.trim() !== '') return address;
+  if (address !== undefined && address.trim() !== '') {
+    const path: string | undefined = address.startsWith('unix:path=')
+      ? address.slice('unix:path='.length)
+      : undefined;
+    if (path === undefined || existsSync(path)) return address;
+  }
   const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;
   return `unix:path=${runtime !== undefined && runtime.trim() !== '' ? runtime : `/run/user/${process.getuid!()}`}/bus`;
 }
@@ -58,12 +63,7 @@ export function runUnitArgv(slice: string, run: string, argv: string[], cutBus: 
 
 // The guard tracks the wrapper pid: when the wrapper dies its finally can no
 // longer run, so the guard drops the run record and stops the scope itself.
-export async function startRunGuard(
-  slice: string,
-  run: string,
-  wpid: number,
-  recordPath: string,
-): Promise<void> {
+export async function startRunGuard(slice: string, run: string, wpid: number, recordPath: string): Promise<void> {
   const base: string = runUnitBase(run);
   const argv: string[] = [
     'systemd-run',
@@ -88,8 +88,7 @@ export async function startRunGuard(
 
 // One call per unit: a single stop job fails whole when a unit name is not loaded.
 export async function stopRunUnits(...units: string[]): Promise<void> {
-  for (const unit of units)
-    await run(['systemctl', '--user', 'stop', unit]).catch(() => undefined);
+  for (const unit of units) await run(['systemctl', '--user', 'stop', unit]).catch(() => undefined);
 }
 
 export function procRoot(): string {
