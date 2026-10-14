@@ -17,5 +17,5 @@ await requireClean(worktree);
 await requireNoIssueFiles(repo, worktree, chartFolder);
 await requireTestChangeCitations(repo, worktree);
 await requireNonEmpty(repo, worktree);
-requireGreenReceipt(repo, await command(['git', 'rev-parse', 'HEAD'], worktree), 'merge');
+await requireGreenReceipt(repo, await command(['git', 'rev-parse', 'HEAD'], worktree), 'merge');
 console.log('direct guards passed');

@@ -208,6 +208,9 @@ export function greenReceipt(
     repo: 'repo',
     leaf: 'seeded',
     sha,
+    tree: Bun.spawnSync(['git', 'rev-parse', `${sha}^{tree}`], { cwd: f.root })
+      .stdout.toString()
+      .trim(),
     scope,
     path: resolve(f.home, 'verified'),
     pid: process.pid,

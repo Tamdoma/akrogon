@@ -259,7 +259,63 @@ test('a failed setup with no configured checks exits red and its receipt is refu
     const sha: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     expect((await verify(f, [], worktree)).code).not.toBe(0);
     expect(records(f)[0]).toMatchObject({ sha, scope: 'leaf', setup: 7, commands: [] });
-    expect(() => requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).toThrow('No green leaf verify receipt');
+    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).rejects.toThrow(
+      'No green leaf verify receipt',
+    );
+  } finally {
+    f.clean();
+  }
+});
+
+test('a green receipt covers another commit with the same tree and command set without a second run', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { checks: { unit: 'echo unit' } });
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, [], worktree)).code).toBe(0);
+    await command(['git', 'commit', '--allow-empty', '-m', 'trailer only'], worktree);
+    const sha: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], worktree);
+    const reused: Result = await verify(f, [], worktree);
+    expect(reused.code).toBe(0);
+    expect(reused.stdout).toBe(`reuse receipt ${records(f)[0].run} tree=${tree}`);
+    expect(records(f)).toHaveLength(1);
+    await requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a green receipt is refused for a different tree', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { checks: { unit: 'echo unit' } });
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, [], worktree)).code).toBe(0);
+    const changed: string = await commitIn(worktree, 'other.ts');
+    await expect(requireGreenReceipt(readRepo('repo', f.root), changed, 'leaf')).rejects.toThrow(
+      `No green leaf verify receipt for ${changed}`,
+    );
+  } finally {
+    f.clean();
+  }
+});
+
+test('a green receipt is refused under a different command set and verify runs again', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { checks: { unit: 'echo unit' } });
+    const { worktree } = await callerWorktree(f);
+    const sha: string = await commitIn(worktree, 'code.ts');
+    expect((await verify(f, [], worktree)).code).toBe(0);
+    config(f, { checks: { unit: 'echo unit changed' } });
+    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).rejects.toThrow(
+      `No green leaf verify receipt for ${sha}`,
+    );
+    expect((await verify(f, [], worktree)).code).toBe(0);
+    expect(records(f)).toHaveLength(2);
   } finally {
     f.clean();
   }

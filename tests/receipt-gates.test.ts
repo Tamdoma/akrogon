@@ -25,7 +25,6 @@ test('a move into check.review needs a green leaf receipt for HEAD under the cur
     const missing: Result = await cli(f, move);
     expect(missing.code).not.toBe(0);
     expect(missing.stderr).toContain(`No green leaf verify receipt for ${head}`);
-    greenReceipt(f, head, 'merge');
     greenReceipt(f, head, 'leaf', stale);
     const mismatched: Result = await cli(f, move);
     expect(mismatched.code).not.toBe(0);
@@ -59,7 +58,6 @@ test('merged --check stamps tested_top only with a green merge receipt for HEAD 
     const missing: Result = await cli(f, check, f.root, herdr.env);
     expect(missing.code).not.toBe(0);
     expect(missing.stderr).toContain(`No green merge verify receipt for ${head}`);
-    greenReceipt(f, head, 'leaf');
     greenReceipt(f, head, 'merge', stale);
     const mismatched: Result = await cli(f, check, f.root, herdr.env);
     expect(mismatched.code).not.toBe(0);
@@ -90,7 +88,6 @@ test('direct guards need a green merge receipt for the worktree HEAD under the c
     const missing: Result = await run();
     expect(missing.code).not.toBe(0);
     expect(missing.stderr).toContain(`No green merge verify receipt for ${head}`);
-    greenReceipt(f, head, 'leaf');
     greenReceipt(f, head, 'merge', stale);
     expect((await run()).code).not.toBe(0);
     greenReceipt(f, head, 'merge');

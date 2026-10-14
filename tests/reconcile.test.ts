@@ -373,6 +373,7 @@ test('unconfirmed verify worktree is removed when clean, kept when dirty', async
         repo: 'repo',
         leaf: 'holder-leaf',
         sha: 'x',
+        tree: 'x',
         scope: 'leaf',
         path,
         pid: 1,

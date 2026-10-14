@@ -293,7 +293,7 @@ export async function transition(
     await requireFrozenCitations(repo, state.worktree, state.frozen, state.frozen_cited, from);
   if (requested === 'check.review' && state.worktree !== undefined) {
     await requireNonEmpty(repo, state.worktree);
-    requireGreenReceipt(repo, await command(['git', 'rev-parse', 'HEAD'], state.worktree), 'leaf');
+    await requireGreenReceipt(repo, await command(['git', 'rev-parse', 'HEAD'], state.worktree), 'leaf');
   }
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
@@ -572,7 +572,7 @@ async function batchCheck(
     );
   await transition(repo, leaf, requested, slot, verdict, reason, true);
   if (record.decision === 'reuse') return;
-  requireGreenReceipt(repo, head, 'merge');
+  await requireGreenReceipt(repo, head, 'merge');
   saveState(leaf.path, {
     ...readState(leaf.path),
     batch: {
@@ -620,7 +620,11 @@ async function batchPush(
   if (record.solo !== true) await requireBatchTop(worktree, record, head);
   if (slot !== undefined && head !== record.tested_top && !(record.decision === 'reuse' && head === record.top))
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);
-  requireGreenReceipt(repo, record.decision === 'reuse' && head === record.top ? record.tested_top! : head, 'merge');
+  await requireGreenReceipt(
+    repo,
+    record.decision === 'reuse' && head === record.top ? record.tested_top! : head,
+    'merge',
+  );
   await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
   saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head } });
   const pushed: Result = await run(

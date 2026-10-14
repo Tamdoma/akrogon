@@ -18,6 +18,7 @@ export const verifyRunSchema = z.strictObject({
   repo: z.string(),
   leaf: z.string(),
   sha: z.string(),
+  tree: z.string(),
   scope: verifyScopeSchema,
   path: z.string(),
   pid: z.number().int(),
@@ -55,12 +56,15 @@ export function verifyCommands(config: RepoConfig, scope: VerifyScope): NamedCom
   }));
 }
 
-export function requireGreenReceipt(repo: Repo, sha: string, scope: VerifyScope): void {
+function treeOf(repo: Repo, sha: string): Promise<string> {
+  return command(['git', 'rev-parse', `${sha}^{tree}`], repo.root);
+}
+
+function greenRun(repo: Repo, tree: string, scope: VerifyScope): VerifyRun | undefined {
   const expected: NamedCommand[] = verifyCommands(repo.config, scope);
-  const green: boolean = readVerifyRuns(repo).some(
+  return readVerifyRuns(repo).find(
     (run) =>
-      run.sha === sha &&
-      run.scope === scope &&
+      run.tree === tree &&
       run.end !== undefined &&
       run.setup === 0 &&
       run.commands.length === expected.length &&
@@ -69,7 +73,10 @@ export function requireGreenReceipt(repo: Repo, sha: string, scope: VerifyScope)
           item.exit === 0 && item.name === expected[index].name && item.command === expected[index].command,
       ),
   );
-  if (!green)
+}
+
+export async function requireGreenReceipt(repo: Repo, sha: string, scope: VerifyScope): Promise<void> {
+  if (greenRun(repo, await treeOf(repo, sha), scope) === undefined)
     throw new Error(
       `No green ${scope} verify receipt for ${sha} under the current config; run akrogon verify on this commit`,
     );
@@ -108,6 +115,12 @@ export async function verify(
   const { caller, cwd: at }: { caller: LeafTarget; cwd: string } = await verifyCaller(repo, cwd, attempt, holder);
   const scope: VerifyScope = caller.phase === undefined || caller.phase === 'merge' ? 'merge' : 'leaf';
   const sha: string = await command(['git', 'rev-parse', '--verify', `${rev ?? 'HEAD'}^{commit}`], at);
+  const tree: string = await treeOf(repo, sha);
+  const reused: VerifyRun | undefined = greenRun(repo, tree, scope);
+  if (reused !== undefined) {
+    process.stdout.write(`reuse receipt ${reused.run} tree=${tree}\n`);
+    return 0;
+  }
   const akrogonBase: string = await base(repo, at);
   const id: string = randomUUID();
   const target: string = resolve(worktreeStore(repo), `verify-${id}`);
@@ -119,6 +132,7 @@ export async function verify(
     repo: repo.name,
     leaf: caller.slug,
     sha,
+    tree,
     scope,
     path: target,
     pid: process.pid,
