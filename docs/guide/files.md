@@ -71,7 +71,7 @@ Each line carries:
 - `pressure` holds cpu, memory and io stall in integer microseconds (the `some` `total=` increase over the attempt); it is absent when the batch predates this field, the host has no `/proc/pressure`, or the host rebooted mid-attempt.
 - `tools` lists the repo's declared `tools:` as `{name, path, version}` resolved once when the merge batch is dispatched; it is absent on lines predating this field and when the repo declares no tools.
 
-The command writes `merged`, `red`, `split`, `reuse` and `ejected` now.
+The command writes `merged`, `red`, `split` and `ejected` now; `reuse` appears only on older lines.
 
 ## timings.jsonl: record when each stage happens
 

@@ -1006,15 +1006,7 @@ async function reconcileBatch(
         allLeaves(repo).some((item) => item.state.slug === member.slug && item.state.phase === 'merge'),
       );
       if (holderNow.state.phase === 'merge') {
-        if (batch.recorded !== true)
-          appendAttempt(
-            repo,
-            holder.state.slug,
-            batch,
-            batch.decision === 'reuse' ? 'reuse' : 'merged',
-            undefined,
-            end,
-          );
+        if (batch.recorded !== true) appendAttempt(repo, holder.state.slug, batch, 'merged', undefined, end);
         await commitMove(repo, holderNow, holderNow.state, 'merged', null);
         if (!inFlight) {
           const remaining: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
@@ -1031,15 +1023,7 @@ async function reconcileBatch(
         const survivors: BatchMember[] = holderNow.state.batch.members.filter((member) =>
           allLeaves(repo).some((item) => item.state.slug === member.slug && item.state.phase === 'merge'),
         );
-        if (batch.recorded !== true)
-          appendAttempt(
-            repo,
-            holder.state.slug,
-            batch,
-            batch.decision === 'reuse' ? 'reuse' : 'merged',
-            undefined,
-            end,
-          );
+        if (batch.recorded !== true) appendAttempt(repo, holder.state.slug, batch, 'merged', undefined, end);
         const notified: boolean = batch.notified === true || (await mergeNotice(repo, holderNow.state.slug));
         saveState(holderNow.path, {
           ...holderNow.state,

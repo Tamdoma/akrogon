@@ -64,8 +64,6 @@ Check these choices:
 - **pass_env** lists session variables, such as `DISPLAY`, passed from the caller into each check command's constructed environment. They are never read from or written to `.env`; a name that is unset stays unset. `DBUS_SESSION_BUS_ADDRESS` is reserved in both lists: every check runs with the session bus cut so test browsers stay in akrogon's cgroup.
 - **tools** lists PATH tools resolved at merge dispatch and recorded on merge attempts.
 
-Check commands must not read tracked files under `issues/` (except `issues/config.yaml`, the check list itself) or `learnings/` — a green batch run is reused when only those folders moved on the default branch.
-
 `setup` runs before every `checks`, `merge_checks` and `advisory` command that `akrogon config` prints, and once per `akrogon verify` checkout before its commands run. It runs under a per-worktree lock kept under the git dir, so the lock never shows in `git status` and is removed with the worktree. The setup skill proposes it only when a lockfile is committed. Every printed check command runs under `akrogon run-check`, which refuses forbidden caller environment (`NODE_PATH`, `BUN_OPTIONS`, `BUN_INSTALL_CACHE_DIR`, `FFMPEG_BIN`, `CHROME_PATH`, `CDP_BROWSER_BINARY`, a global bunfig) and runs the command in a constructed environment. Many check commands can run at a time on the host; every run registers a record and starts at once. Each run lives in its own `akrogon-run-<id>.scope` systemd scope under the leaf slice and prints a `run <id>` line on stderr; `akrogon stop-run <id>` ends it. A run started inside a live run (matching `AKROGON_RUN`) prints no `run` line and creates no unit.
 
 Use the effective configuration to check the result:

@@ -388,7 +388,7 @@ test.serial('a batch check.fix appends exactly one split attempt line', async ()
   }
 });
 
-test.serial('a refused push restacked to reuse appends exactly one reuse line at the landing push', async () => {
+test.serial('a refused push restacked to rerun appends exactly one merged line at the landing push', async () => {
   const f: Fixture = await fixture();
   try {
     const { herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
@@ -407,8 +407,12 @@ test.serial('a refused push restacked to reuse appends exactly one reuse line at
       herdr.env,
     );
     expect(refused.code).toBe(0);
-    expect(refused.stdout).toMatch(/^reuse tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
+    expect(refused.stdout).toMatch(/^rerun tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
     expect(attemptLines(f)).toEqual([]);
+    await verified(f, 'hold', 'merge');
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
+    ).toBe(0);
     const landed: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
@@ -419,7 +423,7 @@ test.serial('a refused push restacked to reuse appends exactly one reuse line at
     expect(await remoteTip(f)).not.toBe(advanced);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
-    expect(lines[0].outcome).toBe('reuse');
+    expect(lines[0].outcome).toBe('merged');
     expect(lines[0].holder).toBe('hold');
     expect(lines[0].members).toEqual(['mem-a', 'mem-b']);
     expect(lines[0].built_on).toBe(advanced);
@@ -530,7 +534,7 @@ test.serial('a merged line carries PSI stall deltas from batch creation', async 
   }
 });
 
-test.serial('a restacked reuse line carries PSI stall deltas from batch creation', async () => {
+test.serial('a restacked merged line carries PSI stall deltas from batch creation', async () => {
   const f: Fixture = await fixture();
   try {
     const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
@@ -552,8 +556,13 @@ test.serial('a restacked reuse line carries PSI stall deltas from batch creation
       herdr.env,
     );
     expect(refused.code).toBe(0);
-    expect(refused.stdout).toMatch(/^reuse tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
+    expect(refused.stdout).toMatch(/^rerun tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
     expect(attemptLines(f)).toEqual([]);
+    await verified(f, 'hold', 'merge');
+    expect(
+      (await spawn(f, 'recheck', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), herdr.env))
+        .code,
+    ).toBe(0);
     const landed: Result = await spawn(
       f,
       'landed',
@@ -563,7 +572,7 @@ test.serial('a restacked reuse line carries PSI stall deltas from batch creation
     expect(landed.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
-    expect(lines[0].outcome).toBe('reuse');
+    expect(lines[0].outcome).toBe('merged');
     expect(lines[0].built_on).toBe(advanced);
     expect(lines[0].pressure).toEqual({ cpu: 10, memory: 20, io: 40 });
   } finally {
@@ -869,7 +878,7 @@ test.serial('a decimal pressure total stops batch creation before any batch or l
   }
 });
 
-test.serial('a created batch preserves PSI counters through rerun then reuse', async () => {
+test.serial('a created batch preserves PSI counters through two reruns', async () => {
   const f: Fixture = await fixture();
   try {
     process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
@@ -928,17 +937,28 @@ test.serial('a created batch preserves PSI counters through rerun then reuse', a
     ).toBe(0);
     await advanceRemote(f, { 'issues/open/x/state.yaml': 'x\n' });
     pressureDir(f, { cpu: '15', memory: '26', io: '47' });
-    const reuse: Result = await spawn(
+    const second: Result = await spawn(
       f,
-      'reuse',
+      'second',
       phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, batch.attempt], dir),
       herdr.env,
     );
-    expect(reuse.code).toBe(0);
-    const reused: Batch = readState(holderPath).batch!;
-    expect(reused.decision).toBe('reuse');
-    expect(reused.pressure_start).toEqual(batch.pressure_start);
+    expect(second.code).toBe(0);
+    const again: Batch = readState(holderPath).batch!;
+    expect(again.decision).toBe('rerun');
+    expect(again.pressure_start).toEqual(batch.pressure_start);
     expect(attemptLines(f)).toEqual([]);
+    await verified(f, 'hold', 'merge');
+    expect(
+      (
+        await spawn(
+          f,
+          'third',
+          phaseBody('hold', 'merged', ['B', undefined, undefined, true, batch.attempt], dir),
+          herdr.env,
+        )
+      ).code,
+    ).toBe(0);
     const landed: Result = await spawn(
       f,
       'land',
@@ -948,7 +968,7 @@ test.serial('a created batch preserves PSI counters through rerun then reuse', a
     expect(landed.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
-    expect(lines[0].outcome).toBe('reuse');
+    expect(lines[0].outcome).toBe('merged');
     expect(lines[0].pressure).toEqual({ cpu: 10, memory: 20, io: 40 });
   } finally {
     f.clean();

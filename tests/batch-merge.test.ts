@@ -1145,91 +1145,53 @@ for (const edited of ['holder', 'member'] as const) {
   });
 }
 
-test.serial(
-  'a record-only advance reuses the green run: prints reuse, keeps the tested pair and pushes the restacked top',
-  async () => {
-    const f: Fixture = await fixture();
-    try {
-      const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a', 'mem-b']);
-      const t1: string = record.top!;
-      const m1: string = record.built_on;
-      const countFile: string = resolve(f.home, 'check-count');
-      yaml(resolve(f.root, 'issues/config.yaml'), {
-        grounding: 'none',
-        checks: { count: 'sh -c "echo x >> ' + countFile + '"' },
-      });
-      await command(['sh', '-c', 'echo x >> ' + countFile]);
-      await verified(f, 'hold', 'merge');
-      const checked: Result = await cli(
-        f,
-        ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-        f.root,
-        herdr.env,
-      );
-      expect(checked.code).toBe(0);
-      const m2: string = await advanceRemote(f, {
-        'issues/open/x/state.yaml': 'x\n',
-        'learnings/history/y.md': 'y\n',
-      });
-      const merged: Result = await cli(
-        f,
-        ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
-        f.root,
-        herdr.env,
-      );
-      expect(merged.code).toBe(0);
-      const t2: string = merged.stdout.split('pushed=')[1];
-      expect(merged.stdout).toBe(`reuse tested=${t1} pushed=${t2}`);
-      const reuseBatch: Batch = readState(holder.path).batch!;
-      expect(reuseBatch.decision).toBe('reuse');
-      expect(reuseBatch.tested_top).toBe(t1);
-      expect(reuseBatch.tested_main).toBe(m1);
-      expect(reuseBatch.built_on).toBe(m2);
-      expect(reuseBatch.top).toBe(t2);
-      expect(reuseBatch.candidate).toBeUndefined();
-      expect(readFileSync(countFile, 'utf8').trim().split('\n')).toHaveLength(1);
-      await verified(f, 'hold', 'merge');
-      const recheck: Result = await cli(
-        f,
-        ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-        f.root,
-        herdr.env,
-      );
-      expect(recheck.code).toBe(0);
-      expect(recheck.stdout).toBe('ok');
-      // The candidate lives on the record only between the push-attempt write and
-      // reconcile's post-landing cleanup, so snapshot state.yaml at the push.
-      const git: string = await command(['sh', '-c', 'command -v git']);
-      const bin: string = resolve(f.home, 'push-bin');
-      mkdirSync(bin);
-      mkdirSync(resolve(f.home, 'snap'));
-      writeFileSync(
-        resolve(bin, 'git'),
-        `#!/bin/sh
-if [ "$1" = push ]; then cp '${holder.path}/state.yaml' '${resolve(f.home, 'snap')}/state.yaml'; fi
-exec '${git}' "$@"
-`,
-      );
-      chmodSync(resolve(bin, 'git'), 0o755);
-      const pushed: Result = await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, {
-        ...herdr.env,
-        PATH: `${bin}:${process.env.PATH}`,
-      });
-      expect(pushed.code).toBe(0);
-      expect(await remoteTip(f)).toBe(t2);
-      const landed: Batch = readState(resolve(f.home, 'snap')).batch!;
-      expect(landed.tested_top).toBe(t1);
-      expect(landed.candidate).toBe(t2);
-      expect(landed.decision).toBe('reuse');
-      expect(landed.built_on).toBe(m2);
-      expect(landed.top).toBe(t2);
-      expect(readState(resolve(f.root, 'issues/closed/issue/hold')).phase).toBe('merged');
-      expect(readFileSync(countFile, 'utf8').trim().split('\n')).toHaveLength(1);
-    } finally {
-      f.clean();
-    }
-  },
-);
+test.serial('a records-only advance refuses the push until the pushed tree has its own green receipt', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
+    const t1: string = record.top!;
+    const m1: string = record.built_on;
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      grounding: 'none',
+      checks: { absent: 'test ! -e learnings/history/red.md' },
+    });
+    expect((await cli(f, ['verify', '--attempt', 'a1'], f.root, herdr.env)).code).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
+    ).toBe(0);
+    const m2: string = await advanceRemote(f, { 'learnings/history/red.md': 'red\n' });
+    const merged: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(merged.code).toBe(0);
+    const t2: string = merged.stdout.split('pushed=')[1];
+    expect(merged.stdout).toBe(`rerun tested=${t1} pushed=${t2}`);
+    const batch: Batch = readState(holder.path).batch!;
+    expect(batch.decision).toBe('rerun');
+    expect(batch.tested_top).toBeUndefined();
+    expect(batch.top).toBe(t2);
+    const refused: Result = await cli(
+      f,
+      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      f.root,
+      herdr.env,
+    );
+    expect(refused.code).not.toBe(0);
+    expect(await remoteTip(f)).toBe(m2);
+    expect(m1).not.toBe(m2);
+    expect((await cli(f, ['verify', '--attempt', 'a1'], f.root, herdr.env)).code).toBe(1);
+    expect(
+      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
+    ).not.toBe(0);
+    expect(await remoteTip(f)).toBe(m2);
+  } finally {
+    f.clean();
+  }
+});
 
 test.serial('a code advance forces a rerun: the seat rechecks and the restacked top lands', async () => {
   const f: Fixture = await fixture();
@@ -1389,51 +1351,6 @@ test.serial(
   },
 );
 
-test.serial('a second refusal after reuse still compares against the original tested pair', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
-    const t1: string = record.top!;
-    const m1: string = record.built_on;
-    await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, herdr.env)).code,
-    ).toBe(0);
-    await advanceRemote(f, { 'issues/open/x/state.yaml': 'x\n' });
-    const first: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      herdr.env,
-    );
-    expect(first.code).toBe(0);
-    const t2: string = first.stdout.split('pushed=')[1];
-    expect(first.stdout).toBe(`reuse tested=${t1} pushed=${t2}`);
-    const m3: string = await advanceRemote(f, { 'learnings/history/z.md': 'z\n' });
-    const second: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      herdr.env,
-    );
-    expect(second.code).toBe(0);
-    const t3: string = second.stdout.split('pushed=')[1];
-    expect(second.stdout).toBe(`reuse tested=${t1} pushed=${t3}`);
-    const again: Batch = readState(holder.path).batch!;
-    expect(again.tested_top).toBe(t1);
-    expect(again.tested_main).toBe(m1);
-    expect(again.decision).toBe('reuse');
-    expect(again.built_on).toBe(m3);
-    expect(again.top).toBe(t3);
-    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, herdr.env)).code).toBe(
-      0,
-    );
-    expect(await remoteTip(f)).toBe(t3);
-  } finally {
-    f.clean();
-  }
-});
-
 test.serial('a dirty holder during restack records rerun and preserves the operator edit', async () => {
   const f: Fixture = await fixture();
   try {
@@ -1460,34 +1377,6 @@ test.serial('a dirty holder during restack records rerun and preserves the opera
     expect(batch.solo).toBe(true);
     expect(readFileSync(edit, 'utf8')).toBe('edit\n');
     expect(await remoteTip(f)).toBe(main);
-  } finally {
-    f.clean();
-  }
-});
-
-test.serial('the reuse decision is identical when the command runs from a subdirectory', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const { holder, record, herdr } = await batchFixture(f, ['hold', 'mem-a']);
-    const t1: string = record.top!;
-    const subdir: string = resolve(holder.state.worktree!, 'subdir');
-    mkdirSync(subdir);
-    await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], subdir, herdr.env)).code,
-    ).toBe(0);
-    await advanceRemote(f, { 'learnings/history/y.md': 'y\n' });
-    const merged: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
-      subdir,
-      herdr.env,
-    );
-    expect(merged.code).toBe(0);
-    const t2: string = merged.stdout.split('pushed=')[1];
-    expect(merged.stdout).toBe(`reuse tested=${t1} pushed=${t2}`);
-    expect(readState(holder.path).batch?.decision).toBe('reuse');
-    expect(readState(holder.path).batch?.tested_top).toBe(t1);
   } finally {
     f.clean();
   }

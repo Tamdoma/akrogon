@@ -35,16 +35,7 @@ import { closeSources } from './pull';
 import { testFile } from './test-files';
 import { trackingRef } from './preflight';
 import { retiredLessonsPresent } from './lessons';
-import {
-  applyStack,
-  buildStack,
-  equalOutsideRecordFolders,
-  isAncestor,
-  holderOwnsBranch,
-  recordConfigEqual,
-  restoreHolder,
-  restoreMembers,
-} from './batch';
+import { applyStack, buildStack, isAncestor, holderOwnsBranch, restoreHolder, restoreMembers } from './batch';
 import { requireGreenReceipt } from './verify';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
@@ -571,7 +562,6 @@ async function batchCheck(
         '. Remove the learnings/LESSONS.md line(s) and commit before pushing.',
     );
   await transition(repo, leaf, requested, slot, verdict, reason, true);
-  if (record.decision === 'reuse') return;
   await requireGreenReceipt(repo, head, 'merge');
   saveState(leaf.path, {
     ...readState(leaf.path),
@@ -618,13 +608,9 @@ async function batchPush(
   const head: string = await mergeHead(repo, state, record);
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
   if (record.solo !== true) await requireBatchTop(worktree, record, head);
-  if (slot !== undefined && head !== record.tested_top && !(record.decision === 'reuse' && head === record.top))
+  if (slot !== undefined && head !== record.tested_top)
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);
-  await requireGreenReceipt(
-    repo,
-    record.decision === 'reuse' && head === record.top ? record.tested_top! : head,
-    'merge',
-  );
+  await requireGreenReceipt(repo, head, 'merge');
   await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
   saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head } });
   const pushed: Result = await run(
@@ -632,7 +618,7 @@ async function batchPush(
     repo.root,
   );
   if (pushed.code === 0) {
-    appendAttempt(repo, leaf.state.slug, record, record.decision === 'reuse' ? 'reuse' : 'merged', undefined, end);
+    appendAttempt(repo, leaf.state.slug, record, 'merged', undefined, end);
     saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head, recorded: true } });
     for (const entry of members)
       await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
@@ -672,7 +658,6 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
     ? await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root)
     : record.holder.head;
   let members: BatchMember[] = record.members;
-  let conflicted: boolean = false;
   for (;;) {
     const items: { slug: string; base: string; head: string }[] = members.map((member) => ({
       slug: member.slug,
@@ -684,16 +669,6 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
       record.holder.head,
     ]);
     if (staged.ok) {
-      const tested: { main: string; top: string } | undefined =
-        record.tested_main !== undefined && record.tested_top !== undefined
-          ? { main: record.tested_main, top: record.tested_top }
-          : undefined;
-      const reuse: boolean =
-        !conflicted &&
-        tested !== undefined &&
-        (await equalOutsideRecordFolders(repo, tested.main, builtOn)) &&
-        (await equalOutsideRecordFolders(repo, tested.top, staged.top)) &&
-        (await recordConfigEqual(repo, tested.main, builtOn));
       const applied: boolean | 'rebuild' | 'dirty-holder' = await withLock(resolve(globalHome(), '.lock'), async () => {
         const current: Leaf = findLeaf(repo, leaf.state.slug);
         const batch: Batch | undefined = current.state.batch;
@@ -792,9 +767,9 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
             top: staged.top,
             members: appliedMembers.map((entry) => entry.member),
             candidate: undefined,
-            tested_top: reuse ? tested!.top : undefined,
-            tested_main: reuse ? tested!.main : undefined,
-            decision: reuse ? 'reuse' : 'rerun',
+            tested_top: undefined,
+            tested_main: undefined,
+            decision: 'rerun',
           },
         });
         return true;
@@ -805,10 +780,9 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
         return;
       }
       if (!applied) throw new Error('Batch attempt superseded during restack; record left for the next pass');
-      console.log(`${reuse ? 'reuse' : 'rerun'} tested=${record.tested_top ?? 'none'} pushed=${staged.top}`);
+      console.log(`rerun tested=${record.tested_top ?? 'none'} pushed=${staged.top}`);
       return;
     }
-    conflicted = true;
     if (staged.conflict === holderHead) {
       await withLock(resolve(globalHome(), '.lock'), async () => {
         const current: Leaf = findLeaf(repo, leaf.state.slug);
@@ -891,8 +865,7 @@ async function finishPush(
       const batch: Batch | undefined = leaf.state.batch;
       if (batch?.attempt !== pending.record.attempt || leaf.state.phase !== 'merge')
         throw new Error('Batch record changed while verifying the push');
-      if (batch.recorded !== true)
-        appendAttempt(repo, slug, batch, batch.decision === 'reuse' ? 'reuse' : 'merged', undefined, pending.end);
+      if (batch.recorded !== true) appendAttempt(repo, slug, batch, 'merged', undefined, pending.end);
       saveState(leaf.path, {
         ...leaf.state,
         batch: { ...batch, applied: true, top: pending.candidate, recorded: true },
