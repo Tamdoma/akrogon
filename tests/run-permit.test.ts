@@ -271,14 +271,12 @@ test('status shows no Run lines while a run holds, and ignores dead waiting reco
   }
 }, 45000);
 
-test('a run-check starts at once with memory.stat missing or unreadable', async () => {
+test('a run-check runs without reading any memory stat', async () => {
   const f: Fixture = await fixture();
   try {
     const dir: string = marks(f);
     const worktree: string = await leafWorktree(f, 'no-stat');
-    const missing: Result = await cli(f, ['run-check', '--name', 'gone', '--', ...touch(dir, 'gone')], worktree, {
-      AKROGON_CGROUP_ROOT: resolve(f.home, 'cgroup-empty'),
-    });
+    const missing: Result = await cli(f, ['run-check', '--name', 'gone', '--', ...touch(dir, 'gone')], worktree);
     expect(missing.code).toBe(0);
     expect(existsSync(resolve(dir, 'gone'))).toBe(true);
   } finally {
