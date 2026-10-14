@@ -1751,7 +1751,7 @@ test('a trailer naming a different path does not cite and the old path of a rena
   }
 });
 
-test('added-only test files and non-test diffs move without a trailer, and recovery re-runs the guard', async () => {
+test('added-only test files and non-test diffs move without a trailer, and recovery runs the guard only into review or merge', async () => {
   const f: Fixture = await fixture();
   try {
     const worktree: string = await oldFileBranch(f, 'cite-add');
@@ -1771,15 +1771,18 @@ test('added-only test files and non-test diffs move without a trailer, and recov
     const recoverBefore: string = bytes(recoverPath);
     writeFileSync(resolve(recover, 'x.test.ts'), 'edited\n');
     await commitAll(recover, ['edit test']);
-    const refused: Result = await cli(f, ['phase', 'cite-recover', 'implement']);
+    await verified(f, 'cite-recover', 'leaf');
+    const refused: Result = await cli(f, ['phase', 'cite-recover', 'check.review']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('x.test.ts');
     expect(readState(recoverPath).phase).toBe('failed');
     expect(bytes(recoverPath)).toBe(recoverBefore);
-    await command(['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: x.test.ts fixed the test'], recover);
     const moved: Result = await cli(f, ['phase', 'cite-recover', 'implement']);
     expect(moved.stdout).toBe('moved implement');
     expect(readState(recoverPath).phase).toBe('implement');
+    const left: Result = await cli(f, ['phase', 'cite-recover', 'check.review', '--slot', 'A']);
+    expect(left.code).not.toBe(0);
+    expect(left.stderr).toContain('x.test.ts');
   } finally {
     f.clean();
   }

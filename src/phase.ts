@@ -277,8 +277,10 @@ export async function transition(
   if (state.worktree !== undefined && !(state.phase === 'failed' && state.failure?.cause === 'blocked'))
     await requireClean(state.worktree);
   if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path, from);
-  if (state.worktree !== undefined) await requireTestChangeCitations(repo, state.worktree, from);
-  if (state.worktree !== undefined && state.frozen !== undefined)
+  // Recovery back into work skips the citation gates: the seat's own move out of that work runs them on the same diff.
+  const cites: boolean = state.phase !== 'failed' || requested === 'check.review' || requested === 'merge';
+  if (state.worktree !== undefined && cites) await requireTestChangeCitations(repo, state.worktree, from);
+  if (state.worktree !== undefined && state.frozen !== undefined && cites)
     await requireFrozenCitations(repo, state.worktree, state.frozen, state.frozen_cited, from);
   if (requested === 'check.review' && state.worktree !== undefined) {
     await requireNonEmpty(repo, state.worktree);
