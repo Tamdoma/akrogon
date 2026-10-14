@@ -105,7 +105,7 @@ Protocol, using the shapes in shapes.md:
 5. Landing, after B returns ready or nits on a committed head:
    1. fetch, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` in the worktree;
    2. conflict resolution sends B a focused re-check of the resolved range with the range-diff recorded, a clean rebase reruns checks only;
-   3. `checks` then `merge_checks` from `akrogon config`;
+   3. `akrogon verify --holder <chart>/direct` in the worktree, which runs `checks` then `merge_checks` on a fresh checkout of the rebased head and writes the receipt direct-guards requires;
    4. `bun <skill-folder>/scripts/direct-guards.ts <worktree> <repo-key> <chart-folder>` must exit 0, with `<skill-folder>` resolved as for chart-usage.ts, run only after the fetch and rebase above;
    5. `git push <remote> <sha>:refs/heads/<default_branch>` of the exact tested SHA, never force; a rejected push keeps the branch, and at most 2 push attempts are made, each with a fresh rebase, checks and B conflict re-check, then stop with the branch kept;
    6. per delivered source, after checking other owners' outstanding work, `akrogon close <id> --by "<chart> direct <sha>"`;
