@@ -44,7 +44,7 @@ A round takes one fork, the next answerable fork first, preferring the one whose
 
 Propose the split by destination and speed of resolution before writing: independently checkable outcomes sharing a destination can be parallel leaves of one issue, independent issues run side by side, and only an actual dependency orders work, never file overlap or presentation preference.
 
-Write one chart folder per destination. When every chart still holds an open fork, stop the seed drain for the operator to select one; a chart whose forks are all taken is handed off without waiting for charts that still hold one; when every fork in every chart is taken, hand off each chart in order without asking for a selection, asking the debate question once for the whole handoff. A direct single item whose map finds no open fork and no fog writes the same chart structure and proceeds to the handoff review immediately, where the route is chosen.
+Write one chart folder per destination. Rounds work one chart at a time and never mix charts: when the current chart hands off, closes or is held, the door moves on without asking for a selection to the chart the operator names, else the open chart that has waited longest, else the next seed; a chart whose forks are all taken is handed off without waiting for charts that still hold one; when every fork in every chart is taken, hand off each chart in order without asking for a selection, asking the debate question once for the whole handoff. A direct single item whose map finds no open fork and no fog writes the same chart structure and proceeds to the handoff review immediately, where the route is chosen.
 
 ## Take
 
@@ -128,7 +128,7 @@ End each door pass with the actual result and reason no automatic pass follows, 
 
 ```text
 Last operation: <what this pass wrote or observed>
-Next: none <awaiting operator answer, chart selection, dispatch, or named blocker>
+Next: none <awaiting operator answer, dispatch, or named blocker>
 ```
 
 The footer is printed only when the turn ends, and never while a prompted peer's turn is open.
