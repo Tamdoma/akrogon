@@ -18,13 +18,23 @@ async function packEvidence(ownerDir: string, members: Record<string, Buffer>): 
   writeFileSync(resolve(ownerDir, 'evidence.tar.zst'), Bun.zstdCompressSync(bytes, { level: 19 }));
 }
 
+const shims: WeakMap<Fixture, NodeJS.ProcessEnv> = new WeakMap();
+function shimEnv(f: Fixture): NodeJS.ProcessEnv {
+  let env: NodeJS.ProcessEnv | undefined = shims.get(f);
+  if (env === undefined) {
+    env = fakeAkrogon(f).env;
+    shims.set(f, env);
+  }
+  return env;
+}
+
 async function logRun(f: Fixture, arg: string, cwd: string): Promise<{ code: number; bytes: Buffer; stderr: string }> {
   const dir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'log-reader-')));
   const out: string = resolve(dir, 'out');
   const err: string = resolve(dir, 'err');
   const result = await spawnCaptured(['sh', '-c', `akrogon log ${quote(arg)} >${quote(out)} 2>${quote(err)}`], {
     cwd,
-    env: { ...process.env, ...fakeAkrogon(f).env, HOME: f.home, AKROGON_HOME: f.home },
+    env: { ...process.env, ...shimEnv(f), HOME: f.home, AKROGON_HOME: f.home },
   });
   return {
     code: result.code,
