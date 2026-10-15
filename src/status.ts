@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync, type Dirent } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync, type Dirent } from 'node:fs';
 import { basename, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import {
@@ -286,6 +286,60 @@ function render(titles: string[], lines: string[][]): string[] {
 
 const chartHeader: string[] = ['CHART', 'TAKEN', 'FOG', 'STAGE', 'AGE'];
 
+export type ChartStage = 'handed off' | 'closed' | 'held';
+
+export function lastStage(markdown: string): ChartStage | undefined {
+  return markdown
+    .match(/^(Handed off|Closed|Held)\b/gm)
+    ?.at(-1)
+    ?.toLowerCase() as ChartStage | undefined;
+}
+
+function chartFolders(root: string): string[] {
+  const store: string = resolve(root, 'issues/chart');
+  if (!existsSync(store)) return [];
+  if (existsSync(resolve(store, 'CHART.md'))) return [store];
+  return readdirSync(store, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && existsSync(resolve(store, entry.name, 'CHART.md')))
+    .map((entry) => resolve(store, entry.name))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+// Folders a person must finish packing: closed owners and ended charts still
+// holding plain logs, any .closing a failed pack or close left, and open-owner
+// .closing markers naming the completion retry.
+function unpackedLines(root: string): string[] {
+  const lines: string[] = [];
+  const packLine = (folder: string): string => {
+    const rel: string = relative(root, folder);
+    return `Unpacked: ${rel}: run akrogon pack ${rel}`;
+  };
+  const hasLog = (dir: string): boolean =>
+    existsSync(dir) &&
+    [...new Bun.Glob('**/*.log').scanSync({ cwd: dir, dot: true, onlyFiles: false })].some(
+      (name) => !lstatSync(resolve(dir, name)).isDirectory(),
+    );
+  const closing = (folder: string): boolean => existsSync(resolve(folder, '.closing'));
+  for (const owner of issueFolders(root, 'issues/closed')) {
+    const folder: string = resolve(root, 'issues/closed', owner);
+    if (hasLog(folder) || closing(folder)) lines.push(packLine(folder));
+  }
+  for (const folder of chartFolders(root)) {
+    const ended: boolean = lastStage(readFileSync(resolve(folder, 'CHART.md'), 'utf8')) !== undefined;
+    if ((ended && hasLog(resolve(folder, 'direct'))) || closing(folder)) lines.push(packLine(folder));
+  }
+  const open: string = resolve(root, 'issues/open');
+  for (const owner of issueFolders(root, 'issues/open')) {
+    const folder: string = resolve(open, owner);
+    if (!closing(folder)) continue;
+    const leaves: Leaf[] = leavesUnder(folder, open);
+    const slug: string | undefined =
+      leaves.find((leaf) => leaf.state.phase === 'merged')?.state.slug ?? leaves[0]?.state.slug;
+    if (slug !== undefined) lines.push(`Unpacked: ${relative(root, folder)}: run akrogon next ${slug}`);
+  }
+  return lines;
+}
+
 function since(ms: number): string {
   const minutes: number = Math.max(0, Math.floor(ms / 60000));
   return minutes < 60
@@ -314,25 +368,13 @@ function chartRow(folder: string, name: string, now: number): string[] {
     /^## Taken\s*\n\s*\S/m.test(readFileSync(resolve(forks, entry), 'utf8')),
   ).length;
   const fog: number = section(markdown, 'Fog').length;
-  const stage: string =
-    markdown
-      .match(/^(Handed off|Closed|Held)\b/gm)
-      ?.at(-1)
-      ?.toLowerCase() ?? (files.length + fog > 0 ? 'charting' : 'empty');
+  const stage: string = lastStage(markdown) ?? (files.length + fog > 0 ? 'charting' : 'empty');
   return [`  ${name}`, `${taken}/${files.length}`, String(fog), stage, since(now - statSync(chart).mtimeMs)];
 }
 
 function chartRows(root: string, now: number): string[][] {
   const store: string = resolve(root, 'issues/chart');
-  if (!existsSync(store)) return [];
-  const single: boolean = existsSync(resolve(store, 'CHART.md'));
-  return single
-    ? [chartRow(store, 'chart', now)]
-    : readdirSync(store, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory() && existsSync(resolve(store, entry.name, 'CHART.md')))
-        .map((entry) => entry.name)
-        .sort((a, b) => a.localeCompare(b))
-        .map((name) => chartRow(resolve(store, name), name, now));
+  return chartFolders(root).map((folder) => chartRow(folder, folder === store ? 'chart' : basename(folder), now));
 }
 
 export async function statusCommand(slug: string | undefined, charts: boolean = false): Promise<void> {
@@ -391,6 +433,9 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
           );
       }
     }
+  }
+  for (const scan of scans) {
+    if (scan.ok) for (const line of unpackedLines(scan.repo.root)) console.log(line);
   }
   for (const scan of scans) {
     if (!scan.ok) continue;

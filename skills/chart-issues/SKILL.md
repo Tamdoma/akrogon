@@ -82,7 +82,7 @@ bun -e "import {readGlobal} from './src/config.ts'; import {readReadiness, gaps}
 
 `akrogon status` cannot see drafts without `state.yaml`, so this is the pre-handoff presence check; after valid writes `akrogon status` validates the emitted files.
 
-On the direct route no leaf files or `state.yaml` are written, `Closed <YYYY-MM-DD>` follows a direct landing after cleanup, and `Held <YYYY-MM-DD>` follows abandon. After valid lifecycle handoff append `Handed off <YYYY-MM-DD>` on its own line to CHART.md, retaining the chart and source inputs in place; command dispatch remains the authority, so the handoff runs no `akrogon next` or chart phase transition and the door moves to the next chart as Drain states. The door makes and verifies a needed step on main during the pass when its precondition exists, and a waiting edit blocked on a leaf's merge or an unsourced chart follows the shapes.md records. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. The door runs the usage script again when it appends `Handed off`, `Held` or `Closed`.
+On the direct route no leaf files or `state.yaml` are written, `Closed <YYYY-MM-DD>` follows a direct landing after cleanup, and `Held <YYYY-MM-DD>` follows abandon. The door runs `akrogon pack <chart>` before appending `Closed`, `Held` or `Handed off` when `<chart>/direct` holds a log. After valid lifecycle handoff append `Handed off <YYYY-MM-DD>` on its own line to CHART.md, retaining the chart and source inputs in place; command dispatch remains the authority, so the handoff runs no `akrogon next` or chart phase transition and the door moves to the next chart as Drain states. The door makes and verifies a needed step on main during the pass when its precondition exists, and a waiting edit blocked on a leaf's merge or an unsourced chart follows the shapes.md records. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. The door runs the usage script again when it appends `Handed off`, `Held` or `Closed`.
 
 ## Direct route
 
@@ -111,14 +111,14 @@ Protocol, using the shapes in shapes.md:
    6. per delivered source, after checking other owners' outstanding work, `akrogon close <id> --by "<chart> direct <sha>"`;
    7. broadcast-issue as sender when the repo configures broadcast, with the chart brief, pushed SHA and closed sources as context, and a failure does not reopen;
    8. `git worktree unlock <path>` then `git worktree remove <path>` verified by `git worktree list`, then `git branch -D <slug>` verified by empty `git branch --list <slug>`;
-   9. the landed SHA into the `Direct attempt` section, then `Closed <date>`.
+   9. `akrogon pack <chart>` when `<chart>/direct` holds a log, then the landed SHA into the `Direct attempt` section, then `Closed <date>`.
    The root checkout is never reset, and a failed local update is reported.
 
 Repair bound: one round is B `fix` (or a blocking landing-check failure), one door repair pass over all Fixes, and B's re-check of the repair diff. The bound is the repo's `fix_rounds` from `akrogon config`, with the count kept in `Direct attempt` so it survives session replacement. A passing last round lands. Exhaustion stops with the open Fixes listed, and the operator chooses one more round, lifecycle handoff, or abandon. Push attempts are not rounds.
 
 Growth stop: stop coding and landing when a locked decision must change, a need eligibility excludes appears, a criterion cannot pass in scope after permitted repairs, or a second outcome appears. The door commits existing work as one partial-labelled commit so the tree is clean, keeps the worktree, updates `Direct attempt` (trigger, done, not done) and opens the trigger as a new fork. Continuations:
 - lifecycle handoff: `git worktree unlock <path>` before the handoff because the command's `ensureWorktree` adopts the worktree as-is and leaf rules must be able to remove it later; the leaf slug equals the branch so the command's worktree setup adopts it, the leaf starts at its normal planning phase, the planner decides what to keep, and lifecycle review covers the whole diff;
-- abandon: `git worktree unlock`, then branch and worktree removed, `Held <date>`.
+- abandon: `git worktree unlock`, then branch and worktree removed, `akrogon pack <chart>` when `<chart>/direct` holds a log, then `Held <date>`.
 
 No new direct attempt starts while a chart names a live direct branch.
 

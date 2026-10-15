@@ -108,6 +108,13 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./sync')).syncCommand(process.cwd());
     break;
+  case 'pack': {
+    if (positionals.length === 0)
+      throw new Error('Usage: akrogon pack issues/closed/<owner> | issues/chart/<chart> ...');
+    const repo: Repo = await requireRepo(readGlobal(), process.cwd());
+    process.exitCode = await (await import('./pack-command')).packCommand(repo, positionals, process.cwd());
+    break;
+  }
   case 'park':
   case 'unpark':
     if (values.all === true && positionals.length !== 0) throw new Error('Use issue names or --all, not both');
@@ -214,6 +221,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack>',
     );
 }

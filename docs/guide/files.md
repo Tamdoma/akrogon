@@ -50,7 +50,7 @@ akrogon sync
 
 That command commits eligible issue data. It excludes imported seeds, lock files and the configured worktree directory. It does not commit the leaf's code for you.
 
-When the containing issue is complete, Akrogon moves its records into the closed store. If it belongs to an epic, the whole epic must be complete before that top-level folder moves. The owner's `*.log` files pack into `evidence.tar.zst` on the move, and `akrogon log <path>` reads a packed member by its plain path.
+When the containing issue is complete, Akrogon moves its records into the closed store. If it belongs to an epic, the whole epic must be complete before that top-level folder moves. The owner's `*.log` files pack into `evidence.tar.zst` on the move, and `akrogon log <path>` reads a packed member by its plain path. `akrogon pack issues/closed/<owner>` or `akrogon pack issues/chart/<chart>` runs the same pack by hand — for a chart only its `direct/` folder — and plain `akrogon status` lists every folder still holding loose logs or a stranded `.closing` as `Unpacked:`.
 
 ## merge-attempts.jsonl: record each merge attempt
 
