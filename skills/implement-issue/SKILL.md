@@ -97,6 +97,8 @@ Except for the direct form, standalone has no config or leaf reads, lifecycle st
 
 The prompt `implement-issue direct chart=<chart-folder> worktree=<path>` is the chart-issues direct route's implementation step, run by the chart door as A. The task is the chart's draft brief and design, read in place and not rewritten as a new brief. The checkout is `worktree=<path>`, where all code is read and edited. Run `akrogon config` there once for `checks` and the base. The plan goes in `<chart-folder>/direct/plan.md` and the report in `<chart-folder>/direct/report.md`, not in `implementation/`.
 
+Direct implementation follows the Shared context command-output keeping rule with the absolute `<chart>/direct` path as holder: `akrogon run-check --holder <chart>/direct --name <label> -- <cmd>` keeps logs there.
+
 Delegation, checking and self-repair work as in Standalone, with A owning the result. A makes no phase call and does not finish: it returns to the door, which sends the result to B for review and back to A for repair rounds under the chart-issues direct route. Direct follows the same order rule: tests from the chart's draft brief first, committed, then code.
 
 ## Printed footer
