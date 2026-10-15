@@ -17,6 +17,8 @@ Pass artifacts are written under the `leaf=` folder while code is read and edite
 
 Temp files and logs go under `$TMPDIR`, never a fixed `/tmp/<name>`; the full check set runs only through `akrogon verify`; anything needed later goes in the leaf folder.
 
+A seat keeps command output only through `akrogon run-check --name <label> -- <cmd>` and cites the `check <label>: <exit> <path>` line it prints to stderr; a cited log is read back with `akrogon log <path>`, and at most a short excerpt is pasted into Markdown. Exempt: the printed `checks` commands and `akrogon verify`, which already keep logs; `akrogon phase ... merged`, which moves its own owner; and coordination commands (fetch, push), whose errors are quoted in the report as text.
+
 Ground in docs first.
 Challenge fuzzy terms.
 Verify with a concrete scenario.
@@ -38,7 +40,7 @@ The prompt ends `attempt=<id> top=<sha> members=<slug,...>` for an applied stack
 
 ### attempt top: the worktree is the stack top
 
-B does not fetch or rebase, and commits nothing except the memberless repair below. Members are never prompted and never run checks themselves: one `akrogon verify` on the top and one push land every member with the holder. B runs `akrogon verify --attempt <id>` in the worktree, which checks `HEAD` out fresh, runs every `checks` command not named in `merge_covers`, then every `merge_checks` command, and writes the receipt `merged --check` requires, then records its output in `review-B.md` under the `leaf=` folder with advisory failures as Nits.
+B does not fetch or rebase, and commits nothing except the memberless repair below. Members are never prompted and never run checks themselves: one `akrogon verify` on the top and one push land every member with the holder. B runs `akrogon verify --attempt <id>` in the worktree, which checks `HEAD` out fresh, runs every `checks` command not named in `merge_covers`, then every `merge_checks` command, and writes the receipt `merged --check` requires, then records its output in `review-B.md` under the `leaf=` folder with advisory failures as Nits; verify keeps its own logs under the Shared context exemption.
 
 On a green verify run `akrogon phase <slug> merged --slot B --check --attempt <id>`, which requires a green merge receipt for HEAD under the current config, HEAD to equal the recorded top, or to descend from it when the record carries no members, checks the `Test-Change:` trailers over the pushed range, and records the tested top. A refusal names each uncited file: on a memberless top it is fixed as the solo form fixes it, while nothing may commit on a top with members, so the gap routes through `akrogon phase <slug> check.fix --slot B --attempt <id>` and ends the pass as below; red runs take the endings under Shared endings.
 

@@ -28,6 +28,8 @@ Workers run only the targeted test commands their brief names, never the full ch
 
 A red criterion proof or `checks` command becomes one more sub-brief with failing output pasted, worker repairs with the targeted tests its sub-brief names, A reruns that proof and `checks`; a planned test red because its own expectation is wrong is no worker repair; it is the mismatch above, and only A's cited expectation correction resolves it.
 
+A worker keeps command output only through `akrogon run-check --name <label> -- <cmd>` and cites the `check <label>: <exit> <path>` line it prints to stderr; a cited log is read back with `akrogon log <path>`, and at most a short excerpt is pasted into its report. Exempt: the printed `checks` commands and `akrogon verify`; `akrogon phase ... merged`; and coordination commands (fetch, push), whose errors are quoted as text.
+
 A conflicting pick is aborted with `git cherry-pick --abort` and that worker's worktree kept so its commit stays reachable; A resolves the conflict itself or delegates only the remainder, whose sub-brief reads its starting state from the retained worktree. After a crash A inspects and resumes a retained worktree. A failure between briefs, a wrong shared interface or incompatible worker choices belongs to A to fix in the brief and rerun the affected worker; a one- or two-line repair may be edited directly by A.
 
 Leaf repair rounds delegate by the same wave rule; standalone self-repair is A's responsibility without lifecycle counters.
