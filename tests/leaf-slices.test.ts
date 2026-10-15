@@ -49,6 +49,46 @@ test('a repo-local pass preserves another registered repo slice with a live tab'
 });
 
 const uid: number = process.getuid!();
+
+test('bad leaf ownership keeps uncertain slices without aborting failed-unit cleanup', async () => {
+  const f: SliceFixture = await slicesFixture();
+  try {
+    leaf(f, 'bad-state', 'merged', { repo: 'old-repo-name', tab: 'w1:t9' });
+    const slice: string = leafSlice({ name: 'repo' }, 'bad-state');
+    const cgRoot: string = resolve(f.home, 'cgroups');
+    mkdirSync(resolve(cgRoot, 'bad-state'), { recursive: true });
+    writeFileSync(resolve(cgRoot, 'bad-state/cgroup.procs'), '');
+    symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(f.home, 'bin/systemctl'));
+    const db: string = resolve(f.home, 'systemctl.json');
+    const log: string = resolve(f.home, 'systemctl.log');
+    writeFileSync(
+      db,
+      JSON.stringify({
+        units: [
+          { unit: slice, sub: 'active', cgroup: '/bad-state' },
+          { unit: 'akrogon-run-bad-state.service', sub: 'failed' },
+        ],
+      }),
+    );
+    const result: Result = await cli(f, ['next', '--all'], f.root, {
+      ...f.env,
+      FAKE_SYSTEMCTL_DB: db,
+      FAKE_SYSTEMCTL_LOG: log,
+      AKROGON_CGROUP_ROOT: cgRoot,
+    });
+    expect(result.code).toBe(1);
+    const calls: string = readFileSync(log, 'utf8');
+    expect(calls).toContain('reset-failed akrogon-run-bad-state.service');
+    expect(calls).not.toContain(`stop ${slice}`);
+    const report = z
+      .object({ kept: z.array(z.object({ path: z.string(), reason: z.string() })) })
+      .parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile-host.json'), 'utf8')));
+    expect(report.kept.some((entry) => entry.path === slice && entry.reason.includes('old-repo-name'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
 const realRuntime: string = `/run/user/${uid}`;
 const realBus: string = `unix:path=${realRuntime}/bus`;
 
