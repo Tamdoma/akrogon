@@ -98,7 +98,7 @@ test('a shell run admitted while another slice stops protects its own slice', as
   const release: string = resolve(f.home, 'release-run');
   try {
     leaf(f, 'a-control', 'merged');
-    leaf(f, 'z-protected', 'merged');
+    leaf(f, 'z-protected', 'merge');
     const control: string = leafSlice({ name: 'repo' }, 'a-control');
     const protectedSlice: string = leafSlice({ name: 'repo' }, 'z-protected');
     const stopping: string = resolve(f.home, 'stopping');
@@ -138,7 +138,7 @@ test('a shell run admitted while another slice stops protects its own slice', as
         [
           'run-check',
           '--leaf',
-          resolve(f.root, 'issues/closed/issue/z-protected'),
+          resolve(f.root, 'issues/open/issue/z-protected'),
           '--',
           'sh',
           '-c',
