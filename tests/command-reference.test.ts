@@ -24,7 +24,7 @@ const contracts: Record<string, string> = {
   stop: '<slug> | --all',
   start: '<slug>',
   status: '[<slug>|--charts]',
-  timing: '[<slug>|--cohort --since <iso>]',
+  timing: '[<slug>|--cohort --since <iso>|--flow --since <YYYY-MM-DD>]',
   flaky: '',
   'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
   verify: '[--sha <rev>] [--attempt <id>] [--holder <dir>]',
@@ -83,6 +83,12 @@ function reference(invocations: Record<string, string> = contracts): string {
 
 test('README covers every dispatched command and its argument contract', () => {
   checkReference(readme, source);
+});
+
+test('the files guide describes the flow report', () => {
+  const guide: string = readFileSync(resolve(import.meta.dir, '../docs/guide/files.md'), 'utf8');
+  expect(guide).toContain('akrogon timing --flow --since <YYYY-MM-DD>');
+  expect(guide).toContain('leaf-carried');
 });
 
 test('the next guide describes stop and start', () => {

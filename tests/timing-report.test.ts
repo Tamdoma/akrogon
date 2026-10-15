@@ -1,7 +1,9 @@
 import { test, expect } from 'bun:test';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, type Fixture } from './helpers';
+import { fixture, cli, yaml, fakeGh, type Fixture, type GhFixture } from './helpers';
+import { command } from '../src/shell';
+import type { GhStep } from './fake-gh';
 
 const ZERO: string = '2026-10-11T00:00:00.000Z';
 const SINCE: string = '2026-10-01T00:00:00.000Z';
@@ -384,6 +386,199 @@ test('cohort gate: remains insufficient with 17 merged and three stalled members
     const result: { code: number; stdout: string; stderr: string } = await timing(f, ['--cohort', '--since', SINCE]);
     expect(result.code).toBe(0);
     expect(result.stdout.split('\n')[0]).toBe('insufficient');
+  } finally {
+    f.clean();
+  }
+});
+
+function listingArgs(repo: string): string[] {
+  return ['api', '--hostname', 'github.com', `repos/${repo}/issues?state=all&per_page=100`, '--paginate', '--slurp'];
+}
+
+type GIssue = { number: number; created_at: string; state: 'open' | 'closed'; pull_request?: object };
+
+function gissue(number: number, created_at: string, state: 'open' | 'closed', pr: boolean = false): GIssue {
+  return { number, created_at, state, ...(pr ? { pull_request: {} } : {}) };
+}
+
+function carrier(
+  f: Fixture,
+  area: 'open' | 'closed' | 'parked',
+  issueFolder: string,
+  slug: string,
+  created: string,
+  sources: string[],
+): void {
+  const dir: string = resolve(f.root, 'issues', area, issueFolder, slug);
+  mkdirSync(dir, { recursive: true });
+  yaml(resolve(dir, 'state.yaml'), {
+    slug,
+    phase: 'implement',
+    created,
+    repo: 'repo',
+    debate: 'no',
+    'blocked-by': [],
+    sources,
+  });
+}
+
+function ghScript(gh: GhFixture, steps: GhStep[]): void {
+  writeFileSync(gh.db, JSON.stringify(steps));
+}
+
+function ghCalls(gh: GhFixture): { args: string[]; cwd: string }[] {
+  const content: string = readFileSync(gh.db + '.calls', 'utf8').trim();
+  return content === '' ? [] : content.split('\n').map((line) => JSON.parse(line));
+}
+
+test('flow report: carried issues print one sorted line each with day spans and the medians split on handoff', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
+    carrier(f, 'closed', 'first-issue', 'a1', '2026-10-03', ['acme/project#1']);
+    carrier(f, 'closed', 'first-issue', 'a2', '2026-10-05', ['acme/project#1']);
+    carrier(f, 'closed', 'second-issue', 'a3', '2026-10-10', ['acme/project#2']);
+    carrier(f, 'closed', 'gone', 'a5', '2026-10-12', ['other/repo#99']);
+    records(f, 'log', [
+      move({ slug: 'a1', from: 'implement', to: 'merge', ts: '2026-10-08T06:00:00.000Z' }),
+      move({ slug: 'a1', from: 'merge', to: 'merged', ts: '2026-10-08T12:00:00.000Z' }),
+      move({ slug: 'a2', from: 'merge', to: 'merged', ts: '2026-10-06T10:00:00.000Z' }),
+      move({ slug: 'a3', from: 'merge', to: 'merged', ts: '2026-10-11T00:00:00.000Z' }),
+      move({ slug: 'a5', from: 'merge', to: 'merged', ts: '2026-10-13T00:00:00.000Z' }),
+    ]);
+    ghScript(gh, [
+      {
+        stdout: JSON.stringify([
+          [
+            gissue(1, '2026-10-01T12:00:00Z', 'closed'),
+            gissue(2, '2026-10-04T00:00:00Z', 'closed'),
+            gissue(9, '2026-10-09T00:00:00Z', 'closed', true),
+          ],
+        ]),
+        args: listingArgs('acme/project'),
+      },
+      { stdout: '[[]]', args: listingArgs('other/repo') },
+    ]);
+    const result: { code: number; stdout: string; stderr: string } = await timing(f, [
+      '--flow',
+      '--since',
+      '2026-10-10',
+    ]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe(
+      [
+        'acme/project#1 filed 2026-10-01T12:00:00Z handoff 2026-10-03 merged 2026-10-08T12:00:00Z wait 2d total 7.0d leaves 2',
+        'acme/project#2 filed 2026-10-04T00:00:00Z handoff 2026-10-10 merged 2026-10-11T00:00:00Z wait 6d total 7.0d leaves 1',
+        'other/repo#99 not in listing',
+        'summary before: 1 merged 1 wait 2.0d total 7.0d',
+        'summary since: 2 merged 2 wait 6.0d total 7.0d',
+        'summary backlog: 0 median - oldest -',
+        'summary uncarried closed: 0',
+      ].join('\n'),
+    );
+    expect(ghCalls(gh).map((call) => call.args)).toEqual([
+      listingArgs('acme/project'),
+      listingArgs('other/repo'),
+    ]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('flow report: parked-carried and open-carried issues stay carried while open uncarried issues print', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
+    carrier(f, 'parked', 'held', 'p1', '2026-10-06', ['acme/project#4']);
+    carrier(f, 'open', 'moving', 'o1', '2026-10-12', ['acme/project#7']);
+    ghScript(gh, [
+      {
+        stdout: JSON.stringify([
+          [
+            gissue(4, '2026-10-02T00:00:00Z', 'open'),
+            gissue(5, '2026-10-11T00:00:00Z', 'open'),
+            gissue(6, '2026-10-13T00:00:00Z', 'open'),
+            gissue(7, '2026-10-07T00:00:00Z', 'open'),
+            gissue(8, '2026-10-05T00:00:00Z', 'closed'),
+          ],
+        ]),
+        args: listingArgs('acme/project'),
+      },
+    ]);
+    const result: { code: number; stdout: string; stderr: string } = await timing(f, [
+      '--flow',
+      '--since',
+      '2026-10-10',
+    ]);
+    expect(result.code).toBe(0);
+    const lines: string[] = result.stdout.split('\n');
+    expect(lines).toHaveLength(8);
+    expect(lines[0]).toMatch(
+      /^acme\/project#4 filed 2026-10-02T00:00:00Z handoff 2026-10-06 merged open wait 4d total \d+\.\dd leaves 1$/,
+    );
+    expect(lines[1]).toMatch(
+      /^acme\/project#7 filed 2026-10-07T00:00:00Z handoff 2026-10-12 merged open wait 5d total \d+\.\dd leaves 1$/,
+    );
+    expect(lines[2]).toMatch(/^acme\/project#5 filed 2026-10-11T00:00:00Z uncarried \d+\.\dd$/);
+    expect(lines[3]).toMatch(/^acme\/project#6 filed 2026-10-13T00:00:00Z uncarried \d+\.\dd$/);
+    expect(result.stdout).not.toContain('acme/project#4 filed 2026-10-02T00:00:00Z uncarried');
+    expect(lines[4]).toBe('summary before: 1 merged 0 wait - total -');
+    expect(lines[5]).toBe('summary since: 1 merged 0 wait - total -');
+    const backlog: RegExpMatchArray | null = /^summary backlog: 2 median (\d+\.\d)d oldest (\d+)d$/.exec(lines[6]);
+    expect(backlog).not.toBeNull();
+    const oldest: number = Number(backlog![2]);
+    expect(oldest).toBeGreaterThanOrEqual(3);
+    expect(oldest).toBeLessThanOrEqual(5);
+    expect(Number(backlog![1])).toBeGreaterThanOrEqual(1);
+    expect(Number(backlog![1])).toBeLessThanOrEqual(oldest);
+    expect(lines[7]).toBe('summary uncarried closed: 1');
+  } finally {
+    f.clean();
+  }
+});
+
+test('flow report: a failed listing retries once then exits non-zero with command and output', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
+    ghScript(gh, [
+      { stdout: '', code: 1, stderr: 'boom one' },
+      { stdout: '', code: 1, stderr: 'boom two' },
+    ]);
+    const result: { code: number; stdout: string; stderr: string } = await timing(f, [
+      '--flow',
+      '--since',
+      '2026-10-10',
+    ]);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('boom one');
+    expect(result.stderr).toContain('boom two');
+    expect(result.stderr).toContain('repos/acme/project/issues?state=all&per_page=100');
+    expect(ghCalls(gh)).toHaveLength(2);
+  } finally {
+    f.clean();
+  }
+});
+
+test('flow report: usage errors name the three timing forms', async () => {
+  const f: Fixture = await fixture();
+  try {
+    for (const args of [
+      ['--flow'],
+      ['--flow', '--since', '2026-10-10', 'extra'],
+      ['--flow', '--cohort', '--since', '2026-10-10'],
+      ['--since', '2026-10-10'],
+    ]) {
+      const result: { code: number; stdout: string; stderr: string } = await timing(f, args);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('--cohort --since');
+      expect(result.stderr).toContain('--flow --since');
+    }
+    expect((await timing(f, ['--flow', '--since', 'not-a-date'])).code).not.toBe(0);
+    expect((await timing(f, ['--cohort', '--since', '2026-10-10'])).code).not.toBe(0);
   } finally {
     f.clean();
   }
