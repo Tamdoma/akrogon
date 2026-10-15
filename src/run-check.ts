@@ -140,7 +140,18 @@ export async function runCheck(
   refuse();
   const repo: Repo = await requireRepo(readGlobal(), cwd);
   const caller: LeafTarget = await leafTarget(repo, cwd, leafOverride, holder);
-  return (await checkedRun(repo, caller, await base(repo, cwd), name ?? 'run', argv, cwd)).code;
+  const result: { code: number; log: string; stderr_final_nl: boolean } = await checkedRun(
+    repo,
+    caller,
+    await base(repo, cwd),
+    name ?? 'run',
+    argv,
+    cwd,
+  );
+  process.stderr.write(
+    `${result.stderr_final_nl ? '' : '\n'}check ${name ?? 'run'}: ${result.code} ${result.log}\n`,
+  );
+  return result.code;
 }
 
 export async function checkedRun(
@@ -150,7 +161,7 @@ export async function checkedRun(
   name: string,
   argv: string[],
   cwd: string,
-): Promise<{ code: number; log: string }> {
+): Promise<{ code: number; log: string; stderr_final_nl: boolean }> {
   const runRoot: string = mkdtempSync(resolve(ensureLeafTemp(repo, slug), 'run-'));
   try {
     const boot: string = existsSync('/proc/sys/kernel/random/boot_id')
@@ -214,7 +225,7 @@ export async function checkedRun(
           duration_ms: Date.now() - started,
           log: kept,
         });
-        return { code: result.code, log: kept };
+        return { code: result.code, log: kept, stderr_final_nl: result.stderr.endsWith('\n') };
       },
     );
   } finally {

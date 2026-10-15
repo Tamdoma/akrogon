@@ -425,7 +425,7 @@ test('pass_env names reach printed checks from the session without a .env entry'
       .object({ checks: z.record(z.string(), z.string()) })
       .parse(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout)).checks.probe;
     const passed: Result = await check(printed, worktree, { SESSION_TOKEN: 'session', EXTRA_TOKEN: 'omit' });
-    expect(passed.stderr).toMatch(/^run [0-9a-f-]{36}\n?$/);
+    expect(passed.stderr).toMatch(/^run [0-9a-f-]{36}\n+check probe: 0 \S+\.log$/);
     expect(passed.code).toBe(0);
     expect(passed.stdout).toBe('session|');
   } finally {

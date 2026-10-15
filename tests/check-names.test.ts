@@ -23,7 +23,7 @@ test('printed checks preserve names containing spaces and slashes in argv and lo
         env: { ...process.env, ...shim.env, HOME: f.home, AKROGON_HOME: f.home },
       });
       expect(code).toBe(0);
-      expect(stderr).toMatch(/^run [0-9a-f-]{36}\n?$/);
+      expect(stderr).toMatch(/^run [0-9a-f-]{36}\n+check [^\n]+: 0 \S+\.log\n?$/);
       expect(stdout.trim()).toBe('name-check');
       expect(
         readdirSync(resolve(target, 'implementation')).some((file: string) =>
