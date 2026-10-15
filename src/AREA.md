@@ -6,6 +6,7 @@
 - `bun src/akrogon.ts run-check -- <argv>...` runs a command under the constructed check environment, and `verify [--sha <rev>]` runs the caller's configured check set on a detached fresh checkout in the worktree store; both box each command in a systemd `akrogon-run-<id>` scope and print `run <id>` on admission, and `stop-run [<run-id>]` stops the caller's own runs; `run-check` and `verify` cut the session bus (`DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent`).
 - `bun src/akrogon.ts guard <ancestors|own-modules>` refuses a checkout under foreign `node_modules`/`package.json` or a worktree with a top-level `package.json` missing its own `node_modules`; composed check commands run `own-modules` while `ancestors` runs at worktree creation through `checkLocation`.
 - `bun run typecheck` checks the TypeScript command and tests; `bun test tests/phase.test.ts` exercises lifecycle transitions and guards.
+- `bun src/akrogon.ts log <path>` prints a recorded log's bytes from a plain file or the owner's `evidence.tar.zst`, resolving the path against the current or every registered repo.
 
 ## Key files
 
@@ -17,6 +18,7 @@
 - `src/verify.ts` checks a commit out detached, runs every command for the caller's scope, logs each into the leaf or holder and records one receipt in `issues/verify-runs.jsonl`; `requireGreenReceipt` is the one gate the `check.review` move, the `check.repair` move into `merge`, `merged --check` stamping and direct-guards call.
 - `src/admission.ts` registers each run's record under `<globalHome>/runs/`, sweeps stale records and their run units, and admits at once — a matching `AKROGON_RUN` token of a live run is the nested case that creates nothing; the memory reading and spacing were dropped 2026-10-14.
 - `src/scope.ts` names the per-leaf slice (`leafSlice`, used by `src/stop.ts`), pane scopes and `akrogon-run-<id>` run units, moves a pane shell into its scope with busctl `StartTransientUnit`, and checks it read-only through `AKROGON_PROC_ROOT` (default `/proc`); `allocate` in `src/next.ts` closes a recorded pane outside its scope and boxes every pane before the seat starts. `src/stop-run.ts` stops the run units live records tie to the caller's scope. `src/stop.ts` keeps the host-local `stopped.yaml` record and runs `stop`/`start`; dispatch, the merge queue and status read it.
+- `src/evidence.ts` maps a recorded log path to its bytes (`locate`, `readMember`, `readLog`, `readLogAcross`): plain file first, then the owner's `evidence.tar.zst`; `akrogon log` and `src/flaky.ts` read through it.
 - `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass and writes the kept report `status` prints under the ignored `reconcile/` state dir.
 
 ## Non-obvious patterns

@@ -72,7 +72,7 @@ Then gather the completion owner's briefs (the issue's, or every leaf brief unde
 
 ### Shared endings
 
-Every run and rerun is `akrogon verify --attempt <id>`, whose receipt lists each command with its exit and log.
+Every run and rerun is `akrogon verify --attempt <id>`, whose receipt lists each command with its exit and log — read a listed log with `akrogon log <path>`.
 
 On a red verify, judge the cause. A red run with no cause in the stack's diff gets one rerun of `akrogon verify --attempt <id>` on the unchanged head: a green rerun is `inconsistent`, recorded in `review-B.md` with both logs, and goes on to `merged --check`; a red rerun takes the ending below, with `review-B.md` recording the runs and the judged cause first. A red run appends each failing command exactly as invoked (command and arguments), its failing output, the rebase target commit and the tested head to `review-B.md` under the `leaf=` folder, then calls `akrogon phase <slug> check.fix --slot B --attempt <id>`. With recorded members that call does not move the leaf: it records each stacked `{slug, head}` on the base in `merge-attempts.jsonl`, restores the holder's branch to its pre-stack head, and prints exactly `stack red; holder turn restarts alone`; B records the red run in `review-B.md` and ends the pass, and the holder's next turn starts by itself. With none the leaf moves to `check.fix` so A corrects it, including any wrong expectation in its own done-criteria under test-proof-rules, and finishes with the actual result and repair footer.
 

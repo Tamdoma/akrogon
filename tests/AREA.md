@@ -23,6 +23,7 @@
 - `tests/timing.test.ts` checks the timing record end to end through real `next`/`phase`/`run-check` calls, worker and verify runs, wait dedup and the unwritable-file negative case.
 - `tests/timing-report.test.ts` checks `akrogon timing` against fixture records: visit decomposition, expected-event flags and cohort verdicts.
 - `tests/pause-status.test.ts` checks pause marks on the board, targeted status and chart headings.
+- `tests/log-reader.test.ts` checks `akrogon log` byte output, archive members, outside-repo resolution and the skill/doc mentions.
 - `tests/hold-retired.test.ts` checks the retired merge verbs refuse, a legacy hold record stays inert, and the docs carry no retired surface.
 
 ## Non-obvious patterns

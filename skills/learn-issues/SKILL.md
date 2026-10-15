@@ -15,7 +15,7 @@ Needs the installed `akrogon` command. Runs only when the operator starts it: no
 
 ## Sort
 
-Per active line: read its history file for the failure and its mechanism, trace that mechanism through current code and checks, then pick one outcome.
+Per active line: read its history file for the failure and its mechanism (read recorded check or verify log paths with `akrogon log <path>`), trace that mechanism through current code and checks, then pick one outcome.
 
 - **Guarded**: command code, an `akrogon phase` guard or a blocking check runs on the relevant path and covers the mechanism everywhere it can recur. An uncalled guard, or one fixed site with the pattern reachable elsewhere, is not guarded.
 - **Checkable**: a command could detect the mechanism as a fixed pattern (banned call, schema shape, path rule, required state before a step), and no running guard covers every reachable case.
