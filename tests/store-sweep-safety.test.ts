@@ -45,7 +45,11 @@ test('F2 surviving processes protect leaf entries and leaf temps', async () => {
   const temp: string = resolve(leafTempRoot(f), relative(process.env.AKROGON_LEAF_TEMP_ROOT!, leafTemp(repo, 'done')));
   const registered: string = resolve(storeDir(f), 'failed-owned');
   await command(['git', 'worktree', 'add', '--detach', registered], f.root);
-  leaf(f, 'failed-owned', 'failed', { worktree: registered, tab: 'w1:t99', failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'fixture' } });
+  leaf(f, 'failed-owned', 'failed', {
+    worktree: registered,
+    tab: 'w1:t99',
+    failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'fixture' },
+  });
   mkdirSync(owned, { recursive: true });
   mkdirSync(temp, { recursive: true });
   writeFileSync(resolve(temp, 'open'), 'x');

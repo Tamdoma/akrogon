@@ -500,6 +500,15 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   }
 
   async function removeWorktree(path: string, force: boolean, rule: string): Promise<boolean> {
+    const inside: number[] = pidsInside(targets(), path);
+    if (inside.length > 0) {
+      keep(
+        path,
+        `process ${inside.join(', ')} inside`,
+        'removed once these processes close their files or leave this path',
+      );
+      return false;
+    }
     const owners: KeptEntry[] = ownerKeeps(path);
     if (owners.length > 0) {
       kept.push(...owners);
