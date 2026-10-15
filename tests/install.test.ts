@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { repoSchema, toolRoot, type Repo } from '../src/config';
 import { command, quote, type Result } from '../src/shell';
 import { selfUpdate } from '../src/self-update';
-import { fixture, cli, registerTemp, yaml, type Fixture } from './helpers';
+import { fixture, cli, leafTempRoot, registerTemp, yaml, type Fixture } from './helpers';
 
 const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
 const skills: string[] = readdirSync(resolve(toolRoot, 'skills'), { withFileTypes: true })
@@ -271,6 +271,7 @@ describe('self-update', () => {
     seed: string;
     remote: string;
     repo: Repo;
+    savedTempRoot: string | undefined;
     clean: () => void;
   };
 
@@ -311,7 +312,22 @@ describe('self-update', () => {
       root: clone,
       config: repoSchema.parse({ grounding: 'none' }),
     };
-    return { home, clone, seed, remote, repo, clean: () => rmSync(home, { recursive: true, force: true }) };
+    const savedTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
+    const scratchRoot: string = leafTempRoot({ home, root: clone, clean: () => undefined });
+    process.env.AKROGON_LEAF_TEMP_ROOT = scratchRoot;
+    return {
+      home,
+      clone,
+      seed,
+      remote,
+      repo,
+      savedTempRoot,
+      clean: () => {
+        if (savedTempRoot === undefined) delete process.env.AKROGON_LEAF_TEMP_ROOT;
+        else process.env.AKROGON_LEAF_TEMP_ROOT = savedTempRoot;
+        rmSync(home, { recursive: true, force: true });
+      },
+    };
   }
 
   async function pushSeed(f: SelfUpdateFixture, change: () => void): Promise<string> {

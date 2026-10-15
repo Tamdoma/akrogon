@@ -849,6 +849,7 @@ test('leafTemp defaults to a per-user /var/tmp root with hashed repo and leaf fo
     delete process.env.AKROGON_LEAF_TEMP_ROOT;
     const path: string = leafTemp(repo, 'long-slug');
     expect(path).toMatch(new RegExp(`^/var/tmp/akr-${process.getuid!()}/[0-9a-f]{4}/[0-9a-f]{8}$`));
+    expect(existsSync(path)).toBe(false);
     expect(dirname(leafTemp(repo, 'other'))).toBe(dirname(path));
     process.env.AKROGON_LEAF_TEMP_ROOT = '/x/leaf-temp';
     expect(leafTemp(repo, 's').startsWith('/x/leaf-temp/')).toBe(true);
