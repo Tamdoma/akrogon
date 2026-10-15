@@ -198,3 +198,29 @@ test('unaccepted folders are refused by form and every failure is named while go
     f.clean();
   }
 });
+
+test('pack continues after a closed owner git failure and names every failed folder', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const owner: string = resolve(f.root, 'issues/closed/issue');
+    writeLog(resolve(owner, 'leaf/check-one.log'), 'tracked\n');
+    await commitAll(f.root);
+    const chart: string = resolve(f.root, 'issues/chart/camp');
+    writeLog(resolve(chart, 'direct/check-two.log'), 'chart\n');
+    writeFileSync(resolve(chart, 'CHART.md'), '# Chart\n');
+    writeFileSync(resolve(f.root, '.git/index'), 'corrupt index\n');
+
+    const result = await cli(f, ['pack', 'issues/closed/issue', 'issues/chart/camp', 'issues/open']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('git ls-files failed');
+    expect(result.stderr).toContain('not packed: issues/closed/issue issues/open');
+    expect(existsSync(resolve(owner, 'leaf/check-one.log'))).toBe(true);
+    expect(existsSync(resolve(owner, '.closing'))).toBe(false);
+    expect(findLogs(resolve(chart, 'direct'))).toEqual([]);
+    const members: Map<string, Buffer> | null = await archiveMembers(resolve(chart, 'direct/evidence.tar.zst'));
+    expect(members!.get('check-two.log')).toEqual(Buffer.from('chart\n'));
+    expect(existsSync(resolve(chart, '.closing'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
