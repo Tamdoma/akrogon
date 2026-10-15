@@ -8,6 +8,7 @@
 ## Key files
 
 - `tests/helpers.ts` supplies temporary repos, CLI invocations and leaf fixtures.
+- `tests/isolation.ts` is the `bunfig.toml` `[test]` preload: per-worker scratch HOME and leaf-temp, a subreaper plus descendant sweep so the suite never reaches real HOME or `/var/tmp/akr-<uid>` and leaves no process.
 - `tests/phase.test.ts` checks real transitions, races and handoff refusal.
 - `tests/command-reference.test.ts` checks README command argument contracts against the dispatched verbs.
 - `tests/docs-links.test.ts` checks relative links and heading anchors in README and the guide.
