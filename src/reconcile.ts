@@ -667,7 +667,12 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     }
     drop(path);
   };
-  const repoRunning: boolean = leaves.some((leaf) => !finished(leaf));
+  const repoRunning: boolean =
+    leaves.some((leaf) => tabLive(panes, leaf.state.tab)) ||
+    (await Promise.all(leaves.map(async (leaf): Promise<boolean> => {
+      const slice: string = leafSlice(repo, leaf.state.slug);
+      return loadedSlices !== null && loadedSlices.has(slice) && !stoppedSlices.has(slice) && await sliceHasProcess(slice);
+    }))).some((running) => running);
   const dropUnowned = async (path: string): Promise<void> => {
     if (repoRunning) {
       keep(path, 'unowned entry', 'removed once no leaf of the repo is running');
