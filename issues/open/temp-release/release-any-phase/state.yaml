@@ -1,7 +1,28 @@
 slug: release-any-phase
 phase: plan.synthesis
-created: '2026-10-16'
+created: 2026-10-16
 repo: akrogon
-debate: 'no'
+debate: "no"
 blocked-by: []
 sources: []
+busy_since:
+  A: 2026-10-15T23:43:53.918Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tCT
+worktree: /home/ivan/.akrogon/worktrees/akrogon/release-any-phase
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pR2
+  B: w8:pR3
+prompted:
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-release-any-phase--/2026-10-15T23-43-50-594Z_01a141f3-5d42-731a-a6c5-a36f6dfe0fee.jsonl
+prompted_at:
+  A: 2026-10-15T23:43:53.919Z
+delivery_error: {}
