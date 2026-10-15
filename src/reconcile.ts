@@ -249,8 +249,7 @@ function procTargets(): Map<number, string[]> {
     try {
       if (statSync(dir).uid !== process.getuid!()) continue;
       const found: string[] = [readlinkSync(resolve(dir, 'cwd'))];
-      for (const fd of readdirSync(resolve(dir, 'fd')))
-        found.push(readlinkSync(resolve(dir, 'fd', fd)));
+      for (const fd of readdirSync(resolve(dir, 'fd'))) found.push(readlinkSync(resolve(dir, 'fd', fd)));
       targets.set(pid, found);
     } catch {
       continue;
@@ -260,9 +259,7 @@ function procTargets(): Map<number, string[]> {
 }
 
 function pidsInside(targets: Map<number, string[]>, path: string): number[] {
-  return [...targets.entries()]
-    .filter(([, found]) => found.some((target) => within(target, path)))
-    .map(([pid]) => pid);
+  return [...targets.entries()].filter(([, found]) => found.some((target) => within(target, path))).map(([pid]) => pid);
 }
 
 export function processesInside(paths: string[]): Set<string> {
@@ -502,8 +499,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         keep(worktree, 'live pane inside');
         continue;
       }
-      if (await removeWorktree(worktree, false))
-        saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
+      if (await removeWorktree(worktree, false)) saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
       continue;
     }
     if (within(worktree, store)) {
@@ -524,8 +520,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(worktree, 'live pane inside');
       continue;
     }
-    if (await removeWorktree(worktree, false))
-      saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
+    if (await removeWorktree(worktree, false)) saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
   }
 
   const candidates: Set<string> = new Set();
