@@ -648,7 +648,9 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         if (existsSync(refusalFile)) {
           let reason: string = 'publish refused';
           try {
-            reason = 'publish refused: ' + z.object({ reason: z.string() }).parse(JSON.parse(readFileSync(refusalFile, 'utf8'))).reason;
+            reason =
+              'publish refused: ' +
+              z.object({ reason: z.string() }).parse(JSON.parse(readFileSync(refusalFile, 'utf8'))).reason;
           } catch {
             // an unreadable refusal file still keeps the run root
           }

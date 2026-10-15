@@ -15,17 +15,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { command, quote, spawnCaptured } from '../src/shell';
 import { readState } from '../src/state';
-import {
-  fixture,
-  cli,
-  fakeAkrogon,
-  leaf,
-  leafTempRoot,
-  holding,
-  registerTemp,
-  yaml,
-  type Fixture,
-} from './helpers';
+import { fixture, cli, fakeAkrogon, leaf, leafTempRoot, holding, registerTemp, yaml, type Fixture } from './helpers';
 
 function writeLog(path: string, data: string | Buffer): void {
   mkdirSync(resolve(path, '..'), { recursive: true });
