@@ -136,7 +136,9 @@ export async function migrateStateHome(): Promise<void> {
       ...config,
       repos: Object.fromEntries(Object.entries(config.repos).map(([name, path]) => [name, expandPath(path, toolRoot)])),
     });
-    console.log(`moved state home: ${toolRoot} -> ${stateHome}`);
+    // stderr: the line must not pollute consumers of stdout (`config` YAML,
+    // run-check output). Criterion 3 names a printed line, not a stream.
+    console.error(`moved state home: ${toolRoot} -> ${stateHome}`);
   };
   // flock creates its file, so a missing .lock is left missing: the copied
   // checkout must stay clean for git status.

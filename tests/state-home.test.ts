@@ -83,7 +83,7 @@ test('unmigrated state in the tool root moves to ~/.akrogon on the first command
   mkdirSync(resolve(root, 'runs/locks'), { recursive: true });
   const first: SpawnResult = await cli(root, home, ['config']);
   expect(first.code).toBe(0);
-  expect(first.stdout).toContain(`moved state home: ${root} -> ${resolve(home, '.akrogon')}`);
+  expect(first.stderr).toContain(`moved state home: ${root} -> ${resolve(home, '.akrogon')}`);
   const moved: string = resolve(home, '.akrogon/config.yaml');
   expect(existsSync(moved)).toBe(true);
   const parsed = Bun.YAML.parse(readFileSync(moved, 'utf8')) as { repos: Record<string, string> };
@@ -133,11 +133,11 @@ test('cutover is deferred while a live run record exists in the tool root runs/'
   writeFileSync(resolve(root, `runs/${'a'.repeat(64)}.yaml`), liveRecord());
   const skipped: SpawnResult = await cli(root, home, ['config']);
   expect(skipped.code).toBe(0);
-  expect(skipped.stdout).not.toContain('moved state home');
+  expect(skipped.stderr).not.toContain('moved state home');
   expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(false);
   rmSync(resolve(root, `runs/${'a'.repeat(64)}.yaml`));
   const moved: SpawnResult = await cli(root, home, ['config']);
-  expect(moved.stdout).toContain('moved state home');
+  expect(moved.stderr).toContain('moved state home');
   expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(true);
 });
 
@@ -148,13 +148,13 @@ test('cutover is deferred while a foreign process holds the tool root as cwd', a
   try {
     const skipped: SpawnResult = await cli(root, home, ['config']);
     expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(false);
-    expect(skipped.stdout).not.toContain('moved state home');
+    expect(skipped.stderr).not.toContain('moved state home');
   } finally {
     sleeper.kill();
     await sleeper.exited;
   }
   const moved: SpawnResult = await cli(root, home, ['config']);
-  expect(moved.stdout).toContain('moved state home');
+  expect(moved.stderr).toContain('moved state home');
 });
 
 test('cutover leaves no tracked file of the checkout modified or deleted', async () => {
