@@ -40,8 +40,11 @@ function outDir(f: Fixture): string {
 }
 
 let serial = 0;
+const createdSlices: Set<string> = new Set();
 function testSlice(): string {
-  return `akrogon-test-${process.pid}-${serial++}.slice`;
+  const slice: string = `akrogon-test-${process.pid}-${serial++}.slice`;
+  createdSlices.add(slice);
+  return slice;
 }
 
 // Spawn the entry with the real systemd-run/systemctl on PATH so units are
@@ -95,8 +98,10 @@ async function realFixture(): Promise<{ f: Fixture; slice: string }> {
 }
 
 afterAll(async () => {
+  for (const slice of createdSlices) {
+    await stopTestSlice(slice);
+  }
   if (shared !== undefined) {
-    await stopTestSlice(shared.slice);
     shared.f.clean();
     shared = undefined;
   }
@@ -654,6 +659,9 @@ test.serial(
       expect(left).toEqual([]);
     } finally {
       if (stale !== undefined) {
+        // The sleep is a systemd-owned scope member, not a descendant of the
+        // systemd-run child: the kill cannot reach it, so stop the scope.
+        await sysctl('stop', 'akrogon-run-stale0.scope');
         if (stale.exitCode === null) stale.kill('SIGKILL');
         await stale.exited;
       }
