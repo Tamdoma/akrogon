@@ -160,10 +160,11 @@ export class PublishRefusedError extends Error {}
 // single owner dir and stay allowed. The late rule adds the vanished-owner
 // case: the owner moved to closed while the command ran.
 async function ownerRefusal(target: string, repo: Repo, late: boolean): Promise<string | undefined> {
-  const found = await locate(target, repo.root, repo);
+  const recorded: string = resolve(target, 'out.log');
+  const found = await locate(recorded, repo.root, repo);
   if (found === null || found.ownerDirs.length === 1) return undefined;
   const [open]: string[] = found.ownerDirs;
-  const owner: string = resolve(target, ...found.member.split('/').map(() => '..'));
+  const owner: string = resolve(recorded, ...found.member.split('/').map(() => '..'));
   const state: string = basename(dirname(owner));
   if (state === 'closed') return `owner closed: ${target}`;
   if (existsSync(resolve(open, '.closing'))) return `owner closing: ${target}`;
