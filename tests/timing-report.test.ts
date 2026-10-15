@@ -575,6 +575,62 @@ test('flow report: foreign open issues stay out of the origin backlog while fore
   }
 });
 
+test('flow report: even counts average the middle two values for merged medians and the backlog', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
+    carrier(f, 'closed', 'pair-a', 'm1', '2026-10-13', ['acme/project#20']);
+    carrier(f, 'closed', 'pair-b', 'm2', '2026-10-13', ['acme/project#21']);
+    records(f, 'log', [
+      move({ slug: 'm1', from: 'merge', to: 'merged', ts: '2026-10-14T00:00:00.000Z' }),
+      move({ slug: 'm2', from: 'merge', to: 'merged', ts: '2026-10-14T12:00:00.000Z' }),
+    ]);
+    ghScript(gh, [
+      {
+        stdout: JSON.stringify([
+          [
+            gissue(20, '2026-10-10T00:00:00Z', 'closed'),
+            gissue(21, '2026-10-11T00:00:00Z', 'closed'),
+            gissue(30, '2026-10-02T00:00:00Z', 'open'),
+            gissue(31, '2026-10-13T00:00:00Z', 'open'),
+          ],
+        ]),
+        args: listingArgs('acme/project'),
+      },
+    ]);
+    const result: { code: number; stdout: string; stderr: string } = await timing(
+      f,
+      ['--flow', '--since', '2026-10-10'],
+      gh.env,
+    );
+    expect(result.code).toBe(0);
+    const day: number = 24 * 60 * 60000;
+    const now: number = Date.now();
+    const ageOld: number = (now - Date.parse('2026-10-02T00:00:00Z')) / day;
+    const ageNew: number = (now - Date.parse('2026-10-13T00:00:00Z')) / day;
+    const lines: string[] = result.stdout.split('\n');
+    expect(lines[0]).toBe(
+      'acme/project#20 filed 2026-10-10T00:00:00Z handoff 2026-10-13 merged 2026-10-14T00:00:00Z wait 3d total 4.0d leaves 1',
+    );
+    expect(lines[1]).toBe(
+      'acme/project#21 filed 2026-10-11T00:00:00Z handoff 2026-10-13 merged 2026-10-14T12:00:00Z wait 2d total 3.5d leaves 1',
+    );
+    expect(lines[2]).toMatch(/^acme\/project#30 filed 2026-10-02T00:00:00Z uncarried \d+\.\dd$/);
+    expect(lines[3]).toMatch(/^acme\/project#31 filed 2026-10-13T00:00:00Z uncarried \d+\.\dd$/);
+    expect(lines[4]).toBe('summary before: 0 merged 0 wait - total -');
+    expect(lines[5]).toBe('summary since: 2 merged 2 wait 2.5d total 3.8d');
+    const backlog: RegExpMatchArray | null = /^summary backlog: 2 median (\d+\.\d)d oldest (\d+)d$/.exec(lines[6]);
+    expect(backlog).not.toBeNull();
+    expect(Number(backlog![1])).toBeCloseTo((ageOld + ageNew) / 2, 1);
+    expect(Number(backlog![2])).toBe(Math.floor(ageOld));
+    expect(lines[7]).toBe('summary uncarried closed: 0');
+    expect(lines).toHaveLength(8);
+  } finally {
+    f.clean();
+  }
+});
+
 test('flow report: a failed listing retries once then exits non-zero with command and output', async () => {
   const f: Fixture = await fixture();
   try {
