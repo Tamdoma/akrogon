@@ -129,3 +129,24 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
     }
   }
 });
+
+test('F5 dead-writer temp files wait for an available pane inventory', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
+    const files: string[] = [storeDir(f), resolve(f.root, 'issues/worktrees')].map((root) => resolve(root, 'writer.4194303.tmp'));
+    for (const file of files) {
+      mkdirSync(resolve(file, '..'), { recursive: true });
+      writeFileSync(file, 'x');
+    }
+    const unavailable: Reconciled = await reconcileFixture(f, null, h.env);
+    for (const file of files) {
+      expect(existsSync(file)).toBe(true);
+      expect(unavailable.removed).not.toContain(file);
+    }
+    await reconcileFixture(f, [], h.env);
+    for (const file of files) expect(existsSync(file)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
