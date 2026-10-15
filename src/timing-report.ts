@@ -441,10 +441,9 @@ async function flowReport(repo: Repo, since: string): Promise<void> {
       list.push({ slug: leaf.state.slug, handoff: leaf.state.created.slice(0, 10) });
       carriers.set(source, list);
     }
+  const origin: string = await originSource(repo);
   const repos: string[] = [
-    ...new Set(
-      [...carriers.keys()].map((identity) => identity.slice(0, identity.indexOf('#'))).concat(await originSource(repo)),
-    ),
+    ...new Set([...carriers.keys()].map((identity) => identity.slice(0, identity.indexOf('#'))).concat(origin)),
   ].sort();
   const listings = new Map<string, FlowIssue>();
   for (const repository of repos) {
@@ -492,7 +491,9 @@ async function flowReport(repo: Repo, since: string): Promise<void> {
     .sort((a, b) => identityOrder(a.identity, b.identity));
   const carriedIds: Set<string> = new Set(carriers.keys());
   const uncarried: { identity: string; issue: FlowIssue }[] = [...listings.entries()]
-    .filter(([identity, issue]) => !carriedIds.has(identity) && issue.state === 'open')
+    .filter(
+      ([identity, issue]) => identity.startsWith(`${origin}#`) && !carriedIds.has(identity) && issue.state === 'open',
+    )
     .map(([identity, issue]) => ({ identity, issue }))
     .sort((a, b) => ms(a.issue.created_at) - ms(b.issue.created_at) || identityOrder(a.identity, b.identity));
   const closed: number = [...listings.entries()].filter(
