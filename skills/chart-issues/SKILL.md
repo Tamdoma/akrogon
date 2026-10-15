@@ -44,7 +44,7 @@ A round takes one fork, the next answerable fork first, preferring the one whose
 
 Propose the split by destination and speed of resolution before writing: independently checkable outcomes sharing a destination can be parallel leaves of one issue, independent issues run side by side, and only an actual dependency orders work, never file overlap or presentation preference.
 
-Write one chart folder per destination. When every chart still holds an open fork, stop the seed drain for the operator to select one; when every fork in every chart is taken, hand off each chart in order without asking for a selection, asking the debate question once for the whole handoff. A direct single item whose map finds no open fork and no fog writes the same chart structure and proceeds to the handoff review immediately, where the route is chosen.
+Write one chart folder per destination. When every chart still holds an open fork, stop the seed drain for the operator to select one; a chart whose forks are all taken is handed off without waiting for charts that still hold one; when every fork in every chart is taken, hand off each chart in order without asking for a selection, asking the debate question once for the whole handoff. A direct single item whose map finds no open fork and no fog writes the same chart structure and proceeds to the handoff review immediately, where the route is chosen.
 
 ## Take
 
