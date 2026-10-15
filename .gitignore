@@ -10,3 +10,6 @@ run-holder.yaml
 reconcile/
 .pi-command-logs/
 .env
+issues/open/**/*.log
+issues/parked/**/*.log
+issues/chart/*/direct/**/*.log
