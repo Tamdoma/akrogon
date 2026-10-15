@@ -815,7 +815,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     // Write-then-rename leftovers: only a dead writer's file is droppable.
     const tempMatch: RegExpMatchArray | null = name.match(/\.(\d+)\.tmp$/);
     if (tempMatch !== null && statSync(path, { throwIfNoEntry: false })?.isDirectory() !== true) {
-      if (!pidAlive(Number(tempMatch[1]))) drop(path);
+      if (!pidAlive(Number(tempMatch[1]))) dropChecked(path);
       continue;
     }
     await dropUnowned(path);
