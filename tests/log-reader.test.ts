@@ -71,6 +71,23 @@ test('log prints plain log bytes from any checkout path form', async (): Promise
   }
 });
 
+test('log resolves cwd-relative paths outside known checkout roots', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const dir: string = leaf(f, 'owner', 'merge');
+    writeLog(resolve(dir, 'check-test.log'));
+    const cwd: string = resolve(f.home, 'retired/issues/open/issue/owner');
+    mkdirSync(cwd, { recursive: true });
+    for (const arg of [resolve(cwd, 'check-test.log'), 'check-test.log']) {
+      const result: Awaited<ReturnType<typeof logRun>> = await logRun(f, arg, cwd);
+      expect({ arg, code: result.code, stderr: result.stderr }).toEqual({ arg, code: 0, stderr: '' });
+      expect(result.bytes.equals(BYTES)).toBe(true);
+    }
+  } finally {
+    f.clean();
+  }
+});
+
 test('log reads the member of evidence.tar.zst for closed, parked and chart owners', async (): Promise<void> => {
   const f: Fixture = await fixture();
   try {
