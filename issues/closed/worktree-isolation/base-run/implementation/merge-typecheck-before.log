@@ -1,2 +1,0 @@
-tests/run-check.test.ts(368,12): error TS2304: Cannot find name 'scratchRuns'.
-$ tsc --noEmit

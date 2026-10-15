@@ -1,5 +1,0 @@
-bun install v1.4.2 (744846f84)
-
-Checked 9 installs across 10 packages (no changes) [2.00ms]
-[0.00ms] ".env"
-$ tsc --noEmit

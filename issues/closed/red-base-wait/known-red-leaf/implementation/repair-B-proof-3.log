@@ -1,5 +1,0 @@
-bun test v1.4.2 (744846f84)
-
-tests/compare.test.ts:
-
-error: regex "verdict" matched 0 tests. Searched 1 file (skipping 28 tests) [20.00ms]

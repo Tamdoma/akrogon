@@ -1,3 +1,0 @@
-{"scenario":"red retry with no counterpart","result":{"code":0,"stdout":"moved check.review","stderr":""},"phase":"check.review"}
-
-probe_exit: 0
