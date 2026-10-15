@@ -327,12 +327,23 @@ test('an AKROGON_RUN matching no live record starts its own run at once', async 
 
 test('no run.lock lanes, run-holder files or name exemptions remain in src, and docs describe the start check', () => {
   const root: string = resolve(import.meta.dir, '..');
-  const forbiddenInSrc: RegExp[] = [/run\.lock/, /run-holder/, /withPermit/, /\bselftest\b/, /\bcheap\b/];
+  const forbiddenInSrc: [RegExp, string?][] = [
+    // src/reconcile.ts legitimately names ~/.akrogon/run.lock: the store-sweep
+    // host step deletes the retired file by exact name (design line: "Retired
+    // lock files by exact name only").
+    [/run\.lock/, 'reconcile.ts'],
+    [/run-holder/],
+    [/withPermit/],
+    [/\bselftest\b/],
+    [/\bcheap\b/],
+  ];
   for (const file of readdirSync(resolve(root, 'src'))) {
     if (!file.endsWith('.ts')) continue;
     const text: string = readFileSync(resolve(root, 'src', file), 'utf8');
-    for (const pattern of forbiddenInSrc)
+    for (const [pattern, exempt] of forbiddenInSrc) {
+      if (exempt === file) continue;
       expect({ file, hit: text.match(pattern)?.[0] }).toEqual({ file, hit: undefined });
+    }
   }
   for (const doc of ['README.md', 'docs/guide/setup.md', 'docs/guide/files.md', 'src/AREA.md']) {
     const text: string = readFileSync(resolve(root, doc), 'utf8');
