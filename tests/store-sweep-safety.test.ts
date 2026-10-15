@@ -6,7 +6,7 @@ import { retiredLeafTempRoot } from '../src/config';
 import { fixture, fakeHerdr, fakeAkrogon, cli, storeDir, leafTempRoot, leaf, procRoot, type Fixture } from './helpers';
 import { suiteRoot } from './isolation';
 import { z } from 'zod';
-import { spawnCaptured, type Pane, type SpawnResult } from '../src/shell';
+import { command, spawnCaptured, type Pane, type SpawnResult } from '../src/shell';
 import type { Reconciled } from '../src/reconcile';
 import { leafSlice } from '../src/scope';
 
@@ -76,12 +76,14 @@ test('F3 live owner records protect recursively deleted parents and batch record
     const retired: string = resolve(f.home, 'retired-temp');
     const oldRepo: string = resolve(leafTempRoot(f), 'unregistered');
     const batch: string = resolve(storeDir(f), 'batch-live');
+    const verify: string = resolve(storeDir(f), 'verify-nested-owner');
+    await command(['git', 'worktree', 'add', '--detach', verify], f.root);
     const record: string = JSON.stringify({
       pid: child.pid,
       boot_id: readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(),
       started: new Date().toISOString(),
     });
-    for (const parent of [retired, oldRepo]) {
+    for (const parent of [retired, oldRepo, verify]) {
       const run: string = resolve(parent, 'leaf', 'run-live');
       mkdirSync(run, { recursive: true });
       writeFileSync(resolve(run, '.owner'), record);
@@ -89,11 +91,11 @@ test('F3 live owner records protect recursively deleted parents and batch record
     mkdirSync(batch, { recursive: true });
     writeFileSync(batch + '.owner', record);
     expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
-    for (const path of [retired, oldRepo, batch, batch + '.owner']) expect(existsSync(path)).toBe(true);
+    for (const path of [retired, oldRepo, verify, batch, batch + '.owner']) expect(existsSync(path)).toBe(true);
     child.kill('SIGKILL');
     await child.exited;
     expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
-    for (const path of [retired, oldRepo, batch, batch + '.owner']) expect(existsSync(path)).toBe(false);
+    for (const path of [retired, oldRepo, verify, batch, batch + '.owner']) expect(existsSync(path)).toBe(false);
   } finally {
     if (child.exitCode === null) child.kill('SIGKILL');
     await child.exited;
