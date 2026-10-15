@@ -783,7 +783,10 @@ test('a finished leaf temp stays while its retained slice holds a running unit w
     expect((await cli(f, ['next', '--all'], f.root, env)).code).toBe(0);
     expect(existsSync(temp)).toBe(true);
     // Once the run record ends and the unit empties, the temp goes.
-    writeFileSync(resolve(runs, 'seed.yaml'), readFileSync(resolve(runs, 'seed.yaml'), 'utf8').replace('state: live', 'state: ended'));
+    writeFileSync(
+      resolve(runs, 'seed.yaml'),
+      readFileSync(resolve(runs, 'seed.yaml'), 'utf8').replace('state: live', 'state: ended'),
+    );
     writeFileSync(resolve(cgRoot, 'busy', 'cgroup.procs'), '');
     expect((await cli(f, ['next', '--all'], f.root, env)).code).toBe(0);
     expect(existsSync(temp)).toBe(false);
