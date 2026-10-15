@@ -61,7 +61,7 @@ Each line carries:
 - `attempt` is the merge attempt id.
 - `repo` is the registered repo name.
 - `holder` is the holder leaf slug.
-- `members` lists carried member slugs; it appears only on lines written before batching was removed.
+- `members` lists carried member slugs as object entries `{slug, head}`; string-slug entries appear only on lines written before this change returned.
 - `built_on` is the remote tip the holder was rebased onto.
 - `tested_top` is the head the checks ran against; it is absent when the attempt ended with no checked top.
 - `outcome` is `merged` or `red`; `held`, `split`, `reuse` and `ejected` appear only on older lines and still parse.
@@ -83,7 +83,7 @@ Each line names its event kind:
 - `prompt` is `akrogon next` delivering or failing a seat prompt.
 - `seat_done` is `akrogon phase` finishing a paired seat without a move.
 - `check_start` and `check_end` are `akrogon run-check` starting and ending a check; `check_start` carries optional `wait_ms`, the time spent registering the run before its immediate start.
-- `batch` is `akrogon next` creating a merge batch record; `members` appears only on older lines.
+- `batch` is `akrogon next` creating a merge batch record.
 - `wait` is `akrogon next` or `akrogon park` opening or closing a wait.
 - `repo_pause` is `akrogon pause` or `akrogon unpause` toggling the repo.
 
