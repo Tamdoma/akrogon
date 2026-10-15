@@ -236,6 +236,16 @@ function ownerDead(owner: { pid: number; boot_id: string }): boolean {
   return !pidAlive(owner.pid) || (owner.boot_id !== '' && owner.boot_id !== currentBoot());
 }
 
+function readProc<T>(read: () => T): T | undefined {
+  try {
+    return read();
+  } catch (error) {
+    const code: string | undefined = (error as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT' && code !== 'EACCES' && code !== 'EPERM') throw error;
+    return undefined;
+  }
+}
+
 // One scan of this uid's processes: pid to the targets of its cwd and open
 // fds. Unreadable entries and dead pids are skipped; fd targets like
 // "socket:[123]" that never resolve simply match no path.
@@ -246,14 +256,16 @@ function procTargets(): Map<number, string[]> {
     const pid: number = Number(entry.name);
     if (!pidAlive(pid)) continue;
     const dir: string = resolve(procRoot(), entry.name);
-    try {
-      if (statSync(dir).uid !== process.getuid!()) continue;
-      const found: string[] = [readlinkSync(resolve(dir, 'cwd'))];
-      for (const fd of readdirSync(resolve(dir, 'fd'))) found.push(readlinkSync(resolve(dir, 'fd', fd)));
-      targets.set(pid, found);
-    } catch {
-      continue;
-    }
+    if (readProc(() => statSync(dir).uid) !== process.getuid!()) continue;
+    const fds: string[] = readProc(() => readdirSync(resolve(dir, 'fd'))) ?? [];
+    const found: (string | undefined)[] = [
+      readProc(() => readlinkSync(resolve(dir, 'cwd'))),
+      ...fds.map((fd) => readProc(() => readlinkSync(resolve(dir, 'fd', fd)))),
+    ];
+    targets.set(
+      pid,
+      found.filter((target) => target !== undefined),
+    );
   }
   return targets;
 }
