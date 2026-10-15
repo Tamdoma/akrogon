@@ -29,8 +29,8 @@ test.serial('suite env is redirected: HOME, leaf-temp root, tmpdir and store res
   );
   expect(child.code).toBe(0);
   const [childHome, childTemp]: string[] = JSON.parse(child.stdout.trim());
-  expect(childHome).toBe(process.env.HOME);
-  expect(childTemp).toBe(process.env.AKROGON_LEAF_TEMP_ROOT);
+  expect(childHome).toBe(process.env.HOME ?? '');
+  expect(childTemp).toBe(process.env.AKROGON_LEAF_TEMP_ROOT ?? '');
 });
 
 test.serial('a killed child leaves no descendant: the orphan is adopted by this worker and swept', async () => {
