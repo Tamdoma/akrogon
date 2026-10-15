@@ -509,9 +509,7 @@ test('store variants are kept as unmanaged through live, unavailable and absent 
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(variant)).toBe(true);
     expect((await status(f, 'variant-holder')).stdout).toContain('unmanaged worktree');
-    expect(keptReport(f).some((entry) => entry.path === variant && entry.reason === 'unmanaged worktree')).toBe(
-      true,
-    );
+    expect(keptReport(f).some((entry) => entry.path === variant && entry.reason === 'unmanaged worktree')).toBe(true);
   } finally {
     f.clean();
   }
@@ -567,9 +565,7 @@ test('targeted next keeps unused registered variants', async () => {
     expect((await next(f, ['typed-holder'])).code).toBe(0);
     expect(existsSync(variant)).toBe(true);
     expect((await status(f, 'typed-holder')).stdout).toContain('unmanaged worktree');
-    expect(keptReport(f).some((entry) => entry.path === variant && entry.reason === 'unmanaged worktree')).toBe(
-      true,
-    );
+    expect(keptReport(f).some((entry) => entry.path === variant && entry.reason === 'unmanaged worktree')).toBe(true);
   } finally {
     f.clean();
   }
@@ -1095,10 +1091,7 @@ test('unowned entries stay while a pane or process sits inside', async () => {
     const db: Database = database(f);
     saveDatabase(f, {
       ...db,
-      panes: [
-        ...db.panes,
-        { pane_id: 'w1:p700', tab_id: 'w1:t700', cwd: junkPane, agent: null, agent_status: 'idle' },
-      ],
+      panes: [...db.panes, { pane_id: 'w1:p700', tab_id: 'w1:t700', cwd: junkPane, agent: null, agent_status: 'idle' }],
     });
     const procDir: string = resolve(procRoot(f), String(child.pid));
     mkdirSync(resolve(procDir, 'fd'), { recursive: true });
