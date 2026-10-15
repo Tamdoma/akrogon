@@ -136,6 +136,11 @@ async function batchFixture(): Promise<{ f: Fixture; repo: Repo; builtOn: string
   const f: Fixture = await fixture();
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
   process.env.HOME = f.home;
+  yaml(resolve(f.root, 'issues/config.yaml'), {
+    checks: { test: 'bun test' },
+    grounding: 'none',
+    worktree_root: storeDir(f),
+  });
   writeFileSync(resolve(f.root, 'file-m'), 'm\n');
   await command(['git', 'add', '.'], f.root);
   await command(['git', 'commit', '-m', 'main-advance'], f.root);
@@ -149,6 +154,11 @@ async function lessonsFixture(): Promise<{ f: Fixture; repo: Repo; builtOn: stri
   const f: Fixture = await fixture();
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
   process.env.HOME = f.home;
+  yaml(resolve(f.root, 'issues/config.yaml'), {
+    checks: { test: 'bun test' },
+    grounding: 'none',
+    worktree_root: storeDir(f),
+  });
   writeFileSync(resolve(f.root, '.gitattributes'), 'learnings/LESSONS.md merge=union\n');
   mkdirSync(resolve(f.root, 'learnings/history'), { recursive: true });
   writeFileSync(
