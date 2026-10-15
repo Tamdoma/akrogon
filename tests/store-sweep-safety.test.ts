@@ -43,6 +43,9 @@ test('F2 surviving processes protect leaf entries and leaf temps', async () => {
   const repo: Repo = readRepo('repo', f.root);
   const owned: string = resolve(storeDir(f), 'done-old');
   const temp: string = resolve(leafTempRoot(f), relative(process.env.AKROGON_LEAF_TEMP_ROOT!, leafTemp(repo, 'done')));
+  const registered: string = resolve(storeDir(f), 'failed-owned');
+  await command(['git', 'worktree', 'add', '--detach', registered], f.root);
+  leaf(f, 'failed-owned', 'failed', { worktree: registered, tab: 'w1:t99', failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'fixture' } });
   mkdirSync(owned, { recursive: true });
   mkdirSync(temp, { recursive: true });
   writeFileSync(resolve(temp, 'open'), 'x');
@@ -53,14 +56,17 @@ test('F2 surviving processes protect leaf entries and leaf temps', async () => {
     mkdirSync(resolve(proc, 'fd'), { recursive: true });
     symlinkSync(owned, resolve(proc, 'cwd'));
     symlinkSync(resolve(temp, 'open'), resolve(proc, 'fd/3'));
+    symlinkSync(resolve(registered, 'file'), resolve(proc, 'fd/4'));
     expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
     expect(existsSync(owned)).toBe(true);
     expect(existsSync(temp)).toBe(true);
+    expect(existsSync(registered)).toBe(true);
     child.kill('SIGKILL');
     await child.exited;
     expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
     expect(existsSync(owned)).toBe(false);
     expect(existsSync(temp)).toBe(false);
+    expect(existsSync(registered)).toBe(false);
   } finally {
     if (child.exitCode === null) child.kill('SIGKILL');
     await child.exited;
