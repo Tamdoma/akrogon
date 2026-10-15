@@ -39,7 +39,7 @@ function slug(title: string): string {
   return shortened.replace(/-$/, '') || 'issue';
 }
 
-export async function pullRepo(repo: Repo): Promise<void> {
+export async function originSource(repo: Repo): Promise<string> {
   const origin: string = await command(['git', 'remote', 'get-url', 'origin'], repo.root);
   const match: RegExpExecArray | null =
     /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([a-zA-Z0-9-]+)\/([a-zA-Z0-9._-]+?)(?:\.git)?\/?$/.exec(
@@ -47,7 +47,11 @@ export async function pullRepo(repo: Repo): Promise<void> {
     );
   if (match === null || match[2] === '.' || match[2] === '..')
     throw new Error(JSON.stringify({ error: 'Origin must identify a GitHub repository', repo: repo.name, origin }));
-  const source: string = `${match[1]}/${match[2]}`;
+  return `${match[1]}/${match[2]}`;
+}
+
+export async function pullRepo(repo: Repo): Promise<void> {
+  const source: string = await originSource(repo);
   const output: string = await retryCommand(
     [
       'gh',

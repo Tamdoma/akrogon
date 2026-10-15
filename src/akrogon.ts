@@ -36,7 +36,7 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
                 : verb === 'status'
                   ? { charts: { type: 'boolean' } }
                   : verb === 'timing'
-                    ? { cohort: { type: 'boolean' }, since: { type: 'string' } }
+                    ? { cohort: { type: 'boolean' }, flow: { type: 'boolean' }, since: { type: 'string' } }
                     : {};
 
 const { values, positionals } = parseArgs({
@@ -148,15 +148,23 @@ switch (verb) {
     await (await import('./install')).install();
     break;
   case 'timing': {
-    if (values.cohort === true && (values.since === undefined || positionals.length !== 0))
-      throw new Error('Usage: akrogon timing --cohort --since <iso>');
-    if (values.cohort !== true && (values.since !== undefined || positionals.length !== 1))
-      throw new Error('Usage: akrogon timing <slug>');
+    const usage: string = 'Usage: akrogon timing <slug> | --cohort --since <iso> | --flow --since <YYYY-MM-DD>';
+    const gate: boolean = values.cohort === true || values.flow === true;
+    if (
+      (values.cohort === true && values.flow === true) ||
+      (gate && (values.since === undefined || positionals.length !== 0)) ||
+      (!gate && (values.since !== undefined || positionals.length !== 1))
+    )
+      throw new Error(usage);
     await (
       await import('./timing-report')
     ).timingCommand(
       process.cwd(),
-      values.cohort === true ? { since: z.iso.datetime().parse(values.since) } : { slug: positionals[0] },
+      values.cohort === true
+        ? { since: z.iso.datetime().parse(values.since) }
+        : values.flow === true
+          ? { flow: z.iso.date().parse(values.since) }
+          : { slug: positionals[0] },
     );
     break;
   }

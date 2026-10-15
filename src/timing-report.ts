@@ -4,7 +4,10 @@ import { z } from 'zod';
 import { attemptRecordSchema } from './attempts';
 import { readGlobal, requireRepo, type Repo } from './config';
 import { readLog, type LogRecord } from './log';
+import { originSource } from './pull';
 import { requiredSlots, type Phase, type Slot } from './routing';
+import { retryCommand } from './shell';
+import { allLeaves, leavesUnder, sourcePattern, type Leaf } from './state';
 import { readTimings, type TimingEvent, type WaitReason } from './timing';
 
 // Gate bounds fixed by issues/chart/leaf-speed/forks/measure-and-revisit.md (operator 2026-10-12).
@@ -360,8 +363,157 @@ function cohortReport(repo: Repo, since: string): void {
   for (const member of members) console.log(memberLine(member));
 }
 
-export async function timingCommand(cwd: string, arg: { slug: string } | { since: string }): Promise<void> {
+const flowIssueSchema = z.object({
+  number: z.number().int().positive(),
+  created_at: z.string(),
+  state: z.string(),
+  pull_request: z.object({}).optional(),
+});
+type FlowIssue = z.infer<typeof flowIssueSchema>;
+
+type Carrier = { slug: string; handoff: string };
+
+type FlowRow = {
+  identity: string;
+  handoff: string;
+  created: number | null;
+  merged: number | null;
+  wait: number | null;
+  total: number | null;
+  leaves: number;
+};
+
+const DAY_MS: number = 24 * 60 * 60000;
+
+function isoUtc(at: number): string {
+  return new Date(at).toISOString().slice(0, 19) + 'Z';
+}
+
+function parseFlowListing(output: string): FlowIssue[] {
+  try {
+    return z
+      .array(z.array(flowIssueSchema))
+      .parse(JSON.parse(output))
+      .flat()
+      .filter((issue) => issue.pull_request === undefined);
+  } catch (error) {
+    if (!(error instanceof SyntaxError) && !(error instanceof z.ZodError)) throw error;
+    throw new Error(JSON.stringify({ error: error.message, response: output }), { cause: error });
+  }
+}
+
+function identityOrder(a: string, b: string): number {
+  const repoA: string = a.slice(0, a.indexOf('#'));
+  const repoB: string = b.slice(0, b.indexOf('#'));
+  return repoA === repoB
+    ? Number.parseInt(a.slice(a.indexOf('#') + 1), 10) - Number.parseInt(b.slice(b.indexOf('#') + 1), 10)
+    : repoA.localeCompare(repoB);
+}
+
+function lastMove(log: LogRecord[], slug: string): Move | undefined {
+  const moves: Move[] = movesOf(log, slug);
+  return moves.at(-1);
+}
+
+function flowMedian(values: number[]): number | null {
+  const sorted: number[] = [...values].sort((a, b) => a - b);
+  if (sorted.length === 0) return null;
+  const mid: number = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function flowBucket(label: string, rows: FlowRow[]): string {
+  const merged: FlowRow[] = rows.filter((row) => row.merged !== null);
+  const timed: FlowRow[] = merged.filter((row) => row.wait !== null && row.total !== null);
+  const waits: number | null = flowMedian(timed.map((row) => row.wait as number));
+  const totals: number | null = flowMedian(timed.map((row) => row.total as number));
+  return `summary ${label}: ${rows.length} merged ${merged.length} wait ${waits === null ? '-' : `${waits.toFixed(1)}d`} total ${totals === null ? '-' : `${totals.toFixed(1)}d`}`;
+}
+
+async function flowReport(repo: Repo, since: string): Promise<void> {
+  const log: LogRecord[] = readLog(repo.root);
+  const parked: string = resolve(repo.root, 'issues/parked');
+  const leaves: Leaf[] = [...allLeaves(repo), ...leavesUnder(parked, parked)];
+  const carriers = new Map<string, Carrier[]>();
+  for (const leaf of leaves)
+    for (const source of leaf.state.sources ?? []) {
+      const list: Carrier[] = carriers.get(source) ?? [];
+      list.push({ slug: leaf.state.slug, handoff: leaf.state.created.slice(0, 10) });
+      carriers.set(source, list);
+    }
+  const repos: string[] = [
+    ...new Set([...carriers.keys()].map((identity) => identity.slice(0, identity.indexOf('#'))).concat(await originSource(repo))),
+  ].sort();
+  const listings = new Map<string, FlowIssue>();
+  for (const repository of repos) {
+    const output: string = await retryCommand(
+      [
+        'gh',
+        'api',
+        '--hostname',
+        'github.com',
+        `repos/${repository}/issues?state=all&per_page=100`,
+        '--paginate',
+        '--slurp',
+      ],
+      repo.root,
+    );
+    for (const issue of parseFlowListing(output)) listings.set(`${repository}#${issue.number}`, issue);
+  }
+  const now: number = Date.now();
+  const rows: FlowRow[] = [...carriers.entries()].map(([identity, list]) => {
+    const handoff: string = list.map((carrier) => carrier.handoff).sort()[0];
+    const last: (Move | undefined)[] = list.map((carrier) => lastMove(log, carrier.slug));
+    const merged: number | null = last.every((move) => move?.to === 'merged')
+      ? Math.max(...last.map((move) => ms((move as Move).ts)))
+      : null;
+    const filed: FlowIssue | undefined = listings.get(identity);
+    const created: number | null = filed === undefined ? null : ms(filed.created_at);
+    const wait: number | null =
+      filed === undefined ? null : Math.round((ms(handoff) - ms(filed.created_at.slice(0, 10))) / DAY_MS);
+    const total: number | null = created === null ? null : ((merged ?? now) - created) / DAY_MS;
+    return { identity, handoff, created, merged, wait, total, leaves: new Set(list.map((carrier) => carrier.slug)).size };
+  });
+  const dated: FlowRow[] = rows
+    .filter((row) => row.created !== null)
+    .sort((a, b) => (a.created as number) - (b.created as number) || identityOrder(a.identity, b.identity));
+  const missing: FlowRow[] = rows
+    .filter((row) => row.created === null)
+    .sort((a, b) => identityOrder(a.identity, b.identity));
+  const carriedIds: Set<string> = new Set(carriers.keys());
+  const uncarried: { identity: string; issue: FlowIssue }[] = [...listings.entries()]
+    .filter(([identity, issue]) => !carriedIds.has(identity) && issue.state === 'open')
+    .map(([identity, issue]) => ({ identity, issue }))
+    .sort((a, b) => ms(a.issue.created_at) - ms(b.issue.created_at) || identityOrder(a.identity, b.identity));
+  const closed: number = [...listings.entries()].filter(
+    ([identity, issue]) => !carriedIds.has(identity) && issue.state === 'closed',
+  ).length;
+  for (const row of dated)
+    console.log(
+      `${row.identity} filed ${isoUtc(row.created as number)} handoff ${row.handoff} merged ${row.merged === null ? 'open' : isoUtc(row.merged)} wait ${row.wait}d total ${(row.total as number).toFixed(1)}d leaves ${row.leaves}`,
+    );
+  for (const row of missing) console.log(`${row.identity} not in listing`);
+  for (const item of uncarried)
+    console.log(
+      `${item.identity} filed ${isoUtc(ms(item.issue.created_at))} uncarried ${((now - ms(item.issue.created_at)) / DAY_MS).toFixed(1)}d`,
+    );
+  console.log(flowBucket('before', rows.filter((row) => row.handoff < since)));
+  console.log(flowBucket('since', rows.filter((row) => row.handoff >= since)));
+  const ages: number[] = uncarried.map((item) => (now - ms(item.issue.created_at)) / DAY_MS);
+  const median: number | null = flowMedian(ages);
+  const oldest: number | null = ages.length === 0 ? null : Math.floor(Math.max(...ages));
+  console.log(
+    `summary backlog: ${ages.length} median ${median === null ? '-' : `${median.toFixed(1)}d`} oldest ${oldest === null ? '-' : `${oldest}d`}`,
+  );
+  console.log(`summary uncarried closed: ${closed}`);
+}
+
+export async function timingCommand(
+  cwd: string,
+  arg: { slug: string } | { since: string } | { flow: string },
+): Promise<void> {
   const repo: Repo = await requireRepo(readGlobal(), cwd);
   if ('slug' in arg) slugReport(repo, arg.slug);
+  else if ('flow' in arg) await flowReport(repo, arg.flow);
   else cohortReport(repo, arg.since);
 }
