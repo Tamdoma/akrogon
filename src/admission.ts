@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { globalHome } from './config';
 import { procRoot, runUnitBase, stopRunUnits } from './scope';
+import { withLock } from './state';
 
 export interface AdmissionHolder {
   repo: string;
@@ -38,6 +39,12 @@ export type RunRecord = z.infer<typeof recordSchema>;
 
 const runsDir = (): string => resolve(globalHome(), 'runs');
 const bootId = (): string => readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+
+export async function withAdmissionLock<T>(slice: string, action: () => Promise<T>): Promise<T> {
+  const locks: string = resolve(runsDir(), 'locks');
+  mkdirSync(locks, { recursive: true });
+  return withLock(resolve(locks, slice), action);
+}
 
 // Field 22 of /proc/<pid>/stat. The command name in field 2 may hold spaces, so split after the last ')'.
 function startTime(pid: number): string {
@@ -150,7 +157,9 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
   };
   const begun: number = Date.now();
   try {
-    writeRecord(record);
+    await withAdmissionLock(holder.slice, async (): Promise<void> => {
+      writeRecord(record);
+    });
     process.stderr.write(`run ${holder.run}\n`);
     let ended: boolean = false;
     return await fn({

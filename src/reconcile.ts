@@ -14,7 +14,7 @@ import { globalHome, leafTemp, within, worktreeStore, type Repo } from './config
 import { readVerifyRuns, type VerifyRun } from './verify';
 import { allLeaves, leavesUnder, readState, saveState, type Leaf, type State } from './state';
 import { cgroupRoot, leafSlice, ownSlices, sessionBusAddress } from './scope';
-import { liveRuns } from './admission';
+import { liveRuns, withAdmissionLock } from './admission';
 import { command, herdrError, run, spawnCaptured, type Pane, type Result } from './shell';
 
 export type Reconciled = { removed: string[]; kept: { path: string; reason: string }[] };
@@ -138,8 +138,11 @@ function sliceKeepReason(
 }
 
 async function stopSlice(slice: string): Promise<string | null> {
-  const result: Result = await systemctl('stop', slice);
-  return result.code === 0 ? null : result.stderr || `systemctl stop exited ${result.code}`;
+  return withAdmissionLock(slice, async (): Promise<string | null> => {
+    if (liveRuns().some((record) => record.slice === slice)) return 'live run record';
+    const result: Result = await systemctl('stop', slice);
+    return result.code === 0 ? null : result.stderr || `systemctl stop exited ${result.code}`;
+  });
 }
 
 const finished = (leaf: Leaf): boolean => leaf.state.phase === 'merged' || leaf.state.phase === 'failed';
