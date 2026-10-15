@@ -553,6 +553,31 @@ test.serial(
   },
 );
 
+test.serial('skills name the run-check keeping rule, its log reader and its exemptions', () => {
+  const root: string = resolve(import.meta.dir, '..');
+  const ruled: string[] = [
+    'skills/implement-issue/SKILL.md',
+    'skills/implement-issue/worker-protocol.md',
+    'skills/implement-issue/brief-template.md',
+    'skills/check-issue/SKILL.md',
+    'skills/merge-issue/SKILL.md',
+    'skills/plan-issue/SKILL.md',
+  ];
+  for (const file of ruled) {
+    const text: string = readFileSync(resolve(root, file), 'utf8');
+    expect(text, `${file} names the run-check rule`).toContain('akrogon run-check');
+    expect(text, `${file} names the log reader`).toContain('akrogon log');
+    expect(text, `${file} exempts verify`).toContain('akrogon verify');
+    expect(text, `${file} exempts the merged move`).toContain('merged');
+    expect(text, `${file} exempts fetch`).toContain('fetch');
+    expect(text, `${file} exempts push`).toContain('push');
+  }
+  const checkIssue: string = readFileSync(resolve(root, 'skills/check-issue/SKILL.md'), 'utf8');
+  expect(checkIssue, 'check-issue allows direct-route logs at the chart holder').toMatch(/<chart>\/direct/);
+  const implementIssue: string = readFileSync(resolve(root, 'skills/implement-issue/SKILL.md'), 'utf8');
+  expect(implementIssue, 'implement-issue keeps standalone outside the rule').toMatch(/standalone[^\n]*outside/i);
+});
+
 test.serial('skills name akrogon stop-run instead of the recorded-PID stop rule', () => {
   const root: string = resolve(import.meta.dir, '..');
   for (const file of [

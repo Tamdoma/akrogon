@@ -433,6 +433,28 @@ test('pass_env names reach printed checks from the session without a .env entry'
   }
 });
 
+test('run-check prints check name, exit and kept path on its own stderr line', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { leafPath, worktree } = await leafWorktree(f, 'path-print');
+    const result: Result = await cli(
+      f,
+      ['run-check', '--name', 'probe', '--', ...sh('printf tail >&2; exit 7')],
+      worktree,
+      baseEnv(f),
+    );
+    expect(result.code).toBe(7);
+    const match: RegExpMatchArray | null = result.stderr.match(/^check probe: 7 (\S+\.log)$/m);
+    expect(match, 'stderr carries the check line at line start').not.toBeNull();
+    const kept: string = match![1];
+    expect(existsSync(kept)).toBe(true);
+    expect(kept.startsWith(resolve(leafPath, 'implementation') + '/')).toBe(true);
+    expect(readFileSync(kept, 'utf8')).toContain('tail');
+  } finally {
+    f.clean();
+  }
+});
+
 test('run-check preserves failed executable errors and removes their capture directories', async () => {
   const f: Fixture = await fixture();
   try {
