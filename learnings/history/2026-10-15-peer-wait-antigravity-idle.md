@@ -11,3 +11,5 @@ Pane status is a turn signal only for harnesses whose status covers subagent wor
 
 ## Report
 https://github.com/Tamdoma/akrogon/issues/91
+
+Applied 2026-10-16 by skills/chart-issues/scripts/peer-wait.ts:226: `turnVerdict` returns `unproven` for any kind without a proven end signal, so only claude transcript, pi hook authority and codex rollout turns can end a wait with `failure`.
