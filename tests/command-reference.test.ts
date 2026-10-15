@@ -24,6 +24,7 @@ const contracts: Record<string, string> = {
   stop: '<slug> | --all',
   start: '<slug>',
   status: '[<slug>|--charts]',
+  leftovers: '',
   timing: '[<slug>|--cohort --since <iso>|--flow --since <YYYY-MM-DD>]',
   flaky: '',
   log: '<path>',

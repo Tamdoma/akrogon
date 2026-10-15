@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -203,12 +204,14 @@ for (const directory of ['missing', 'empty']) {
   });
 }
 
-test('plain status lists kept-by-last-cleanup entries under each repo, skips missing paths and writes nothing', async () => {
+test('leftovers lists kept paths by reason per repo and kept units, skips missing paths and in-use work, and writes nothing', async () => {
   const f: Fixture = await fixture();
   try {
     const keptDir: string = registerTemp(resolve(f.home, 'kept-worktree'));
     mkdirSync(keptDir, { recursive: true });
     writeFileSync(resolve(keptDir, 'file'), 'x');
+    const busyDir: string = resolve(f.home, 'busy-worktree');
+    mkdirSync(busyDir, { recursive: true });
     const gone: string = resolve(f.home, 'gone-worktree');
     const report: string = resolve(f.home, 'reconcile/repo.json');
     mkdirSync(resolve(f.home, 'reconcile'), { recursive: true });
@@ -218,20 +221,59 @@ test('plain status lists kept-by-last-cleanup entries under each repo, skips mis
         kept: [
           { path: keptDir, reason: 'uncommitted changes' },
           { path: gone, reason: 'uncommitted changes' },
+          { path: busyDir, reason: 'active leaf' },
+          { path: busyDir, reason: 'verify 123 in progress' },
+          { path: busyDir, reason: 'live pane inside' },
+          { path: busyDir, reason: 'state.batch' },
+        ],
+      }) + '\n',
+    );
+    writeFileSync(
+      resolve(f.home, 'reconcile-host.json'),
+      JSON.stringify({
+        kept: [
+          { path: 'akrogon-lstray.slice', reason: 'process inside' },
+          { path: 'akrogon-lown.slice', reason: 'own slice' },
+          { path: 'akrogon-lrun.slice', reason: 'live run record' },
+          { path: 'akrogon-ltab.slice', reason: 'live tab' },
+          { path: 'akrogon-lpanes.slice', reason: 'pane list unavailable' },
         ],
       }) + '\n',
     );
     const before: Record<string, string> = snapshot(f.home);
-    const result: Result = await cli(f, ['status'], f.home);
+    const result: Result = await cli(f, ['leftovers'], f.home);
     expect(result.code).toBe(0);
-    const rows: string[] = result.stdout.split('\n');
-    const line: string = `  Kept by last cleanup: ${keptDir} — uncommitted changes`;
-    expect(rows).toContain(line);
-    expect(rows.indexOf('repo')).toBeLessThan(rows.indexOf('  no open leaves'));
-    expect(rows.indexOf('  no open leaves')).toBeLessThan(rows.indexOf(line));
-    expect(result.stdout).not.toContain(gone);
+    expect(result.stdout).toBe(
+      'repo\n  uncommitted changes\n    ~/kept-worktree\n\nsystemd units\n  pane list unavailable\n    akrogon-lpanes.slice\n  process inside\n    akrogon-lstray.slice',
+    );
+    const board: Result = await cli(f, ['status'], f.home);
+    expect(board.code).toBe(0);
+    expect(board.stdout).toBe('repo\n  no open leaves');
     expect(snapshot(f.home)).toEqual(before);
   } finally {
+    f.clean();
+  }
+});
+
+test('leftovers fails naming the kept report when it is invalid or unreadable', async () => {
+  const f: Fixture = await fixture();
+  const folder: string = resolve(f.home, 'reconcile');
+  try {
+    mkdirSync(folder, { recursive: true });
+    const report: string = resolve(folder, 'repo.json');
+    writeFileSync(report, '{"kept": [');
+    const invalid: Result = await cli(f, ['leftovers'], f.home);
+    expect(invalid.code).not.toBe(0);
+    expect(invalid.stdout).not.toContain('no leftovers');
+    expect(invalid.stderr).toContain(report);
+    writeFileSync(report, JSON.stringify({ kept: [] }) + '\n');
+    chmodSync(folder, 0o600);
+    const denied: Result = await cli(f, ['leftovers'], f.home);
+    expect(denied.code).not.toBe(0);
+    expect(denied.stdout).not.toContain('no leftovers');
+    expect(denied.stderr).toContain(report);
+  } finally {
+    chmodSync(folder, 0o755);
     f.clean();
   }
 });

@@ -107,7 +107,7 @@ test('failed leaf worktree is removed and its branch is kept', async () => {
   }
 });
 
-// DC2/DC4: kept worktrees reported by plain `akrogon status` and
+// DC2/DC4: kept worktrees reported by `akrogon leftovers` and
 // `akrogon status <slug>` with path and reason; a gone path drops its line.
 test('dirty merged worktree is kept and reported with path and reason', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -121,14 +121,14 @@ test('dirty merged worktree is kept and reported with path and reason', async ()
     const out: Result = await status(f, 'dirty-leaf');
     expect(out.stdout).toContain(worktree);
     expect(out.stdout).toContain('uncommitted');
-    const plain: Result = await cli(f, ['status'], f.root, f.env);
+    const plain: Result = await cli(f, ['leftovers'], f.root, f.env);
     expect(plain.code).toBe(0);
-    expect(plain.stdout).toContain(`  Kept by last cleanup: ${worktree} — uncommitted changes`);
+    expect(plain.stdout).toContain(`  uncommitted changes\n    ${worktree.replace(f.home, '~')}`);
     expect((await branchExists(f, 'dirty-leaf')).code).toBe(0);
     rmSync(worktree, { recursive: true, force: true });
-    const stale: Result = await cli(f, ['status'], f.root, f.env);
+    const stale: Result = await cli(f, ['leftovers'], f.root, f.env);
     expect(stale.code).toBe(0);
-    expect(stale.stdout).not.toContain(worktree);
+    expect(stale.stdout).not.toContain(worktree.replace(f.home, '~'));
   } finally {
     f.clean();
   }
@@ -830,7 +830,7 @@ while (true) {
       for (let pass: number = 0; pass < 10; pass++) {
         expect((await next(f, ['--all'], { AKROGON_PROC_ROOT: '/proc' })).code).toBe(0);
         expect(existsSync(copy)).toBe(true);
-        const out: Result = await cli(f, ['status'], f.root, f.env);
+        const out: Result = await cli(f, ['leftovers'], f.root, f.env);
         expect(out.stdout).toContain(`process ${child.pid} inside`);
       }
     } finally {

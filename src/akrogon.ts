@@ -143,6 +143,10 @@ switch (verb) {
     z.array(z.string()).max(1).parse(positionals);
     await (await import('./status')).statusCommand(positionals[0], values.charts === true);
     break;
+  case 'leftovers':
+    z.tuple([]).parse(positionals);
+    await (await import('./leftovers')).leftoversCommand(process.cwd());
+    break;
   case 'install':
     z.tuple([]).parse(positionals);
     await (await import('./install')).install();
@@ -210,6 +214,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|timing|flaky|log|run-check|verify|guard>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard>',
     );
 }

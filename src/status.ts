@@ -408,10 +408,6 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     const lines: string[][] = [...rows(scan, now, stopped), ...separator, ...parked];
     if (lines.length > 0) console.log(render(header, [['  LEAF', ...header.slice(1)], ...lines]).join('\n'));
     else console.log('  no open leaves');
-    for (const entry of readKept(scan.repo))
-      if (existsSync(entry.path)) console.log(`  Kept by last cleanup: ${entry.path} — ${entry.reason}`);
   }
-  // Host keeps are units, not paths: no existsSync filter.
-  for (const entry of readHostKept()) console.log(`  Kept by last cleanup: ${entry.path} — ${entry.reason}`);
   if (scans.some((scan) => !scan.ok)) process.exitCode = 1;
 }

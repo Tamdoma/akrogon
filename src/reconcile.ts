@@ -27,13 +27,25 @@ export function keptReportPath(repo: Repo): string {
   return resolve(globalHome(), 'reconcile', `${repo.name}.json`);
 }
 
-export function readKept(repo: Repo): { path: string; reason: string }[] {
-  const file: string = keptReportPath(repo);
+function readReport(file: string): { path: string; reason: string }[] {
+  let raw: string;
   try {
-    return keptReportSchema.parse(JSON.parse(readFileSync(file, 'utf8'))).kept;
-  } catch {
-    return [];
+    raw = readFileSync(file, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
   }
+  try {
+    return keptReportSchema.parse(JSON.parse(raw)).kept;
+  } catch (error) {
+    throw new Error(`invalid kept report ${file}: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error,
+    });
+  }
+}
+
+export function readKept(repo: Repo): { path: string; reason: string }[] {
+  return readReport(keptReportPath(repo));
 }
 
 function writeKept(file: string, kept: { path: string; reason: string }[]): void {
@@ -50,11 +62,7 @@ function writeKeptReport(repo: Repo, kept: { path: string; reason: string }[]): 
 const hostReportPath = (): string => resolve(globalHome(), 'reconcile-host.json');
 
 export function readHostKept(): { path: string; reason: string }[] {
-  try {
-    return keptReportSchema.parse(JSON.parse(readFileSync(hostReportPath(), 'utf8'))).kept;
-  } catch {
-    return [];
-  }
+  return readReport(hostReportPath());
 }
 
 // The manager's bus address is pinned because callers inside a run-check cut
