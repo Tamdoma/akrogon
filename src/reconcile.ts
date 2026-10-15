@@ -752,7 +752,9 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     }
   }
 
-  if (removedWorktrees.length > 0) await command(['git', 'worktree', 'prune'], repo.root);
+  // Prune on any removal: rmSync'd scratch dirs can hold inner worktrees whose
+  // stale registrations only this pass clears.
+  if (removed.length > 0) await command(['git', 'worktree', 'prune'], repo.root);
   writeKeptReport(repo, kept, removedWorktrees);
   return { removed, kept };
 }
