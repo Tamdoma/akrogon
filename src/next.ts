@@ -940,6 +940,7 @@ async function reconcileBatch(
     return;
   }
   const moved: Leaf[] = [];
+  const closable: Leaf[] = [];
   await withLock(resolve(globalHome(), '.lock'), async () => {
     if (isAutomatic && isPaused(repo.name)) return;
     const fresh: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
@@ -986,9 +987,17 @@ async function reconcileBatch(
       const notified: boolean = batch.notified === true || (await mergeNotice(repo, holderNow.state.slug));
       saveState(holderNow.path, { ...holderNow.state, batch: { ...batch, notified, recorded: true } });
     } else saveState(holderNow.path, { ...holderNow.state, batch: undefined });
+    const movedSlugs: Set<string> = new Set(moved.map((leaf) => leaf.state.slug));
+    for (const leaf of allLeaves(repo))
+      if (
+        leaf.state.phase === 'merged' &&
+        !movedSlugs.has(leaf.state.slug) &&
+        batch.members.some((member) => member.slug === leaf.state.slug)
+      )
+        closable.push(leaf);
   });
   if (!(isAutomatic && isPaused(repo.name)))
-    for (const leaf of moved) {
+    for (const leaf of [...moved, ...closable]) {
       await closeMergedTab(repo, leaf, await panes());
       await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
     }
