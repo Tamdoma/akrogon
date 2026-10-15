@@ -20,6 +20,8 @@ Note for review: the design consumes `akrogon leftovers` as landed by kept-statu
 
 ## Implementation notes
 
+- 2026-10-16 (B, check.repair F7): isolate AKROGON_RETIRED_TEMP_ROOT in the suite and shared CLI/fake-command environments, as the design’s retired-root override requires tests never to touch the real retired root.
+
 - 2026-10-16 (U1 worker, recorded by A): `loaded === null` (no user systemd manager reachable, the fixture reality) removes the finished temp rather than keeping it. Rationale: `null` conflates "manager missing" with "inventory unreadable", and keeping would regress the existing `a failed leaf temp stays while its tab lives` family whose fixture has no manager. Refines D2's "unavailable slice inventory keeps the temp" to "a loaded busy slice keeps the temp".
   - Stray entries directly under the repo-hash dir (stray files, `.tmp*` dirs, unknown dirs): unowned; deleted when the repo is idle under D5.
   - After children are swept, a repo-hash dir left empty is removed (covers the F1 empty-repo-dir junk). Repo dirs for repos no longer registered are host items (D6).

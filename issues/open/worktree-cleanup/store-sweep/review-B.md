@@ -86,3 +86,93 @@ None. No credentials or live external mutations required.
 ## Verdict
 
 fix. F1-F7 require repair. No separate Nits retained. The current green suite does not establish these required safety outcomes.
+
+
+## check.repair — 2026-10-16
+
+Started at reviewed head 0ab2552078bbafb7cf9bb4c7a2cc2c52706d6625. Repair head 7518cc6b76deefcec75509ca12379c9b6b572e67. No brief or design edits. No grants, credentials or external live actions were needed. Existing isolated repo fixtures and tracked child processes were cleaned in finally blocks. No temporary scripts created during this repair.
+
+### Repairs
+
+| Finding | Reproduction commits | Product/fixture commits | Result |
+|---|---|---|---|
+| F1 | 04f431f | 618c72e | lstat-based entry checks remove dangling links and preserve visible kept links in reports/leftovers. Original planned assertion correction remains for A. |
+| F2 | 3fe2a47, 47a83a9 | 78788b4, fc39de9 | Shared pane/process decision guards filesystem removals. Every Git worktree removal also checks surviving processes. Reproduction covers unregistered leaf entries, leaf temps and recorded registered failed worktrees. |
+| F3 | 3613d0b, 6da55db | f37448e, 163ac62 | Recursive owner inspection guards parent deletion in both filesystem sweeps and Git worktree removal. Live batch records remain authoritative even when their copy is present. Young/invalid run-owner states remain protected. |
+| F4 | 3efaf88, 38d746f | d12ff4c, 7518cc6 | Repo activity comes from live recorded tabs or loaded occupied slices that this pass did not stop. A queued record alone does not retain unowned junk. An active occupied slice also protects its leaf temp with no tab. |
+| F5 | 6deaa6d | 68630b7 | Dead-writer atomic files use pane/process vetoes. The dead-owner run exception remains unchanged. |
+| F6 | b27492d | 3f99071 | Both keep writers require a clearing condition at every call. Read compatibility with old reports remains optional. |
+| F7 | d88f00d | 04fe611 | Suite, CLI and fake command environments set isolated retired-root overrides. Explicit fixture overrides still win. |
+
+Each finding has one reproduction test in tests/store-sweep-safety.test.ts, shown red before its behavior fix and green afterward. Test commits carry Test-Change trailers citing the finding and criterion/source. Final formatting of previously added reproduction code is included in 3f99071, fc39de9 and 7518cc6 without expectation changes.
+
+Root audit: the original F2/F3 repair covered the new filesystem delete path but not removeWorktree. Searching all rmSync/git-worktree-remove sites found this shared Git path. The F3 reproduction was extended to a registered verify copy with a live descendant run and shown red/green. The F2 reproduction was extended to an actual registered failed-leaf worktree with an open-file target and shown red/green. The remaining unconditional filesystem call is the explicitly required dead-owner-run removal. All other new filesystem removals use dropChecked or the host equivalent. Extending F4’s same reproduction to assert leaf-temp survival then exposed a phase guard that applied the occupied-slice veto only to finished leaves. Removing that guard repairs active-slice temp retention too, with an additional red/green pair.
+
+### Verification evidence
+
+These are the run-check result lines. Each listed log was read back with akrogon log. A red reproduction is expected evidence of the bug. Final regression run: 7 pass, 0 fail, 42 assertions.
+
+- `check repair-f7-red: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f7-red-1792104932381-3384664.log`
+- `check repair-f7-green: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f7-green-1792104939339-3387830.log`
+- `check repair-f1-red: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f1-red-1792104958380-3420096.log`
+- `check repair-f1-green: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f1-green-1792104966664-3442574.log`
+- `check repair-f2-red: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f2-red-1792104986598-3475550.log`
+- `check repair-f2-green: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f2-green-1792105002461-3487302.log`
+- `check repair-f3-red: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f3-red-1792105027894-3516664.log`
+- `check repair-f3-green: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f3-green-1792105042022-3527293.log`
+- `check repair-f4-red: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f4-red-1792105066509-3546380.log`
+- `check repair-f4-green: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f4-green-1792105073064-3550966.log`
+- `check repair-f5-red: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f5-red-1792105080302-3555540.log`
+- `check repair-f5-green: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f5-green-1792105084501-3558312.log`
+- `check repair-f6-red: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f6-red-1792105108932-3575437.log`
+- `check repair-f6-green: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f6-green-1792105127542-3586847.log`
+- `check repair-f3-registered-red: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f3-registered-red-1792105197693-3790085.log`
+- `check repair-f3-registered-green: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f3-registered-green-1792105216286-3883959.log`
+- `check repair-f2-registered-red: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f2-registered-red-1792105229550-3914146.log`
+- `check repair-f2-registered-green: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f2-registered-green-1792105245036-3959719.log`
+- `check repair-final-regressions: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-final-regressions-1792105370713-162594.log`
+- `check sweep-c1: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c1-1792105380006-212841.log`
+- `check sweep-c2: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c2-1792105380044-212843.log`
+- `check sweep-c3: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c3-1792105380832-212840.log`
+- `check sweep-c4: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c4-1792105380540-212839.log`
+- `check sweep-c5: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c5-1792105380494-212845.log`
+- `check sweep-c6: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c6-1792105379836-212846.log`
+- `check sweep-c7: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c7-1792105379836-212849.log`
+- `check sweep-c8: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c8-1792105380006-212853.log`
+- `check sweep-c9: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c9-1792105379986-212851.log`
+- `check sweep-c10: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c10-1792105379983-212852.log`
+- `check sweep-c2b: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-sweep-c2b-1792105380212-212855.log`
+- `check repair-c6-boundary: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-c6-boundary-1792105380540-212857.log`
+- `check repair-c7-boundary: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-c7-boundary-1792105379986-212865.log`
+
+Planned commands C1-C5, C8-C10 and C2b passed on 7518cc6. C6 and C7 fail because their literal plan filters match zero test names. This is deterministic and caused by this leaf's proof-command/test-name mismatch, so the unrelated-red retry rule does not apply. The existing actual boundary cases pass under repair-c6-boundary and repair-c7-boundary. These specific results establish the exercised outcomes but do not erase the two failing planned commands.
+
+A previous full verify passed on 3f99071 with 908 tests, format and typecheck. That receipt predates the registered-path extensions and is superseded by the final-head verification recorded below.
+
+### Handed to A
+
+- F1 test-expectation correction: in tests/reconcile.test.ts, replace the planned C1 existsSync assertion for old-link with an entry-aware check. The skill reserves correction of an existing test expectation for A. Product behavior is repaired and the separate F1 reproduction passes.
+- Criterion 6/C2b missing proof case: tests/leaf-slices.test.ts currently keeps the tab live during the occupied-slice assertion. Existing fake-systemctl and cgroup fixtures can run the missing gone-tab, retained-busy-slice case without new machinery. Add that case so the slice condition cannot be masked by the tab guard.
+- Criteria 6 and 7 proof recording: the exact plan commands use filters vetoes and unmanaged worktree, which match no tests. Use the existing bun runner with actual matching titles (unowned entries stay while and unknown registered worktrees), reconcile the plan commands, and record current successful planned runs. No new runner is required.
+
+No operator actions remain. No separate reusable Nits retained by B. Peer N3's live batch-owner mechanism is covered by F3's repair.
+
+- `check repair-f4-temp-red: 1 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f4-temp-red-1792105350816-134522.log`
+
+- `check repair-f4-temp-green: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-f4-temp-green-1792105358816-143598.log`
+
+- `check repair-saved-tree: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-repair-saved-tree-1792105389795-254212.log`
+
+
+### Final verification and handoff
+
+`akrogon verify` on committed head 7518cc6b76deefcec75509ca12379c9b6b572e67 completed green: setup, format, test and typecheck all exit 0. Tests: 908 pass, 0 fail, 9286 assertions across 54 files. This is after the latest source, test and shared fixture changes. No merge_checks were run.
+
+- `verify setup: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-setup-1792105369310-156509.log`
+- `verify format: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-format-1792105371320-156509.log`
+- `verify test: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-test-1792105481409-156509.log`
+- `verify typecheck: 0 /home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/store-sweep/implementation/check-typecheck-1792105483313-156509.log`
+
+All final verify logs were read back with akrogon log. The final saved-tree check records a clean worktree and git diff --check success. All F1-F7 behavior/fixture repairs are committed. The Handed to A items above remain, so the requested next phase is check.fix, not merge.
+
+Handoff citation guard: the first check.fix request was rejected because tests/helpers.ts was not in the final trailer block of the F7 commit (two separate -m trailer paragraphs). Empty citation commit 8e6eaaf45140b8d3d500d704cf8ad9887b45b789 supplies that exact final-block citation. Its tree is unchanged from verified 7518cc6 (a5546ac8ddd888fa42d41e8bb2aa158650e23aba), so the green receipt still covers the implementation. Final branch head: 8e6eaaf45140b8d3d500d704cf8ad9887b45b789.

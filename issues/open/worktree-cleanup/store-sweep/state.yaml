@@ -1,5 +1,5 @@
 slug: store-sweep
-phase: check.repair
+phase: check.fix
 created: 2026-10-15
 repo: akrogon
 debate: "no"
@@ -10,13 +10,13 @@ blocked-by:
 sources:
   - "Tamdoma/akrogon#93"
 busy_since:
-  B: 2026-10-15T22:55:01.850Z
+  A: 2026-10-15T23:05:16.244Z
 busy_notified: {}
 attempts:
   A: 0
   B: 0
 done: []
-fix_rounds: 0
+fix_rounds: 1
 verdict: {}
 tab: w8:tCN
 worktree: /home/ivan/.akrogon/worktrees/akrogon/store-sweep
@@ -26,9 +26,9 @@ pane:
   A: w8:pQR
   B: w8:pQS
 prompted:
-  B: 01a141c4-798b-7b02-8cc0-273f947be6c2
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-store-sweep--/2026-10-15T22-01-12-225Z_01a14195-6521-706e-8280-cf40c83fed97.jsonl
 prompted_at:
-  B: 2026-10-15T22:55:01.850Z
+  A: 2026-10-15T23:05:16.244Z
 delivery_error: {}
 frozen:
   tests/command-reference.test.ts: 49449ce7da8087a407f323291e991dec57972cb7
