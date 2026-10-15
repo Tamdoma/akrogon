@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+584 |     await dispatchLeaf(f, 'stray-holder');
+585 |     const stray: string = resolve(storeDir(f), 'verify-no-record');
+586 |     await command(['git', 'worktree', 'add', '--detach', stray], f.root);
+587 |     await unreachable(stray, f.root);
+588 |     expect((await next(f, ['--all'])).code).toBe(0);
+589 |     expect(existsSync(stray)).toBe(false);
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/scratch-copy-removal/tests/reconcile.test.ts:589:31)
+(fail) a verify scratch copy with no record is removed like a dead-owner copy [1534.04ms]
+
+ 0 pass
+ 29 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [1.58s]

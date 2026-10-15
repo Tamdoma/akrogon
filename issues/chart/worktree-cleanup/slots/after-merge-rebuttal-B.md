@@ -1,0 +1,11 @@
+# Slot B disagreement-only rebuttal
+
+- **R1. Remove B from the four-second historical timing claim (line 14).** B established eventual absence from the current tab inventory and closed states, explicitly not who removed them or how quickly (`after-merge-B.md`, Q1/F2). The new history finding also means those merges cannot prove today's hook-only cleanup timing. Keep the timing attribution to the slots that inspected that evidence.
+
+- **R2. Restore serialization as a build-protection option, and do not treat B as endorsing the proposed owner-file implementation (lines 7, 33).** B requested either serialization or durable live-build identity, conditional on proving protection through attempt supersession. An owner file can implement the latter, but its publication boundary needs a decision: the directory becomes visible during `createSparseWorktree` (`src/next.ts:288-303`), before a file written afterward exists. A concurrent sweep must not classify that interval as abandoned scratch. Include creation-before-owner-publication in the proof, alongside the overlapping-build case. B has not approved that mechanism merely because it contains a PID.
+
+- **R3. Repeated sequential builds do not by themselves cause a fixed-name collision (line 6).** `buildStack` awaits forced removal in `finally` before returning (`src/batch.ts:154-155`), and the rebuild loop awaits each call (`src/next.ts:1078-1083,1127`). A collision needs overlapping calls using the same name or a surviving directory after interrupted/failed cleanup. State that condition rather than attributing a collision to the loop alone.
+
+- **R4. Qualify “dependents never dispatch” (line 15).** With no member-close event, this particular completion chain can miss their immediate wake. A later sweep can still dispatch them (`src/next.ts:844-875,1400-1428`). This is a delayed-wake claim, not permanent inability to dispatch. B did not establish that separate defect historically.
+
+- **R5. Remove B from the explicit report-timestamp proposal (line 26).** B asked to identify the output as saved last-reconcile results, without requesting a timestamp field (`after-merge-B.md`, Q2/D2 and R5). Keep a timestamp as C's proposal if C supplied it.

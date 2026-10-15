@@ -1,0 +1,30 @@
+slug: worktree-keep-rule
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#94"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tCP
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQT
+  B: w8:pQV
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T22:31:45.558Z
+frozen:
+  tests/keep-rule.test.ts: 9930849ad890b6380316ed903dafc92d374cd68f
+  tests/reconcile.test.ts: 6a4be71bb5ed95d6f39fe4e2b0cd7853d43470c6
+frozen_cited: []

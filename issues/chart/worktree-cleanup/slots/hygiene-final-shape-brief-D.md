@@ -1,0 +1,3 @@
+# Final-shape check, slot D
+
+The operator chose 1a | 2a | 3a. Read /home/ivan/Work/infra/akrogon/issues/chart/worktree-cleanup/slots/hygiene-final-shape-draft.md and the fork forks/store-hygiene.md Findings. Check it once as the implementer. Reply only with defects, with evidence (path:line or host fact): a rule that breaks something running, a case it misses, or a contradiction with the taken forks (forks/scratch-copy-removal.md, forks/after-merge-remainder.md). Check especially: can stopping the leaf slice at merge kill the process doing the merge or a seat still finishing (where does the merge run, src/next.ts / src/phase.ts)? Say "none" if nothing. Read-only. Write to /home/ivan/Work/infra/akrogon/issues/chart/worktree-cleanup/slots/hygiene-final-shape-D.md.

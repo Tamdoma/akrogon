@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+618 |     await command(['git', 'worktree', 'add', '--detach', stray], f.root);
+619 |     writeFileSync(resolve(stray, 'untracked'), 'dirty');
+620 |     const orphaned: string = resolve(storeDir(f), 'batch-gone.owner');
+621 |     writeFileSync(orphaned, JSON.stringify({ pid: 4194303, boot_id: boot, started: new Date().toISOString() }));
+622 |     expect((await next(f, ['--all'])).code).toBe(0);
+623 |     expect(existsSync(owned)).toBe(false);
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/scratch-copy-removal/tests/reconcile.test.ts:623:31)
+(fail) batch copies follow their owner record: live kept, dead and absent removed [1726.89ms]
+
+ 0 pass
+ 29 filtered out
+ 1 fail
+ 7 expect() calls
+Ran 1 test across 1 file. [1.76s]

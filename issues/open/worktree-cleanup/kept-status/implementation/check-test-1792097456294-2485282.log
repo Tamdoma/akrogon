@@ -1,0 +1,56 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/status.test.ts:
+(pass) overview reports no open leaves for a empty open directory without writes [228.11ms]
+224 |     const before: Record<string, string> = snapshot(f.home);
+225 |     const result: Result = await cli(f, ['status'], f.home);
+226 |     expect(result.code).toBe(0);
+227 |     const rows: string[] = result.stdout.split('\n');
+228 |     const line: string = `  Kept by last cleanup: ${keptDir} — uncommitted changes`;
+229 |     expect(rows).toContain(line);
+                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "  Kept by last cleanup: /var/tmp/akr-1000/5d20/24180b33/run-iWZWWV/akrogon-6TIVuV/kept-worktree — uncommitted changes"
+Received: [ "repo", "  no open leaves" ]
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/kept-status/tests/status.test.ts:229:18)
+(pass) busy durations appear in NOTE for every recorded seat without writes or herdr calls [279.85ms]
+(fail) plain status lists kept-by-last-cleanup entries under each repo, skips missing paths and writes nothing [286.45ms]
+(pass) delivery errors surface as prompt tokens unless the seat is busy [336.50ms]
+(pass) overview reports no open leaves for a missing open directory without writes [349.62ms]
+(pass) failed leaves show cause and reason in NOTE and terminal phases suppress busy [340.94ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [382.62ms]
+(pass) --charts derives stage from last terminal marker line [442.36ms]
+(pass) --charts lists every chart with taken counts, fog items, stage and age [504.74ms]
+(pass) a leaf with the removed hand_built key is unreadable while healthy repos remain visible [686.85ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [719.48ms]
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [774.41ms]
+(pass) repo mismatch identifies both keys in overview and detail while healthy repos remain visible [852.49ms]
+(pass) status identifies dormant issue/resting and prefers open or closed leaves [870.13ms]
+(pass) age is unavailable for missing, empty, unrelated and future history and uses file order [879.30ms]
+(pass) status reports invalid open/ while showing another repo without writes [920.81ms]
+(pass) status identifies dormant epic/issue/resting and prefers open or closed leaves [964.44ms]
+(pass) TURN names the holder and later stamp places [624.60ms]
+(pass) status reports invalid open/epic/issue/extra/invalid while showing another repo without writes [1003.83ms]
+(pass) status reports invalid open/invalid while showing another repo without writes [1004.35ms]
+(pass) TURN is empty for ineligible merge leaves and non-merge leaves [625.30ms]
+(pass) TURN orders unstamped merge leaves by last to: merge record and marks no record last [658.02ms]
+(pass) status detail prints Missing lines between state and History without env values [745.23ms]
+(pass) status prints Missing lines after Failed lines and before the repo section without env values [802.66ms]
+(pass) overview NOTE marks only leaves whose seat comes from an index [541.05ms]
+(pass) status detail prints the seats the next agent start uses with the file each came from [602.47ms]
+(pass) merged leaves show gaps in open and closed detail but not overview [784.32ms]
+(pass) invalid readiness.yaml reports its path in overview and detail [746.60ms]
+(pass) status rejects malformed epic front matter when the issue overrides both seats [504.20ms]
+(pass) malformed index (missing seat field) reports unreadable in overview and fails detail naming the file [453.18ms]
+(pass) malformed index (unparseable front matter) reports unreadable in overview and fails detail naming the file [501.79ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [1617.55ms]
+
+1 tests failed:
+(fail) plain status lists kept-by-last-cleanup entries under each repo, skips missing paths and writes nothing [286.45ms]
+
+ 31 pass
+ 1 fail
+ 333 expect() calls
+Ran 32 tests across 1 file. [1.65s]

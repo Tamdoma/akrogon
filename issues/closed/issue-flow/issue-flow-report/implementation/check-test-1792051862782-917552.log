@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/timing-report.test.ts:
+617 |       'acme/project#21 filed 2026-10-11T00:00:00Z handoff 2026-10-13 merged 2026-10-14T12:00:00Z wait 2d total 3.5d leaves 1',
+618 |     );
+619 |     expect(lines[2]).toMatch(/^acme\/project#30 filed 2026-10-02T00:00:00Z uncarried \d+\.\dd$/);
+620 |     expect(lines[3]).toMatch(/^acme\/project#31 filed 2026-10-13T00:00:00Z uncarried \d+\.\dd$/);
+621 |     expect(lines[4]).toBe('summary before: 0 merged 0 wait - total -');
+622 |     expect(lines[5]).toBe('summary since: 2 merged 2 wait 2.5d total 3.8d');
+                           ^
+error: expect(received).toBe(expected)
+
+Expected: "summary since: 2 merged 2 wait 2.5d total 3.8d"
+Received: "summary since: 2 merged 2 wait 2.0d total 3.5d"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/issue-flow-report/tests/timing-report.test.ts:622:22)
+(fail) flow report: even counts average the middle two values for merged medians and the backlog [78.31ms]
+
+ 0 pass
+ 13 filtered out
+ 1 fail
+ 7 expect() calls
+Ran 1 test across 1 file. [102.00ms]

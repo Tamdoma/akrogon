@@ -1,0 +1,18 @@
+/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/test-isolation/implementation/check-isolation-1792097932394-965246.log
+bun test v1.4.3 (c6da4a4d3)
+
+tests/isolation.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './isolation' from '/home/ivan/.akrogon/worktrees/akrogon/test-isolation/tests/isolation.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [4.00ms]
+
+/home/ivan/Work/infra/akrogon/issues/config.yaml True
+/home/ivan/Work/infra/akrogon/issues/merge-attempts.jsonl True

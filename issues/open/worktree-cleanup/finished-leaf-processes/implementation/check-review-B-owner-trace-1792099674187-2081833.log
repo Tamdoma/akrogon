@@ -1,0 +1,175 @@
+  const identity: string = `${repo}/slug:${slug}`;
+  if (invocation.skipped.has(key) || (slug !== undefined && invocation.skipped.has(identity))) return;
+  invocation.skipped.add(key);
+  if (slug !== undefined) invocation.skipped.add(identity);
+  console.error(JSON.stringify({ repo, path, ...(slug === undefined ? {} : { slug }), error: error.message }));
+}
+
+function discover(repo: Repo, invocation: Invocation): Inventory {
+  const result: Inventory = { leaves: [], unreadable: 0, unknown: false, foreign: [] };
+  function visit(path: string, areaRoot: string): void {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(path, { withFileTypes: true });
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, repo.name, path, error);
+      result.unknown = true;
+      return;
+    }
+    if (entries.some((entry) => entry.name === 'state.yaml')) {
+      try {
+        validateLeafDepth(areaRoot, path);
+        const state: State = readState(path);
+        if (state.repo !== repo.name) result.foreign.push({ path, stored: state.repo });
+        else result.leaves.push({ path, state });
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        report(invocation, repo.name, path, error);
+        result.unreadable += 1;
+      }
+      return;
+    }
+    for (const entry of entries.filter((entry) => entry.isDirectory())) visit(resolve(path, entry.name), areaRoot);
+  }
+  for (const area of ['open', 'closed']) {
+    const path: string = resolve(repo.root, 'issues', area);
+    try {
+      if (statSync(path, { throwIfNoEntry: false }) !== undefined) visit(path, path);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, repo.name, path, error);
+      result.unknown = true;
+    }
+  }
+  const slugs: Set<string> = new Set();
+  const duplicates: Set<string> = new Set();
+  for (const leaf of result.leaves) {
+    if (slugs.has(leaf.state.slug)) duplicates.add(leaf.state.slug);
+    slugs.add(leaf.state.slug);
+  }
+  for (const leaf of result.leaves.filter((leaf) => duplicates.has(leaf.state.slug))) {
+    report(invocation, repo.name, leaf.path, new Error(`Duplicate leaf slug: ${leaf.state.slug}`));
+    result.unreadable += 1;
+  }
+  if (result.foreign.length > 0 && !invocation.skipped.has(repo.name)) {
+    invocation.skipped.add(repo.name);
+src/state.ts:153:export function allLeaves(repo: Repo): Leaf[] {
+src/state.ts:198:  const leaf: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === slug);
+src/config.ts:337:    const { allLeaves } = await import('./state');
+src/config.ts:339:    leafPath = allLeaves(repo).find(
+src/next.ts:1355:  const rawEvent: string | undefined = input === undefined ? process.env.HERDR_PLUGIN_EVENT_JSON : undefined;
+          kind === 'seat-A exited'
+            ? { event: 'pane_exited', data: { type: 'pane_exited', pane_id: pane, workspace_id: 'w1' } }
+            : {
+                event: 'pane_agent_status_changed',
+                data: { type: 'pane_agent_status_changed', pane_id: pane, workspace_id: 'w1', agent_status: status },
+              },
+        ),
+      });
+      expect(result.code).toBe(0);
+      expect(database(f).tabs.map((tab) => tab.label)).toEqual(['done']);
+      expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
+    } finally {
+      f.clean();
+    }
+  }, 15000);
+}
+
+test('a merged leaf whose tab is already gone makes no tab close call and a driven tab_closed hook stays quiet', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'gone', 'plan.synthesis', {});
+    expect((await next(f, ['gone'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    const tab: string = readState(path).tab!;
+    saveState(path, { ...readState(path), phase: 'merge', ...holding(f), sources: ['team/project#1'] });
+    const gh: GhFixture = fakeGh(f);
+    f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
+    const probe: NonNullable<GhStep['probe']> = {
+      open: resolve(f.root, 'issues/open/issue'),
+      closed: resolve(f.root, 'issues/closed/issue'),
+      lock: resolve(f.home, '.lock'),
+      worktree,
+    };
+    const failure: GhStep[] = [
+      { stdout: '', code: 1, stderr: 'offline', probe },
+      { stdout: '', code: 1, stderr: 'offline', probe },
+    ];
+    writeFileSync(gh.db, JSON.stringify(failure));
+    expect((await cli(f, ['phase', 'gone', 'merged'], f.root, f.env)).code).not.toBe(0);
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      tabs: db.tabs.filter((item) => item.tab_id !== tab),
+      panes: db.panes.filter((pane) => pane.tab_id !== tab),
+    });
+    writeFileSync(gh.db, JSON.stringify(failure));
+    const failed: Result = await next(f, ['--all']);
+    expect(failed.code).not.toBe(0);
+    expect(failed.stderr).toContain('offline');
+    expect(existsSync(worktree)).toBe(true);
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        { stdout: '{"state":"OPEN"}', probe },
+        { stdout: '', probe },
+      ]),
+    );
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(probe.closed)).toBe(true);
+    expect(existsSync(worktree)).toBe(false);
+    const closed: Result = await next(f, [], {
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'tab_closed',
+        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' },
+      }),
+    });
+    expect(closed.code).toBe(0);
+    expect(closed.stderr).toBe('');
+    expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('a merged leaf whose closure failed during phase merged closes its tab on the seat-B idle hook after moving', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'late', 'plan.synthesis', {}, 'late-issue');
+    expect((await next(f, ['late'])).code).toBe(0);
+    const worktree: string = readState(path).worktree!;
+    saveState(path, { ...readState(path), phase: 'merge', ...holding(f), sources: ['team/project#1'] });
+    const gh: GhFixture = fakeGh(f);
+    f.env = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
+    const probe: NonNullable<GhStep['probe']> = {
+      open: resolve(f.root, 'issues/open/late-issue'),
+      closed: resolve(f.root, 'issues/closed/late-issue'),
+      lock: resolve(f.home, '.lock'),
+      worktree,
+    };
+    writeFileSync(
+      gh.db,
+    await closeSources(repo, remaining, leaf);
+  }
+  if (!complete) return;
+  if (justMerged) console.log(`${owner === issue ? 'issue' : 'epic'} complete ${basename(owner)}`);
+  mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
+  renameSync(owner, destination);
+}
+
+export async function transition(
+  repo: Repo,
+  leaf: Leaf,
+  requested: Phase,
+  explicitSlot: Slot | undefined,
+  verdict: Verdict | undefined,
+  reason: string | undefined,
+  checkOnly: boolean,
+  onCommitted?: () => void,
+  from?: string,
+): Promise<void> {
+  const state: State = readState(leaf.path);
+  if (checkOnly && requested === 'failed') throw new Error('--check cannot move to failed');
+  if (state.phase === 'merged') throw new Error(`Merged is terminal: ${state.slug}`);
+rg: src/discover.ts: No such file or directory (os error 2)

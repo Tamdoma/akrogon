@@ -1,0 +1,79 @@
+src/admission.ts:39:const runsDir = (): string => resolve(globalHome(), 'runs');
+src/admission.ts:57:const recordPath = (hash: string): string => resolve(runsDir(), `${hash}.yaml`);
+src/admission.ts:84:  const dir: string = runsDir();
+src/admission.ts:99:  const dir: string = runsDir();
+src/admission.ts:133:  mkdirSync(runsDir(), { recursive: true });
+tests/run-permit.test.ts:268:    writeFileSync(resolve(f.home, 'runs/last-start'), String(Date.now()));
+tests/run-permit.test.ts:296:    const runsDir: string = resolve(f.home, 'runs');
+tests/run-permit.test.ts:297:    mkdirSync(runsDir, { recursive: true });
+tests/run-permit.test.ts:302:      resolve(runsDir, `${createHash('sha256').update(deadToken).digest('hex')}.yaml`),
+src/run-check.ts:19:import { callerScope, withAdmission } from './admission';
+src/run-check.ts:187:    return await withAdmission(
+src/admission.ts:130:export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: Admission) => Promise<T>): Promise<T> {
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { resolve } from 'node:path';
+
+export const SHELL_START: string = '4242';
+export const OUTSIDE_CGROUP: string = '0::/user.slice/user-1000.slice/user@1000.service/app.slice/herdr.scope';
+
+export function shellPid(paneId: string): number {
+  return 10000 + (parseInt(createHash('sha256').update(paneId).digest('hex').slice(0, 6), 16) % 50000);
+}
+
+export function procDir(root: string, pid: number): string {
+  return resolve(root, String(pid));
+}
+
+export function seedShell(root: string, paneId: string, cgroup: string): void {
+  const pid: number = shellPid(paneId);
+  const dir: string = procDir(root, pid);
+  mkdirSync(dir, { recursive: true });
+  // Fields 3..21 are filler; field 22 is the start time, as in /proc/<pid>/stat.
+  const fields: string[] = ['S', '1', ...Array.from({ length: 17 }, () => '0'), SHELL_START, '0'];
+  writeFileSync(resolve(dir, 'stat'), `${pid} (ba sh) ${fields.join(' ')}\n`);
+  writeFileSync(resolve(dir, 'cgroup'), cgroup + '\n');
+}
+
+export function expectedSlice(repoName: string, slug: string): string {
+  return `akrogon-l${createHash('sha256').update(`${repoName}/${slug}`).digest('hex').slice(0, 12)}.slice`;
+}
+
+export function expectedScope(slice: string, paneId: string): string {
+  return `${slice.replace(/\.slice$/, '')}-p${paneId.replace(/[^A-Za-z0-9]/g, '')}-${shellPid(paneId)}-${SHELL_START}.scope`;
+}
+
+export function boxedCgroup(slice: string, scope: string): string {
+  return `0::/user.slice/user-1000.slice/user@1000.service/akrogon.slice/${slice}/${scope}`;
+}
+import { callerScope, liveRuns, type RunRecord } from './admission';
+import { runUnitBase, sessionBusAddress } from './scope';
+import { CommandError, spawnCaptured, type SpawnResult } from './shell';
+
+function matched(record: RunRecord): string[] {
+  return [record.unit, `${runUnitBase(record.run)}-guard.service`];
+}
+
+export async function stopRunCommand(id: string | undefined): Promise<void> {
+  const scope: string = callerScope();
+  if (scope === '') throw new Error('Caller is not inside a run or pane scope');
+  const candidates: RunRecord[] = liveRuns().filter((record) => record.scope === scope);
+  let units: string[];
+  if (id === undefined) {
+    for (const record of candidates)
+      process.stderr.write(`run ${record.run} ${record.repo}/${record.leaf} ${record.check}\n`);
+    if (candidates.length === 0) throw new Error(`No runs owned by scope ${scope}`);
+    if (candidates.length > 1) throw new Error(`${candidates.length} runs owned by scope ${scope}; name a run id`);
+    units = matched(candidates[0]);
+  } else {
+    const found: RunRecord | undefined = candidates.find((record) => record.run === id);
+    if (found === undefined) throw new Error(`No run ${id} owned by scope ${scope}`);
+    units = matched(found);
+  }
+  const argv: string[] = ['systemctl', '--user', 'stop', ...units];
+  const result: SpawnResult = await spawnCaptured(argv, {
+    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+  });
+  if (result.code !== 0) throw new CommandError(argv, process.cwd(), result);
+}
+rg: src/leftovers.ts: No such file or directory (os error 2)

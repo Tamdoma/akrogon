@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/batch.test.ts:
+342 |     );
+343 |     await command(['chmod', '+x', resolve(shimBin, 'git')]);
+344 |     process.env.PATH = `${shimBin}:${originalPath}`;
+345 |     const built: Promise<Awaited<ReturnType<typeof buildStack>>> = buildStack(repo, builtOn, builtOn);
+346 |     for (let i: number = 0; i < 500 && !existsSync(record); i++) await Bun.sleep(10);
+347 |     expect(existsSync(record)).toBe(true);
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/scratch-copy-removal/tests/batch.test.ts:347:32)
+(fail) buildStack writes its owner record before the copy and removes both in finally [5083.81ms]
+
+ 0 pass
+ 13 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [5.12s]

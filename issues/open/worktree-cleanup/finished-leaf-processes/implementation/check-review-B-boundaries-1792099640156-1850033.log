@@ -1,0 +1,358 @@
+import { appendFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
+import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
+import { readRepo } from '../src/config';
+import { verifyCommands, type VerifyScope } from '../src/verify';
+import { findLeaf, readState, type Batch } from '../src/state';
+
+export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
+const tempDirs: Set<string> = new Set();
+export function registerTemp(path: string): string {
+  tempDirs.add(path);
+  return path;
+}
+process.on('exit', () => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+});
+export type Fixture = { home: string; root: string; clean: () => void };
+export function leafTempRoot(f: Fixture): string {
+  return resolve(f.home, 'leaf-temp');
+}
+export function storeDir(f: Fixture, repo: string = 'repo'): string {
+  return resolve(f.home, '.akrogon/worktrees', repo);
+}
+export function yaml(path: string, data: object): void {
+  writeFileSync(path, Bun.YAML.stringify(data));
+}
+export function cgroupRoot(f: Fixture): string {
+  return resolve(f.home, 'cgroup');
+}
+export function statPath(f: Fixture): string {
+  const uid: number = process.getuid!();
+  return resolve(cgroupRoot(f), `user.slice/user-${uid}.slice/user@${uid}.service/akrogon.slice/memory.stat`);
+}
+export function seedStat(f: Fixture, anon: number, shmem: number = 0): void {
+  const file: string = statPath(f);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, `anon ${anon}\nfile 0\nshmem ${shmem}\n`);
+}
+export function unitBin(f: Fixture): string {
+  return resolve(f.home, 'unitbin');
+}
+export async function fixture(): Promise<Fixture> {
+  const home: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-')));
+  const root: string = resolve(home, 'repo');
+  mkdirSync(resolve(root, 'issues/open'), { recursive: true });
+  await command(['git', 'init', '-b', 'main', root]);
+  await command(['git', 'config', 'user.email', 'test@example.invalid'], root);
+  await command(['git', 'config', 'user.name', 'Test'], root);
+  writeFileSync(resolve(root, 'file'), 'initial\n');
+  writeFileSync(resolve(root, '.gitignore'), '.env\n');
+  await command(['git', 'add', '.'], root);
+  await command(['git', 'commit', '-m', 'initial'], root);
+  await command(['git', 'init', '--bare', '-b', 'main', resolve(home, 'remote.git')]);
+  await command(['git', 'remote', 'add', 'origin', resolve(home, 'remote.git')], root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], root);
+  yaml(resolve(root, 'issues/config.yaml'), { checks: { test: 'bun test' }, grounding: 'none' });
+  yaml(resolve(home, 'config.yaml'), {
+    slots: {
+      a: { harness: 'fake', model: 'strong-a', effort: 'high' },
+      b: { harness: 'fake', model: 'strong-b', effort: 'medium' },
+    },
+    harnesses: { fake: 'fake --model {model} --effort {effort}' },
+    repos: { repo: root },
+  });
+  const f: Fixture = { home, root, clean: () => rmSync(home, { recursive: true, force: true }) };
+  seedStat(f, 1024 * 1024 * 1024);
+  const units: string = unitBin(f);
+  mkdirSync(units);
+  symlinkSync(resolve(import.meta.dir, 'fake-systemd-run.sh'), resolve(units, 'systemd-run'));
+  return f;
+}
+export async function cli(
+  f: Fixture,
+  args: string[],
+  cwd: string = f.root,
+  env: NodeJS.ProcessEnv = {},
+  timeout?: number,
+): Promise<Result> {
+  const withDefault: NodeJS.ProcessEnv =
+    'AKROGON_LEAF_TEMP_ROOT' in env ? env : { ...env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) };
+  const result: SpawnResult = await spawnCaptured([process.execPath, entry, ...args], {
+    cwd,
+    env: {
+      ...process.env,
+      AKROGON_HOME: f.home,
+      HERDR_PANE_ID: '',
+      HOME: f.home,
+      ...withDefault,
+      ...('AKROGON_RUN' in env ? {} : { AKROGON_RUN: '' }),
+      PATH: `${unitBin(f)}:${env.PATH ?? process.env.PATH}`,
+    },
+    timeout,
+    killSignal: 'SIGKILL',
+  });
+  const { stdout, stderr, code } = result;
+  if (result.signalCode !== null)
+    throw new Error(JSON.stringify({ args, timeout, signal: result.signalCode, code, stdout, stderr }));
+  return { code, stdout: stdout.trim(), stderr: stderr.trim() };
+}
+export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}, container: string = 'issue'): string {
+  const path: string = resolve(f.root, 'issues/open', container, slug);
+  mkdirSync(path, { recursive: true });
+  yaml(resolve(path, 'state.yaml'), {
+    slug,
+    phase,
+    created: '2026-09-10',
+    repo: 'repo',
+    debate: 'no',
+    'blocked-by': [],
+    ...extra,
+  });
+  return path;
+}
+
+export function procRoot(f: Fixture): string {
+  return resolve(f.home, 'proc');
+}
+
+export type HerdrFixture = { db: string; env: NodeJS.ProcessEnv };
+export function fakeHerdr(f: Fixture): HerdrFixture {
+  const bin: string = resolve(f.home, 'bin');
+  mkdirSync(bin);
+  symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
+  symlinkSync(resolve(import.meta.dir, 'fake-busctl.ts'), resolve(bin, 'busctl'));
+  const db: string = resolve(f.home, 'herdr.json');
+  writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, prompts: [], starts: [] }));
+  mkdirSync(procRoot(f));
+  mkdirSync(resolve(f.home, 'run'));
+  return {
+    db,
+    env: {
+      PATH: `${bin}:${process.env.PATH}`,
+      FAKE_HERDR: db,
+      FAKE_BUSCTL_HOME: f.home,
+      AKROGON_PROC_ROOT: procRoot(f),
+      XDG_RUNTIME_DIR: resolve(f.home, 'run'),
+      AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+    },
+    verdict: {},
+    prompted: {},
+    prompted_at: {},
+    delivery_error: {},
+    attempts: { A: 0, B: 0 },
+    failure: to === 'failed' ? failure : undefined,
+    busy_since: to === 'failed' || to === 'merged' ? {} : recorded.busy_since,
+    busy_notified: to === 'failed' || to === 'merged' ? {} : recorded.busy_notified,
+    fix_rounds:
+      to === 'check.fix' && (recorded.phase === 'check.repair' || recorded.phase === 'merge')
+        ? recorded.fix_rounds + 1
+        : recorded.fix_rounds,
+    merge_stamp: to === 'merge' ? new Date().toISOString() : recorded.merge_stamp,
+  };
+  saveState(leaf.path, after);
+  console.log(`moved ${to}`);
+  onCommitted?.();
+  // The transition is committed even if diagnostic collection or append fails.
+  let announced: State = after;
+  try {
+    if (to === 'failed') announced = await announceFailed(repo, leaf, after);
+    else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(after.tab, after.slug, after.slug);
+    if (to === 'merged') await completeOwner(repo, leaf, true);
+  } catch (error) {
+    if (error instanceof MoveCommittedError) throw error;
+    throw new MoveCommittedError(
+      repo,
+      to,
+      `Move to ${to} is committed, but follow-up work failed: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  } finally {
+    try {
+      await logMove(repo, recorded, to === 'failed' ? readState(leaf.path) : announced, slot);
+      appendTiming(repo, {
+        kind: 'visit_start',
+        slug: recorded.slug,
+        phase: to,
+        visit: currentVisit(readLog(repo.root), recorded.slug, to),
+      });
+    } catch (error) {
+      const cause: Error = error instanceof Error ? error : new Error(String(error), { cause: error });
+      throw new MoveCommittedError(repo, to, `Move to ${to} is committed, but log append failed: ${cause.message}`, {
+        cause,
+      });
+    }
+  }
+  return announced;
+}
+
+export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): Promise<void> {
+  if (within(leaf.path, resolve(repo.root, 'issues/closed'))) return;
+  const issue: string = dirname(leaf.path);
+  const issueLeaves: Leaf[] = leavesUnder(issue, resolve(repo.root, 'issues/open'));
+  if (!issueLeaves.every((item) => item.state.phase === 'merged')) return;
+  const parent: string = dirname(issue);
+  const owner: string = basename(parent) === 'open' ? issue : parent;
+  const ownerLeaves: Leaf[] = owner === issue ? issueLeaves : leavesUnder(owner, resolve(repo.root, 'issues/open'));
+  const complete: boolean = ownerLeaves.every((item) => item.state.phase === 'merged');
+  const destination: string = resolve(repo.root, 'issues/closed', basename(owner));
+  if (complete && existsSync(destination)) throw new Error(`Completion destination exists: ${destination}`);
+  const issueSources: Set<string> = new Set(issueLeaves.flatMap((item) => item.state.sources ?? []));
+  const siblingSources: Set<string> = new Set(
+    ownerLeaves.filter((item) => dirname(item.path) !== issue).flatMap((item) => item.state.sources ?? []),
+  );
+  const privateSources: Set<string> =
+    owner === issue
+      ? issueSources
+      : new Set(
+          [...issueSources].filter(
+            (source) =>
+src/park.ts:41:    [...open, ...leavesUnder(resolve(root, 'issues/closed'), resolve(root, 'issues/closed'))].map(
+src/phase.ts:162:    if (to === 'merged') await completeOwner(repo, leaf, true);
+src/phase.ts:190:export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): Promise<void> {
+src/phase.ts:191:  if (within(leaf.path, resolve(repo.root, 'issues/closed'))) return;
+src/phase.ts:199:  const destination: string = resolve(repo.root, 'issues/closed', basename(owner));
+src/phase.ts:223:  mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
+src/phase.ts:780:    if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
+src/next.ts:79:import { commitMove, completeOwner } from './phase';
+src/next.ts:88:import { closeMergedTab, reconcile, reconcileHost, reconcileNeedsPanes } from './reconcile';
+src/next.ts:109:    event: z.literal('tab_closed'),
+src/next.ts:110:    data: z.object({ type: z.literal('tab_closed'), tab_id: z.string() }),
+src/next.ts:773:      await completeOwner(repo, { path: leaf.path, state }, false);
+src/next.ts:1001:      await closeMergedTab(repo, leaf, await panes());
+src/next.ts:1201:export async function mergeWake(
+src/next.ts:1374:    input !== '--all' && input !== '--resume' && event?.event !== 'tab_closed' && (input !== undefined || !hooked)
+src/next.ts:1445:      } else if (event?.event === 'tab_closed') {
+src/next.ts:1506:            await closeMergedTab(owner.repo, rediscovered, await panes());
+      if (batch.members.length > 0) await move(repo, fresh.state.slug, batch.holder.head, fresh);
+      if ((fresh.state.phase === 'merge' || fresh.state.phase === 'failed') && batch.recorded !== true)
+        appendAttempt(repo, holder.state.slug, batch, 'red', end);
+      saveState(fresh.path, { ...fresh.state, batch: undefined });
+      return;
+    }
+    if ((fresh.state.phase === 'merge' || fresh.state.phase === 'failed') && batch.recorded !== true)
+      appendAttempt(repo, holder.state.slug, batch, 'merged', end);
+    for (const member of batch.members) {
+      const item: Leaf | undefined = allLeaves(repo).find((leaf) => leaf.state.slug === member.slug);
+      const sha: string | undefined = await branchSha(repo, member.slug);
+      // A missing ref means merged cleanup already reaped it; a ref still at
+      // the recorded head means the member never moved; its tip means only the
+      // phase move remains. Anything else drifted.
+      if (item === undefined || (sha !== undefined && sha !== member.head && sha !== member.tip)) continue;
+      await move(repo, member.slug, member.tip, item);
+      if (item.state.phase !== 'merge') continue;
+      moved.push(item);
+      await commitMove(repo, item, item.state, 'merged', 'B');
+    }
+    const holderNow: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
+    if (holderNow === undefined) return;
+    if (holderNow.state.phase === 'merge') {
+      await commitMove(repo, holderNow, holderNow.state, 'merged', null);
+      const remaining: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
+      if (remaining !== undefined) saveState(remaining.path, { ...remaining.state, batch: undefined });
+    } else if (holderNow.state.phase === 'failed') {
+      const notified: boolean = batch.notified === true || (await mergeNotice(repo, holderNow.state.slug));
+      saveState(holderNow.path, { ...holderNow.state, batch: { ...batch, notified, recorded: true } });
+    } else saveState(holderNow.path, { ...holderNow.state, batch: undefined });
+    const movedSlugs: Set<string> = new Set(moved.map((leaf) => leaf.state.slug));
+    for (const leaf of allLeaves(repo))
+      if (
+        leaf.state.phase === 'merged' &&
+        !movedSlugs.has(leaf.state.slug) &&
+        batch.members.some((member) => member.slug === leaf.state.slug)
+      )
+        closable.push(leaf);
+  });
+  if (!(isAutomatic && isPaused(repo.name)))
+    for (const leaf of [...moved, ...closable]) {
+      await closeMergedTab(repo, leaf, await panes());
+      await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
+    }
+}
+
+async function mergeTurn(
+  global: GlobalConfig,
+  repo: Repo,
+  invocation: Invocation,
+  isAutomatic: boolean,
+  pressureDir: string = '/proc/pressure',
+): Promise<void> {
+  if (isAutomatic && isPaused(repo.name)) return;
+  const inventory: Inventory = discover(repo, invocation);
+  for (const leaf of inventory.leaves.filter((item) => item.state.batch !== undefined)) {
+    try {
+      await reconcileBatch(global, repo, leaf, invocation, isAutomatic, pressureDir);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, repo.name, leaf.path, error, leaf.state.slug);
+    }
+  }
+  const holder: Leaf | undefined = mergeQueue(global, discover(repo, invocation).leaves, () => readLog(repo.root))[0]
+    ?.leaf;
+  if (holder === undefined) return;
+Checking formatting...
+All matched files use Prettier code style!
+$ tsc --noEmit
+tests/worktree-store.test.ts:
+(pass) buildStack rebases the holder inside a sparse store checkout that is removed after [110.34ms]
+(pass) dispatch refuses a store path under an ancestor holding node_modules and creates nothing [177.51ms]
+(pass) a repo worktree_root tilde expands to home so the dispatched worktree lands there [682.20ms]
+(pass) a dispatched worktree lands sparse in the home store while the root keeps its issues tree [693.13ms]
+(pass) a sparse store leaf resolves only its own modules: foreign left-pad fails, local vendored resolves [699.52ms]
+(pass) a rebase inside a sparse dispatch worktree crosses an issues change cleanly [709.77ms]
+
+ 859 pass
+ 0 fail
+ 8844 expect() calls
+Ran 859 tests across 50 files. [129.48s]
+src/AREA.md
+exists docs/reference-index.md
+missing issues/timings.jsonl
+missing issues/verify-runs.jsonl
+exists src/admission.ts
+exists src/akrogon.ts
+exists src/config.ts
+exists src/init.ts
+exists src/next.ts
+exists src/phase.ts
+exists src/preflight.ts
+exists src/readiness.ts
+exists src/reconcile.ts
+exists src/scope.ts
+exists src/shell.ts
+exists src/stop-run.ts
+exists src/stop.ts
+exists src/timing-report.ts
+exists src/timing.ts
+exists src/verify.ts
+exists tests/helpers.ts
+tests/AREA.md
+exists docs/reference-index.md
+missing issues/config.yaml
+missing issues/merge-attempts.jsonl
+exists skills/watch-issues
+exists src/shell.ts
+exists tests/command-reference.test.ts
+exists tests/docs-links.test.ts
+exists tests/fake-busctl.ts
+exists tests/fake-proc.ts
+exists tests/fake-systemctl.ts
+exists tests/guard.test.ts
+exists tests/helpers.ts
+exists tests/hold-retired.test.ts
+exists tests/leaf-slices.test.ts
+exists tests/leaf-stop.test.ts
+exists tests/merge-attempts.test.ts
+exists tests/pause-status.test.ts
+exists tests/phase.test.ts
+exists tests/receipt-gates.test.ts
+exists tests/reconcile.test.ts
+exists tests/run-permit.test.ts
+exists tests/run-units.test.ts
+exists tests/seat-containment.test.ts
+exists tests/timing-report.test.ts
+exists tests/timing.test.ts
+exists tests/verify.test.ts
+exists tests/watch-issues-scripts.test.ts

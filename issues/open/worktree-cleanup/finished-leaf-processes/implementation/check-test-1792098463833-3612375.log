@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/leaf-slices.test.ts:
+214 |     expect(await isActive(sliceName)).toBe(true);
+215 |     expect(pidAlive(pid)).toBe(true);
+216 |     const callLog: string = f.db + '.calls';
+217 |     const calls: string[] = existsSync(callLog) ? readFileSync(callLog, 'utf8').trim().split('\n') : [];
+218 |     // The leaf has no worktree and no temp, so only the slice rule can trigger the fetch.
+219 |     expect(calls.filter((line) => line.includes('pane')).length).toBeGreaterThan(0);
+                                                                       ^
+error: expect(received).toBeGreaterThan(expected)
+
+Expected: > 0
+Received: 0
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/finished-leaf-processes/tests/leaf-slices.test.ts:219:66)
+(fail) a finished leaf with a live tab keeps its slice, and the pass fetched the pane list [138.56ms]
+
+ 0 pass
+ 8 filtered out
+ 1 fail
+ 7 expect() calls
+Ran 1 test across 1 file. [166.00ms]

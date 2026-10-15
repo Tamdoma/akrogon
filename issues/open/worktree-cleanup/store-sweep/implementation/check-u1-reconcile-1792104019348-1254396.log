@@ -1,0 +1,91 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+(pass) old-location worktree migration is refused while live cwd [393.24ms]
+(pass) old-location worktree migration is refused while mid-rebase [401.10ms]
+(pass) old-location worktree migration is refused while batch [410.27ms]
+(pass) old-location worktree migration is refused while dirty [418.15ms]
+(pass) old-location worktree migration is refused while live tab [417.99ms]
+(pass) failed leaf worktree is removed and its branch is kept [1162.01ms]
+(pass) worktree with a live pane inside is kept and reported [1166.24ms]
+(pass) mid-rebase worktree is kept and reported [1176.19ms]
+(pass) worktree with unreachable commits is kept and reported with a count [1211.27ms]
+(pass) clean old-location worktree of an active leaf is removed and recreated sparse at the store [1335.78ms]
+(pass) dirty merged worktree is kept and reported with path and reason [1344.62ms]
+311 |     });
+312 |     await next(f, ['--all']);
+313 |     expect(existsSync(scratch)).toBe(true);
+314 |     closeTab(f, readState(path).tab!);
+315 |     expect((await next(f, ['--all'])).code).toBe(0);
+316 |     expect(existsSync(scratch)).toBe(false);
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/store-sweep-u1/tests/reconcile.test.ts:316:33)
+(fail) a failed leaf temp stays while its tab lives, because its seats still use it as TMPDIR [1349.18ms]
+(pass) failed leaf scratch preserves an actual running verify command [1373.24ms]
+929 |     const runDead: string = mkdtempSync(resolve(temp, 'run-'));
+930 |     writeFileSync(resolve(runDead, '.owner'), ownerRecord(4194303));
+931 |     writeFileSync(resolve(temp, 'stray.file'), 'x');
+932 |     mkdirSync(resolve(temp, 'wrench.42.tmp'));
+933 |     mkdirSync(resolve(temp, 'other.abc'));
+934 |     expect((await next(f, ['--all'])).code).toBe(0);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/store-sweep-u1/tests/reconcile.test.ts:934:45)
+(fail) unregistered and stray entries are deleted when no leaf of the repo runs [174.40ms]
+(pass) unconfirmed verify worktrees are removed once the run ends [1530.69ms]
+(pass) operator worktree outside managed roots is kept as unmanaged [1537.23ms]
+(pass) run root with a dead owner pid is removed, live owner kept [1568.83ms]
+(pass) an unowned directory inside the store is kept while a leaf runs, removed once idle [1646.03ms]
+(pass) recorded worktree that is not a registered git worktree is kept, not removed [1653.76ms]
+(pass) unknown registered worktrees are kept unmanaged; locked ones are never removed [178.99ms]
+(pass) a failed delete is reported with path and error and the item remains [178.73ms]
+(pass) a stray-file-only pass fetches the pane list before deleting [175.66ms]
+(pass) targeted next keeps unused registered variants [1455.36ms]
+(pass) a verify scratch copy with no record is removed like a dead-owner copy [1436.70ms]
+(pass) registered store variants are kept as unmanaged in every pane state [1861.74ms]
+(pass) an unfinished leaf temp is removed once its tab is gone and kept silently while its tab lives [1888.71ms]
+(pass) verify scratch copies are removed by owner state and kept while the run is live [1501.56ms]
+(pass) a worker worktree of an active leaf is kept until the leaf fails [1651.05ms]
+(pass) worker copies follow the owner leaf: merged removes, failed keeps the guard [1140.19ms]
+(pass) configured destination store migrates a clean old managed worktree [1008.29ms]
+(pass) a dead-owner run dir is removed under an unavailable pane list, strays stay [830.30ms]
+(pass) live owners keep run dirs and build records; a young ownerless run dir stays [879.18ms]
+(pass) unowned entries stay while a pane or process sits inside [865.25ms]
+(pass) scratch copies stay while a pane is inside or the pane list is unavailable [1410.58ms]
+(pass) batch copies follow their owner record: live kept, dead and absent removed [2210.05ms]
+963 |     closeTab(f, readState(path).tab!);
+964 |     saveState(path, { ...readState(path), phase: 'merged' });
+965 |     expect((await next(f, ['--all'])).code).toBe(0);
+966 |     expect(existsSync(resolve(store, 'guard-leaf-old'))).toBe(false);
+967 |     expect(existsSync(resolve(store, 'stray.txt'))).toBe(false);
+968 |     expect(existsSync(temp)).toBe(false);
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/store-sweep-u1/tests/reconcile.test.ts:968:30)
+(fail) a running leaf keeps its temp, its slug entries and unowned entries [1272.31ms]
+(pass) a scratch copy with a process inside stays, recorded with the pid [1584.53ms]
+(pass) a leaf slug ending in -u<N> is handled as that leaf, not as a worker copy [1649.46ms]
+(pass) a scratch copy stays while its surviving process closes unrelated file descriptors [1750.72ms]
+
+3 tests failed:
+(fail) a failed leaf temp stays while its tab lives, because its seats still use it as TMPDIR [1349.18ms]
+(fail) unregistered and stray entries are deleted when no leaf of the repo runs [174.40ms]
+(fail) a running leaf keeps its temp, its slug entries and unowned entries [1272.31ms]
+
+ 36 pass
+ 3 fail
+ 261 expect() calls
+Ran 39 tests across 1 file. [3.12s]

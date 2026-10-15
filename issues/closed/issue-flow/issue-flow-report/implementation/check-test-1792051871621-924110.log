@@ -1,0 +1,30 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/command-reference.test.ts:
+(pass) README covers every dispatched command and its argument contract [0.75ms]
+(pass) the files guide describes the flow report [0.04ms]
+(pass) the next guide describes stop and start [0.02ms]
+(pass) coverage rejects missing, extra and duplicate rows and newly dispatched verbs [0.35ms]
+(pass) argument contracts reject lost values, requiredness and exclusive alternatives [1.22ms]
+(pass) escaped alternatives and reordered rows preserve argument semantics [0.12ms]
+
+tests/timing-report.test.ts:
+(pass) slug report: each closed visit decomposes into priority waits, prompted time and unattributed waiting [89.09ms]
+(pass) slug report: missing expected events are named per visit while exempt visits stay clean [90.01ms]
+(pass) cohort member: parked waiting continues after the last phase move [88.18ms]
+(pass) cohort gate: fails when the two central F values average above 35 minutes [91.65ms]
+(pass) cohort gate: insufficient while a member is unmerged and younger than 24 hours [94.01ms]
+(pass) cohort gate: remains insufficient with 17 merged and three stalled members [93.44ms]
+(pass) cohort gate: fail when fewer than 18 members merge [96.08ms]
+(pass) cohort gate: pass applies membership, 600-line exit, stall and failure accounting in prompt order [96.47ms]
+(pass) flow report: even counts average the middle two values for merged medians and the backlog [115.96ms]
+(pass) flow report: parked-carried and open-carried issues stay carried while open uncarried issues print [118.07ms]
+(pass) flow report: a failed listing retries once then exits non-zero with command and output [129.28ms]
+(pass) flow report: foreign open issues stay out of the origin backlog while foreign closed issues count [136.25ms]
+(pass) flow report: carried issues print one sorted line each with day spans and the medians split on handoff [137.82ms]
+(pass) flow report: usage errors name the three timing forms [191.15ms]
+
+ 20 pass
+ 0 fail
+ 1349 expect() calls
+Ran 20 tests across 2 files. [221.00ms]

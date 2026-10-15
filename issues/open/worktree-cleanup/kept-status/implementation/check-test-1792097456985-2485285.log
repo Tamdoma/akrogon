@@ -1,0 +1,47 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+(pass) old-location worktree migration is refused while batch [569.48ms]
+(pass) old-location worktree migration is refused while live tab [600.93ms]
+(pass) old-location worktree migration is refused while live cwd [631.97ms]
+(pass) old-location worktree migration is refused while dirty [635.85ms]
+(pass) old-location worktree migration is refused while mid-rebase [667.21ms]
+(pass) worktree with a live pane inside is kept and reported [1553.27ms]
+(pass) failed leaf worktree is removed and its branch is kept [1560.02ms]
+(pass) mid-rebase worktree is kept and reported [1578.03ms]
+(pass) worktree with unreachable commits is kept and reported with a count [1593.38ms]
+110 |     const out: Result = await status(f, 'dirty-leaf');
+111 |     expect(out.stdout).toContain(worktree);
+112 |     expect(out.stdout).toContain('uncommitted');
+113 |     const plain: Result = await cli(f, ['status'], f.root, f.env);
+114 |     expect(plain.code).toBe(0);
+115 |     expect(plain.stdout).toContain(`  Kept by last cleanup: ${worktree} — uncommitted changes`);
+                               ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "  Kept by last cleanup: /var/tmp/akr-1000/5d20/24180b33/run-KDXeGB/akrogon-9AAmEm/.akrogon/worktrees/repo/dirty-leaf — uncommitted changes"
+Received: "repo\n  no open leaves"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/kept-status/tests/reconcile.test.ts:115:26)
+(fail) dirty merged worktree is kept and reported with path and reason [1596.41ms]
+(pass) a failed leaf temp stays while its tab lives, because its seats still use it as TMPDIR [1680.67ms]
+(pass) clean old-location worktree of an active leaf is removed and recreated sparse at the store [1753.96ms]
+(pass) failed leaf scratch preserves an actual running verify command [1748.73ms]
+(pass) an unknown directory inside the store is reported, never removed [1833.94ms]
+(pass) unconfirmed verify worktree is removed when clean, kept when dirty [1845.23ms]
+(pass) run root with a dead owner pid is removed, live owner kept [1869.40ms]
+(pass) operator worktree outside managed roots is kept as unmanaged [1869.69ms]
+(pass) recorded worktree that is not a registered git worktree is kept, not removed [1901.90ms]
+(pass) configured destination store migrates a clean old managed worktree [1297.23ms]
+(pass) an unfinished leaf temp is removed once its tab is gone and kept silently while its tab lives [2078.59ms]
+(pass) targeted next sweeps unused registered variants [1536.59ms]
+(pass) a worker worktree of an active leaf is kept until the leaf fails [1636.88ms]
+(pass) store variants survive live or unavailable pane inventories [2303.47ms]
+
+1 tests failed:
+(fail) dirty merged worktree is kept and reported with path and reason [1596.41ms]
+
+ 22 pass
+ 1 fail
+ 122 expect() calls
+Ran 23 tests across 1 file. [2.34s]

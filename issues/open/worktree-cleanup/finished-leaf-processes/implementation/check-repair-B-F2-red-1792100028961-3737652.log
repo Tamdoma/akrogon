@@ -1,0 +1,27 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [2.00ms]
+bun test v1.4.3 (c6da4a4d3)
+[0.01ms] ".env"
+
+tests/leaf-slices.test.ts:
+131 |       try {
+132 |         await waitFor(async () => existsSync(held));
+133 |         writeFileSync(gate, '');
+134 |         const result: Result = await pass;
+135 |         expect(result.code, result.stderr).toBe(0);
+136 |         expect(readFileSync(log, 'utf8')).not.toContain(`stop ${protectedSlice}`);
+                                                    ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "stop akrogon-l462ee6e1aadb.slice"
+Received: "--user list-units --all akrogon-l*.slice --output=json\n--user list-units --all akrogon-l*.slice --output=json\n--user stop akrogon-lf3e03a74ac0c.slice\n--user stop akrogon-l462ee6e1aadb.slice\n--user list-units --all akrogon-l*.slice --output=json\n--user list-units --failed akrogon-run-* --output=json\n"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/finished-leaf-processes/tests/leaf-slices.test.ts:136:47)
+(fail) a shell run admitted while another slice stops protects its own slice [544.44ms]
+
+ 0 pass
+ 11 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [581.00ms]

@@ -1,0 +1,27 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [0.00ms]
+bun test v1.4.3 (c6da4a4d3)
+[0.00ms] ".env"
+
+tests/leaf-slices.test.ts:
+37 |       FAKE_SYSTEMCTL_DB: db,
+38 |       FAKE_SYSTEMCTL_LOG: log,
+39 |       AKROGON_CGROUP_ROOT: cgRoot,
+40 |     });
+41 |     expect(result.code, result.stderr).toBe(0);
+42 |     expect(readFileSync(log, 'utf8')).not.toContain(`stop ${slice}`);
+                                               ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "stop akrogon-l517adc8cc3b5.slice"
+Received: "--user list-units --all akrogon-l*.slice --output=json\n--user list-units --all akrogon-l*.slice --output=json\n--user list-units --failed akrogon-run-* --output=json\n--user show akrogon-l517adc8cc3b5.slice -p ControlGroup --value\n--user stop akrogon-l517adc8cc3b5.slice\n"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/finished-leaf-processes/tests/leaf-slices.test.ts:42:43)
+(fail) a repo-local pass preserves another registered repo slice with a live tab [187.77ms]
+
+ 0 pass
+ 9 filtered out
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [213.00ms]

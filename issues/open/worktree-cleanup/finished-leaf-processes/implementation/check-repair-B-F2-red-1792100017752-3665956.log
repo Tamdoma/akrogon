@@ -1,0 +1,44 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+bun test v1.4.3 (c6da4a4d3)
+[0.01ms] ".env"
+
+tests/leaf-slices.test.ts:
+136 |         expect(readFileSync(log, 'utf8')).not.toContain(`stop ${protectedSlice}`);
+137 |       } finally {
+138 |         writeFileSync(gate, '');
+139 |         writeFileSync(release, '');
+140 |         const result: Result = await run;
+141 |         expect(result.code, result.stderr).toBe(0);
+                                                 ^
+error: 113 |     super(`Leaf repo mismatch at ${path}: stored key "${stored}", registered key "${registered}"`);
+114 |   }
+115 | }
+116 | 
+117 | export function readState(path: string): State {
+118 |   const parsed: ReturnType<typeof Bun.YAML.parse> = Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8'));
+                                                                         ^
+ENOENT: no such file or directory, open '/var/tmp/akr-1000/5d20/4abcdd54/run-lyhhiI/akrogon-EcKQ8P/repo/issues/open/issue/z-protected/state.yaml'
+    path: "/var/tmp/akr-1000/5d20/4abcdd54/run-lyhhiI/akrogon-EcKQ8P/repo/issues/open/issue/z-protected/state.yaml",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at readState (/home/ivan/.akrogon/worktrees/akrogon/finished-leaf-processes/src/state.ts:118:68)
+      at leafTarget (/home/ivan/.akrogon/worktrees/akrogon/finished-leaf-processes/src/run-check.ts:106:26)
+      at runCheck (/home/ivan/.akrogon/worktrees/akrogon/finished-leaf-processes/src/run-check.ts:142:36)
+
+Bun v1.4.3 (Linux x64)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/finished-leaf-processes/tests/leaf-slices.test.ts:141:44)
+(fail) a shell run admitted while another slice stops protects its own slice [10809.89ms]
+
+ 0 pass
+ 11 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [10.85s]

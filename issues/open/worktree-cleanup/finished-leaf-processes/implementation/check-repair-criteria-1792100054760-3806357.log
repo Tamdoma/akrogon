@@ -1,0 +1,24 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+bun test v1.4.3 (c6da4a4d3)
+[0.00ms] ".env"
+
+tests/leaf-slices.test.ts:
+(pass) bad leaf ownership keeps uncertain slices without aborting failed-unit cleanup [189.89ms]
+(pass) a pass with the pane list unavailable stops no slice of a leaf that has a recorded tab [213.81ms]
+(pass) akrogon phase merged inside the leaf slice stops no slice [230.64ms]
+(pass) a repo-local pass preserves another registered repo slice with a live tab [252.25ms]
+(pass) a finished leaf with a live tab keeps its slice, and the pass fetched the pane list [297.53ms]
+(pass) a shell run admitted while another slice stops protects its own slice [490.94ms]
+(pass) the run guard unit is submitted with CollectMode=inactive-or-failed [733.90ms]
+(pass) a loaded failed akrogon-run unit is cleared by a reconcile pass [745.16ms]
+(pass) a loaded slice matching no leaf record is stopped only when it holds no process [803.85ms]
+(pass) a reconcile pass running inside a leaf slice does not stop that slice [855.36ms]
+(pass) merged and failed leaf slices with gone tabs are stopped and their processes end [1547.53ms]
+(pass) a finished leaf slice named by a live run record is not stopped [1573.62ms]
+
+ 12 pass
+ 0 fail
+ 55 expect() calls
+Ran 12 tests across 1 file. [1.60s]

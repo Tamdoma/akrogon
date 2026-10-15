@@ -1,0 +1,50 @@
+/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/test-isolation/implementation/check-test-1792099970852-2961538.log
+(pass) a repo worktree_root tilde expands to home so the dispatched worktree lands there [569.07ms]
+(pass) a dispatched worktree lands sparse in the home store while the root keeps its issues tree [599.51ms]
+(pass) a sparse store leaf resolves only its own modules: foreign left-pad fails, local vendored resolves [606.63ms]
+(pass) a rebase inside a sparse dispatch worktree crosses an issues change cleanly [619.46ms]
+
+ 852 pass
+ 0 fail
+ 8812 expect() calls
+Ran 852 tests across 50 files. [105.53s]
+/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/test-isolation/implementation/check-format-1792099865229-2961538.log
+Checking formatting...
+All matched files use Prettier code style!
+/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/test-isolation/implementation/check-typecheck-1792099972894-2961538.log
+$ tsc --noEmit
+after-pids 3805
+after2 3364
+before-pids 2309
+before2 3217
+new-procs.txt 105872
+procs-after.txt 117311
+procs-before.txt 79171
+procs2-after.txt 125694
+procs2-before.txt 71526
+roots-written.txt 0
+suite.log 80625
+suite2.log 85216
+suite3.log 82076
+tmp-after.txt 4922
+tmp-before.txt 4922
+var-tmp-after.txt 3629
+var-tmp-before.txt 2427
+worktrees-after.txt 22817
+worktrees-before.txt 20336
+namespace suite tail:
+tests/watch-issues-scripts.test.ts:
+(pass) watch-issues scripts test and typecheck pass [2284.65ms]
+
+tests/worktree-store.test.ts:
+(pass) buildStack rebases the holder inside a sparse store checkout that is removed after [124.11ms]
+(pass) dispatch refuses a store path under an ancestor holding node_modules and creates nothing [184.72ms]
+(pass) a repo worktree_root tilde expands to home so the dispatched worktree lands there [736.54ms]
+(pass) a sparse store leaf resolves only its own modules: foreign left-pad fails, local vendored resolves [847.92ms]
+(pass) a dispatched worktree lands sparse in the home store while the root keeps its issues tree [861.31ms]
+(pass) a rebase inside a sparse dispatch worktree crosses an issues change cleanly [917.96ms]
+
+ 845 pass
+ 0 fail
+ 8718 expect() calls
+Ran 845 tests across 49 files. [105.59s]

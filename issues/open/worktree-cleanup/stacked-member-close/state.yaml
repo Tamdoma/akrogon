@@ -1,0 +1,29 @@
+slug: stacked-member-close
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#93"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tCG
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQF
+  B: w8:pQG
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T20:59:18.677Z
+frozen:
+  tests/batch-dispatch.test.ts: 4fc35c5bc05124f87d508b5b3fe36c4a6c765f0d
+frozen_cited: []

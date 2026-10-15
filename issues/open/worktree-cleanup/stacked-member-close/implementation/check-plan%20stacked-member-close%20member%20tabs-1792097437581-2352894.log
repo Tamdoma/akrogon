@@ -1,0 +1,19 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/batch-dispatch.test.ts:
+1079 |     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+1080 |     toMerge(cc.path, '2026-09-13T00:00:00.000Z');
+1081 |     saveDatabase(f, { ...database(f), prompts: [] });
+1082 |     expect((await next(f, [])).code).toBe(0);
+1083 |     const record = readState(aa.path).batch!;
+1084 |     expect(stacked(aa.path)!.map((member) => member.slug)).toEqual(['bb', 'cc']);
+                                 ^
+TypeError: undefined is not an object (evaluating 'stacked(aa.path).map')
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/stacked-member-close/tests/batch-dispatch.test.ts:1084:27)
+(fail) a landed stack closes each member tab and wakes member dependents at once [3924.67ms]
+
+ 0 pass
+ 29 filtered out
+ 1 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [3.97s]

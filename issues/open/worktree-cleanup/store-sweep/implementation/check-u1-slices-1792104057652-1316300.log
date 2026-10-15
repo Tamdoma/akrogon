@@ -1,0 +1,48 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/leaf-slices.test.ts:
+(pass) bad leaf ownership keeps uncertain slices without aborting failed-unit cleanup [204.17ms]
+(pass) a pass with the pane list unavailable stops no slice of a leaf that has a recorded tab [209.02ms]
+668 |     expect(existsSync(resolve(tempRoot, 'aaaa'))).toBe(false);
+669 |     expect(existsSync(resolve(runs, 'last-start'))).toBe(false);
+670 |     expect(existsSync(resolve(f.home, 'x.4194303.tmp'))).toBe(false);
+671 |     expect(existsSync(resolve(f.home, 'z.4194303.tmp'))).toBe(false);
+672 |     expect(existsSync(resolve(runs, `y.${child.pid}.tmp`))).toBe(true);
+673 |     expect(existsSync(resolve(locks, 'run.lock'))).toBe(false);
+                                                         ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/store-sweep-u1/tests/leaf-slices.test.ts:673:52)
+(fail) the host step removes retired leftovers and keeps unprovable items [212.33ms]
+(pass) akrogon phase merged inside the leaf slice stops no slice [232.89ms]
+(pass) a repo-local pass preserves another registered repo slice with a live tab [247.60ms]
+(pass) a finished leaf with a live tab keeps its slice, and the pass fetched the pane list [279.65ms]
+721 |     // still holds a running unit.
+722 |     expect(existsSync(temp)).toBe(true);
+723 |     closeTab(f, 'w1:t9');
+724 |     writeFileSync(resolve(cgRoot, 'busy', 'cgroup.procs'), '');
+725 |     expect((await cli(f, ['next', '--all'], f.root, env)).code).toBe(0);
+726 |     expect(existsSync(temp)).toBe(false);
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/store-sweep-u1/tests/leaf-slices.test.ts:726:30)
+(fail) a finished leaf temp stays while its slice holds a running unit [379.88ms]
+(pass) a loaded failed akrogon-run unit is cleared by a reconcile pass [664.29ms]
+(pass) the run guard unit is submitted with CollectMode=inactive-or-failed [679.04ms]
+(pass) a loaded slice matching no leaf record is stopped only when it holds no process [729.71ms]
+(pass) a reconcile pass running inside a leaf slice does not stop that slice [794.63ms]
+(pass) a shell run admitted while another slice stops protects its own slice [952.43ms]
+(pass) merged and failed leaf slices with gone tabs are stopped and their processes end [1387.70ms]
+(pass) a finished leaf slice named by a live run record is not stopped [1413.26ms]
+
+ 12 pass
+ 2 fail
+ 70 expect() calls
+Ran 14 tests across 1 file. [1441.00ms]

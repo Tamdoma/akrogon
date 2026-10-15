@@ -1,0 +1,69 @@
+ 1:  b688f9d =  1:  484d030 test: scratch copy removal criteria for verify, batch and worker copies
+ 2:  7538742 !  2:  3a3464a feat: remove scratch copies by owner state with process veto
+    @@ src/reconcile.ts: import {
+        writeFileSync,
+        type Dirent,
+      } from 'node:fs';
+    -@@ src/reconcile.ts: import { globalHome, leafTemp, within, worktreeStore, type Repo } from './config
+    +@@ src/reconcile.ts: import { z } from 'zod';
+    + import { globalHome, leafTemp, within, worktreeStore, type Repo } from './config';
+      import { readVerifyRuns, type VerifyRun } from './verify';
+    - import { leavesUnder, readState, saveState, type Leaf, type State } from './state';
+    - import { command, herdrError, run, type Pane, type Result } from './shell';
+    -+import { procRoot } from './scope';
+    - 
+    - export type Reconciled = { removed: string[]; kept: { path: string; reason: string }[] };
+    + import { allLeaves, leavesUnder, readState, saveState, type Leaf, type State } from './state';
+    +-import { cgroupRoot, leafSlice, ownSlices, sessionBusAddress } from './scope';
+    ++import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
+    + import { liveRuns, withAdmissionLock } from './admission';
+    + import { command, herdrError, run, spawnCaptured, type Pane, type Result } from './shell';
+      
+     @@ src/reconcile.ts: const ownerSchema = z.object({
+        started: z.string(),
+    @@ src/reconcile.ts: export async function reconcile(repo: Repo, leaves: Leaf[], li
+        const verifyRuns: VerifyRun[] = readVerifyRuns(repo);
+        const leafBySlug: Map<string, Leaf> = new Map(leaves.map((leaf) => [leaf.state.slug, leaf]));
+      
+    +@@ src/reconcile.ts: export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
+    +     }
+    +   }
+    + 
+     -  async function removeWorktree(path: string): Promise<boolean> {
+     -    const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
+     -    if (!verdict.ok) {
+ 3:  48e3181 =  3:  a3a52e9 test: read the done-holder record at its closed path in the worker-copy case
+ 4:  64ab23a =  4:  baa1616 test: point batch fixtures at the fixture worktree store
+ 5:  22f115e =  5:  3e1c11e feat: write the build owner record before the batch copy
+ 6:  14336e0 !  6:  6ca326b docs: describe scratch copy removal by owner state
+    @@ README.md: sources: []
+      
+      Moving a repository or changing its worktree root requires reconciling existing worktree paths and Git metadata. A configuration edit does not move them.
+      
+    --Every `akrogon next` pass reconciles worktrees, scratch and run roots against leaf state: clean, reachable, unused leftovers are removed. Everything it keeps shows under each repo in plain `akrogon status` as `Kept by last cleanup:` lines for paths that still exist, and `akrogon status <slug>` prints the whole kept report as `Kept:` lines with path and reason.
+    -+Every `akrogon next` pass reconciles worktrees, scratch and run roots against leaf state: clean, reachable, unused leftovers are removed. `verify-*`, `batch-*` and `<slug>-u<N>` copies in the worktree store are scratch, removed with `git worktree remove --force` once the owner is gone (an ended or dead verify run, an absent or dead `batch-<id>.owner` build record, a merged owner leaf) and kept while the owner lives, while a live pane or a surviving process sits inside, or while the pane list is unavailable. Everything it keeps shows under each repo in plain `akrogon status` as `Kept by last cleanup:` lines for paths that still exist, and `akrogon status <slug>` prints the whole kept report as `Kept:` lines with path and reason.
+    +-Every `akrogon next` pass reconciles worktrees, scratch and run roots against leaf state: clean, reachable, unused leftovers are removed. The same pass stops the systemd slice of a merged or failed leaf once its tab is gone — ending processes it left running — unless a live run record names the slice or the pass itself runs inside it; a loaded `akrogon-l*` slice matching no leaf record is stopped only when it holds no process, and failed `akrogon-run-*` units are cleared. Everything it keeps shows under each repo in plain `akrogon status` as `Kept by last cleanup:` lines for paths that still exist, and `akrogon status <slug>` prints the whole kept report as `Kept:` lines with path and reason.
+    ++Every `akrogon next` pass reconciles worktrees, scratch and run roots against leaf state: clean, reachable, unused leftovers are removed. The same pass stops the systemd slice of a merged or failed leaf once its tab is gone — ending processes it left running — unless a live run record names the slice or the pass itself runs inside it; a loaded `akrogon-l*` slice matching no leaf record is stopped only when it holds no process, and failed `akrogon-run-*` units are cleared. `verify-*`, `batch-*` and `<slug>-u<N>` copies in the worktree store are scratch, removed with `git worktree remove --force` once the owner is gone (an ended or dead verify run, an absent or dead `batch-<id>.owner` build record, a merged owner leaf) and kept while the owner lives, while a live pane or a surviving process sits inside, or while the pane list is unavailable. Everything it keeps shows under each repo in plain `akrogon status` as `Kept by last cleanup:` lines for paths that still exist, and `akrogon status <slug>` prints the whole kept report as `Kept:` lines with path and reason.
+      
+      This repository's [reference index](docs/reference-index.md) links its code areas.
+      
+     
+      ## src/AREA.md ##
+     @@
+    - - `src/verify.ts` checks a commit out detached, runs every command for the caller's scope, logs each into the leaf or holder and records one receipt in `issues/verify-runs.jsonl`; `requireGreenReceipt` is the one gate the `check.review` move, the `check.repair` move into `merge`, `merged --check` stamping and direct-guards call.
+      - `src/admission.ts` registers each run's record under `<globalHome>/runs/`, sweeps stale records and their run units, and admits at once — a matching `AKROGON_RUN` token of a live run is the nested case that creates nothing; the memory reading and spacing were dropped 2026-10-14.
+    - - `src/scope.ts` names the per-leaf slice (`leafSlice`, used by `src/stop.ts`), pane scopes and `akrogon-run-<id>` run units, moves a pane shell into its scope with busctl `StartTransientUnit`, and checks it read-only through `AKROGON_PROC_ROOT` (default `/proc`); `allocate` in `src/next.ts` closes a recorded pane outside its scope and boxes every pane before the seat starts. `src/stop-run.ts` stops the run units live records tie to the caller's scope. `src/stop.ts` keeps the host-local `stopped.yaml` record and runs `stop`/`start`; dispatch, the merge queue and status read it.
+    --- `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass and writes the kept report `status` prints under the ignored `reconcile/` state dir.
+    -+- `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass — `verify-*`, `batch-*` and `<slug>-u<N>` store copies go by owner state (`batch-<id>.owner` record for batch copies) behind live-pane and surviving-process vetoes — and writes the kept report `status` prints under the ignored `reconcile/` state dir.
+    + - `src/scope.ts` names the per-leaf slice (`leafSlice`, used by `src/stop.ts`), pane scopes and `akrogon-run-<id>` run units, moves a pane shell into its scope with busctl `StartTransientUnit`, and checks it read-only through `AKROGON_PROC_ROOT` (default `/proc`) and `AKROGON_CGROUP_ROOT` (default `/sys/fs/cgroup`); `allocate` in `src/next.ts` closes a recorded pane outside its scope and boxes every pane before the seat starts. `src/stop-run.ts` stops the run units live records tie to the caller's scope. `src/stop.ts` keeps the host-local `stopped.yaml` record and runs `stop`/`start`; dispatch, the merge queue and status read it.
+    + - `src/evidence.ts` maps a recorded log path to its bytes (`locate`, `readMember`, `readLog`, `readLogAcross`): plain file first, then the owner's `evidence.tar.zst`; `akrogon log` and `src/flaky.ts` read through it.
+    +-- `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass, stops finished-leaf slices and unmatched empty `akrogon-l*` slices, clears failed `akrogon-run-*` units in the host step, and writes the kept reports `status` prints under the ignored `reconcile/` state dir and `reconcile-host.json`.
+    ++- `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass — `verify-*`, `batch-*` and `<slug>-u<N>` store copies go by owner state (`batch-<id>.owner` record for batch copies) behind live-pane and surviving-process vetoes — stops finished-leaf slices and unmatched empty `akrogon-l*` slices, clears failed `akrogon-run-*` units in the host step, and writes the kept reports `status` prints under the ignored `reconcile/` state dir and `reconcile-host.json`.
+      
+      ## Non-obvious patterns
+      
+ 7:  0df876b =  7:  fa925df style: prettier line-width collapse in reconcile and its tests
+ 8:  8e296df =  8:  6b34354 fix: run checkLocation before creating the batch owner record
+ 9:  fa9a4a7 =  9:  b17bf8b chore: cite reconcile test formatting
+10:  0e84505 = 10:  3a11432 test: reproduce scratch removal during live fd churn
+11:  65aa12b = 11:  9800d9e fix: preserve process targets when an fd disappears

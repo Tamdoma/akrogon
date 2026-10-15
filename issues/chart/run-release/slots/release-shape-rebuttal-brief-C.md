@@ -1,0 +1,2 @@
+# Rebuttal brief: release-shape (slot C)
+Do not edit any repo file. Read only /home/ivan/Work/infra/akrogon/issues/chart/run-release/slots/release-shape-merged.md. Return one disagreement-only rebuttal (under 25 lines): where the merge misstates your notes, or a pick you still contest with evidence. Write only to: /home/ivan/Work/infra/akrogon/issues/chart/run-release/slots/release-shape-rebuttal-C.md

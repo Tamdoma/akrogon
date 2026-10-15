@@ -1,0 +1,31 @@
+8b8515ff597dfc42039244b35da694a818e03c3c
+fa0f4c261532b1b2ba32e9984f3f38d5897c6e07
+ 1:  9ad2541 =  1:  a23c997 test: cover finished-leaf slice stopping and guard collection
+ 2:  be8561d !  2:  c200c57 feat: stop finished-leaf slices and clear failed run units in reconcile
+    @@ src/AREA.md
+      - `src/verify.ts` checks a commit out detached, runs every command for the caller's scope, logs each into the leaf or holder and records one receipt in `issues/verify-runs.jsonl`; `requireGreenReceipt` is the one gate the `check.review` move, the `check.repair` move into `merge`, `merged --check` stamping and direct-guards call.
+      - `src/admission.ts` registers each run's record under `<globalHome>/runs/`, sweeps stale records and their run units, and admits at once — a matching `AKROGON_RUN` token of a live run is the nested case that creates nothing; the memory reading and spacing were dropped 2026-10-14.
+     -- `src/scope.ts` names the per-leaf slice (`leafSlice`, used by `src/stop.ts`), pane scopes and `akrogon-run-<id>` run units, moves a pane shell into its scope with busctl `StartTransientUnit`, and checks it read-only through `AKROGON_PROC_ROOT` (default `/proc`); `allocate` in `src/next.ts` closes a recorded pane outside its scope and boxes every pane before the seat starts. `src/stop-run.ts` stops the run units live records tie to the caller's scope. `src/stop.ts` keeps the host-local `stopped.yaml` record and runs `stop`/`start`; dispatch, the merge queue and status read it.
+    --- `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass and writes the kept report `status` prints under the ignored `reconcile/` state dir.
+     +- `src/scope.ts` names the per-leaf slice (`leafSlice`, used by `src/stop.ts`), pane scopes and `akrogon-run-<id>` run units, moves a pane shell into its scope with busctl `StartTransientUnit`, and checks it read-only through `AKROGON_PROC_ROOT` (default `/proc`) and `AKROGON_CGROUP_ROOT` (default `/sys/fs/cgroup`); `allocate` in `src/next.ts` closes a recorded pane outside its scope and boxes every pane before the seat starts. `src/stop-run.ts` stops the run units live records tie to the caller's scope. `src/stop.ts` keeps the host-local `stopped.yaml` record and runs `stop`/`start`; dispatch, the merge queue and status read it.
+    + - `src/evidence.ts` maps a recorded log path to its bytes (`locate`, `readMember`, `readLog`, `readLogAcross`): plain file first, then the owner's `evidence.tar.zst`; `akrogon log` and `src/flaky.ts` read through it.
+    +-- `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass and writes the kept report `status` prints under the ignored `reconcile/` state dir.
+     +- `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass, stops finished-leaf slices and unmatched empty `akrogon-l*` slices, clears failed `akrogon-run-*` units in the host step, and writes the kept reports `status` prints under the ignored `reconcile/` state dir and `reconcile-host.json`.
+      
+      ## Non-obvious patterns
+ 3:  a16265e =  3:  8328271 fix: count only stop calls in leaf-stop systemctl assertions
+ 4:  32f0b13 =  4:  61cf3dd style: format leaf-stop assertion fix
+ 5:  2c97934 =  5:  2afa1dc test: reproduce cross-repo slice stop with a live tab
+ 6:  d0e624b =  6:  5ad96a2 fix: map all registered repos during host slice cleanup
+ 7:  7a4e003 =  7:  f9c6521 test: reproduce host cleanup abort on foreign leaf records
+ 8:  47821da =  8:  bfb763c fix: retain uncertain slices when leaf inventory fails
+ 9:  a3e4f14 =  9:  47fc417 test: reproduce concurrent admission during slice cleanup
+10:  0dfcedc = 10:  8b8515f fix: serialize slice stops with run admission
+exists src/evidence.ts
+exists src/reconcile.ts
+exists src/scope.ts
+exists src/stop.ts
+exists src/next.ts
+exists src/stop-run.ts
+exists src/flaky.ts
+none

@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr tab close <tab_id>
+    command: 'herdr tab close w8:tC9'
+    identity: local user ivan, herdr socket
+    target: throwaway unfocused tab created with herdr tab create --label akrproof-tab-<n>
+    version: herdr 0.9.1
+    result: '{"type":"ok"}, exit 0, label gone from herdr tab list'
+    cleanup: the close itself, checked
+    limits: tab_closed hook delivery not covered
+    record: issues/chart/worktree-cleanup/forks/after-merge-remainder.md
+    date: '2026-10-15'

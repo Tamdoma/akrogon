@@ -1,0 +1,38 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/command-reference.test.ts:
+(pass) README covers every dispatched command and its argument contract [0.68ms]
+(pass) the files guide describes the flow report [0.04ms]
+(pass) the next guide describes stop and start [0.02ms]
+(pass) coverage rejects missing, extra and duplicate rows and newly dispatched verbs [0.30ms]
+(pass) argument contracts reject lost values, requiredness and exclusive alternatives [1.30ms]
+(pass) escaped alternatives and reordered rows preserve argument semantics [0.11ms]
+
+tests/pull.test.ts:
+(pass) startup runs pull all before next resume and wrappers forward arguments [42.52ms]
+(pass) pull caps slugs at word boundaries and hard cuts oversized first words [102.77ms]
+(pass) pull --all from a registered repo pulls the healthy repos and exits non-zero naming the failed repo [139.06ms]
+(pass) pull reconciles every page by number, preserves bodies, excludes PRs, and handles empty listings [274.87ms]
+(pass) missing and invalid origins fail visibly, and all continues after invalid registrations and origins [293.50ms]
+(pass) pull resolves supported origins, ignores merge remote, and targets the registered checkout from worktrees [371.17ms]
+(pass) pull --all pulls every registered repo from a repo root, a linked worktree, and an unregistered directory [395.27ms]
+(pass) failed, malformed, and invalid listings leave seed bytes unchanged and command failures retry once [445.05ms]
+
+tests/timing-report.test.ts:
+(pass) slug report: each closed visit decomposes into priority waits, prompted time and unattributed waiting [88.68ms]
+(pass) cohort gate: fail when fewer than 18 members merge [89.76ms]
+(pass) cohort gate: fails when the two central F values average above 35 minutes [88.43ms]
+(pass) cohort member: parked waiting continues after the last phase move [88.82ms]
+(pass) slug report: missing expected events are named per visit while exempt visits stay clean [94.23ms]
+(pass) cohort gate: remains insufficient with 17 merged and three stalled members [91.08ms]
+(pass) cohort gate: pass applies membership, 600-line exit, stall and failure accounting in prompt order [95.87ms]
+(pass) cohort gate: insufficient while a member is unmerged and younger than 24 hours [94.30ms]
+(pass) flow report: parked-carried and open-carried issues stay carried while open uncarried issues print [110.37ms]
+(pass) flow report: a failed listing retries once then exits non-zero with command and output [126.96ms]
+(pass) flow report: carried issues print one sorted line each with day spans and the medians split on handoff [128.90ms]
+(pass) flow report: usage errors name the three timing forms [186.33ms]
+
+ 26 pass
+ 0 fail
+ 1425 expect() calls
+Ran 26 tests across 3 files. [667.00ms]

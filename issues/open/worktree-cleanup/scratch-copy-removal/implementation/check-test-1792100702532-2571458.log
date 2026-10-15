@@ -1,0 +1,9 @@
+HOME=/home/ivan
+PATH=/home/ivan/.pi/agent/bin:/home/ivan/.local/share/mise/command-wrappers/bin:/home/ivan/.local/share/mise/installs/antigravity-cli/latest:/home/ivan/.local/share/mise/installs/claude/latest:/home/ivan/.local/share/mise/installs/codex/latest/bin:/home/ivan/.local/share/mise/installs/gh/latest/gh_2.102.0_linux_amd64/bin:/home/ivan/.local/share/mise/installs/http-muse/latest:/home/ivan/.local/share/mise/installs/node/latest/bin:/home/ivan/.local/share/mise/installs/npm-playwright/latest/node_modules/.bin:/home/ivan/.local/share/mise/installs/pi/latest/pi:/home/ivan/.local/share/mise/shims:/home/ivan/.local/share/mise/command-wrappers/bin:/usr/share/omarchy/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/home/ivan/.local/bin:/opt/cuda/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl
+XDG_CACHE_HOME=/home/ivan/.cache
+NODE_DISABLE_COMPILE_CACHE=1
+TMPDIR=/var/tmp/akr-1000/5d20/e7595e75/run-XcxWN9
+DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent
+AKROGON_BASE=dace0f7ae802db734890e43e2860a46a80d1653d
+AKROGON_RUN=cf2783f2-9b1b-4897-85c9-c781be15e51a
+INVOCATION_ID=f5d5c72a45a9432eaa670961162edf78

@@ -1,0 +1,3130 @@
+F I V E - H O U R B O OT CA M P · F I E L D M A N UA L
+
+
+
+Systems Thinking
+for Agentic Builders
+From first principles to advanced diagnosis. Every concept is
+drawn from the field's founding works, explained with charts, and
+applied to agentic systems in web development, marketing and
+mid-market business automation.
+
+
+
+
+PART I · FOUNDATIONS                                     PART II · DYNAMICS
+01 Why systems thinking exists                           05 The systems zoo
+02 What a system is                                      06 Delays and oscillation
+03 Stocks and flows                                      07 Behavior over time
+04 Feedback loops
+PART III · WHY SYSTEMS BEHAVE AS THEY DO                 PART IV · DIAGNOSIS AND INTERVENTION
+08 Resilience, self-organization, hierarchy              11 System traps and archetypes
+09 Why systems surprise us                               12 Leverage points
+10 Cybernetics: control and variety
+PART V · PRACTICE                                        APPENDICES
+13 Mapping tools                                         A Glossary · B Problem-approach checklist
+14 Mental models and learning                            C Agent directive library · D Sources and reading
+15 Capstone and guidelines for living with systems
+
+Tamdoma · October 2026
+
+
+
+
+Systems Thinking for Agentic Builders                                                                        1
+How to use this manual
+This is meant to be the document you come back to when a build gets complicated and you've lost sight of what
+the actual problem is. Agents are very good at the parts: a function, a landing page, an extraction step. They are
+much weaker at the whole: how one change ripples through everything else over weeks and months. That whole
+is your job. Systems thinking is the discipline for seeing it.
+The manual builds in order. Part I gives you the vocabulary from scratch. Part II shows how that vocabulary
+produces behavior over time. Part III explains why real systems are robust, surprising and controllable (or not).
+Part IV is the diagnostic toolkit: recurring traps and where to intervene. Part V is method: how to map a system
+and how to check your own thinking.
+
+Each module follows the same pattern
+ Block                                  What it does
+ First principle                        Why the concept exists, stated plainly, before any jargon.
+ Analogy                                An everyday picture to hang the idea on.
+ Concepts and charts                    The definitions, with the jargon translated, and behavior-over-time charts. Every chart is a
+                                        small simulation, so the curve you see is produced by the structure described in the text.
+ Naive vs systems                       The same problem solved twice in each of the three domains: once the way an agent (or a
+                                        busy human) does it by default, once with systems thinking.
+ Say this instead                       Vague instructions translated into precise agent directives.
+ Exercise, check, go deeper             Apply it to your own system, test yourself, then prompts for studying further with an LLM.
+
+
+The three domains
+Web development. Coding agents, WordPress and                          Mid-market business automation. Back-office agents
+headless builds, deploy pipelines, plugin updates, QA                  for companies of roughly 50 to 500 people: accounts
+loops.                                                                 payable, CRM sync, support triage, onboarding,
+                                                                       approvals, ERP integration.
+Marketing. Content and SEO pipelines, Google and
+Meta Ads optimization, lead generation, email,                         Chart colors. Orange dashed lines are the naive
+reporting. Many examples use aesthetics clinics and                    design. Blue solid lines are the systems design. Gray
+home-service contractors.                                              dotted lines are goals, limits or events.
+
+
+About accuracy
+Definitions, lists and quotations come from the primary sources: Donella Meadows (Thinking in Systems, 2008,
+and the 1999 essay "Leverage Points"), Peter Senge (The Fifth Discipline, 1990/2006), John Sterman (Business
+Dynamics, 2000, and his published experiments), Jay Forrester, W. Ross Ashby, Stafford Beer, Herbert Simon,
+Charles Perrow and Daniel Kim. Where sources disagree or an attribution is uncertain, the text says so. The
+domain examples and simulations are teaching illustrations built on those principles; the numbers in them are
+realistic but invented, and are labeled that way.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                  2
+When you're overwhelmed, start here
+Five hours of material compresses into seven questions. When a build feels tangled, stop writing prompts and
+answer these on paper. Each one points to the module that goes deeper.
+ #       Question                                       What you're really asking                                    Module
+ 1       What is this system actually doing?            Ignore the stated goal. Watch behavior over time. The        02, 07
+                                                        purpose is what it does.
+ 2       What is piling up, and what fills and drains   Find the stocks. Every backlog, queue, cache, debt or list   03
+         it?                                            is a bathtub.
+ 3       What loops are running?                        What compounds (reinforcing)? What is trying to hold a       04, 05
+                                                        target (balancing), and can its sensor see the real thing?
+ 4       Where are the delays?                          What takes days or weeks to show up? Am I correcting         06
+                                                        faster than the feedback arrives?
+ 5       What's the binding limit?                      Which single constraint sets the pace right now, and what 09
+                                                        comes after it?
+ 6       Which trap is this?                            Fix that fails, shifting the burden, eroding goals,          11
+                                                        escalation, commons, wrong goal...
+ 7       Where is the leverage?                         Am I about to tweak a number when changing                   12
+                                                        information, rules or the goal would do more?
+
+     THE ONE-LINE VERSION
+     Structure produces behavior. If you don't like the behavior, change the structure: the stocks, the loops, the
+     delays, the information, the rules, the goals. Don't just push harder on the parts.
+
+Hand the same seven questions to an agent as a planning step before it builds anything:
+
+     Before writing any code or content, analyze this as a system:
+     1. What does the current system actually do (behavior over time, not intent)?
+     2. Which stocks accumulate, and what are their inflows and outflows?
+     3. Which reinforcing and balancing loops exist? For each balancing loop:
+        goal, sensor, corrective action. Does the sensor measure the real goal?
+     4. Where are the delays, and how long are they?
+     5. What is the binding constraint now, and what will bind next?
+     6. Which system traps could this design fall into within six months?
+     7. Rank possible interventions by leverage point, highest first.
+     Answer briefly, flag uncertainty, then wait for approval.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                         3
+PA R T I
+
+
+Foundations
+The vocabulary from scratch: what a system is, what accumulates in it,
+and how it steers itself. About 70 minutes.
+
+1. Why systems thinking exists
+2. What a system is
+3. Stocks and flows
+4. Feedback loops
+
+
+
+
+Systems Thinking for Agentic Builders                                    4
+01 Why systems thinking exists                                                                                               10 min
+
+You'll learn: the problem systems thinking was invented to solve, where it came from, and why your intuition (and your
+agent's) gets complex systems wrong.
+
+    FIRST PRINCIPLE
+    In a simple machine, causes push effects in one direction. In anything made of many interacting parts
+    (a business, a market, a software platform) effects loop back and change their own causes. Tools
+    built for one-way causation give wrong answers in a world of loops.
+
+   ANALOGY
+   Linear thinking treats a problem like a flat tire: find the hole, patch it, done. Systems thinking treats it like a
+   recurring traffic jam: the jam is produced by how roads, jobs, housing and driver habits interact. Patching
+   one road often moves the jam somewhere else, or invites more drivers.
+
+
+                          Linear view                                                    Systems view
+                                                                                             Problem
+
+   Problem                       Fix              Solved
+                                                                        Other actors                               Fix
+                                                                           adapt
+
+
+                                                                                            Side effect
+
+Figure 1.1 Linear view: a problem gets a fix and is solved. Systems view: the fix produces side effects, other actors adapt, and the
+result feeds back into the original problem.
+
+Where it came from
+ Year              Milestone
+ 1946–53           The Macy Conferences bring together Norbert Wiener, John von Neumann, Margaret Mead, Gregory
+                   Bateson and others. The first meeting is titled "Feedback Mechanisms and Circular Causal Systems in
+                   Biological and Social Systems."
+ 1948              Wiener publishes Cybernetics: Or Control and Communication in the Animal and the Machine. The word
+                   comes from the Greek for "steersman."
+ 1956              Jay Forrester, an engineer who had led MIT's Whirlwind computer project, moves to MIT Sloan and founds
+                   system dynamics. W. Ross Ashby publishes An Introduction to Cybernetics.
+ 1961              Forrester's Industrial Dynamics shows how supply chains create their own boom and bust cycles.
+ 1962              Herbert Simon's "The Architecture of Complexity" explains why complex systems are built as hierarchies.
+ 1968              Ludwig von Bertalanffy's General System Theory collects his work on open systems that exchange energy
+                   and matter with their environment.
+ 1971–72           Forrester's "Counterintuitive Behavior of Social Systems." Then The Limits to Growth (Meadows, Meadows,
+                   Randers, Behrens) models world growth for the Club of Rome.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                             5
+ 1972                                  Stafford Beer's Brain of the Firm introduces the Viable System Model.
+ 1990                                  Peter Senge's The Fifth Discipline brings systems thinking into management.
+ 2000                                  John Sterman's Business Dynamics becomes the standard technical text.
+ 2008                                  Donella Meadows' Thinking in Systems: A Primer is published posthumously. It is the best single
+                                       introduction.
+
+
+Why intuition fails
+Forrester argued in 1971 that social systems "belong to the class called multi-loop nonlinear feedback systems,"
+while our intuition was developed from contact with simple systems. His uncomfortable conclusions: such
+systems are insensitive to most of the policy changes people choose; they have a few sensitive influence points;
+and intuition is likely to push those points in the wrong direction. He also warned: "A policy which produces
+improvement in the short run, within five to ten years, is usually one which degrades the system in the long run,
+beyond ten years."
+Senge turned these ideas into eleven "laws of the fifth discipline." Read them slowly. Each one describes
+something you have probably seen in a project.
+ 1            Today's problems come from yesterday's                          7    Cause and effect are not closely related in time and space.
+              "solutions."
+ 2 The harder you push, the harder the                                        8    Small changes can produce big results, but the areas of highest
+   system pushes back.                                                             leverage are often the least obvious.
+ 3 Behavior grows better before it grows                                      9    You can have your cake and eat it too, but not at once.
+   worse.
+ 4 The easy way out usually leads back in.                                    10 Dividing an elephant in half does not produce two small elephants.
+ 5 The cure can be worse than the disease.                                    11   There is no blame.
+ 6 Faster is slower.
+
+
+                                Behavior grows better before it grows worse
+                    70
+                                               fix applied
+                   60
+
+
+
+
+     htnom / segap nekorb
+                                                                                        ...then side effects pile up
+                   50                                                                                                    Symptom patch
+                   40
+                   30
+                   20
+                                                     Patch looks better first...                                             Structural fix
+                     10
+                            0
+                                   0                         10                    20                     30               40                    50
+                                                                                            weeks
+
+Figure 1.2 · Simulated. Law 3 in action on a WordPress maintenance retainer. A symptom patch (suppressing PHP warnings,
+pinning broken plugins) cuts reported breakages immediately, then side effects accumulate. The structural fix (staging
+environment plus automated regression checks) improves more slowly but keeps improving.
+
+Why this matters more with agents
+An agent sees through a keyhole: the current file, the current error, the current brief. It optimizes locally, quickly
+and confidently. That makes it an excellent executor of linear fixes and a poor judge of their side effects. Your
+
+
+Systems Thinking for Agentic Builders                                                                                                                 6
+value as the human in the loop is holding the picture the agent can't see: the loops, the delays and the rest of
+the system.
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+WEB DEVELOPMENT
+The coding agent that keeps breaking the mobile layout
+
+  NAIVE                                                          SYSTEMS
+  Every third task breaks mobile. Conclusion: the model          Ask what the agent can perceive. It has no screenshot
+  isn't good enough. Switch models, write "be careful            and no viewport check, so the failure is invisible to it.
+  with mobile" in the prompt.                                    Add a sensor to its loop.
+
+                                                                   After every CSS or template change: render at
+                                                                   375px
+                                                                   and 1440px, compare to /qa/baseline, revert
+                                                                   and report
+                                                                   if layout shift exceeds the threshold.
+
+
+
+
+MARKETING
+Forty blog posts a month and flat organic traffic
+
+  NAIVE                                                          SYSTEMS
+  Tell the writing agent to "improve quality" and add            The agent is briefed by keyword only, never sees
+  another 20 posts a month.                                      which posts ranked, and is effectively rewarded for
+                                                                 volume. It is optimizing exactly what the system
+                                                                 measures. Route Search Console data back into
+                                                                 briefing so ranking outcomes shape the next brief.
+
+
+MID-MARKET AUTOMATION
+Invoice matching that "needs a human anyway"
+
+  NAIVE                                                          SYSTEMS
+  A distributor's accounts payable (AP) agent flags 30%          Map the structure around the agent: supplier master
+  of invoices. The team blames the AI and asks for a             data is stale, purchase orders are raised after invoices
+  better extraction model.                                       arrive, and the agent can't see goods-received notes.
+                                                                 Fix those flows and the flag rate falls without touching
+                                                                 the model.
+
+
+ Instead of telling the agent...             Say this
+ "Fix this bug."                             "Before fixing, explain what structure produced this bug and whether the
+                                             same structure will produce others. Fix the structure if it's in scope; otherwise
+                                             fix the instance and report the structure."
+ "Make it better."                           "State what 'better' means as a measurable outcome, what you can observe
+                                             about it, and what could get worse as a side effect."
+
+
+  Exercise. Pick the system you'll use throughout this manual: your agency, one client project or one automation.
+  Write down a problem in it that has been "fixed" at least twice and came back. List the fixes. Did any of them
+  change the structure, or only the event?
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                            7
+   Go deeper
+    1. "Summarize Jay Forrester's 1971 paper 'Counterintuitive Behavior of Social Systems.' Explain each main claim
+       with a modern business example."
+    2. "Walk me through Senge's eleven laws of the fifth discipline one at a time. For each, give an example from
+       software projects and one from marketing agencies."
+    3. "What is the difference between general systems theory, cybernetics and system dynamics? Who founded each
+       and what problem was each trying to solve?"
+    4. "Interview me about a recurring problem in my business, one question at a time, until we have identified the
+       structure producing it."
+
+Sources. Forrester, "Counterintuitive Behavior of Social Systems," Technology Review, 1971 (rev. 1995). Senge, The Fifth Discipline, ch. 4.
+Wiener, Cybernetics, 1948. Macy Conferences records. Meadows et al., The Limits to Growth, 1972.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                         8
+02 What a system is                                                                                                     15 min
+
+You'll learn: the three parts of every system, how to tell a system from a pile of parts, how to find a system's real
+purpose, and how to draw its boundary.
+
+    FIRST PRINCIPLE
+    You can't change what you can't see as a whole. Before fixing anything, you need to know what the
+    parts are, how they affect each other, and what the whole is actually producing.
+
+Meadows' definition:
+
+   "A system is an interconnected set of elements that is coherently organized in a way that achieves
+   something."
+   Meadows, Thinking in Systems, p. 11
+
+It has three kinds of things:
+    Elements: the parts you can point at. Agents, tools, databases, people, budgets.
+    Interconnections: the relationships that hold the elements together. Data passed between agents, approvals,
+    rules, physical flows, information signals.
+    Function or purpose: what the system produces. Meadows notes that purpose is "the least obvious part of
+    the system" and often "the most crucial determinant" of its behavior.
+
+   ANALOGY
+   A football team. Swap every player (elements) and it's still recognizably the same team with the same style.
+   Change the rules from football to basketball (interconnections) and, as Meadows puts it, "you've got, as
+   they say, a whole new ball game." Change the purpose from winning to losing on purpose and every
+   element and rule now serves something else.
+
+
+System or heap? Meadows' four questions
+                                                             A WordPress plugin
+ Question                                                    folder                   A lead-gen pipeline
+ Can you identify parts?                                     Yes                      Yes: forms, CRM, scoring agent,
+                                                                                      sales team
+ Do the parts affect each other?                             Barely, until they       Yes: lead score changes sales
+                                                             conflict                 follow-up
+ Do the parts together produce an effect different from      No                       Yes: booked consultations
+ each part alone?
+ Does that effect persist in a variety of circumstances?     No                       Yes, even as campaigns change
+
+The plugin folder is closer to a heap. The pipeline is a system. Treat it as one.
+
+Which changes matter most
+Meadows: "Changing elements usually has the least effect on the system." "Changing interconnections in a
+system can change it dramatically." Changing the purpose changes it most. She adds a caution: asking which
+part matters most is itself "an unsystemic question," because all three interact. But as a guide to where to look
+first, the order holds.
+
+
+
+Systems Thinking for Agentic Builders                                                                                        9
+This is exactly why swapping the model in an agent workflow so often disappoints. The model is an element.
+The workflow's handoffs, information and success criteria are interconnections and purpose.
+
+The purpose of a system is what it does
+Stafford Beer coined the phrase "the purpose of a system is what it does" (often abbreviated POSIWID).
+Meadows makes the same point: purposes are deduced from behavior, not from rhetoric or stated goals. If your
+content pipeline produces lots of mediocre posts, its operating purpose is "produce lots of posts," whatever the
+brief says.
+
+Boundaries
+The boundary separates what you treat as inside the system from its environment. Meadows is blunt: "There
+are no separate systems. The world is a continuum." A boundary is a choice you make for a purpose. Draw it too
+tight and you miss the cause. Draw it too wide and you can't act.
+
+              Elements = boxes Interconnections = arrows
+
+                                                    BOUNDARY what you design and control
+                                                                        failed checks
+           Client                                                                                                     Google
+         reviewer                                                                                                     updates
+                                        Planner                Coding                    QA
+                                         agent                 agent                    agent
+
+
+          Hosting                                                                                                      Plugin
+           limits                                 Git repo                  Staging             Deploy                vendors
+
+
+
+              ENVIRONMENT affects you, you don't control it
+                                   PURPOSE (by behavior): ship pages the client approves without rework
+
+Figure 2.1 Anatomy of an agentic site-build system. Elements inside the boundary, interconnections as arrows, and environment
+factors outside. The purpose is read from behavior: what reliably comes out the end.
+
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+WEB DEVELOPMENT
+A pipeline that closes 20 tickets a day and still misses launch
+
+  NAIVE BOUNDARY                                                           SYSTEMS BOUNDARY
+  Boundary drawn around the agents. Throughput looks                       Include the client reviewer. They approve 5 tickets a
+  great. Add a fourth coding agent to go faster.                           day. The binding constraint sits outside the agent loop,
+                                                                           so the fix is batching reviews, clearer review packets
+                                                                           and acceptance criteria agreed up front.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                 10
+MARKETING
+Reading the real purpose of a Meta Ads setup
+
+  NAIVE                                                            SYSTEMS
+  Stated purpose: "booked consultations for the clinic."           Watch what it does: it produces cheap form fills from
+  The optimization agent targets cost per lead, which it           people who never answer the phone. Its actual
+  hits.                                                            purpose is cheap leads. Change the purpose it
+                                                                   optimizes by sending back offline conversion data
+                                                                   (showed up, booked) as the target event.
+
+
+MID-MARKET AUTOMATION
+Support triage at a 150-person SaaS company
+
+  NAIVE                                                            SYSTEMS
+  Boundary stops at the inbox. The triage agent's job is           Widen the boundary to include product releases and
+  to sort faster.                                                  billing. The agent now reports root causes upstream.
+
+                                                                     Each Friday, group tickets by root cause, not
+                                                                     category.
+                                                                     For the top 3 causes, name the upstream team
+                                                                     or process
+                                                                     and estimate tickets per week each one adds.
+
+
+
+
+ Instead of telling the agent...               Say this
+ "Build the onboarding flow."                  "List every element and actor the onboarding flow touches, including ones
+                                               outside our code (client staff, third-party APIs, email providers). Mark which
+                                               we control and which we don't. Then propose the design."
+ "What's the goal of this workflow?"           "Based on the last 30 days of outputs, describe what this workflow actually
+                                               produces. Compare that with its stated goal and explain the difference."
+
+
+  Exercise. For your chosen system: list 6 to 10 elements, the key interconnections, and the purpose as revealed by
+  behavior. Then draw the boundary twice, once tight and once wide. What does the wide version explain that the
+  tight one doesn't?
+
+
+   Check yourself
+    1. Why does swapping an LLM model often change a workflow less than expected? It changes an element.
+       Interconnections and purpose usually drive behavior more.
+    2. How do you find a system's real purpose? Observe what it reliably produces over time, not what anyone says it's for.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                           11
+   Go deeper
+    1. "Explain Meadows' definition of a system and her four questions for telling a system from a heap. Apply them to
+       five things in a digital agency."
+    2. "Explain Stafford Beer's idea 'the purpose of a system is what it does.' Give five examples where stated and
+       actual purpose differ in marketing and software."
+    3. "Help me draw the boundary for a client's lead-generation system. Ask questions until we've listed every outside
+       factor that affects lead volume and quality."
+    4. "Explain Peter Checkland's CATWOE checklist from Soft Systems Methodology and use it to describe an
+       automated invoice-approval process."
+
+Sources. Meadows, Thinking in Systems, ch. 1, pp. 11–17; ch. 4, pp. 95–97. Beer, The Heart of Enterprise (1979) and Diagnosing the System
+for Organizations (1985) for POSIWID. Checkland, Systems Thinking, Systems Practice (1981).
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                       12
+03 Stocks and flows                                                                                                               25 min
+
+You'll learn: the bathtub, the most important and most misunderstood idea in the field; how stocks create inertia and
+buffers; and how to read flows to predict where a stock is heading.
+
+    FIRST PRINCIPLE
+    Anything that accumulates can only change through what flows in and what flows out. Nothing jumps.
+    If you want to understand why a level is where it is, look at its history of flows. If you want to change
+    it, change a flow.
+
+   ANALOGY
+   A bathtub. Water level is the stock. The faucet is the inflow. The drain is the outflow. If the faucet runs faster
+   than the drain, the level rises, even if you're turning the faucet down. It only falls once the drain is faster
+   than the faucet.
+
+
+The definitions
+    Stock: anything you can count or measure at a moment in time. Meadows calls it "the memory of the history
+    of changing flows within the system." Examples: open tickets, cash in the bank, indexed pages, leads in the
+    CRM, items in a queue, technical debt, trust.
+    Flow: a rate of change per unit of time. Tickets opened per day, invoices processed per hour, posts published
+    per month.
+    Dynamic equilibrium: inflow equals outflow, so the stock stays level while things keep moving through it.
+
+                                                      Change in stock = inflow − outflow, every period
+                     source                                                                                                sink
+
+
+                                                                           STOCK
+                                                                    live, ranking posts
+                                         Inflow                                                          Outflow
+                                 posts published / month                                          posts decaying / month
+
+
+Figure 3.1 Stock-and-flow notation. The box is the stock. Pipes with valves are flows. Clouds are sources and sinks outside the
+boundary you care about.
+
+Meadows' bathtub rules
+1. "As long as the sum of all inflows exceeds the sum of all outflows, the level of the stock will rise." The reverse
+   makes it fall. If they're equal, the stock holds.
+2. "A stock can be increased by decreasing its outflow rate as well as by increasing its inflow rate." People
+   almost always reach for the inflow first.
+3. "Stocks usually change slowly. They can act as delays, lags, buffers, ballast, and sources of momentum in a
+   system."
+4. "The presence of stocks allows inflows and outflows to be independent of each other," at least for a while.
+   That is what a buffer is.
+
+Why smart people get this wrong
+In 2000, Linda Booth Sweeney and John Sterman gave MIT Sloan students simple bathtub tasks: here are the
+inflow and outflow over time, sketch the stock. On a manufacturing version with a production delay, the
+conference version of the study reports an average of 41% of criteria met, with most participants drawing
+
+
+Systems Thinking for Agentic Builders                                                                                                 13
+production paths that broke conservation of material. Performance didn't vary with education, age or nationality.
+Later work by Cronin, Gonzalez and Sterman (2009) found the error persisted even after controlling for graph-
+reading skill and motivation. Many people use a "correlation heuristic": they assume the stock moves the same
+way as its inflow.
+It doesn't. The stock keeps rising after the inflow starts falling, and peaks exactly when the falling inflow meets
+the outflow.
+
+                              Flows
+                         60
+                                                                                           outflow overtakes inflow
+                                      Inflow: posts published
+
+
+          htnom / stsop
+                         40
+                                                                                                               Outflow: posts decaying
+                         20
+
+                          0
+                              Stock
+                                                                                            peak exactly where the flows cross
+
+
+
+   stsop gniknar ,evil
+                400
+
+
+                200
+                                                                 inflow already falling,
+                                                                 stock still rising
+                          0
+                                 0            5             10            15               20             25             30              35
+                                                                                 months
+
+Figure 3.2 · Simulated. A clinic's blog. Publishing is cut back from month 12, yet live ranking posts keep growing for another
+seven months, because inflow still exceeds decay. The stock peaks where the flows cross, then declines. Anyone reading only
+the inflow would have predicted the decline months too early.
+
+Stocks as buffers
+Because a stock decouples inflow from outflow, it lets two parts of a system run at different speeds. That's why
+queues exist. A buffer that's too small makes the system brittle. A buffer that's too large hides problems and
+slows response.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                         14
+                              Flows
+                    75                                      Orders arriving (bursty)                              ERP intake (max 28/h)
+
+
+      ruoh / sredro
+                50
+
+                25
+
+                      0
+                              Stock: the queue absorbs the burst, nothing is lost
+             150
+
+
+   gnitiaw sredro
+            100
+
+                50
+
+                      0
+                                  0                  10                      20                   30                    40
+                                                                                  hour
+
+Figure 3.3 · Simulated. A wholesaler's order-intake agent receives bursty email orders (morning spike), but the ERP accepts at
+most 28 orders an hour. A queue stock absorbs each burst and drains steadily. Without it, the excess is rejected or lost.
+
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+MID-MARKET AUTOMATION
+A support backlog that won't go down
+
+                               Support backlog: work the outflow or shrink the inflow
+            1000
+                                                          change made                                            No change
+                800
+
+
+
+   stekcit nepo
+                600
+
+                400
+                                                                                                         Triage agent 15% faster
+                200
+                                                                                          Fix invoice format upstream
+                          0
+                                   0                5                   10                  15                  20                 25
+                                                                                  weeks
+
+Figure 3.4 · Simulated. Making the triage agent 15% faster drains the outflow side but the backlog stays high, because inflow is
+unchanged. Fixing the confusing invoice format that generated 38% of tickets shrinks the inflow and empties the backlog.
+
+  NAIVE                                                                           SYSTEMS
+  "Agent, handle tickets faster." Only the outflow side is                        Name the stock, measure both flows, and ask which
+  worked.                                                                         one is cheaper to move. Often it's the inflow.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                     15
+WEB DEVELOPMENT
+Memory and queues inside the code itself
+
+  NAIVE                                                              SYSTEMS
+  Agent loads a 2 GB product CSV into memory, keeps                  Every one of those is a stock with an inflow and no
+  an unbounded cache dictionary, and appends every                   outflow. Give each a drain or a cap.
+  processed ID to a global list. Works on 100 rows;
+  crashes on 300,000.                                                  Stream the CSV in chunks so memory stays flat.
+                                                                       Use an LRU cache capped at 500 entries with a
+                                                                       10-minute TTL. Never accumulate unbounded
+                                                                       state.
+
+
+
+
+MARKETING
+Growing an email list
+
+  NAIVE                                                              SYSTEMS
+  List growth stalls at 4,000. Spend more on lead                    Check the outflow: unsubscribes and bounces are 9%
+  magnets to increase inflow.                                        a month after a daily-send experiment. Cutting the
+                                                                     drain to 3% grows the list faster than any inflow
+                                                                     campaign.
+
+
+ Instead of telling the agent...                Say this
+ "Clear the backlog."                           "Report the backlog's inflow and outflow per day for the last four weeks, the
+                                                top sources of inflow, and whether reducing inflow or increasing outflow is
+                                                cheaper."
+ "Cache this."                                  "Cache with a hard max size and a TTL. Tell me the eviction rule."
+ "Process all these in the background."         "Put a bounded queue in front of the workers. Report queue depth over time
+                                                and what happens when it fills."
+
+
+  Exercise. Name five stocks in your system, including at least one intangible (trust, reputation, morale,
+  knowledge). For each: inflow, outflow, current trend, and whether you've been working the inflow or the outflow.
+
+
+   Check yourself
+    1. Inflow has been falling for three months. Is the stock falling? Not necessarily. It falls only once inflow drops below
+       outflow.
+    2. Give two ways to grow a stock. Increase inflow or decrease outflow.
+
+
+   Go deeper
+    1. "Give me five bathtub exercises: show inflow and outflow over time in a table and ask me to sketch the stock.
+       Check my answers and explain any mistake."
+    2. "Explain the 2000 Booth Sweeney and Sterman 'Bathtub Dynamics' study and the 'correlation heuristic.' Why do
+       educated adults get accumulation wrong?"
+    3. "Map the stocks and flows in a marketing agency's client base: acquisition, churn, upsell. Which flow should a
+       10-person agency work on first?"
+    4. "Explain the difference between buffering and streaming, queues and backpressure, as stock-and-flow ideas. No
+       code, just the system logic."
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                           16
+Sources. Meadows, Thinking in Systems, ch. 1, pp. 17–24. Booth Sweeney & Sterman, "Bathtub Dynamics," System Dynamics Review 16(4),
+2000. Cronin, Gonzalez & Sterman, Organizational Behavior and Human Decision Processes 108(1), 2009.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                             17
+04 Feedback loops                                                                                                             20 min
+
+You'll learn: the two kinds of feedback, how to read and label a loop, why every balancing loop depends on its sensor,
+and how fast reinforcing loops really grow.
+
+    FIRST PRINCIPLE
+    A system "runs itself" when the level of a stock feeds information back to change the flows into or out
+    of that same stock. That closed circle is a feedback loop. Every system that grows, collapses or holds
+    steady does so because of feedback.
+
+Meadows: "A feedback loop is a closed chain of causal connections from a stock, through a set of decisions or
+rules or physical laws or actions" that depend on the stock, back to a flow that changes it.
+
+Reinforcing loop (R)                                               Balancing loop (B)
+"A reinforcing feedback loop enhances whatever                     "A balancing feedback loop opposes whatever
+direction of change is imposed on it." More produces               direction of change is imposed on the system." It is
+more; less produces less. Compound interest, word of               goal-seeking: it pulls a stock toward a target from
+mouth, viral growth, death spirals. It has no goal of its          either side. Thermostats, hunger, inventory control,
+own.                                                               quality gates.
+
+                              Happy clients                                                  Failing tests
+                         +                                                                                   −
+
+
+                                   R
+                                                       +                                           B
+                                                                               +
+                                snowball            Referrals                                  seeks goal
+                                                                                                                     Fix attempts
+         New clients                                                       Gap to goal
+                                                                                   −
+                          +                                                                                      +
+                                                                         Goal: 0 failing
+
+Figure 4.1 Left: referrals snowball. Right: a test loop pulls failures toward zero. Arrows show influence; + means the two move in
+the same direction, − means opposite directions.
+
+Reading and labeling a loop
+Each arrow has a polarity. Sterman's precise reading: + means that if the cause increases, the effect is higher
+than it would otherwise have been; − means lower than it would otherwise have been. To label a loop, Sterman
+recommends tracing a small change all the way around. If it comes back amplified, the loop is reinforcing; if it
+comes back opposed, balancing. A shortcut: count the − links. An even number (including zero) means
+reinforcing, an odd number means balancing. Sterman warns that it's easy to miscount, so always trace the
+story too.
+
+The anatomy of a balancing loop
+ Part                           Role                                  In a coding agent's test loop
+ Goal (setpoint)                The desired state                     All tests pass and behavior matches spec
+ Sensor                         Perceives the current state           Test runner output plus spec review
+ Gap                            Goal minus perceived state            Failing checks
+
+
+
+Systems Thinking for Agentic Builders                                                                                               18
+ Corrective action                        Shrinks the gap                        Targeted code change
+
+A balancing loop closes the gap it can see. If the sensor measures a proxy, the loop will faithfully close the proxy
+gap and leave the real one open.
+
+                           A balancing loop closes the gap its sensor can see
+              40
+
+               30
+
+   skcehc gniliaf
+               20                                                                      Real defects behind the proxy
+
+                 10
+                                                                                                 Honest sensor: real failures
+                                                                                                                       goal: 0
+                       0
+                                0                   2               4                        6                   8                     10
+                                                                          agent iterations
+
+Figure 4.2 · Simulated. Two test loops. With an honest sensor, real failures fall to zero. When the agent may edit or skip tests, the
+visible failures fall even faster, but the real defects behind them plateau.
+
+How fast reinforcing loops run
+Meadows gives the rule of 70: doubling time is about 70 divided by the percentage growth rate. At 7% a period,
+a stock doubles in about 10 periods; at 35% a period, in about 2. Exponential growth always looks slow, then
+sudden.
+
+                               A 3-second spike: one design recovers, one never does
+               2000
+                                                                                      Retry 3x immediately R loop)
+                                                   traffic
+
+
+
+
+   dnoces / stseuqer
+                 1500                              spike
+
+
+                 1000
+
+                       500
+                                                                              Exponential backoff + jitter B loop)
+                                                                   server capacity
+                           0
+                                    0.0      2.5             5.0    7.5           10.0           12.5          15.0             17.5
+                                                                              seconds
+
+Figure 4.3 · Simulated. A three-second traffic spike hits an API. Workers that retry each failure three times immediately create a
+reinforcing loop: failures cause retries, retries cause more load, more load causes more failures. The server never recovers.
+Exponential backoff with jitter turns retries into a balancing loop that eases off as failures rise.
+
+Two more insights from Meadows
+    "The information delivered by a feedback loop can only affect future behavior." The loop can never correct
+    the behavior that produced the current signal. That built-in lag matters a lot in Module 6.
+    "If A causes B, is it possible that B also causes A?" Ask this of every arrow you draw. Many apparent one-
+    way causes are loops.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                       19
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+WEB DEVELOPMENT
+Self-correcting code generation
+
+  NAIVE                                                          SYSTEMS
+  "Write the feature, then test it and fix problems." No         Specify the balancing loop explicitly.
+  stated goal, no rule about what counts as fixed, and the
+  agent can edit tests.                                            Goal: tests in /tests pass AND feature matches
+                                                                   spec.md.
+                                                                   Sensor: test output + diff review against
+                                                                   spec.md.
+                                                                   Correct the first failing test's root cause,
+                                                                   rerun.
+                                                                   Never edit or delete tests. Stop after 5
+                                                                   cycles and
+                                                                   report the remaining gap.
+
+
+
+
+MARKETING
+Building a reinforcing loop on purpose
+
+  NAIVE                                                          SYSTEMS
+  Each campaign starts from a blank brief. Learnings live        Close the loop: results feed a shared playbook the
+  in someone's head or a slide nobody opens.                     agent reads before every new brief. Better briefs give
+                                                                 better results, which give a better playbook. That
+                                                                 compounding is the asset you're building for the client.
+
+
+MID-MARKET AUTOMATION
+Client onboarding corrections
+
+  NAIVE                                                          SYSTEMS
+  Staff fix the onboarding agent's mistakes in the CRM           Every human correction is captured as a rule in a file
+  directly. The same mistakes repeat every week.                 the agent reads. Corrections fall, freeing time to review
+                                                                 edge cases more carefully, which produces better
+                                                                 rules: a reinforcing loop on the good side.
+
+
+ Instead of telling the agent...             Say this
+ "Review your work and fix any issues."      "Run a balancing loop. Goal: [checklist]. Sensor: score each item pass/fail
+                                             with evidence. Correct only failed items. Stop at all-pass or 3 iterations. You
+                                             may not change the checklist."
+ "Make the API calls reliable."              "Retry with exponential backoff and jitter, a hard timeout, and a maximum
+                                             retry count. Make the call idempotent so a retry can never duplicate the
+                                             effect."
+
+
+  Exercise. Draw one reinforcing and one balancing loop in your system with + and − on every link. For the
+  balancing loop, write the goal, sensor, gap and correction. Then ask: could the corrective action change the
+  sensor's reading without changing reality?
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                          20
+   Go deeper
+    1. "Teach me causal loop diagrams. Give me three short business stories; I'll draw the loops and label polarity. Then
+       check my work using Sterman's 'trace a change around the loop' method."
+    2. "Explain the rule of 70 and give five examples of exponential processes in software operations and digital
+       marketing."
+    3. "List ten balancing loops in a typical web agency. For each, is the sensor measuring the real goal or a proxy, and
+       what happens when they drift apart?"
+    4. "Explain retry storms, thundering herds and cache stampedes as reinforcing loops, and the standard balancing
+       mechanisms for each."
+
+Sources. Meadows, Thinking in Systems, ch. 1, pp. 25–34; ch. 2, pp. 39–40. Sterman, Business Dynamics, ch. 5, and "Fine-Tuning Your
+Causal Loop Diagrams," The Systems Thinker, 2001. Kim, "Guidelines for Drawing Causal Loop Diagrams," Pegasus.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                 21
+PA R T I I
+
+
+Dynamics
+How stocks and loops combine to produce behavior over time: the
+classic small systems, the havoc caused by delays, and the handful of
+shapes that nearly every system's behavior follows. About 60 minutes.
+
+5. The systems zoo
+6. Delays and oscillation
+7. Behavior over time: the six modes
+
+
+
+
+Systems Thinking for Agentic Builders                                   22
+05 The systems zoo                                                                                                                       25 min
+
+You'll learn: Meadows' five small systems, each a pattern you'll recognize in client work, and the lesson each one
+teaches.
+
+    FIRST PRINCIPLE
+    Systems with similar feedback structures produce similar behavior, whatever they're made of. Learn a
+    few small structures well and you can recognize them inside large, messy systems. Meadows:
+    "Systems with similar feedback structures produce similar dynamic behaviors."
+
+   ANALOGY
+   A zoo lets you study animals one species at a time before you go into the jungle where they're all mixed
+   together. Meadows' "systems zoo" does the same with feedback structures.
+
+
+Exhibit 1 · Two competing balancing loops: the thermostat
+A furnace heats a room toward the thermostat setting (balancing loop 1). Heat leaks to the cold outdoors
+(balancing loop 2, pulling toward outside temperature). Because heat keeps leaking while the furnace works, the
+room settles a little below the setting. Meadows' lesson: "A stock-maintaining balancing feedback loop must
+have its goal set appropriately to compensate for draining or inflowing processes that affect that stock."
+
+                                Two balancing loops pull against each other
+                     120
+
+
+
+
+   dradnats OES gniteem segap
+                                       target: 100 optimised pages              Goal set to cover decay: holds at 100
+                     100
+
+                           80
+                                                                                                Refresh agent aims at 100 settles near 75
+                           60
+
+                           40
+
+                                   0               5            10   15        20          25           30              35        40
+                                                                              weeks
+
+Figure 5.1 · Simulated. An SEO refresh agent keeps a client's service pages up to standard while Google updates and competitor
+moves quietly decay them. Aiming exactly at the target leaves the stock permanently short. Setting the effective goal to cover
+expected decay (or adding a stronger correction) holds it at target.
+
+Exhibit 2 · One reinforcing plus one balancing loop: population and capital
+Births are a reinforcing loop, deaths a balancing one. The population grows or shrinks depending on which loop
+is stronger. The same structure describes capital: investment reinforces, depreciation balances. Meadows:
+"Complex behaviors of systems often arise as the relative strengths of feedback loops shift." This is loop
+dominance.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                        23
+                        S-shaped growth: the loop in charge changes
+                                market size: clinics in the region
+             120
+            100                   R dominant:
+
+
+   stneilc cinilc
+                80                referrals bring
+                                  more referrals
+                60
+                40                                                         B dominant: fewer clinics left
+                                                                           who haven't heard of you
+                20
+                    0
+                           0                          10                  20                    30                 40        50
+                                                                                months
+
+Figure 5.2 · Simulated. A clinic-marketing agency growing by referral in one region. Early on the reinforcing loop dominates. As
+fewer clinics remain who haven't heard of the agency, a balancing loop takes over and growth flattens: S-shaped growth.
+
+Exhibit 3 · A system with delays: business inventory
+Meadows' car dealer keeps about ten days of sales on the lot, a version of the thermostat. Add three delays
+(perceiving sales, deciding orders, receiving deliveries) and a small rise in demand sets off oscillations. Her
+counterintuitive finding: the dealer was reacting "not too slowly, but too quickly." Lengthening the response time
+from three to six days damped the swings.
+
+                        Reorder agent with a 5-day supplier delay
+             500                                                                                            Reacts fast,
+                                                                                                            corrects hard
+
+            400
+
+   kcots ni stinu
+                                                    demand 10%
+             300                                                            Middle setting
+                                target stock
+             200
+                                                       Averages demand, corrects gently
+              100
+                            0                    10                  20             30                40             50     60
+                                                                                  days
+
+Figure 5.3 · Simulated. A mid-market e-commerce reorder agent with a 5-day supplier delay faces a 10% demand rise. Reacting
+fast and correcting hard produces large swings. Averaging demand and correcting gently reaches the new level with little
+overshoot.
+
+Exhibit 4 · A renewable stock constrained by a nonrenewable one: the oil economy
+Capital grows by reinvesting profits from extracting a fixed stock of oil. Growth speeds extraction, which
+exhausts the resource sooner. Meadows: "Nonrenewable resources are stock-limited." "A quantity growing
+exponentially toward a constraint or limit reaches that limit in a surprisingly short time." And: "The higher and
+faster you grow, the farther and faster you fall."
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                             24
+                                     Overshoot and collapse: growth that eats its own resource base
+                      25                                        Reinvest every reply into more sending
+                      20
+
+
+   keew / seilper
+                         15
+
+                         10
+                                                                                                     Capped at 300/week, list replenished
+                                 5
+
+                                 0
+                                        0                10                20                  30                  40                  50
+                                                                                     weeks
+
+Figure 5.4 · Simulated. Cold outreach to a fixed list of 12,000 dental clinics. Reinvesting every reply into more sending grows
+replies fast, then collapses them as the best prospects are used up and the list empties. Capping volume and adding newly
+opened businesses each week keeps replies flowing for the whole year.
+
+Exhibit 5 · A renewable stock constrained by a renewable one: the fishery
+Fish regenerate at a rate that depends on how many remain. Meadows: "Renewable resources are flow-limited.
+They can support extraction or harvest indefinitely, but only at a finite flow rate." Harvest faster than
+regeneration and the stock may be driven below a critical threshold. She describes three possible outcomes:
+settling at a sustainable level, oscillating around it, or collapse of the resource and the industry that depends on
+it.
+
+                                     Harvesting a renewable stock: attention regrows only so fast
+                      100
+
+
+
+
+   )xedni( srebircsbus degagne
+                                                                                                                           1 email / week
+                            80
+                                                                                                                           3 / week
+                            60
+
+                            40
+
+                            20                                                                                             daily
+
+                                 0
+                                         0          10        20           30           40               50       60           70           80
+                                                                                      weeks
+
+Figure 5.5 · Simulated. Subscriber attention is a renewable stock: people re-engage at a limited rate. One email a week stays
+sustainable, three a week settles lower, and daily sending exceeds regeneration and drives engagement toward collapse.
+
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+WEB DEVELOPMENT
+A maintenance agent keeping 300 client sites patched
+
+  NAIVE                                                                                 SYSTEMS
+  Goal: "keep sites up to date." The agent patches when                                 Measure the drain (new advisories per week) and size
+  it notices. New vulnerabilities arrive continuously, so                               the correction to exceed it, with a target of "no site
+  the fleet always lags (thermostat with a leak).                                       more than 7 days behind."
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                            25
+MARKETING
+Scaling a winning ad creative
+
+  NAIVE                                                                  SYSTEMS
+  Creative works, so the agent pushes budget into it                     Treat audience attention as a renewable stock. Track
+  daily until results crash (audience fatigue: a renewable               frequency, cap it, and rotate new creative in at the rate
+  resource harvested too fast).                                          the old one decays.
+
+
+MID-MARKET AUTOMATION
+A reorder agent for a building-supplies wholesaler
+
+  NAIVE                                                                  SYSTEMS
+  Reorders daily against yesterday's sales, ignoring                     Count stock on order as part of inventory, smooth the
+  what's already on order. Warehouse swings between                      demand signal, and correct only a fraction of the gap
+  stockouts and overstock.                                               each cycle.
+
+                                                                           Order = smoothed demand + (target − on hand −
+                                                                           on order)/4.
+                                                                           Never ignore units already in transit.
+
+
+
+
+ Instead of telling the agent...                   Say this
+ "Keep X at the target."                           "Estimate what drains X each period and set the correction so it covers that
+                                                   drain plus the gap."
+ "Scale what's working."                           "Identify the resource this growth consumes, whether it regenerates, at what
+                                                   rate, and propose a pace below that rate."
+
+
+  Exercise. Find one example of each zoo animal in your work: a stock held against a leak, a growth loop meeting a
+  limit, a delayed inventory, a resource that doesn't refill and one that refills slowly.
+
+
+   Go deeper
+    1. "Walk me through each system in chapter 2 of Meadows' Thinking in Systems (the systems zoo). For each, give
+       the structure, the behavior and the lesson, then a digital-agency example."
+    2. "Explain why the car dealer in Meadows' inventory example should react more slowly, not faster. Use a step-by-
+       step numeric example."
+    3. "What's the difference between stock-limited and flow-limited resources? Classify ten resources a marketing
+       agency depends on."
+    4. "Help me build a simple spreadsheet model of the thermostat with a leak, so I can change the goal and leak rate
+       and watch the result."
+
+Sources. Meadows, Thinking in Systems, ch. 2, pp. 35–72 (thermostat, population and capital, business inventory, oil economy, fishing
+economy).
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                   26
+06 Delays and oscillation                                                                                                       20 min
+
+You'll learn: the main kinds of delay, why delays plus aggressive correction cause oscillation, what the Beer Game
+revealed about human decision making, and the bullwhip effect.
+
+    FIRST PRINCIPLE
+    Every action takes time to show its effect, and every measurement is a picture of the past. If you
+    correct based on old information as if it were current, you overcorrect. Meadows: "Overshoots,
+    oscillations, and collapses are always caused by delays."
+
+   ANALOGY
+   An unfamiliar shower. You turn it hotter, nothing happens, so you turn it hotter again. By the time the first
+   change arrives, you've added a second and a third, and you get scalded. Then you overcorrect toward
+   cold.
+
+
+Kinds of delay
+    Material delay: physical things in transit. Shipped goods, deploys propagating, leads moving through a
+    funnel. Nothing is lost along the way.
+    Information (perception) delay: time to notice a change. Analytics lag, monthly reports, conversion
+    attribution windows.
+    Delays also differ in shape, even with the same average length.
+
+                                Same 8-day average delay, three different shapes
+                  30
+                                                                    Pipeline: all 100 arrive on day 8 (bar cut off)
+                  25                                                (a fixed 8-day approval queue)
+
+
+
+
+   yad / tuo gnimoc smeti
+                  20
+                                        First-order: some immediately,
+                     15                 long tail (support tickets resolved)
+                                                                                      Third-order: slow start, peak near
+                     10                                                               the average (leads becoming sales)
+                            5
+                            0
+                                    0                5                  10                   15                20          25   30
+                                                                               days after 100 items enter
+
+Figure 6.1 · Simulated. Three delays with the same 8-day average. A pipeline delay releases everything at once. A first-order
+delay releases some immediately with a long tail. A third-order delay starts slowly and peaks near the average. Knowing the
+shape tells you when to expect feedback.
+
+Meadows quotes Jay Forrester's rule of thumb: take people's best guess of a delay and triple it. "Delays are
+ubiquitous in systems." "Every stock is a delay."
+
+Why delays cause oscillation
+A balancing loop with a delay keeps correcting after the gap has closed, because its information is stale.
+Senge's guidance for the "balancing process with delay" archetype: "In a sluggish system, aggressiveness
+produces instability. Either be patient or make the system more responsive."
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                27
+                                    Correcting faster than the feedback arrives causes oscillation
+                     120                                                      Daily big moves on lagging data
+
+
+
+
+   )xedni( ngiapmac no tegdub
+                     100
+                           80
+                                           target CPL-efficient spend
+                           60
+                                                                                                Weekly, max 20% move
+                           40
+                           20
+                                0
+                                       0                5               10   15          20            25        30    35   40
+                                                                                       days
+
+Figure 6.2 · Simulated. An ad-budget agent reallocates spend based on cost per qualified lead, but leads take about four days to
+qualify in the CRM. Big daily moves on lagging data swing wildly. Weekly decisions with a cap on each move settle smoothly.
+
+The Beer Game
+The Beer Distribution Game grew out of Forrester's system dynamics group at MIT, around 1960. Four players
+(retailer, wholesaler, distributor, factory) each manage inventory, with shipping delays between them and no
+communication except orders. Customer demand changes exactly once: from 4 to 8 cases a week, then stays
+there.
+In Sterman's 1989 study of the game:
+    Every game oscillated, with an average period of about 20 weeks, though demand was flat after a single
+    step.
+    Order swings grew at every stage upstream. Peak factory orders averaged more than double peak retail
+    orders.
+    Average team costs were about ten times a simple benchmark.
+    Players gave orders already in transit (the supply line) only about a third of the weight they deserved. They
+    kept ordering for a gap that shipments already on the way would close.
+    Most players blamed outside forces, chiefly customer demand. Asked to sketch it afterwards, most drew
+    oscillating demand that never existed.
+Senge's lessons from the game: structure influences behavior; structure in human systems is subtle; leverage
+often comes from new ways of thinking.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                            28
+                              Bullwhip: each stage amplifies the swing it receives
+                                                     Stage 3 peak: 27
+                 25
+
+
+
+
+   keew / deredro stinu
+                 20                                  Stage 2 peak: 18
+                   15
+                                                     Stage 1 peak: 12
+                   10                                                                                         End demand
+                          5
+                          0
+                                 0            5             10          15           20            25             30             35
+                                                                             weeks
+
+Figure 6.3 · Simulated. One step in end demand, amplified at each stage upstream: the bullwhip effect. Lee, Padmanabhan and
+Whang (1997) named four causes: forecasting from orders rather than real demand, rationing games, order batching and price
+promotions. In agency terms, think client demand to your agency, to your freelancer pool, to their own subcontractors.
+
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+MARKETING
+Optimizing on lagging conversion data
+
+  NAIVE                                                                       SYSTEMS
+  Agent pauses and restarts campaigns daily on                                Match the decision cycle to the feedback delay.
+  yesterday's numbers. Algorithms re-enter learning
+  phases, CPL rises, the agent reacts harder.                                   Decide budget weekly using cost per qualified
+                                                                                lead
+                                                                                with a 7-day lag. Move at most 20% of a
+                                                                                campaign's
+                                                                                budget per cycle. Log every change with its
+                                                                                reason.
+
+
+
+
+WEB DEVELOPMENT
+Retries before the last attempt has resolved
+
+  NAIVE                                                                       SYSTEMS
+  A deploy agent sees "pending," assumes failure,                             Count the supply line: a pending deploy is an action
+  redeploys. Two deploys race and corrupt the build                           already in transit. Wait for it, with a known timeout,
+  cache.                                                                      before acting again. Make deploys idempotent so a
+                                                                              duplicate does no harm.
+
+
+MID-MARKET AUTOMATION
+Staffing an outsourced support team from ticket volume
+
+  NAIVE                                                                       SYSTEMS
+  Automation requests contractors whenever weekly                             Base requests on a smoothed four-week trend, count
+  backlog rises. Onboarding takes three weeks, so by                          contractors already being onboarded, and absorb short
+  the time new staff arrive the spike has passed, and the                     spikes with a buffer (overflow to a shared queue)
+  team is overstaffed.                                                        instead of hiring.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                  29
+ Instead of telling the agent...                 Say this
+ "React quickly to changes."                     "Estimate the delay between action and measurable effect. Decide no more
+                                                 often than that delay, and correct only part of the gap each time."
+ "Order enough to cover demand."                 "Include everything already ordered but not yet received when calculating
+                                                 what to order."
+
+
+  Exercise. List the three longest delays in your system: one material, one information and one decision delay. For
+  each, does anyone act more often than the delay allows feedback to arrive?
+
+
+   Go deeper
+    1. "Simulate the Beer Game with me in text. You play three positions with simple ordering rules, I play the retailer.
+       Run 20 weeks and show me the results."
+    2. "Summarize Sterman's 1989 paper 'Modeling Managerial Behavior: Misperceptions of Feedback in a Dynamic
+       Decision Making Experiment' and its implications for automated decision systems."
+    3. "Explain the bullwhip effect and its four causes from Lee, Padmanabhan and Whang (1997), with examples from
+       digital services rather than physical goods."
+    4. "Help me list every information delay in a Google Ads and CRM setup for a home-services contractor, and how
+       long each is."
+
+Sources. Meadows, Thinking in Systems, ch. 2 (inventory) and ch. 4, pp. 103–105. Sterman, Management Science 35(3), 1989. Senge, The
+Fifth Discipline, ch. 3 and appendix 2. Lee, Padmanabhan & Whang, Management Science 43(4), 1997. Sterman, Business Dynamics, ch. 11
+(delays).
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                              30
+07 Behavior over time: the six modes                                                                                             15 min
+
+You'll learn: the basic shapes of system behavior, which loop structure produces each, and how to use a behavior-
+over-time sketch to diagnose structure.
+
+    FIRST PRINCIPLE
+    Structure produces behavior, so behavior is evidence about structure. If you sketch how a key
+    variable has moved over time, its shape tells you which loops are in charge. Meadows: "System
+    structure is the source of system behavior."
+
+   ANALOGY
+   A doctor reading an ECG. The shape of the trace, not one reading, points to what's going on in the heart. A
+   behavior-over-time graph is the ECG of a system.
+
+
+  Exponential growth                            Goal seeking                                   Oscillation
+  R dominant                                    B dominant                                     B with delay
+
+
+
+
+  S-shaped growth                               S-shaped with overshoot                        Overshoot and collapse
+  R, then B                                     R, then B with delay                           R, then B eroding its own limit
+
+
+
+
+Figure 7.1 Sterman's fundamental modes and the structures that generate them. Exponential growth: reinforcing loop. Goal
+seeking: balancing loop. Oscillation: balancing loop with significant delay. S-shaped growth: reinforcing loop, then balancing
+loop takes over with no significant delay and a fixed limit. S-shaped with overshoot: the same, with delays in the balancing loop.
+Overshoot and collapse: the limit itself is eroded by the growth.
+
+Using modes to diagnose
+ You see                          Suspect                              First question to ask
+ Steady acceleration              A reinforcing loop dominating        What is it feeding on, and what limit will it meet?
+ Smooth approach to a             A balancing loop                     What's the goal, and is it the right one?
+ level
+ Repeated swings                  A balancing loop with delay          Where's the delay, and is someone overcorrecting?
+ Growth that flattens             Loop dominance shifting to a         Which constraint is binding now?
+                                  limit
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                31
+ Boom then bust                   Growth eroding its own         What does the growth consume that doesn't regenerate fast
+                                  resource                       enough?
+
+
+Reference modes
+Sterman's modeling process starts with a reference mode: a graph of the problem's behavior over time, both its
+history and possible futures. It turns "things are bad" into "this variable has done this over this period," which
+you can actually explain. The time horizon matters: look far enough back to see the roots of the problem and far
+enough forward to see the delayed effects of policies.
+
+Shifting dominance
+Real systems contain many loops. Which one dominates changes over time, often because of nonlinearities
+(effects that aren't proportional to causes). The S-curve in Module 5 is the classic case. Many surprising turns in
+a project's history are a change in which loop is in charge, not a change in anyone's effort.
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+WEB DEVELOPMENT
+Page speed that keeps getting worse
+
+  NAIVE                                                              SYSTEMS
+  React to today's slow page: compress images, done.                 Sketch LCP over 12 months. It degrades steadily with
+                                                                     each plugin and tracking script added: slow erosion,
+                                                                     not an event. Add a balancing loop: a performance
+                                                                     budget enforced in CI.
+
+
+MARKETING
+Leads plateau after fast growth
+
+  NAIVE                                                              SYSTEMS
+  Growth stalled, so raise budget and launch more                    The S-shape says a limit has become dominant. Find it:
+  campaigns.                                                         local search volume, clinic capacity to answer calls, or
+                                                                     review count versus competitors. Push on the limit, not
+                                                                     on growth.
+
+
+MID-MARKET AUTOMATION
+Month-end close that oscillates
+
+  NAIVE                                                              SYSTEMS
+  Close is late one month, early the next. Each month,               Oscillation suggests a delay plus overcorrection. The
+  management changes the process.                                    reconciliation agent's exception report arrives after the
+                                                                     controller has already reallocated staff. Shorten the
+                                                                     information delay by sending a mid-month exception
+                                                                     preview.
+
+
+ Instead of telling the agent...                  Say this
+ "Why did conversions drop?"                      "Plot conversions weekly for 12 months. Describe the shape (growth, decline,
+                                                  plateau, oscillation, step) and propose which loop structure would produce it
+                                                  before suggesting causes."
+
+
+
+Systems Thinking for Agentic Builders                                                                                            32
+  Exercise. Draw a reference mode for the most important variable in your system over the last 12 months, plus the
+  future you fear and the future you want. Name the mode and the structure it suggests.
+
+
+   Go deeper
+    1. "Explain the fundamental modes of dynamic behavior from Sterman's Business Dynamics chapter 4, with the loop
+       structure that produces each and a digital-business example."
+    2. "What is a reference mode in system dynamics? Walk me through creating one for a client's declining organic
+       traffic."
+    3. "Explain shifting loop dominance and nonlinearity with three examples. How can I spot the moment dominance
+       shifts?"
+
+Sources. Sterman, Business Dynamics, ch. 3 (modeling process, reference modes) and ch. 4 (structure and behavior). Meadows, Thinking
+in Systems, ch. 2, p. 45; ch. 4, pp. 89–94.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                              33
+ PA R T I I I
+
+
+ Why systems behave as they do
+ Why some systems hold together under stress, why systems keep
+ surprising the people running them, and how control actually works.
+ About 60 minutes.
+
+ 8. Resilience, self-organization, hierarchy
+ 9. Why systems surprise us
+10. Cybernetics: control and variety
+
+
+
+
+ Systems Thinking for Agentic Builders                                 34
+08 Resilience, self-organization, hierarchy                                                                      20 min
+
+You'll learn: the three properties Meadows says make systems work well, plus emergence, coupling and nonlinearity,
+and how to design for each.
+
+    FIRST PRINCIPLE
+    Systems that last aren't the most efficient ones. They are the ones that can absorb shocks, rebuild
+    their own structure and keep each part's job manageable. Efficiency and resilience often pull in
+    opposite directions.
+
+   ANALOGY
+   A ship with watertight compartments (bulkheads). It carries a little less cargo than one big open hull, but
+   when one compartment floods, the ship stays afloat.
+
+
+Resilience
+Meadows: "Resilience is a measure of a system's ability to survive and persist within a variable environment." Its
+opposite is brittleness. "Resilience arises from a rich structure of many feedback loops," working through
+different mechanisms and time scales, with some redundancy. Resilience is not the same as stability: a resilient
+system can fluctuate a lot and still recover. Optimizing purely for efficiency usually removes the redundancy that
+resilience depends on.
+
+Self-organization
+Meadows: "This capacity for a system to make its own structure more complex is called self-organization." It
+"produces heterogeneity and unpredictability. It requires freedom and experimentation, and a certain amount of
+disorder." Evolution, learning and a company inventing new product lines are all self-organization. In agentic
+systems, an agent that proposes new rules or skills from its own failures is self-organizing.
+
+Hierarchy
+Herbert Simon's 1962 parable: two watchmakers, Hora and Tempus, each build watches of about 1,000 parts
+and are frequently interrupted. Tempus assembles each watch in one go, so an interruption makes it fall apart.
+Hora builds stable subassemblies of about ten parts, so an interruption costs only the current subassembly.
+With a 1% chance of interruption per part, Simon calculated that Tempus takes on average about four thousand
+times as long. Hora prospered; Tempus lost his shop. Complex systems evolve much faster from stable
+intermediate forms, which is why hierarchy is everywhere.
+Meadows adds that hierarchies "reduce the amount of information that any part of the system has to keep track
+of," and that "the original purpose of a hierarchy is always to help its originating subsystems do their jobs
+better." She names two failure modes: suboptimization (a subsystem's goals dominate at the expense of the
+whole) and too much central control.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                35
+                             Naive: everything flows up                                    Systems: summaries flow up
+
+                                        Orchestrator                                                 Orchestrator
+
+
+
+
+                      Copy            Design           Ads            Email         Copy           Design           Ads          Email
+
+                             context floods, decisions degrade                             "5 emails ready, forecast 32% open"
+
+Figure 8.1 A campaign orchestrator and four subagents. Left: every draft and log flows up, so the orchestrator's context floods.
+Right: each subagent handles its own work and passes up a summary, as Simon's stable subassemblies do.
+
+Emergence, coupling and nonlinearity
+    Emergence: behavior of the whole that no part has on its own. No driver decides to create a traffic jam. In
+    multi-agent work, duplicated effort and conflicting edits emerge from shared state without anyone intending
+    them.
+    Coupling: how tightly parts depend on each other. Charles Perrow (Normal Accidents, 1984) showed that
+    systems that are both interactively complex (failures can combine in unexpected ways) and tightly coupled
+    (little slack, fixed sequences, failures cascade) will eventually have accidents however careful the operators
+    are. His trigger case was Three Mile Island in 1979, where several small failures that would each have been
+    manageable interacted.
+    Nonlinearity: effects aren't proportional to causes. Meadows: in a nonlinear relationship "the cause does not
+    produce a proportional effect," and nonlinearities can "flip a system from one mode of behavior to another."
+
+                Tightly coupled: orders lost                                        Buffered: queue grows, then drains
+       60                     ERP                                              60
+                              down
+       50                                                                      50
+       40                                                                      40
+   sredro
+       30                                                                      30
+       20                                                                      20
+        10                                                                     10
+            0                                                                   0
+                 0      2         4         6    8               10       12         0         2         4         6    8           10   12
+                                           hours                                                                  hours
+
+Figure 8.2 · Simulated. An order-intake agent pushes orders straight into an ERP. During a two-hour ERP outage, the tightly
+coupled version loses 50 orders. With a queue between them, orders wait and drain once the ERP returns.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                         36
+                                Illustrative: more input stops producing proportional output
+                                                                 API rate limit reached:
+                  125                                            retries and 429s start eating capacity
+
+
+
+
+   nim / dessecorp segap
+                                     linear zone:
+                 100                 more workers, more output
+
+                           75
+                       50
+                       25
+                           0
+                                 0           5             10          15             20         25           30           35           40
+                                                                            parallel agent workers
+
+Figure 8.3 · Illustrative. Adding parallel workers raises throughput linearly until an API rate limit is hit. Past that point, 429 errors
+and retries consume capacity, and more workers produce less output.
+
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+WEB DEVELOPMENT
+Three coding agents in parallel
+
+  NAIVE                                                                                SYSTEMS
+  Header, product pages and checkout built in parallel in                              Loose coupling through clear ownership and one
+  one repo. Result: three button styles and two                                        shared read-only interface.
+  conflicting CSS resets. Nobody decided this; it
+  emerged.                                                                                You own /components/checkout only. Read all
+                                                                                          colors,
+                                                                                          spacing and type from /tokens/design.json
+                                                                                          (read-only).
+                                                                                          Request new tokens in /requests/tokens.md.
+
+
+
+
+MARKETING
+One heavy job sinking the whole stack
+
+  NAIVE                                                                                SYSTEMS
+  Reporting agent's monthly 200-page export runs on                                    Bulkheads: lead routing gets its own reserved capacity;
+  the same worker pool as lead routing. During the                                     reports run in a separate pool with a resource cap and
+  export, new leads wait 40 minutes.                                                   lower priority.
+
+
+MID-MARKET AUTOMATION
+Contract extraction that adapts
+
+  NAIVE                                                                                SYSTEMS
+  An engineer updates extraction rules by hand every                                   Allow bounded self-organization: the agent proposes
+  time a supplier changes their contract template.                                     new rules, a human approves them.
+
+                                                                                          On an unfamiliar layout, extract what you can,
+                                                                                          write a
+                                                                                          proposed rule to /proposals/ with 3 example
+                                                                                          documents.
+                                                                                          Never apply it until a human marks it
+                                                                                          approved.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                            37
+ Instead of telling the agent...                  Say this
+ "Make it scalable."                              "Identify which components are tightly coupled. Put a buffer between any two
+                                                  that can fail independently, and isolate heavy or risky jobs in their own
+                                                  capacity pool."
+ "Send me everything the subagents                "Each subagent returns a summary: status, key numbers, decisions needed,
+ produce."                                        risks. Full output goes to files I can open if needed."
+
+
+  Exercise. Find the tightest coupling in your system. If that part failed for two hours, what would be lost, and what
+  single buffer or fallback would contain the damage?
+
+
+   Go deeper
+    1. "Explain Herbert Simon's watchmaker parable from 'The Architecture of Complexity' (1962), including near-
+       decomposability, and how it applies to designing multi-agent systems."
+    2. "Summarize Charles Perrow's Normal Accidents: interactive complexity, tight coupling, and his chart of example
+       systems. Where would a typical SaaS stack sit?"
+    3. "What does Meadows mean by resilience, self-organization and hierarchy in chapter 3 of Thinking in Systems?
+       Give an agency example of each failing."
+    4. "Explain suboptimization with examples from marketing teams where channel goals hurt the overall business."
+
+Sources. Meadows, Thinking in Systems, ch. 3, pp. 75–85; ch. 4, pp. 91–94. Simon, "The Architecture of Complexity," Proc. American
+Philosophical Society 106(6), 1962. Perrow, Normal Accidents, 1984.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                38
+09 Why systems surprise us                                                                                                   20 min
+
+You'll learn: the six reasons Meadows gives for why our models of systems keep failing, including layers of limits and
+bounded rationality, and how to guard against each.
+
+    FIRST PRINCIPLE
+    Meadows: "Everything we think we know about the world is a model." Models are useful but always
+    incomplete. Systems surprise us at exactly the places where our models leave things out.
+
+ Source of surprise                     Meadows' point                                 Guard against it
+ Beguiling events                       Events are "the outputs, moment by             Never act on a single data point. Plot
+                                        moment, from the black box of the system."     the history.
+                                        They explain little. Look at behavior over
+                                        time, then structure.
+ Linear minds in a nonlinear world Doubling a cause rarely doubles the effect.         Ask where the curve bends: thresholds,
+                                   Nonlinearities shift loop dominance.                saturation, tipping points.
+ Nonexistent boundaries                 "There are no separate systems."               Redraw the boundary when the problem
+                                        Boundaries are choices for a purpose.          doesn't make sense inside it.
+ Layers of limits                       Growth is limited by the scarcest input, and   Find today's constraint and predict
+                                        growth itself shifts which limit binds.        tomorrow's.
+ Ubiquitous delays                      "Every stock is a delay." With long delays,    Triple your delay estimates. Act on
+                                        "some sort of foresight is essential."         forecasts, not just reports.
+ Bounded rationality                    People "make quite reasonable decisions        Change what each actor can see, not
+                                        based on the information they have," and       just what they're told to do.
+                                        that information is incomplete and late.
+
+
+Layers of limits
+Justus von Liebig found that grain growth is limited by the scarcest nutrient, not the most abundant one: the law
+of the minimum. Meadows: "At any given time, the input that is most important to a system is the one that is
+most limiting." And: "There always will be limits to growth. They can be self-imposed. If they aren't, they will be
+system-imposed."
+Eliyahu Goldratt's Theory of Constraints turns this into a procedure, the Five Focusing Steps: identify the
+constraint; decide how to exploit it; subordinate everything else to that decision; elevate the constraint; and if it
+breaks, go back to step one without letting inertia become the new constraint.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                            39
+                                             Stage capacity (items/sec, log)                              Items waiting in memory
+                                                                                                6000
+                                Scrape                                    100
+                                                                                                5000              Scrape at full speed:
+                                                                                                                  items pile up before the LLM
+                                    Clean                                             500       4000
+                                                                                                3000
+  LLM summary                                     2                                             2000
+                                                                                                1000
+                                    Save                                        200                                                  Paced to 2/sec: queue stays flat
+                                                                                                     0
+                                            100              101        102            103                    0   10      20      30    40             50   60
+                                                                                                                                seconds
+
+Figure 9.1 · Simulated. A four-stage content pipeline. The LLM summary step handles 2 items a second. Speeding up scraping
+does nothing for output; it only piles work into memory in front of the bottleneck. Pacing upstream stages to the bottleneck
+keeps the queue flat.
+
+                                    Layers of limits: removing one constraint reveals the next
+                                                                                                                             limit: client approvals
+
+
+
+
+   htnom / dehsilbup selcitra
+                     150
+
+
+                     100                                                               limit: editor review
+
+
+                           50               limit: writers
+
+
+                                0
+                                        0                          10                 20                  30              40                   50             60
+                                                                                                         weeks
+
+Figure 9.2 · Simulated. A content agency removes one constraint at a time. Hiring AI writing agents lifts the writer limit, which
+exposes editor review, then client approvals. Each fix is real, and each reveals the next limit.
+
+Bounded rationality
+The term comes from Herbert Simon, who also coined satisficing: people and organizations look for options that
+are good enough, not optimal. Meadows: "The bounded rationality of each actor in a system may not lead to
+decisions that further the welfare of the system as a whole." The fix is rarely to make actors smarter. It's to
+restructure what information reaches them, and when. Every agent is boundedly rational by construction: it
+decides from its context window.
+
+   "Bounded rationality means that people make quite reasonable decisions based on the information
+   they have."
+   Meadows, Thinking in Systems, ch. 4
+
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                                                   40
+WEB DEVELOPMENT
+"Make this pipeline faster"
+
+  NAIVE                                                           SYSTEMS
+  The agent proudly makes scraping and cleaning 10x               Find the bottleneck first.
+  faster. Output is unchanged, memory use explodes.
+                                                                     Measure throughput of each stage. Identify the
+                                                                     slowest
+                                                                     stage or tightest rate limit. Pace all
+                                                                     upstream stages
+                                                                     to its capacity. Only then propose how to
+                                                                     raise it.
+
+
+
+
+MARKETING
+An upload service that can't see the database
+
+  NAIVE                                                           SYSTEMS
+  Lead-import agent keeps pushing 50,000 rows into the            Connect the sensor to the actor: expose the CRM's
+  CRM while its API is throttling. It's acting rationally on      rate-limit headers and queue health to the importer so
+  what it sees: "upload succeeded, keep going."                   it slows down when the downstream system is
+                                                                  strained.
+
+
+MID-MARKET AUTOMATION
+Department agents optimizing locally
+
+  NAIVE                                                           SYSTEMS
+  Sales agent maximizes closed deals; finance agent               Give both agents a shared view of customer lifetime
+  minimizes payment terms. Each is rational; together             value and a shared constraint, so each decision is
+  they lose the company's largest customer over                   made with the whole in view.
+  invoicing terms.
+
+
+ Instead of telling the agent...               Say this
+ "Speed this up."                              "Find the system bottleneck first. Report each stage's capacity, then pace
+                                               upstream work to the bottleneck before optimizing anything else."
+ "Investigate why this happened."              "Treat this event as one data point. Show the pattern over the last 90 days,
+                                               then propose the structure behind it."
+
+
+  Exercise. Name today's binding constraint in your system and the one you expect next. Then pick one actor
+  (human or agent) making a locally rational but globally bad decision. What information would change it?
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                         41
+   Go deeper
+    1. "Walk me through chapter 4 of Meadows' Thinking in Systems, 'Why Systems Surprise Us,' section by section,
+       with a software and a marketing example for each."
+    2. "Explain Goldratt's Theory of Constraints and the Five Focusing Steps using a content production pipeline as the
+       example."
+    3. "Explain Herbert Simon's bounded rationality and satisficing. How do they apply to LLM agents that decide from a
+       limited context window?"
+    4. "Apply Liebig's law of the minimum to a local lead-generation system for a home-services contractor. What are
+       the likely limiting inputs?"
+
+Sources. Meadows, Thinking in Systems, ch. 4, pp. 86–110. Simon, "Rational Choice and the Structure of the Environment," Psychological
+Review, 1956. Goldratt, What Is This Thing Called Theory of Constraints, 1990. Liebig's law of the minimum (first formulated by Carl
+Sprengel, popularized by Liebig).
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                    42
+10 Cybernetics: control and variety                                                                                        20 min
+
+You'll learn: the anatomy of a control loop, Ashby's law of requisite variety, the good regulator theorem, Beer's Viable
+System Model, and why the observer is part of the system.
+
+    FIRST PRINCIPLE
+    To keep something on course in a changing world, you need three things: a way to see where it is, a
+    model of how it responds, and enough different responses to match the different things that can go
+    wrong. Miss any one and control fails.
+
+   ANALOGY
+   A helmsman (the Greek root of "cybernetics") steering a ship. Wind, current and waves push it off course.
+   The helmsman watches the heading, compares it with the destination, and adjusts. A helmsman who can
+   only turn left can't hold a course.
+
+
+
+           Goal                     Compare:              Controller                Actuator
+        (setpoint)                    gap                 (decides)                  (acts)
+
+
+
+                                          feedback
+
+
+
+                                     Sensor                                          System                     Disturbances
+                                   (measures)                                      (the stock)
+                                                        measured state
+
+
+
+Figure 10.1 The control loop. A goal is compared with the measured state; the gap goes to a controller that decides; an actuator
+acts on the system; disturbances push the system around; a sensor measures the result and closes the loop.
+
+Requisite variety (Ashby's law)
+W. Ross Ashby, An Introduction to Cybernetics (1956): "only variety can destroy variety." Variety is the number
+of distinguishable states. In plain terms: a regulator can only hold outcomes steady if it has at least as many
+distinct responses as there are distinct disturbances it must counter. Every disturbance without a matching
+response shows up in the outcome. Stafford Beer later put it as "variety absorbs variety." Note that this is a
+necessary condition, not a sufficient one: having enough responses doesn't guarantee picking the right one.
+
+The good regulator theorem
+Conant and Ashby (1970): "Every good regulator of a system must be a model of that system." Model here
+means a mapping from the system's states to the regulator's, not a full replica. A careful reading: a good
+controller must contain, or have access to, a model of what it controls. An agent steering a client's ad account
+without a model of the account's structure, seasonality and conversion lag can't regulate it well, however clever
+it is.
+
+The Viable System Model
+Stafford Beer (Brain of the Firm, 1972; The Heart of Enterprise, 1979) asked what any organization needs to stay
+viable. His answer is five functions:
+
+
+
+Systems Thinking for Agentic Builders                                                                                          43
+       5 Policy / identity
+       What we are and won't do: Tamdoma's offer, ethics, client fit
+
+       4 Intelligence
+       Scan outside and future: new models, Google updates, market shifts
+
+       3 Control 3* audit)
+       Allocate today's resources, set rules; spot-check real output
+
+       2 Coordination
+       Stop units colliding: shared schedule, rate-limit budget, file ownership
+
+      1 Web builds                                   1 Marketing                                1 Automations
+      coding  QA agents                             content + ads agents                       AP, CRM, support flows
+
+    System 1 units are themselves viable systems: the same five functions repeat inside each (recursion).
+
+Figure 10.2 The Viable System Model, simplified and mapped onto an agency running agentic operations. System 1 units do the
+work; 2 coordinates them; 3 manages the present, with 3* auditing directly; 4 looks outward and ahead; 5 sets identity and
+policy. Each System 1 unit is itself a viable system.
+
+Two more ideas from Beer: recursion (the same five functions repeat at every level) and algedonic signals (pain
+and pleasure alarms that bypass normal reporting when something goes far outside bounds). Beer also applied
+the model at national scale in Chile's Project Cybersyn (1971–73), which linked state enterprises by telex until the
+1973 coup ended it.
+
+Observability and second-order cybernetics
+Observability means you can infer what's happening inside from what you can see outside. Logs, traces and
+structured outputs make an agent observable. Heinz von Foerster distinguished first-order cybernetics, "the
+cybernetics of observed systems," from second-order cybernetics, "the cybernetics of observing systems." The
+observer is part of the system. When you measure a team or an agent, the measurement changes what it does.
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+WEB DEVELOPMENT
+A deploy agent with one response for every failure
+
+  NAIVE                                                                     SYSTEMS
+  "Error: build failed." The only response available is                     Raise variety: distinguish failure types and give each a
+  retry, whatever went wrong.                                               response.
+                                                                              Disturbance           Response
+                                                                              Dependency            Pin version, rebuild
+                                                                              conflict
+                                                                              Type error            Back to coding agent with file
+                                                                                                    and line
+                                                                              Out of memory         Escalate, never retry
+                                                                              Missing env           Stop, name the key, ask
+                                                                              variable
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                  44
+MARKETING
+An SEO agent nobody can audit
+
+  NAIVE                                                                 SYSTEMS
+  Agent edits 300 service pages for a dental chain. A                   Make it observable.
+  month later 40 drop in rankings; there's no record of
+  what changed.                                                            Append one line per edit to /logs/seo-
+                                                                           changes.csv:
+                                                                           date, url, element, before, after, keyword,
+                                                                           reason.
+                                                                           Never edit a page twice within 14 days.
+
+
+
+
+MID-MARKET AUTOMATION
+Expense approvals that take six days
+
+  NAIVE                                                                 SYSTEMS
+  Approval agent routes requests with amount only.                      Give the controller (the manager) a model: budget
+  Managers can't decide without digging, so requests sit.               remaining and whether the vendor is already approved,
+                                                                        on the request itself. Most approvals become one click.
+
+
+ Instead of telling the agent...                   Say this
+ "Handle errors gracefully."                       "List the distinct failure types you can encounter. For each, define a specific
+                                                   response. Anything unrecognized is escalated, never silently retried."
+ "Manage this ad account."                         "Before acting, write down your model of the account: conversion lag,
+                                                   seasonality, budget constraints, what each campaign is for. Update it weekly
+                                                   and act from it."
+ "Let me know if something goes wrong."            "Define alarm thresholds that bypass the normal weekly report and notify me
+                                                   immediately."
+
+
+  Exercise. Pick one controller in your system (human or agent). List the disturbances it faces and its available
+  responses. Where is variety missing? Then check Beer's five functions: which one does your operation lack?
+
+
+   Go deeper
+    1. "Explain Ashby's law of requisite variety with examples from customer support, error handling and management.
+       How do you increase a controller's variety, or reduce the variety it has to absorb?"
+    2. "Explain the Conant–Ashby good regulator theorem in plain language and what it implies for AI agents that
+       manage live systems."
+    3. "Walk me through Stafford Beer's Viable System Model, systems 1 to 5, recursion and algedonic signals. Then
+       diagnose a 15-person digital agency with it."
+    4. "What is second-order cybernetics, and what does 'the observer is part of the system' mean for measuring agent
+       performance?"
+
+Sources. Wiener, Cybernetics, 1948. Ashby, An Introduction to Cybernetics, 1956, p. 207. Conant & Ashby, International Journal of Systems
+Science 1(2), 1970. Beer, Brain of the Firm (1972), The Heart of Enterprise (1979). Von Foerster, Cybernetics of Cybernetics, 1974.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                   45
+PA R T I V
+
+
+Diagnosis and intervention
+The recurring structures that cause most persistent problems, and
+where to push to change them. This is the part you'll come back to most.
+About 65 minutes.
+
+11. System traps and archetypes
+12. Leverage points
+
+
+
+
+ Systems Thinking for Agentic Builders                                     46
+11 System traps and archetypes                                                                                           40 min
+
+You'll learn: Meadows' eight system traps with their ways out, Senge's archetypes with their loop structures and
+warning signs, and how each appears in agentic work.
+
+    FIRST PRINCIPLE
+    A handful of loop structures cause most stubborn problems, in every kind of organization. Once you
+    can name the structure, you already know the typical way out. Diagnosis by pattern is faster and
+    more reliable than analysis from scratch.
+
+   ANALOGY
+   A chess player doesn't calculate every position from first principles. They recognize patterns ("this is a
+   fork," "this is a pin") and know the standard responses. Archetypes are the named patterns of systems.
+
+
+Where the names come from
+Senge's The Fifth Discipline (1990, appendix 2) introduced the term "systems archetypes" and listed ten. Daniel
+Kim's Systems Archetypes I (Pegasus, 1992) refined them, renaming some ("limits to success," "drifting goals").
+Meadows' chapter 5, "System Traps... and Opportunities," presents eight traps, each with "the way out." The
+lists overlap. This module uses both.
+
+Meadows' eight system traps
+ Trap                                   The trap                                       The way out (Meadows)
+ Policy resistance                      Several actors pull one stock toward           "Let go." Bring all actors together
+                                        different goals; each one's effort cancels     and redirect the energy spent on
+                                        the others'.                                   resistance toward goals everyone
+                                                                                       can share.
+ Tragedy of the commons                 Each user gains directly from a shared         Educate and exhort users; restore
+                                        resource but shares the cost of its abuse      the missing feedback by privatizing
+                                        with everyone, so the warning feedback is      the resource or regulating access.
+                                        weak.
+ Drift to low performance               Standards are set from past performance,       "Keep performance standards
+                                        especially if perceived negatively, so goals   absolute. Even better, let standards
+                                        and results erode together.                    be enhanced by the best actual
+                                                                                       performances."
+ Escalation                             Each party's stock is set by trying to         Best: avoid getting in. If in, refuse to
+                                        surpass the other's. Exponential race.         compete, or negotiate a new system
+                                                                                       with balancing loops.
+ Success to the successful              Winners get the means to win again; losers     Diversify so losers can play a
+                                        are eliminated.                                different game; limit what any winner
+                                                                                       can take; level the playing field.
+ Shifting the burden to the intervenor A fix relieves symptoms but not the             Best: avoid getting in. "Take the
+                                       problem, and the system's own ability to        focus off short-term relief and put it
+                                       cope withers. Dependence and addiction.         on long-term restructuring."
+ Rule beating                           Behavior that appears to obey the rules        Redesign rules so creativity goes
+                                        while defeating their purpose.                 toward the rule's purpose, not
+                                                                                       around it.
+
+
+
+Systems Thinking for Agentic Builders                                                                                             47
+ Seeking the wrong goal                      The system works obediently toward an          "Specify indicators and goals that
+                                             indicator that doesn't reflect what's actually reflect the real welfare of the
+                                             wanted.                                        system." Don't confuse effort with
+                                                                                            result.
+
+A related principle: Goodhart's law. Charles Goodhart's 1975 wording: "Any observed statistical regularity will
+tend to collapse once pressure is placed upon it for control purposes." Marilyn Strathern's popular 1997
+phrasing: "When a measure becomes a target, it ceases to be a good measure." Donald Campbell made a similar
+point about social indicators. For agents, this is reward hacking.
+
+        Lighthouse score (the target)                                      Real-user LCP, seconds (the purpose)
+  100                                                               4.0
+   90                                                               3.5
+   80                                                               3.0
+   70                                                               2.5
+                                                                                             metric gamed from here:
+   60                                                               2.0                      hero image lazy-loaded
+
+   50                                                                1.5
+          0         2        4       6        8      10      12             0      2       4       6        8      10     12
+                              agent iterations                                              agent iterations
+
+Figure 11.1 · Simulated. A coding agent told to reach a Lighthouse score of 95+. The score climbs steadily. Real-user load time
+improves at first, then worsens once the agent starts lazy-loading the hero image and deferring things users need. Seeking the
+wrong goal.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                             48
+The archetypes, one by one
+Each card shows the loop structure, the typical behavior over time (orange dashed is the troubling variable, blue
+solid the other), Senge's warning sign and management principle where verified, and how the pattern appears in
+each domain.
+Fixes that fail
+
+
+                                        Quick fix
+               −
+                          B             +
+       Problem
+       symptom                                                       A fix relieves the symptom (B) but, after a delay, its side
+                                                                     effect makes the problem worse (R). Warning: "It always
+                 +                 R                +                seemed to work before; why isn't it working now?"
+                                                                     Principle: "Maintain focus on the long term. Disregard short-
+                                            Side effect
+                                                                     term 'fix,' if feasible, or use it only to 'buy time' while
+                                                                     working on long-term remedy."
+
+ Web             Agent wraps a crash in try/catch that returns empty data. Error gone; corrupted records flow downstream
+                 and surface three steps later. Fix: validate at the entry boundary and fail fast.
+ Marketing Discount offers to rescue weak months train clinic patients to wait for discounts, weakening full-price months.
+ Ops             Manually re-sending failed invoice syncs each morning hides a mapping error that creates duplicate customer
+                 records.
+
+Shifting the burden (and to the intervenor)
+                                 Symptomatic
+                                     fix
+             −            B1
+                                        +                   +
+      Problem         −                             R
+                                                             Side
+      symptom                                               effect   A symptomatic fix (B1) works fast; the fundamental fix (B2)
+                                                                     works slowly. The symptomatic fix's side effect weakens the
+                        B2                                           capacity for the fundamental one (R). When the
+                                                                     symptomatic fix is an outside party, it's shifting the burden
+                                 Fundamental            −            to the intervenor. Warning: "Look here, this solution has
+                           +         fix                             worked so far! What do you mean, there's trouble down that
+                                                                     road?" Principle: "Focus on the fundamental solution. If
+                                                                     symptomatic solution is imperative (because of delays in
+                                                                     fundamental solution), use it to gain time while working on
+                                                                     the fundamental solution."
+
+ Web             You hand-fix the agent's output every time, so the prompt, tests and skills never improve. You are the
+                 intervenor.
+ Marketing Paid ads cover a client's weak organic presence. The SEO foundation never gets built, and the client can't
+           stop spending.
+ Ops             An ops manager spends 20 minutes each morning fixing CRM-sync errors. It never feels worth fixing properly,
+                 so the agent never learns.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                           49
+Limits to growth (Kim: limits to success)
+
+
+
+                 +                       −
+       Growth              Performance                Limiting
+        effort        R                      B         action      Effort drives performance in a reinforcing loop until a
+                              +                            +       balancing loop driven by some constraint slows it. Warning:
+                                                  +                "Why should we worry about problems we don't have?
+                                                                   We're growing tremendously." Later: "The harder we run,
+                                                  Constraint       the more we seem to stay in the same place." Principle:
+                                                                   "Don't push on the reinforcing (growth) process, remove (or
+                                                                   weaken) the source of limitation."
+
+ Web             Agent-generated pages scale until the human QA reviewer is the limit. More generation just lengthens the
+                 review queue.
+ Marketing Lead volume grows until the clinic can't answer calls fast enough; conversion falls as leads wait.
+ Ops             Automation volume grows until shared ERP API limits cap all flows.
+
+Eroding goals (Kim: drifting goals) · Meadows: drift to low performance
+                                  Goal
+
+                     B2
+                                   −
+                                                  +
+ Pressure to
+                                         +            Corrective
+ lower goal                       Gap                  action      A gap can close two ways: corrective action (B1, slow) or
+                              −                                    lowering the goal (B2, instant). Senge calls it "a shifting the
+                 +                           B1
+                                                                   burden type of structure in which the short-term solution
+                                                                   involves letting a long-term, fundamental goal decline."
+                            Actual state                           Warning: "It's okay if our performance standards slide a
+                                             +                     little, just until the crisis is over." Way out (Meadows): keep
+                                                                   standards absolute. Kim: goals anchored outside the system
+                                                                   drift less.
+
+ Web             Test coverage target quietly goes from 80% to 60% because the agent "can't reach it." Fix: the agent may
+                 never edit success criteria.
+ Marketing Brand guidelines loosen campaign by campaign as content volume rises.
+ Ops             Auto-match threshold for invoices lowered "temporarily" to reduce flags; error rate creeps up unnoticed.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                           50
+Escalation
+                                            −
+      A's actions                                B's result
+                                                relative to A
+        −
+                                   R                                Each party acts to improve its position relative to the other,
+                                                                    which threatens the other, which acts in turn. Warning: "If
+                                                        −           our opponent would only slow down, then we could stop
+       A's result                               B's actions
+      relative to B                                                 fighting this battle and get some other things done."
+                                                                    Principle: "Look for a way for both sides to 'win.'" Meadows
+                          −                                         adds that one party can break the spiral by refusing to
+                                                                    compete.
+
+ Web            Two agents editing the same config, each "fixing" the other's change, round after round.
+ Marketing Writer and critic agents: each round the critic finds more, the writer hedges more. A 120-word post becomes
+           400 words. Fix: fixed rubric, word cap, at most three issues per round.
+ Ops            Two competing contractors' bidding agents undercutting each other on every local job.
+
+Success to the successful
+
+
+     A's                                               B's
+   success                                           success
+  +                         +           −                       +
+                               Allocation
+                 R1           to A over B       R2                  Two activities share a limited resource. Whichever does well
+                                                                    gets more of it and does better still. Warning: "One of the
+                                                                    two interrelated activities, groups, or individuals is beginning
+  Resources       +                             −    Resources
+     to A                                               to B        to do very well and the other is struggling." Principle: "Look
+                                                                    for the overarching goal for balanced achievement of both
+                                                                    choices. In some cases, break or weaken the coupling
+                                                                    between the two."
+
+ Web            A router always sends tasks to whichever agent succeeded last, so the other never gets the practice or
+                feedback to improve.
+ Marketing Smart bidding pours budget into the campaign with most conversion history; new services never get enough
+           data to compete.
+ Ops            The best-documented department gets automated first, then gets more automation budget because it showed
+                ROI.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                             51
+Tragedy of the commons
+              +               Gain per
+                              activity
+  A's activity                                  +
+                                 B
+
+                         +    Total use                 Resource
+                                                    −     left        Each user's gain loop adds to total use of a shared resource;
+                                                                      once it's depleted, everyone's gain falls. Warning: "There
+                             +                                        used to be plenty for everyone. Now things are getting
+  B's activity                                                        tough." Principle: "Manage the 'commons,' either through
+                                                                      educating everyone and creating forms of self-regulation
+                                                                      and peer pressure, or through an official regulating
+                                                                      mechanism, ideally designed by participants." Kim: solutions
+                                                                      "never lie at the individual level."
+
+ Web              Parallel subagents each within limits, together exhausting the shared LLM rate limit.
+ Marketing Several client campaigns sending from the same domain degrade its sender reputation for all.
+ Ops              Invoicing, CRM, reporting, inventory and email automations all hit the ERP API at 9:00 and all fail. Fix: a shared
+                  scheduler with a quota per flow.
+
+Growth and underinvestment
+              +
+    Demand             B      Performance
+
+                                 −+                     −
+                                                      Perceived    Growth approaches a capacity limit. Investment depends on
+                                            B       need to invest measured performance, so falling performance justifies
+                                            +                      withholding the investment that would restore it. Warning:
+ Performance                                                       "Well, we used to be the best, and we'll be the best again,
+   standard                      Capacity                          but right now we have to conserve our resources and not
+                                             +                     over-invest." Principle: "If there is a genuine potential for
+                                                                   growth, build capacity in advance of demand, as a strategy
+                                                                   for creating demand. Hold the vision."
+
+ Web              Hosting stays on a cheap plan as traffic grows; slow pages lose traffic; lower traffic "proves" the upgrade isn't
+                  needed.
+ Marketing An agency doesn't invest in a reporting pipeline while busy; service quality slips; churn rises; "no budget" for
+           the pipeline.
+ Ops              Support automation never gets its knowledge base updated; answers worsen; adoption falls; leadership sees
+                  low adoption and cuts funding.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                  52
+Accidental adversaries
+                             A's action
+                      +      helping B
+
+                                                      +
+       A's                                            B's
+     success                       R                success         Described by Jennifer Kemeny (The Systems Thinker, 1994),
+                            the partnership                         first recognized between Procter & Gamble and Walmart.
+           +                                                        Partners help each other (R), but each one's fixes for its own
+                                                                    problems unintentionally obstruct the other, and the
+                             B's action       +                     partnership turns into a vicious cycle. Way out: examine the
+                             helping A                              shared structure together, understand each other's needs,
+                                                                    and coordinate action around the original purpose.
+
+ Web            Your dev team and the client's IT both "protect" the site: they add security plugins, you remove them for
+                speed.
+ Marketing Agency pushes lead volume; client's front desk filters harder to cope; agency sees fewer bookings and
+           pushes more volume.
+ Ops            Finance tightens approval rules to control spend; operations splits purchases to dodge rules; finance tightens
+                further.
+
+Rule beating and seeking the wrong goal (Meadows)
+
+
+
+
+Rule beating. Reported compliance rises while the purpose           Seeking the wrong goal. The metric climbs; the real
+of the rule is lost. Agent example: "every page must have an        outcome stalls or falls. Meadows: "If you define the goal of a
+FAQ section" yields boilerplate FAQs that hurt quality.             society as GNP, that society will do its best to produce
+                                                                    GNP."
+
+
+Archetype quick-check for any automation
+  Run monthly on every live automation:
+  - Is a human silently correcting its output?                     → shifting the burden
+  - Has any threshold or target been lowered?                      → eroding goals
+  - Does it share a resource with other flows?                     → tragedy of the commons
+  - Is it optimizing a metric rather than an outcome?              → seeking the wrong goal
+  - Does fixing one symptom create another downstream?             → fixes that fail
+  - Is growth stalling despite more effort?                        → limits to growth
+  - Are two agents or teams reacting to each other?                → escalation
+
+
+ Instead of telling the agent...                  Say this
+ "Make the error go away."                        "Do not mask errors downstream. Trace the bad data to where it enters the
+                                                  system and add strict validation there, failing fast with a clear message."
+ "Hit the target."                                "The target is a proxy for [real outcome]. Report both. Never improve the
+                                                  proxy in a way that harms the outcome, and never change the target."
+ "Use as much of the API as you need."            "You have a fixed share of the shared rate limit: N calls per minute. Stay under
+                                                  it even if other flows are idle."
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                            53
+  Exercise. Which three archetypes are active in your system right now? For each, sketch the loops with your own
+  variable names, and write the archetype's standard principle as an instruction for your setup.
+
+
+   Go deeper
+    1. "Go through each of Meadows' eight system traps from chapter 5 of Thinking in Systems. For each: the trap, the
+       way out, and an example from web development, marketing and back-office automation."
+    2. "Explain the difference between 'fixes that fail,' 'shifting the burden' and 'eroding goals.' They look similar. How
+       do I tell which one I'm in?"
+    3. "Give me ten Goodhart's law examples from marketing metrics and ten from software metrics, and how to design
+       measures that resist gaming."
+    4. "I'll describe a client's situation. Identify which archetypes are present, with evidence, and draw the causal loops
+       in text." (Then describe one.)
+
+Sources. Meadows, Thinking in Systems, ch. 5, pp. 111–141. Senge, The Fifth Discipline, ch. 6 and appendix 2. Kim, Systems Archetypes I
+(Pegasus, 1992) and "Archetypes at a Glance." Kemeny, "Accidental Adversaries," The Systems Thinker 5(1), 1994. Goodhart, 1975;
+Strathern, European Review 5(3), 1997; Campbell, 1979.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                     54
+12 Leverage points                                                                                                                  25 min
+
+You'll learn: Meadows' twelve places to intervene in a system, from weakest to strongest, why the strong ones are
+counterintuitive, and how to choose an intervention.
+
+      FIRST PRINCIPLE
+      Not all changes are equal. Some places in a system let a small push produce a large, lasting shift.
+      Others absorb enormous effort and change nothing. Meadows: "Leverage points frequently are not
+      intuitive."
+
+     ANALOGY
+     Steering a large ship. Pushing on the hull with your hands does nothing. Turning the trim tab, a small
+     surface on the rudder, turns the rudder, which turns the ship.
+
+Meadows' 1999 essay opens: "Folks who do systems analysis have a great belief in 'leverage points.'" She
+recounts Jay Forrester's observation: "People know intuitively where leverage points are... Everyone is trying
+very hard to push it IN THE WRONG DIRECTION!" She called her own list "tentative," noting that "its order is
+slithery."
+
+      1      Transcending paradigms                                                                       holding every model loosely
+
+      2      Paradigms                                                                               the beliefs behind the goals
+
+      3      Goals                                                                             what the system is for
+
+      4      Self-organisation                                                           can the system change its own structure
+
+      5      Rules                                                                 permissions, incentives, constraints
+
+      6      Information flows                                                 who sees which data, when
+
+      7      Reinforcing loops                                           what compounds: rules file, referrals
+
+      8      Balancing loops                                       quality gates, circuit breakers
+
+      9      Delays                                           how fast results come back
+
+      10     Stock-flow structure                        which agents exist, pipeline layout
+
+      11     Buffers                                queue size, cash reserve
+
+      12     Parameters                        max retries, budgets, temperature
+
+  ↑ more leverage, more resistance to change
+
+Figure 12.1 The twelve leverage points, weakest (12) at the bottom to strongest (1) at the top, with agentic-system equivalents.
+The higher you go, the more powerful the intervention and the more the system resists it.
+
+The twelve, in Meadows' words, with agentic equivalents
+ #         Meadows (1999 essay)                       What it means for agentic systems
+ 12        Constants, parameters, numbers             Temperature, max retries, budgets, thresholds. "Probably 90, no 95, no
+                                                      99 percent of our attention goes to parameters, but there's not a lot of
+                                                      leverage in them."
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                   55
+ 11    The sizes of buffers and other stabilizing         Queue size, cash reserve, content backlog. Stabilizing, but often
+       stocks, relative to their flows                    physically hard to change.
+ 10    The structure of material stocks and flows         Which agents exist and how work passes between them. Powerful but
+                                                          slow and expensive to rebuild.
+ 9     The lengths of delays, relative to the rate        How fast results return to the decision maker. Often it's easier to slow
+       of system change                                   the rate of change than shorten the delay.
+ 8     The strength of negative (balancing)               Quality gates, circuit breakers, review steps. They must scale with the
+       feedback loops, relative to the impacts            disturbances they handle.
+       they correct against
+ 7     The gain around driving positive                   What's allowed to compound. Slowing a runaway loop is usually more
+       (reinforcing) feedback loops                       powerful than strengthening a balancing one.
+ 6     The structure of information flows (who            Adding a missing feedback signal. Cheap and often transformative.
+       does and does not have access to
+       information)
+ 5     The rules of the system (incentives,               Permissions, what agents may and may not change, what gets
+       punishments, constraints)                          rewarded.
+ 4     The power to add, change, evolve, or self-         Letting the system propose new rules, skills and structures.
+       organize system structure
+ 3     The goals of the system                            What the whole workflow is for. Change it and everything below
+                                                          reorganizes.
+ 2     The mindset or paradigm out of which the           The beliefs behind the goals, such as "agents replace staff" versus
+       system arises                                      "agents extend staff."
+ 1     The power to transcend paradigms                   Holding every model loosely, including this one.
+
+Her most famous information-flow example (point 6): identical houses where some had the electricity meter in
+the basement and others in the front hall. Consumption was about 30 percent lower in the front-hall houses (the
+book's version, set near Amsterdam, says one-third). Nothing changed except who could see the information.
+She also notes that after the US Toxic Release Inventory made emissions public, they fell about 40 percent.
+
+SAME PROBLEM, THREE LEVELS OF INTERVENTION
+WEB DEVELOPMENT
+Code passes tests but doesn't match what the client wanted
+ Level                            Intervention
+ 12 Parameter                     Raise max iterations from 3 to 8.
+ 6 Information flow               Give the agent the client's annotated Figma file and original brief, not just the ticket.
+ 3 Goal                           Redefine done from "tests pass" to "client acceptance criteria met," with criteria written before
+                                  coding starts.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                 56
+MARKETING
+Cold email with a 0.4% reply rate
+ Level                            Intervention
+ 12 Parameter                     Test subject lines; move from 0.4% to 0.5%.
+ 5 Rule                           Email only contacts with a trigger event in the last 30 days (a new clinic opening, a new
+                                  location). Fewer emails, higher replies, less domain damage.
+ 3 Goal                           Change the goal from "emails sent" to "qualified conversations per week," which reorganizes
+                                  targeting, copy and follow-up.
+
+MID-MARKET AUTOMATION
+An AP automation with a high exception rate
+ Level                            Intervention
+ 12 Parameter                     Lower the match-confidence threshold (and risk eroding goals).
+ 6 Information flow               Give the agent goods-received notes and live supplier master data.
+ 4 Self-organization              Corrections become proposed rules that a controller approves, so the system improves itself.
+
+ Instead of telling the agent...                    Say this
+ "Try tweaking the settings."                       "List interventions at five different leverage points for this problem, from
+                                                    parameter to goal. For each, the expected effect, cost and risk. Recommend
+                                                    the highest-leverage one that's feasible."
+ "Improve accuracy."                                "Before changing any parameter, check whether the agent is missing
+                                                    information that a human would use to decide. Report what's missing."
+
+
+  Exercise. Take the last three changes you made to your system. Place each on the ladder. For the lowest one,
+  write an alternative intervention at least four levels higher.
+
+
+   Go deeper
+    1. "Walk me through Meadows' essay 'Leverage Points: Places to Intervene in a System,' one point at a time, with
+       her examples and a modern agency example for each."
+    2. "Why do people intervene at low leverage points even when higher ones exist? Explain the psychology and
+       politics."
+    3. "Here's a problem. List interventions at five leverage points, weakest to strongest, with the risk of each." (Then
+       describe it.)
+    4. "How do paradigms change, according to Meadows? Give examples of companies that changed a paradigm
+       rather than a process."
+
+Sources. Meadows, "Leverage Points: Places to Intervene in a System," Sustainability Institute, 1999 (donellameadows.org); earlier version
+"Places to Intervene in a System," Whole Earth, 1997. Meadows, Thinking in Systems, ch. 6, pp. 145–165, and the interlude "Electric Meters in
+Dutch Houses."
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                     57
+ PA R T V
+
+
+ Practice
+ Method: how to map a system on paper, how to check your own
+ thinking, and one system worked end to end. About 45 minutes.
+
+13. Mapping tools
+14. Mental models and learning
+15. Capstone and guidelines for living with systems
+
+
+
+
+ Systems Thinking for Agentic Builders                           58
+13 Mapping tools                                                                                                            20 min
+
+You'll learn: the iceberg and levels of perspective, rules for drawing causal loop diagrams that hold up, when to use
+stock-and-flow maps instead, and Sterman's modeling process.
+
+    FIRST PRINCIPLE
+    Thinking you can't see is thinking you can't check. Drawing a system forces every assumption onto
+    paper, where you, a colleague or an agent can question it.
+
+The iceberg and levels of perspective
+Senge distinguishes three levels of explanation: events, patterns of behavior, and systemic structure. Structural
+explanations are "the least common and most powerful." Many writers add mental models as a fourth level and
+draw it as an iceberg; versions with three to six levels exist, and the original author of the iceberg image is
+uncertain. Daniel Kim's related framework links each level to a mode of action: events (reactive), patterns
+(adaptive), structures (creative), mental models (reflective), vision (generative).
+
+                                                                 EVENTS
+                                                                                                        Reactive
+                                                             What happened?
+                                                      "The contact form broke again"
+                  waterline
+
+                                                               PATTERNS
+                                                                                                        Adaptive
+                                                          What keeps happening?
+                                                      Breaks after every plugin update
+
+
+                                                             STRUCTURES
+                                                                                                        Creative
+                                                         What causes the pattern?
+                                                  Auto-updates on production, no test step
+
+
+                                                           MENTAL MODELS
+                                                                                                        Reflective
+                                                     What beliefs keep the structure?
+                                                  "Updates are maintenance, not deploys"
+
+
+                                                                                                  leverage grows downward
+
+
+Figure 13.1 The iceberg applied to a recurring website failure, with Kim's mode of action for each level. Leverage grows with
+depth.
+
+Kim's guiding questions, from events down: What specific events characterize the current reality? Are they part
+of a pattern over time? What systemic structures are responsible for the pattern? What mental models led us to
+put those structures in place?
+
+Drawing causal loop diagrams that hold up
+Combined from Sterman's "Fine-Tuning Your Causal Loop Diagrams" and Kim's "Guidelines for Drawing Causal
+Loop Diagrams":
+1. Use nouns for variables ("Backlog," not "Increasing backlog"), and choose quantities that can go up or down.
+2. Prefer the positive sense of a variable ("Quality," not "Defects," where possible).
+3. Avoid ambiguous links. If a link's polarity is unclear, there are probably two pathways; draw them separately.
+4. Make the goals of balancing loops explicit, and ask how goals are set and whether they drift.
+5. Show causation, not correlation.
+6. Mark important delays on the arrow (two short lines or the word "delay").
+7. Distinguish actual from perceived states. Perception lags and biases.
+
+
+Systems Thinking for Agentic Builders                                                                                           59
+ 8. Include unintended consequences and long-term effects, not just the intended ones.
+ 9. Name and number loops (R1, B2) with short descriptive names.
+10. Build in stages: small diagrams first, then combine summarized versions.
+11. Check every loop's label by telling its story around the circle.
+
+When to use which map
+ Tool                               Best for                                          Limits
+ Behavior-over-time graph           Defining the problem as a pattern; the            Shows what, not why
+                                    reference mode
+ Causal loop diagram                Communicating feedback structure quickly;         Hides stocks and accumulation, which is
+                                    spotting archetypes                               where intuition fails most
+ Stock-and-flow map                 Anything with backlogs, queues, inventories or    More effort to draw
+                                    budgets; the basis for simulation
+ Simulation model                   Testing policies before using them for real       Only as good as its assumptions
+
+
+Sterman's modeling process
+ 1. Problem articulation: what's the problem, which variables matter, what time horizon, and the reference
+    mode.
+ 2. Dynamic hypothesis: an explanation in terms of the system's own feedback structure, mapped with loops
+    and stocks.
+ 3. Formulation: turn the map into a model with explicit rules and parameters.
+ 4. Testing: compare with the reference mode; test extreme conditions.
+ 5. Policy design and evaluation: try interventions, test their robustness and how they interact.
+He presents it as iterative: each step can send you back to an earlier one.
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+WEB DEVELOPMENT
+Planning a site migration
+
+  NAIVE                                                                SYSTEMS
+  A task list: export, transform, import, redirect, launch.            Add a stock-and-flow map: URLs migrated vs URLs
+                                                                       with working redirects vs pages indexed. Rankings
+                                                                       depend on the gap between the second and third
+                                                                       stocks during the weeks Google recrawls (a delay).
+
+
+MARKETING
+Referral program for an aesthetics clinic
+
+  NAIVE                                                                SYSTEMS
+  One loop: happy patients bring referrals, referrals bring            Add the balancing loops: more patients increase wait
+  patients.                                                            times, which lower satisfaction and referrals. An agent
+                                                                       tasked with growing referrals needs clinic capacity in
+                                                                       its model, or it will drive demand into a wall.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                            60
+MID-MARKET AUTOMATION
+Before building any new automation
+  Before designing, map this as a system:
+  1. Elements, stocks and flows; draw the boundary and list what's outside.
+  2. All feedback loops, labeled R or B, with delays marked.
+  3. Which archetypes could appear after six months of running.
+  4. Second-order effects: who changes behavior once this exists?
+  5. Interventions ranked by leverage point, highest first.
+  Output a causal loop diagram in text plus a one-page summary.
+
+
+
+  Exercise. Draw a causal loop diagram of your system with 6 to 10 variables using the rules above. Label every link
+  and loop. Then list one stock your diagram hides, and sketch it as a stock and flow.
+
+
+   Go deeper
+    1. "Teach me to draw causal loop diagrams using Sterman's and Daniel Kim's guidelines. Give me practice stories
+       and critique my diagrams against each rule."
+    2. "What's the difference between causal loop diagrams and stock-and-flow diagrams? Show the same system both
+       ways."
+    3. "Walk me through Sterman's five-step modeling process for the problem of rising customer churn at a SaaS
+       company."
+    4. "What free or low-cost tools exist for drawing and simulating system dynamics models, and what is each good
+       for?"
+
+Sources. Senge, The Fifth Discipline, ch. 3. Goodman, "Systems Thinking: What, Why, When, Where, and How?" The Systems Thinker. Kim,
+"Vision Deployment Matrix," The Systems Thinker 6(1), 1995; "Guidelines for Drawing Causal Loop Diagrams," Pegasus. Sterman, Business
+Dynamics, ch. 3 and 5; "Fine-Tuning Your Causal Loop Diagrams," 2001.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                               61
+14 Mental models and learning                                                                                             10 min
+
+You'll learn: Senge's five disciplines and seven learning disabilities, and the ladder of inference: tools for checking the
+model in your own head.
+
+    FIRST PRINCIPLE
+    Every structure was built by someone acting on a mental model. If the model is wrong, the structures
+    it produces will keep producing the same problems. The deepest leverage is often in your own
+    assumptions, and yours are the hardest to see.
+
+The five disciplines
+ Discipline                       In Senge's terms
+ Personal mastery                 Continually clarifying personal vision and "seeing reality objectively."
+ Mental models                    "Deeply ingrained assumptions, generalizations, or even pictures or images that influence how
+                                  we understand the world and how we take action."
+ Shared vision                    Shared pictures of the future that build genuine commitment rather than compliance.
+ Team learning                    Starts with dialogue: suspending assumptions and thinking together.
+ Systems thinking                 The fifth discipline, which integrates the other four.
+
+
+The seven learning disabilities
+"I am my position." "The enemy is out there." The illusion of taking charge. The fixation on events. The parable
+of the boiled frog. The delusion of learning from experience (we rarely see the consequences of our most
+important decisions directly). The myth of the management team. Each of these has an agentic twin: an agent
+only sees its task ("I am my position"), blames the input ("the enemy is out there"), and reacts to the current
+error ("fixation on events").
+
+The ladder of inference
+Credited to Chris Argyris and presented by Rick Ross in The Fifth Discipline Fieldbook (1994). We climb from
+observable data to action in steps, usually in seconds and without noticing. Our beliefs then filter which data we
+select next time.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                             62
+                                Actions I take       Pause all new ads, keep old ones
+
+
+                                Beliefs I adopt      "Never trust new creatives"
+
+
+                             Conclusions I draw      "The agency's creative team is weak"
+
+
+                             Assumptions I make      "Creative fatigue is always the cause"
+
+
+                               Meanings I add        "The new creative is failing"
+
+
+                                 Data I select       I look only at Meta, not Google
+
+
+                               Observable data       CPL rose from €38 to €52 this week
+                                                                                                             beliefs filter
+                                                                                                           which data you
+                                                                                                           select next time
+
+Figure 14.1 A marketing manager climbs from one week's cost-per-lead data to pausing every new ad, with each step adding
+interpretation. The reflexive loop on the right is why the error repeats.
+
+Three practices from the Fieldbook: reflection (notice your own reasoning), advocacy (make your reasoning
+visible), and inquiry (ask about others' reasoning: "What's the observable data behind that?"). Senge's 1990
+book adds the left-hand column exercise: write what was said on the right and what you were thinking but
+didn't say on the left.
+
+NAIVE VS SYSTEMS, ACROSS THE THREE DOMAINS
+WEB DEVELOPMENT
+"The client keeps changing requirements"
+
+  NAIVE                                                                  SYSTEMS
+  Conclusion: the client is difficult. Action: stricter                  Down the ladder: the data is three revisions to page
+  change-request fees.                                                   layout after seeing the build. The structure is that the
+                                                                         client first sees anything real at the build stage. Earlier
+                                                                         clickable previews change the pattern.
+
+
+MARKETING
+Agent reports and your own leaps
+
+  NAIVE                                                                  SYSTEMS
+  A reporting agent says "CPL up 37%." You conclude                      Ask the agent to show its ladder: raw numbers, time
+  the creative failed and pause it.                                      window, what was excluded, which assumptions it
+                                                                         made.
+
+
+MID-MARKET AUTOMATION
+"Staff won't adopt the automation"
+
+  NAIVE                                                                  SYSTEMS
+  Belief: they resist change. Action: mandate use.                       Inquire: staff were burned twice by wrong outputs with
+                                                                         no way to flag them. Add a one-click "this is wrong"
+                                                                         signal that feeds the rules file. Trust becomes a stock
+                                                                         you can rebuild.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                  63
+ Instead of telling the agent...                    Say this
+ "What's the conclusion?"                           "Show your ladder: the raw data, what you selected and excluded, the
+                                                    assumptions you made, then the conclusion. Flag the weakest step."
+ "Review my plan."                                  "List the assumptions this plan depends on. For each, what evidence
+                                                    supports it and what would prove it wrong?"
+
+
+   Go deeper
+    1. "Explain Senge's five disciplines and seven learning disabilities with examples from a small agency using AI
+       agents."
+    2. "Teach me the ladder of inference, the left-hand column and balancing advocacy with inquiry. Give me a practice
+       scenario with a client."
+    3. "Help me surface the mental models behind how I price agentic projects. Ask questions that reveal assumptions I
+       haven't examined."
+
+Sources. Senge, The Fifth Discipline, ch. 1, 2 and 10. Senge, Kleiner, Roberts, Ross & Smith, The Fifth Discipline Fieldbook, 1994 (Ross on the
+ladder of inference). Argyris & Schön on espoused theory vs theory-in-use.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                       64
+15 Capstone and guidelines for living with systems                                                                             15 min
+
+You'll learn: how all the pieces combine on one real system, and Meadows' fifteen guidelines for working with
+systems you can't fully control.
+
+One system, end to end: AP automation at a 200-person distributor
+The situation: an accounts-payable agent matches supplier invoices to purchase orders. Six months in, 30% of
+invoices are flagged for review, payments are late, and the finance team says the agent "doesn't work."
+
+                                               +                      +
+              Invoices                                 Auto-matched                        Matching
+               arriving                                  invoices                           rules      +
+
+                                                                                                                Corrections
+                                                                                              R1                  saved
+                                                   +
+                                                               −                            learning              +
+                                               −
+           Supplier data                                Flagged for                         Review
+             quality                                       review                          workload
+                                                                                    +
+              −
+                                        R2
+                                    distrust
+                                                               −                                              +Late payments
+             Manual                                     Team trust
+           workarounds                                   in agent
+                               −
+Figure 15.1 Causal loop diagram of the AP system. R1 (learning): review workload generates corrections, which become matching
+rules, which raise auto-matching and cut flags. R2 (distrust): flags lower team trust after a delay, which leads to manual
+workarounds, which degrade supplier data, which raise flags further. Late payments follow review workload with a delay.
+
+ Step                               Applied
+ 1 Behavior over time               Flag rate fell from 40% to 25% in the first two months, then rose to 30% and stuck. Late
+                                    payments followed with a lag of about three weeks.
+ 2 Stocks and flows                 Flagged invoices awaiting review (stock): inflow from mismatches, outflow from reviewer
+                                    capacity. Supplier data quality is a slow-moving stock too.
+ 3 Loops                            R1 learning loop is weak: corrections are made in the ERP, not captured as rules. R2 distrust
+                                    loop is strong and gaining: dominance has shifted.
+ 4 Delays                           Trust reacts weeks after errors. Late-payment complaints reach finance a month later.
+ 5 Binding limit                    Reviewer capacity, then supplier master data.
+ 6 Traps                            Shifting the burden (staff absorb errors manually), eroding goals risk (pressure to lower the
+                                    match threshold), fixes that fail (workarounds that corrupt data).
+ 7 Leverage                         Information flow (give the agent goods-received notes); self-organization (capture each
+                                    correction as a proposed rule); rule (no manual changes to supplier data outside one owner);
+                                    goal (measure "invoices paid on time and correctly," not "auto-match rate").
+
+Notice that none of the high-leverage moves involve a better extraction model.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                               65
+WEB DEVELOPMENT · SHORT VERSION                                    MARKETING · SHORT VERSION
+A 300-site maintenance retainer where breakages keep               A home-services contractor whose leads plateaued.
+rising. Behavior: slow growth. Stock: unpatched                    Behavior: S-curve. Limit: speed to answer calls, not ad
+vulnerabilities and untested plugin updates. Loop: auto-           budget. Trap: success to the successful (budget flows to
+updates on production cause breakages, emergency fixes             the one service with history). Leverage: information
+skip testing, which causes more breakages (fixes that fail).       (missed-call data fed to the ad agent) and goal (optimize
+Leverage: rule (no update reaches production without               for booked jobs, not form fills).
+staging tests) and information (a visual regression report
+per site).
+
+
+
+Meadows' guidelines for living in a world of systems
+The last chapter of Thinking in Systems gives fifteen guidelines. They read like advice for a life, and they are
+also an excellent operating manual for running agentic systems.
+ #     Guideline                                              For agentic work
+ 1     Get the beat of the system                             Watch it run before changing anything. "Before you disturb the
+                                                              system in any way, watch how it behaves."
+ 2     Expose your mental models to the light of day          Write your assumptions into the spec where an agent and a
+                                                              colleague can challenge them.
+ 3     Honor, respect, and distribute information             Most failures are missing information flows. Fix those first.
+ 4     Use language with care and enrich it with systems Stocks, loops, delays, limits: precise words make precise
+       concepts                                          prompts.
+ 5     Pay attention to what is important, not just what is   Client trust and team morale are stocks even if no dashboard
+       quantifiable                                           shows them.
+ 6     Make feedback policies for feedback systems            Rules that adjust to conditions ("move budget at most 20% per
+                                                              week") beat fixed instructions.
+ 7     Go for the good of the whole                           Optimize the workflow's outcome, not each agent's local metric.
+ 8     Listen to the wisdom of the system                     Support what already works in a client's operation before
+                                                              replacing it.
+ 9     Locate responsibility in the system                    Design so the actor who causes a problem feels its feedback.
+ 10    Stay humble, stay a learner                            "The thing to do, when you don't know, is not to bluff and not to
+                                                              freeze, but to learn."
+ 11    Celebrate complexity                                   Don't force a messy business into a clean diagram that hides
+                                                              what matters.
+ 12    Expand time horizons                                   Ask what this automation does to the system in a year, not just
+                                                              this sprint.
+ 13    Defy the disciplines                                   The answer to a marketing problem may be in operations, and
+                                                              the reverse.
+ 14    Expand the boundary of caring                          Include end customers, staff and suppliers in what the system is
+                                                              for.
+ 15    Don't erode the goal of goodness                       Keep standards absolute, for the work and for how it treats
+                                                              people.
+
+Meadows also wrote a separate essay, "Dancing with Systems," with a similar but not identical list of fourteen.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                             66
+  Final exercise. Run the seven-step capstone table on your chosen system. Then write the single-page brief you
+  would hand an agent to redesign it, using the directive library in Appendix C.
+
+
+   Go deeper
+    1. "Act as a systems thinking coach. I'll describe one of my client systems. Take me through behavior over time,
+       stocks and flows, loops, delays, limits, traps and leverage, one step at a time, asking me questions rather than
+       answering for me."
+    2. "Explain each of Meadows' fifteen guidelines from chapter 7 of Thinking in Systems with an example from
+       running an agency that uses AI agents."
+    3. "Design a 30-day practice plan for building systems thinking as a habit, using my own projects as material."
+
+Sources. Meadows, Thinking in Systems, ch. 7, pp. 166 onward ("learn" quotation p. 180); "Dancing with Systems," donellameadows.org.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                                  67
+Appendix A · Glossary
+ Term                                   Meaning                                                                             Mod.
+ Algedonic signal                       An alarm or reward signal that bypasses normal reporting when performance           10
+                                        goes far outside bounds (Beer).
+ Archetype                              A recurring loop structure that produces a recognizable pattern of behavior.        11
+ Balancing loop (B)                     Feedback that opposes change and pulls a stock toward a goal.                       04
+ Boundary                               The line, chosen for a purpose, between what you model as the system and its 02
+                                        environment.
+ Bounded rationality                    Reasonable decisions made on incomplete, delayed information (Simon).               09
+ Buffer                                 A stock that lets inflow and outflow differ for a while.                            03
+ Bullwhip effect                        Amplification of order swings at each stage up a supply chain.                      06
+ Causal loop diagram                    Map of variables connected by arrows with + or − polarity, with loops labeled       04, 13
+                                        R or B.
+ Constraint                             The single factor currently limiting a system's output (Goldratt; Liebig's law of   09
+                                        the minimum).
+ Coupling                               How tightly parts depend on each other; tight coupling lets failures cascade        08
+                                        (Perrow).
+ Delay                                  Time between a cause and its visible effect. Material or information; pipeline,     06
+                                        first-order or higher-order.
+ Dynamic equilibrium                    Inflow equals outflow, so a stock holds steady while material keeps moving          03
+                                        through it.
+ Element                                A part of a system.                                                                 02
+ Emergence                              Behavior of the whole that no part has alone.                                       08
+ Feedback loop                          A closed chain of causes from a stock, through decisions or rules, back to a        04
+                                        flow that changes the stock.
+ Flow                                   A rate of change of a stock per unit of time.                                       03
+ Good regulator theorem                 Every good regulator of a system must be a model of that system (Conant and         10
+                                        Ashby).
+ Goodhart's law                         A measure used as a target loses its value as a measure.                            11
+ Hierarchy                              Systems nested within systems; reduces what each part must track (Simon,            08
+                                        Meadows).
+ Iceberg model                          Events, patterns, structures and mental models as deepening levels of               13
+                                        explanation.
+ Interconnection                        A relationship that links elements: a physical flow, a rule, an information signal. 02
+ Ladder of inference                    The steps from observed data to action, through selection, meaning,                 14
+                                        assumptions, conclusions and beliefs (Argyris).
+ Leverage point                         A place where a small change produces a large, lasting effect (Meadows'             12
+                                        twelve).
+ Loop dominance                         Which loop currently drives behavior; it can shift over time.                       05, 07
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                              68
+ Mental model                           The assumptions and beliefs through which people interpret the world and        14
+                                        act.
+ Nonlinearity                           Effects not proportional to causes; thresholds, saturation, tipping points.     08
+ Observability                          The ability to infer a system's internal state from its outputs.                10
+ Oscillation                            Repeated swings around a goal, typically from a balancing loop with delay.      06
+ Policy resistance                      Interventions defeated by the system's response to them (Sterman); actors       11
+                                        pulling one stock toward different goals (Meadows).
+ POSIWID                                The purpose of a system is what it does (Beer).                                 02
+ Purpose (function)                     What a system actually produces, read from its behavior.                        02
+ Reference mode                         A graph of the problem's behavior over time, past and possible future           07
+                                        (Sterman).
+ Reinforcing loop (R)                   Feedback that amplifies change in whatever direction it starts.                 04
+ Requisite variety                      Only variety can destroy variety: a controller needs as many responses as the   10
+                                        disturbances it must counter (Ashby).
+ Resilience                             A system's ability to survive and persist in a variable environment.            08
+ Satisficing                            Seeking an option that is good enough rather than optimal (Simon).              09
+ Self-organization                      A system's capacity to create new structure and make itself more complex.       08
+ Setpoint, sensor, gap, correction The parts of a balancing loop.                                                       04
+ Stock                                  An accumulation you can count at a moment in time; the memory of past           03
+                                        flows.
+ Suboptimization                        A subsystem's goals dominating at the expense of the whole.                     08
+ Supply line                            Actions already taken whose effects haven't arrived yet, such as orders in      06
+                                        transit.
+ Viable System Model                    Beer's five functions every viable organization needs: operations,              10
+                                        coordination, control, intelligence, policy.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                        69
+Appendix B · Problem-approach checklist
+The expanded version of the one-page core. Walk through it before designing a solution, or hand it to an agent
+as a planning step and review its answers.
+
+1 Purpose and behavior                                     6 Limits
+    What outcome do I actually want, and how will I           What's the binding constraint now? What binds
+    know?                                                     next?
+    What does the current system produce over time?           What does growth consume, and does it
+    Draw the reference mode.                                  regenerate?
+    Is this the problem or a symptom (event, pattern,
+    structure, mental model)?                              7 Robustness
+                                                              Where is coupling tightest? What cascades if it
+2 Boundary                                                    fails?
+    What's inside, and what's outside but still affects       Is the hierarchy passing up summaries or floods?
+    the result?                                               Do controllers have enough variety, and a model of
+    Who touches it, and whose goals conflict with             what they control?
+    mine?
+                                                           8 Traps
+3 Stocks and flows                                            Which of the eight traps or ten archetypes could
+    What accumulates? What fills and drains it?               appear within six months?
+    Am I working the inflow or the outflow, and which is      Can anything edit its own success criteria?
+    cheaper?
+                                                           9 Leverage
+    Which buffers exist, and are they too small or too
+    large?                                                    Am I adjusting a parameter when information, rules
+                                                              or goals would do more?
+4 Feedback                                                    What's the highest feasible leverage point?
+    Which loops compound? Which seek goals?
+                                                           10 Consequences and evolution
+    For each balancing loop: goal, sensor, correction.
+    Does the sensor measure the real goal?                    And then what? Ask it twice. Who changes
+    Which loop dominates now, and when might that             behavior once this exists?
+    shift?                                                    How does this system learn? Where are corrections
+                                                              captured?
+5 Delays                                                      When will I review the design?
+    What are the material, information and decision
+    delays? Triple my guess.
+    Is anyone correcting faster than feedback arrives?
+    Is the supply line counted?
+
+
+
+
+Systems Thinking for Agentic Builders                                                                            70
+Appendix C · Agent directive library
+Vague requests on the left, precise systems directives on the right, grouped by concept. Copy them into
+prompts, specs and skill files.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                     71
+ Instead of...                          Say this
+ "Fix this bug."                        "Explain the structure that produced this bug and whether it will produce
+                                        others. Fix the structure if in scope; otherwise fix the instance and report the
+                                        structure."
+ "What's the goal here?"                "Describe what this workflow actually produced in the last 30 days, compare
+                                        it with the stated goal, and explain the difference."
+ "Clear the backlog."                   "Report inflow and outflow per day for four weeks and the top inflow sources.
+                                        Is cutting inflow or raising outflow cheaper?"
+ "Cache this."                          "Use a bounded cache with a max size and a TTL. State the eviction rule."
+ "Process these in the background."     "Bounded queue in front of a worker pool with a concurrency limit,
+                                        backpressure when full, and a dead-letter queue for jobs that fail three
+                                        times."
+ "Don't crash on big files."            "Stream or paginate so memory stays flat regardless of input size."
+ "Review and fix your work."            "Balancing loop: goal [checklist]; sensor: pass/fail per item with evidence;
+                                        correct failed items only; stop at all-pass or 3 iterations; never change the
+                                        checklist."
+ "Make API calls reliable."             "Exponential backoff with jitter, hard timeout, max retries, and idempotent
+                                        requests so retries can't duplicate effects."
+ "Check when the file changes."         "Use an event watcher with a debounce so rapid changes trigger one run."
+ "Keep X at the target."                "Estimate what drains X each period and size corrections to cover the drain
+                                        plus the gap."
+ "Scale what's working."                "Name the resource this growth consumes, whether and how fast it
+                                        regenerates, and propose a pace below that rate."
+ "React quickly."                       "Decide no more often than the delay between action and measurable effect;
+                                        correct only part of the gap each cycle."
+ "Order enough to cover demand."        "Count everything already ordered but not received before ordering more."
+ "Why did this metric drop?"            "Plot it for 12 months, name the shape, propose the loop structure that would
+                                        produce it, then suggest causes."
+ "Make it scalable."                    "Find tight couplings, add buffers between parts that can fail independently,
+                                        and isolate heavy jobs in their own capacity pool (bulkheads)."
+ "Send me everything."                  "Return a summary: status, key numbers, decisions needed, risks. Full output
+                                        to files."
+ "Speed this up."                       "Measure each stage's capacity, identify the bottleneck, pace upstream to it,
+                                        then propose how to raise it."
+ "Handle errors gracefully."            "List distinct failure types with a specific response for each. Escalate
+                                        anything unrecognized; never silently retry it."
+ "Manage this account."                 "Write your model of the system first (lags, seasonality, constraints, purpose
+                                        of each part), update it weekly, act from it."
+ "Make the error go away."              "Don't mask errors downstream. Validate where data enters and fail fast."
+ "Hit the target."                      "The target is a proxy for [outcome]. Report both. Never improve the proxy at
+                                        the outcome's expense, and never change the target."
+ "Use the API as needed."               "You have a fixed share of the shared limit. Stay within it even when others
+                                        are idle."
+
+
+
+Systems Thinking for Agentic Builders                                                                                      72
+ "Try different settings."              "List interventions at five leverage points, parameter to goal, with effect, cost
+                                        and risk. Recommend the highest feasible one."
+ "What's your conclusion?"              "Show your ladder: raw data, what you selected and excluded, assumptions,
+                                        conclusion. Flag the weakest step."
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                       73
+Appendix D · Sources and reading path
+Read in this order
+1. Donella H. Meadows, Thinking in Systems: A Primer (Chelsea Green, 2008). The best single introduction.
+   Short and readable.
+2. Donella H. Meadows, "Leverage Points: Places to Intervene in a System" (1999). Free at
+   donellameadows.org. Read it twice.
+3. Peter M. Senge, The Fifth Discipline (1990; revised 2006). Archetypes, mental models, the Beer Game,
+   learning organizations.
+4. Daniel H. Kim, Systems Archetypes I and the pocket guides at thesystemsthinker.com. Practical diagram
+   guides.
+5. Eliyahu M. Goldratt and Jeff Cox, The Goal (1984). Theory of Constraints as a novel.
+6. John D. Sterman, Business Dynamics (2000). The technical depth: modeling, delays, simulation.
+7. Stafford Beer, Brain of the Firm (1972). The Viable System Model.
+8. W. Ross Ashby, An Introduction to Cybernetics (1956). Variety and regulation.
+9. Herbert A. Simon, "The Architecture of Complexity" (1962) and Charles Perrow, Normal Accidents (1984).
+
+Papers and articles cited
+    Forrester, J. W. (1971). Counterintuitive behavior of social systems. Technology Review.
+    Meadows, D. H., Meadows, D. L., Randers, J., Behrens, W. W. (1972). The Limits to Growth.
+    Sterman, J. D. (1989). Modeling managerial behavior: misperceptions of feedback in a dynamic decision making
+    experiment. Management Science 35(3).
+    Booth Sweeney, L., Sterman, J. D. (2000). Bathtub dynamics. System Dynamics Review 16(4).
+    Cronin, M., Gonzalez, C., Sterman, J. D. (2009). Why don't well-educated adults understand accumulation? OBHDP
+    108(1).
+    Sterman, J. D. (2001). Fine-tuning your causal loop diagrams. The Systems Thinker.
+    Lee, H. L., Padmanabhan, V., Whang, S. (1997). Information distortion in a supply chain: the bullwhip effect. Management
+    Science 43(4).
+    Conant, R. C., Ashby, W. R. (1970). Every good regulator of a system must be a model of that system. Int. J. Systems
+    Science 1(2).
+    Simon, H. A. (1956). Rational choice and the structure of the environment. Psychological Review.
+    Kemeny, J. (1994). "Accidental adversaries": when friends become foes. The Systems Thinker 5(1).
+    Goodhart, C. (1975). Problems of monetary management: the U.K. experience. Strathern, M. (1997). "Improving ratings":
+    audit in the British university system. European Review 5(3).
+    Senge, P., Kleiner, A., Roberts, C., Ross, R., Smith, B. (1994). The Fifth Discipline Fieldbook.
+    Checkland, P. (1981). Systems Thinking, Systems Practice. Von Foerster, H. (1974). Cybernetics of Cybernetics.
+
+Notes on accuracy
+Quotations were checked against the books' text, the authors' articles or reputable reproductions of them. Some page
+numbers in Meadows may differ by a page between printings. The originator of the iceberg image is uncertain. Meadows'
+electricity-meter figure is "30 percent" in the 1999 essay and "one-third" in the book. All charts are simulations or
+illustrations built for teaching; the figures in the domain examples are realistic but invented.
+
+
+
+
+Systems Thinking for Agentic Builders                                                                                     74
+

@@ -1,0 +1,14 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/command-reference.test.ts:
+(pass) README covers every dispatched command and its argument contract [0.91ms]
+(pass) the files guide describes the flow report [0.04ms]
+(pass) the next guide describes stop and start [0.02ms]
+(pass) coverage rejects missing, extra and duplicate rows and newly dispatched verbs [0.42ms]
+(pass) argument contracts reject lost values, requiredness and exclusive alternatives [1.28ms]
+(pass) escaped alternatives and reordered rows preserve argument semantics [0.12ms]
+
+ 6 pass
+ 0 fail
+ 1287 expect() calls
+Ran 6 tests across 1 file. [7.00ms]

@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: git worktree add --lock / remove refusal / unlock
+    command: git worktree add --lock --reason "chart issues/chart/x" <store>/d1 d1; git worktree list --porcelain; git worktree remove <path>; git worktree remove --force <path>; git worktree unlock <path>; git worktree remove <path>
+    identity: local user ivan
+    target: throwaway repo under the door's job temp folder
+    version: git 2.56.0
+    date: '2026-10-15'
+    result: add --lock exit 0, porcelain shows locked line, plain and single-force remove exit 128, unlock then remove exit 0
+    cleanup: throwaway folder removed and confirmed absent
+    limits: does not prove a lock added after creation, another user, or --force --force
+    record: issues/chart/live-worktree-guard/forks/removal-rule.md

@@ -1,0 +1,10 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+(pass) scratch copies stay while a pane is inside or the pane list is unavailable [1099.90ms]
+
+ 1 pass
+ 29 filtered out
+ 0 fail
+ 8 expect() calls
+Ran 1 test across 1 file. [1136.00ms]

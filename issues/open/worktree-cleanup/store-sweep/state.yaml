@@ -1,0 +1,38 @@
+slug: store-sweep
+phase: implement
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by:
+  - scratch-copy-removal
+  - kept-status
+  - finished-leaf-processes
+sources:
+  - "Tamdoma/akrogon#93"
+busy_since:
+  A: 2026-10-15T22:20:35.482Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tCN
+worktree: /home/ivan/.akrogon/worktrees/akrogon/store-sweep
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQR
+  B: w8:pQS
+prompted:
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-store-sweep--/2026-10-15T22-01-12-225Z_01a14195-6521-706e-8280-cf40c83fed97.jsonl
+prompted_at:
+  A: 2026-10-15T22:20:35.483Z
+delivery_error: {}
+frozen:
+  tests/command-reference.test.ts: 49449ce7da8087a407f323291e991dec57972cb7
+  tests/leaf-slices.test.ts: b5e3ad423d09a5508f28248012acd352ed1f0e3e
+  tests/reconcile.test.ts: 07a0a60af7d85b6efa9cb64f4e691ca73508a934
+  tests/status.test.ts: 5149c771ad42fa0d011d711deb47be95525b095c
+frozen_cited: []

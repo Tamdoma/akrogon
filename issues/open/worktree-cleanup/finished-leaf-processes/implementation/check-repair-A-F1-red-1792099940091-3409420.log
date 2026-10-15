@@ -1,0 +1,27 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+bun test v1.4.3 (c6da4a4d3)
+[0.01ms] ".env"
+
+tests/leaf-slices.test.ts:
+71 |       FAKE_SYSTEMCTL_LOG: log,
+72 |       AKROGON_CGROUP_ROOT: cgRoot,
+73 |     });
+74 |     expect(result.code).toBe(1);
+75 |     const calls: string = readFileSync(log, 'utf8');
+76 |     expect(calls).toContain('reset-failed akrogon-run-bad-state.service');
+                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "reset-failed akrogon-run-bad-state.service"
+Received: "--user list-units --all akrogon-l*.slice --output=json\n--user list-units --all akrogon-l*.slice --output=json\n--user list-units --failed akrogon-run-* --output=json\n"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/finished-leaf-processes/tests/leaf-slices.test.ts:76:19)
+(fail) bad leaf ownership keeps uncertain slices without aborting failed-unit cleanup [138.10ms]
+
+ 0 pass
+ 10 filtered out
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [171.00ms]

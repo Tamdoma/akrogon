@@ -1,0 +1,17 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/leaf-slices.test.ts:
+(pass) a pass with the pane list unavailable stops no slice of a leaf that has a recorded tab [197.62ms]
+(pass) akrogon phase merged inside the leaf slice stops no slice [234.32ms]
+(pass) a finished leaf with a live tab keeps its slice, and the pass fetched the pane list [292.26ms]
+(pass) the run guard unit is submitted with CollectMode=inactive-or-failed [736.00ms]
+(pass) a loaded failed akrogon-run unit is cleared by a reconcile pass [778.11ms]
+(pass) a loaded slice matching no leaf record is stopped only when it holds no process [788.64ms]
+(pass) a reconcile pass running inside a leaf slice does not stop that slice [841.94ms]
+(pass) merged and failed leaf slices with gone tabs are stopped and their processes end [1546.70ms]
+(pass) a finished leaf slice named by a live run record is not stopped [1564.63ms]
+
+ 9 pass
+ 0 fail
+ 46 expect() calls
+Ran 9 tests across 1 file. [1.59s]

@@ -1,0 +1,30 @@
+slug: log-reader
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tCC
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQ7
+  B: w8:pQ8
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T21:20:23.491Z
+frozen:
+  tests/command-reference.test.ts: 331de6e4e68b5a3a9bae5e499f8963d8e5dc4465
+  tests/flaky.test.ts: 4381e15a05b647b71e57f36c046e09b70ffb0f5c
+  tests/log-reader.test.ts: e1493863f80d6ff54abc559f30aacd3b9cf4da5d
+frozen_cited: []

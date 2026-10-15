@@ -1,0 +1,14 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/status.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find package 'zod' from '/home/ivan/.akrogon/worktrees/akrogon/kept-status/tests/status.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [8.00ms]

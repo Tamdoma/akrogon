@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/leaf-slices.test.ts:
+450 |     const seeded: SpawnResult = await sdrun('--quiet', `--unit=${unit}`, '--slice=akrogon.slice', 'false');
+451 |     expect(seeded.code).toBe(0);
+452 |     await waitFor(async () => (await listed('akrogon-run-flp-*')).includes(`${unit}.service`));
+453 |     const pass: SpawnResult = await (spawnReal(f, ['next', '--all'], f.root)).result;
+454 |     expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
+455 |     expect(await listed('akrogon-run-flp-*')).not.toContain(`${unit}.service`);
+                                                        ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "akrogon-run-flp-3622445-dead.service"
+Received: [ "akrogon-run-flp-3622445-dead.service", "akrogon-run-flp-dbg-2275315.service" ]
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/finished-leaf-processes/tests/leaf-slices.test.ts:455:51)
+(fail) a loaded failed akrogon-run unit is cleared by a reconcile pass [739.46ms]
+
+ 0 pass
+ 8 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [774.00ms]

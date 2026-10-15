@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+643 |     mkdirSync(resolve(worker, '__pycache__'));
+644 |     writeFileSync(resolve(worker, '__pycache__/x.pyc'), 'x');
+645 |     closeTab(f, readState(path).tab!);
+646 |     saveState(path, { ...readState(path), phase: 'merged' });
+647 |     expect((await next(f, ['--all'])).code).toBe(0);
+648 |     expect(existsSync(worker)).toBe(false);
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/scratch-copy-removal/tests/reconcile.test.ts:648:32)
+(fail) worker copies follow the owner leaf: merged removes, failed keeps the guard [771.79ms]
+
+ 0 pass
+ 29 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [798.00ms]

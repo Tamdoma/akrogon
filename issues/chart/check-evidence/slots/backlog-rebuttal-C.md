@@ -1,0 +1,15 @@
+# Slot C rebuttal: existing-backlog merged notes
+
+Disagreements only.
+
+## Required answers
+
+- D-entry. Pick: B's bounded one-time migration entry point, removed in a later leaf once the registered repos are migrated. Reason: my notes offered both forms ("pack on a closed owner folder, or a migrate verb looping closed owners") and took no pick, so the merged D-entry line narrows me to one side; the looping verb is the form that carries the clean-tree check, per-owner counts and byte sample in one tested place, and the removal date answers A's dead-code question.
+- D-disk. Pick: stop an owner whose tracked logs are modified on disk, but pack untracked extras, listed separately in the run report. Reason: a modified tracked log packed from disk silently replaces the tracked evidence bytes, which a clean-modified check removes; untracked extras (B's 61 akrogon files, 904 KB) are evidence never yet committed, and packing them is their first save, while stopping 61 files' worth of owners invites deleting them instead. This also corrects the merged verification line: the equality to print is packed = tracked = deleted, with extras counted apart, not a single "present" that hides them.
+- Q-slots. Pick: delete the 9 slots scraps in the same akrogon run, listed separately from the evidence migration, not packed. Reason: I read one at HEAD and it is a single JSON peer-wait outcome line (1,128 bytes total), harness scratch that entered the tree by accident, and history keeps the copies; the merged Pitfalls line "fixtures and slots files untouched (B,C)" overstates my position, since my pick left slots untouched only pending this question.
+
+## Other points
+
+- Q-dead misattributes a position to me. My notes reported the 13 dead receipt paths as a measured fact and took no repair pick; "Both B and C: no, record as baseline" is not in my notes. The merged notes also hold two facts they do not connect: the 12 dead akrogon receipts point into a removed `system-flow/direct`, and B counts 18 untracked logs in `system-flow/direct` on disk today, so "baseline" should not be settled until someone checks whether those bytes are the same runs.
+- The merged Evidence omits the reader inventory that bounds the migration risk. Timings `check_end` log fields (akrogon 274, framework 1,088 in the live files I counted) are schema-only strings no code opens (src/timing.ts:48); the only code that opens a recorded log is flaky, and report citations resolve as paths (520 unique `/`-bearing `.log` strings in akrogon `issues/**/*.md` at HEAD, 1,996 in framework). Migration reader risk is therefore flaky plus human path reads, not every record that mentions a log.
+- The merged Pitfalls drop the mid-pack read window from my notes: a seat reading a closed log while its owner packs sees the plain file vanish between archive landing and delete. What removes it is running the migration while no chart door or learn pass is open on that repo; closed owners have no writer, so the window is one owner's pack, but the merged run conditions should still say so.

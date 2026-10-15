@@ -1,0 +1,1013 @@
+import { test, expect } from 'bun:test';
+import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { z } from 'zod';
+import { cli, entry, fixture, leaf, fakeHerdr, holding, leafTempRoot, storeDir, type Fixture } from './helpers';
+import { finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
+import { leafSlice } from '../src/scope';
+import { readState, saveState, type State } from '../src/state';
+import type { Database } from './fake-herdr';
+
+type SliceFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
+type Cap = { proc: Bun.Subprocess; result: Promise<SpawnResult> };
+
+const uid: number = process.getuid!();
+const realRuntime: string = `/run/user/${uid}`;
+const realBus: string = `unix:path=${realRuntime}/bus`;
+
+async function slicesFixture(): Promise<SliceFixture> {
+  const f: Fixture = await fixture();
+  return { ...f, ...fakeHerdr(f) };
+}
+
+function database(f: SliceFixture): Database {
+  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
+}
+
+function saveDatabase(f: SliceFixture, db: Database): void {
+  writeFileSync(f.db, JSON.stringify(db));
+}
+
+function closeTab(f: SliceFixture, tab: string): void {
+  const db: Database = database(f);
+  saveDatabase(f, {
+    ...db,
+    tabs: db.tabs.filter((item) => item.tab_id !== tab),
+    panes: db.panes.filter((pane) => pane.tab_id !== tab),
+  });
+}
+
+// Real systemd calls: the leaf slice code pins DBUS_SESSION_BUS_ADDRESS to the
+// real user bus; herdr and systemd-run resolve through the fixture bin dir.
+function realEnv(f: SliceFixture, env: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    AKROGON_HOME: f.home,
+    HERDR_PANE_ID: '',
+    HOME: f.home,
+    AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+    AKROGON_RUN: '',
+    AKROGON_PROC_ROOT: f.env.AKROGON_PROC_ROOT,
+    FAKE_HERDR: f.env.FAKE_HERDR,
+    FAKE_BUSCTL_HOME: f.env.FAKE_BUSCTL_HOME,
+    XDG_RUNTIME_DIR: realRuntime,
+    DBUS_SESSION_BUS_ADDRESS: realBus,
+    PATH: `${resolve(f.home, 'bin')}:${process.env.PATH}`,
+    ...env,
+  };
+}
+
+function spawnReal(f: SliceFixture, args: string[], cwd: string, env: NodeJS.ProcessEnv = {}): Cap {
+  const { child, captured } = spawnFiles([process.execPath, entry, ...args], {
+    cwd,
+    env: realEnv(f, env),
+  });
+  return { proc: child, result: finishCaptured(child, captured) };
+}
+
+function sysctl(...args: string[]): Promise<SpawnResult> {
+  const { child, captured } = spawnFiles([
+    'env',
+    `XDG_RUNTIME_DIR=${realRuntime}`,
+    `DBUS_SESSION_BUS_ADDRESS=${realBus}`,
+    'systemctl',
+    '--user',
+    ...args,
+  ]);
+  return finishCaptured(child, captured);
+}
+
+function sdrun(...args: string[]): Promise<SpawnResult> {
+  const { child, captured } = spawnFiles([
+    'env',
+    `XDG_RUNTIME_DIR=${realRuntime}`,
+    `DBUS_SESSION_BUS_ADDRESS=${realBus}`,
+    'systemd-run',
+    '--user',
+    ...args,
+  ]);
+  return finishCaptured(child, captured);
+}
+
+async function isActive(unit: string): Promise<boolean> {
+  return (await sysctl('is-active', unit)).code === 0;
+}
+
+async function listed(pattern: string): Promise<string[]> {
+  const result: SpawnResult = await sysctl('list-units', '--all', pattern, '--output=json');
+  if (result.code !== 0) return [];
+  return z
+    .array(z.object({ unit: z.string() }))
+    .parse(JSON.parse(result.stdout))
+    .map((row) => row.unit);
+}
+
+async function waitFor(ok: () => Promise<boolean>, ms: number = 10000): Promise<void> {
+  const begun: number = Date.now();
+  for (;;) {
+    if (await ok()) return;
+    if (Date.now() - begun > ms) throw new Error('Timed out waiting');
+    await Bun.sleep(100);
+  }
+}
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function dispatchLeaf(f: SliceFixture, slug: string, extra: object = {}): Promise<string> {
+  const path: string = leaf(f, slug, 'plan.synthesis', extra);
+  const result: Result = await cli(f, ['next', slug], f.root, f.env);
+  expect(result.code).toBe(0);
+  return path;
+}
+
+// A real sleeper service inside the leaf's real slice; writes its pid to a file.
+async function sleeper(f: SliceFixture, sliceName: string): Promise<number> {
+  const tag: string = `akr-flp-${process.pid}-${Math.floor(Math.random() * 1e6)}`;
+  const pidFile: string = resolve(f.home, `${tag}.pid`);
+  const finished: SpawnResult = await sdrun(
+    '--quiet',
+    '--collect',
+    `--unit=${tag}`,
+    `--slice=${sliceName}`,
+    'sh',
+    '-c',
+    // systemd-run eats one $$ pair per specifier pass, so $$$$ reaches sh as $$.
+    `echo $$$$ > ${pidFile}; exec sleep 300`,
+  );
+  expect(finished.code).toBe(0);
+  for (let i: number = 0; i < 100 && !existsSync(pidFile); i++) await Bun.sleep(50);
+  const pid: number = Number(readFileSync(pidFile, 'utf8').trim());
+  expect(pidAlive(pid)).toBe(true);
+  return pid;
+}
+
+async function cleanupUnit(unit: string): Promise<void> {
+  await sysctl('stop', unit).catch(() => undefined);
+  await sysctl('reset-failed', unit).catch(() => undefined);
+}
+
+test('merged and failed leaf slices with gone tabs are stopped and their processes end', async () => {
+  const f: SliceFixture = await slicesFixture();
+  const units: string[] = [];
+  try {
+    const mergedPath: string = await dispatchLeaf(f, 'merged-leaf');
+    const failedPath: string = await dispatchLeaf(f, 'failed-leaf');
+    const mergedSlice: string = leafSlice({ name: 'repo' }, 'merged-leaf');
+    const failedSlice: string = leafSlice({ name: 'repo' }, 'failed-leaf');
+    const mergedPid: number = await sleeper(f, mergedSlice);
+    const failedPid: number = await sleeper(f, failedSlice);
+    units.push(mergedSlice, failedSlice);
+    closeTab(f, z.string().parse(readState(mergedPath).tab));
+    closeTab(f, z.string().parse(readState(failedPath).tab));
+    saveState(mergedPath, { ...readState(mergedPath), phase: 'merged' });
+    saveState(failedPath, {
+      ...readState(failedPath),
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'test' },
+    });
+    const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
+    expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
+    await waitFor(async () => !(await isActive(mergedSlice)) && !(await isActive(failedSlice)));
+    await waitFor(async () => !pidAlive(mergedPid) && !pidAlive(failedPid));
+  } finally {
+    for (const unit of units) await cleanupUnit(unit);
+    f.clean();
+  }
+}, 25000);
+
+test('a finished leaf with a live tab keeps its slice, and the pass fetched the pane list', async () => {
+  const f: SliceFixture = await slicesFixture();
+  const sliceName: string = leafSlice({ name: 'repo' }, 'tabbed-merged');
+  const units: string[] = [sliceName];
+  try {
+    const path: string = leaf(f, 'tabbed-merged', 'merged', { tab: 'w1:t9' });
+    expect(readState(path).worktree).toBeUndefined();
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      tabs: [...db.tabs, { tab_id: 'w1:t9', label: 'tabbed-merged', focused: false }],
+      panes: [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' }],
+    });
+    const pid: number = await sleeper(f, sliceName);
+    const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
+    expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
+    expect(await isActive(sliceName)).toBe(true);
+    expect(pidAlive(pid)).toBe(true);
+    const callLog: string = f.db + '.calls';
+    const calls: string[] = existsSync(callLog) ? readFileSync(callLog, 'utf8').trim().split('\n') : [];
+    // The leaf has no worktree and no temp, so only the slice rule can trigger the fetch.
+    expect(calls.filter((line) => line.includes('pane')).length).toBeGreaterThan(0);
+  } finally {
+    for (const unit of units) await cleanupUnit(unit);
+    f.clean();
+  }
+});
+
+test('a finished leaf slice named by a live run record is not stopped', async () => {
+  const f: SliceFixture = await slicesFixture();
+  let sliceName: string | undefined;
+  const control: string = leafSlice({ name: 'repo' }, 'control-leaf');
+  try {
+    const path: string = await dispatchLeaf(f, 'run-leaf');
+    const controlPath: string = await dispatchLeaf(f, 'control-leaf');
+    const worktree: string = z.string().parse(readState(path).worktree);
+    sliceName = leafSlice({ name: 'repo' }, 'run-leaf');
+    const controlPid: number = await sleeper(f, control);
+    const cap: Cap = spawnReal(f, ['run-check', '--name', 'hold', '--', 'sleep', '60'], worktree);
+    try {
+      await waitFor(async () => existsSync(resolve(f.home, 'runs')) && readdirSync(resolve(f.home, 'runs')).length > 0);
+      await waitFor(async () => await isActive(z.string().parse(sliceName)));
+      closeTab(f, z.string().parse(readState(path).tab));
+      closeTab(f, z.string().parse(readState(controlPath).tab));
+      saveState(path, { ...readState(path), phase: 'merged' });
+      saveState(controlPath, { ...readState(controlPath), phase: 'merged' });
+      const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
+      expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
+      // The control proves the pass stopped finished slices this run; only the
+      // live run record protects run-leaf's slice.
+      await waitFor(async () => !(await isActive(control)) && !pidAlive(controlPid));
+      expect(await isActive(z.string().parse(sliceName))).toBe(true);
+    } finally {
+      cap.proc.kill('SIGKILL');
+      await cap.result.catch(() => undefined);
+      await cleanupUnit(z.string().parse(sliceName));
+      await cleanupUnit(control);
+    }
+  } finally {
+    f.clean();
+  }
+}, 40000);
+
+test('a pass with the pane list unavailable stops no slice of a leaf that has a recorded tab', async () => {
+  const f: SliceFixture = await slicesFixture();
+  try {
+    const path: string = leaf(f, 'no-panes', 'merged', { tab: 'w1:t7' });
+    const sliceName: string = leafSlice({ name: 'repo' }, 'no-panes');
+    const cgroup: string = `/user.slice/user-${uid}.slice/user@${uid}.service/akrogon.slice/${sliceName}`;
+    const cgRoot: string = resolve(f.home, 'cgroups');
+    mkdirSync(resolve(cgRoot, cgroup.slice(1)), { recursive: true });
+    const bin: string = resolve(f.home, 'bin');
+    symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(bin, 'systemctl'));
+    const sysDb: string = resolve(f.home, 'systemctl.json');
+    writeFileSync(sysDb, JSON.stringify({ units: [{ unit: sliceName, sub: 'active', cgroup }] }));
+    const log: string = resolve(f.home, 'systemctl.log');
+    saveDatabase(f, { ...database(f), paneListStdout: 'unavailable' });
+    const result: Result = await cli(f, ['next', '--all'], f.root, {
+      ...f.env,
+      FAKE_SYSTEMCTL_DB: sysDb,
+      FAKE_SYSTEMCTL_LOG: log,
+      AKROGON_CGROUP_ROOT: cgRoot,
+    });
+    expect(result.code).toBe(0);
+    const calls: string[] = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
+    // The pass must reach the slice step (inventory listed) yet stop nothing:
+    // the recorded tab cannot be proven gone while the pane list is unavailable.
+    expect(calls.some((line) => line.includes('list-units'))).toBe(true);
+    expect(calls.some((line) => line.includes('stop') && line.includes(sliceName))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a loaded slice matching no leaf record is stopped only when it holds no process', async () => {
+  const f: SliceFixture = await slicesFixture();
+  try {
+    const empty: string = 'akrogon-ldeadbeef00.slice';
+    const busy: string = 'akrogon-lalivebee00.slice';
+    const rootCg: string = `/user.slice/user-${uid}.slice/user@${uid}.service/akrogon.slice`;
+    const cgRoot: string = resolve(f.home, 'cgroups');
+    mkdirSync(resolve(cgRoot, rootCg.slice(1), empty), { recursive: true });
+    mkdirSync(resolve(cgRoot, rootCg.slice(1), busy), { recursive: true });
+    writeFileSync(resolve(cgRoot, rootCg.slice(1), busy, 'cgroup.procs'), `${process.pid}\n`);
+    const bin: string = resolve(f.home, 'bin');
+    symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(bin, 'systemctl'));
+    const sysDb: string = resolve(f.home, 'systemctl.json');
+    writeFileSync(
+      sysDb,
+      JSON.stringify({
+        units: [
+          { unit: empty, sub: 'active', cgroup: `${rootCg}/${empty}` },
+          { unit: busy, sub: 'active', cgroup: `${rootCg}/${busy}` },
+        ],
+      }),
+    );
+    const log: string = resolve(f.home, 'systemctl.log');
+    leaf(f, 'seed', 'plan.synthesis');
+    const result: Result = await cli(f, ['next', '--all'], f.root, {
+      ...f.env,
+      FAKE_SYSTEMCTL_DB: sysDb,
+      FAKE_SYSTEMCTL_LOG: log,
+      AKROGON_CGROUP_ROOT: cgRoot,
+    });
+    expect(result.code).toBe(0);
+    const calls: string[] = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
+    expect(calls.some((line) => line.includes(`stop ${empty}`))).toBe(true);
+    expect(calls.some((line) => line.includes(`stop ${busy}`))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a reconcile pass running inside a leaf slice does not stop that slice', async () => {
+  const f: SliceFixture = await slicesFixture();
+  let sliceName: string | undefined;
+  try {
+    const path: string = await dispatchLeaf(f, 'self-leaf');
+    sliceName = leafSlice({ name: 'repo' }, 'self-leaf');
+    closeTab(f, z.string().parse(readState(path).tab));
+    saveState(path, { ...readState(path), phase: 'merged' });
+    // Fake systemctl marks the leaf slice a stop candidate (loaded, no live tab)
+    // while the pass runs inside the real slice: only the own-slice guard saves it.
+    const bin: string = resolve(f.home, 'bin');
+    symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(bin, 'systemctl'));
+    const sysDb: string = resolve(f.home, 'systemctl.json');
+    const cgroup: string = `/user.slice/user-${uid}.slice/user@${uid}.service/akrogon.slice/${sliceName}`;
+    const cgRoot: string = resolve(f.home, 'cgroups');
+    mkdirSync(resolve(cgRoot, cgroup.slice(1)), { recursive: true });
+    writeFileSync(sysDb, JSON.stringify({ units: [{ unit: sliceName, sub: 'active', cgroup }] }));
+    const marker: string = resolve(f.home, 'self.exit');
+    const log: string = resolve(f.home, 'systemctl.log');
+    // Assignments prefix the bun invocation so they are exported to it alone.
+    const inner: string = [
+      `cd ${f.root};`,
+      `AKROGON_HOME=${f.home}`,
+      `HOME=${f.home}`,
+      `AKROGON_LEAF_TEMP_ROOT=${leafTempRoot(f)}`,
+      `HERDR_PANE_ID=`,
+      `AKROGON_RUN=`,
+      `AKROGON_PROC_ROOT=/proc`,
+      `AKROGON_CGROUP_ROOT=${cgRoot}`,
+      `FAKE_SYSTEMCTL_DB=${sysDb}`,
+      `FAKE_SYSTEMCTL_LOG=${log}`,
+      `FAKE_HERDR=${f.db}`,
+      `FAKE_BUSCTL_HOME=${f.home}`,
+      `XDG_RUNTIME_DIR=${realRuntime}`,
+      `DBUS_SESSION_BUS_ADDRESS=${realBus}`,
+      `PATH=${resolve(f.home, 'bin')}:${process.env.PATH}`,
+      `${process.execPath} ${entry} next --all;`,
+      `echo $? > ${marker}`,
+    ].join(' ');
+    await sdrun('--scope', '--quiet', `--slice=${sliceName}`, '--', 'sh', '-c', inner);
+    for (let i: number = 0; i < 300 && !existsSync(marker); i++) await Bun.sleep(100);
+    expect(existsSync(marker)).toBe(true);
+    expect(readFileSync(marker, 'utf8').trim()).toBe('0');
+    const calls: string[] = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
+    const guarded: string = z.string().parse(sliceName);
+    expect(calls.some((line) => line.includes('list-units'))).toBe(true);
+    expect(calls.some((line) => line.includes('stop') && line.includes(guarded))).toBe(false);
+    expect(await isActive(guarded)).toBe(true);
+  } finally {
+    if (sliceName !== undefined) await cleanupUnit(sliceName);
+    f.clean();
+  }
+}, 40000);
+
+test('akrogon phase merged inside the leaf slice stops no slice', async () => {
+  const f: SliceFixture = await slicesFixture();
+  let sliceName: string | undefined;
+  try {
+    leaf(f, 'phase-leaf', 'merge', { ...holding(f), merge_stamp: '2026-10-15T20:00:00Z' }, 'standalone');
+    sliceName = leafSlice({ name: 'repo' }, 'phase-leaf');
+    const pid: number = await sleeper(f, sliceName);
+    const marker: string = resolve(f.home, 'phase.exit');
+    const inner: string = [
+      `cd ${f.root};`,
+      `AKROGON_HOME=${f.home}`,
+      `HOME=${f.home}`,
+      `AKROGON_LEAF_TEMP_ROOT=${leafTempRoot(f)}`,
+      `HERDR_PANE_ID=`,
+      `AKROGON_RUN=`,
+      `FAKE_HERDR=${f.db}`,
+      `FAKE_BUSCTL_HOME=${f.home}`,
+      `XDG_RUNTIME_DIR=${realRuntime}`,
+      `DBUS_SESSION_BUS_ADDRESS=${realBus}`,
+      `PATH=${resolve(f.home, 'bin')}:${process.env.PATH}`,
+      `${process.execPath} ${entry} phase phase-leaf merged 2> ${marker}.err;`,
+      `echo $? > ${marker}`,
+    ].join(' ');
+    await sdrun('--scope', '--quiet', `--slice=${sliceName}`, '--', 'sh', '-c', inner);
+    for (let i: number = 0; i < 300 && !existsSync(marker); i++) await Bun.sleep(100);
+    expect(existsSync(marker)).toBe(true);
+    const code: string = readFileSync(marker, 'utf8').trim();
+    const err: string = existsSync(`${marker}.err`) ? readFileSync(`${marker}.err`, 'utf8') : '';
+    expect(code, err).toBe('0');
+    expect(pidAlive(pid)).toBe(true);
+    expect(await isActive(sliceName)).toBe(true);
+    const moved: State = readState(resolve(f.root, 'issues/closed/standalone/phase-leaf'));
+    expect(moved.phase).toBe('merged');
+  } finally {
+    if (sliceName !== undefined) await cleanupUnit(sliceName);
+    f.clean();
+  }
+}, 40000);
+
+test('the run guard unit is submitted with CollectMode=inactive-or-failed', async () => {
+  const f: SliceFixture = await slicesFixture();
+  try {
+    const path: string = await dispatchLeaf(f, 'guard-leaf');
+    const worktree: string = z.string().parse(readState(path).worktree);
+    const log: string = resolve(f.home, 'systemd-run.calls');
+    const result: Result = await cli(f, ['run-check', '--name', 'x', '--', 'true'], worktree, {
+      ...f.env,
+      FAKE_SYSTEMD_RUN_LOG: log,
+    });
+    expect(result.code).toBe(0);
+    const lines: string[] = readFileSync(log, 'utf8').trim().split('\n');
+    const guard: string | undefined = lines.find((line) => line.includes('-guard'));
+    expect(guard).toBeDefined();
+    expect(guard).toContain('CollectMode=inactive-or-failed');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a loaded failed akrogon-run unit is cleared by a reconcile pass', async () => {
+  const f: SliceFixture = await slicesFixture();
+  const unit: string = `akrogon-run-flp-${process.pid}-dead`;
+  try {
+    leaf(f, 'seed', 'plan.synthesis');
+    // No CollectMode here: the unit must stay listed as failed until the pass clears it.
+    const seeded: SpawnResult = await sdrun('--quiet', `--unit=${unit}`, '--slice=akrogon.slice', 'false');
+    expect(seeded.code).toBe(0);
+    await waitFor(async () => (await listed('akrogon-run-flp-*')).includes(`${unit}.service`));
+    const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
+    expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
+    expect(await listed('akrogon-run-flp-*')).not.toContain(`${unit}.service`);
+  } finally {
+    await cleanupUnit(unit);
+    f.clean();
+  }
+});
+#!/usr/bin/env bun
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { z } from 'zod';
+
+// Test seam for the user manager: units and cgroup paths come from
+// FAKE_SYSTEMCTL_DB, every call appends argv to FAKE_SYSTEMCTL_LOG.
+const unitSchema = z.object({ unit: z.string(), sub: z.string(), cgroup: z.string().optional() });
+const databaseSchema = z.object({ units: z.array(unitSchema) });
+type Database = z.infer<typeof databaseSchema>;
+
+const path: string = z.string().parse(process.env.FAKE_SYSTEMCTL_DB);
+const db: Database = databaseSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+const args: string[] = process.argv.slice(2);
+if (process.env.FAKE_SYSTEMCTL_LOG !== undefined)
+  appendFileSync(z.string().parse(process.env.FAKE_SYSTEMCTL_LOG), args.join(' ') + '\n');
+
+function save(): void {
+  writeFileSync(path, JSON.stringify(db));
+}
+
+function glob(name: string, pattern: string): boolean {
+  const star: number = pattern.indexOf('*');
+  if (star === -1) return name === pattern;
+  const prefix: string = pattern.slice(0, star);
+  const suffix: string = pattern.slice(star + 1);
+  return name.startsWith(prefix) && name.endsWith(suffix) && name.length >= prefix.length + suffix.length;
+}
+
+const verb: string | undefined = args.find((arg) => !arg.startsWith('-') && !arg.includes('=') && arg !== 'user');
+if (args[0] !== '--user') throw new Error(`Unexpected systemctl call: ${JSON.stringify(args)}`);
+
+if (verb === 'list-units') {
+  const pattern: string | undefined = args.find((arg) => arg.includes('*'));
+  const rows = db.units
+    .filter((unit) => pattern === undefined || glob(unit.unit, pattern))
+    .map((unit) => ({
+      unit: unit.unit,
+      load: 'loaded',
+      active: unit.sub === 'failed' ? 'failed' : 'active',
+      sub: unit.sub,
+      description: '',
+    }));
+  console.log(JSON.stringify(rows));
+  process.exit(0);
+}
+
+if (verb === 'show') {
+  const unit: string = z.string().parse(args.find((arg) => arg.endsWith('.slice') || arg.endsWith('.scope')));
+  const found = db.units.find((item) => item.unit === unit);
+  if (found === undefined) {
+    console.error(`Failed to show unit: Unit ${unit} not found.`);
+    process.exit(1);
+  }
+  const pi: number = args.indexOf('-p');
+  const name: string | undefined = pi === -1 ? undefined : args[pi + 1];
+  if (args.includes('--value')) console.log(name === 'ControlGroup' ? (found.cgroup ?? '') : '');
+  else console.log(`ControlGroup=${found.cgroup ?? ''}`);
+  process.exit(0);
+}
+
+if (verb === 'stop' || verb === 'reset-failed') {
+  const names: string[] = args.filter((arg) => arg.includes('.') && !arg.startsWith('-'));
+  const missing: string[] = names.filter((name) => !db.units.some((unit) => unit.unit === name));
+  if (missing.length > 0 && verb === 'stop') {
+    console.error(`Failed to stop ${missing[0]}: Unit ${missing[0]} not loaded.`);
+    process.exit(5);
+  }
+  db.units = db.units.filter((unit) => !names.includes(unit.unit));
+  save();
+  process.exit(0);
+}
+
+console.log('');
+process.exit(0);
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
+import { z } from 'zod';
+import { globalHome } from './config';
+import { procRoot, runUnitBase, stopRunUnits } from './scope';
+
+export interface AdmissionHolder {
+  repo: string;
+  leaf: string;
+  check: string;
+  run: string;
+  slice: string;
+  scope: string;
+  unit: string;
+}
+
+export type Admission =
+  | { kind: 'held'; token: string; wait_ms: number; record_path: string; release: () => void }
+  | { kind: 'nested'; token: string };
+
+const recordSchema = z.object({
+  token_hash: z.string(),
+  pid: z.number().int(),
+  start_time: z.string(),
+  boot_id: z.string(),
+  repo: z.string(),
+  leaf: z.string(),
+  check: z.string(),
+  state: z.enum(['live', 'ended']),
+  run: z.string(),
+  slice: z.string(),
+  scope: z.string(),
+  unit: z.string(),
+  since: z.iso.datetime(),
+});
+export type RunRecord = z.infer<typeof recordSchema>;
+
+const runsDir = (): string => resolve(globalHome(), 'runs');
+const bootId = (): string => readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+
+// Field 22 of /proc/<pid>/stat. The command name in field 2 may hold spaces, so split after the last ')'.
+function startTime(pid: number): string {
+  const stat: string = readFileSync(`/proc/${pid}/stat`, 'utf8');
+  return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+}
+
+function liveStartTime(pid: number): string | undefined {
+  try {
+    return startTime(pid);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
+const recordPath = (hash: string): string => resolve(runsDir(), `${hash}.yaml`);
+
+function writeRecord(record: RunRecord): void {
+  const path: string = recordPath(record.token_hash);
+  const temp: string = `${path}.${process.pid}.tmp`;
+  writeFileSync(temp, Bun.YAML.stringify(record));
+  renameSync(temp, path);
+}
+
+function readRecord(path: string): RunRecord | undefined {
+  try {
+    return recordSchema.parse(Bun.YAML.parse(readFileSync(path, 'utf8')));
+  } catch {
+    return undefined;
+  }
+}
+
+const live = (record: RunRecord, boot: string): boolean =>
+  record.boot_id === boot && liveStartTime(record.pid) === record.start_time;
+
+function nested(token: string): boolean {
+  const hash: string = createHash('sha256').update(token).digest('hex');
+  const record: RunRecord | undefined = readRecord(recordPath(hash));
+  return record !== undefined && record.token_hash === hash && record.state === 'live' && live(record, bootId());
+}
+
+export function liveRuns(): RunRecord[] {
+  const dir: string = runsDir();
+  if (!existsSync(dir)) return [];
+  const boot: string = bootId();
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.yaml'))
+    .flatMap((name) => {
+      const record: RunRecord | undefined = readRecord(resolve(dir, name));
+      return record !== undefined && record.state === 'live' && live(record, boot) ? [record] : [];
+    });
+}
+
+// Records whose writer is gone (or whose file is unreadable) are stale: drop
+// the file and best-effort stop the units it left behind. Hashes in skip name
+// records the caller still owns.
+async function sweepStale(skip: ReadonlySet<string>): Promise<void> {
+  const dir: string = runsDir();
+  if (!existsSync(dir)) return;
+  const boot: string = bootId();
+  const units: string[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.yaml') || skip.has(name.slice(0, -'.yaml'.length))) continue;
+    const path: string = resolve(dir, name);
+    const record: RunRecord | undefined = readRecord(path);
+    if (record !== undefined && live(record, boot)) continue;
+    rmSync(path, { force: true });
+    if (record !== undefined) units.push(record.unit, `${runUnitBase(record.run)}-guard.service`);
+  }
+  await stopRunUnits(...units);
+}
+
+export function callerScope(): string {
+  const token: string | undefined = process.env.AKROGON_RUN;
+  if (token !== undefined && token !== '') {
+    const hash: string = createHash('sha256').update(token).digest('hex');
+    const record: RunRecord | undefined = readRecord(recordPath(hash));
+    if (record !== undefined && live(record, bootId())) return record.scope;
+  }
+  const selfCgroup: string = resolve(procRoot(), 'self', 'cgroup');
+  if (!existsSync(selfCgroup)) return '';
+  const scopes: string[] = [...readFileSync(selfCgroup, 'utf8').matchAll(/\/([^/]+\.scope)/g)].map((match) => match[1]);
+  return scopes[scopes.length - 1] ?? '';
+}
+
+// Admission registers the run and starts it at once: the memory reading, the
+// 48 GiB limit, per-run reservations and the 30 s start spacing were dropped
+// by the operator on 2026-10-14 (run-units brief criterion 5).
+export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: Admission) => Promise<T>): Promise<T> {
+  const inherited: string | undefined = process.env.AKROGON_RUN;
+  if (inherited !== undefined && inherited !== '' && nested(inherited)) return fn({ kind: 'nested', token: inherited });
+  mkdirSync(runsDir(), { recursive: true });
+  const token: string = randomUUID();
+  const ownHash: string = createHash('sha256').update(token).digest('hex');
+  await sweepStale(
+    new Set([
+      ownHash,
+      ...(inherited === undefined || inherited === '' ? [] : [createHash('sha256').update(inherited).digest('hex')]),
+    ]),
+  );
+  const record: RunRecord = {
+    token_hash: ownHash,
+    pid: process.pid,
+    start_time: startTime(process.pid),
+    boot_id: bootId(),
+    ...holder,
+    state: 'live',
+    since: new Date().toISOString(),
+  };
+  const begun: number = Date.now();
+  try {
+    writeRecord(record);
+    process.stderr.write(`run ${holder.run}\n`);
+    let ended: boolean = false;
+    return await fn({
+      kind: 'held',
+      token,
+      wait_ms: Date.now() - begun,
+      record_path: recordPath(record.token_hash),
+      release: () => {
+        if (!ended) writeRecord({ ...record, state: 'ended' });
+        ended = true;
+      },
+    });
+  } finally {
+    rmSync(recordPath(record.token_hash), { force: true });
+  }
+}
+import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { isAbsolute, resolve } from 'node:path';
+import { z } from 'zod';
+import type { Repo } from './config';
+import { CommandError, herdr, quote, run, spawnCaptured, type SpawnResult } from './shell';
+
+export type ScopePlace =
+  { place: 'inside' } | { place: 'outside'; cgroup: string } | { place: 'unreadable'; error: string };
+
+type Shell = { pid: number; start: string };
+
+export function leafSlice(repo: Pick<Repo, 'name'>, slug: string): string {
+  return `akrogon-l${createHash('sha256').update(`${repo.name}/${slug}`).digest('hex').slice(0, 12)}.slice`;
+}
+
+export function paneScope(slice: string, paneId: string, pid: number, start: string): string {
+  return `${slice.replace(/\.slice$/, '')}-p${paneId.replace(/[^A-Za-z0-9]/g, '')}-${pid}-${start}.scope`;
+}
+
+export function runUnitBase(run: string): string {
+  return `akrogon-run-${run}`;
+}
+
+export function runSlice(slice: string): string {
+  const override: string | undefined = process.env.AKROGON_RUN_SLICE;
+  if (override === undefined || override.trim() === '') return slice;
+  if (!override.endsWith('.slice'))
+    throw new Error(`Invalid AKROGON_RUN_SLICE: must be a *.slice name, got ${override}`);
+  return override;
+}
+
+export function sessionBusAddress(): string {
+  const address: string | undefined = process.env.DBUS_SESSION_BUS_ADDRESS;
+  if (address !== undefined && address.trim() !== '') {
+    const path: string | undefined = address.startsWith('unix:path=') ? address.slice('unix:path='.length) : undefined;
+    if (path === undefined || existsSync(path)) return address;
+  }
+  const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;
+  return `unix:path=${runtime !== undefined && runtime.trim() !== '' ? runtime : `/run/user/${process.getuid!()}`}/bus`;
+}
+
+export function runUnitArgv(slice: string, run: string, argv: string[], cutBus: string): string[] {
+  return [
+    'systemd-run',
+    '--user',
+    '--scope',
+    '--quiet',
+    `--unit=${runUnitBase(run)}`,
+    `--slice=${slice}`,
+    '-p',
+    'TimeoutStopSec=5',
+    '-p',
+    'CollectMode=inactive-or-failed',
+    '--',
+    'env',
+    `DBUS_SESSION_BUS_ADDRESS=${cutBus}`,
+    ...argv,
+  ];
+}
+
+// The guard tracks the wrapper pid: when the wrapper dies its finally can no
+// longer run, so the guard drops the run record and stops the scope itself.
+export async function startRunGuard(slice: string, run: string, wpid: number, recordPath: string): Promise<void> {
+  const base: string = runUnitBase(run);
+  const argv: string[] = [
+    'systemd-run',
+    '--user',
+    '--quiet',
+    `--unit=${base}-guard`,
+    `--slice=${slice}`,
+    '-p',
+    'TimeoutStopSec=5',
+    '-p',
+    'CollectMode=inactive-or-failed',
+    '--',
+    'sh',
+    '-c',
+    `tail --pid=${wpid} -f /dev/null; rm -f ${quote(recordPath)}; exec systemctl --user stop ${base}.scope`,
+  ];
+  const cwd: string = process.cwd();
+  const result: SpawnResult = await spawnCaptured(argv, {
+    cwd,
+    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+  });
+  if (result.code !== 0) throw new CommandError(argv, cwd, result);
+}
+
+// One call per unit: a single stop job fails whole when a unit name is not loaded.
+// Callers may run under a check whose bus is cut, so the address is pinned.
+export async function stopRunUnits(...units: string[]): Promise<void> {
+  for (const unit of units)
+    await spawnCaptured(['systemctl', '--user', 'stop', unit], {
+      env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+    }).catch(() => undefined);
+}
+
+export function procRoot(): string {
+  const override: string | undefined = process.env.AKROGON_PROC_ROOT;
+  if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
+    throw new Error(`Invalid AKROGON_PROC_ROOT: must be a non-blank absolute path`);
+  return override ?? '/proc';
+}
+
+export function cgroupRoot(): string {
+  const override: string | undefined = process.env.AKROGON_CGROUP_ROOT;
+  if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
+    throw new Error(`Invalid AKROGON_CGROUP_ROOT: must be a non-blank absolute path`);
+  return override ?? '/sys/fs/cgroup';
+}
+
+// Slice names on the caller's own cgroup path: a pass inside a leaf slice sees
+// that slice among its segments and must never stop it (finished-leaf-processes 6).
+export function ownSlices(): Set<string> {
+  const self: string = resolve(procRoot(), 'self', 'cgroup');
+  if (!existsSync(self)) return new Set();
+  return new Set([...readFileSync(self, 'utf8').matchAll(/\b([a-zA-Z0-9_.\-]+\.slice)\b/g)].map((match) => match[1]));
+}
+
+async function shellPid(paneId: string): Promise<number> {
+  }
+  const recorded: Set<string> = new Set(
+    leaves.flatMap((leaf) => (leaf.state.worktree === undefined ? [] : [leaf.state.worktree])),
+  );
+  if (
+    [store, oldRoot].some(
+      (root) =>
+        existsSync(root) &&
+        readdirSync(root, { withFileTypes: true }).some(
+          (entry) => entry.isDirectory() && !recorded.has(resolve(root, entry.name)),
+        ),
+    )
+  )
+    return true;
+  // A finished leaf with a recorded tab can only be judged with live panes; a
+  // finished leaf with a loaded slice is a stop candidate either way, and an
+  // unreadable unit inventory forces the conservative fetch.
+  const finishedLeaves: Leaf[] = leaves.filter(finished);
+  if (finishedLeaves.some((leaf) => leaf.state.tab !== undefined)) return true;
+  if (finishedLeaves.length === 0) return false;
+  const loaded: Set<string> | null = await loadedLeafSlices();
+  if (loaded === null) return true;
+  return finishedLeaves.some((leaf) => loaded.has(leafSlice(repo, leaf.state.slug)));
+}
+
+export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null): Promise<Reconciled> {
+  const removed: string[] = [];
+  const kept: { path: string; reason: string }[] = [];
+  const keep = (path: string, reason: string): void => {
+    kept.push({ path, reason });
+  };
+
+  const listed: string = await command(['git', 'worktree', 'list', '--porcelain'], repo.root);
+  const registered: Set<string> = new Set(
+    listed
+      .split('\n')
+      .filter((line) => line.startsWith('worktree '))
+      .map((line) => line.slice('worktree '.length)),
+  );
+
+  const store: string = worktreeStore(repo);
+  const oldRoot: string = resolve(repo.root, 'issues/worktrees');
+  const roots: string[] = [store, oldRoot];
+  const underRoot = (path: string): boolean => roots.some((root) => path !== root && within(path, root));
+  const openRoot: string = resolve(repo.root, 'issues/open');
+
+  const knownSlugs: Set<string> = new Set();
+  const collectSlugs = (path: string): void => {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(path, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    if (entries.some((entry) => entry.name === 'state.yaml')) {
+      try {
+        knownSlugs.add(readState(path).slug);
+      } catch {
+        // unreadable state.yaml protects nothing
+      }
+      return;
+    }
+    for (const entry of entries.filter((entry) => entry.isDirectory())) collectSlugs(resolve(path, entry.name));
+  };
+  for (const area of ['open', 'closed']) {
+    const areaRoot: string = resolve(repo.root, 'issues', area);
+    if (existsSync(areaRoot)) collectSlugs(areaRoot);
+  }
+  const leafSlugs: Set<string> = new Set(leaves.map((leaf) => leaf.state.slug));
+
+  const batchAttempts: Set<string> = new Set(
+    leaves.flatMap((leaf) => (leaf.state.batch === undefined ? [] : [leaf.state.batch.attempt])),
+  );
+  const verifyRuns: VerifyRun[] = readVerifyRuns(repo);
+  const leafBySlug: Map<string, Leaf> = new Map(leaves.map((leaf) => [leaf.state.slug, leaf]));
+
+  // The slice step runs before leaf temp and unowned-item checks so a later
+  // sweep in the same pass already sees stopped slices. A finished leaf's slice
+  // is stopped outright — killing leftovers is the point — unless it is the
+  // pass's own, a live run names it, or its tab cannot be proven gone.
+  {
+    const loaded: Set<string> | null = await loadedLeafSlices();
+    const own: Set<string> = ownSlices();
+    const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
+    for (const leaf of leaves) {
+      if (!finished(leaf)) continue;
+      const slice: string = leafSlice(repo, leaf.state.slug);
+      if (loaded === null || !loaded.has(slice)) continue;
+      const reason: string | null = sliceKeepReason(slice, leaf, live, own, runs);
+      if (reason !== null) {
+        keep(slice, reason);
+        continue;
+      }
+      const error: string | null = await stopSlice(slice);
+      if (error === null) removed.push(slice);
+      else keep(slice, error);
+    }
+  }
+
+  async function removeWorktree(path: string): Promise<boolean> {
+    const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
+    if (!verdict.ok) {
+      keep(path, verdict.reason);
+      return false;
+    }
+    const result: Result = await run(['git', 'worktree', 'remove', path], repo.root);
+src/state.ts:153:export function allLeaves(repo: Repo): Leaf[] {
+src/state.ts:198:  const leaf: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === slug);
+src/next.ts:36:  allLeaves,
+src/next.ts:200:function registeredRepos(global: GlobalConfig, invocation: Invocation): { repos: Repo[]; unknown: boolean } {
+src/next.ts:415:  const registered: ReturnType<typeof registeredRepos> = registeredRepos(global, invocation);
+src/next.ts:845:  const { repos } = registeredRepos(global, invocation);
+src/next.ts:946:    const fresh: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
+src/next.ts:969:      const item: Leaf | undefined = allLeaves(repo).find((leaf) => leaf.state.slug === member.slug);
+src/next.ts:980:    const holderNow: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
+src/next.ts:984:      const remaining: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
+src/next.ts:991:    for (const leaf of allLeaves(repo))
+src/next.ts:1047:    const leaves: Leaf[] = allLeaves(repo);
+src/next.ts:1097:        const leaves: Leaf[] = allLeaves(repo);
+src/next.ts:1295:  for (const repo of registeredRepos(global, invocation).repos) {
+src/next.ts:1347:  return registeredRepos(global, invocation).repos.flatMap((repo) =>
+src/next.ts:1379:      ? registeredRepos(global, invocation).repos
+src/next.ts:1420:          const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
+src/next.ts:1429:        const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
+src/next.ts:1446:        const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
+src/next.ts:1462:          await reconcileHost(registeredRepos(global, invocation).repos, live, panesOnce);
+# src area
+
+## Commands
+
+- `bun src/akrogon.ts close <owner/repo#n> --by <text>` closes one unowned GitHub issue; `bun src/akrogon.ts config` prints effective settings and the worktree base.
+- `bun src/akrogon.ts run-check -- <argv>...` runs a command under the constructed check environment, and `verify [--sha <rev>]` runs the caller's configured check set on a detached fresh checkout in the worktree store; both box each command in a systemd `akrogon-run-<id>` scope and print `run <id>` on admission, and `stop-run [<run-id>]` stops the caller's own runs; `run-check` and `verify` cut the session bus (`DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent`).
+- `bun src/akrogon.ts guard <ancestors|own-modules>` refuses a checkout under foreign `node_modules`/`package.json` or a worktree with a top-level `package.json` missing its own `node_modules`; composed check commands run `own-modules` while `ancestors` runs at worktree creation through `checkLocation`.
+- `bun run typecheck` checks the TypeScript command and tests; `bun test tests/phase.test.ts` exercises lifecycle transitions and guards.
+
+## Key files
+
+- `src/akrogon.ts` validates CLI arguments and dispatches commands.
+- `src/preflight.ts` verifies the configured base remote branch and local tracking ref; `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
+- `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file; `src/readiness.ts` owns the readiness contract schema and gap computation.
+- `src/phase.ts` and `src/shell.ts` aggregate slot completion and enforce handoff guards; shell wraps subprocesses, retries, YAML writes and Herdr responses.
+- `src/timing.ts` defines the timing-event schema and appends to `issues/timings.jsonl` (`readTimings` and `visitOf` feed the readout); `src/timing-report.ts` implements `akrogon timing`: per-visit time decomposition from `timings.jsonl` and `log.jsonl`, plus the 20-leaf cohort gate from `merge-attempts.jsonl` and the `--flow` leaf-carried issue report from per-repository GitHub `state=all` listings.
+- `src/verify.ts` checks a commit out detached, runs every command for the caller's scope, logs each into the leaf or holder and records one receipt in `issues/verify-runs.jsonl`; `requireGreenReceipt` is the one gate the `check.review` move, the `check.repair` move into `merge`, `merged --check` stamping and direct-guards call.
+- `src/admission.ts` registers each run's record under `<globalHome>/runs/`, sweeps stale records and their run units, and admits at once — a matching `AKROGON_RUN` token of a live run is the nested case that creates nothing; the memory reading and spacing were dropped 2026-10-14.
+- `src/scope.ts` names the per-leaf slice (`leafSlice`, used by `src/stop.ts`), pane scopes and `akrogon-run-<id>` run units, moves a pane shell into its scope with busctl `StartTransientUnit`, and checks it read-only through `AKROGON_PROC_ROOT` (default `/proc`) and `AKROGON_CGROUP_ROOT` (default `/sys/fs/cgroup`); `allocate` in `src/next.ts` closes a recorded pane outside its scope and boxes every pane before the seat starts. `src/stop-run.ts` stops the run units live records tie to the caller's scope. `src/stop.ts` keeps the host-local `stopped.yaml` record and runs `stop`/`start`; dispatch, the merge queue and status read it.
+- `src/reconcile.ts` removes dead worktrees, scratch and run roots each pass, stops finished-leaf slices and unmatched empty `akrogon-l*` slices, clears failed `akrogon-run-*` units in the host step, and writes the kept reports `status` prints under the ignored `reconcile/` state dir and `reconcile-host.json`.
+
+## Non-obvious patterns
+
+- Repository identity comes from registration and the shared Git directory.
+- A phase move can be committed even when later log collection fails.
+- Phase moves reject a dirty worktree and branch changes under `issues/`; a stop into `failed` skips both, a `cause: blocked` restart skips only the dirty check, and the empty-branch refusal applies only at review handoff.
+- External command retries warn once, then preserve the last failure context.
+- Foreign leaves are summarized once per repo and excluded from capacity and dispatch; prompt delivery is one attempt per pass per seat, with a timeout settling against the seat session file on the next pass.
+- `verify` appends its receipt before checkout, then rewrites `verify-runs.jsonl` under the same lock with its setup exit, each command's exit and log and its end before removing the checkout; `end` is set only after every command ran, and a receipt matches any commit with its tree under the exact current command set, so `verify` on such a commit prints `reuse receipt <run> tree=<tree>` and runs nothing.
+- `akrogon config` composes a repo's `setup` key into every printed `checks`, `merge_checks` and `advisory` command as a `flock`ed `sh -c <setup> && sh -c <command>`.
+- A leaf worktree's `.env` is a written file (mode 0600) holding only declared `env:` names copied from the registered checkout; dispatch rewrites it when no tab is live and refuses a tracked path or missing ignore rule.
+- `buildStack` rebases the holder onto the remote base first, then each recorded `members` entry onto the tip — a member whose rebase conflicts is skipped and stays in `merge` — and removes resurrected retired lesson lines as a fixup commit on the stack top, which `merged --check` refuses a pushed range still holding.
+- The `plan.synthesis` to `implement` move records each branch-changed path's blob id in state `frozen`; a later move refuses a recorded path changed or gone, or an added test-file-matched path outside the record, until the last commit touching it or a later one carries a `Test-Change` trailer naming it, and a path no commit touches needs a later trailer-only commit new since the record, not a replayed planning-era trailer.
+
+## See also
+
+- `docs/reference-index.md` links the other repository areas.
+- `tests/helpers.ts` builds isolated registered repositories for command tests.
+# tests area
+
+## Commands
+
+- `bun test` runs the command suite rooted at `tests/` by `bunfig.toml`.
+- `bun test tests/phase.test.ts` isolates lifecycle transition scenarios.
+
+## Key files
+
+- `tests/helpers.ts` supplies temporary repos, CLI invocations and leaf fixtures.
+- `tests/phase.test.ts` checks real transitions, races and handoff refusal.
+- `tests/command-reference.test.ts` checks README command argument contracts against the dispatched verbs.
+- `tests/docs-links.test.ts` checks relative links and heading anchors in README and the guide.
+- `tests/watch-issues-scripts.test.ts` is the `skills/watch-issues` gate, running its scripts tests and typecheck.
+- `tests/guard.test.ts` checks the `akrogon guard` ancestor and own-modules refusals.
+- `tests/run-permit.test.ts` checks runs start at once: concurrent runs, nested `run-check`/`verify`, `status` showing no waiter lines, missing `memory.stat` ignored and unmatched `AKROGON_RUN` tokens. `tests/run-units.test.ts` checks run-unit boxing, `stop-run` authority, wrapper-death reaping, verify units, immediate admission, the stale sweep and the skills' `stop-run` wording, with real units under `akrogon-test-*.slice`.
+- `tests/verify.test.ts` checks the fresh checkout, every command run past a red one, the receipt, env and cleanup of `verify`.
+- `tests/receipt-gates.test.ts` checks the `check.review`, `merged --check` and direct-guards receipt gates.
+- `tests/seat-containment.test.ts` checks pane boxing, restore replacement and the bus cut through `next`, with `tests/fake-busctl.ts`, the fake proc root in `tests/fake-proc.ts` and fake herdr `pane process-info`/`pane close`.
+- `tests/reconcile.test.ts` checks reconciler removal, refusal and old-root migration against real worktrees.
+- `tests/leaf-slices.test.ts` checks finished-leaf slice stopping, the tab/run-record/own-slice keeps, unmatched empty slices, guard CollectMode and failed-unit clearing with real units and `tests/fake-systemctl.ts`.
+- `tests/leaf-stop.test.ts` checks stop, start, the dispatch and merge gates and status marks with a test-local fake systemctl.
+- `tests/merge-attempts.test.ts` checks `issues/merge-attempts.jsonl` lines per ending, including a legacy `held` line that still parses.
+- `tests/timing.test.ts` checks the timing record end to end through real `next`/`phase`/`run-check` calls, worker and verify runs, wait dedup and the unwritable-file negative case.
+- `tests/timing-report.test.ts` checks `akrogon timing` against fixture records: visit decomposition, expected-event flags and cohort verdicts.
+- `tests/pause-status.test.ts` checks pause marks on the board, targeted status and chart headings.
+- `tests/hold-retired.test.ts` checks the retired merge verbs refuse, a legacy hold record stays inert, and the docs carry no retired surface.
+
+## Non-obvious patterns
+
+- CLI fixtures isolate machine configuration through the environment.
+- Each fixture creates a real Git repository and removes it after the test; registered temp dirs are also swept at process exit.
+- `bunfig.toml` runs every test file concurrently, and tests that share global state use `test.serial`.
+- The 30 s test timeout comes from `--timeout=30000` in the `checks` commands of `issues/config.yaml`.
+
+## See also
+
+- `src/shell.ts` defines command results and failure context used by tests.
+- `docs/reference-index.md` links the other repository areas.

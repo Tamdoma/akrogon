@@ -1,0 +1,61 @@
+}
+
+export function findLeaf(repo: Repo, slug: string): Leaf {
+  const leaf: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === slug);
+  if (leaf === undefined) throw new Error(missingLeafMessage(repo, slug));
+  return leaf;
+}
+
+export async function withLock<T>(path: string, action: () => Promise<T>): Promise<T> {
+  const child: Bun.Subprocess<'pipe', 'pipe', 'pipe'> = Bun.spawn(
+    ['flock', '-x', path, 'sh', '-c', 'printf locked; cat >/dev/null'],
+    { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
+  );
+  const reader: ReadableStreamDefaultReader<Uint8Array> = child.stdout.getReader();
+  const acquired: Awaited<ReturnType<typeof reader.read>> = await reader.read();
+  if (acquired.done) {
+    const stderr: string = await new Response(child.stderr).text();
+    throw new Error(JSON.stringify({ lock: path, code: await child.exited, stderr }));
+  }
+  try {
+    return await action();
+  } finally {
+    child.stdin.end();
+    reader.releaseLock();
+    const code: number = await child.exited;
+    if (code !== 0)
+      throw new Error(JSON.stringify({ lock: path, code, stderr: await new Response(child.stderr).text() }));
+  }
+}
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
+import { z } from 'zod';
+import { phaseSchema, slotSchema, verdictSchema } from './routing';
+import { type Repo } from './config';
+import { writeYaml } from './shell';
+import { issueFolders } from './park';
+
+const counts = z.object({ A: z.number().int().nonnegative().default(0), B: z.number().int().nonnegative().default(0) });
+const text = z.string().min(1);
+
+export const failureSchema = z.strictObject({
+  cause: z.enum(['blocked', 'attempts']),
+  phase: phaseSchema,
+  slot: slotSchema,
+  reason: z.string().trim().min(1),
+  delivery: z.string().optional(),
+});
+
+export type Failure = z.infer<typeof failureSchema>;
+
+export const deliveryErrorSchema = z.strictObject({
+  command: z.array(z.string()),
+  code: z.string(),
+  message: z.string(),
+{
+  "compilerOptions": {
+    "target": "ESNext", "module": "Preserve", "moduleResolution": "bundler",
+    "strict": true, "noEmit": true, "types": ["bun"], "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "skills/chart-issues/scripts/**/*.ts"]
+}

@@ -1,0 +1,35 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: systemctl --user stop <slice>
+    command: systemctl --user stop akrproof<n>.slice
+    identity: local user ivan (uid 1000), user systemd manager
+    target: throwaway slice holding a running scope (sleep 300)
+    version: systemd 262
+    result: exit 0; slice inactive, no unit listed, process gone
+    cleanup: final stop; list-units on the prefix shows 0 units
+    limits: a process outside the slice cgroup (Chrome app scope) is not stopped
+    record: issues/chart/worktree-cleanup/forks/store-hygiene.md
+    date: '2026-10-15'
+  - operation: systemd-run --user -p CollectMode=inactive-or-failed (service)
+    command: systemd-run --user --quiet --unit=akrproof<n>-g --slice=akrproof<n>.slice -p TimeoutStopSec=5 -p CollectMode=inactive-or-failed false
+    identity: local user ivan (uid 1000), user systemd manager
+    target: throwaway service
+    version: systemd 262
+    result: after the service fails no unit with its name is listed
+    cleanup: slice stopped; 0 units listed
+    limits: only the failed path observed
+    record: issues/chart/worktree-cleanup/forks/store-hygiene.md
+    date: '2026-10-15'
+  - operation: systemctl --user reset-failed <unit>
+    command: systemctl --user reset-failed akrproof<n>-h.service
+    identity: local user ivan (uid 1000), user systemd manager
+    target: throwaway failed service without CollectMode
+    version: systemd 262
+    result: listed loaded failed before; exit 0 and no longer listed after
+    cleanup: slice stopped; 0 units listed
+    limits: single named unit; a glob pattern not exercised
+    record: issues/chart/worktree-cleanup/forks/store-hygiene.md
+    date: '2026-10-15'

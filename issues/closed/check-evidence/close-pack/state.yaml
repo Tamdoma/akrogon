@@ -1,0 +1,30 @@
+slug: close-pack
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by:
+  - log-reader
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tCM
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQP
+  B: w8:pQQ
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T22:06:50.033Z
+frozen:
+  tests/close-pack.test.ts: 21c183651cb0a00c5d46943a170a47c7a1793f8e
+  tests/init.test.ts: 786074463f347a798bb09a08aa305605efc9ed44
+frozen_cited: []

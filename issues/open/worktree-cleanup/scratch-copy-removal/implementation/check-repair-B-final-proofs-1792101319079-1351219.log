@@ -1,0 +1,60 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+bun test v1.4.3 (c6da4a4d3)
+{"ok":true,"top":"f0786819ee6a296fc2c4263d9ab93c40a6ac4e44","tips":{}}
+[0.01ms] ".env"
+
+tests/batch.test.ts:
+(pass) stateSchema accepts a state with a batch record [2.58ms]
+(pass) readState drops a legacy solo key left in state.yaml [25.90ms]
+(pass) stateSchema rejects unknown or missing-required batch fields [1.65ms]
+(pass) attemptId returns unique nonempty strings [0.20ms]
+(pass) buildStack re-removes a retired lesson line the union merge resurrects [72.80ms]
+(pass) buildStack keeps a same-stem lesson main added while the retiring holder was in flight [79.72ms]
+(pass) buildStack adds no fixup commit when no retired lesson is resurrected [62.65ms]
+(pass) buildStack rebases the holder range onto the base and leaves the branch unchanged [46.92ms]
+(pass) buildStack refuses a store path under an ancestor holding node_modules [30.23ms]
+(pass) a holder already on the base produces the base without a rebase [32.99ms]
+(pass) buildStack writes its owner record before the copy and removes both in finally [83.20ms]
+(pass) a holder conflict reports failure and leaves the branch unchanged [61.85ms]
+(pass) applyTop resets a clean worktree to the top and puts a dirty one back at head [54.59ms]
+(pass) isAncestor returns the merge-base verdict and throws on other codes [39.08ms]
+
+tests/reconcile.test.ts:
+(pass) old-location worktree migration is refused while batch [373.39ms]
+(pass) old-location worktree migration is refused while live tab [393.48ms]
+(pass) old-location worktree migration is refused while dirty [401.89ms]
+(pass) old-location worktree migration is refused while live cwd [408.50ms]
+(pass) old-location worktree migration is refused while mid-rebase [414.36ms]
+(pass) failed leaf worktree is removed and its branch is kept [1172.12ms]
+(pass) worktree with unreachable commits is kept and reported with a count [1268.13ms]
+(pass) worktree with a live pane inside is kept and reported [1270.65ms]
+(pass) mid-rebase worktree is kept and reported [1339.76ms]
+(pass) dirty merged worktree is kept and reported with path and reason [1360.36ms]
+(pass) a failed leaf temp stays while its tab lives, because its seats still use it as TMPDIR [1377.82ms]
+(pass) failed leaf scratch preserves an actual running verify command [1464.01ms]
+(pass) clean old-location worktree of an active leaf is removed and recreated sparse at the store [1475.31ms]
+(pass) run root with a dead owner pid is removed, live owner kept [1623.76ms]
+(pass) operator worktree outside managed roots is kept as unmanaged [1644.24ms]
+(pass) unconfirmed verify worktrees are removed once the run ends [1675.62ms]
+(pass) an unknown directory inside the store is reported, never removed [1682.03ms]
+(pass) recorded worktree that is not a registered git worktree is kept, not removed [1740.13ms]
+(pass) a verify scratch copy with no record is removed like a dead-owner copy [1516.45ms]
+(pass) targeted next sweeps unused registered variants [1561.15ms]
+(pass) an unfinished leaf temp is removed once its tab is gone and kept silently while its tab lives [1944.87ms]
+(pass) verify scratch copies are removed by owner state and kept while the run is live [1555.96ms]
+(pass) a worker worktree of an active leaf is kept until the leaf fails [1706.53ms]
+(pass) store variants survive live or unavailable pane inventories [2284.28ms]
+(pass) worker copies follow the owner leaf: merged removes, failed keeps the guard [1150.18ms]
+(pass) configured destination store migrates a clean old managed worktree [982.16ms]
+(pass) scratch copies stay while a pane is inside or the pane list is unavailable [1320.34ms]
+(pass) batch copies follow their owner record: live kept, dead and absent removed [2256.95ms]
+(pass) a leaf slug ending in -u<N> is handled as that leaf, not as a worker copy [1548.86ms]
+(pass) a scratch copy with a process inside stays, recorded with the pid [1523.44ms]
+(pass) a scratch copy stays while its surviving process closes unrelated file descriptors [1842.91ms]
+
+ 45 pass
+ 0 fail
+ 382 expect() calls
+Ran 45 tests across 2 files. [3.82s]

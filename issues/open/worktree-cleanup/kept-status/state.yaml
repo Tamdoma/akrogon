@@ -1,0 +1,30 @@
+slug: kept-status
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#93"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tCE
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQB
+  B: w8:pQC
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T20:56:17.861Z
+frozen:
+  tests/reconcile.test.ts: b21ac97aff534fd83e9d2d46e3093cde196cc7d1
+  tests/status.test.ts: e78dbc320ffe435f971f31a1e79536b8a1040b71
+frozen_cited: []

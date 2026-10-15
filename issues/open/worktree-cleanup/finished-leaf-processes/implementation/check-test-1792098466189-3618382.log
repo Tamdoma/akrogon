@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/leaf-slices.test.ts:
+433 |     });
+434 |     expect(result.code).toBe(0);
+435 |     const lines: string[] = readFileSync(log, 'utf8').trim().split('\n');
+436 |     const guard: string | undefined = lines.find((line) => line.includes('-guard'));
+437 |     expect(guard).toBeDefined();
+438 |     expect(guard).toContain('CollectMode=inactive-or-failed');
+                        ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "CollectMode=inactive-or-failed"
+Received: "--user --quiet --unit=akrogon-run-d315f330-ae78-4f4b-b8ac-f49f6a91cf75-guard --slice=akrogon-le44ba22c3098.slice -p TimeoutStopSec=5 -- sh -c tail --pid=3621693 -f /dev/null; rm -f '/var/tmp/akr-1000/5d20/4abcdd54/run-8SxNza/akrogon-Ir8s1r/runs/932cb9f18d027097e4cdcd8f0cc065300ff57ae03212849ed0ee74b6e8cb7d49.yaml'; exec systemctl --user stop akrogon-run-d315f330-ae78-4f4b-b8ac-f49f6a91cf75.scope"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/finished-leaf-processes/tests/leaf-slices.test.ts:438:19)
+(fail) the run guard unit is submitted with CollectMode=inactive-or-failed [738.92ms]
+
+ 0 pass
+ 8 filtered out
+ 1 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [767.00ms]

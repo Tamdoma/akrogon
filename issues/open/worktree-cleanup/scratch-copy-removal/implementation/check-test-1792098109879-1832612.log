@@ -1,0 +1,35 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/batch.test.ts:
+(pass) stateSchema accepts a state with a batch record [3.07ms]
+(pass) readState drops a legacy solo key left in state.yaml [27.04ms]
+(pass) stateSchema rejects unknown or missing-required batch fields [2.27ms]
+(pass) attemptId returns unique nonempty strings [0.32ms]
+(pass) buildStack re-removes a retired lesson line the union merge resurrects [86.39ms]
+(pass) buildStack keeps a same-stem lesson main added while the retiring holder was in flight [91.15ms]
+(pass) buildStack adds no fixup commit when no retired lesson is resurrected [71.39ms]
+(pass) buildStack rebases the holder range onto the base and leaves the branch unchanged [61.40ms]
+(pass) buildStack refuses a store path under an ancestor holding node_modules [38.41ms]
+(pass) a holder already on the base produces the base without a rebase [39.45ms]
+346 |     const built: Promise<Awaited<ReturnType<typeof buildStack>>> = buildStack(repo, builtOn, builtOn);
+347 |     const settled: Promise<Awaited<ReturnType<typeof buildStack>>> = built;
+348 |     settled.catch(() => undefined);
+349 |     for (let i: number = 0; i < 300 && !existsSync(record); i++) await Bun.sleep(10);
+350 |     if (!existsSync(record)) writeFileSync(gate, 'go');
+351 |     expect(existsSync(record)).toBe(true);
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/scratch-copy-removal/tests/batch.test.ts:351:32)
+(fail) buildStack writes its owner record before the copy and removes both in finally [3067.30ms]
+(pass) a holder conflict reports failure and leaves the branch unchanged [70.04ms]
+(pass) applyTop resets a clean worktree to the top and puts a dirty one back at head [56.12ms]
+(pass) isAncestor returns the merge-base verdict and throws on other codes [44.31ms]
+
+ 13 pass
+ 1 fail
+ 168 expect() calls
+Ran 14 tests across 1 file. [3.69s]

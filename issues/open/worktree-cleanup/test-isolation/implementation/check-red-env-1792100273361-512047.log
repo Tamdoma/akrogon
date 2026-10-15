@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/isolation.test.ts:
+23 |   async () => {
+24 |     expect(process.env.HOME, `HOME=${process.env.HOME}`).toStartWith(suiteRoot);
+25 |     expect(
+26 |       process.env.AKROGON_LEAF_TEMP_ROOT,
+27 |       `AKROGON_LEAF_TEMP_ROOT=${process.env.AKROGON_LEAF_TEMP_ROOT}`,
+28 |     ).toStartWith(suiteRoot);
+           ^
+error: AKROGON_LEAF_TEMP_ROOT=/var/tmp/akr-1000/5d20/28b30d18/run-4sYUNv/akrogon-wrong-leaf-Q9gqvr
+
+Expected to start with: "/var/tmp/akr-1000/5d20/28b30d18/run-4sYUNv/akrogon-suite-exo0jn"
+Received: "/var/tmp/akr-1000/5d20/28b30d18/run-4sYUNv/akrogon-wrong-leaf-Q9gqvr"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/test-isolation/tests/isolation.test.ts:28:7)
+(fail) suite env is redirected: HOME, leaf-temp root, tmpdir and store resolve under the suite scratch [0.22ms]
+(pass) a killed child leaves no descendant: the orphan is adopted by this worker and swept [41.59ms]
+
+ 1 pass
+ 1 fail
+ 5 expect() calls
+Ran 2 tests across 1 file. [70.00ms]

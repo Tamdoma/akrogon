@@ -1,0 +1,324 @@
+diff --git a/README.md b/README.md
+index 8632d18..00421d0 100644
+--- a/README.md
++++ b/README.md
+@@ -118,7 +118,7 @@ sources: []
+ 
+ Moving a repository or changing its worktree root requires reconciling existing worktree paths and Git metadata. A configuration edit does not move them.
+ 
+-Every `akrogon next` pass reconciles worktrees, scratch and run roots against leaf state: clean, reachable, unused leftovers are removed. The same pass stops the systemd slice of a merged or failed leaf once its tab is gone — ending processes it left running — unless a live run record names the slice or the pass itself runs inside it; a loaded `akrogon-l*` slice matching no leaf record is stopped only when it holds no process, and failed `akrogon-run-*` units are cleared. Everything it keeps shows under each repo in plain `akrogon status` as `Kept by last cleanup:` lines for paths that still exist, and `akrogon status <slug>` prints the whole kept report as `Kept:` lines with path and reason.
++Every `akrogon next` pass reconciles worktrees, scratch and run roots against leaf state: clean, reachable, unused leftovers are removed. The same pass stops the systemd slice of a merged or failed leaf once its tab is gone — ending processes it left running — unless a live run record names the slice or the pass itself runs inside it; a loaded `akrogon-l*` slice matching no leaf record is stopped only when it holds no process, and failed `akrogon-run-*` units are cleared. `akrogon leftovers` lists, per repo and grouped by reason, the kept paths that still exist and need a person. Paths kept only because their leaf, worker or run is still working, or a live pane sits inside, are left out, since a later pass removes them. `akrogon status <slug>` prints the whole kept report as `Kept:` lines with path and reason.
+ 
+ This repository's [reference index](docs/reference-index.md) links its code areas.
+ 
+@@ -138,6 +138,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
+ | `akrogon pull [--all]` | Import open GitHub issues as seeds. With --all, pull every registered repository from any directory. |
+ | `akrogon close <owner/repo#n> --by <text>` | Close one unowned GitHub issue with a delivered-by note. |
+ | `akrogon status [<slug>\|--charts]` | Show the board, leaf history or chart store. |
++| `akrogon leftovers` | List kept paths that need a person, grouped by reason. |
+ | `akrogon timing [<slug>\|--cohort --since <iso>\|--flow --since <YYYY-MM-DD>]` | Report per-visit time from the timing record, evaluate the 20-leaf cohort gate since a marker, or report leaf-carried issue flow from a handoff date. |
+ | `akrogon sync` | Commit eligible issue records, rebase and push. |
+ | `akrogon park <issue>... \| --all` | Set aside whole eligible issues. |
+diff --git a/docs/guide/next.md b/docs/guide/next.md
+index 0604896..7c09423 100644
+--- a/docs/guide/next.md
++++ b/docs/guide/next.md
+@@ -158,7 +158,7 @@ Leaves in `merge` take their repository's single merge turn: the merge pass writ
+ 
+ Each leaf pane shell runs in its own systemd scope under a per-leaf slice under `akrogon.slice` before a seat starts in it. A recorded pane found outside its scope, as after a Herdr restore, is closed and recreated before any prompt. A pane whose cgroup cannot be read is left open, and the leaf is skipped that pass with the error. A failed boxing also skips the leaf. Panes you split by hand in a leaf tab are not boxed.
+ 
+-The same per-leaf slice outlives the leaf until cleanup: a reconcile pass stops the slice of a merged or failed leaf once its tab is gone, ending processes the seats left running, unless a live run record names the slice or the pass itself runs inside it. A pass that cannot fetch the pane list stops nothing whose tab is recorded. Loaded `akrogon-l*` slices matching no leaf record are stopped only while empty, and failed `akrogon-run-*` units are cleared each pass. Kept slices and units appear as `Kept by last cleanup:` lines in `akrogon status`.
++The same per-leaf slice outlives the leaf until cleanup: a reconcile pass stops the slice of a merged or failed leaf once its tab is gone, ending processes the seats left running, unless a live run record names the slice or the pass itself runs inside it. A pass that cannot fetch the pane list stops nothing whose tab is recorded. Loaded `akrogon-l*` slices matching no leaf record are stopped only while empty, and failed `akrogon-run-*` units are cleared each pass. Kept slices and units that need a person appear under `systemd units` in `akrogon leftovers`.
+ 
+ A working, blocked or unknown seat is not treated as idle. A recently delivered prompt also gets a grace period.
+ 
+diff --git a/src/akrogon.ts b/src/akrogon.ts
+index 55a17c5..6e3f94e 100755
+--- a/src/akrogon.ts
++++ b/src/akrogon.ts
+@@ -143,6 +143,10 @@ switch (verb) {
+     z.array(z.string()).max(1).parse(positionals);
+     await (await import('./status')).statusCommand(positionals[0], values.charts === true);
+     break;
++  case 'leftovers':
++    z.tuple([]).parse(positionals);
++    await (await import('./leftovers')).leftoversCommand(process.cwd());
++    break;
+   case 'install':
+     z.tuple([]).parse(positionals);
+     await (await import('./install')).install();
+@@ -210,6 +214,6 @@ switch (verb) {
+     break;
+   default:
+     throw new Error(
+-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|timing|flaky|log|run-check|verify|guard>',
++      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard>',
+     );
+ }
+diff --git a/src/leftovers.ts b/src/leftovers.ts
+new file mode 100644
+index 0000000..7b44aec
+--- /dev/null
++++ b/src/leftovers.ts
+@@ -0,0 +1,56 @@
++import { existsSync } from 'node:fs';
++import { homedir } from 'node:os';
++import { sep } from 'node:path';
++import { currentRepo, readGlobal, readRepo, type GlobalConfig, type Repo } from './config';
++import { readHostKept, readKept } from './reconcile';
++
++type Kept = { path: string; reason: string };
++
++// Kept only while work or a live pane is still there: the next cleanup after it ends removes the path.
++// A failed batch holder keeps its batch until `akrogon phase <slug> merge`; the board and a notification already name that leaf.
++const inUse: Set<string> = new Set([
++  'active leaf',
++  'active leaf worker',
++  'live pane inside',
++  'run in progress',
++  'state.batch',
++]);
++
++// Host keeps are systemd units, not paths; these clear once the run, tab or pass ends.
++const unitInUse: Set<string> = new Set(['own slice', 'live run record', 'live tab']);
++
++function leftover(entry: Kept): boolean {
++  return existsSync(entry.path) && !inUse.has(entry.reason) && !/^verify \S+ in progress$/.test(entry.reason);
++}
++
++function tilde(path: string): string {
++  return path.startsWith(`${homedir()}${sep}`) ? `~${path.slice(homedir().length)}` : path;
++}
++
++function lines(name: string, kept: Kept[]): string[] {
++  const reasons: string[] = [...new Set(kept.map((entry) => entry.reason))].sort((a, b) => a.localeCompare(b));
++  return [
++    name,
++    ...reasons.flatMap((reason) => [
++      `  ${reason}`,
++      ...kept.filter((entry) => entry.reason === reason).map((entry) => `    ${tilde(entry.path)}`),
++    ]),
++  ];
++}
++
++export async function leftoversCommand(cwd: string): Promise<void> {
++  const global: GlobalConfig = readGlobal();
++  const current: Repo | null = await currentRepo(global, cwd);
++  const repos: Repo[] =
++    current !== null
++      ? [current]
++      : Object.entries(global.repos)
++          .sort(([a], [b]) => a.localeCompare(b))
++          .map(([name, path]) => readRepo(name, path));
++  const blocks: [string, Kept[]][] = [
++    ...repos.map((repo): [string, Kept[]] => [repo.name, readKept(repo).filter(leftover)]),
++    ['systemd units', readHostKept().filter((entry) => !unitInUse.has(entry.reason))],
++  ];
++  const found: string[][] = blocks.filter(([, kept]) => kept.length > 0).map(([name, kept]) => lines(name, kept));
++  console.log(found.length === 0 ? 'no leftovers' : found.map((block) => block.join('\n')).join('\n\n'));
++}
+diff --git a/src/reconcile.ts b/src/reconcile.ts
+index 5c394dc..121a95d 100644
+--- a/src/reconcile.ts
++++ b/src/reconcile.ts
+@@ -25,13 +25,25 @@ export function keptReportPath(repo: Repo): string {
+   return resolve(globalHome(), 'reconcile', `${repo.name}.json`);
+ }
+ 
+-export function readKept(repo: Repo): { path: string; reason: string }[] {
+-  const file: string = keptReportPath(repo);
++function readReport(file: string): { path: string; reason: string }[] {
++  let raw: string;
+   try {
+-    return keptReportSchema.parse(JSON.parse(readFileSync(file, 'utf8'))).kept;
+-  } catch {
+-    return [];
++    raw = readFileSync(file, 'utf8');
++  } catch (error) {
++    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
++    throw error;
+   }
++  try {
++    return keptReportSchema.parse(JSON.parse(raw)).kept;
++  } catch (error) {
++    throw new Error(`invalid kept report ${file}: ${error instanceof Error ? error.message : String(error)}`, {
++      cause: error,
++    });
++  }
++}
++
++export function readKept(repo: Repo): { path: string; reason: string }[] {
++  return readReport(keptReportPath(repo));
+ }
+ 
+ function writeKept(file: string, kept: { path: string; reason: string }[]): void {
+@@ -48,11 +60,7 @@ function writeKeptReport(repo: Repo, kept: { path: string; reason: string }[]):
+ const hostReportPath = (): string => resolve(globalHome(), 'reconcile-host.json');
+ 
+ export function readHostKept(): { path: string; reason: string }[] {
+-  try {
+-    return keptReportSchema.parse(JSON.parse(readFileSync(hostReportPath(), 'utf8'))).kept;
+-  } catch {
+-    return [];
+-  }
++  return readReport(hostReportPath());
+ }
+ 
+ // The manager's bus address is pinned because callers inside a run-check cut
+diff --git a/src/status.ts b/src/status.ts
+index 8cf3128..5a80a4b 100644
+--- a/src/status.ts
++++ b/src/status.ts
+@@ -408,10 +408,6 @@ export async function statusCommand(slug: string | undefined, charts: boolean =
+     const lines: string[][] = [...rows(scan, now, stopped), ...separator, ...parked];
+     if (lines.length > 0) console.log(render(header, [['  LEAF', ...header.slice(1)], ...lines]).join('\n'));
+     else console.log('  no open leaves');
+-    for (const entry of readKept(scan.repo))
+-      if (existsSync(entry.path)) console.log(`  Kept by last cleanup: ${entry.path} — ${entry.reason}`);
+   }
+-  // Host keeps are units, not paths: no existsSync filter.
+-  for (const entry of readHostKept()) console.log(`  Kept by last cleanup: ${entry.path} — ${entry.reason}`);
+   if (scans.some((scan) => !scan.ok)) process.exitCode = 1;
+ }
+diff --git a/tests/command-reference.test.ts b/tests/command-reference.test.ts
+index 331de6e..49449ce 100644
+--- a/tests/command-reference.test.ts
++++ b/tests/command-reference.test.ts
+@@ -24,6 +24,7 @@ const contracts: Record<string, string> = {
+   stop: '<slug> | --all',
+   start: '<slug>',
+   status: '[<slug>|--charts]',
++  leftovers: '',
+   timing: '[<slug>|--cohort --since <iso>|--flow --since <YYYY-MM-DD>]',
+   flaky: '',
+   log: '<path>',
+diff --git a/tests/reconcile.test.ts b/tests/reconcile.test.ts
+index b21ac97..1982e24 100644
+--- a/tests/reconcile.test.ts
++++ b/tests/reconcile.test.ts
+@@ -96,7 +96,7 @@ test('failed leaf worktree is removed and its branch is kept', async () => {
+   }
+ });
+ 
+-// DC2/DC4: kept worktrees reported by plain `akrogon status` and
++// DC2/DC4: kept worktrees reported by `akrogon leftovers` and
+ // `akrogon status <slug>` with path and reason; a gone path drops its line.
+ test('dirty merged worktree is kept and reported with path and reason', async () => {
+   const f: DispatchFixture = await dispatchFixture();
+@@ -110,14 +110,14 @@ test('dirty merged worktree is kept and reported with path and reason', async ()
+     const out: Result = await status(f, 'dirty-leaf');
+     expect(out.stdout).toContain(worktree);
+     expect(out.stdout).toContain('uncommitted');
+-    const plain: Result = await cli(f, ['status'], f.root, f.env);
++    const plain: Result = await cli(f, ['leftovers'], f.root, f.env);
+     expect(plain.code).toBe(0);
+-    expect(plain.stdout).toContain(`  Kept by last cleanup: ${worktree} — uncommitted changes`);
++    expect(plain.stdout).toContain(`  uncommitted changes\n    ${worktree.replace(f.home, '~')}`);
+     expect((await branchExists(f, 'dirty-leaf')).code).toBe(0);
+     rmSync(worktree, { recursive: true, force: true });
+-    const stale: Result = await cli(f, ['status'], f.root, f.env);
++    const stale: Result = await cli(f, ['leftovers'], f.root, f.env);
+     expect(stale.code).toBe(0);
+-    expect(stale.stdout).not.toContain(worktree);
++    expect(stale.stdout).not.toContain(worktree.replace(f.home, '~'));
+   } finally {
+     f.clean();
+   }
+diff --git a/tests/status.test.ts b/tests/status.test.ts
+index e78dbc3..108eb4a 100644
+--- a/tests/status.test.ts
++++ b/tests/status.test.ts
+@@ -1,5 +1,6 @@
+ import { test, expect } from 'bun:test';
+ import {
++  chmodSync,
+   existsSync,
+   mkdirSync,
+   readFileSync,
+@@ -203,12 +204,14 @@ for (const directory of ['missing', 'empty']) {
+   });
+ }
+ 
+-test('plain status lists kept-by-last-cleanup entries under each repo, skips missing paths and writes nothing', async () => {
++test('leftovers lists kept paths by reason per repo and kept units, skips missing paths and in-use work, and writes nothing', async () => {
+   const f: Fixture = await fixture();
+   try {
+     const keptDir: string = registerTemp(resolve(f.home, 'kept-worktree'));
+     mkdirSync(keptDir, { recursive: true });
+     writeFileSync(resolve(keptDir, 'file'), 'x');
++    const busyDir: string = resolve(f.home, 'busy-worktree');
++    mkdirSync(busyDir, { recursive: true });
+     const gone: string = resolve(f.home, 'gone-worktree');
+     const report: string = resolve(f.home, 'reconcile/repo.json');
+     mkdirSync(resolve(f.home, 'reconcile'), { recursive: true });
+@@ -218,24 +221,63 @@ test('plain status lists kept-by-last-cleanup entries under each repo, skips mis
+         kept: [
+           { path: keptDir, reason: 'uncommitted changes' },
+           { path: gone, reason: 'uncommitted changes' },
++          { path: busyDir, reason: 'active leaf' },
++          { path: busyDir, reason: 'verify 123 in progress' },
++          { path: busyDir, reason: 'live pane inside' },
++          { path: busyDir, reason: 'state.batch' },
++        ],
++      }) + '\n',
++    );
++    writeFileSync(
++      resolve(f.home, 'reconcile-host.json'),
++      JSON.stringify({
++        kept: [
++          { path: 'akrogon-lstray.slice', reason: 'process inside' },
++          { path: 'akrogon-lown.slice', reason: 'own slice' },
++          { path: 'akrogon-lrun.slice', reason: 'live run record' },
++          { path: 'akrogon-ltab.slice', reason: 'live tab' },
++          { path: 'akrogon-lpanes.slice', reason: 'pane list unavailable' },
+         ],
+       }) + '\n',
+     );
+     const before: Record<string, string> = snapshot(f.home);
+-    const result: Result = await cli(f, ['status'], f.home);
++    const result: Result = await cli(f, ['leftovers'], f.home);
+     expect(result.code).toBe(0);
+-    const rows: string[] = result.stdout.split('\n');
+-    const line: string = `  Kept by last cleanup: ${keptDir} — uncommitted changes`;
+-    expect(rows).toContain(line);
+-    expect(rows.indexOf('repo')).toBeLessThan(rows.indexOf('  no open leaves'));
+-    expect(rows.indexOf('  no open leaves')).toBeLessThan(rows.indexOf(line));
+-    expect(result.stdout).not.toContain(gone);
++    expect(result.stdout).toBe(
++      'repo\n  uncommitted changes\n    ~/kept-worktree\n\nsystemd units\n  pane list unavailable\n    akrogon-lpanes.slice\n  process inside\n    akrogon-lstray.slice',
++    );
++    const board: Result = await cli(f, ['status'], f.home);
++    expect(board.code).toBe(0);
++    expect(board.stdout).toBe('repo\n  no open leaves');
+     expect(snapshot(f.home)).toEqual(before);
+   } finally {
+     f.clean();
+   }
+ });
+ 
++test('leftovers fails naming the kept report when it is invalid or unreadable', async () => {
++  const f: Fixture = await fixture();
++  const folder: string = resolve(f.home, 'reconcile');
++  try {
++    mkdirSync(folder, { recursive: true });
++    const report: string = resolve(folder, 'repo.json');
++    writeFileSync(report, '{"kept": [');
++    const invalid: Result = await cli(f, ['leftovers'], f.home);
++    expect(invalid.code).not.toBe(0);
++    expect(invalid.stdout).not.toContain('no leftovers');
++    expect(invalid.stderr).toContain(report);
++    writeFileSync(report, JSON.stringify({ kept: [] }) + '\n');
++    chmodSync(folder, 0o600);
++    const denied: Result = await cli(f, ['leftovers'], f.home);
++    expect(denied.code).not.toBe(0);
++    expect(denied.stdout).not.toContain('no leftovers');
++    expect(denied.stderr).toContain(report);
++  } finally {
++    chmodSync(folder, 0o755);
++    f.clean();
++  }
++});
++
+ test('incomplete repositories report exact paths before readable trees and exit nonzero', async () => {
+   const f: Fixture = await fixture();
+   const g: Fixture = await fixture();

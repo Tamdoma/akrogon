@@ -1,0 +1,53 @@
+bun test v1.4.3 (c6da4a4d3)
+moved merged
+issue complete issue
+
+tests/batch-dispatch.test.ts:
+(pass) a failed removal stops the merge prompt [1599.47ms]
+(pass) empty untracked folders are removed before a solo merge prompt [1614.40ms]
+(pass) unreadable ignored folders do not stop empty-folder cleanup before merge [1643.36ms]
+(pass) empty untracked folders are removed before an applied merge prompt [1679.50ms]
+(pass) an edit arriving after the move status read survives the Git reset [1685.63ms]
+(pass) a dirty holder worktree drops the batch to solo and keeps its branch [1708.26ms]
+(pass) an interrupted build is discarded and rebuilt under a new attempt [1724.14ms]
+(pass) cleanup retains a merged holder worktree while publication recovery is blocked [1811.27ms]
+(pass) holder-seat commits survive the check.fix handoff [1821.53ms]
+(pass) holder-seat commits survive the failed handoff [1833.45ms]
+(pass) a fetch failure keeps the record, moves nothing and reports the error [1865.18ms]
+(pass) an applied holder retains its checked integration head on red [1877.75ms]
+(pass) a failed holder with a landed candidate is told to move back, then reconciles without run or push [2042.57ms]
+(pass) a green merge clears the record once the holder lands [2068.24ms]
+(pass) a failed published holder receives one recovery notice across repeated passes [2095.44ms]
+(pass) late holder dirt during initial apply is isolated and survives cleanup [2188.56ms]
+(pass) the holder gets a batch record rebased onto the remote and only the holder is prompted [2429.62ms]
+(pass) a clean waiting leaf stacks under the holder and lands with it in one push [2721.90ms]
+(pass) a landed candidate moves the holder once, clears the record, and the next pass wakes dependents [2848.19ms]
+(pass) a member that conflicts with the stack is skipped and merges in a later turn [3024.71ms]
+(pass) a stopped waiting leaf is never stacked [1872.62ms]
+(pass) a holder that cannot be rebased takes a solo turn with nothing stacked [1913.70ms]
+(pass) reconcile completes a landed member after its branch moved but before its phase moved [2230.88ms]
+(pass) reconcile moves every still-merge stacked member to merged exactly once [2813.68ms]
+(pass) a drifted member refuses the push and the restack drops it [2998.67ms]
+(pass) a red stack restarts only its holder when another leaf enters merge during verification [2970.66ms]
+(pass) a member head red on the old base stacks on the moved base [3324.31ms]
+(pass) a red stack records member heads, clears the batch and restarts the holder alone [4053.73ms]
+
+tests/batch.test.ts:
+(pass) stateSchema accepts a state with a batch record [0.26ms]
+(pass) readState drops a legacy solo key left in state.yaml [24.00ms]
+(pass) stateSchema rejects unknown or missing-required batch fields [1.41ms]
+(pass) attemptId returns unique nonempty strings [0.19ms]
+(pass) buildStack re-removes a retired lesson line the union merge resurrects [62.99ms]
+(pass) buildStack keeps a same-stem lesson main added while the retiring holder was in flight [72.66ms]
+(pass) buildStack adds no fixup commit when no retired lesson is resurrected [57.02ms]
+(pass) buildStack rebases the holder range onto the base and leaves the branch unchanged [47.36ms]
+(pass) buildStack refuses a store path under an ancestor holding node_modules [30.09ms]
+(pass) a holder already on the base produces the base without a rebase [32.17ms]
+(pass) a holder conflict reports failure and leaves the branch unchanged [54.68ms]
+(pass) applyTop resets a clean worktree to the top and puts a dirty one back at head [47.87ms]
+(pass) isAncestor returns the merge-base verdict and throws on other codes [35.64ms]
+
+ 41 pass
+ 0 fail
+ 485 expect() calls
+Ran 41 tests across 2 files. [6.19s]

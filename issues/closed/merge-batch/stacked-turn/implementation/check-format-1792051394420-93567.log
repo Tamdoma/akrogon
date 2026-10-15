@@ -1,0 +1,10 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+Checking formatting...
+[0.02ms] ".env"
+[warn] src/batch.ts
+[warn] src/next.ts
+[warn] src/phase.ts
+[warn] tests/batch-dispatch.test.ts
+[warn] Code style issues found in 4 files. Run Prettier with --write to fix.

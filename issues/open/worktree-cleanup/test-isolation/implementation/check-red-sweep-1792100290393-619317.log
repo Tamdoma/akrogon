@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/isolation.test.ts:
+(pass) suite env is redirected: HOME, leaf-temp root, tmpdir and store resolve under the suite scratch [5.56ms]
+70 |     await Bun.sleep(20);
+71 |   }
+72 |   expect(adopted, `orphan ${grandchild} adopted by this worker`).toBe(true);
+73 |   sweepSuite();
+74 |   for (let i: number = 0; i < 50 && existsSync(`/proc/${grandchild}`); i += 1) await Bun.sleep(20);
+75 |   expect(existsSync(`/proc/${grandchild}`), `grandchild ${grandchild} still alive after sweep`).toBe(false);
+                                                                                                     ^
+error: grandchild 620623 still alive after sweep
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/test-isolation/tests/isolation.test.ts:75:97)
+(fail) a killed child leaves no descendant: the orphan is adopted by this worker and swept [1052.63ms]
+
+ 1 pass
+ 1 fail
+ 13 expect() calls
+Ran 2 tests across 1 file. [1086.00ms]

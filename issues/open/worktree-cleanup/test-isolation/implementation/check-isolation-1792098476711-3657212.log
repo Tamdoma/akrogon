@@ -1,0 +1,10 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/isolation.test.ts:
+(pass) suite env is redirected: HOME, leaf-temp root, tmpdir and store resolve under the suite scratch [6.08ms]
+(pass) a killed child leaves no descendant: the orphan is adopted by this worker and swept [41.60ms]
+
+ 2 pass
+ 0 fail
+ 13 expect() calls
+Ran 2 tests across 1 file. [68.00ms]

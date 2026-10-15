@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: git worktree remove --force
+    command: git worktree remove --force ../copy
+    identity: local user ivan (uid 1000)
+    target: throwaway repo in the door job temp dir, detached worktree at a commit unreachable from any branch, untracked __pycache__/ and dirty.txt
+    version: git 2.56.0
+    result: plain remove exits 128 (modified or untracked files); --force exits 0, folder gone, git worktree list shows only main
+    cleanup: throwaway repo deleted, temp dir empty
+    limits: locked worktrees and submodules not covered
+    record: issues/chart/worktree-cleanup/forks/scratch-copy-removal.md
+    date: '2026-10-15'

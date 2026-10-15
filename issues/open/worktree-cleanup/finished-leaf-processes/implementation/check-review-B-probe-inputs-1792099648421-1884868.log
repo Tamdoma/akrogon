@@ -1,0 +1,309 @@
+      .map((leaf) => ({ repo, leaf })),
+  );
+}
+
+export async function nextCommand(input: string | undefined, pressureDir: string = '/proc/pressure'): Promise<void> {
+  const rawEvent: string | undefined = input === undefined ? process.env.HERDR_PLUGIN_EVENT_JSON : undefined;
+  const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
+  readPaused();
+  if (event?.event === 'pane_agent_status_changed' && event.data.agent_status === 'working') return;
+  const global: GlobalConfig = readGlobal();
+  const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
+  const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
+  // One shared lazy pane list per pass; reconcile and the host step share it.
+  let panesRequested: boolean = false;
+  let live: Pane[] | null = null;
+  const panesOnce = async (): Promise<Pane[] | null> => {
+    if (!panesRequested) {
+      panesRequested = true;
+      live = await panes().catch(() => null);
+    }
+    return live;
+  };
+  const hooked: boolean = event !== undefined;
+  const selection: Selection | undefined =
+    input !== '--all' && input !== '--resume' && event?.event !== 'tab_closed' && (input !== undefined || !hooked)
+      ? await selectLeaves(global, invocation, input)
+      : undefined;
+  const updating: Repo[] =
+    input === '--all' || input === '--resume'
+      ? registeredRepos(global, invocation).repos
+      : selection === undefined
+        ? []
+        : [selection.repo];
+  for (const repo of updating) {
+    try {
+      await selfUpdate(repo);
+tests/next.test.ts:578:        event: 'tab_closed',
+tests/next.test.ts:579:        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w2' },
+tests/next.test.ts:614:for (const path of ['targeted', 'tab_closed', 'pane_hook'] as const) {
+tests/next.test.ts:633:      } else if (path === 'tab_closed') {
+tests/next.test.ts:642:            event: 'tab_closed',
+tests/next.test.ts:643:            data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w2' },
+tests/next.test.ts:659:      // Targeted and tab_closed passes close the merged tab via reconciliation;
+tests/next.test.ts:661:      const expected: string[] = path === 'targeted' || path === 'tab_closed' ? ['second'] : ['first', 'second'];
+tests/next.test.ts:2417:test('a merged leaf whose tab is already gone makes no tab close call and a driven tab_closed hook stays quiet', async () => {
+tests/next.test.ts:2462:        event: 'tab_closed',
+tests/next.test.ts:2463:        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' },
+tests/next.test.ts:4062:        event: 'tab_closed',
+tests/next.test.ts:4063:        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' },
+tests/next.test.ts:4098:        event: 'tab_closed',
+tests/next.test.ts:4099:        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' },
+tests/next.test.ts:5907:        event: 'tab_closed',
+tests/next.test.ts:5908:        data: { type: 'tab_closed', tab_id: 'w1:t999', workspace_id: 'w1' },
+src/next.ts:91:const hookEventSchema = z.discriminatedUnion('event', [
+src/next.ts:109:    event: z.literal('tab_closed'),
+src/next.ts:110:    data: z.object({ type: z.literal('tab_closed'), tab_id: z.string() }),
+src/next.ts:114:type HookEvent = z.infer<typeof hookEventSchema>;
+src/next.ts:1356:  const event: HookEvent | undefined = rawEvent === undefined ? undefined : hookEventSchema.parse(JSON.parse(rawEvent));
+src/next.ts:1374:    input !== '--all' && input !== '--resume' && event?.event !== 'tab_closed' && (input !== undefined || !hooked)
+src/next.ts:1445:      } else if (event?.event === 'tab_closed') {
+import { test, expect } from 'bun:test';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+import { fixture, cli, leaf, fakeHerdr, fakeAkrogon, yaml, leafTempRoot, storeDir, type Fixture } from './helpers';
+import { readState, saveState } from '../src/state';
+import { command, run, type Result } from '../src/shell';
+import { z } from 'zod';
+import type { Database } from './fake-herdr';
+
+type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
+async function dispatchFixture(): Promise<DispatchFixture> {
+  const f: Fixture = await fixture();
+  return { ...f, ...fakeHerdr(f) };
+}
+function database(f: DispatchFixture): Database {
+  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
+}
+function saveDatabase(f: DispatchFixture, db: Database): void {
+  writeFileSync(f.db, JSON.stringify(db));
+}
+async function next(
+  f: DispatchFixture,
+  args: string[],
+  env: NodeJS.ProcessEnv = {},
+  cwd: string = f.root,
+): Promise<Result> {
+  return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
+}
+async function status(f: DispatchFixture, slug: string): Promise<Result> {
+  return cli(f, ['status', slug], f.root, f.env);
+}
+function branchExists(f: DispatchFixture, name: string): Promise<Result> {
+  return run(['git', 'show-ref', '--verify', '--quiet', `refs/heads/${name}`], f.root);
+}
+function worktreeList(f: DispatchFixture): Promise<string> {
+  return command(['git', 'worktree', 'list', '--porcelain'], f.root);
+}
+function scratchFor(f: DispatchFixture, slug: string): string {
+  const create: string[] | undefined = calls(f).find(
+    (args) => args[0] === 'tab' && args[1] === 'create' && args.includes(slug),
+  );
+  expect(create).toBeDefined();
+  const found: string[] = [];
+  for (let i = 0; i + 1 < create!.length; i++)
+    if (create![i] === '--env' && create![i + 1].startsWith('TMPDIR='))
+      found.push(create![i + 1].slice('TMPDIR='.length));
+  expect(found).toHaveLength(1);
+  return found[0];
+}
+function calls(f: DispatchFixture): string[][] {
+  const path: string = f.db + '.calls';
+  return existsSync(path)
+    ? readFileSync(path, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
+    : [];
+}
+function closeTab(f: DispatchFixture, tab: string): void {
+  const db: Database = database(f);
+  saveDatabase(f, {
+    ...db,
+    tabs: db.tabs.filter((item) => item.tab_id !== tab),
+    panes: db.panes.filter((pane) => pane.tab_id !== tab),
+  });
+}
+async function dispatchLeaf(f: DispatchFixture, slug: string, extra: object = {}, container?: string): Promise<string> {
+  const path: string =
+    container === undefined
+      ? leaf(f, slug, 'plan.synthesis', extra)
+      : leaf(f, slug, 'plan.synthesis', extra, container);
+  expect((await next(f, [slug])).code).toBe(0);
+  return path;
+}
+
+// DC1: merged leaf, clean worktree, reachable head → worktree removed, branch -d.
+// Covered by next.test.ts ("bare next …", "typed next …"). Failed variant here:
+test('failed leaf worktree is removed and its branch is kept', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = await dispatchLeaf(f, 'gone-leaf');
+    const worktree: string = readState(path).worktree!;
+    closeTab(f, readState(path).tab!);
+    saveState(path, {
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { z } from 'zod';
+import { command, quote, run, type Result } from './shell';
+import { trackingRef } from './preflight';
+
+const text = z.string().min(1);
+
+const seat: z.ZodString = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(/^[^'"]*$/);
+
+const slotConfigSchema = z.strictObject({ harness: seat, model: seat, effort: seat });
+
+const indexSchema = z.strictObject({
+  slots: z.strictObject({ a: slotConfigSchema.optional(), b: slotConfigSchema.optional() }),
+});
+
+export const globalSchema = z
+  .strictObject({
+    max_active: z.number().int().positive().default(3),
+    slots: z.strictObject({ a: slotConfigSchema, b: slotConfigSchema }),
+    harnesses: z.record(text, text),
+    toolkits: z.record(text, text).default({}),
+    repos: z.record(text, text).default({}),
+  })
+  .superRefine((config, ctx) => {
+    for (const slot of [config.slots.a, config.slots.b]) {
+      if (!Object.hasOwn(config.harnesses, slot.harness))
+        ctx.addIssue({ code: 'custom', message: `Missing harness template: ${slot.harness}` });
+    }
+  });
+
+export const repoSchema = z
+  .strictObject({
+    remote: text.default('origin'),
+    default_branch: text.default('main'),
+    worktree_root: text.optional(),
+    rebuttal: z.boolean().default(true),
+    fix_rounds: z.number().int().positive().default(3),
+    implement: z.enum(['subagents', 'inline']).default('subagents'),
+    setup: text.optional(),
+    checks: z.record(text, text).default({}),
+    merge_checks: z.record(text, text).default({}),
+    merge_covers: z.array(text).default([]),
+    advisory: z.array(text).default([]),
+    env: z.array(text).default([]),
+    pass_env: z.array(text).default([]),
+    tools: z.array(text).default([]),
+    grounding: z.union([
+      z.literal('none'),
+      z.object({
+        index: text.optional(),
+        docs: z.array(text).optional(),
+        surfaces: z.array(text).optional(),
+        indexed_scopes: z.array(text).optional(),
+      }),
+    ]),
+    broadcast: z.object({ discord: z.object({ webhook_env: z.array(text) }) }).optional(),
+    slots: z.strictObject({ a: slotConfigSchema.optional(), b: slotConfigSchema.optional() }).optional(),
+  })
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
+import { z } from 'zod';
+
+export type Result = { code: number; stdout: string; stderr: string };
+
+export class CommandError extends Error {
+  constructor(
+    readonly argv: string[],
+    readonly cwd: string,
+    readonly result: Result,
+  ) {
+    super(JSON.stringify({ command: argv, cwd, ...result }));
+  }
+}
+
+export type SpawnResult = Result & { signalCode: NodeJS.Signals | null; killed: boolean };
+
+// Pipe streams in Bun.spawn can lose their EOF or buffered data under load, so
+// capture through files instead: the OS owns the bytes end to end.
+export type Captured = { dir: string; outPath: string; errPath: string };
+
+export function spawnFiles(
+  argv: string[],
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    stdin?: string;
+    timeout?: number;
+    killSignal?: NodeJS.Signals;
+    captureRoot?: string;
+  } = {},
+): { child: Bun.Subprocess; captured: Captured } {
+  const dir: string = mkdtempSync(resolve(options.captureRoot ?? tmpdir(), 'akrogon-io-'));
+  const captured: Captured = { dir, outPath: resolve(dir, 'out'), errPath: resolve(dir, 'err') };
+  let launched: boolean = false;
+  try {
+    const child: Bun.Subprocess = Bun.spawn(argv, {
+      cwd: options.cwd ?? process.cwd(),
+      env: options.env,
+      stdin: options.stdin === undefined ? 'ignore' : new Blob([options.stdin]),
+      stdout: Bun.file(captured.outPath),
+      stderr: Bun.file(captured.errPath),
+      timeout: options.timeout,
+      killSignal: options.killSignal,
+    });
+    launched = true;
+    return { child, captured };
+  } finally {
+    if (!launched) rmSync(captured.dir, { recursive: true, force: true });
+  }
+}
+
+export async function finishCaptured(child: Bun.Subprocess, captured: Captured): Promise<SpawnResult> {
+  const code: number = await child.exited;
+  const result: SpawnResult = {
+    code,
+    signalCode: child.signalCode,
+    killed: child.killed,
+        if (owners.length > 1) throw new Error(`Multiple leaves own hook pane: ${hookPane}`);
+        if (owners.length === 0) return;
+        const owner: { repo: Repo; leaf: Leaf } = owners[0];
+        if (isPaused(owner.repo.name)) return;
+        const completedSlug: string = owner.leaf.state.slug;
+        const outcome: DispatchOutcome = await dispatchLeaf(
+          global,
+          owner.repo,
+          owner.leaf,
+          false,
+          invocation,
+          undefined,
+          true,
+        );
+        if (outcome === 'completed') await dispatchDependents(global, owner.repo, completedSlug, invocation, true);
+        let rediscovered: Leaf | undefined;
+        try {
+          rediscovered = discover(owner.repo, invocation).leaves.find((leaf) => leaf.state.slug === completedSlug);
+          if (
+            rediscovered !== undefined &&
+            rediscovered.state.phase === 'merged' &&
+            hookPane === rediscovered.state.pane.B &&
+            (event === undefined ||
+              event.event !== 'pane_agent_status_changed' ||
+              (event.data.agent_status !== 'blocked' && event.data.agent_status !== 'unknown'))
+          )
+            await closeMergedTab(owner.repo, rediscovered, await panes());
+        } catch (error) {
+          if (!(error instanceof Error)) throw error;
+          report(invocation, owner.repo.name, rediscovered?.path ?? owner.leaf.path, error, completedSlug);
+        }
+        touched.set(owner.repo.name, { repo: owner.repo, isAutomatic: true });
+      }
+    });
+    for (const { repo, isAutomatic } of touched.values()) {
+      try {
+137:function discover(repo: Repo, invocation: Invocation): Inventory {
+1241:  const openRoot: string = resolve(repoRoot, 'issues/open');
+1260:  const openRoot: string = resolve(repo.root, 'issues/open');

@@ -1,0 +1,14 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+bun test v1.4.3 (c6da4a4d3)
+[0.01ms] ".env"
+
+tests/leaf-slices.test.ts:
+(pass) a shell run admitted while another slice stops protects its own slice [466.33ms]
+
+ 1 pass
+ 11 filtered out
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [494.00ms]

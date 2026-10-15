@@ -1,0 +1,10 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/batch-dispatch.test.ts:
+(pass) reconcile completes a landed member after its branch moved but before its phase moved [1745.11ms]
+
+ 1 pass
+ 26 filtered out
+ 0 fail
+ 11 expect() calls
+Ran 1 test across 1 file. [1.78s]

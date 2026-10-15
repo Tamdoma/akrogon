@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/leaf-slices.test.ts:
+659 |       FAKE_SYSTEMCTL_LOG: log,
+660 |       AKROGON_RETIRED_TEMP_ROOT: retired,
+661 |       AKROGON_CGROUP_ROOT: resolve(f.home, 'cgroups'),
+662 |     });
+663 |     expect(result.code).toBe(0);
+664 |     expect(existsSync(retired)).toBe(false);
+                                      ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/store-sweep-u1/tests/leaf-slices.test.ts:664:33)
+(fail) the host step removes retired leftovers and keeps unprovable items [139.48ms]
+
+ 0 pass
+ 13 filtered out
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [166.00ms]

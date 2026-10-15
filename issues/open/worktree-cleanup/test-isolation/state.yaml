@@ -1,0 +1,29 @@
+slug: test-isolation
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#93"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tCH
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQH
+  B: w8:pQJ
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T21:41:36.769Z
+frozen:
+  tests/isolation.test.ts: bb027d737cfd3c09047fc00849e589d74bc14bb2
+frozen_cited: []

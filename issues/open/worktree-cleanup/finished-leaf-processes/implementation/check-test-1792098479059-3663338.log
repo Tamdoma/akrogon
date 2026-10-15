@@ -1,0 +1,10 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/leaf-slices.test.ts:
+(pass) akrogon phase merged inside the leaf slice stops no slice [218.69ms]
+
+ 1 pass
+ 8 filtered out
+ 0 fail
+ 7 expect() calls
+Ran 1 test across 1 file. [250.00ms]

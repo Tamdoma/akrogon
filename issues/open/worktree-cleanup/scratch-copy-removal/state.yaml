@@ -1,0 +1,30 @@
+slug: scratch-copy-removal
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#93"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tCD
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQ9
+  B: w8:pQA
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T21:57:34.900Z
+frozen:
+  tests/batch.test.ts: 6f0e6b037f09b6fd9bbfbdea0950bb948bf93843
+  tests/reconcile.test.ts: cb96a4dea55f691a900615f58b32fa57ba721b5e
+frozen_cited: []

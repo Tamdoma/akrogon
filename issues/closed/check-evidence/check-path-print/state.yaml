@@ -1,0 +1,29 @@
+slug: check-path-print
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tCJ
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQK
+  B: w8:pQM
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T21:07:04.107Z
+frozen:
+  tests/run-check.test.ts: 36538b8cfb332e4f6d66791aa04bf61ca43d9018
+  tests/run-units.test.ts: 00b27e8b67270d109f554541d379d7009ac8aa46
+frozen_cited: []

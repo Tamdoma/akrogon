@@ -1,0 +1,32 @@
+slug: folder-pack
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by:
+  - close-pack
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tCQ
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQW
+  B: w8:pQX
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T22:37:26.694Z
+frozen:
+  tests/command-reference.test.ts: b4ce6920fdc3b5969ebb13a01109a1332a21d46e
+  tests/docs-links.test.ts: 4287058e4f5fe255f33ae62da1e1da6947208364
+  tests/folder-pack.test.ts: d9b0845b0e345d1a31091d46998bd6eb77efd7fc
+  tests/status.test.ts: 763961de7251f1314d7ee001a3703d90e1436a6c
+frozen_cited: []

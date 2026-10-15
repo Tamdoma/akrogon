@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: GitHub REST issue listing, all states
+    command: gh api --hostname github.com 'repos/Tamdoma/akrogon/issues?state=all&per_page=100' --paginate --slurp
+    identity: operator gh login on this host
+    target: Tamdoma/akrogon and Tamdoma/tamdoma-framework issues
+    version: gh 2.102.0
+    date: '2026-10-15'
+    result: akrogon 1 page, 89 issues, all with created_at and closed_at, 0.9 s; framework 3 pages, 257 issues after dropping pull requests, all with created_at
+    cleanup: none, read-only
+    limits: does not prove transferred or deleted issues appear, or behavior above 100 pages
+    record: issues/chart/system-flow/forks/flow-view.md

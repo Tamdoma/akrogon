@@ -1,0 +1,18 @@
+/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/finished-leaf-processes/implementation/check-format-1792100061805-3827557.log
+Checking formatting...
+All matched files use Prettier code style!
+/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/finished-leaf-processes/implementation/check-setup-1792100059965-3827557.log
++ shell-quote@1.10.0
++ zod@4.6.1
+
+9 packages installed [9.00ms]
+[0.00ms] ".env"
+/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/finished-leaf-processes/implementation/check-test-1792100175154-3827557.log
+
+ 862 pass
+ 0 fail
+ 8853 expect() calls
+Ran 862 tests across 50 files. [113.32s]
+/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/finished-leaf-processes/implementation/check-typecheck-1792100177097-3827557.log
+$ tsc --noEmit
+0dfcedc217967ae4a97935a6cf3b9957bad30054

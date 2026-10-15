@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/batch-dispatch.test.ts:
+1010 |     await command(['git', 'push', 'origin', `${record.top!}:main`], f.root);
+1011 |     saveState(aa.path, { ...readState(aa.path), batch: { ...record, candidate: record.top } });
+1012 |     await command(['git', 'reset', '--keep', member.tip], readState(bb.path).worktree!);
+1013 |     const recovered: Result = await next(f, ['--all']);
+1014 |     expect(recovered.code).toBe(0);
+1015 |     expect(leafState(bb.path).phase).toBe('merged');
+                                            ^
+error: expect(received).toBe(expected)
+
+Expected: "merged"
+Received: "merge"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/stacked-turn/tests/batch-dispatch.test.ts:1015:38)
+(fail) reconcile completes a landed member after its branch moved but before its phase moved [2064.64ms]
+
+ 0 pass
+ 26 filtered out
+ 1 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [2.09s]

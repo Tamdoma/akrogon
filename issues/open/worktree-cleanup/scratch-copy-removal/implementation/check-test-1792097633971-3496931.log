@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+566 |     writeFileSync(
+567 |       resolve(f.root, 'issues/verify-runs.jsonl'),
+568 |       record('dead-run', dead, 4194303) + '\n' + record('live-run', live, process.pid) + '\n',
+569 |     );
+570 |     expect((await next(f, ['--all'])).code).toBe(0);
+571 |     expect(existsSync(dead)).toBe(false);
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/scratch-copy-removal/tests/reconcile.test.ts:571:30)
+(fail) verify scratch copies are removed by owner state and kept while the run is live [2098.27ms]
+
+ 0 pass
+ 29 filtered out
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [2.14s]

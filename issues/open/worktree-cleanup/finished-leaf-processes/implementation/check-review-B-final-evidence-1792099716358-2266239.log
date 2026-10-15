@@ -1,0 +1,151 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+{"scenario":"closed-owner-tab-closed","exit":0,"stderr":"","systemctlCalls":"--user list-units --all akrogon-l*.slice --output=json\n--user stop akrogon-l17e6d6a9e769.slice\n--user list-units --all akrogon-l*.slice --output=json\n--user list-units --failed akrogon-run-* --output=json\n","unitsAfter":{"units":[]}}
+{"scenario":"current-repo-pass-other-repo-live-tab","exit":0,"stderr":"","systemctlCalls":"--user list-units --all akrogon-l*.slice --output=json\n--user stop akrogon-l17e6d6a9e769.slice\n--user list-units --all akrogon-l*.slice --output=json\n--user list-units --failed akrogon-run-* --output=json\n--user list-units --all akrogon-l*.slice --output=json\n--user list-units --all akrogon-l*.slice --output=json\n--user list-units --failed akrogon-run-* --output=json\n--user show akrogon-l517adc8cc3b5.slice -p ControlGroup --value\n--user stop akrogon-l517adc8cc3b5.slice\n","unitsAfter":{"units":[]}}
+[0.01ms] ".env"
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+{"liveRecordDuringStop":true,"secondSliceStopped":true,"calls":"--user list-units --all akrogon-l*.slice --output=json\n--user stop akrogon-l013f877c37d6.slice\n--user stop akrogon-ld39ac978354b.slice\n"}
+[0.00ms] ".env"
+run race-proof
+   315	
+   316	  // The slice step runs before leaf temp and unowned-item checks so a later
+   317	  // sweep in the same pass already sees stopped slices. A finished leaf's slice
+   318	  // is stopped outright — killing leftovers is the point — unless it is the
+   319	  // pass's own, a live run names it, or its tab cannot be proven gone.
+   320	  {
+   321	    const loaded: Set<string> | null = await loadedLeafSlices();
+   322	    const own: Set<string> = ownSlices();
+   323	    const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
+   324	    for (const leaf of leaves) {
+   325	      if (!finished(leaf)) continue;
+   326	      const slice: string = leafSlice(repo, leaf.state.slug);
+   327	      if (loaded === null || !loaded.has(slice)) continue;
+   328	      const reason: string | null = sliceKeepReason(slice, leaf, live, own, runs);
+   329	      if (reason !== null) {
+   330	        keep(slice, reason);
+   331	        continue;
+   332	      }
+   333	      const error: string | null = await stopSlice(slice);
+   334	      if (error === null) removed.push(slice);
+   335	      else keep(slice, error);
+   336	    }
+   337	  }
+   338	
+   339	  async function removeWorktree(path: string): Promise<boolean> {
+   340	    const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
+   603	  const keep = (unit: string, reason: string): void => {
+   604	    kept.push({ path: unit, reason });
+   605	  };
+   606	  const loaded: Set<string> | null = await loadedLeafSlices();
+   607	  const failedRuns: Set<string> | null = await loadedUnits('akrogon-run-*', '--failed');
+   608	  if (loaded !== null) {
+   609	    const leafOf: Map<string, { repo: Repo; leaf: Leaf }> = new Map();
+   610	    for (const repo of repos)
+   611	      for (const leaf of allLeaves(repo)) leafOf.set(leafSlice(repo, leaf.state.slug), { repo, leaf });
+   612	    const own: Set<string> = ownSlices();
+   613	    const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
+   614	    let panes: Pane[] | null = live;
+   615	    let fetched: boolean = live !== null;
+   616	    const livePanes = async (): Promise<Pane[] | null> => {
+   617	      if (!fetched) {
+   618	        panes = await panesOnce();
+   619	        fetched = true;
+   620	      }
+   621	      return panes;
+   622	    };
+   623	    for (const slice of [...loaded].sort()) {
+   624	      const match: { repo: Repo; leaf: Leaf } | undefined = leafOf.get(slice);
+   625	      if (match !== undefined && !finished(match.leaf)) continue;
+   626	      if (match !== undefined) {
+   627	        const view: Pane[] | null = match.leaf.state.tab === undefined ? panes : await livePanes();
+   628	        const reason: string | null = sliceKeepReason(slice, match.leaf, view, own, runs);
+   629	        if (reason !== null) {
+   630	          keep(slice, reason);
+   631	          continue;
+   632	        }
+   633	        const error: string | null = await stopSlice(slice);
+   634	        if (error !== null) keep(slice, error);
+   635	        continue;
+   636	      }
+   637	      if (own.has(slice)) {
+   638	        keep(slice, 'own slice');
+   639	        continue;
+   640	      }
+   641	      if (runs.has(slice)) {
+   642	        keep(slice, 'live run record');
+   643	        continue;
+   644	      }
+   645	      if (await sliceHasProcess(slice)) {
+   646	        keep(slice, 'process inside');
+   647	        continue;
+   648	      }
+   649	      const error: string | null = await stopSlice(slice);
+   650	      if (error !== null) keep(slice, error);
+   651	    }
+   652	  }
+   653	  if (failedRuns !== null)
+   654	    for (const unit of [...failedRuns].sort()) {
+   655	      const result: Result = await systemctl('reset-failed', unit);
+   656	      if (result.code !== 0) keep(unit, result.stderr || `systemctl reset-failed exited ${result.code}`);
+   657	    }
+   658	  writeKept(hostReportPath(), kept);
+  1320	}
+  1321	
+  1322	async function reconcileRepos(
+  1323	  repos: Repo[],
+  1324	  invocation: Invocation,
+  1325	  isAutomatic: boolean,
+  1326	  panesOnce: () => Promise<Pane[] | null>,
+  1327	): Promise<void> {
+  1328	  for (const repo of repos) {
+  1329	    if (isAutomatic && isPaused(repo.name)) continue;
+  1330	    const leaves: Leaf[] = discover(repo, invocation).leaves;
+  1331	    try {
+  1332	      await reconcile(repo, leaves, (await reconcileNeedsPanes(repo, leaves)) ? await panesOnce() : []);
+  1333	    } catch (error) {
+  1334	      if (!(error instanceof Error)) throw error;
+  1335	      report(invocation, repo.name, repo.root, error);
+  1336	    }
+  1337	  }
+  1338	  await reconcileHost(repos, null, panesOnce);
+  1339	}
+  1340	
+  1341	async function paneOwners(
+  1342	  global: GlobalConfig,
+  1343	  invocation: Invocation,
+  1414	        touched.set(selection.repo.name, { repo: selection.repo, isAutomatic: false });
+  1415	        await reconcileRepos([selection.repo], invocation, false, panesOnce);
+  1416	      } else if (input === '--all') {
+  1417	        const current: Repo | null = await currentRepo(global, process.cwd());
+  1418	        if (current === null) {
+  1419	          await sweepAll(global, invocation, false);
+  1420	          const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
+  1421	          for (const repo of registered.repos) touched.set(repo.name, { repo, isAutomatic: false });
+  1422	          await reconcileRepos(registered.repos, invocation, false, panesOnce);
+  1423	        } else {
+  1424	          await sweep(global, current, discover(current, invocation).leaves, invocation, true, false);
+  1425	          touched.set(current.name, { repo: current, isAutomatic: false });
+  1426	          await reconcileRepos([current], invocation, false, panesOnce);
+  1427	        }
+  1428	      } else if (input === '--resume') {
+  1429	        const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
+  1430	        const active: Repo[] = registered.repos.filter((repo) => !isPaused(repo.name));
+  1431	        for (const repo of active)
+  1432	          await sweep(
+  1433	            global,
+  1434	            repo,
+  1435	            discover(repo, invocation).leaves.filter(
+  1436	              (leaf) =>
+  1437	                leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined,
+  1438	            ),
+  1439	            invocation,
+  1440	            false,
+  1441	            true,
+  1442	          );
+  1443	        for (const repo of active) touched.set(repo.name, { repo, isAutomatic: true });
+  1444	        await reconcileRepos(active, invocation, true, panesOnce);
+  1445	      } else if (event?.event === 'tab_closed') {
+32f0b13193d873f43c46a645b5884b272789b174

@@ -1,0 +1,30 @@
+slug: finished-leaf-processes
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#93"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tCF
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQD
+  B: w8:pQE
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T21:36:41.588Z
+frozen:
+  tests/fake-systemctl.ts: 7e80d6572caf9c90c5e40e38fc186d74868f2648
+  tests/leaf-slices.test.ts: 4bd802d8e3d8d3508ef678b2b932b09b3ecb0ffb
+frozen_cited: []

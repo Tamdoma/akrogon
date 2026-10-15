@@ -1,0 +1,42 @@
+# Turn end signal
+
+## Question
+Q1. When herdr shows a non-Claude peer idle and no return file exists, what does peer-wait report: `failure` only on an end signal proven for that harness (claude transcript, pi hook authority, codex rollout) with every other kind waiting out the budget; never `failure` on idle for any non-Claude kind; or today's 10-second rule?
+
+Q2. A peer with no proven end signal that has really stopped returns `budget` on every rerun, and the door reruns at once on `budget`. What stops that: the door reports to the operator after a set number of idle budgets with no `working` seen, or the door keeps rerunning until the operator steps in?
+
+Earlier wording, kept for the record: Q1 asked keep waiting / per-harness signal / herdr agy fix upstream; Q2 asked whether `done` (taken as process exited) still gives `failure`. That Q2 rested on a wrong premise: herdr `done` is Idle not yet seen (A,B,C).
+
+### Carries
+- peer-turn lock: issues/chart/door-turn-and-stale-tab/forks/peer-turn.md:20-24.
+- issues/chart/peer-wait/CHART.md Off route listed herdr changes (a past scope line).
+- Operator split answer 2026-10-15: `1a`.
+
+## Findings
+- `turnOpen` is false for every kind but claude (skills/chart-issues/scripts/peer-wait.ts:130-131); idle/done + 10 s grace + no file = failure (:67, :183-193) (A,B,C,D).
+- Trigger: agy parks its parent while subagents run; herdr's agy manifest matches only braille spinner + `-ing` word or `· N task` (herdr src/detect/manifests/antigravity.toml:19-33), so `● Agent(...)` and non-`-ing` labels read idle (C,D).
+- herdr: pi has full lifecycle hook authority, agy is session-identity only (herdr src/detect/mod.rs:283-300); codex writes `task_complete` to its rollout file (D).
+- agy transcript.jsonl is plain JSONL; the parent writes PLANNER_RESPONSE DONE with no tool_calls during subagent waits (D rebuttal).
+- A dead peer under "keep waiting" costs one budget, then `budget` returns (peer-wait.ts:159-200, peer-ask.ts:31-37) (C R2).
+- Fake herdr holds one status per pane (tests/fake-herdr.ts:218-235); a status sequence is needed for tests (C R3).
+- Session replacement: peer identity is read once (peer-wait.ts:156) (B R1).
+- Live 2026-10-15: agy slot ran ~37 min with herdr `working` on every 5 s sample (slots/status-sample.log).
+
+- Notes 2026-10-15: [A](../slots/signal-A.md), [B](../slots/signal-B.md) (codex), [C](../slots/signal-C.md) (pi), [merged](../slots/signal-merged.md).
+- The machine harness config lists claude, codex, pi; agy is not configured (A,B,C). This session's peer exchanges ended `done` or `budget`, never `failure` (A).
+- pi: full lifecycle hook authority; the installed hook publishes idle only on `agent_settled` with `ctx.isIdle()` (~/.pi/agent/extensions/herdr-agent-state.ts:243-259); live list shows `source: herdr:pi`, `screen_detection_skipped: true` (B,C).
+- codex: screen-only status (live override ~/.config/herdr/agent-detection/codex.toml, B); rollout events `task_started`/`task_complete`/`turn_aborted` with `turn_id` (A,B,C).
+- herdr `done` is Idle not yet seen (herdr src/app/api_helpers.rs:96-107); an agent exiting to a shell reads `unknown` or leaves the list; peer-wait already loops on `unknown` and throws on a vanished agent only at start (peer-wait.ts:107,156) (B,C).
+- fake herdr already scripts a wait sequence (tests/fake-herdr.ts:24-26,247-253) (B); tests use the real HOME (C).
+
+- Rebuttals 2026-10-15: [B](../slots/signal-rebuttal-B.md), [C](../slots/signal-rebuttal-C.md). Settled between slots: the codex reader binds to the newest `task_started` `turn_id` seen at the first check and ends only on that id's `task_complete` or `turn_aborted`; no start found means unproven (B,C). A session changing from one non-null value to another mid-wait is an explicit error, never a switch of reader; identity is re-read at each grace check, which also turns a vanished agent into the existing `No herdr agent` error (B,C; C would exempt pi). Fake herdr gains a persisted per-pane status, session `source`/`kind`, `screen_detection_skipped`, a scripted session change, and tests stop inheriting the real HOME; no machinery leaf (B,C). Corrections: no peer-wait `failure` from codex or pi is recorded, but an older codex early return exists (Tamdoma/akrogon#44, different cause, before the guarded prompt) (B,C); a missing or released peer already ends the wait with a herdr error, so endless budgets apply only to a peer still listed (B).
+- Proof, A 2026-10-15, herdr 0.9.1, codex pane w8:pNQ (session 01a1402e-4c09-7ba1-8e9b-cdd7b70dff76): `herdr agent prompt w8:pNQ "<reply ok, no tools>" --wait --until working --timeout 5000` sent at 20:56:10.322Z returned at 20:56:10.933Z; the rollout's `task_started` count went 20→21 and the new `task_started` carries timestamp 20:56:10.637Z, before herdr's working was seen; `task_complete` followed at 20:56:16.124Z. Limits: one sample on an idle host; does not cover a slow disk or a codex version change.
+- Proof, A 2026-10-15: `turn_aborted` events with `turn_id`, `reason: interrupted` exist in earlier rollouts on this host (2026-10-01 sessions). Limits: not produced on purpose today.
+- Proof, A 2026-10-15, herdr 0.9.1: `herdr agent list` with pi pane w8:pPY idle shows `agent_status: idle`, `screen_detection_skipped: true`, `agent_session.source: herdr:pi`; the codex pane shows `source: herdr:codex` with `screen_detection_skipped: null`, so `source` alone does not prove hook authority and the check needs kind `pi` plus `screen_detection_skipped: true`. Not yet proven: what herdr reports after a pi or codex process exits to its shell (a scratch-pane call, run before handoff only if a criterion claims it).
+- Proof, exited pi (herdr 0.9.1, local user ivan, 2026-10-15, throwaway tab "exit-probe" in the job temp dir): `herdr agent start probe --kind pi --pane <p>`; while running, `agent get` showed pi idle, `source: herdr:pi`, `screen_detection_skipped: true`. Right after ctrl+c, ctrl+c, ctrl+d, herdr still showed pi idle with the same session for a short time. Once the pane showed the shell prompt (`pane process-info` foreground `bash`), `agent get` and `agent wait` both returned `agent_not_found`, so peer-wait's existing `No herdr agent on pane` error applies. Cleanup: tab closed and gone from `tab list`, temp dir and the empty probe pi session dir removed. Limits: the short stale-idle window before herdr drops the agent reads as pi `ended`, which gives `failure`, the right outcome for an exited peer; the length of that window was not measured.
+
+## Taken
+- Operator 2026-10-15: `1a | 2a`. `failure` only on an end signal proven for that harness; a kind with no proven signal never fails on idle; after one idle `budget` for such a kind the door stops and asks the operator.
+- Reason: fast, correct failure for the harnesses in use and no false failure for any other kind; a stuck unproven wait reaches the operator after one budget instead of looping.
+- Foreclosed: never failing any non-Claude kind on idle (1b); today's 10-second rule for every non-Claude kind (1c); rerunning budgets until the operator steps in (2b); an agy turn reader and an upstream herdr agy fix (Off route).
+- Final shape (draft, pending the final-shape check by B and C, [draft](../slots/signal-final-shape-draft.md)).

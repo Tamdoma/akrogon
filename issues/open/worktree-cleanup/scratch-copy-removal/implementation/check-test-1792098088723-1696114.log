@@ -1,0 +1,10 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+(pass) unconfirmed verify worktrees are removed once the run ends [2139.91ms]
+
+ 1 pass
+ 29 filtered out
+ 0 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [2.18s]

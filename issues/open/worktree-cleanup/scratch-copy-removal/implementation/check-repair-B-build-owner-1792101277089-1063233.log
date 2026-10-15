@@ -1,0 +1,15 @@
+bun install v1.4.3 (c6da4a4d3)
+
+Checked 9 installs across 10 packages (no changes) [1.00ms]
+bun test v1.4.3 (c6da4a4d3)
+{"ok":true,"top":"4c4776a6c55da4d13d46e6d8fa746c91dff9996e","tips":{}}
+[0.01ms] ".env"
+
+tests/batch.test.ts:
+(pass) buildStack writes its owner record before the copy and removes both in finally [98.36ms]
+
+ 1 pass
+ 13 filtered out
+ 0 fail
+ 7 expect() calls
+Ran 1 test across 1 file. [126.00ms]

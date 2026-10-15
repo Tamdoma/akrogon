@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/batch-dispatch.test.ts:
+1164 |     expect(merged.code).toBe(0);
+1165 |     expect(leafState(aa.path).phase).toBe('merged');
+1166 |     expect(leafState(bb.path).phase).toBe('merged');
+1167 |     // The recovery wake reconciled the landed push and closed the member tab itself.
+1168 |     expect(database(f).tabs.map((tab) => tab.tab_id)).toContain(aaTab);
+1169 |     expect(database(f).tabs.some((tab) => tab.tab_id === bbTab)).toBe(false);
+                                                                        ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/stacked-member-close/tests/batch-dispatch.test.ts:1169:66)
+(fail) a push reported lost but landed closes member tabs in the recovery wake [5172.51ms]
+
+ 0 pass
+ 29 filtered out
+ 1 fail
+ 10 expect() calls
+Ran 1 test across 1 file. [5.21s]

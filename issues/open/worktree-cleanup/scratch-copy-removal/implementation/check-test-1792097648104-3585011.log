@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+677 |     });
+678 |     const copy: string = resolve(storeDir(f), 'mine-u1');
+679 |     await command(['git', 'worktree', 'add', '--detach', copy], f.root);
+680 |     writeFileSync(resolve(copy, 'untracked'), 'dirty');
+681 |     saveDatabase(f, { ...database(f), paneListStdout: 'unavailable' });
+682 |     expect((await next(f, ['--all'])).code).toBe(0);
+                                                  ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/scratch-copy-removal/tests/reconcile.test.ts:682:45)
+(fail) a leaf slug ending in -u<N> is handled as that leaf, not as a worker copy [109.27ms]
+
+ 0 pass
+ 29 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [136.00ms]

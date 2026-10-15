@@ -1,0 +1,35 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: Bun.Archive with Bun.zstdCompressSync level 19 and Bun.zstdDecompressSync round trip
+    command: bun probe writing and reading one tar.zst with a 174-char member name, read again with tar -I zstd -xOf
+    identity: local user
+    target: local filesystem
+    version: Bun 1.4.3, GNU tar 1.35
+    date: '2026-10-15'
+    result: bytes 0,1,10,13,128,255 and the long member name round-tripped byte-equal; GNU tar read the same archive
+    cleanup: probe files deleted
+    limits: does not cover archives above 148 MB or concurrent readers
+    record: issues/chart/check-evidence/forks/evidence-location.md
+  - operation: read-only git listing of tracked, modified, deleted and untracked logs and indexed bytes
+    command: git ls-files -z [--modified|--deleted|--others --exclude-standard] -- <owner>; git cat-file blob :<path>
+    identity: local user
+    target: throwaway git repo under the job temp dir
+    version: git 2.56.0
+    date: '2026-10-15'
+    result: dotfile and nested logs listed; --modified includes deletions; --deleted lists only deletions; cat-file printed indexed bytes of a deleted log
+    cleanup: throwaway repo removed, absence checked
+    limits: --exclude-standard hides ignored untracked logs; not run inside a linked worktree
+    record: issues/chart/check-evidence/forks/existing-backlog.md
+  - operation: indexed git object id compared with a locally computed blob hash
+    command: git rev-parse --show-object-format; git ls-files -s -z -- <owner>; Bun CryptoHasher sha1 over blob <len>\0 plus file bytes
+    identity: local user
+    target: throwaway git repo under the job temp dir
+    version: git 2.56.0, Bun 1.4.3
+    date: '2026-10-15'
+    result: object format sha1; the indexed oid equalled the local hash for a log holding bytes 0, 255 and CR LF
+    cleanup: throwaway repo removed, absence checked
+    limits: sha256 repositories not run; proves equality with the index, not HEAD
+    record: issues/chart/check-evidence/forks/existing-backlog.md

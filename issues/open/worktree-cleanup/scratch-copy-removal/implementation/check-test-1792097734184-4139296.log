@@ -1,0 +1,25 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+113 |     super(`Leaf repo mismatch at ${path}: stored key "${stored}", registered key "${registered}"`);
+114 |   }
+115 | }
+116 | 
+117 | export function readState(path: string): State {
+118 |   const parsed: ReturnType<typeof Bun.YAML.parse> = Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8'));
+                                                                         ^
+ENOENT: no such file or directory, open '/var/tmp/akr-1000/5d20/e7595e75/run-Gj5xwT/akrogon-KO6SCn/repo/issues/open/issue/mine-u1/state.yaml'
+    path: "/var/tmp/akr-1000/5d20/e7595e75/run-Gj5xwT/akrogon-KO6SCn/repo/issues/open/issue/mine-u1/state.yaml",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at readState (/home/ivan/.akrogon/worktrees/akrogon/scratch-copy-removal/src/state.ts:118:68)
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/scratch-copy-removal/tests/reconcile.test.ts:682:12)
+(fail) a leaf slug ending in -u<N> is handled as that leaf, not as a worker copy [2055.40ms]
+
+ 0 pass
+ 29 filtered out
+ 1 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [2.10s]

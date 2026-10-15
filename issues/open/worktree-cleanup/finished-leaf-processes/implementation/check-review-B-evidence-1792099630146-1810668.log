@@ -1,0 +1,381 @@
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
+import { z } from 'zod';
+import { globalHome } from './config';
+import { procRoot, runUnitBase, stopRunUnits } from './scope';
+
+export interface AdmissionHolder {
+  repo: string;
+  leaf: string;
+  check: string;
+  run: string;
+  slice: string;
+  scope: string;
+  unit: string;
+}
+
+export type Admission =
+  | { kind: 'held'; token: string; wait_ms: number; record_path: string; release: () => void }
+  | { kind: 'nested'; token: string };
+
+const recordSchema = z.object({
+  token_hash: z.string(),
+  pid: z.number().int(),
+  start_time: z.string(),
+  boot_id: z.string(),
+  repo: z.string(),
+  leaf: z.string(),
+  check: z.string(),
+  state: z.enum(['live', 'ended']),
+  run: z.string(),
+  slice: z.string(),
+  scope: z.string(),
+  unit: z.string(),
+  since: z.iso.datetime(),
+});
+export type RunRecord = z.infer<typeof recordSchema>;
+
+const runsDir = (): string => resolve(globalHome(), 'runs');
+const bootId = (): string => readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+
+// Field 22 of /proc/<pid>/stat. The command name in field 2 may hold spaces, so split after the last ')'.
+function startTime(pid: number): string {
+  const stat: string = readFileSync(`/proc/${pid}/stat`, 'utf8');
+  return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+}
+
+function liveStartTime(pid: number): string | undefined {
+  try {
+    return startTime(pid);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
+const recordPath = (hash: string): string => resolve(runsDir(), `${hash}.yaml`);
+
+function writeRecord(record: RunRecord): void {
+  const path: string = recordPath(record.token_hash);
+  const temp: string = `${path}.${process.pid}.tmp`;
+  writeFileSync(temp, Bun.YAML.stringify(record));
+  renameSync(temp, path);
+}
+
+function readRecord(path: string): RunRecord | undefined {
+  try {
+    return recordSchema.parse(Bun.YAML.parse(readFileSync(path, 'utf8')));
+  } catch {
+    return undefined;
+  }
+}
+
+const live = (record: RunRecord, boot: string): boolean =>
+  record.boot_id === boot && liveStartTime(record.pid) === record.start_time;
+
+function nested(token: string): boolean {
+  const hash: string = createHash('sha256').update(token).digest('hex');
+  const record: RunRecord | undefined = readRecord(recordPath(hash));
+  return record !== undefined && record.token_hash === hash && record.state === 'live' && live(record, bootId());
+}
+
+export function liveRuns(): RunRecord[] {
+  const dir: string = runsDir();
+  if (!existsSync(dir)) return [];
+  const boot: string = bootId();
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.yaml'))
+    .flatMap((name) => {
+      const record: RunRecord | undefined = readRecord(resolve(dir, name));
+      return record !== undefined && record.state === 'live' && live(record, boot) ? [record] : [];
+    });
+}
+
+// Records whose writer is gone (or whose file is unreadable) are stale: drop
+// the file and best-effort stop the units it left behind. Hashes in skip name
+// records the caller still owns.
+async function sweepStale(skip: ReadonlySet<string>): Promise<void> {
+  const dir: string = runsDir();
+  if (!existsSync(dir)) return;
+  const boot: string = bootId();
+  const units: string[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.yaml') || skip.has(name.slice(0, -'.yaml'.length))) continue;
+    const path: string = resolve(dir, name);
+    const record: RunRecord | undefined = readRecord(path);
+    if (record !== undefined && live(record, boot)) continue;
+    rmSync(path, { force: true });
+    if (record !== undefined) units.push(record.unit, `${runUnitBase(record.run)}-guard.service`);
+  }
+  await stopRunUnits(...units);
+}
+
+export function callerScope(): string {
+  const token: string | undefined = process.env.AKROGON_RUN;
+  if (token !== undefined && token !== '') {
+    const hash: string = createHash('sha256').update(token).digest('hex');
+    const record: RunRecord | undefined = readRecord(recordPath(hash));
+    if (record !== undefined && live(record, bootId())) return record.scope;
+  }
+  const selfCgroup: string = resolve(procRoot(), 'self', 'cgroup');
+  if (!existsSync(selfCgroup)) return '';
+  const scopes: string[] = [...readFileSync(selfCgroup, 'utf8').matchAll(/\/([^/]+\.scope)/g)].map((match) => match[1]);
+  return scopes[scopes.length - 1] ?? '';
+}
+
+// Admission registers the run and starts it at once: the memory reading, the
+// 48 GiB limit, per-run reservations and the 30 s start spacing were dropped
+// by the operator on 2026-10-14 (run-units brief criterion 5).
+export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: Admission) => Promise<T>): Promise<T> {
+  const inherited: string | undefined = process.env.AKROGON_RUN;
+  if (inherited !== undefined && inherited !== '' && nested(inherited)) return fn({ kind: 'nested', token: inherited });
+  mkdirSync(runsDir(), { recursive: true });
+  const token: string = randomUUID();
+  const ownHash: string = createHash('sha256').update(token).digest('hex');
+  await sweepStale(
+    new Set([
+      ownHash,
+      ...(inherited === undefined || inherited === '' ? [] : [createHash('sha256').update(inherited).digest('hex')]),
+    ]),
+  );
+  const record: RunRecord = {
+    token_hash: ownHash,
+    pid: process.pid,
+    start_time: startTime(process.pid),
+    boot_id: bootId(),
+    ...holder,
+    state: 'live',
+    since: new Date().toISOString(),
+  };
+  const begun: number = Date.now();
+  try {
+    writeRecord(record);
+    process.stderr.write(`run ${holder.run}\n`);
+    let ended: boolean = false;
+    return await fn({
+      kind: 'held',
+      token,
+      wait_ms: Date.now() - begun,
+      record_path: recordPath(record.token_hash),
+      release: () => {
+        if (!ended) writeRecord({ ...record, state: 'ended' });
+        ended = true;
+      },
+    });
+  } finally {
+    rmSync(recordPath(record.token_hash), { force: true });
+  }
+}
+
+export function saveState(path: string, state: State): void {
+  writeYaml(resolve(path, 'state.yaml'), state);
+}
+
+export function validateLeafDepth(areaRoot: string, leafPath: string): void {
+  const depth: number = relative(areaRoot, leafPath).split(sep).filter(Boolean).length;
+  z.number()
+    .refine((value) => value === 2 || value === 3, `Invalid leaf depth: ${resolve(leafPath, 'state.yaml')}`)
+    .parse(depth);
+}
+
+export function leavesUnder(path: string, areaRoot: string): Leaf[] {
+  if (!existsSync(path)) return [];
+  if (existsSync(resolve(path, 'state.yaml'))) {
+    validateLeafDepth(areaRoot, path);
+    return [{ path, state: readState(path) }];
+  }
+  return readdirSync(path, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) => leavesUnder(resolve(path, entry.name), areaRoot));
+}
+
+export function allLeaves(repo: Repo): Leaf[] {
+  const leaves: Leaf[] = ['open', 'closed'].flatMap((area) => {
+    const areaRoot: string = resolve(repo.root, 'issues', area);
+    return leavesUnder(areaRoot, areaRoot);
+  });
+  const slugs: Set<string> = new Set();
+  for (const leaf of leaves) {
+    if (slugs.has(leaf.state.slug)) throw new Error(`Duplicate leaf slug: ${leaf.state.slug}`);
+    if (leaf.state.repo !== repo.name) throw new RepoMismatchError(leaf.path, leaf.state.repo, repo.name);
+    slugs.add(leaf.state.slug);
+  }
+  return leaves;
+}
+
+export function isParked(repo: Repo, slug: string): boolean {
+  const parkedRoot: string = resolve(repo.root, 'issues/parked');
+  return issueFolders(repo.root, 'issues/parked').some((owner) => {
+    const ownerPath: string = resolve(parkedRoot, owner);
+    return issueFolders(ownerPath, '.').some((child) => {
+      const childPath: string = resolve(ownerPath, child);
+      return (
+        (child === slug && existsSync(resolve(childPath, 'state.yaml'))) ||
+        issueFolders(childPath, '.').some((leaf) => leaf === slug && existsSync(resolve(childPath, leaf, 'state.yaml')))
+      );
+    });
+  });
+}
+
+    invocation.skipped.add(repo.name);
+    for (const entry of result.foreign) invocation.skipped.add(`${repo.name}/${entry.path}`);
+    console.error(
+      JSON.stringify({
+        repo: repo.name,
+        path: result.foreign[0].path,
+        error: `Foreign leaves in repo "${repo.name}": ${result.foreign.length} leaves stored under other keys`,
+        count: result.foreign.length,
+        paths: result.foreign,
+      }),
+    );
+  }
+  return { ...result, leaves: result.leaves.filter((leaf) => !duplicates.has(leaf.state.slug)) };
+}
+
+function registeredRepos(global: GlobalConfig, invocation: Invocation): { repos: Repo[]; unknown: boolean } {
+  const repos: Repo[] = [];
+  let unknown: boolean = false;
+  for (const [name, path] of Object.entries(global.repos)) {
+    try {
+      repos.push(readRepo(name, path));
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, name, expandPath(path, globalHome()), error);
+      unknown = true;
+    }
+  }
+  return { repos, unknown };
+}
+
+function inWorktree(cwd: string | null, leaf: Leaf): boolean {
+  return cwd !== null && leaf.state.worktree !== undefined && within(cwd, leaf.state.worktree);
+}
+
+function ownsPane(leaf: Leaf, pane: Pane | undefined, paneId: string): boolean {
+  return Object.values(leaf.state.pane).includes(paneId) || (pane !== undefined && inWorktree(pane.cwd, leaf));
+}
+
+function busy(pane: Pane): boolean {
+  return pane.agent_status === 'working' || pane.agent_status === 'blocked' || pane.agent_status === 'unknown';
+}
+            discover(repo, invocation).leaves.filter(
+              (leaf) =>
+                leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined,
+            ),
+            invocation,
+            false,
+            true,
+          );
+        for (const repo of active) touched.set(repo.name, { repo, isAutomatic: true });
+        await reconcileRepos(active, invocation, true, panesOnce);
+      } else if (event?.event === 'tab_closed') {
+        const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
+          discover(repo, invocation)
+            .leaves.filter((leaf) => leaf.state.tab === event.data.tab_id)
+            .map((leaf) => ({ repo, leaf })),
+        );
+        if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
+        if (owners.length === 0) return;
+        if (isPaused(owners[0].repo.name)) return;
+        const completedSlug: string = owners[0].leaf.state.slug;
+        try {
+          const leaves: Leaf[] = discover(owners[0].repo, invocation).leaves;
+          await reconcile(
+            owners[0].repo,
+            leaves,
+            (await reconcileNeedsPanes(owners[0].repo, leaves)) ? await panesOnce() : [],
+          );
+          await reconcileHost(registeredRepos(global, invocation).repos, live, panesOnce);
+        } catch (error) {
+          if (!(error instanceof Error)) throw error;
+          report(invocation, owners[0].repo.name, owners[0].leaf.path, error, completedSlug);
+        }
+        const outcome: DispatchOutcome = await dispatchLeaf(
+          global,
+          owners[0].repo,
+          owners[0].leaf,
+          false,
+          invocation,
+          undefined,
+          true,
+        );
+33:{"run":"bd830076-bcf5-4829-a693-e8cab8d128be","repo":"akrogon","leaf":"finished-leaf-processes","sha":"5aac9f18dcbf6eb9f80eb973ffd6b34213247d95","tree":"b89e6eea2662e3ce02d5e8e24ba672b7a8c0440b","scope":"leaf","path":"/home/ivan/.akrogon/worktrees/akrogon/verify-bd830076-bcf5-4829-a693-e8cab8d128be","pid":636394,"boot_id":"e8b8fea9-f8ed-4f78-bdd6-f7f6eb21a4f9","setup":0,"commands":[{"name":"format","command":"bunx prettier --check src tests skills/chart-issues/scripts","exit":0,"log":"/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/finished-leaf-processes/implementation/check-format-1792099429604-636394.log"},{"name":"test","command":"bun test --timeout=30000","exit":0,"log":"/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/finished-leaf-processes/implementation/check-test-1792099559116-636394.log"},{"name":"typecheck","command":"bun run typecheck","exit":0,"log":"/home/ivan/Work/infra/akrogon/issues/open/worktree-cleanup/finished-leaf-processes/implementation/check-typecheck-1792099561765-636394.log"}],"start":"2026-10-15T21:23:47.769Z","end":"2026-10-15T21:26:01.765Z"}
+44:export async function fixture(): Promise<Fixture> {
+58:  yaml(resolve(root, 'issues/config.yaml'), { checks: { test: 'bun test' }, grounding: 'none' });
+59:  yaml(resolve(home, 'config.yaml'), {
+122:export function fakeHerdr(f: Fixture): HerdrFixture {
+#!/usr/bin/env bun
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { z } from 'zod';
+
+// Test seam for the user manager: units and cgroup paths come from
+// FAKE_SYSTEMCTL_DB, every call appends argv to FAKE_SYSTEMCTL_LOG.
+const unitSchema = z.object({ unit: z.string(), sub: z.string(), cgroup: z.string().optional() });
+const databaseSchema = z.object({ units: z.array(unitSchema) });
+type Database = z.infer<typeof databaseSchema>;
+
+const path: string = z.string().parse(process.env.FAKE_SYSTEMCTL_DB);
+const db: Database = databaseSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+const args: string[] = process.argv.slice(2);
+if (process.env.FAKE_SYSTEMCTL_LOG !== undefined)
+  appendFileSync(z.string().parse(process.env.FAKE_SYSTEMCTL_LOG), args.join(' ') + '\n');
+
+function save(): void {
+  writeFileSync(path, JSON.stringify(db));
+}
+
+function glob(name: string, pattern: string): boolean {
+  const star: number = pattern.indexOf('*');
+  if (star === -1) return name === pattern;
+  const prefix: string = pattern.slice(0, star);
+  const suffix: string = pattern.slice(star + 1);
+  return name.startsWith(prefix) && name.endsWith(suffix) && name.length >= prefix.length + suffix.length;
+}
+
+const verb: string | undefined = args.find((arg) => !arg.startsWith('-') && !arg.includes('=') && arg !== 'user');
+if (args[0] !== '--user') throw new Error(`Unexpected systemctl call: ${JSON.stringify(args)}`);
+
+if (verb === 'list-units') {
+  const pattern: string | undefined = args.find((arg) => arg.includes('*'));
+  const rows = db.units
+    .filter((unit) => pattern === undefined || glob(unit.unit, pattern))
+    .map((unit) => ({
+      unit: unit.unit,
+      load: 'loaded',
+      active: unit.sub === 'failed' ? 'failed' : 'active',
+      sub: unit.sub,
+      description: '',
+    }));
+  console.log(JSON.stringify(rows));
+  process.exit(0);
+}
+
+if (verb === 'show') {
+  const unit: string = z.string().parse(args.find((arg) => arg.endsWith('.slice') || arg.endsWith('.scope')));
+  const found = db.units.find((item) => item.unit === unit);
+  if (found === undefined) {
+    console.error(`Failed to show unit: Unit ${unit} not found.`);
+    process.exit(1);
+  }
+  const pi: number = args.indexOf('-p');
+  const name: string | undefined = pi === -1 ? undefined : args[pi + 1];
+  if (args.includes('--value')) console.log(name === 'ControlGroup' ? (found.cgroup ?? '') : '');
+  else console.log(`ControlGroup=${found.cgroup ?? ''}`);
+  process.exit(0);
+}
+
+if (verb === 'stop' || verb === 'reset-failed') {
+  const names: string[] = args.filter((arg) => arg.includes('.') && !arg.startsWith('-'));
+  const missing: string[] = names.filter((name) => !db.units.some((unit) => unit.unit === name));
+  if (missing.length > 0 && verb === 'stop') {
+    console.error(`Failed to stop ${missing[0]}: Unit ${missing[0]} not loaded.`);
+    process.exit(5);
+  }
+  db.units = db.units.filter((unit) => !names.includes(unit.unit));
+  save();
+  process.exit(0);
+}
+
+console.log('');
+process.exit(0);

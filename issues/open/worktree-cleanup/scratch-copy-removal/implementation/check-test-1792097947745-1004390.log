@@ -1,0 +1,23 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/reconcile.test.ts:
+778 |     symlinkSync(resolve(dead, 'open-file'), resolve(procDir, 'fd/3'));
+779 |     expect((await next(f, ['--all'])).code).toBe(0);
+780 |     expect(existsSync(dead)).toBe(true);
+781 |     const out: Result = await status(f, 'proc-holder');
+782 |     expect(out.stdout).toContain(dead);
+783 |     expect(out.stdout).toContain(String(child.pid));
+                             ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "1004674"
+Received: "slug: proc-holder\nphase: plan.synthesis\ncreated: 2026-09-10\nrepo: repo\ndebate: \"no\"\nblocked-by: []\nbusy_since:\n  A: 2026-10-15T20:59:07.329Z\nbusy_notified: {}\nattempts:\n  A: 0\n  B: 0\ndone: []\nfix_rounds: 0\nverdict: {}\ntab: w1:t1\nworktree: /var/tmp/akr-1000/5d20/e7595e75/run-uKyXH5/akrogon-FBDvxD/.akrogon/worktrees/repo/proc-holder\nenv_names: []\nenv_generation: 0\npane:\n  A: w1:p2\n  B: w1:p3\nprompted:\n  A: session-4\nprompted_at:\n  A: 2026-10-15T20:59:07.330Z\ndelivery_error: {}\nKept: /var/tmp/akr-1000/5d20/e7595e75/run-uKyXH5/akrogon-FBDvxD/.akrogon/worktrees/repo/proc-holder — active leaf\nKept: /var/tmp/akr-1000/5d20/e7595e75/run-uKyXH5/akrogon-FBDvxD/.akrogon/worktrees/repo/verify-proc — uncommitted changes\nHistory:\nunavailable\n/var/tmp/akr-1000/5d20/e7595e75/run-uKyXH5/akrogon-FBDvxD/repo/issues/open/issue/proc-holder/plan.md\nSeats for the next agent start:\na:\n  harness: fake\n  model: strong-a\n  effort: high\n  source: /var/tmp/akr-1000/5d20/e7595e75/run-uKyXH5/akrogon-FBDvxD/config.yaml\nb:\n  harness: fake\n  model: strong-b\n  effort: medium\n  source: /var/tmp/akr-1000/5d20/e7595e75/run-uKyXH5/akrogon-FBDvxD/config.yaml"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/scratch-copy-removal/tests/reconcile.test.ts:783:24)
+(fail) a scratch copy with a process inside stays, recorded with the pid [918.49ms]
+
+ 0 pass
+ 29 filtered out
+ 1 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [943.00ms]
