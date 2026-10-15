@@ -274,6 +274,28 @@ function ownerDead(owner: { pid: number; boot_id: string }): boolean {
   return !pidAlive(owner.pid) || (owner.boot_id !== '' && owner.boot_id !== currentBoot());
 }
 
+function ownerKeeps(path: string): KeptEntry[] {
+  const stat: Stats | undefined = lstatSync(path, { throwIfNoEntry: false });
+  if (stat === undefined || stat.isSymbolicLink()) return [];
+  const name: string = basename(path);
+  const ownerFile: string | undefined =
+    /^batch-.*\.owner$/.test(name) ? path : stat.isDirectory() && name.startsWith('batch-') ? `${path}.owner` :
+    stat.isDirectory() && name.startsWith('run-') ? resolve(path, '.owner') : undefined;
+  if (ownerFile !== undefined) {
+    const owner: Owner | undefined = readOwner(ownerFile);
+    if (owner !== undefined && !ownerDead(owner))
+      return [{ path, reason: 'live owner', clears: 'removed once the owner exits' }];
+    if (stat.isDirectory() && name.startsWith('run-') && owner === undefined) {
+      if (existsSync(ownerFile))
+        return [{ path, reason: 'invalid .owner record', clears: 'repair the owner record so ownership can be checked' }];
+      const created: number = stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.mtimeMs;
+      if (Date.now() - created < 60_000)
+        return [{ path, reason: 'run younger than 60s', clears: 'removed once it outlives the owner-record gap' }];
+    }
+  }
+  return stat.isDirectory() ? readdirSync(path).flatMap((entry) => ownerKeeps(resolve(path, entry))) : [];
+}
+
 function readProc<T>(read: () => T): T | undefined {
   try {
     return read();
@@ -637,6 +659,12 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(path, `process ${inside.join(', ')} inside`);
       return;
     }
+    const owners: KeptEntry[] = ownerKeeps(path);
+    if (owners.length > 0) {
+      kept.push(...owners);
+      if (!owners.some((entry) => entry.path === path)) keep(path, 'live owner inside', 'removed once contained owners clear');
+      return;
+    }
     drop(path);
   };
   const repoRunning: boolean = leaves.some((leaf) => !finished(leaf));
@@ -996,6 +1024,12 @@ export async function reconcileHost(
     const inside: number[] = pidsInside(targets(), path);
     if (inside.length > 0) {
       keep(path, `process ${inside.join(', ')} inside`);
+      return;
+    }
+    const owners: KeptEntry[] = ownerKeeps(path);
+    if (owners.length > 0) {
+      kept.push(...owners);
+      if (!owners.some((entry) => entry.path === path)) keep(path, 'live owner inside', 'removed once contained owners clear');
       return;
     }
     try {
