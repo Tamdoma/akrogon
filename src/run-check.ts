@@ -148,9 +148,7 @@ export async function runCheck(
     argv,
     cwd,
   );
-  process.stderr.write(
-    `${result.stderr_final_nl ? '' : '\n'}check ${name ?? 'run'}: ${result.code} ${result.log}\n`,
-  );
+  process.stderr.write(`${result.stderr_final_nl ? '' : '\n'}check ${name ?? 'run'}: ${result.code} ${result.log}\n`);
   return result.code;
 }
 
