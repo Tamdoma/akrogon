@@ -14,8 +14,6 @@ import {
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { command, quote, spawnCaptured } from '../src/shell';
-import { readRepo } from '../src/config';
-import { readKept } from '../src/reconcile';
 import { readState } from '../src/state';
 import {
   fixture,
@@ -37,11 +35,13 @@ function writeLog(path: string, data: string | Buffer): void {
 // The same listing rule the pack applies: every *.log entry under the root,
 // recursive and dotfiles included, non-file entries included.
 function logPaths(root: string): string[] {
-  return [...new Bun.Glob('**/*.log').scanSync({ cwd: root, dot: true })].sort();
+  return [...new Bun.Glob('**/*.log').scanSync({ cwd: root, dot: true, onlyFiles: false })].sort();
 }
 
 function findLogs(root: string): string[] {
-  return logPaths(root).map((name) => resolve(root, name));
+  return logPaths(root)
+    .map((name) => resolve(root, name))
+    .filter((path) => lstatSync(path).isFile());
 }
 
 async function archiveMembers(archive: string): Promise<Map<string, Buffer> | null> {
@@ -100,8 +100,8 @@ test('completion packs every log into evidence.tar.zst and a logless owner gets 
     writeLog(resolve(packed, 'implementation/check-a-1.log'), 'alpha\n');
     writeLog(resolve(packed, 'implementation/nested/.deep/check-b-1.log'), Buffer.from([0, 13, 255]));
     writeLog(resolve(packed, 'notes.txt'), 'not a log\n');
-    const quiet: string = leaf(f, 'quiet', 'merge', holding(f), 'issue2');
-    writeLog(resolve(quiet, 'README.md'), 'plain\n');
+    leaf(f, 'quiet', 'merge', holding(f), 'issue2');
+    writeFileSync(resolve(f.root, 'issues/open/issue2/notes.txt'), 'plain\n');
     expect((await cli(f, ['phase', 'packed', 'merged'])).code).toBe(0);
     expect((await cli(f, ['phase', 'quiet', 'merged'])).code).toBe(0);
     const closed: string = resolve(f.root, 'issues/closed/issue');
@@ -118,6 +118,7 @@ test('completion packs every log into evidence.tar.zst and a logless owner gets 
     expect(reread.code).toBe(0);
     expect(reread.bytes.toString()).toBe('alpha\n');
     expect(readFileSync(resolve(closed, 'notes.txt'), 'utf8')).toBe('not a log\n');
+    expect(readFileSync(resolve(f.root, 'issues/closed/issue2/notes.txt'), 'utf8')).toBe('plain\n');
     expect(readState(resolve(closed, 'packed')).phase).toBe('merged');
     const noLogs: string = resolve(f.root, 'issues/closed/issue2');
     expect(readdirSync(noLogs)).toContain('quiet');
@@ -227,7 +228,7 @@ test('run-check refuses closed and closing owners at start and right before publ
       checks: {},
       grounding: 'none',
     });
-    const worktree: string = await mergingLeaf(f, 'racer');
+    const worktree: string = await mergingLeaf(f, 'racer', 'issue3');
     const raced = await cli(
       f,
       [
@@ -253,7 +254,9 @@ test('run-check refuses closed and closing owners at start and right before publ
     expect(readFileSync(resolve(runRoot, 'refusal.json'), 'utf8')).toContain('racer');
     expect((await cli(f, ['next'])).code).toBe(0);
     expect(readFileSync(outLog![1], 'utf8')).toContain('before-close');
-    const kept: { path: string; reason: string }[] = readKept(readRepo('repo', f.root));
+    const kept: { path: string; reason: string }[] = JSON.parse(
+      readFileSync(resolve(f.home, 'reconcile/repo.json'), 'utf8'),
+    ).kept;
     expect(kept.some((entry) => entry.path === runRoot && entry.reason !== '')).toBe(true);
     const before: string[] = readdirSync(resolve(f.root, 'issues/open'));
     expect((await cli(f, ['next'])).code).toBe(0);
@@ -285,7 +288,7 @@ test('a member byte conflict between the archive and a plain log stops the pack 
     const result = await cli(f, ['phase', 'conflict', 'merged']);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(member);
-    expect(readFileSync(resolve(owner, 'evidence.tar.zst'))).toEqual(archiveBytes);
+    expect(Buffer.compare(readFileSync(resolve(owner, 'evidence.tar.zst')), archiveBytes)).toBe(0);
     expect(readFileSync(resolve(dir, 'implementation/a.log'), 'utf8')).toBe('different\n');
     expect(readFileSync(resolve(dir, 'implementation/b.log'), 'utf8')).toBe('other\n');
     expect(existsSync(resolve(owner, 'evidence.tar.zst.tmp'))).toBe(false);
