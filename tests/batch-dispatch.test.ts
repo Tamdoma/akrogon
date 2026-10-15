@@ -1023,3 +1023,38 @@ test('reconcile completes a landed member after its branch moved but before its 
     f.clean();
   }
 }, 30000);
+
+test('a red stack restarts only its holder when another leaf enters merge during verification', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
+    const cc: { path: string; b: string } = await allocatedLeaf(f, 'cc', 'issue-cc');
+    await commitFile(f, aa.path, 'aa-file', 'aa\n');
+    await commitFile(f, bb.path, 'bb-file', 'bb\n');
+    await commitFile(f, cc.path, 'cc-file', 'cc\n');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    expect((await next(f, [])).code).toBe(0);
+    const record = readState(aa.path).batch!;
+    expect(record.members.map((member) => member.slug)).toEqual(['bb']);
+    toMerge(cc.path, '2026-09-13T00:00:00.000Z');
+    idleAllNewSession(f);
+    const red: Result = await cli(
+      f,
+      ['phase', 'aa', 'check.fix', '--slot', 'B', '--attempt', record.attempt],
+      f.root,
+      f.env,
+    );
+    expect(red.code).toBe(0);
+    const restarted = readState(aa.path).batch!;
+    expect(restarted.attempt).not.toBe(record.attempt);
+    expect(restarted.applied).toBe(true);
+    expect(restarted.members).toEqual([]);
+    expect(await command(['git', 'ls-tree', '--name-only', restarted.top!], f.root)).not.toContain('cc-file');
+    expect(readState(cc.path).phase).toBe('merge');
+    expect(attemptLines(f)[0].members).toEqual([{ slug: 'bb', head: record.members[0].head }]);
+  } finally {
+    f.clean();
+  }
+}, 30000);
