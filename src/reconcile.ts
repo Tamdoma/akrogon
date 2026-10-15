@@ -962,7 +962,6 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
             // were removed without one before this check existed (D2, D10).
             const slice: string = leafSlice(repo, leaf.state.slug);
             if (
-              done &&
               loadedSlices !== null &&
               loadedSlices.has(slice) &&
               !stoppedSlices.has(slice) &&
