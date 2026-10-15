@@ -149,6 +149,8 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
     try {
       const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
       leaf(f, 'seat', scenario === 'finished-tab' ? 'merged' : 'implement', { tab: 'w1:t1' });
+      const temp: string = resolve(leafTempRoot(f), relative(process.env.AKROGON_LEAF_TEMP_ROOT!, leafTemp(readRepo('repo', f.root), 'seat')));
+      mkdirSync(temp, { recursive: true });
       const junk: string = resolve(storeDir(f), 'junk');
       mkdirSync(junk, { recursive: true });
       const panes: Pane[] =
@@ -176,6 +178,7 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
         AKROGON_CGROUP_ROOT: cgroups,
       });
       expect({ scenario, present: existsSync(junk) }).toEqual({ scenario, present: scenario !== 'queued' });
+      expect({ scenario, tempPresent: existsSync(temp) }).toEqual({ scenario, tempPresent: scenario !== 'queued' });
     } finally {
       f.clean();
     }
