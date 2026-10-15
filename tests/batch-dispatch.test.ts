@@ -993,3 +993,33 @@ test('reconcile moves every still-merge stacked member to merged exactly once', 
     f.clean();
   }
 }, 30000);
+
+test('reconcile completes a landed member after its branch moved but before its phase moved', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
+    await commitFile(f, aa.path, 'aa-file', 'aa\n');
+    await commitFile(f, bb.path, 'bb-file', 'bb\n');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    expect((await next(f, [])).code).toBe(0);
+    const record = readState(aa.path).batch!;
+    const member = record.members[0];
+    expect(member.tip).not.toBe(member.head);
+    await command(['git', 'push', 'origin', `${record.top!}:main`], f.root);
+    saveState(aa.path, { ...readState(aa.path), batch: { ...record, candidate: record.top } });
+    await command(['git', 'reset', '--keep', member.tip], readState(bb.path).worktree!);
+    const recovered: Result = await next(f, ['--all']);
+    expect(recovered.code).toBe(0);
+    expect(leafState(bb.path).phase).toBe('merged');
+    expect(recovered.stdout).toContain('issue complete issue-bb');
+    expect(leafState(aa.path).batch).toBeUndefined();
+    const repeated: Result = await next(f, ['--all']);
+    expect(repeated.code).toBe(0);
+    expect(repeated.stdout).not.toContain('issue complete issue-bb');
+    expect(attemptLines(f).map((line) => line.outcome)).toEqual(['merged']);
+  } finally {
+    f.clean();
+  }
+}, 30000);
