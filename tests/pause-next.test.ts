@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { command, finishCaptured, spawnFiles, type Captured, type Result } from '../src/shell';
 import { readState, saveState, type State } from '../src/state';
 import type { Database } from './fake-herdr';
-import { cli, entry, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
+import { cli, entry, fakeHerdr, fixture, killTree, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 
@@ -483,11 +483,7 @@ test('race A: pause recorded before the locked merge section suppresses the laun
     expect(mutating(f)).toEqual([]);
     expect(database(f).prompts).toEqual([]);
   } finally {
-    try {
-      child.current?.kill();
-    } catch {
-      // already exited
-    }
+    if (child.current !== undefined) killTree(child.current);
     f.clean();
   }
 });
@@ -549,13 +545,7 @@ test('race B: pause waits for a held launch lock, later automatic work is suppre
     expect(again.code).toBe(0);
     expect(mutating(f).length).toBe(before);
   } finally {
-    for (const proc of procs) {
-      try {
-        proc.kill();
-      } catch {
-        // already exited
-      }
-    }
+    for (const proc of procs) killTree(proc);
     f.clean();
   }
 });

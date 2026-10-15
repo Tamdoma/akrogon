@@ -7,6 +7,7 @@ import {
   entry,
   fakeAkrogon,
   fixture,
+  killTree,
   leaf,
   leafTempRoot,
   seedStat,
@@ -114,7 +115,7 @@ function timings(f: Fixture): Event[] {
 }
 
 function stop(caps: Cap[]): void {
-  for (const cap of caps) if (cap.proc.exitCode === null && cap.proc.signalCode === null) cap.proc.kill('SIGKILL');
+  for (const cap of caps) killTree(cap.proc);
 }
 
 test('two run-checks in two leaves run at the same time', async () => {

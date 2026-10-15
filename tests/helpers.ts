@@ -6,6 +6,7 @@ import { command, spawnCaptured, type Result, type SpawnResult } from '../src/sh
 import { readRepo } from '../src/config';
 import { verifyCommands, type VerifyScope } from '../src/verify';
 import { findLeaf, readState, type Batch } from '../src/state';
+import { descendantsOf } from './isolation';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
 const tempDirs: Set<string> = new Set();
@@ -98,6 +99,16 @@ export async function cli(
   if (result.signalCode !== null)
     throw new Error(JSON.stringify({ args, timeout, signal: result.signalCode, code, stdout, stderr }));
   return { code, stdout: stdout.trim(), stderr: stderr.trim() };
+}
+export function killTree(proc: Bun.Subprocess): void {
+  if (proc.exitCode === null && proc.signalCode === null) proc.kill('SIGKILL');
+  for (const pid of descendantsOf(proc.pid)) {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // exited between listing and kill
+    }
+  }
 }
 export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}, container: string = 'issue'): string {
   const path: string = resolve(f.root, 'issues/open', container, slug);
