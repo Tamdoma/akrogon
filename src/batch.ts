@@ -1,11 +1,14 @@
 import { existsSync, readdirSync, rmdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
-import { worktreeStore, type Repo } from './config';
-import { type Leaf } from './state';
+import { worktreeStore, type GlobalConfig, type Repo } from './config';
+import { type BatchMember, type Leaf } from './state';
 import { command, run, CommandError, type Result } from './shell';
 import { removeRetiredLessons } from './lessons';
 import { createSparseWorktree } from './next';
+import { mergeQueue } from './turn';
+import { readLog } from './log';
+import { redMemberHeads } from './attempts';
 
 export async function removeEmptyUntrackedDirs(worktree: string): Promise<void> {
   const present: string = await command(['git', 'ls-files', '-c', '-z'], worktree);
@@ -66,12 +69,46 @@ export async function isAncestor(cwd: string, a: string, b: string): Promise<boo
   throw new CommandError(['git', 'merge-base', '--is-ancestor', a, b], cwd, result);
 }
 
+export async function branchSha(repo: Repo, slug: string): Promise<string | undefined> {
+  const result: Result = await run(
+    ['git', 'rev-parse', '--verify', '--quiet', `refs/heads/${slug}^{commit}`],
+    repo.root,
+  );
+  if (result.code === 0) return result.stdout;
+  if (result.code === 1) return undefined;
+  throw new CommandError(['git', 'rev-parse', `refs/heads/${slug}^{commit}`], repo.root, result);
+}
+
+// The waiting leaves behind the holder, minus heads already red on this base.
+export async function pickMembers(
+  repo: Repo,
+  global: GlobalConfig,
+  leaves: Leaf[],
+  builtOn: string,
+): Promise<BatchMember[]> {
+  const red: Set<string> = redMemberHeads(repo, builtOn);
+  const members: BatchMember[] = [];
+  for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root)).slice(1)) {
+    const slug: string = candidate.leaf.state.slug;
+    // Only leaves carrying commits beyond the base can stack; a branch at or
+    // below the base adds nothing to the turn.
+    const sha: string | undefined = await branchSha(repo, slug);
+    if (sha === undefined || sha === builtOn) continue;
+    if (red.has(sha)) continue;
+    members.push({ slug, base: await memberBase(repo, builtOn, sha), head: sha, tip: sha });
+  }
+  return members;
+}
+
+export type StackResult = { ok: true; top: string; tips?: Map<string, string> } | { ok: false };
+
 export async function buildStack(
   repo: Repo,
   builtOn: string,
   holderHead: string,
+  members: { slug: string; base: string; head: string }[] = [],
   retirementHead: string = holderHead,
-): Promise<{ ok: true; top: string } | { ok: false }> {
+): Promise<StackResult> {
   const dir: string = resolve(worktreeStore(repo), 'batch-' + attemptId());
   await createSparseWorktree(repo, dir, builtOn, { detach: true });
   try {
@@ -84,7 +121,25 @@ export async function buildStack(
       }
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
     }
+    const tips: Map<string, string> = new Map();
+    const stacked: { slug: string; base: string; head: string }[] = [];
+    for (const member of members) {
+      if (await isAncestor(dir, member.head, tip)) {
+        tips.set(member.slug, tip);
+        stacked.push(member);
+        continue;
+      }
+      const merged: Result = await run(['git', 'merge', '--no-edit', member.head], dir);
+      if (merged.code !== 0) {
+        await run(['git', 'merge', '--abort'], dir);
+        continue;
+      }
+      tip = await command(['git', 'rev-parse', 'HEAD'], dir);
+      tips.set(member.slug, tip);
+      stacked.push(member);
+    }
     const removed: string[] = await removeRetiredLessons(dir, builtOn, 'HEAD', [
+      ...stacked.map((member) => ({ base: member.base, head: member.head })),
       { base: await memberBase(repo, builtOn, retirementHead), head: retirementHead },
     ]);
     if (removed.length > 0) {
@@ -92,7 +147,10 @@ export async function buildStack(
       await command(['git', 'commit', '-m', 'lessons: retire applied lines'], dir);
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
     }
-    return { ok: true, top: tip };
+    // tips stays non-enumerable so equality checks on {ok, top} keep working.
+    const result: Extract<StackResult, { ok: true }> = { ok: true, top: tip, tips };
+    Object.defineProperty(result, 'tips', { value: tips, enumerable: false });
+    return result;
   } finally {
     await command(['git', 'worktree', 'remove', '--force', dir], repo.root);
   }
@@ -100,7 +158,7 @@ export async function buildStack(
 
 export type MoveResult = { moved: 'worktree' | 'ref' | 'dirty-ref' };
 
-async function move(repo: Repo, slug: string, target: string, leaf: Leaf): Promise<MoveResult> {
+export async function move(repo: Repo, slug: string, target: string, leaf: Leaf): Promise<MoveResult> {
   if (leaf.state.worktree !== undefined && existsSync(leaf.state.worktree)) {
     const status: string = await command(['git', '-C', leaf.state.worktree, 'status', '--porcelain'], repo.root);
     if (status !== '') {

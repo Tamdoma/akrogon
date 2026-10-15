@@ -67,9 +67,9 @@ switch (verb) {
     const [slug, phase]: [string, string] = z.tuple([z.string(), z.string()]).parse(positionals);
     const { phaseCommand, MoveCommittedError } = await import('./phase');
     const { mergeWake } = await import('./next');
-    let committed: { repo: Repo; to?: Phase } | undefined;
+    let committed: { repo: Repo; to?: Phase; landed?: boolean } | undefined;
     try {
-      const result: { repo: Repo; committed: boolean; to?: Phase } = await phaseCommand(
+      const result: { repo: Repo; committed: boolean; to?: Phase; landed?: boolean } = await phaseCommand(
         slug,
         phase,
         values.slot,
@@ -83,7 +83,8 @@ switch (verb) {
       if (error instanceof MoveCommittedError) committed = error;
       throw error;
     } finally {
-      if (committed !== undefined) await mergeWake(readGlobal(), committed.repo, committed.to);
+      if (committed !== undefined)
+        await mergeWake(readGlobal(), committed.repo, committed.to, '/proc/pressure', committed.landed === true);
     }
     break;
   }

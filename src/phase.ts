@@ -11,6 +11,7 @@ import {
   withLock,
   failureSchema,
   type Batch,
+  type BatchMember,
   type Failure,
   type State,
   type Leaf,
@@ -30,11 +31,12 @@ import { logMove, readLog } from './log';
 import { appendTiming, currentVisit } from './timing';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
 import { mergeQueue } from './turn';
+import { isStopped } from './stop';
 import { closeSources } from './pull';
 import { testFile } from './test-files';
 import { trackingRef } from './preflight';
 import { retiredLessonsPresent } from './lessons';
-import { applyTop, buildStack, isAncestor } from './batch';
+import { applyTop, branchSha, buildStack, isAncestor, move, pickMembers } from './batch';
 import { requireGreenReceipt } from './verify';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
@@ -505,10 +507,11 @@ async function mergeHead(repo: Repo, state: State, record: Batch): Promise<strin
   return record.top;
 }
 
-// B may carry repair commits past the recorded top.
-async function requireBatchTop(worktree: string, top: string, head: string): Promise<void> {
-  if (!(await isAncestor(worktree, top, head)))
-    throw new Error(`HEAD must descend from the recorded batch top ${top}, found ${head}`);
+// With members HEAD is the recorded top; a memberless holder may carry B's repair commits past it.
+async function requireBatchTop(worktree: string, record: Batch, head: string): Promise<void> {
+  const members: boolean = (record.members ?? []).length > 0;
+  if (record.top === undefined || (members ? head !== record.top : !(await isAncestor(worktree, record.top, head))))
+    throw new Error(`HEAD must ${members ? 'equal' : 'descend from'} the recorded batch top ${record.top}, found ${head}`);
 }
 
 async function batchCheck(
@@ -526,11 +529,20 @@ async function batchCheck(
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
   if (record.top === undefined) await requireNonEmpty(repo, worktree);
   else {
-    await requireBatchTop(worktree, record.top, head);
+    await requireBatchTop(worktree, record, head);
+    for (const member of record.members ?? []) {
+      if (member.base === member.head) continue;
+      await requireNoIssueFiles(repo, repo.root, leaf.path, member.base, member.head);
+      await requireTestChangeCitations(repo, repo.root, member.base, member.head);
+      await requireNonEmpty(repo, repo.root, member.base, member.head);
+    }
     await requireNoIssueFiles(repo, repo.root, leaf.path, record.built_on, head);
     await requireTestChangeCitations(repo, repo.root, record.built_on, head);
   }
-  const retired: string[] = await retiredLessonsPresent(worktree, record.built_on, head, [record.holder]);
+  const retired: string[] = await retiredLessonsPresent(worktree, record.built_on, head, [
+    ...(record.members ?? []).map((member) => ({ base: member.base, head: member.head })),
+    record.holder,
+  ]);
   if (retired.length > 0)
     throw new Error(
       'Retired lesson lines present in push range: ' +
@@ -570,12 +582,41 @@ async function batchPush(
   const worktree: string = state.worktree ?? repo.root;
   const head: string = await mergeHead(repo, state, record);
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
-  if (record.top !== undefined) await requireBatchTop(worktree, record.top, head);
+  if (record.top !== undefined) await requireBatchTop(worktree, record, head);
   if (slot !== undefined && head !== record.tested_top)
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);
   await requireGreenReceipt(repo, head, 'merge');
   await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
   saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head } });
+  const members: { member: BatchMember; leaf: Leaf }[] = [];
+  let drifted: boolean = false;
+  for (const member of record.members ?? []) {
+    const item: Leaf | undefined = allLeaves(repo).find((entry) => entry.state.slug === member.slug);
+    if (
+      item === undefined ||
+      item.state.phase !== 'merge' ||
+      isStopped(repo.name, member.slug) ||
+      (await branchSha(repo, member.slug)) !== member.head
+    ) {
+      drifted = true;
+      break;
+    }
+    members.push({ member, leaf: item });
+  }
+  if (drifted) {
+    saveState(leaf.path, {
+      ...readState(leaf.path),
+      batch: {
+        ...record,
+        candidate: head,
+        applied: false,
+        tested_top: undefined,
+        tested_main: undefined,
+        decision: undefined,
+      },
+    });
+    return { kind: 'refused', record, candidate: head, end };
+  }
   const pushed: Result = await run(
     ['git', 'push', repo.config.remote, `${head}:refs/heads/${repo.config.default_branch}`],
     repo.root,
@@ -583,7 +624,12 @@ async function batchPush(
   if (pushed.code === 0) {
     appendAttempt(repo, leaf.state.slug, record, 'merged', end);
     saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head, recorded: true } });
-    await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted, record.built_on);
+    for (const entry of members) {
+      await move(repo, entry.member.slug, entry.member.tip, entry.leaf);
+      await commitMove(repo, entry.leaf, entry.leaf.state, 'merged', 'B', undefined, onCommitted);
+    }
+    const holderNow: Leaf = findLeaf(repo, leaf.state.slug);
+    await transition(repo, holderNow, requested, slot, verdict, reason, false, onCommitted, record.built_on);
     return { kind: 'none' };
   }
   if (pushed.stderr.includes('non-fast-forward') || pushed.stderr.includes('[rejected]')) {
@@ -604,15 +650,24 @@ async function batchPush(
   return { kind: 'error', record, candidate: head, result: pushed, end };
 }
 
-async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
+async function restack(repo: Repo, global: GlobalConfig, leaf: Leaf, record: Batch): Promise<void> {
   const builtOn: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
-  const holderHead: string = await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root);
+  const membered: boolean = (record.members ?? []).length > 0;
+  if (membered) await move(repo, leaf.state.slug, record.holder.head, leaf);
+  const holderHead: string = membered
+    ? record.holder.head
+    : await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root);
+  const members: BatchMember[] = membered
+    ? await pickMembers(repo, global, allLeaves(repo), builtOn)
+    : [];
   const staged: Awaited<ReturnType<typeof buildStack>> = await buildStack(
     repo,
     builtOn,
     holderHead,
+    members,
     record.holder.head,
   );
+  const stagedTips: Map<string, string> | undefined = staged.ok ? staged.tips : undefined;
   const top: string | undefined = await withLock(resolve(globalHome(), '.lock'), async () => {
     const current: Leaf = findLeaf(repo, leaf.state.slug);
     const batch: Batch | undefined = current.state.batch;
@@ -625,8 +680,15 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
       batch: {
         ...batch,
         built_on: applied === undefined ? batch.built_on : builtOn,
+        ...(applied === undefined ? {} : { holder: { base: batch.holder.base, head: holderHead } }),
         applied: true,
         top: applied,
+        members:
+          applied === undefined
+            ? []
+            : members.flatMap((member) =>
+                stagedTips?.has(member.slug) ? [{ ...member, tip: stagedTips.get(member.slug)! }] : [],
+              ),
         candidate: undefined,
         tested_top: undefined,
         tested_main: undefined,
@@ -644,6 +706,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
 
 async function finishPush(
   repo: Repo,
+  global: GlobalConfig,
   slug: string,
   pending: Exclude<BatchPending, { kind: 'none' }>,
   requested: Phase,
@@ -671,13 +734,20 @@ async function finishPush(
         ...leaf.state,
         batch: { ...batch, applied: true, top: pending.candidate, recorded: true },
       });
-      await transition(repo, leaf, requested, slot, verdict, reason, false, onCommitted, batch.built_on);
+      for (const member of batch.members ?? []) {
+        const item: Leaf | undefined = allLeaves(repo).find((entry) => entry.state.slug === member.slug);
+        if (item?.state.phase !== 'merge') continue;
+        await move(repo, member.slug, member.tip, item);
+        await commitMove(repo, item, item.state, 'merged', 'B', undefined, onCommitted);
+      }
+      const holderNow: Leaf = findLeaf(repo, slug);
+      await transition(repo, holderNow, requested, slot, verdict, reason, false, onCommitted, batch.built_on);
     });
     return;
   }
   if (pending.kind === 'error')
     throw new Error(`Push failed: git push exited ${pending.result.code}: ${pending.result.stderr}`);
-  await restack(repo, findLeaf(repo, slug), pending.record);
+  await restack(repo, global, findLeaf(repo, slug), pending.record);
 }
 
 export async function phaseCommand(
@@ -689,7 +759,7 @@ export async function phaseCommand(
   rawCheck: string | boolean | undefined,
   rawAttempt: string | boolean | undefined,
   pressureDir: string = '/proc/pressure',
-): Promise<{ repo: Repo; committed: boolean; to?: Phase }> {
+): Promise<{ repo: Repo; committed: boolean; to?: Phase; landed?: boolean }> {
   const requested: Phase = phaseSchema.parse(rawPhase);
   const slot: Slot | undefined = slotSchema.optional().parse(rawSlot);
   const verdict: Verdict | undefined = verdictSchema.optional().parse(rawVerdict);
@@ -700,11 +770,13 @@ export async function phaseCommand(
   const repo: Repo = await requireRepo(global, process.cwd());
   let committed: boolean = false;
   let committedTo: Phase | undefined;
+  let landed: boolean = false;
   let pending: BatchPending = { kind: 'none' };
   const onCommitted: () => void = () => {
     committedTo = requested;
     committed = true;
   };
+  let mergedRecord: Batch | undefined;
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
     if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
@@ -718,6 +790,7 @@ export async function phaseCommand(
         );
     }
     const record: Batch | undefined = leaf.state.batch;
+    if (requested === 'merged') mergedRecord = record;
     if (leaf.state.phase === 'merge' && requested === 'merged' && record === undefined)
       throw new Error(`Merged refused: ${slug} holds no batch record, so nothing was pushed`);
     if (leaf.state.phase === 'merge' && record !== undefined && (requested === 'merged' || requested === 'check.fix')) {
@@ -742,7 +815,16 @@ export async function phaseCommand(
             end,
             pressureDir,
           );
-        else
+        else if ((record.members ?? []).length > 0) {
+          const state: State = readState(leaf.path);
+          if (slot === undefined || !requiredSlots(state.phase, state.fix_rounds).includes(slot))
+            throw new Error('A required --slot is missing or invalid');
+          await move(repo, state.slug, record.holder.head, leaf);
+          appendAttempt(repo, leaf.state.slug, record, 'red', end);
+          saveState(leaf.path, { ...state, batch: undefined });
+          console.log('stack red; holder turn restarts alone');
+          onCommitted();
+        } else
           await transition(repo, leaf, requested, slot, verdict, reason, check, () => {
             appendAttempt(repo, leaf.state.slug, record, 'red', end);
             onCommitted();
@@ -753,6 +835,13 @@ export async function phaseCommand(
     }
   });
   if (pending.kind !== 'none')
-    await finishPush(repo, slug, pending, requested, slot, verdict, reason, onCommitted, pressureDir);
-  return { repo, committed, to: committedTo };
+    await finishPush(repo, global, slug, pending, requested, slot, verdict, reason, onCommitted, pressureDir);
+  // A merge turn that landed commits defers the successor's turn to the
+  // next pass so member drift is checked against final state; a push that
+  // added nothing (top == built_on) wakes the queue immediately.
+  landed =
+    mergedRecord !== undefined &&
+    mergedRecord.top !== undefined &&
+    mergedRecord.top !== mergedRecord.built_on;
+  return { repo, committed, to: committedTo, landed };
 }

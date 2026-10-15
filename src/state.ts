@@ -37,6 +37,15 @@ export const toolSchema = z.strictObject({ name: text, path: text, version: text
 
 export type Tool = z.infer<typeof toolSchema>;
 
+export const batchMemberSchema = z.strictObject({
+  slug: z.string(),
+  base: z.string(),
+  head: z.string(),
+  tip: z.string(),
+});
+
+export type BatchMember = z.infer<typeof batchMemberSchema>;
+
 export const batchSchema = z.strictObject({
   attempt: z.string().min(1),
   started: z.iso.datetime().optional(),
@@ -51,6 +60,7 @@ export const batchSchema = z.strictObject({
   recorded: z.boolean().optional(),
   built_on: z.string(),
   holder: z.strictObject({ base: z.string(), head: z.string() }),
+  members: z.array(batchMemberSchema).default([]),
   tools: z.array(toolSchema).optional(),
   top: z.string().optional(),
   tested_top: z.string().optional(),
@@ -61,7 +71,8 @@ export const batchSchema = z.strictObject({
   applied: z.boolean(),
 });
 
-export type Batch = z.infer<typeof batchSchema>;
+// Records assembled in code may omit members; parsing fills the default.
+export type Batch = Omit<z.infer<typeof batchSchema>, 'members'> & { members?: BatchMember[] };
 
 export const stateSchema = z
   .strictObject({
@@ -94,7 +105,7 @@ export const stateSchema = z
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
 
-export type State = z.infer<typeof stateSchema>;
+export type State = Omit<z.infer<typeof stateSchema>, 'batch'> & { batch?: Batch };
 
 export type Leaf = { path: string; state: State };
 
@@ -106,7 +117,7 @@ export class RepoMismatchError extends Error {
 
 export function readState(path: string): State {
   const parsed: ReturnType<typeof Bun.YAML.parse> = Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8'));
-  return stateSchema.parse(
+  const state: State = stateSchema.parse(
     parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
       ? Object.fromEntries(
           Object.entries(parsed).filter(
@@ -115,6 +126,21 @@ export function readState(path: string): State {
         )
       : parsed,
   );
+  // Preserve record identity: a batch written without members reads back
+  // without members even though the schema default fills [] for checks.
+  const batch: unknown =
+    parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>).batch
+      : undefined;
+  if (
+    state.batch !== undefined &&
+    batch !== null &&
+    typeof batch === 'object' &&
+    !Array.isArray(batch) &&
+    !('members' in batch)
+  )
+    delete state.batch.members;
+  return state;
 }
 
 export function saveState(path: string, state: State): void {
