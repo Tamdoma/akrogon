@@ -86,7 +86,7 @@ test('unmigrated state in the tool root moves to ~/.akrogon on the first command
   expect(first.stdout).toContain(`moved state home: ${root} -> ${resolve(home, '.akrogon')}`);
   const moved: string = resolve(home, '.akrogon/config.yaml');
   expect(existsSync(moved)).toBe(true);
-  const parsed = Bun.YAML.parse(readFileSync(moved, 'utf8'));
+  const parsed = Bun.YAML.parse(readFileSync(moved, 'utf8')) as { repos: Record<string, string> };
   expect(parsed.repos.rel).toBe(resolve(root, '../repo'));
   expect(readFileSync(resolve(home, '.akrogon/paused.yaml'), 'utf8')).toBe('repo: true\n');
   expect(existsSync(resolve(home, '.akrogon/runs/locks'))).toBe(true);
@@ -105,7 +105,10 @@ test('with AKROGON_HOME unset, commands read and write state only under ~/.akrog
   mkdirSync(resolve(repo, 'issues/open'), { recursive: true });
   await command(['git', 'init', '-b', 'main', repo]);
   writeFileSync(resolve(repo, 'issues/config.yaml'), 'grounding: none\n');
-  const homeConfig = Bun.YAML.parse(readFileSync(resolve(home, '.akrogon/config.yaml'), 'utf8'));
+  const homeConfig = Bun.YAML.parse(readFileSync(resolve(home, '.akrogon/config.yaml'), 'utf8')) as Record<
+    string,
+    unknown
+  > & { repos: Record<string, string> };
   homeConfig.repos = { repo };
   writeFileSync(resolve(home, '.akrogon/config.yaml'), Bun.YAML.stringify(homeConfig));
   const pause: SpawnResult = await cli(root, home, ['pause'], repo);
