@@ -140,7 +140,11 @@ test('no source file reads or writes held.yaml and the hold module is gone', () 
   ];
   for (const name of srcFiles) {
     const text: string = readFileSync(resolve(root, 'src', name), 'utf8');
-    for (const pattern of banned) expect(text, `${name} matches ${pattern}`).not.toMatch(pattern);
+    for (const pattern of banned) {
+      // state-home.ts names the retired file in its cutover copy list (state-home brief criterion 1); the ban stands for every other reference.
+      if (name === 'state-home.ts' && pattern.source === 'held\\.ya?ml') continue;
+      expect(text, `${name} matches ${pattern}`).not.toMatch(pattern);
+    }
   }
   expect(existsSync(resolve(root, 'src/hold.ts'))).toBe(false);
 });
