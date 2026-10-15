@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { readRepo, type Repo } from '../src/config';
 import { flakyLines } from '../src/flaky';
 import { type VerifyRun } from '../src/verify';
-import { fixture, leaf, type Fixture } from './helpers';
+import { cli, fixture, leaf, type Fixture } from './helpers';
 
 type Step = { tree: string; command: string; exit: number; log: string; end?: string; setup?: number };
 
@@ -31,6 +31,29 @@ async function packEvidence(ownerDir: string, members: Record<string, string>): 
   const bytes: Uint8Array = await new Bun.Archive(members).bytes();
   writeFileSync(resolve(ownerDir, 'evidence.tar.zst'), Bun.zstdCompressSync(bytes, { level: 19 }));
 }
+
+test('flaky reports a deleted log when its owner remains without an archive', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const repo: Repo = readRepo('repo', f.root);
+    const dir: string = leaf(f, 'leaf', 'merge');
+    const log: string = resolve(dir, 'check-test.log');
+    writeFileSync(log, '(fail) deleted log\n');
+    rmSync(log);
+    const steps: Step[] = [
+      { tree: 'A', command: 'bun test', exit: 1, log, end: '2026-10-14T01:00:00.000Z' },
+      { tree: 'A', command: 'bun test', exit: 0, log, end: '2026-10-14T02:00:00.000Z' },
+    ];
+    expect(await flakyLines(repo, steps.map(run))).toEqual([
+      { name: 'test', test: '(log gone)', count: 1, last: '2026-10-14T02:00:00.000Z' },
+    ]);
+    const result: Awaited<ReturnType<typeof cli>> = await cli(f, ['log', log]);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain(log);
+  } finally {
+    f.clean();
+  }
+});
 
 test('flaky lists a command red then green on the same tree by failed test, and nothing else', async (): Promise<void> => {
   const f: Fixture = await fixture();
