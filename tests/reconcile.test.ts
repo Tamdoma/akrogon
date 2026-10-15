@@ -2,6 +2,7 @@ import { test, expect } from 'bun:test';
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -941,7 +942,9 @@ test('unregistered and stray entries are deleted when no leaf of the repo runs',
     expect((await next(f, ['--all'])).code).toBe(0);
     for (const root of [storeDir(f), legacy]) {
       expect(existsSync(resolve(root, 'junk'))).toBe(false);
-      expect(existsSync(resolve(root, 'old-link'))).toBe(false);
+      // lstatSync reads the entry itself: existsSync follows the dangling
+      // target and can never tell link-present from link-removed (F1).
+      expect(lstatSync(resolve(root, 'old-link'), { throwIfNoEntry: false })).toBeUndefined();
       expect(existsSync(resolve(root, 'stray.txt'))).toBe(false);
     }
     expect(existsSync(runDead)).toBe(false);
