@@ -138,10 +138,31 @@ test('a tracked log modified on disk refuses the owner and a missing one joins o
     expect(refusedMissing.stderr).toContain(memberB);
     expect(existsSync(resolve(owner, '.closing'))).toBe(false);
 
+    // A present member whose bytes differ from the indexed bytes refuses too.
+    rmSync(resolve(owner, 'leaf/keep.log'));
+    await writeArchive(resolve(owner, 'evidence.tar.zst'), {
+      [memberA]: 'ends with newline\n',
+      [memberB]: Buffer.from([0, 255, 10, 13]),
+      'leaf/keep.log': 'wrong bytes\n',
+    });
+    const refusedBytes: { code: number; stderr: string } = await cli(f, ['pack', 'issues/closed/issue']);
+    expect(refusedBytes.code).not.toBe(0);
+    expect(refusedBytes.stderr).toContain('leaf/keep.log');
+    expect(existsSync(resolve(owner, '.closing'))).toBe(false);
+    await writeArchive(resolve(owner, 'evidence.tar.zst'), {
+      [memberA]: 'ends with newline\n',
+      [memberB]: Buffer.from([0, 255, 10, 13]),
+      'leaf/keep.log': Buffer.from([255, 0, 128]),
+    });
+    const refusedBinary: { code: number; stderr: string } = await cli(f, ['pack', 'issues/closed/issue']);
+    expect(refusedBinary.code).not.toBe(0);
+    expect(refusedBinary.stderr).toContain('leaf/keep.log');
+
     // Missing tracked logs with archived bytes matching the index are accepted.
     await writeArchive(resolve(owner, 'evidence.tar.zst'), {
       [memberA]: 'ends with newline\n',
       [memberB]: Buffer.from([0, 255, 10, 13]),
+      'leaf/keep.log': 'kept\n',
     });
     const archived = await cli(f, ['pack', 'issues/closed/issue']);
     expect(archived.code, archived.stderr).toBe(0);
