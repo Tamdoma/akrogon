@@ -76,7 +76,11 @@ test('F3 live owner records protect recursively deleted parents and batch record
     const retired: string = resolve(f.home, 'retired-temp');
     const oldRepo: string = resolve(leafTempRoot(f), 'unregistered');
     const batch: string = resolve(storeDir(f), 'batch-live');
-    const record: string = JSON.stringify({ pid: child.pid, boot_id: readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(), started: new Date().toISOString() });
+    const record: string = JSON.stringify({
+      pid: child.pid,
+      boot_id: readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(),
+      started: new Date().toISOString(),
+    });
     for (const parent of [retired, oldRepo]) {
       const run: string = resolve(parent, 'leaf', 'run-live');
       mkdirSync(run, { recursive: true });
@@ -98,13 +102,33 @@ test('F3 live owner records protect recursively deleted parents and batch record
 });
 
 async function reconcileFixture(f: Fixture, panes: Pane[] | null, env: NodeJS.ProcessEnv): Promise<Reconciled> {
-  const source: (name: string) => string = (name: string): string => JSON.stringify(resolve(import.meta.dir, '../src', name + '.ts'));
-  const result: SpawnResult = await spawnCaptured([process.execPath, '-e', `const {reconcile}=await import(${source('reconcile')});const {readRepo}=await import(${source('config')});const {allLeaves}=await import(${source('state')});const r=readRepo('repo',process.cwd());console.log(JSON.stringify(await reconcile(r,allLeaves(r),${JSON.stringify(panes)})));`], {
-    cwd: f.root,
-    env: { ...process.env, ...env, HOME: f.home, AKROGON_HOME: f.home, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f), AKROGON_RUN: '' },
-  });
+  const source: (name: string) => string = (name: string): string =>
+    JSON.stringify(resolve(import.meta.dir, '../src', name + '.ts'));
+  const result: SpawnResult = await spawnCaptured(
+    [
+      process.execPath,
+      '-e',
+      `const {reconcile}=await import(${source('reconcile')});const {readRepo}=await import(${source('config')});const {allLeaves}=await import(${source('state')});const r=readRepo('repo',process.cwd());console.log(JSON.stringify(await reconcile(r,allLeaves(r),${JSON.stringify(panes)})));`,
+    ],
+    {
+      cwd: f.root,
+      env: {
+        ...process.env,
+        ...env,
+        HOME: f.home,
+        AKROGON_HOME: f.home,
+        AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+        AKROGON_RUN: '',
+      },
+    },
+  );
   if (result.code !== 0) throw new Error(JSON.stringify(result));
-  return z.object({ removed: z.array(z.string()), kept: z.array(z.object({ path: z.string(), reason: z.string(), clears: z.string().optional() })) }).parse(JSON.parse(result.stdout));
+  return z
+    .object({
+      removed: z.array(z.string()),
+      kept: z.array(z.object({ path: z.string(), reason: z.string(), clears: z.string().optional() })),
+    })
+    .parse(JSON.parse(result.stdout));
 }
 
 test('F4 repo activity follows live tabs and occupied slices instead of phase', async () => {
@@ -115,14 +139,30 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
       leaf(f, 'seat', scenario === 'finished-tab' ? 'merged' : 'implement', { tab: 'w1:t1' });
       const junk: string = resolve(storeDir(f), 'junk');
       mkdirSync(junk, { recursive: true });
-      const panes: Pane[] = scenario === 'finished-tab' ? [{ pane_id: 'w1:p1', tab_id: 'w1:t1', cwd: f.root, agent: null, agent_status: 'working' }] : [];
+      const panes: Pane[] =
+        scenario === 'finished-tab'
+          ? [{ pane_id: 'w1:p1', tab_id: 'w1:t1', cwd: f.root, agent: null, agent_status: 'working' }]
+          : [];
       const db: string = resolve(f.home, 'systemctl.json');
       const cgroups: string = resolve(f.home, 'cgroups');
       mkdirSync(resolve(cgroups, 'busy'), { recursive: true });
       writeFileSync(resolve(cgroups, 'busy/cgroup.procs'), String(process.pid));
-      writeFileSync(db, JSON.stringify({ units: scenario === 'busy-slice' ? [{ unit: leafSlice({ name: 'repo' }, 'seat'), sub: 'active', cgroup: '/busy' }] : [] }));
+      writeFileSync(
+        db,
+        JSON.stringify({
+          units:
+            scenario === 'busy-slice'
+              ? [{ unit: leafSlice({ name: 'repo' }, 'seat'), sub: 'active', cgroup: '/busy' }]
+              : [],
+        }),
+      );
       symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(f.home, 'bin/systemctl'));
-      await reconcileFixture(f, panes, { ...h.env, FAKE_SYSTEMCTL_DB: db, FAKE_SYSTEMCTL_LOG: resolve(f.home, 'systemctl.log'), AKROGON_CGROUP_ROOT: cgroups });
+      await reconcileFixture(f, panes, {
+        ...h.env,
+        FAKE_SYSTEMCTL_DB: db,
+        FAKE_SYSTEMCTL_LOG: resolve(f.home, 'systemctl.log'),
+        AKROGON_CGROUP_ROOT: cgroups,
+      });
       expect({ scenario, present: existsSync(junk) }).toEqual({ scenario, present: scenario !== 'queued' });
     } finally {
       f.clean();
@@ -134,7 +174,9 @@ test('F5 dead-writer temp files wait for an available pane inventory', async () 
   const f: Fixture = await fixture();
   try {
     const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
-    const files: string[] = [storeDir(f), resolve(f.root, 'issues/worktrees')].map((root) => resolve(root, 'writer.4194303.tmp'));
+    const files: string[] = [storeDir(f), resolve(f.root, 'issues/worktrees')].map((root) =>
+      resolve(root, 'writer.4194303.tmp'),
+    );
     for (const file of files) {
       mkdirSync(resolve(file, '..'), { recursive: true });
       writeFileSync(file, 'x');
@@ -159,13 +201,17 @@ test('F6 kept filesystem reports include actionable clearing conditions', async 
     mkdirSync(junk, { recursive: true });
     const repoResult: Reconciled = await reconcileFixture(f, null, h.env);
     expect(repoResult.kept.length).toBeGreaterThan(0);
-    const report = z.object({ kept: z.array(z.object({ path: z.string(), reason: z.string().min(1), clears: z.string().min(1) })) });
+    const report = z.object({
+      kept: z.array(z.object({ path: z.string(), reason: z.string().min(1), clears: z.string().min(1) })),
+    });
     report.parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile/repo.json'), 'utf8')));
     const worktree: string = resolve(f.home, '.akrogon/worktrees/retired/checkout');
     mkdirSync(worktree, { recursive: true });
     writeFileSync(resolve(worktree, '.git'), 'gitdir: retained');
     expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
-    const host: z.infer<typeof report> = report.parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile-host.json'), 'utf8')));
+    const host: z.infer<typeof report> = report.parse(
+      JSON.parse(readFileSync(resolve(f.home, 'reconcile-host.json'), 'utf8')),
+    );
     expect(host.kept.length).toBeGreaterThan(0);
   } finally {
     f.clean();

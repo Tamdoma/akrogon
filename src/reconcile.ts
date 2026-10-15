@@ -76,7 +76,9 @@ export function readRemoved(repo: Repo): RemovedRecord[] {
 // the report; unit names are not paths, so only absolute paths are pruned.
 function writeKept(file: string, kept: KeptEntry[], removed?: RemovedRecord[]): void {
   mkdirSync(dirname(file), { recursive: true });
-  const pruned: KeptEntry[] = kept.filter((entry) => !entry.path.startsWith('/') || lstatSync(entry.path, { throwIfNoEntry: false }) !== undefined);
+  const pruned: KeptEntry[] = kept.filter(
+    (entry) => !entry.path.startsWith('/') || lstatSync(entry.path, { throwIfNoEntry: false }) !== undefined,
+  );
   const temporary: string = `${file}.${process.pid}.tmp`;
   writeFileSync(
     temporary,
@@ -278,16 +280,22 @@ function ownerKeeps(path: string): KeptEntry[] {
   const stat: Stats | undefined = lstatSync(path, { throwIfNoEntry: false });
   if (stat === undefined || stat.isSymbolicLink()) return [];
   const name: string = basename(path);
-  const ownerFile: string | undefined =
-    /^batch-.*\.owner$/.test(name) ? path : stat.isDirectory() && name.startsWith('batch-') ? `${path}.owner` :
-    stat.isDirectory() && name.startsWith('run-') ? resolve(path, '.owner') : undefined;
+  const ownerFile: string | undefined = /^batch-.*\.owner$/.test(name)
+    ? path
+    : stat.isDirectory() && name.startsWith('batch-')
+      ? `${path}.owner`
+      : stat.isDirectory() && name.startsWith('run-')
+        ? resolve(path, '.owner')
+        : undefined;
   if (ownerFile !== undefined) {
     const owner: Owner | undefined = readOwner(ownerFile);
     if (owner !== undefined && !ownerDead(owner))
       return [{ path, reason: 'live owner', clears: 'removed once the owner exits' }];
     if (stat.isDirectory() && name.startsWith('run-') && owner === undefined) {
       if (existsSync(ownerFile))
-        return [{ path, reason: 'invalid .owner record', clears: 'repair the owner record so ownership can be checked' }];
+        return [
+          { path, reason: 'invalid .owner record', clears: 'repair the owner record so ownership can be checked' },
+        ];
       const created: number = stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.mtimeMs;
       if (Date.now() - created < 60_000)
         return [{ path, reason: 'run younger than 60s', clears: 'removed once it outlives the owner-record gap' }];
@@ -401,8 +409,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   const removed: string[] = [];
   const removedWorktrees: RemovedRecord[] = [];
   const kept: KeptEntry[] = [];
-  const keep = (path: string, reason: string, clears?: string): void => {
-    kept.push(clears === undefined ? { path, reason } : { path, reason, clears });
+  const keep = (path: string, reason: string, clears: string): void => {
+    kept.push({ path, reason, clears });
   };
 
   const listed: string = await command(['git', 'worktree', 'list', '--porcelain'], repo.root);
@@ -476,14 +484,14 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       if (loadedSlices === null || !loadedSlices.has(slice)) continue;
       const reason: string | null = sliceKeepReason(slice, leaf, live, own, runs);
       if (reason !== null) {
-        keep(slice, reason);
+        keep(slice, reason, 'removed once the pass, recorded run or live tab ends and pane inventory is available');
         continue;
       }
       const error: string | null = await stopSlice(slice);
       if (error === null) {
         removed.push(slice);
         stoppedSlices.add(slice);
-      } else keep(slice, error);
+      } else keep(slice, error, 'resolve the systemd stop error and retry cleanup');
     }
   }
 
@@ -491,13 +499,21 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     if (!force) {
       const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
       if (!verdict.ok) {
-        keep(path, verdict.reason);
+        keep(
+          path,
+          verdict.reason,
+          'resolve the Git status error, save changes and finish pending Git operations before retrying cleanup',
+        );
         return false;
       }
     }
     const result: Result = await run(['git', 'worktree', 'remove', ...(force ? ['--force'] : []), path], repo.root);
     if (result.code !== 0) {
-      keep(path, result.stderr || `git worktree remove exited ${result.code}`);
+      keep(
+        path,
+        result.stderr || `git worktree remove exited ${result.code}`,
+        'resolve the Git removal error or worktree lock and retry cleanup',
+      );
       return false;
     }
     removed.push(path);
@@ -513,7 +529,12 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     const branch: Result = await run(['git', 'show-ref', '--verify', '--quiet', `refs/heads/${slug}`], repo.root);
     if (branch.code === 0) {
       const dropped: Result = await run(['git', 'branch', '-d', slug], repo.root);
-      if (dropped.code !== 0) keep(worktree, dropped.stderr || `git branch -d exited ${dropped.code}`);
+      if (dropped.code !== 0)
+        keep(
+          worktree,
+          dropped.stderr || `git branch -d exited ${dropped.code}`,
+          'resolve the branch deletion error and retry cleanup',
+        );
     }
   }
 
@@ -521,7 +542,11 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     const closed: Result = await run(['herdr', 'tab', 'close', tab]);
     if (closed.code === 0) return true;
     const detail: { code: string; message: string } = herdrError(closed);
-    keep(worktree, detail.message === '' ? detail.code : detail.message);
+    keep(
+      worktree,
+      detail.message === '' ? detail.code : detail.message,
+      'resolve the Herdr tab-close error and retry cleanup',
+    );
     return false;
   }
 
@@ -533,26 +558,26 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
 
   async function mergedWorktree(leaf: Leaf, worktree: string, open: boolean): Promise<void> {
     if (leaf.state.batch !== undefined) {
-      keep(worktree, 'state.batch');
+      keep(worktree, 'state.batch', 'removed once the leaf releases its merge batch');
       return;
     }
     const tab: string | undefined = leaf.state.tab;
     if (live === null) {
-      keep(worktree, 'pane list unavailable');
+      keep(worktree, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
       return;
     }
     if (tabLive(panes, tab)) {
       const closed: boolean = await closeTab(worktree, z.string().parse(tab));
       if (open || !closed) {
-        if (closed) keep(worktree, 'live pane inside');
+        if (closed) keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
         return;
       }
     } else if (open && ownerCompletes(repo, leaf)) {
-      keep(worktree, 'active leaf');
+      keep(worktree, 'active leaf', 'removed once the owning leaf finishes');
       return;
     }
     if (foreignPaneInside(panes, worktree, tab)) {
-      keep(worktree, 'live pane inside');
+      keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
       return;
     }
     await removeMergedWorktree(leaf, worktree);
@@ -578,12 +603,16 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       // have moved, in which case the record is the only pointer left.
       if (within(worktree, repo.root) || within(worktree, store))
         saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
-      else keep(worktree, 'unmanaged worktree');
+      else keep(worktree, 'unmanaged worktree', 'remove this worktree explicitly with git worktree remove');
       continue;
     }
     const row: WorktreeRow | undefined = registered.get(worktree);
     if (row === undefined) {
-      keep(worktree, 'unregistered worktree directory');
+      keep(
+        worktree,
+        'unregistered worktree directory',
+        'restore its worktree registration or remove the directory explicitly',
+      );
       continue;
     }
     if (row.locked !== false) {
@@ -591,7 +620,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       continue;
     }
     if (state.batch !== undefined) {
-      keep(worktree, 'state.batch');
+      keep(worktree, 'state.batch', 'removed once the leaf releases its merge batch');
       continue;
     }
     if (state.phase === 'merged') {
@@ -600,11 +629,11 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     }
     if (state.phase === 'failed') {
       if (live === null) {
-        keep(worktree, 'pane list unavailable');
+        keep(worktree, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
         continue;
       }
       if (tabLive(panes, state.tab) || foreignPaneInside(panes, worktree, state.tab)) {
-        keep(worktree, 'live pane inside');
+        keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
         continue;
       }
       if (await removeWorktree(worktree, false, 'failed leaf'))
@@ -612,21 +641,21 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       continue;
     }
     if (within(worktree, store)) {
-      keep(worktree, 'active leaf');
+      keep(worktree, 'active leaf', 'removed once the owning leaf finishes');
       continue;
     }
     // Migration applies only to leaf worktrees recorded under the old in-repo
     // default root; any other outside-store record is an operator's setup.
     if (!within(worktree, oldRoot)) {
-      keep(worktree, 'unmanaged worktree');
+      keep(worktree, 'unmanaged worktree', 'remove this worktree explicitly with git worktree remove');
       continue;
     }
     if (live === null) {
-      keep(worktree, 'pane list unavailable');
+      keep(worktree, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
       continue;
     }
     if (livePaneInside(panes, worktree) || tabLive(panes, state.tab)) {
-      keep(worktree, 'live pane inside');
+      keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
       continue;
     }
     if (await removeWorktree(worktree, false, 'old-root migration'))
@@ -639,40 +668,59 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     try {
       rmSync(path, { recursive: true, force: true });
     } catch (error) {
-      keep(path, `delete failed: ${error instanceof Error ? error.message : String(error)}`);
+      keep(
+        path,
+        `delete failed: ${error instanceof Error ? error.message : String(error)}`,
+        'resolve the filesystem error and retry cleanup',
+      );
       return;
     }
-    if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) keep(path, 'delete failed: path still present');
+    if (lstatSync(path, { throwIfNoEntry: false }) !== undefined)
+      keep(path, 'delete failed: path still present', 'resolve the deletion failure and retry cleanup');
     else removed.push(path);
   };
   const dropChecked = (path: string): void => {
     if (live === null) {
-      keep(path, 'pane list unavailable');
+      keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
       return;
     }
     if (livePaneInside(panes, path)) {
-      keep(path, 'live pane inside');
+      keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
       return;
     }
     const inside: number[] = pidsInside(targets(), path);
     if (inside.length > 0) {
-      keep(path, `process ${inside.join(', ')} inside`);
+      keep(
+        path,
+        `process ${inside.join(', ')} inside`,
+        'removed once these processes close their files or leave this path',
+      );
       return;
     }
     const owners: KeptEntry[] = ownerKeeps(path);
     if (owners.length > 0) {
       kept.push(...owners);
-      if (!owners.some((entry) => entry.path === path)) keep(path, 'live owner inside', 'removed once contained owners clear');
+      if (!owners.some((entry) => entry.path === path))
+        keep(path, 'live owner inside', 'removed once contained owners clear');
       return;
     }
     drop(path);
   };
   const repoRunning: boolean =
     leaves.some((leaf) => tabLive(panes, leaf.state.tab)) ||
-    (await Promise.all(leaves.map(async (leaf): Promise<boolean> => {
-      const slice: string = leafSlice(repo, leaf.state.slug);
-      return loadedSlices !== null && loadedSlices.has(slice) && !stoppedSlices.has(slice) && await sliceHasProcess(slice);
-    }))).some((running) => running);
+    (
+      await Promise.all(
+        leaves.map(async (leaf): Promise<boolean> => {
+          const slice: string = leafSlice(repo, leaf.state.slug);
+          return (
+            loadedSlices !== null &&
+            loadedSlices.has(slice) &&
+            !stoppedSlices.has(slice) &&
+            (await sliceHasProcess(slice))
+          );
+        }),
+      )
+    ).some((running) => running);
   const dropUnowned = async (path: string): Promise<void> => {
     if (repoRunning) {
       keep(path, 'unowned entry', 'removed once no leaf of the repo is running');
@@ -690,7 +738,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     if (path === repo.root || handled.has(path)) continue;
     if (!existsSync(path)) continue; // stale registration, pruned below when anything was removed
     if (underRoot(path)) candidates.add(path);
-    else keep(path, 'unmanaged worktree');
+    else keep(path, 'unmanaged worktree', 'remove this worktree explicitly with git worktree remove');
   }
   // Longest known slug the entry name matches exactly or as <slug>-<rest>
   // (D1.2); undefined when no leaf record claims the name.
@@ -722,20 +770,20 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         }
         if (leaf.state.phase === 'failed') {
           handled.add(path);
-          if (live === null) keep(path, 'pane list unavailable');
+          if (live === null) keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
           else if (tabLive(panes, leaf.state.tab) || foreignPaneInside(panes, path, leaf.state.tab))
-            keep(path, 'live pane inside');
+            keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
           else await removeWorktree(path, false, 'failed leaf');
           continue;
         }
-        keep(path, 'active leaf');
+        keep(path, 'active leaf', 'removed once the owning leaf finishes');
         continue;
       }
       // A delegated worker runs at <slug>-u<N> from the seat's own pane, so no pane sits inside it.
       const owner: Leaf | undefined =
         leaf === undefined && /-u\d+$/.test(name) ? leafBySlug.get(name.replace(/-u\d+$/, '')) : undefined;
       if (owner !== undefined && owner.state.phase !== 'merged' && owner.state.phase !== 'failed') {
-        keep(path, 'active leaf worker');
+        keep(path, 'active leaf worker', 'removed once the owning leaf finishes');
         continue;
       }
       if (owner === undefined && !name.startsWith('verify-') && !name.startsWith('batch-')) {
@@ -747,7 +795,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       if (name.startsWith('verify-')) {
         const record: VerifyRun | undefined = verifyRuns.find((item) => item.run === name.slice('verify-'.length));
         if (record !== undefined && record.end === undefined && !ownerDead(record)) {
-          keep(path, `verify ${record.run} in progress`);
+          keep(path, `verify ${record.run} in progress`, 'removed once the verify owner exits');
           continue;
         }
         force = true;
@@ -759,17 +807,28 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         force = true;
         rule = existsSync(`${path}.owner`) ? 'dead batch owner' : 'unrecorded batch';
       }
+      const scratchKind: boolean = owner !== undefined || name.startsWith('verify-') || name.startsWith('batch-');
+      if (!scratchKind) {
+        // Registered but no leaf or scratch kind claims it: an operator's
+        // worktree parked in the store, never removed by the sweep (D1.1).
+        keep(path, 'unmanaged worktree', 'remove this worktree explicitly with git worktree remove');
+        continue;
+      }
       if (live === null) {
-        keep(path, 'pane list unavailable');
+        keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
         continue;
       }
       if (livePaneInside(panes, path)) {
-        keep(path, 'live pane inside');
+        keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
         continue;
       }
       const inside: number[] = pidsInside(targets(), path);
       if (inside.length > 0) {
-        keep(path, `process ${inside.join(', ')} inside`);
+        keep(
+          path,
+          `process ${inside.join(', ')} inside`,
+          'removed once these processes close their files or leave this path',
+        );
         continue;
       }
       await removeWorktree(path, force, rule);
@@ -788,18 +847,18 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         continue;
       }
       if (live === null) {
-        keep(path, 'pane list unavailable');
+        keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
         continue;
       }
       if (tabLive(panes, ownerLeaf.state.tab) || foreignPaneInside(panes, path, ownerLeaf.state.tab)) {
-        keep(path, 'live pane inside');
+        keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
         continue;
       }
       dropChecked(path);
       continue;
     }
     if (ownerSlug !== undefined) {
-      keep(path, 'unknown directory');
+      keep(path, 'unknown directory', 'restore readable leaf ownership or remove the unregistered entry explicitly');
       continue;
     }
     if (/^batch-.*\.owner$/.test(name) && !existsSync(path.slice(0, -'.owner'.length))) {
@@ -808,7 +867,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       // a dead or unreadable one is dropped once panes are available (D1.3).
       const record: Owner | undefined = readOwner(path);
       if (record !== undefined && !ownerDead(record)) keep(path, 'live owner', 'removed once the owner exits');
-      else if (live === null) keep(path, 'pane list unavailable');
+      else if (live === null) keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
       else dropChecked(path);
       continue;
     }
@@ -847,7 +906,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
             } catch {
               // an unreadable refusal file still keeps the run root
             }
-            keep(runRoot, reason);
+            keep(runRoot, reason, 'resolve the recorded publish refusal before removing the run');
             continue;
           }
           const ownerFile: string = resolve(runRoot, '.owner');
@@ -863,11 +922,11 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
           }
           const owner: Owner | undefined = readOwner(ownerFile);
           if (owner === undefined) {
-            keep(runRoot, 'invalid .owner record');
+            keep(runRoot, 'invalid .owner record', 'repair the owner record so ownership can be checked');
             continue;
           }
           if (ownerDead(owner)) drop(runRoot);
-          else keep(runRoot, 'run in progress');
+          else keep(runRoot, 'run in progress', 'removed once the run owner exits');
         }
         if (leaf !== undefined) {
           // A leaf's temp lives only while its seat or a check uses it. Only
@@ -875,9 +934,9 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
           // stays while its slice still holds a running unit (D2).
           const done: boolean = finished(leaf);
           if (live === null) {
-            if (done) keep(dir, 'pane list unavailable');
+            if (done) keep(dir, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
           } else if (tabLive(live, leaf.state.tab) || livePaneInside(live, dir)) {
-            if (done) keep(dir, 'live pane inside');
+            if (done) keep(dir, 'live pane inside', 'removed once the pane closes or leaves this path');
           } else if (kept.length === keptBefore) {
             // An unreadable unit inventory is no proof of a busy slice: temps
             // were removed without one before this check existed (D2, D10).
@@ -923,7 +982,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     ]) {
       if (!existsSync(lock)) continue;
       const inside: number[] = pidsInside(targets(), lock);
-      if (inside.length > 0) keep(lock, `process ${inside.join(', ')} inside`);
+      if (inside.length > 0)
+        keep(lock, `process ${inside.join(', ')} inside`, 'removed once these processes close the lock');
       else dropChecked(lock);
     }
 
@@ -943,8 +1003,8 @@ export async function reconcileHost(
   panesOnce: () => Promise<Pane[] | null>,
 ): Promise<void> {
   const kept: KeptEntry[] = [];
-  const keep = (unit: string, reason: string, clears?: string): void => {
-    kept.push(clears === undefined ? { path: unit, reason } : { path: unit, reason, clears });
+  const keep = (unit: string, reason: string, clears: string): void => {
+    kept.push({ path: unit, reason, clears });
   };
   let panes: Pane[] | null = live;
   let fetched: boolean = live !== null;
@@ -979,37 +1039,46 @@ export async function reconcileHost(
         const view: Pane[] | null = match.leaf.state.tab === undefined ? panes : await livePanes();
         const reason: string | null = sliceKeepReason(slice, match.leaf, view, own, runs);
         if (reason !== null) {
-          keep(slice, reason);
+          keep(slice, reason, 'removed once the pass, recorded run or live tab ends and pane inventory is available');
           continue;
         }
         const error: string | null = await stopSlice(slice);
-        if (error !== null) keep(slice, error);
+        if (error !== null) keep(slice, error, 'resolve the systemd stop error and retry cleanup');
         continue;
       }
       if (own.has(slice)) {
-        keep(slice, 'own slice');
+        keep(slice, 'own slice', 'removed by a later pass outside this slice');
         continue;
       }
       if (inventoryErrors.length > 0) {
-        keep(slice, `leaf inventory unavailable: ${inventoryErrors.join('; ')}`);
+        keep(
+          slice,
+          `leaf inventory unavailable: ${inventoryErrors.join('; ')}`,
+          'restore readable repository leaf records and retry cleanup',
+        );
         continue;
       }
       if (runs.has(slice)) {
-        keep(slice, 'live run record');
+        keep(slice, 'live run record', 'removed once the recorded run exits');
         continue;
       }
       if (await sliceHasProcess(slice)) {
-        keep(slice, 'process inside');
+        keep(slice, 'process inside', 'removed once the processes in this slice exit');
         continue;
       }
       const error: string | null = await stopSlice(slice);
-      if (error !== null) keep(slice, error);
+      if (error !== null) keep(slice, error, 'resolve the systemd stop error and retry cleanup');
     }
   }
   if (failedRuns !== null)
     for (const unit of [...failedRuns].sort()) {
       const result: Result = await systemctl('reset-failed', unit);
-      if (result.code !== 0) keep(unit, result.stderr || `systemctl reset-failed exited ${result.code}`);
+      if (result.code !== 0)
+        keep(
+          unit,
+          result.stderr || `systemctl reset-failed exited ${result.code}`,
+          'resolve the systemd reset-failed error and retry cleanup',
+        );
     }
 
   // Host filesystem sweep (D6): retired temp root, unregistered worktree-store
@@ -1019,31 +1088,41 @@ export async function reconcileHost(
   const dropPath = async (path: string, isDir: boolean): Promise<void> => {
     const view: Pane[] | null = await livePanes();
     if (view === null) {
-      keep(path, 'pane list unavailable');
+      keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
       return;
     }
     if (isDir && livePaneInside(view, path)) {
-      keep(path, 'live pane inside');
+      keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
       return;
     }
     const inside: number[] = pidsInside(targets(), path);
     if (inside.length > 0) {
-      keep(path, `process ${inside.join(', ')} inside`);
+      keep(
+        path,
+        `process ${inside.join(', ')} inside`,
+        'removed once these processes close their files or leave this path',
+      );
       return;
     }
     const owners: KeptEntry[] = ownerKeeps(path);
     if (owners.length > 0) {
       kept.push(...owners);
-      if (!owners.some((entry) => entry.path === path)) keep(path, 'live owner inside', 'removed once contained owners clear');
+      if (!owners.some((entry) => entry.path === path))
+        keep(path, 'live owner inside', 'removed once contained owners clear');
       return;
     }
     try {
       rmSync(path, { recursive: true, force: true });
     } catch (error) {
-      keep(path, `delete failed: ${error instanceof Error ? error.message : String(error)}`);
+      keep(
+        path,
+        `delete failed: ${error instanceof Error ? error.message : String(error)}`,
+        'resolve the filesystem error and retry cleanup',
+      );
       return;
     }
-    if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) keep(path, 'delete failed: path still present');
+    if (lstatSync(path, { throwIfNoEntry: false }) !== undefined)
+      keep(path, 'delete failed: path still present', 'resolve the deletion failure and retry cleanup');
   };
 
   const retired: string = retiredLeafTempRoot();
@@ -1106,7 +1185,8 @@ export async function reconcileHost(
   for (const lock of [resolve(retiredLockDir, 'run.lock'), resolve(retiredLockDir, 'framework-tests.lock')]) {
     if (!existsSync(lock)) continue;
     const inside: number[] = pidsInside(targets(), lock);
-    if (inside.length > 0) keep(lock, `process ${inside.join(', ')} inside`);
+    if (inside.length > 0)
+      keep(lock, `process ${inside.join(', ')} inside`, 'removed once these processes close the lock');
     else await dropPath(lock, false);
   }
 

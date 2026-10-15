@@ -20,12 +20,19 @@ const inUse: Set<string> = new Set([
 const unitInUse: Set<string> = new Set(['own slice', 'live run record', 'live tab']);
 
 function leftover(entry: Kept): boolean {
-  return lstatSync(entry.path, { throwIfNoEntry: false }) !== undefined && !inUse.has(entry.reason) && !/^verify \S+ in progress$/.test(entry.reason);
+  return (
+    lstatSync(entry.path, { throwIfNoEntry: false }) !== undefined &&
+    !inUse.has(entry.reason) &&
+    !/^verify \S+ in progress$/.test(entry.reason)
+  );
 }
 
 // Units carry no '/', so only retired-path entries hit the same existence check as leftover().
 function hostLeftover(entry: Kept): boolean {
-  return !unitInUse.has(entry.reason) && (!entry.path.includes('/') || lstatSync(entry.path, { throwIfNoEntry: false }) !== undefined);
+  return (
+    !unitInUse.has(entry.reason) &&
+    (!entry.path.includes('/') || lstatSync(entry.path, { throwIfNoEntry: false }) !== undefined)
+  );
 }
 
 function tilde(path: string): string {
