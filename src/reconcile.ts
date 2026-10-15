@@ -1,5 +1,6 @@
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -75,7 +76,7 @@ export function readRemoved(repo: Repo): RemovedRecord[] {
 // the report; unit names are not paths, so only absolute paths are pruned.
 function writeKept(file: string, kept: KeptEntry[], removed?: RemovedRecord[]): void {
   mkdirSync(dirname(file), { recursive: true });
-  const pruned: KeptEntry[] = kept.filter((entry) => !entry.path.startsWith('/') || existsSync(entry.path));
+  const pruned: KeptEntry[] = kept.filter((entry) => !entry.path.startsWith('/') || lstatSync(entry.path, { throwIfNoEntry: false }) !== undefined);
   const temporary: string = `${file}.${process.pid}.tmp`;
   writeFileSync(
     temporary,
@@ -619,7 +620,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(path, `delete failed: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
-    if (existsSync(path)) keep(path, 'delete failed: path still present');
+    if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) keep(path, 'delete failed: path still present');
     else removed.push(path);
   };
   const repoRunning: boolean = leaves.some((leaf) => !finished(leaf));
@@ -665,7 +666,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       .sort((a, b) => b.length - a.length)[0];
 
   for (const path of [...candidates].sort()) {
-    if (!existsSync(path) || handled.has(path)) continue;
+    if (lstatSync(path, { throwIfNoEntry: false }) === undefined || handled.has(path)) continue;
     const name: string = basename(path);
     const leaf: Leaf | undefined = leafBySlug.get(name);
     const row: WorktreeRow | undefined = registered.get(path);
@@ -1002,11 +1003,11 @@ export async function reconcileHost(
       keep(path, `delete failed: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
-    if (existsSync(path)) keep(path, 'delete failed: path still present');
+    if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) keep(path, 'delete failed: path still present');
   };
 
   const retired: string = retiredLeafTempRoot();
-  if (existsSync(retired)) await dropPath(retired, true);
+  if (lstatSync(retired, { throwIfNoEntry: false }) !== undefined) await dropPath(retired, true);
 
   // ~/.akrogon/worktrees/<name> for an unregistered name is a store dir with
   // no repo behind it: dropped unless a child still holds a .git worktree.
@@ -1017,7 +1018,7 @@ export async function reconcileHost(
     for (const entry of readdirSync(storeRoot)) {
       if (repoNames.has(entry)) continue;
       const dir: string = resolve(storeRoot, entry);
-      const stat = statSync(dir, { throwIfNoEntry: false });
+      const stat: Stats | undefined = lstatSync(dir, { throwIfNoEntry: false });
       if (stat === undefined || !stat.isDirectory()) {
         await dropPath(dir, false);
         continue;
@@ -1042,7 +1043,7 @@ export async function reconcileHost(
         if (!pidAlive(Number(tempMatch[1]))) await dropPath(dir, false);
         continue;
       }
-      const stat = statSync(dir, { throwIfNoEntry: false });
+      const stat: Stats | undefined = lstatSync(dir, { throwIfNoEntry: false });
       if (stat === undefined) continue;
       if (stat.isDirectory() && repoHashes.has(entry)) continue;
       await dropPath(dir, stat.isDirectory());
