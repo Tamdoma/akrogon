@@ -18,6 +18,7 @@
 - `tests/receipt-gates.test.ts` checks the `check.review`, `merged --check` and direct-guards receipt gates.
 - `tests/seat-containment.test.ts` checks pane boxing, restore replacement and the bus cut through `next`, with `tests/fake-busctl.ts`, the fake proc root in `tests/fake-proc.ts` and fake herdr `pane process-info`/`pane close`.
 - `tests/reconcile.test.ts` checks reconciler removal, refusal and old-root migration against real worktrees.
+- `tests/leaf-slices.test.ts` checks finished-leaf slice stopping, the tab/run-record/own-slice keeps, unmatched empty slices, guard CollectMode and failed-unit clearing with real units and `tests/fake-systemctl.ts`.
 - `tests/leaf-stop.test.ts` checks stop, start, the dispatch and merge gates and status marks with a test-local fake systemctl.
 - `tests/merge-attempts.test.ts` checks `issues/merge-attempts.jsonl` lines per ending, including a legacy `held` line that still parses.
 - `tests/timing.test.ts` checks the timing record end to end through real `next`/`phase`/`run-check` calls, worker and verify runs, wait dedup and the unwritable-file negative case.

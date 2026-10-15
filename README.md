@@ -118,7 +118,7 @@ sources: []
 
 Moving a repository or changing its worktree root requires reconciling existing worktree paths and Git metadata. A configuration edit does not move them.
 
-Every `akrogon next` pass reconciles worktrees, scratch and run roots against leaf state: clean, reachable, unused leftovers are removed. Everything it keeps shows under each repo in plain `akrogon status` as `Kept by last cleanup:` lines for paths that still exist, and `akrogon status <slug>` prints the whole kept report as `Kept:` lines with path and reason.
+Every `akrogon next` pass reconciles worktrees, scratch and run roots against leaf state: clean, reachable, unused leftovers are removed. The same pass stops the systemd slice of a merged or failed leaf once its tab is gone — ending processes it left running — unless a live run record names the slice or the pass itself runs inside it; a loaded `akrogon-l*` slice matching no leaf record is stopped only when it holds no process, and failed `akrogon-run-*` units are cleared. Everything it keeps shows under each repo in plain `akrogon status` as `Kept by last cleanup:` lines for paths that still exist, and `akrogon status <slug>` prints the whole kept report as `Kept:` lines with path and reason.
 
 This repository's [reference index](docs/reference-index.md) links its code areas.
 
@@ -188,15 +188,15 @@ A report whose named failure path lives under the installed akrogon checkout rou
 
 ## Skills
 
-| Skill | Purpose |
-| --- | --- |
-| [chart-issues](skills/chart-issues/SKILL.md) | Resolve open decisions and write leaf contracts. |
-| [plan-issue](skills/plan-issue/SKILL.md) | Plan how to implement a leaf. |
-| [implement-issue](skills/implement-issue/SKILL.md) | Build the plan or repair review findings. |
-| [check-issue](skills/check-issue/SKILL.md) | Review defects and verify repairs. |
-| [merge-issue](skills/merge-issue/SKILL.md) | Rebase, check and land the merge leaf. |
-| [seed-issue](skills/seed-issue/SKILL.md) | File an observation for investigation. |
-| [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a completed-issue-or-epic update to Discord. |
-| [init-akrogon](skills/init-akrogon/SKILL.md) | Inspect a repository and set up its lifecycle. |
-| [watch-issues](skills/watch-issues/SKILL.md) | Watch open leaves on an optional 20-minute Claude Code cron. |
-| [learn-issues](skills/learn-issues/SKILL.md) | Remove guarded lessons and seed checkable ones. |
+| Skill                                              | Purpose                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------ |
+| [chart-issues](skills/chart-issues/SKILL.md)       | Resolve open decisions and write leaf contracts.             |
+| [plan-issue](skills/plan-issue/SKILL.md)           | Plan how to implement a leaf.                                |
+| [implement-issue](skills/implement-issue/SKILL.md) | Build the plan or repair review findings.                    |
+| [check-issue](skills/check-issue/SKILL.md)         | Review defects and verify repairs.                           |
+| [merge-issue](skills/merge-issue/SKILL.md)         | Rebase, check and land the merge leaf.                       |
+| [seed-issue](skills/seed-issue/SKILL.md)           | File an observation for investigation.                       |
+| [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a completed-issue-or-epic update to Discord.            |
+| [init-akrogon](skills/init-akrogon/SKILL.md)       | Inspect a repository and set up its lifecycle.               |
+| [watch-issues](skills/watch-issues/SKILL.md)       | Watch open leaves on an optional 20-minute Claude Code cron. |
+| [learn-issues](skills/learn-issues/SKILL.md)       | Remove guarded lessons and seed checkable ones.              |

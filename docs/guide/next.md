@@ -158,6 +158,8 @@ Leaves in `merge` take their repository's single merge turn: the merge pass writ
 
 Each leaf pane shell runs in its own systemd scope under a per-leaf slice under `akrogon.slice` before a seat starts in it. A recorded pane found outside its scope, as after a Herdr restore, is closed and recreated before any prompt. A pane whose cgroup cannot be read is left open, and the leaf is skipped that pass with the error. A failed boxing also skips the leaf. Panes you split by hand in a leaf tab are not boxed.
 
+The same per-leaf slice outlives the leaf until cleanup: a reconcile pass stops the slice of a merged or failed leaf once its tab is gone, ending processes the seats left running, unless a live run record names the slice or the pass itself runs inside it. A pass that cannot fetch the pane list stops nothing whose tab is recorded. Loaded `akrogon-l*` slices matching no leaf record are stopped only while empty, and failed `akrogon-run-*` units are cleared each pass. Kept slices and units appear as `Kept by last cleanup:` lines in `akrogon status`.
+
 A working, blocked or unknown seat is not treated as idle. A recently delivered prompt also gets a grace period.
 
 A dispatch pass attempts leaves with more unmerged leaves waiting on them through `blocked-by`, directly or transitively, before leaves with fewer; ties keep the previous visit order with merged leaves first.

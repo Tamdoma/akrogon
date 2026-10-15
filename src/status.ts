@@ -31,7 +31,7 @@ import { issueFolders } from './park';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 import { readPaused } from './pause';
 import { readStopped } from './stop';
-import { readKept } from './reconcile';
+import { readHostKept, readKept } from './reconcile';
 
 type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
 type Scan =
@@ -350,6 +350,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     if (paused.has(repo.name)) console.log(`paused: ${repo.name}`);
     if (stopped.has(`${repo.name}/${slug}`)) console.log(`stopped: ${repo.name}/${slug}`);
     for (const entry of readKept(repo)) console.log(`Kept: ${entry.path} — ${entry.reason}`);
+    for (const entry of readHostKept()) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     for (const gap of missing)
       console.log(`Missing: ${repo.name}/${slug} ${gap.kind} ${gap.name} in ${gap.holder}: ${gap.steps}`);
     console.log('History:');
@@ -410,5 +411,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     for (const entry of readKept(scan.repo))
       if (existsSync(entry.path)) console.log(`  Kept by last cleanup: ${entry.path} — ${entry.reason}`);
   }
+  // Host keeps are units, not paths: no existsSync filter.
+  for (const entry of readHostKept()) console.log(`  Kept by last cleanup: ${entry.path} — ${entry.reason}`);
   if (scans.some((scan) => !scan.ok)) process.exitCode = 1;
 }

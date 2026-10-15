@@ -8,12 +8,14 @@ import {
   writeFileSync,
   type Dirent,
 } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { globalHome, leafTemp, within, worktreeStore, type Repo } from './config';
 import { readVerifyRuns, type VerifyRun } from './verify';
-import { leavesUnder, readState, saveState, type Leaf, type State } from './state';
-import { command, herdrError, run, type Pane, type Result } from './shell';
+import { allLeaves, leavesUnder, readState, saveState, type Leaf, type State } from './state';
+import { cgroupRoot, leafSlice, ownSlices, sessionBusAddress } from './scope';
+import { liveRuns } from './admission';
+import { command, herdrError, run, spawnCaptured, type Pane, type Result } from './shell';
 
 export type Reconciled = { removed: string[]; kept: { path: string; reason: string }[] };
 
@@ -32,13 +34,115 @@ export function readKept(repo: Repo): { path: string; reason: string }[] {
   }
 }
 
-function writeKeptReport(repo: Repo, kept: { path: string; reason: string }[]): void {
-  const file: string = keptReportPath(repo);
+function writeKept(file: string, kept: { path: string; reason: string }[]): void {
   mkdirSync(dirname(file), { recursive: true });
   const temporary: string = `${file}.${process.pid}.tmp`;
   writeFileSync(temporary, JSON.stringify({ kept }, null, 2) + '\n');
   renameSync(temporary, file);
 }
+
+function writeKeptReport(repo: Repo, kept: { path: string; reason: string }[]): void {
+  writeKept(keptReportPath(repo), kept);
+}
+
+const hostReportPath = (): string => resolve(globalHome(), 'reconcile-host.json');
+
+export function readHostKept(): { path: string; reason: string }[] {
+  try {
+    return keptReportSchema.parse(JSON.parse(readFileSync(hostReportPath(), 'utf8'))).kept;
+  } catch {
+    return [];
+  }
+}
+
+// The manager's bus address is pinned because callers inside a run-check cut
+// DBUS_SESSION_BUS_ADDRESS; a spawn failure counts as a failed call, never a throw.
+async function systemctl(...args: string[]): Promise<Result> {
+  try {
+    return await spawnCaptured(['systemctl', '--user', ...args], {
+      env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+    });
+  } catch (error) {
+    return { code: 1, stdout: '', stderr: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+// Loaded units matching a pattern; null means the manager could not be asked,
+// which callers treat as "stop nothing" rather than "nothing is loaded".
+async function loadedUnits(pattern: string, ...extra: string[]): Promise<Set<string> | null> {
+  const result: Result = await systemctl('list-units', ...extra, pattern, '--output=json');
+  if (result.code !== 0) return null;
+  try {
+    return new Set(
+      z
+        .array(z.object({ unit: z.string() }))
+        .parse(JSON.parse(result.stdout))
+        .map((row) => row.unit),
+    );
+  } catch {
+    return null;
+  }
+}
+
+const loadedLeafSlices = (): Promise<Set<string> | null> => loadedUnits('akrogon-l*.slice', '--all');
+
+async function sliceControlGroup(slice: string): Promise<string | null> {
+  const result: Result = await systemctl('show', slice, '-p', 'ControlGroup', '--value');
+  const group: string = result.stdout.trim();
+  return result.code === 0 && group !== '' ? group : null;
+}
+
+// cgroup.procs files under the slice's cgroupfs subtree; an unreadable subtree
+// is treated as occupied so an unprovable slice is never stopped.
+function subtreeHasProcess(root: string): boolean {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(root, { withFileTypes: true });
+  } catch {
+    return true;
+  }
+  for (const entry of entries) {
+    const path: string = join(root, entry.name);
+    if (entry.isDirectory() && subtreeHasProcess(path)) return true;
+    if (entry.name === 'cgroup.procs')
+      try {
+        if (readFileSync(path, 'utf8').trim() !== '') return true;
+      } catch {
+        return true;
+      }
+  }
+  return false;
+}
+
+async function sliceHasProcess(slice: string): Promise<boolean> {
+  const group: string | null = await sliceControlGroup(slice);
+  if (group === null) return true;
+  return subtreeHasProcess(join(cgroupRoot(), group));
+}
+
+// Why a finished leaf's slice survives this pass, or null when it may stop.
+function sliceKeepReason(
+  slice: string,
+  leaf: Leaf,
+  live: Pane[] | null,
+  own: Set<string>,
+  runs: Set<string>,
+): string | null {
+  if (own.has(slice)) return 'own slice';
+  if (runs.has(slice)) return 'live run record';
+  if (leaf.state.tab !== undefined) {
+    if (live === null) return 'pane list unavailable';
+    if (tabLive(live, leaf.state.tab)) return 'live tab';
+  }
+  return null;
+}
+
+async function stopSlice(slice: string): Promise<string | null> {
+  const result: Result = await systemctl('stop', slice);
+  return result.code === 0 ? null : result.stderr || `systemctl stop exited ${result.code}`;
+}
+
+const finished = (leaf: Leaf): boolean => leaf.state.phase === 'merged' || leaf.state.phase === 'failed';
 
 async function worktreeRemovable(repo: Repo, path: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   const status: Result = await run(['git', '-C', path, 'status', '--porcelain'], repo.root);
@@ -120,8 +224,10 @@ export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null
 
 // A pass only needs herdr when a pane-dependent candidate exists: a leaf
 // worktree that is not plainly active under the store, a finished-leaf scratch
-// dir, or anything else whose keep/remove choice needs live pane state.
-export function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): boolean {
+// dir, a finished leaf whose recorded tab or loaded slice must be checked
+// against live panes, or anything else whose keep/remove choice needs live pane
+// state.
+export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<boolean> {
   const store: string = worktreeStore(repo);
   const oldRoot: string = resolve(repo.root, 'issues/worktrees');
   for (const leaf of leaves) {
@@ -135,13 +241,25 @@ export function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): boolean {
   const recorded: Set<string> = new Set(
     leaves.flatMap((leaf) => (leaf.state.worktree === undefined ? [] : [leaf.state.worktree])),
   );
-  return [store, oldRoot].some(
-    (root) =>
-      existsSync(root) &&
-      readdirSync(root, { withFileTypes: true }).some(
-        (entry) => entry.isDirectory() && !recorded.has(resolve(root, entry.name)),
-      ),
-  );
+  if (
+    [store, oldRoot].some(
+      (root) =>
+        existsSync(root) &&
+        readdirSync(root, { withFileTypes: true }).some(
+          (entry) => entry.isDirectory() && !recorded.has(resolve(root, entry.name)),
+        ),
+    )
+  )
+    return true;
+  // A finished leaf with a recorded tab can only be judged with live panes; a
+  // finished leaf with a loaded slice is a stop candidate either way, and an
+  // unreadable unit inventory forces the conservative fetch.
+  const finishedLeaves: Leaf[] = leaves.filter(finished);
+  if (finishedLeaves.some((leaf) => leaf.state.tab !== undefined)) return true;
+  if (finishedLeaves.length === 0) return false;
+  const loaded: Set<string> | null = await loadedLeafSlices();
+  if (loaded === null) return true;
+  return finishedLeaves.some((leaf) => loaded.has(leafSlice(repo, leaf.state.slug)));
 }
 
 export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null): Promise<Reconciled> {
@@ -194,6 +312,29 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   );
   const verifyRuns: VerifyRun[] = readVerifyRuns(repo);
   const leafBySlug: Map<string, Leaf> = new Map(leaves.map((leaf) => [leaf.state.slug, leaf]));
+
+  // The slice step runs before leaf temp and unowned-item checks so a later
+  // sweep in the same pass already sees stopped slices. A finished leaf's slice
+  // is stopped outright — killing leftovers is the point — unless it is the
+  // pass's own, a live run names it, or its tab cannot be proven gone.
+  {
+    const loaded: Set<string> | null = await loadedLeafSlices();
+    const own: Set<string> = ownSlices();
+    const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
+    for (const leaf of leaves) {
+      if (!finished(leaf)) continue;
+      const slice: string = leafSlice(repo, leaf.state.slug);
+      if (loaded === null || !loaded.has(slice)) continue;
+      const reason: string | null = sliceKeepReason(slice, leaf, live, own, runs);
+      if (reason !== null) {
+        keep(slice, reason);
+        continue;
+      }
+      const error: string | null = await stopSlice(slice);
+      if (error === null) removed.push(slice);
+      else keep(slice, error);
+    }
+  }
 
   async function removeWorktree(path: string): Promise<boolean> {
     const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
@@ -446,4 +587,73 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   if (removed.length > 0) await command(['git', 'worktree', 'prune'], repo.root);
   writeKeptReport(repo, kept);
   return { removed, kept };
+}
+
+// One host-wide step per pass: every loaded akrogon-l*.slice across all
+// registered repos (open and closed leaf records) plus failed akrogon-run-*
+// units. A slice matching a finished leaf follows the same rule as the per-repo
+// step; a slice matching no leaf at all is stopped only when its cgroupfs
+// subtree holds no process. panesOnce is asked only when a tab has to be judged.
+export async function reconcileHost(
+  repos: Repo[],
+  live: Pane[] | null,
+  panesOnce: () => Promise<Pane[] | null>,
+): Promise<void> {
+  const kept: { path: string; reason: string }[] = [];
+  const keep = (unit: string, reason: string): void => {
+    kept.push({ path: unit, reason });
+  };
+  const loaded: Set<string> | null = await loadedLeafSlices();
+  const failedRuns: Set<string> | null = await loadedUnits('akrogon-run-*', '--failed');
+  if (loaded !== null) {
+    const leafOf: Map<string, { repo: Repo; leaf: Leaf }> = new Map();
+    for (const repo of repos)
+      for (const leaf of allLeaves(repo)) leafOf.set(leafSlice(repo, leaf.state.slug), { repo, leaf });
+    const own: Set<string> = ownSlices();
+    const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
+    let panes: Pane[] | null = live;
+    let fetched: boolean = live !== null;
+    const livePanes = async (): Promise<Pane[] | null> => {
+      if (!fetched) {
+        panes = await panesOnce();
+        fetched = true;
+      }
+      return panes;
+    };
+    for (const slice of [...loaded].sort()) {
+      const match: { repo: Repo; leaf: Leaf } | undefined = leafOf.get(slice);
+      if (match !== undefined && !finished(match.leaf)) continue;
+      if (match !== undefined) {
+        const view: Pane[] | null = match.leaf.state.tab === undefined ? panes : await livePanes();
+        const reason: string | null = sliceKeepReason(slice, match.leaf, view, own, runs);
+        if (reason !== null) {
+          keep(slice, reason);
+          continue;
+        }
+        const error: string | null = await stopSlice(slice);
+        if (error !== null) keep(slice, error);
+        continue;
+      }
+      if (own.has(slice)) {
+        keep(slice, 'own slice');
+        continue;
+      }
+      if (runs.has(slice)) {
+        keep(slice, 'live run record');
+        continue;
+      }
+      if (await sliceHasProcess(slice)) {
+        keep(slice, 'process inside');
+        continue;
+      }
+      const error: string | null = await stopSlice(slice);
+      if (error !== null) keep(slice, error);
+    }
+  }
+  if (failedRuns !== null)
+    for (const unit of [...failedRuns].sort()) {
+      const result: Result = await systemctl('reset-failed', unit);
+      if (result.code !== 0) keep(unit, result.stderr || `systemctl reset-failed exited ${result.code}`);
+    }
+  writeKept(hostReportPath(), kept);
 }

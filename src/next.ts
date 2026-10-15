@@ -85,7 +85,7 @@ import { isStopped } from './stop';
 import { selfUpdate } from './self-update';
 import { blockDetail, dependentCounts, mergeQueue, type DepDetail, type QueueEntry } from './turn';
 import { appendTiming, currentVisit, readTimings, recordWait, type WaitReason } from './timing';
-import { closeMergedTab, reconcile, reconcileNeedsPanes } from './reconcile';
+import { closeMergedTab, reconcile, reconcileHost, reconcileNeedsPanes } from './reconcile';
 import { adoptShell, inOwnScope, leafSlice, type ScopePlace } from './scope';
 
 const hookEventSchema = z.discriminatedUnion('event', [
@@ -1319,26 +1319,23 @@ async function selectLeaves(
   return { repo, leaves: selected };
 }
 
-async function reconcileRepos(repos: Repo[], invocation: Invocation, isAutomatic: boolean): Promise<void> {
-  let panesRequested: boolean = false;
-  let live: Pane[] | null = null;
-  const panesOnce = async (): Promise<Pane[] | null> => {
-    if (!panesRequested) {
-      panesRequested = true;
-      live = await panes().catch(() => null);
-    }
-    return live;
-  };
+async function reconcileRepos(
+  repos: Repo[],
+  invocation: Invocation,
+  isAutomatic: boolean,
+  panesOnce: () => Promise<Pane[] | null>,
+): Promise<void> {
   for (const repo of repos) {
     if (isAutomatic && isPaused(repo.name)) continue;
     const leaves: Leaf[] = discover(repo, invocation).leaves;
     try {
-      await reconcile(repo, leaves, reconcileNeedsPanes(repo, leaves) ? await panesOnce() : []);
+      await reconcile(repo, leaves, (await reconcileNeedsPanes(repo, leaves)) ? await panesOnce() : []);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       report(invocation, repo.name, repo.root, error);
     }
   }
+  await reconcileHost(repos, null, panesOnce);
 }
 
 async function paneOwners(
@@ -1362,6 +1359,16 @@ export async function nextCommand(input: string | undefined, pressureDir: string
   const global: GlobalConfig = readGlobal();
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
   const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
+  // One shared lazy pane list per pass; reconcile and the host step share it.
+  let panesRequested: boolean = false;
+  let live: Pane[] | null = null;
+  const panesOnce = async (): Promise<Pane[] | null> => {
+    if (!panesRequested) {
+      panesRequested = true;
+      live = await panes().catch(() => null);
+    }
+    return live;
+  };
   const hooked: boolean = event !== undefined;
   const selection: Selection | undefined =
     input !== '--all' && input !== '--resume' && event?.event !== 'tab_closed' && (input !== undefined || !hooked)
@@ -1405,18 +1412,18 @@ export async function nextCommand(input: string | undefined, pressureDir: string
             await dispatchDependents(global, selection.repo, completedSlug, invocation, false);
         } else await sweep(global, selection.repo, selection.leaves, invocation, true, false);
         touched.set(selection.repo.name, { repo: selection.repo, isAutomatic: false });
-        await reconcileRepos([selection.repo], invocation, false);
+        await reconcileRepos([selection.repo], invocation, false, panesOnce);
       } else if (input === '--all') {
         const current: Repo | null = await currentRepo(global, process.cwd());
         if (current === null) {
           await sweepAll(global, invocation, false);
           const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
           for (const repo of registered.repos) touched.set(repo.name, { repo, isAutomatic: false });
-          await reconcileRepos(registered.repos, invocation, false);
+          await reconcileRepos(registered.repos, invocation, false, panesOnce);
         } else {
           await sweep(global, current, discover(current, invocation).leaves, invocation, true, false);
           touched.set(current.name, { repo: current, isAutomatic: false });
-          await reconcileRepos([current], invocation, false);
+          await reconcileRepos([current], invocation, false, panesOnce);
         }
       } else if (input === '--resume') {
         const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
@@ -1434,7 +1441,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
             true,
           );
         for (const repo of active) touched.set(repo.name, { repo, isAutomatic: true });
-        await reconcileRepos(active, invocation, true);
+        await reconcileRepos(active, invocation, true, panesOnce);
       } else if (event?.event === 'tab_closed') {
         const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
           discover(repo, invocation)
@@ -1450,8 +1457,9 @@ export async function nextCommand(input: string | undefined, pressureDir: string
           await reconcile(
             owners[0].repo,
             leaves,
-            reconcileNeedsPanes(owners[0].repo, leaves) ? await panes().catch(() => null) : [],
+            (await reconcileNeedsPanes(owners[0].repo, leaves)) ? await panesOnce() : [],
           );
+          await reconcileHost(registeredRepos(global, invocation).repos, live, panesOnce);
         } catch (error) {
           if (!(error instanceof Error)) throw error;
           report(invocation, owners[0].repo.name, owners[0].leaf.path, error, completedSlug);
@@ -1529,7 +1537,7 @@ export async function unpausePass(repo: Repo, pressureDir: string = '/proc/press
       false,
       false,
     );
-    await reconcileRepos([repo], invocation, false);
+    await reconcileRepos([repo], invocation, false, async () => await panes().catch(() => null));
   });
   await mergePass(global, repo, invocation, false, pressureDir);
   if (invocation.skipped.size > 0)

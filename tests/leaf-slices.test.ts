@@ -2,17 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import {
-  cli,
-  entry,
-  fixture,
-  leaf,
-  fakeHerdr,
-  holding,
-  leafTempRoot,
-  storeDir,
-  type Fixture,
-} from './helpers';
+import { cli, entry, fixture, leaf, fakeHerdr, holding, leafTempRoot, storeDir, type Fixture } from './helpers';
 import { finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import { leafSlice } from '../src/scope';
 import { readState, saveState, type State } from '../src/state';
@@ -182,7 +172,7 @@ test('merged and failed leaf slices with gone tabs are stopped and their process
       phase: 'failed',
       failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'test' },
     });
-    const pass: SpawnResult = await (spawnReal(f, ['next', '--all'], f.root)).result;
+    const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
     expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
     await waitFor(async () => !(await isActive(mergedSlice)) && !(await isActive(failedSlice)));
     await waitFor(async () => !pidAlive(mergedPid) && !pidAlive(failedPid));
@@ -203,13 +193,10 @@ test('a finished leaf with a live tab keeps its slice, and the pass fetched the 
     saveDatabase(f, {
       ...db,
       tabs: [...db.tabs, { tab_id: 'w1:t9', label: 'tabbed-merged', focused: false }],
-      panes: [
-        ...db.panes,
-        { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' },
-      ],
+      panes: [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' }],
     });
     const pid: number = await sleeper(f, sliceName);
-    const pass: SpawnResult = await (spawnReal(f, ['next', '--all'], f.root)).result;
+    const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
     expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
     expect(await isActive(sliceName)).toBe(true);
     expect(pidAlive(pid)).toBe(true);
@@ -241,7 +228,7 @@ test('a finished leaf slice named by a live run record is not stopped', async ()
       closeTab(f, z.string().parse(readState(controlPath).tab));
       saveState(path, { ...readState(path), phase: 'merged' });
       saveState(controlPath, { ...readState(controlPath), phase: 'merged' });
-      const pass: SpawnResult = await (spawnReal(f, ['next', '--all'], f.root)).result;
+      const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
       expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
       // The control proves the pass stopped finished slices this run; only the
       // live run record protects run-leaf's slice.
@@ -450,7 +437,7 @@ test('a loaded failed akrogon-run unit is cleared by a reconcile pass', async ()
     const seeded: SpawnResult = await sdrun('--quiet', `--unit=${unit}`, '--slice=akrogon.slice', 'false');
     expect(seeded.code).toBe(0);
     await waitFor(async () => (await listed('akrogon-run-flp-*')).includes(`${unit}.service`));
-    const pass: SpawnResult = await (spawnReal(f, ['next', '--all'], f.root)).result;
+    const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
     expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
     expect(await listed('akrogon-run-flp-*')).not.toContain(`${unit}.service`);
   } finally {

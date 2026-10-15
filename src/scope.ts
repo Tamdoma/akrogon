@@ -71,6 +71,8 @@ export async function startRunGuard(slice: string, run: string, wpid: number, re
     `--slice=${slice}`,
     '-p',
     'TimeoutStopSec=5',
+    '-p',
+    'CollectMode=inactive-or-failed',
     '--',
     'sh',
     '-c',
@@ -98,6 +100,21 @@ export function procRoot(): string {
   if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
     throw new Error(`Invalid AKROGON_PROC_ROOT: must be a non-blank absolute path`);
   return override ?? '/proc';
+}
+
+export function cgroupRoot(): string {
+  const override: string | undefined = process.env.AKROGON_CGROUP_ROOT;
+  if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
+    throw new Error(`Invalid AKROGON_CGROUP_ROOT: must be a non-blank absolute path`);
+  return override ?? '/sys/fs/cgroup';
+}
+
+// Slice names on the caller's own cgroup path: a pass inside a leaf slice sees
+// that slice among its segments and must never stop it (finished-leaf-processes 6).
+export function ownSlices(): Set<string> {
+  const self: string = resolve(procRoot(), 'self', 'cgroup');
+  if (!existsSync(self)) return new Set();
+  return new Set([...readFileSync(self, 'utf8').matchAll(/\b([a-zA-Z0-9_.\-]+\.slice)\b/g)].map((match) => match[1]));
 }
 
 async function shellPid(paneId: string): Promise<number> {

@@ -19,8 +19,11 @@ function save(): void {
 }
 
 function glob(name: string, pattern: string): boolean {
-  if (!pattern.endsWith('*')) return name === pattern;
-  return name.startsWith(pattern.slice(0, -1));
+  const star: number = pattern.indexOf('*');
+  if (star === -1) return name === pattern;
+  const prefix: string = pattern.slice(0, star);
+  const suffix: string = pattern.slice(star + 1);
+  return name.startsWith(prefix) && name.endsWith(suffix) && name.length >= prefix.length + suffix.length;
 }
 
 const verb: string | undefined = args.find((arg) => !arg.startsWith('-') && !arg.includes('=') && arg !== 'user');
@@ -30,7 +33,13 @@ if (verb === 'list-units') {
   const pattern: string | undefined = args.find((arg) => arg.includes('*'));
   const rows = db.units
     .filter((unit) => pattern === undefined || glob(unit.unit, pattern))
-    .map((unit) => ({ unit: unit.unit, load: 'loaded', active: unit.sub === 'failed' ? 'failed' : 'active', sub: unit.sub, description: '' }));
+    .map((unit) => ({
+      unit: unit.unit,
+      load: 'loaded',
+      active: unit.sub === 'failed' ? 'failed' : 'active',
+      sub: unit.sub,
+      description: '',
+    }));
   console.log(JSON.stringify(rows));
   process.exit(0);
 }
