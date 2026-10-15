@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fixture, cli, leaf, fakeHerdr, fakeAkrogon, yaml, leafTempRoot, storeDir, type Fixture } from './helpers';
@@ -96,7 +96,8 @@ test('failed leaf worktree is removed and its branch is kept', async () => {
   }
 });
 
-// DC2: kept worktrees reported in `akrogon status <slug>` with path and reason.
+// DC2/DC4: kept worktrees reported by plain `akrogon status` and
+// `akrogon status <slug>` with path and reason; a gone path drops its line.
 test('dirty merged worktree is kept and reported with path and reason', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -109,7 +110,14 @@ test('dirty merged worktree is kept and reported with path and reason', async ()
     const out: Result = await status(f, 'dirty-leaf');
     expect(out.stdout).toContain(worktree);
     expect(out.stdout).toContain('uncommitted');
+    const plain: Result = await cli(f, ['status'], f.root, f.env);
+    expect(plain.code).toBe(0);
+    expect(plain.stdout).toContain(`  Kept by last cleanup: ${worktree} — uncommitted changes`);
     expect((await branchExists(f, 'dirty-leaf')).code).toBe(0);
+    rmSync(worktree, { recursive: true, force: true });
+    const stale: Result = await cli(f, ['status'], f.root, f.env);
+    expect(stale.code).toBe(0);
+    expect(stale.stdout).not.toContain(worktree);
   } finally {
     f.clean();
   }

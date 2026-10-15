@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve, relative } from 'node:path';
-import { fixture, cli, leaf, yaml, fakeHerdr, type Fixture } from './helpers';
+import { fixture, cli, leaf, yaml, fakeHerdr, registerTemp, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
 import { z } from 'zod';
 import { readState, saveState, stateSchema, type State } from '../src/state';
@@ -202,6 +202,39 @@ for (const directory of ['missing', 'empty']) {
     }
   });
 }
+
+test('plain status lists kept-by-last-cleanup entries under each repo, skips missing paths and writes nothing', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const keptDir: string = registerTemp(resolve(f.home, 'kept-worktree'));
+    mkdirSync(keptDir, { recursive: true });
+    writeFileSync(resolve(keptDir, 'file'), 'x');
+    const gone: string = resolve(f.home, 'gone-worktree');
+    const report: string = resolve(f.home, 'reconcile/repo.json');
+    mkdirSync(resolve(f.home, 'reconcile'), { recursive: true });
+    writeFileSync(
+      report,
+      JSON.stringify({
+        kept: [
+          { path: keptDir, reason: 'uncommitted changes' },
+          { path: gone, reason: 'uncommitted changes' },
+        ],
+      }) + '\n',
+    );
+    const before: Record<string, string> = snapshot(f.home);
+    const result: Result = await cli(f, ['status'], f.home);
+    expect(result.code).toBe(0);
+    const rows: string[] = result.stdout.split('\n');
+    const line: string = `  Kept by last cleanup: ${keptDir} — uncommitted changes`;
+    expect(rows).toContain(line);
+    expect(rows.indexOf('repo')).toBeLessThan(rows.indexOf('  no open leaves'));
+    expect(rows.indexOf('  no open leaves')).toBeLessThan(rows.indexOf(line));
+    expect(result.stdout).not.toContain(gone);
+    expect(snapshot(f.home)).toEqual(before);
+  } finally {
+    f.clean();
+  }
+});
 
 test('incomplete repositories report exact paths before readable trees and exit nonzero', async () => {
   const f: Fixture = await fixture();
