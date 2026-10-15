@@ -800,6 +800,50 @@ test('a scratch copy with a process inside stays, recorded with the pid', async 
   }
 });
 
+test('a scratch copy stays while its surviving process closes unrelated file descriptors', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      worktree_root: storeDir(f),
+    });
+    const copy: string = resolve(storeDir(f), 'verify-fd-churn');
+    await command(['git', 'worktree', 'add', '--detach', copy], f.root);
+    const child: Bun.Subprocess<'ignore', 'pipe', 'inherit'> = Bun.spawn(
+      [
+        process.execPath,
+        '-e',
+        `import { openSync, closeSync } from 'node:fs';
+console.log('ready');
+while (true) {
+  const fds = Array.from({ length: 512 }, () => openSync('/dev/null', 'r'));
+  for (const fd of fds) closeSync(fd);
+}`,
+      ],
+      { cwd: copy, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit' },
+    );
+    try {
+      const output: ReadableStreamDefaultReader<Uint8Array> = child.stdout.getReader();
+      expect(new TextDecoder().decode((await output.read()).value)).toContain('ready');
+      output.releaseLock();
+      for (let pass: number = 0; pass < 10; pass++) {
+        expect((await next(f, ['--all'], { AKROGON_PROC_ROOT: '/proc' })).code).toBe(0);
+        expect(existsSync(copy)).toBe(true);
+        const out: Result = await cli(f, ['status'], f.root, f.env);
+        expect(out.stdout).toContain(`process ${child.pid} inside`);
+      }
+    } finally {
+      child.kill('SIGKILL');
+      await child.exited;
+    }
+    expect((await next(f, ['--all'], { AKROGON_PROC_ROOT: '/proc' })).code).toBe(0);
+    expect(existsSync(copy)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
 test('configured destination store migrates a clean old managed worktree', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
