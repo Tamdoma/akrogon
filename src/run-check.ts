@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { base, ensureLeafTemp, readGlobal, requireRepo, type Repo } from './config';
 import { allLeaves, readState, type Leaf, type State } from './state';
 import { command, spawnCaptured, type Result } from './shell';
@@ -162,10 +162,12 @@ export class PublishRefusedError extends Error {}
 async function ownerRefusal(target: string, repo: Repo, late: boolean): Promise<string | undefined> {
   const found = await locate(target, repo.root, repo);
   if (found === null || found.ownerDirs.length === 1) return undefined;
-  const [open, closed]: string[] = found.ownerDirs;
-  if (existsSync(closed)) return `owner closed: ${target}`;
+  const [open]: string[] = found.ownerDirs;
+  const owner: string = resolve(target, ...found.member.split('/').map(() => '..'));
+  const state: string = basename(dirname(owner));
+  if (state === 'closed') return `owner closed: ${target}`;
   if (existsSync(resolve(open, '.closing'))) return `owner closing: ${target}`;
-  if (late && !existsSync(open)) return `owner gone: ${target}`;
+  if (late && state === 'open' && !existsSync(open)) return `owner gone: ${target}`;
   return undefined;
 }
 
