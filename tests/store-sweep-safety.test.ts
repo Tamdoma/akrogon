@@ -150,3 +150,24 @@ test('F5 dead-writer temp files wait for an available pane inventory', async () 
     f.clean();
   }
 });
+
+test('F6 kept filesystem reports include actionable clearing conditions', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
+    const junk: string = resolve(storeDir(f), 'junk');
+    mkdirSync(junk, { recursive: true });
+    const repoResult: Reconciled = await reconcileFixture(f, null, h.env);
+    expect(repoResult.kept.length).toBeGreaterThan(0);
+    const report = z.object({ kept: z.array(z.object({ path: z.string(), reason: z.string().min(1), clears: z.string().min(1) })) });
+    report.parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile/repo.json'), 'utf8')));
+    const worktree: string = resolve(f.home, '.akrogon/worktrees/retired/checkout');
+    mkdirSync(worktree, { recursive: true });
+    writeFileSync(resolve(worktree, '.git'), 'gitdir: retained');
+    expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
+    const host: z.infer<typeof report> = report.parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile-host.json'), 'utf8')));
+    expect(host.kept.length).toBeGreaterThan(0);
+  } finally {
+    f.clean();
+  }
+});
