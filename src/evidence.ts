@@ -29,9 +29,8 @@ async function roots(repo: Repo): Promise<string[]> {
 
 export async function locate(recorded: string, cwd: string, repo: Repo): Promise<LogTarget | null> {
   const absolute: string = isAbsolute(recorded) ? recorded : resolve(cwd, recorded);
-  let path: string = recorded;
   const root: string | undefined = (await roots(repo)).find((root) => within(absolute, root));
-  if (root !== undefined) path = relative(root, absolute);
+  const path: string = root === undefined ? absolute : relative(root, absolute);
   const found: RegExpMatchArray | null = path.match(boundary);
   if (found === null || found.index === undefined) return null;
   const rest: string = path.slice(found.index + found[0].length);
