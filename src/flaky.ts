@@ -15,9 +15,9 @@ async function failedTests(repo: Repo, recorded: string): Promise<string[]> {
     if (error instanceof LogError && error.kind === 'nomatch') return ['(log gone)'];
     throw error;
   }
-  const names: string[] = [...new TextDecoder().decode(bytes).matchAll(/(?:^|\| )\(fail\) (.+?)(?: \[[\d.]+m?s\])?$/gm)].map(
-    (match: RegExpMatchArray) => match[1],
-  );
+  const names: string[] = [
+    ...new TextDecoder().decode(bytes).matchAll(/(?:^|\| )\(fail\) (.+?)(?: \[[\d.]+m?s\])?$/gm),
+  ].map((match: RegExpMatchArray) => match[1]);
   return names.length === 0 ? ['(no test name)'] : [...new Set(names)];
 }
 

@@ -94,7 +94,10 @@ export async function readLogAcross(
   }
   if (matches.length === 0) throw new LogError('nomatch', `no log for recorded path: ${recorded}`);
   if (matches.length > 1)
-    throw new LogError('ambiguous', `recorded path ${recorded} matches repos: ${matches.map((match) => match.name).join(', ')}`);
+    throw new LogError(
+      'ambiguous',
+      `recorded path ${recorded} matches repos: ${matches.map((match) => match.name).join(', ')}`,
+    );
   const only: { name: string } & ({ bytes: Uint8Array } | { error: LogError }) = matches[0];
   if ('error' in only) throw only.error;
   return only.bytes;
