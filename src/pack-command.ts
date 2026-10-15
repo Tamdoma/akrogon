@@ -20,9 +20,8 @@ function plainLogs(root: string): string[] {
 }
 
 // Args must resolve inside the registered checkout: issues/closed/<one segment>
-// or issues/chart/<one segment> (plus the single-chart layout where issues/chart
-// itself holds CHART.md). A worktree's issues/ copy resolves under the worktree
-// root, never repo.root, so it lands here as refused.
+// or issues/chart/<one segment>. A worktree's issues/ copy resolves under the
+// worktree root, never repo.root, so it lands here as refused.
 function classify(repo: Repo, arg: string, cwd: string): Folder {
   const fail = (reason: string): Refused => ({ arg, reason });
   let absolute: string;
@@ -35,7 +34,7 @@ function classify(repo: Repo, arg: string, cwd: string): Folder {
   const closed: string = resolve(repo.root, 'issues/closed');
   if (dirname(absolute) === closed) return { arg, folder: absolute, packDir: absolute, kind: 'closed' };
   const charts: string = resolve(repo.root, 'issues/chart');
-  if (dirname(absolute) === charts || (absolute === charts && existsSync(resolve(absolute, 'CHART.md'))))
+  if (dirname(absolute) === charts)
     return { arg, folder: absolute, packDir: resolve(absolute, 'direct'), kind: 'chart' };
   return fail(FORMS);
 }

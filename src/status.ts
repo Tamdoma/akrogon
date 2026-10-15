@@ -325,6 +325,9 @@ function unpackedLines(root: string): string[] {
     if (hasLog(folder) || closing(folder)) lines.push(packLine(folder));
   }
   for (const folder of chartFolders(root)) {
+    // The single-chart layout's direct/ logs are unpackable: locate resolves
+    // only issues/chart/<chart>/direct/*, so pack cannot verify its members.
+    if (folder === resolve(root, 'issues/chart')) continue;
     const ended: boolean = lastStage(readFileSync(resolve(folder, 'CHART.md'), 'utf8')) !== undefined;
     if ((ended && hasLog(resolve(folder, 'direct'))) || closing(folder)) lines.push(packLine(folder));
   }
