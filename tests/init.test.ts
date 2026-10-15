@@ -1,5 +1,7 @@
 import { test, expect } from 'bun:test';
 import { resolve } from 'node:path';
+
+const LOG_IGNORES: string = 'issues/open/**/*.log\nissues/parked/**/*.log\nissues/chart/*/direct/**/*.log\n';
 import { appendFileSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, readdirSync } from 'node:fs';
 import { fixture, cli, yaml, type Fixture } from './helpers';
 import { command, run, type Result } from '../src/shell';
@@ -10,7 +12,7 @@ test('init writes proposal, registration and toolkit and preserves repeated user
     const proposal: string = resolve(f.home, 'proposal.yaml');
     yaml(proposal, { checks: { test: 'bun test' }, implement: 'inline', grounding: 'none' });
     expect((await cli(f, ['init', '--from', proposal, '--toolkit', 'typescript=bun:test'])).code).toBe(0);
-    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe('.env\nissues/seeds/\n.lock\n');
+    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe('.env\nissues/seeds/\n.lock\n' + LOG_IGNORES);
     expect(Bun.YAML.parse(readFileSync(resolve(f.root, 'issues/config.yaml'), 'utf8'))).toMatchObject({
       implement: 'inline',
       remote: 'origin',
@@ -54,7 +56,7 @@ test('init ignores the custom worktree root and preserves user rules on repeated
     writeFileSync(ignore, '# User rules\nlocal/\nissues/seeds/\n.lock');
     expect((await cli(f, ['init', '--from', proposal])).code).toBe(0);
     const before: string = readFileSync(ignore, 'utf8');
-    expect(before).toBe('# User rules\nlocal/\nissues/seeds/\n.lock\nwork/trees/\n');
+    expect(before).toBe('# User rules\nlocal/\nissues/seeds/\n.lock\nwork/trees/\n' + LOG_IGNORES);
     mkdirSync(resolve(f.root, 'work/trees/leaf'), { recursive: true });
     writeFileSync(resolve(f.root, 'work/trees/leaf/file'), 'worktree content\n');
     expect(await command(['git', 'check-ignore', 'work/trees/leaf/file'], f.root)).toBe('work/trees/leaf/file');
@@ -85,7 +87,9 @@ test.each(rootCases)('init resolves %s worktree root from nested cwd', async (_,
     const proposal: string = resolve(f.home, 'proposal.yaml');
     yaml(proposal, { worktree_root: worktreeRoot(f), grounding: 'none' });
     expect((await cli(f, ['init', '--from', proposal], resolve(f.root, 'issues/open'))).code).toBe(0);
-    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe(`.env\n${expected}issues/seeds/\n.lock\n`);
+    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe(
+      `.env\n${expected}issues/seeds/\n.lock\n` + LOG_IGNORES,
+    );
   } finally {
     f.clean();
   }
