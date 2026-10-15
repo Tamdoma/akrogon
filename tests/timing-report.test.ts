@@ -481,10 +481,7 @@ test('flow report: carried issues print one sorted line each with day spans and 
         'summary uncarried closed: 0',
       ].join('\n'),
     );
-    expect(ghCalls(gh).map((call) => call.args)).toEqual([
-      listingArgs('acme/project'),
-      listingArgs('other/repo'),
-    ]);
+    expect(ghCalls(gh).map((call) => call.args)).toEqual([listingArgs('acme/project'), listingArgs('other/repo')]);
   } finally {
     f.clean();
   }

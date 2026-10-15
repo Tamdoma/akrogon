@@ -442,7 +442,9 @@ async function flowReport(repo: Repo, since: string): Promise<void> {
       carriers.set(source, list);
     }
   const repos: string[] = [
-    ...new Set([...carriers.keys()].map((identity) => identity.slice(0, identity.indexOf('#'))).concat(await originSource(repo))),
+    ...new Set(
+      [...carriers.keys()].map((identity) => identity.slice(0, identity.indexOf('#'))).concat(await originSource(repo)),
+    ),
   ].sort();
   const listings = new Map<string, FlowIssue>();
   for (const repository of repos) {
@@ -472,7 +474,15 @@ async function flowReport(repo: Repo, since: string): Promise<void> {
     const wait: number | null =
       filed === undefined ? null : Math.round((ms(handoff) - ms(filed.created_at.slice(0, 10))) / DAY_MS);
     const total: number | null = created === null ? null : ((merged ?? now) - created) / DAY_MS;
-    return { identity, handoff, created, merged, wait, total, leaves: new Set(list.map((carrier) => carrier.slug)).size };
+    return {
+      identity,
+      handoff,
+      created,
+      merged,
+      wait,
+      total,
+      leaves: new Set(list.map((carrier) => carrier.slug)).size,
+    };
   });
   const dated: FlowRow[] = rows
     .filter((row) => row.created !== null)
@@ -497,8 +507,18 @@ async function flowReport(repo: Repo, since: string): Promise<void> {
     console.log(
       `${item.identity} filed ${isoUtc(ms(item.issue.created_at))} uncarried ${((now - ms(item.issue.created_at)) / DAY_MS).toFixed(1)}d`,
     );
-  console.log(flowBucket('before', rows.filter((row) => row.handoff < since)));
-  console.log(flowBucket('since', rows.filter((row) => row.handoff >= since)));
+  console.log(
+    flowBucket(
+      'before',
+      rows.filter((row) => row.handoff < since),
+    ),
+  );
+  console.log(
+    flowBucket(
+      'since',
+      rows.filter((row) => row.handoff >= since),
+    ),
+  );
   const ages: number[] = uncarried.map((item) => (now - ms(item.issue.created_at)) / DAY_MS);
   const median: number | null = flowMedian(ages);
   const oldest: number | null = ages.length === 0 ? null : Math.floor(Math.max(...ages));
