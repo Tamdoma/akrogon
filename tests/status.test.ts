@@ -1035,20 +1035,26 @@ test('unpacked folders are listed with their pack command and open .closing name
     writeFileSync(resolve(openChart, 'direct/check-e-1.log'), 'live\n');
     const merged: string = leaf(f, 'done-leaf', 'merged', {}, 'issue');
     leaf(f, 'quiet-leaf', 'implement', {}, 'calm');
-    writeFileSync(resolve(merged, '../../.closing'), '');
+    writeFileSync(resolve(merged, '../.closing'), '');
 
     const listed: Result = await cli(f, ['status']);
     expect(listed.code).toBe(0);
     const unpacked: string[] = listed.stdout.split('\n').filter((line) => line.startsWith('Unpacked: '));
-    expect(unpacked.length).toBe(4);
+    expect(unpacked.length).toBe(5);
     expect(unpacked.some((line) => line.includes('issues/closed/finished') && line.includes('pack'))).toBe(true);
     expect(unpacked.some((line) => line.includes('issues/closed/moved') && line.includes('pack'))).toBe(true);
     expect(unpacked.some((line) => line.includes('issues/chart/ended') && line.includes('pack'))).toBe(true);
     expect(unpacked.some((line) => line.includes('issues/chart/halted') && line.includes('pack'))).toBe(true);
     expect(
-      listed.stdout.split('\n').some(
-        (line) => line.startsWith('Unpacked: ') && line.includes('issues/open/issue') && line.includes('next') && line.includes('done-leaf'),
-      ),
+      listed.stdout
+        .split('\n')
+        .some(
+          (line) =>
+            line.startsWith('Unpacked: ') &&
+            line.includes('issues/open/issue') &&
+            line.includes('next') &&
+            line.includes('done-leaf'),
+        ),
     ).toBe(true);
     expect(unpacked.some((line) => line.includes('issues/chart/live'))).toBe(false);
     expect(unpacked.some((line) => line.includes('issues/open/') && line.includes('calm'))).toBe(false);

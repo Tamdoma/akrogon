@@ -137,16 +137,13 @@ test('missing anchors with and without a path part are reported', () => {
 
 test('chart-issues skill runs akrogon pack before appending an end marker', (): void => {
   const content: string = readFileSync(resolve(import.meta.dir, '../skills/chart-issues/SKILL.md'), 'utf8');
-  const appendSite = /(Handed off|Closed|Held) <[^\s`]*>|append `Handed off|then `Closed|abandon.*`Held/g;
-  const sites: number = (content.match(appendSite) ?? []).length;
-  expect(sites).toBeGreaterThanOrEqual(3);
-  // Every paragraph or list step that appends an end marker names the pack step before it.
-  for (const block of content.split(/\n\n+/)) {
-    const site: RegExpMatchArray | null = block.match(/(Handed off|Closed|Held) <[^\s`]*>/);
-    if (site === null || site.index === undefined) continue;
-    const markerAt: number = site.index;
-    const packAt: number = block.indexOf('akrogon pack');
-    expect(packAt, JSON.stringify(block.slice(0, 120))).toBeGreaterThanOrEqual(0);
-    expect(packAt, JSON.stringify(block.slice(0, 120))).toBeLessThan(markerAt);
+  const appends: RegExpMatchArray[] = [
+    ...content.matchAll(/append `(Handed off|Closed|Held)|then `(Closed|Held) <date>/g),
+  ];
+  expect(appends.length).toBeGreaterThanOrEqual(3);
+  // Each append instruction names `akrogon pack <chart>` inside its own paragraph or step.
+  for (const at of appends) {
+    const start: number = content.lastIndexOf('\n\n', at.index) + 2;
+    expect(content.slice(start, at.index), JSON.stringify(content.slice(start, at.index))).toContain('akrogon pack');
   }
 });
