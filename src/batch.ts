@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmdirSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
 import { worktreeStore, type GlobalConfig, type Repo } from './config';
@@ -9,6 +9,7 @@ import { createSparseWorktree } from './next';
 import { mergeQueue } from './turn';
 import { readLog } from './log';
 import { redMemberHeads } from './attempts';
+import { writeOwner } from './reconcile';
 
 export async function removeEmptyUntrackedDirs(worktree: string): Promise<void> {
   const present: string = await command(['git', 'ls-files', '-c', '-z'], worktree);
@@ -113,8 +114,11 @@ export async function buildStack(
   retirementHead: string = holderHead,
 ): Promise<StackResult> {
   const dir: string = resolve(worktreeStore(repo), 'batch-' + attemptId());
-  await createSparseWorktree(repo, dir, builtOn, { detach: true });
+  const owner: string = `${dir}.owner`;
+  mkdirSync(dirname(dir), { recursive: true });
+  writeOwner(owner);
   try {
+    await createSparseWorktree(repo, dir, builtOn, { detach: true });
     let tip: string = builtOn;
     if (!(await isAncestor(dir, holderHead, tip))) {
       const held: Result = await run(['git', 'rebase', '--onto', tip, tip, holderHead], dir);
@@ -153,6 +157,7 @@ export async function buildStack(
     return { ok: true, top: tip, tips };
   } finally {
     await command(['git', 'worktree', 'remove', '--force', dir], repo.root);
+    rmSync(owner, { force: true });
   }
 }
 
