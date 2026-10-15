@@ -607,8 +607,14 @@ export async function reconcileHost(
   const failedRuns: Set<string> | null = await loadedUnits('akrogon-run-*', '--failed');
   if (loaded !== null) {
     const leafOf: Map<string, { repo: Repo; leaf: Leaf }> = new Map();
+    const inventoryErrors: string[] = [];
     for (const repo of repos)
-      for (const leaf of allLeaves(repo)) leafOf.set(leafSlice(repo, leaf.state.slug), { repo, leaf });
+      try {
+        for (const leaf of allLeaves(repo)) leafOf.set(leafSlice(repo, leaf.state.slug), { repo, leaf });
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        inventoryErrors.push(`${repo.name}: ${error.message}`);
+      }
     const own: Set<string> = ownSlices();
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
     let panes: Pane[] | null = live;
@@ -636,6 +642,10 @@ export async function reconcileHost(
       }
       if (own.has(slice)) {
         keep(slice, 'own slice');
+        continue;
+      }
+      if (inventoryErrors.length > 0) {
+        keep(slice, `leaf inventory unavailable: ${inventoryErrors.join('; ')}`);
         continue;
       }
       if (runs.has(slice)) {
