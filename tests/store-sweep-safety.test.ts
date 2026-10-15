@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { lstatSync, mkdirSync, symlinkSync, existsSync, writeFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, symlinkSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import { leafTemp, readRepo, type Repo } from '../src/config';
 import { retiredLeafTempRoot } from '../src/config';
@@ -57,6 +57,35 @@ test('F2 surviving processes protect leaf entries and leaf temps', async () => {
     expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
     expect(existsSync(owned)).toBe(false);
     expect(existsSync(temp)).toBe(false);
+  } finally {
+    if (child.exitCode === null) child.kill('SIGKILL');
+    await child.exited;
+    f.clean();
+  }
+});
+
+test('F3 live owner records protect recursively deleted parents and batch records', async () => {
+  const f: Fixture = await fixture();
+  const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
+  try {
+    const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
+    const retired: string = resolve(f.home, 'retired-temp');
+    const oldRepo: string = resolve(leafTempRoot(f), 'unregistered');
+    const batch: string = resolve(storeDir(f), 'batch-live');
+    const record: string = JSON.stringify({ pid: child.pid, boot_id: readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(), started: new Date().toISOString() });
+    for (const parent of [retired, oldRepo]) {
+      const run: string = resolve(parent, 'leaf', 'run-live');
+      mkdirSync(run, { recursive: true });
+      writeFileSync(resolve(run, '.owner'), record);
+    }
+    mkdirSync(batch, { recursive: true });
+    writeFileSync(batch + '.owner', record);
+    expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
+    for (const path of [retired, oldRepo, batch, batch + '.owner']) expect(existsSync(path)).toBe(true);
+    child.kill('SIGKILL');
+    await child.exited;
+    expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
+    for (const path of [retired, oldRepo, batch, batch + '.owner']) expect(existsSync(path)).toBe(false);
   } finally {
     if (child.exitCode === null) child.kill('SIGKILL');
     await child.exited;
