@@ -47,7 +47,7 @@ When the last leaf of an epic merges, it reports:
 epic complete <epic>
 ```
 
-Completed records move to the closed store. An issue inside an epic prints no completion line and waits for the whole epic before the top-level folder moves. One stack can print several completion lines, one per standalone issue or epic whose last open leaf it lands.
+Completed records move to the closed store. On the move each owner folder gets a `.closing` marker while its `*.log` files pack into `evidence.tar.zst`. An issue inside an epic prints no completion line and waits for the whole epic before the top-level folder moves. One stack can print several completion lines, one per standalone issue or epic whose last open leaf it lands.
 
 If the holder leaves `merge` mid-run, the next pass reconciles the record instead of rebuilding: it fetches the remote, then either finishes the moves by ancestry — the pushed candidate's ancestry on the tracking ref proves the stack, and every recorded member still in `merge` and the holder move to `merged` once, skipping any already moved — or clears the record. Each merged member's tab is closed and its dependents dispatched by that pass. A failed fetch changes nothing and reports only the error. A holder failed after its push landed gets a notification naming `akrogon phase <slug> merge`; moving it back to `merge` lands it by ancestry with no prompt and no check run.
 
