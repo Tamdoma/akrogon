@@ -9,17 +9,22 @@ import {
   statSync,
   writeFileSync,
   type Dirent,
+  type Stats,
 } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { globalHome, leafTemp, within, worktreeStore, type Repo } from './config';
+import { globalHome, leafTemp, leafTempRoot, retiredLeafTempRoot, within, worktreeStore, type Repo } from './config';
 import { readVerifyRuns, type VerifyRun } from './verify';
 import { allLeaves, leavesUnder, readState, saveState, type Leaf, type State } from './state';
 import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
 import { liveRuns, withAdmissionLock } from './admission';
 import { command, herdrError, run, spawnCaptured, type Pane, type Result } from './shell';
 
-export type Reconciled = { removed: string[]; kept: { path: string; reason: string }[] };
+export type Reconciled = { removed: string[]; kept: { path: string; reason: string; clears?: string }[] };
+
+export type KeptEntry = { path: string; reason: string; clears?: string };
 
 export type RemovedRecord = { path: string; head: string; rule: string; branch?: string };
 
@@ -33,7 +38,7 @@ const removedRecordSchema = z.strictObject({
 });
 
 const keptReportSchema = z.strictObject({
-  kept: z.array(z.strictObject({ path: z.string(), reason: z.string() })),
+  kept: z.array(z.strictObject({ path: z.string(), reason: z.string(), clears: z.string().optional() })),
   removed: z.array(removedRecordSchema).optional(),
 });
 
@@ -58,7 +63,7 @@ function readReport(file: string): z.infer<typeof keptReportSchema> {
   }
 }
 
-export function readKept(repo: Repo): { path: string; reason: string }[] {
+export function readKept(repo: Repo): KeptEntry[] {
   return readReport(keptReportPath(repo)).kept;
 }
 
@@ -66,20 +71,26 @@ export function readRemoved(repo: Repo): RemovedRecord[] {
   return readReport(keptReportPath(repo)).removed ?? [];
 }
 
-function writeKept(file: string, kept: { path: string; reason: string }[], removed?: RemovedRecord[]): void {
+// Entries naming paths that no longer exist carry no signal for anyone reading
+// the report; unit names are not paths, so only absolute paths are pruned.
+function writeKept(file: string, kept: KeptEntry[], removed?: RemovedRecord[]): void {
   mkdirSync(dirname(file), { recursive: true });
+  const pruned: KeptEntry[] = kept.filter((entry) => !entry.path.startsWith('/') || existsSync(entry.path));
   const temporary: string = `${file}.${process.pid}.tmp`;
-  writeFileSync(temporary, JSON.stringify(removed === undefined ? { kept } : { kept, removed }, null, 2) + '\n');
+  writeFileSync(
+    temporary,
+    JSON.stringify(removed === undefined ? { kept: pruned } : { kept: pruned, removed }, null, 2) + '\n',
+  );
   renameSync(temporary, file);
 }
 
-function writeKeptReport(repo: Repo, kept: { path: string; reason: string }[], removed: RemovedRecord[]): void {
+function writeKeptReport(repo: Repo, kept: KeptEntry[], removed: RemovedRecord[]): void {
   writeKept(keptReportPath(repo), kept, removed);
 }
 
 const hostReportPath = (): string => resolve(globalHome(), 'reconcile-host.json');
 
-export function readHostKept(): { path: string; reason: string }[] {
+export function readHostKept(): KeptEntry[] {
   return readReport(hostReportPath()).kept;
 }
 
@@ -332,13 +343,23 @@ export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<b
   const recorded: Set<string> = new Set(
     leaves.flatMap((leaf) => (leaf.state.worktree === undefined ? [] : [leaf.state.worktree])),
   );
+  // Any unrecorded entry — file, dir or link — can end up a pane-dependent
+  // candidate (unowned veto, leaf-owned tab check, orphan .owner record).
   if (
     [store, oldRoot].some(
-      (root) =>
-        existsSync(root) &&
-        readdirSync(root, { withFileTypes: true }).some(
-          (entry) => entry.isDirectory() && !recorded.has(resolve(root, entry.name)),
-        ),
+      (root) => existsSync(root) && readdirSync(root).some((name) => !recorded.has(resolve(root, name))),
+    )
+  )
+    return true;
+  // Anything inside a leaf's repo-hash dir is a candidate: leaf temps need tab
+  // and slice judgement, strays and ownerless run dirs need the unowned veto.
+  const tempDir: string = dirname(leafTemp(repo, 'x'));
+  if (existsSync(tempDir) && readdirSync(tempDir).length > 0) return true;
+  // A retired lock file is deletable only once panes are available.
+  if (
+    existsSync(resolve(repo.root, 'issues/.lock')) ||
+    existsSync(
+      resolve(repo.root, await command(['git', 'rev-parse', '--git-path', 'akrogon-base-runs.lock'], repo.root)),
     )
   )
     return true;
@@ -356,9 +377,9 @@ export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<b
 export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null): Promise<Reconciled> {
   const removed: string[] = [];
   const removedWorktrees: RemovedRecord[] = [];
-  const kept: { path: string; reason: string }[] = [];
-  const keep = (path: string, reason: string): void => {
-    kept.push({ path, reason });
+  const kept: KeptEntry[] = [];
+  const keep = (path: string, reason: string, clears?: string): void => {
+    kept.push(clears === undefined ? { path, reason } : { path, reason, clears });
   };
 
   const listed: string = await command(['git', 'worktree', 'list', '--porcelain'], repo.root);
@@ -421,22 +442,25 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   // sweep in the same pass already sees stopped slices. A finished leaf's slice
   // is stopped outright — killing leftovers is the point — unless it is the
   // pass's own, a live run names it, or its tab cannot be proven gone.
+  const loadedSlices: Set<string> | null = await loadedLeafSlices();
+  const stoppedSlices: Set<string> = new Set();
   {
-    const loaded: Set<string> | null = await loadedLeafSlices();
     const own: Set<string> = ownSlices();
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
     for (const leaf of leaves) {
       if (!finished(leaf)) continue;
       const slice: string = leafSlice(repo, leaf.state.slug);
-      if (loaded === null || !loaded.has(slice)) continue;
+      if (loadedSlices === null || !loadedSlices.has(slice)) continue;
       const reason: string | null = sliceKeepReason(slice, leaf, live, own, runs);
       if (reason !== null) {
         keep(slice, reason);
         continue;
       }
       const error: string | null = await stopSlice(slice);
-      if (error === null) removed.push(slice);
-      else keep(slice, error);
+      if (error === null) {
+        removed.push(slice);
+        stoppedSlices.add(slice);
+      } else keep(slice, error);
     }
   }
 
@@ -586,11 +610,46 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
   }
 
+  // Every new filesystem deletion goes through drop(): a failed rmSync is
+  // recorded and a survivor is never claimed removed (D5, criterion 9).
+  const drop = (path: string): void => {
+    try {
+      rmSync(path, { recursive: true, force: true });
+    } catch (error) {
+      keep(path, `delete failed: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    if (existsSync(path)) keep(path, 'delete failed: path still present');
+    else removed.push(path);
+  };
+  const repoRunning: boolean = leaves.some((leaf) => !finished(leaf));
+  // Unowned entries delete under one shared rule: idle repo, pane list
+  // available, no pane cwd or process inside (D1.5, D3, D5).
+  const dropUnowned = async (path: string): Promise<void> => {
+    if (repoRunning) {
+      keep(path, 'unowned entry', 'removed once no leaf of the repo is running');
+      return;
+    }
+    if (live === null) {
+      keep(path, 'pane list unavailable');
+      return;
+    }
+    if (livePaneInside(panes, path)) {
+      keep(path, 'live pane inside');
+      return;
+    }
+    const inside: number[] = pidsInside(targets(), path);
+    if (inside.length > 0) {
+      keep(path, `process ${inside.join(', ')} inside`);
+      return;
+    }
+    drop(path);
+  };
+
   const candidates: Set<string> = new Set();
   for (const root of roots) {
     if (!existsSync(root)) continue;
-    for (const entry of readdirSync(root, { withFileTypes: true }))
-      if (entry.isDirectory()) candidates.add(resolve(root, entry.name));
+    for (const entry of readdirSync(root)) candidates.add(resolve(root, entry));
   }
   for (const path of registered.keys()) {
     if (path === repo.root || handled.has(path)) continue;
@@ -598,162 +657,241 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     if (underRoot(path)) candidates.add(path);
     else keep(path, 'unmanaged worktree');
   }
+  // Longest known slug the entry name matches exactly or as <slug>-<rest>
+  // (D1.2); undefined when no leaf record claims the name.
+  const matchSlug = (name: string): string | undefined =>
+    [...knownSlugs]
+      .filter((slug) => name === slug || name.startsWith(`${slug}-`))
+      .sort((a, b) => b.length - a.length)[0];
+
   for (const path of [...candidates].sort()) {
     if (!existsSync(path) || handled.has(path)) continue;
     const name: string = basename(path);
     const leaf: Leaf | undefined = leafBySlug.get(name);
     const row: WorktreeRow | undefined = registered.get(path);
-    if (row === undefined) {
+    if (row !== undefined) {
+      if (row.locked !== false) {
+        keepLocked(path, row.locked);
+        continue;
+      }
+      if (!leafSlugs.has(name) && knownSlugs.has(name)) {
+        keep(path, 'unknown directory');
+        continue;
+      }
+      if (leaf !== undefined && leaf.state.worktree === undefined) {
+        // A worktree the leaf will adopt on dispatch gets the leaf's own rules.
+        if (leaf.state.phase === 'merged') {
+          handled.add(path);
+          await mergedWorktree(leaf, path, within(leaf.path, openRoot));
+          continue;
+        }
+        if (leaf.state.phase === 'failed') {
+          handled.add(path);
+          if (live === null) keep(path, 'pane list unavailable');
+          else if (tabLive(panes, leaf.state.tab) || foreignPaneInside(panes, path, leaf.state.tab))
+            keep(path, 'live pane inside');
+          else await removeWorktree(path, false, 'failed leaf');
+          continue;
+        }
+        keep(path, 'active leaf');
+        continue;
+      }
+      // A delegated worker runs at <slug>-u<N> from the seat's own pane, so no pane sits inside it.
+      const owner: Leaf | undefined =
+        leaf === undefined && /-u\d+$/.test(name) ? leafBySlug.get(name.replace(/-u\d+$/, '')) : undefined;
+      if (owner !== undefined && owner.state.phase !== 'merged' && owner.state.phase !== 'failed') {
+        keep(path, 'active leaf worker');
+        continue;
+      }
+      if (owner === undefined && !name.startsWith('verify-') && !name.startsWith('batch-')) {
+        keep(path, 'unmanaged worktree');
+        continue;
+      }
+      let force: boolean = owner?.state.phase === 'merged';
+      let rule: string = 'worker of finished leaf';
+      if (name.startsWith('verify-')) {
+        const record: VerifyRun | undefined = verifyRuns.find((item) => item.run === name.slice('verify-'.length));
+        if (record !== undefined && record.end === undefined && !ownerDead(record)) {
+          keep(path, `verify ${record.run} in progress`);
+          continue;
+        }
+        force = true;
+        rule = 'ended verify';
+      }
+      if (name.startsWith('batch-')) {
+        const record: Owner | undefined = readOwner(`${path}.owner`);
+        if (record !== undefined && !ownerDead(record)) continue; // live builder owns this copy
+        force = true;
+        rule = existsSync(`${path}.owner`) ? 'dead batch owner' : 'unrecorded batch';
+      }
+      if (live === null) {
+        keep(path, 'pane list unavailable');
+        continue;
+      }
+      if (livePaneInside(panes, path)) {
+        keep(path, 'live pane inside');
+        continue;
+      }
+      const inside: number[] = pidsInside(targets(), path);
+      if (inside.length > 0) {
+        keep(path, `process ${inside.join(', ')} inside`);
+        continue;
+      }
+      await removeWorktree(path, force, rule);
+      continue;
+    }
+
+    // Unregistered entries (D1.2+): leaf-owned junk, orphan owner records,
+    // dead-writer tmp files, then the unowned rule.
+    const ownerSlug: string | undefined = matchSlug(name);
+    const ownerLeaf: Leaf | undefined = ownerSlug === undefined ? undefined : leafBySlug.get(ownerSlug);
+    if (ownerLeaf !== undefined) {
+      // Leaf-owned junk (<slug>/<slug>-*) follows the leaf's tab, not git:
+      // kept while the leaf runs, dropped once a finished owner's tab is gone.
+      if (!finished(ownerLeaf)) {
+        keep(path, 'active leaf', 'removed once the owning leaf finishes');
+        continue;
+      }
+      if (live === null) {
+        keep(path, 'pane list unavailable');
+        continue;
+      }
+      if (tabLive(panes, ownerLeaf.state.tab) || foreignPaneInside(panes, path, ownerLeaf.state.tab)) {
+        keep(path, 'live pane inside');
+        continue;
+      }
+      drop(path);
+      continue;
+    }
+    if (ownerSlug !== undefined) {
       keep(path, 'unknown directory');
       continue;
     }
-    if (row.locked !== false) {
-      keepLocked(path, row.locked);
+    if (/^batch-.*\.owner$/.test(name) && !existsSync(path.slice(0, -'.owner'.length))) {
+      // A batch-<id>.owner record with no copy directory is swept with the
+      // copy's own rule: a live owner may precede a copy still being created,
+      // a dead or unreadable one is dropped once panes are available (D1.3).
+      const record: Owner | undefined = readOwner(path);
+      if (record !== undefined && !ownerDead(record)) keep(path, 'live owner', 'removed once the owner exits');
+      else if (live === null) keep(path, 'pane list unavailable');
+      else drop(path);
       continue;
     }
-    if (!leafSlugs.has(name) && knownSlugs.has(name)) {
-      keep(path, 'unknown directory');
+    // Write-then-rename leftovers: only a dead writer's file is droppable.
+    const tempMatch: RegExpMatchArray | null = name.match(/\.(\d+)\.tmp$/);
+    if (tempMatch !== null && statSync(path, { throwIfNoEntry: false })?.isDirectory() !== true) {
+      if (!pidAlive(Number(tempMatch[1]))) drop(path);
       continue;
     }
-    if (leaf !== undefined && leaf.state.worktree === undefined) {
-      // A worktree the leaf will adopt on dispatch gets the leaf's own rules.
-      if (leaf.state.phase === 'merged') {
-        handled.add(path);
-        await mergedWorktree(leaf, path, within(leaf.path, openRoot));
-        continue;
-      }
-      if (leaf.state.phase === 'failed') {
-        handled.add(path);
-        if (live === null) keep(path, 'pane list unavailable');
-        else if (tabLive(panes, leaf.state.tab) || foreignPaneInside(panes, path, leaf.state.tab))
-          keep(path, 'live pane inside');
-        else await removeWorktree(path, false, 'failed leaf');
-        continue;
-      }
-      keep(path, 'active leaf');
-      continue;
-    }
-    // A delegated worker runs at <slug>-u<N> from the seat's own pane, so no pane sits inside it.
-    const owner: Leaf | undefined =
-      leaf === undefined && /-u\d+$/.test(name) ? leafBySlug.get(name.replace(/-u\d+$/, '')) : undefined;
-    if (owner !== undefined && owner.state.phase !== 'merged' && owner.state.phase !== 'failed') {
-      keep(path, 'active leaf worker');
-      continue;
-    }
-    if (owner === undefined && !name.startsWith('verify-') && !name.startsWith('batch-')) {
-      keep(path, 'unmanaged worktree');
-      continue;
-    }
-    let force: boolean = owner?.state.phase === 'merged';
-    let rule: string = 'worker of finished leaf';
-    if (name.startsWith('verify-')) {
-      const record: VerifyRun | undefined = verifyRuns.find((item) => item.run === name.slice('verify-'.length));
-      if (record !== undefined && record.end === undefined && !ownerDead(record)) {
-        keep(path, `verify ${record.run} in progress`);
-        continue;
-      }
-      force = true;
-      rule = 'ended verify';
-    }
-    if (name.startsWith('batch-')) {
-      const record: Owner | undefined = readOwner(`${path}.owner`);
-      if (record !== undefined && !ownerDead(record)) continue; // live builder owns this copy
-      force = true;
-      rule = existsSync(`${path}.owner`) ? 'dead batch owner' : 'unrecorded batch';
-    }
-    if (live === null) {
-      keep(path, 'pane list unavailable');
-      continue;
-    }
-    if (livePaneInside(panes, path)) {
-      keep(path, 'live pane inside');
-      continue;
-    }
-    const inside: number[] = pidsInside(targets(), path);
-    if (inside.length > 0) {
-      keep(path, `process ${inside.join(', ')} inside`);
-      continue;
-    }
-    await removeWorktree(path, force, rule);
+    await dropUnowned(path);
   }
 
-  // A batch-<id>.owner record with no copy directory is swept with the copy's
-  // own rule: a live owner may precede a copy still being created, a dead or
-  // unreadable one is dropped.
-  if (existsSync(store))
-    for (const entry of readdirSync(store, { withFileTypes: true })) {
-      if (!entry.isFile() || !/^batch-.*\.owner$/.test(entry.name)) continue;
-      const file: string = resolve(store, entry.name);
-      if (existsSync(resolve(store, entry.name.slice(0, -'.owner'.length)))) continue;
-      const record: Owner | undefined = readOwner(file);
-      if (record !== undefined && !ownerDead(record)) continue;
-      rmSync(file, { force: true });
-      removed.push(file);
-    }
-
-  const scratchRoot: string = resolve(leafTemp(repo, 'x'), '..');
+  const scratchRoot: string = dirname(leafTemp(repo, 'x'));
   if (existsSync(scratchRoot)) {
     const scratchByDir: Map<string, Leaf> = new Map(
       leaves.map((leaf) => [basename(leafTemp(repo, leaf.state.slug)), leaf]),
     );
-    const checkoutScratch: string = basename(leafTemp(repo, 'checkout'));
+    const ownTemps: Set<string> = new Set(['checkout', 'self-update'].map((slug) => basename(leafTemp(repo, slug))));
     for (const entry of readdirSync(scratchRoot, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
       const dir: string = resolve(scratchRoot, entry.name);
       const leaf: Leaf | undefined = scratchByDir.get(entry.name);
-      const runEntries: Dirent[] = readdirSync(dir, { withFileTypes: true }).filter(
-        (child) => child.isDirectory() && child.name.startsWith('run-'),
-      );
       const keptBefore: number = kept.length;
-      for (const child of runEntries) {
-        const runRoot: string = resolve(dir, child.name);
-        const refusalFile: string = resolve(runRoot, 'refusal.json');
-        if (existsSync(refusalFile)) {
-          let reason: string = 'publish refused';
-          try {
-            reason =
-              'publish refused: ' +
-              z.object({ reason: z.string() }).parse(JSON.parse(readFileSync(refusalFile, 'utf8'))).reason;
-          } catch {
-            // an unreadable refusal file still keeps the run root
+      if (entry.isDirectory()) {
+        const runEntries: Dirent[] = readdirSync(dir, { withFileTypes: true }).filter(
+          (child) => child.isDirectory() && child.name.startsWith('run-'),
+        );
+        for (const child of runEntries) {
+          const runRoot: string = resolve(dir, child.name);
+          const refusalFile: string = resolve(runRoot, 'refusal.json');
+          if (existsSync(refusalFile)) {
+            let reason: string = 'publish refused';
+            try {
+              reason =
+                'publish refused: ' +
+                z.object({ reason: z.string() }).parse(JSON.parse(readFileSync(refusalFile, 'utf8'))).reason;
+            } catch {
+              // an unreadable refusal file still keeps the run root
+            }
+            keep(runRoot, reason);
+            continue;
           }
-          keep(runRoot, reason);
+          const ownerFile: string = resolve(runRoot, '.owner');
+          if (!existsSync(ownerFile)) {
+            // mkdtemp precedes the .owner write; birthtime measures that
+            // window, mtime is the fallback where the filesystem reports none.
+            const stat: Stats = statSync(runRoot);
+            const created: number = stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.mtimeMs;
+            if (Date.now() - created < 60_000) {
+              keep(runRoot, 'run younger than 60s', 'removed once it outlives the owner-record gap');
+            } else await dropUnowned(runRoot);
+            continue;
+          }
+          const owner: Owner | undefined = readOwner(ownerFile);
+          if (owner === undefined) {
+            keep(runRoot, 'invalid .owner record');
+            continue;
+          }
+          if (ownerDead(owner)) drop(runRoot);
+          else keep(runRoot, 'run in progress');
+        }
+        if (leaf !== undefined) {
+          // A leaf's temp lives only while its seat or a check uses it. Only
+          // finished leaves report what stays; a finished leaf's temp also
+          // stays while its slice still holds a running unit (D2).
+          const done: boolean = finished(leaf);
+          if (live === null) {
+            if (done) keep(dir, 'pane list unavailable');
+          } else if (tabLive(live, leaf.state.tab) || livePaneInside(live, dir)) {
+            if (done) keep(dir, 'live pane inside');
+          } else if (kept.length === keptBefore) {
+            // An unreadable unit inventory is no proof of a busy slice: temps
+            // were removed without one before this check existed (D2, D10).
+            const slice: string = leafSlice(repo, leaf.state.slug);
+            if (
+              done &&
+              loadedSlices !== null &&
+              loadedSlices.has(slice) &&
+              !stoppedSlices.has(slice) &&
+              (await sliceHasProcess(slice))
+            )
+              keep(dir, 'slice holds a running unit', 'removed once the unit exits');
+            else {
+              drop(dir);
+              continue;
+            }
+          }
           continue;
         }
-        const ownerFile: string = resolve(runRoot, '.owner');
-        if (!existsSync(ownerFile)) {
-          keep(runRoot, 'no .owner record');
-          continue;
-        }
-        const owner: Owner | undefined = readOwner(ownerFile);
-        if (owner === undefined) {
-          keep(runRoot, 'invalid .owner record');
-          continue;
-        }
-        if (ownerDead(owner)) {
-          rmSync(runRoot, { recursive: true, force: true });
-          removed.push(runRoot);
-        } else keep(runRoot, 'run in progress');
       }
-      if (leaf === undefined && entry.name !== checkoutScratch) keep(dir, 'unknown scratch directory');
-      else if (leaf !== undefined) {
-        // A leaf's temp lives only while its seat or a check uses it. Only finished leaves report what stays.
-        const finished: boolean = leaf.state.phase === 'merged' || leaf.state.phase === 'failed';
-        if (live === null) {
-          if (finished) keep(dir, 'pane list unavailable');
-        } else if (tabLive(live, leaf.state.tab) || livePaneInside(live, dir)) {
-          if (finished) keep(dir, 'live pane inside');
-        } else if (kept.length === keptBefore) {
-          rmSync(dir, { recursive: true, force: true });
-          removed.push(dir);
-          continue;
-        }
+      if (ownTemps.has(entry.name)) {
+        // checkout/self-update dirs are akrogon's own: they stay while a kept
+        // run or a registered worktree inside proves use, else idle-swept (D2).
+        if (kept.length === keptBefore && ![...registered.keys()].some((path) => within(path, dir)))
+          await dropUnowned(dir);
+        continue;
       }
+      if (kept.length === keptBefore) await dropUnowned(dir);
     }
+    // An emptied repo-hash dir is itself junk.
+    if (existsSync(scratchRoot) && readdirSync(scratchRoot).length === 0) drop(scratchRoot);
   }
 
   // Prune on any removal: rmSync'd scratch dirs can hold inner worktrees whose
   // stale registrations only this pass clears.
+
+  // Retired repo-side locks, exact names only: deleted when no process holds
+  // them open and the pane list is available (D4).
+  if (live !== null)
+    for (const lock of [
+      resolve(repo.root, await command(['git', 'rev-parse', '--git-path', 'akrogon-base-runs.lock'], repo.root)),
+      resolve(repo.root, 'issues/.lock'),
+    ]) {
+      if (!existsSync(lock)) continue;
+      const inside: number[] = pidsInside(targets(), lock);
+      if (inside.length > 0) keep(lock, `process ${inside.join(', ')} inside`);
+      else drop(lock);
+    }
+
   if (removed.length > 0) await command(['git', 'worktree', 'prune'], repo.root);
   writeKeptReport(repo, kept, removedWorktrees);
   return { removed, kept };
@@ -769,10 +907,22 @@ export async function reconcileHost(
   live: Pane[] | null,
   panesOnce: () => Promise<Pane[] | null>,
 ): Promise<void> {
-  const kept: { path: string; reason: string }[] = [];
-  const keep = (unit: string, reason: string): void => {
-    kept.push({ path: unit, reason });
+  const kept: KeptEntry[] = [];
+  const keep = (unit: string, reason: string, clears?: string): void => {
+    kept.push(clears === undefined ? { path: unit, reason } : { path: unit, reason, clears });
   };
+  let panes: Pane[] | null = live;
+  let fetched: boolean = live !== null;
+  const livePanes = async (): Promise<Pane[] | null> => {
+    if (!fetched) {
+      panes = await panesOnce();
+      fetched = true;
+    }
+    return panes;
+  };
+  // One /proc scan per pass, run only when a candidate reaches removal.
+  let scanned: Map<number, string[]> | undefined;
+  const targets = (): Map<number, string[]> => scanned ?? (scanned = procTargets());
   const loaded: Set<string> | null = await loadedLeafSlices();
   const failedRuns: Set<string> | null = await loadedUnits('akrogon-run-*', '--failed');
   if (loaded !== null) {
@@ -787,15 +937,6 @@ export async function reconcileHost(
       }
     const own: Set<string> = ownSlices();
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
-    let panes: Pane[] | null = live;
-    let fetched: boolean = live !== null;
-    const livePanes = async (): Promise<Pane[] | null> => {
-      if (!fetched) {
-        panes = await panesOnce();
-        fetched = true;
-      }
-      return panes;
-    };
     for (const slice of [...loaded].sort()) {
       const match: { repo: Repo; leaf: Leaf } | undefined = leafOf.get(slice);
       if (match !== undefined && !finished(match.leaf)) continue;
@@ -835,5 +976,98 @@ export async function reconcileHost(
       const result: Result = await systemctl('reset-failed', unit);
       if (result.code !== 0) keep(unit, result.stderr || `systemctl reset-failed exited ${result.code}`);
     }
+
+  // Host filesystem sweep (D6): retired temp root, unregistered worktree-store
+  // and leaf-temp repo dirs, temp-root strays, runs/last-start, dead-pid tmp
+  // files and retired global locks. Every deletion needs panes available and
+  // no pane cwd or process inside; dead-pid tmp files need neither.
+  const dropPath = async (path: string, isDir: boolean): Promise<void> => {
+    const view: Pane[] | null = await livePanes();
+    if (view === null) {
+      keep(path, 'pane list unavailable');
+      return;
+    }
+    if (isDir && livePaneInside(view, path)) {
+      keep(path, 'live pane inside');
+      return;
+    }
+    const inside: number[] = pidsInside(targets(), path);
+    if (inside.length > 0) {
+      keep(path, `process ${inside.join(', ')} inside`);
+      return;
+    }
+    try {
+      rmSync(path, { recursive: true, force: true });
+    } catch (error) {
+      keep(path, `delete failed: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    if (existsSync(path)) keep(path, 'delete failed: path still present');
+  };
+
+  const retired: string = retiredLeafTempRoot();
+  if (existsSync(retired)) await dropPath(retired, true);
+
+  // ~/.akrogon/worktrees/<name> for an unregistered name is a store dir with
+  // no repo behind it: dropped unless a child still holds a .git worktree.
+  const home: string = globalHome();
+  const repoNames: Set<string> = new Set(repos.map((repo) => repo.name));
+  const storeRoot: string = resolve(homedir(), '.akrogon/worktrees');
+  if (existsSync(storeRoot))
+    for (const entry of readdirSync(storeRoot)) {
+      if (repoNames.has(entry)) continue;
+      const dir: string = resolve(storeRoot, entry);
+      const stat = statSync(dir, { throwIfNoEntry: false });
+      if (stat === undefined || !stat.isDirectory()) {
+        await dropPath(dir, false);
+        continue;
+      }
+      const hasWorktree: boolean = readdirSync(dir, { withFileTypes: true }).some(
+        (child) => child.isDirectory() && existsSync(resolve(dir, child.name, '.git')),
+      );
+      if (hasWorktree) keep(dir, 'unregistered repo', 'removed once its last worktree goes');
+      else await dropPath(dir, true);
+    }
+
+  // Strays directly under the leaf temp root; repo-hash dirs of registered
+  // repos are skipped because the repo pass owns them.
+  const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
+  const repoHashes: Set<string> = new Set(repos.map((repo) => hex(repo.root).slice(0, 4)));
+  const root: string = leafTempRoot();
+  if (existsSync(root))
+    for (const entry of readdirSync(root)) {
+      const dir: string = resolve(root, entry);
+      const tempMatch: RegExpMatchArray | null = entry.match(/\.(\d+)\.tmp$/);
+      if (tempMatch !== null) {
+        if (!pidAlive(Number(tempMatch[1]))) await dropPath(dir, false);
+        continue;
+      }
+      const stat = statSync(dir, { throwIfNoEntry: false });
+      if (stat === undefined) continue;
+      if (stat.isDirectory() && repoHashes.has(entry)) continue;
+      await dropPath(dir, stat.isDirectory());
+    }
+
+  // <file>.<pid>.tmp under globalHome, runs/ and reconcile/ with a dead pid.
+  for (const parent of [home, resolve(home, 'runs'), resolve(home, 'reconcile')]) {
+    if (!existsSync(parent)) continue;
+    for (const entry of readdirSync(parent)) {
+      const tempMatch: RegExpMatchArray | null = entry.match(/\.(\d+)\.tmp$/);
+      if (tempMatch === null || pidAlive(Number(tempMatch[1]))) continue;
+      await dropPath(resolve(parent, entry), false);
+    }
+  }
+  const lastStart: string = resolve(home, 'runs/last-start');
+  if (existsSync(lastStart)) await dropPath(lastStart, false);
+
+  // Retired locks by exact name: held open by no live process means free.
+  const retiredLockDir: string = resolve(homedir(), '.akrogon');
+  for (const lock of [resolve(retiredLockDir, 'run.lock'), resolve(retiredLockDir, 'framework-tests.lock')]) {
+    if (!existsSync(lock)) continue;
+    const inside: number[] = pidsInside(targets(), lock);
+    if (inside.length > 0) keep(lock, `process ${inside.join(', ')} inside`);
+    else await dropPath(lock, false);
+  }
+
   writeKept(hostReportPath(), kept);
 }

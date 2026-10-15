@@ -263,11 +263,23 @@ export function worktreeStore(repo: Repo): string {
 // Short on purpose: Chrome puts its SingletonSocket under TMPDIR and aborts past the 107-byte socket path limit.
 // Fixed /var/tmp, not tmpdir(), because a seat's TMPDIR is itself a leaf temp folder.
 // Disk-backed on purpose: /tmp is tmpfs, so test files left there count as memory.
-export function leafTemp(repo: Repo, slug: string): string {
+export function leafTempRoot(): string {
   const override: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
   if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
     throw new Error(`Invalid AKROGON_LEAF_TEMP_ROOT: must be a non-blank absolute path`);
-  const root: string = override ?? `/var/tmp/akr-${process.getuid!()}`;
+  return override ?? `/var/tmp/akr-${process.getuid!()}`;
+}
+
+// The pre-/var/tmp leaf temp root, kept as a name so the host sweep can retire it.
+export function retiredLeafTempRoot(): string {
+  const override: string | undefined = process.env.AKROGON_RETIRED_TEMP_ROOT;
+  if (override !== undefined && (override.trim() === '' || !isAbsolute(override)))
+    throw new Error(`Invalid AKROGON_RETIRED_TEMP_ROOT: must be a non-blank absolute path`);
+  return override ?? `/tmp/akr-${process.getuid!()}`;
+}
+
+export function leafTemp(repo: Repo, slug: string): string {
+  const root: string = leafTempRoot();
   const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
   return resolve(root, hex(repo.root).slice(0, 4), hex(repo.root + '\n' + slug).slice(0, 8));
 }
