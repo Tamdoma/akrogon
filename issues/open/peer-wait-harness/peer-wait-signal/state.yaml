@@ -1,5 +1,5 @@
 slug: peer-wait-signal
-phase: plan.synthesis
+phase: implement
 created: 2026-10-16
 repo: akrogon
 debate: "no"
@@ -7,7 +7,7 @@ blocked-by: []
 sources:
   - "Tamdoma/akrogon#91"
 busy_since:
-  A: 2026-10-15T23:25:31.970Z
+  A: 2026-10-15T23:45:45.787Z
 busy_notified: {}
 attempts:
   A: 0
@@ -25,5 +25,10 @@ pane:
 prompted:
   A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-peer-wait-signal--/2026-10-15T23-25-28-640Z_01a141e2-8cbf-7373-a46a-0f877967a197.jsonl
 prompted_at:
-  A: 2026-10-15T23:25:31.971Z
+  A: 2026-10-15T23:45:45.788Z
 delivery_error: {}
+frozen:
+  tests/fake-herdr.ts: 248d726e60d5fbd032678c067e01371fa9e2a1d8
+  tests/peer-ask.test.ts: d418b1280c1763ec0d496ad1ebeab2e5cd7608a7
+  tests/peer-wait.test.ts: a69bae322c5f3135067835fb5e290a908e68876c
+frozen_cited: []

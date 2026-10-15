@@ -23,4 +23,44 @@ none
 ## Pending steps
 - After store-sweep, finished-leaf-processes and test-isolation merge: run `akrogon next --all` from outside any registered repo, then check that each path in [store-hygiene F1](forks/store-hygiene.md) is gone or shown with a reason in plain `akrogon status`, and that no `akrogon-l*.slice` of a finished leaf is loaded. Owner: the door. Proof: the listing before and after, recorded in this chart.
 
+Done 2026-10-16 by the door (A on operator autopilot): ran `akrogon next --all` inside akrogon and inside framework rather than from outside every repo, because from outside it would also have started blepsis `headless-default`, which the operator has not started. Plain status no longer shows kept items (fb60ccd), so `akrogon leftovers` is the reason surface. Before:
+```
+PRESENT /var/tmp/akr-1000/6855/58898f27/run-RewR23
+PRESENT /var/tmp/akr-1000/6855/f8-base2.log
+PRESENT /var/tmp/akr-1000/6855/f8-rerun.log
+gone /tmp/akr-1000
+PRESENT /home/ivan/Work/infra/tamdoma/framework/.temp
+gone /home/ivan/.akrogon/run.lock
+gone /home/ivan/.akrogon/framework-tests.lock
+gone /home/ivan/Work/infra/akrogon/runs/last-start
+gone /home/ivan/Work/infra/akrogon/.git/akrogon-base-runs.lock
+PRESENT /home/ivan/Work/infra/tamdoma/framework/.git/akrogon-base-runs.lock
+PRESENT /home/ivan/Work/infra/tamdoma/framework/issues/.lock
+empty repo dirs in /var/tmp/akr-1000: 0 of 4
+worktrees/repo dirs: akrogon framework 
+dangling symlinks: akrogon 0, framework 5
+finished-leaf slices loaded: 5
+failed run units: 0
+```
+After:
+```
+PRESENT /var/tmp/akr-1000/6855/58898f27/run-RewR23
+PRESENT /var/tmp/akr-1000/6855/f8-base2.log
+PRESENT /var/tmp/akr-1000/6855/f8-rerun.log
+gone /tmp/akr-1000
+PRESENT /home/ivan/Work/infra/tamdoma/framework/.temp
+gone /home/ivan/.akrogon/run.lock
+gone /home/ivan/.akrogon/framework-tests.lock
+gone /home/ivan/Work/infra/akrogon/runs/last-start
+gone /home/ivan/Work/infra/akrogon/.git/akrogon-base-runs.lock
+gone /home/ivan/Work/infra/tamdoma/framework/.git/akrogon-base-runs.lock
+gone /home/ivan/Work/infra/tamdoma/framework/issues/.lock
+empty repo dirs in /var/tmp/akr-1000: 0 of 4
+worktrees/repo dirs: akrogon framework 
+dangling symlinks: akrogon 0, framework 0
+finished-leaf slices loaded: 5
+failed run units: 0
+```
+`akrogon leftovers`: framework `unowned entry` for `.dcf16a3f00401334-1.node-gyp`, `.temp`, `run-RewR23`, `77861a00`, `f8-base2.log`, `f8-rerun.log` (unowned items wait until no framework leaf is running, store-hygiene Q2); akrogon `unowned entry` `/var/tmp/akr-1000/5d20/07a5c53f` and one unmanaged Claude Code worktree. The 5 loaded `akrogon-l*.slice` units are the 5 running leaves (akrogon peer-wait-signal, state-home, release-any-phase; framework upload-deploy-config, upload-scope-guards); no finished leaf's slice is loaded.
+
 Handed off 2026-10-15
