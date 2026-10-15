@@ -968,8 +968,9 @@ async function reconcileBatch(
       const item: Leaf | undefined = allLeaves(repo).find((leaf) => leaf.state.slug === member.slug);
       const sha: string | undefined = await branchSha(repo, member.slug);
       // A missing ref means merged cleanup already reaped it; a ref still at
-      // the recorded head means the member never moved. Anything else drifted.
-      if (item === undefined || (sha !== undefined && sha !== member.head)) continue;
+      // the recorded head means the member never moved; its tip means only the
+      // phase move remains. Anything else drifted.
+      if (item === undefined || (sha !== undefined && sha !== member.head && sha !== member.tip)) continue;
       await move(repo, member.slug, member.tip, item);
       if (item.state.phase !== 'merge') continue;
       moved.push(item);
