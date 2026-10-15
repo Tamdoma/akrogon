@@ -238,6 +238,9 @@ test('a checkout missing its own node_modules is refused and named in the log', 
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), { checks: { test: 'echo unreached' }, grounding: 'none' });
     const { worktree } = await callerWorktree(f);
+    writeFileSync(resolve(worktree, 'package.json'), '{"name":"repo"}\n');
+    await command(['git', 'add', 'package.json'], worktree);
+    await command(['git', 'commit', '-m', 'add package.json'], worktree);
     const result: Result = await verify(f, [], worktree);
     expect(result.code).not.toBe(0);
     const run: VerifyRun = records(f)[0];
