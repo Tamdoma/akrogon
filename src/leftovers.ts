@@ -16,11 +16,16 @@ const inUse: Set<string> = new Set([
   'state.batch',
 ]);
 
-// Host keeps are systemd units, not paths; these clear once the run, tab or pass ends.
+// Host keeps mix units and retired filesystem paths; these clear once the run, tab or pass ends.
 const unitInUse: Set<string> = new Set(['own slice', 'live run record', 'live tab']);
 
 function leftover(entry: Kept): boolean {
   return existsSync(entry.path) && !inUse.has(entry.reason) && !/^verify \S+ in progress$/.test(entry.reason);
+}
+
+// Units carry no '/', so only retired-path entries hit the same existence check as leftover().
+function hostLeftover(entry: Kept): boolean {
+  return !unitInUse.has(entry.reason) && (!entry.path.includes('/') || existsSync(entry.path));
 }
 
 function tilde(path: string): string {
@@ -49,7 +54,7 @@ export async function leftoversCommand(cwd: string): Promise<void> {
           .map(([name, path]) => readRepo(name, path));
   const blocks: [string, Kept[]][] = [
     ...repos.map((repo): [string, Kept[]] => [repo.name, readKept(repo).filter(leftover)]),
-    ['systemd units', readHostKept().filter((entry) => !unitInUse.has(entry.reason))],
+    ['host', readHostKept().filter(hostLeftover)],
   ];
   const found: string[][] = blocks.filter(([, kept]) => kept.length > 0).map(([name, kept]) => lines(name, kept));
   console.log(found.length === 0 ? 'no leftovers' : found.map((block) => block.join('\n')).join('\n\n'));
