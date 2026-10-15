@@ -88,6 +88,7 @@ export async function cli(
       AKROGON_HOME: f.home,
       HERDR_PANE_ID: '',
       HOME: f.home,
+      AKROGON_RETIRED_TEMP_ROOT: resolve(f.home, 'retired-temp'),
       ...withDefault,
       ...('AKROGON_RUN' in env ? {} : { AKROGON_RUN: '' }),
       PATH: `${unitBin(f)}:${env.PATH ?? process.env.PATH}`,
@@ -148,6 +149,7 @@ export function fakeHerdr(f: Fixture): HerdrFixture {
       AKROGON_PROC_ROOT: procRoot(f),
       XDG_RUNTIME_DIR: resolve(f.home, 'run'),
       AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+      AKROGON_RETIRED_TEMP_ROOT: resolve(f.home, 'retired-temp'),
     },
   };
 }
@@ -160,6 +162,7 @@ export function fakeAkrogon(f: Fixture): { env: NodeJS.ProcessEnv } {
     env: {
       PATH: `${bin}:${unitBin(f)}:${process.env.PATH}`,
       AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+      AKROGON_RETIRED_TEMP_ROOT: resolve(f.home, 'retired-temp'),
     },
   };
 }

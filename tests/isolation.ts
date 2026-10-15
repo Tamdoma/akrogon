@@ -24,6 +24,7 @@ function setEnv(name: string, value: string): void {
 }
 setEnv('HOME', join(suiteRoot, 'home'));
 setEnv('AKROGON_LEAF_TEMP_ROOT', join(suiteRoot, 'leaf-temp'));
+setEnv('AKROGON_RETIRED_TEMP_ROOT', join(suiteRoot, 'retired-temp'));
 setEnv('TMPDIR', suiteRoot);
 mkdirSync(process.env.HOME!, { recursive: true });
 mkdirSync(process.env.AKROGON_LEAF_TEMP_ROOT!, { recursive: true });
