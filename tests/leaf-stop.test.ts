@@ -46,7 +46,10 @@ function systemctlCalls(f: StopFixture): string[] {
   // Reconcile also calls the fake (list-units, reset-failed); only stop calls
   // prove the leaf's slice was stopped.
   return existsSync(f.systemctlLog)
-    ? readFileSync(f.systemctlLog, 'utf8').trim().split('\n').filter((line) => line.includes(' stop '))
+    ? readFileSync(f.systemctlLog, 'utf8')
+        .trim()
+        .split('\n')
+        .filter((line) => line.includes(' stop '))
     : [];
 }
 
