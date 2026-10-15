@@ -195,7 +195,11 @@ export function seats(
 export const toolRoot: string = resolve(import.meta.dir, '..');
 
 export function globalHome(): string {
-  return resolve(process.env.AKROGON_HOME ?? toolRoot);
+  if (process.env.AKROGON_HOME !== undefined) return resolve(process.env.AKROGON_HOME);
+  const home: string = resolve(homedir(), '.akrogon');
+  if (existsSync(resolve(home, 'config.yaml'))) return home;
+  if (existsSync(resolve(toolRoot, 'config.yaml'))) return toolRoot;
+  return home;
 }
 
 export function expandPath(path: string, base: string = process.cwd()): string {

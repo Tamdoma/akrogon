@@ -5,6 +5,9 @@ import { currentRepo, effectiveConfig, readGlobal, requireRepo, type GlobalConfi
 import { initialize } from './init';
 import { sourcePattern } from './state';
 import { type Phase } from './routing';
+import { migrateStateHome } from './state-home';
+
+await migrateStateHome();
 
 const RETIRED_MERGE_HOLD: string =
   'Merge hold commands are retired; a red merge run follows the red-run endings in skills/merge-issue/SKILL.md';

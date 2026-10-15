@@ -11,6 +11,7 @@
 ## Key files
 
 - `src/akrogon.ts` validates CLI arguments and dispatches commands.
+- `src/state-home.ts` moves the state home out of the tool root to `~/.akrogon` (or `AKROGON_HOME`) on the first command after deploy, gated on live run records and foreign processes and committed last via the rewritten `config.yaml`.
 - `src/preflight.ts` verifies the configured base remote branch and local tracking ref; `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
 - `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file; `src/readiness.ts` owns the readiness contract schema and gap computation.
 - `src/phase.ts` and `src/shell.ts` aggregate slot completion and enforce handoff guards; shell wraps subprocesses, retries, YAML writes and Herdr responses.
