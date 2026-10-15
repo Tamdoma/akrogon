@@ -71,8 +71,7 @@ export function sweepSuite(): void {
     }
   }
   const survivors: number[] = descendantsOf();
-  if (survivors.length > 0)
-    throw new Error(`sweepSuite: descendants survived SIGKILL: ${survivors.join(', ')}`);
+  if (survivors.length > 0) throw new Error(`sweepSuite: descendants survived SIGKILL: ${survivors.join(', ')}`);
 }
 
 process.on('exit', () => {

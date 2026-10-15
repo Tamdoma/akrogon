@@ -10,28 +10,37 @@ const repo: Repo = { name: 'repo', root: '/r', config: repoSchema.parse({ ground
 
 function ppidOf(pid: number): number {
   const stat: string = readFileSync(`/proc/${pid}/stat`, 'utf8');
-  return Number(stat.slice(stat.lastIndexOf(')') + 1).trim().split(' ')[1]);
+  return Number(
+    stat
+      .slice(stat.lastIndexOf(')') + 1)
+      .trim()
+      .split(' ')[1],
+  );
 }
 
-test.serial('suite env is redirected: HOME, leaf-temp root, tmpdir and store resolve under the suite scratch', async () => {
-  expect(process.env.HOME, `HOME=${process.env.HOME}`).toStartWith(suiteRoot);
-  expect(process.env.AKROGON_LEAF_TEMP_ROOT, `AKROGON_LEAF_TEMP_ROOT=${process.env.AKROGON_LEAF_TEMP_ROOT}`).toStartWith(
-    suiteRoot,
-  );
-  expect(process.env.TMPDIR, `TMPDIR=${process.env.TMPDIR}`).toStartWith(suiteRoot);
-  expect(homedir(), `homedir()=${homedir()}`).toStartWith(suiteRoot);
-  expect(homedir(), `homedir()=${homedir()}`).not.toBe('/home/ivan');
-  expect(leafTemp(repo, 'x')).toStartWith(resolve(process.env.AKROGON_LEAF_TEMP_ROOT ?? '', '/'));
-  expect(worktreeStore(repo)).toBe(resolve(suiteRoot, 'home', '.akrogon/worktrees/repo'));
-  const child: SpawnResult = await spawnCaptured(
-    [process.execPath, '-e', 'console.log(JSON.stringify([process.env.HOME, process.env.AKROGON_LEAF_TEMP_ROOT]))'],
-    { env: { ...process.env } },
-  );
-  expect(child.code).toBe(0);
-  const [childHome, childTemp]: string[] = JSON.parse(child.stdout.trim());
-  expect(childHome).toBe(process.env.HOME ?? '');
-  expect(childTemp).toBe(process.env.AKROGON_LEAF_TEMP_ROOT ?? '');
-});
+test.serial(
+  'suite env is redirected: HOME, leaf-temp root, tmpdir and store resolve under the suite scratch',
+  async () => {
+    expect(process.env.HOME, `HOME=${process.env.HOME}`).toStartWith(suiteRoot);
+    expect(
+      process.env.AKROGON_LEAF_TEMP_ROOT,
+      `AKROGON_LEAF_TEMP_ROOT=${process.env.AKROGON_LEAF_TEMP_ROOT}`,
+    ).toStartWith(suiteRoot);
+    expect(process.env.TMPDIR, `TMPDIR=${process.env.TMPDIR}`).toStartWith(suiteRoot);
+    expect(homedir(), `homedir()=${homedir()}`).toStartWith(suiteRoot);
+    expect(homedir(), `homedir()=${homedir()}`).not.toBe('/home/ivan');
+    expect(leafTemp(repo, 'x')).toStartWith(resolve(process.env.AKROGON_LEAF_TEMP_ROOT ?? '', '/'));
+    expect(worktreeStore(repo)).toBe(resolve(suiteRoot, 'home', '.akrogon/worktrees/repo'));
+    const child: SpawnResult = await spawnCaptured(
+      [process.execPath, '-e', 'console.log(JSON.stringify([process.env.HOME, process.env.AKROGON_LEAF_TEMP_ROOT]))'],
+      { env: { ...process.env } },
+    );
+    expect(child.code).toBe(0);
+    const [childHome, childTemp]: string[] = JSON.parse(child.stdout.trim());
+    expect(childHome).toBe(process.env.HOME ?? '');
+    expect(childTemp).toBe(process.env.AKROGON_LEAF_TEMP_ROOT ?? '');
+  },
+);
 
 test.serial('a killed child leaves no descendant: the orphan is adopted by this worker and swept', async () => {
   const child: Bun.Subprocess = Bun.spawn(['sh', '-c', "sh -c 'exec sleep 300' & exec sleep 300"], {
