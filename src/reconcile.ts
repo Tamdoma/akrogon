@@ -434,7 +434,11 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   );
 
   const keepLocked = (path: string, locked: string): void =>
-    keep(path, locked === '' ? 'locked worktree' : `locked worktree (${locked})`);
+    keep(
+      path,
+      locked === '' ? 'locked worktree' : `locked worktree (${locked})`,
+      'removed once the worktree is unlocked and the pass retries',
+    );
 
   const store: string = worktreeStore(repo);
   const oldRoot: string = resolve(repo.root, 'issues/worktrees');
@@ -496,6 +500,13 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   }
 
   async function removeWorktree(path: string, force: boolean, rule: string): Promise<boolean> {
+    const owners: KeptEntry[] = ownerKeeps(path);
+    if (owners.length > 0) {
+      kept.push(...owners);
+      if (!owners.some((entry) => entry.path === path))
+        keep(path, 'live owner inside', 'removed once contained owners clear');
+      return false;
+    }
     if (!force) {
       const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
       if (!verdict.ok) {
@@ -758,7 +769,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         continue;
       }
       if (!leafSlugs.has(name) && knownSlugs.has(name)) {
-        keep(path, 'unknown directory');
+        keep(path, 'unknown directory', 'removed once nothing inside references it');
         continue;
       }
       if (leaf !== undefined && leaf.state.worktree === undefined) {
@@ -787,7 +798,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         continue;
       }
       if (owner === undefined && !name.startsWith('verify-') && !name.startsWith('batch-')) {
-        keep(path, 'unmanaged worktree');
+        keep(path, 'unmanaged worktree', 'remove this worktree explicitly with git worktree remove');
         continue;
       }
       let force: boolean = owner?.state.phase === 'merged';
