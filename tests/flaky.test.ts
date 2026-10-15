@@ -1,16 +1,17 @@
 import { test, expect } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { readRepo, type Repo } from '../src/config';
 import { flakyLines } from '../src/flaky';
 import { type VerifyRun } from '../src/verify';
+import { fixture, leaf, type Fixture } from './helpers';
 
 type Step = { tree: string; command: string; exit: number; log: string; end?: string; setup?: number };
 
 function run(step: Step, index: number): VerifyRun {
   return {
     run: `r${index}`,
-    repo: 'demo',
+    repo: 'repo',
     leaf: 'leaf',
     sha: `s${index}`,
     tree: step.tree,
@@ -25,15 +26,23 @@ function run(step: Step, index: number): VerifyRun {
   };
 }
 
-test('flaky lists a command red then green on the same tree by failed test, and nothing else', () => {
-  const dir: string = mkdtempSync(resolve(tmpdir(), 'flaky-'));
+async function packEvidence(ownerDir: string, members: Record<string, string>): Promise<void> {
+  mkdirSync(ownerDir, { recursive: true });
+  const bytes: Uint8Array = await new Bun.Archive(members).bytes();
+  writeFileSync(resolve(ownerDir, 'evidence.tar.zst'), Bun.zstdCompressSync(bytes, { level: 19 }));
+}
+
+test('flaky lists a command red then green on the same tree by failed test, and nothing else', async (): Promise<void> => {
+  const f: Fixture = await fixture();
   try {
-    const redLog: string = resolve(dir, 'red.log');
+    const repo: Repo = readRepo('repo', f.root);
+    const redLog: string = resolve(f.root, 'issues/open/leaf/red.log');
+    mkdirSync(resolve(f.root, 'issues/open/leaf'), { recursive: true });
     writeFileSync(
       redLog,
       'test:owner | (pass) fine [1.00ms]\ntest:owner | (fail) browser owner > dies with run [5012.00ms]\n',
     );
-    const green: string = resolve(dir, 'green.log');
+    const green: string = resolve(f.root, 'issues/open/leaf/green.log');
     const steps: Step[] = [
       // Listed: red then green on tree A, recorded out of order so only end time orders them.
       { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
@@ -49,10 +58,81 @@ test('flaky lists a command red then green on the same tree by failed test, and 
       { tree: 'F', command: 'bun test', exit: 1, log: redLog },
       { tree: 'F', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
     ];
-    expect(flakyLines(steps.map(run))).toEqual([
+    expect(await flakyLines(repo, steps.map(run))).toEqual([
       { name: 'test', test: 'browser owner > dies with run', count: 1, last: '2026-10-14T02:00:00.000Z' },
     ]);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    f.clean();
+  }
+});
+
+test('flaky lists failed test names from plain and packed red logs and fails on broken archives', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const repo: Repo = readRepo('repo', f.root);
+    const dir: string = leaf(f, 'leaf', 'merge');
+    const content: string =
+      'test:owner | (pass) fine [1.00ms]\ntest:owner | (fail) browser owner > dies with run [5012.00ms]\ntest:owner | (fail) browser owner > flakes on retry [3.00ms]\n';
+    const log: string = resolve(dir, 'check-test.log');
+    writeFileSync(log, content);
+    const green: string = resolve(dir, 'check-green.log');
+    const flip: Step[] = [
+      { tree: 'A', command: 'bun test', exit: 1, log, end: '2026-10-14T01:00:00.000Z' },
+      { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
+    ];
+    const names: { name: string; test: string; count: number; last: string }[] = [
+      { name: 'test', test: 'browser owner > dies with run', count: 1, last: '2026-10-14T02:00:00.000Z' },
+      { name: 'test', test: 'browser owner > flakes on retry', count: 1, last: '2026-10-14T02:00:00.000Z' },
+    ];
+    expect((await flakyLines(repo, flip.map(run))).sort((a, b) => a.test.localeCompare(b.test))).toEqual(names);
+
+    rmSync(log);
+    await packEvidence(dir, { 'check-test.log': content });
+    expect((await flakyLines(repo, flip.map(run))).sort((a, b) => a.test.localeCompare(b.test))).toEqual(names);
+
+    const gone: Step[] = [
+      {
+        tree: 'A',
+        command: 'bun test',
+        exit: 1,
+        log: resolve(f.root, 'issues/open/none/x.log'),
+        end: '2026-10-14T01:00:00.000Z',
+      },
+      { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
+    ];
+    expect(await flakyLines(repo, gone.map(run))).toEqual([
+      { name: 'test', test: '(log gone)', count: 1, last: '2026-10-14T02:00:00.000Z' },
+    ]);
+
+    const broken: string = resolve(f.root, 'issues/open/bad/evidence.tar.zst');
+    mkdirSync(resolve(f.root, 'issues/open/bad'), { recursive: true });
+    writeFileSync(broken, Buffer.from('not a zstd archive'));
+    const brokenRun: Step[] = [
+      {
+        tree: 'A',
+        command: 'bun test',
+        exit: 1,
+        log: resolve(f.root, 'issues/open/bad/check.log'),
+        end: '2026-10-14T01:00:00.000Z',
+      },
+      { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
+    ];
+    await expect(flakyLines(repo, brokenRun.map(run))).rejects.toThrow(broken);
+
+    const present: string = resolve(f.root, 'issues/open/present');
+    await packEvidence(present, { 'other.log': 'x' });
+    const absent: Step[] = [
+      {
+        tree: 'A',
+        command: 'bun test',
+        exit: 1,
+        log: resolve(f.root, 'issues/open/present/check.log'),
+        end: '2026-10-14T01:00:00.000Z',
+      },
+      { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
+    ];
+    await expect(flakyLines(repo, absent.map(run))).rejects.toThrow(resolve(present, 'evidence.tar.zst'));
+  } finally {
+    f.clean();
   }
 });
