@@ -663,8 +663,11 @@ test('worker copies follow the owner leaf: merged removes, failed keeps the guar
     saveState(path, { ...readState(path), phase: 'merged' });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worker)).toBe(false);
-    saveState(path, {
-      ...readState(path),
+    // The merge pass completed the issue: the leaf record now lives in closed.
+    const closed: string = resolve(f.root, 'issues/closed/issue/done-holder');
+    expect(existsSync(resolve(closed, 'state.yaml'))).toBe(true);
+    saveState(closed, {
+      ...readState(closed),
       phase: 'failed',
       failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'test' },
     });
