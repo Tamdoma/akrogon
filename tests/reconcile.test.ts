@@ -98,9 +98,10 @@ async function dispatchLeaf(f: DispatchFixture, slug: string, extra: object = {}
 }
 
 // store-sweep fixtures: the repo-hash dir under the leaf temp root and an
-// owner record in the reconcile shape.
+// owner record in the reconcile shape. The root is the child process's
+// AKROGON_LEAF_TEMP_ROOT (leafTempRoot(f)), never the suite's own.
 function repoTempDir(f: DispatchFixture): string {
-  return dirname(leafTemp(readRepo('repo', f.root), 'x'));
+  return resolve(leafTempRoot(f), createHash('sha256').update(f.root).digest('hex').slice(0, 4));
 }
 function ownerRecord(pid: number): string {
   const boot: string = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
@@ -925,6 +926,7 @@ test('unregistered and stray entries are deleted when no leaf of the repo runs',
     leaf(f, 'gone-leaf', 'merged');
     leaf(f, 'lost-leaf', 'failed', {
       failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'test' },
+      tab: 'w1:t8',
     });
     const legacy: string = resolve(f.root, 'issues/worktrees');
     const temp: string = repoTempDir(f);

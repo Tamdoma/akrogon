@@ -700,7 +700,10 @@ test('a finished leaf temp stays while its slice holds a running unit', async ()
       tabs: [...db.tabs, { tab_id: 'w1:t9', label: 'busy-temp', focused: false }],
       panes: [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' }],
     });
-    const temp: string = leafTemp(readRepo('repo', f.root), 'busy-temp');
+    // Resolve under the child process's AKROGON_LEAF_TEMP_ROOT (leafTempRoot(f)),
+    // not the suite's own env root.
+    const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
+    const temp: string = resolve(leafTempRoot(f), hex(f.root).slice(0, 4), hex(`${f.root}\nbusy-temp`).slice(0, 8));
     mkdirSync(temp, { recursive: true });
     const slice: string = leafSlice({ name: 'repo' }, 'busy-temp');
     const cgRoot: string = resolve(f.home, 'cgroups');
