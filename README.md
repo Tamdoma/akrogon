@@ -56,7 +56,7 @@ You control the queue through dispatch, parking and dependencies. Failure record
 
 ## Install
 
-Install Bun, Git, Herdr, flock and the harness CLIs listed in [config.yaml](config.yaml). GitHub intake and issue closure also need an authenticated GitHub CLI.
+Install Bun, Git, Herdr, flock and the harness CLIs listed in the [machine configuration](docs/guide/install.md#global-config-since-youll-stare-at-it-next). GitHub intake and issue closure also need an authenticated GitHub CLI.
 
 From this checkout:
 
@@ -65,7 +65,7 @@ bun install
 bun src/akrogon.ts install
 ```
 
-Set the machine's seats, harness commands and registered repositories in the tool-root configuration. AKROGON_HOME can select a different configuration directory. A repository may override either seat in `issues/config.yaml`.
+Set the machine's seats, harness commands and registered repositories in `~/.akrogon/config.yaml`. AKROGON_HOME can select a different configuration directory. A repository may override either seat in `issues/config.yaml`.
 
 Installation links the command, skills and [plugin](plugin/). It also installs the configured Herdr harness integrations. Conflicting destinations stop installation and print removal commands for review.
 

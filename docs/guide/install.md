@@ -61,10 +61,10 @@ A linked skill still needs the tools it was written for. In particular, watch-is
 
 ## Global config, since you'll stare at it next
 
-The machine configuration lives at the Akrogon root, or in the directory selected by AKROGON_HOME:
+The machine configuration lives at `~/.akrogon/config.yaml`, or in the directory selected by AKROGON_HOME:
 
 ```text
-config.yaml
+~/.akrogon/config.yaml
 ```
 
 It defines the harness commands, the two seats, registered repositories and a global capacity limit.
