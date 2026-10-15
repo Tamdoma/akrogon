@@ -1,0 +1,28 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/batch-dispatch.test.ts:
+606 |     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+607 |     saveDatabase(f, { ...database(f), prompts: [] });
+608 |     expect((await next(f, [])).code).toBe(0);
+609 |     const record = readState(aa.path).batch!;
+610 |     const members = stacked(aa.path);
+611 |     expect(members.map((member) => member.slug)).toEqual(['bb']);
+                                                       ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "bb",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/stacked-turn/tests/batch-dispatch.test.ts:611:50)
+(fail) a clean waiting leaf stacks under the holder and lands with it in one push [1439.91ms]
+
+ 0 pass
+ 24 filtered out
+ 1 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [1463.00ms]

@@ -1,0 +1,11 @@
+# Answer A (written before reading peer answers)
+
+I1. The stop is a naming error, not a missing rule. The locked decision defines machinery as runner, dispatcher, session or port pool, fixture factory (test-proof-rules brief.md:7) and lets a planned test add new files on existing runner and helpers (case f). B applies check-issue :79's "evidence machinery is missing" to a missing case or capture on existing machinery, so the leaf stops. Pick: B adds the missing criterion test itself in check.repair, from the brief line, on existing runner and helpers, commits it with a Test-Change trailer citing that line, and shows it red against a deliberate product break. If it is green on the head, done. If red, the product fix goes under Handed to A (:79 already accepts B's repair only by a proof B did not write). This keeps the locked reason better than A writing it: the seat that wrote the product never writes its grader. `failed` stays only for absent runner/dispatcher/pool/factory. Change: check-issue :79 last two sentences; implement-issue :59 names B's added test as a planned test A must not edit. Risk: B writes a weak test; mitigated by the red-against-break rule already used for planned tests.
+
+I2. Lifting the order is enough once I1 lands, because the class that failed twice no longer reaches `failed`. No watch-issues change.
+
+I3. Keep the 120 s default: it exists because a seat hung 59 min in a silent install (pi-extensions issues/closed/shell-timeout-bound brief.md Why; operator 2026-09-19 "working processes are not killed by a clock"). Drop only the 600 s ceiling: an explicit `timeout` is the agent's own bound, so a ceiling only kills working processes, which contradicts the same operator line. Sentence becomes: set `timeout` above the expected time for installs, test suites and verify. Then implement-issue :45 shrinks to "run slow commands in the foreground with a tool timeout above their expected time". Open: Claude Code's 600 s ceiling (BASH_MAX_TIMEOUT_MS) and codex limits for the other seats.
+
+I4. Not decided before peers. The measured ~9 min per leaf of merge-turn wait is larger than the pi cap cost and grows with queue depth. I want a design under ~150 lines, reusing the batch record that still exists in src/batch.ts.
+
+I5. No systemic change. Ready work is the door's output. The 59 seeds are intake for chart passes.

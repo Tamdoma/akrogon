@@ -1,0 +1,14 @@
+416 |     .filter((path) => testFile(path));
+417 |   if (changed.length === 0) return;
+418 |   const cited: Set<string> = await citedPaths(worktree, `${from}..${to}`);
+419 |   const missing: string[] = changed.filter((path) => !cited.has(path));
+420 |   if (missing.length === 0) return;
+421 |   throw new Error(
+                  ^
+error: Changed test files need a citation:
+Test-Change: tests/command-reference.test.ts <source and reason>
+Test-Change: tests/receipt-gates.test.ts <source and reason>
+Add each line to the final trailer block of a commit on this branch; a later empty commit may carry it.
+      at requireTestChangeCitations (/home/ivan/.akrogon/worktrees/akrogon/merge-green-rate/src/phase.ts:421:13)
+
+Bun v1.4.3 (Linux x64)

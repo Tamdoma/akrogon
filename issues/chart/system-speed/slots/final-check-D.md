@@ -1,0 +1,9 @@
+# Final check D
+
+X1 D1 "the recovery owner exists (watch-issues)" holds for transient stops only. watch-issues recovers "failed otherwise" by rerunning `failure.phase` unchanged (skills/watch-issues/SKILL.md:41), so a stop whose cause is a criterion or plan defect (F4: 3 guessed caps, 2 idle-host, 3 missing machinery = 8 of 11) fails the same way twice and ends in a notice. Those 8 have no owner except a person reading notices; the "shrinking stock" in D1 is the inflow (7092fae, shapes.md:289), not the stock. Smallest fix inside D1: one intake line in skills/chart-issues/SKILL.md:31 next to `akrogon flaky`, listing failed leaves whose `failure.reason` names a criterion, so the door's next pass starts from them. No new cause, state or route.
+
+X2 Q1 as worded reopens what the locked rule removed: the seat that wrote the product adding the test that grades it (issues/closed/pre-written-tests/test-proof-rules/brief.md Why: 25% vs 14% fault detection, arXiv 2607.05139). The three machinery stops were not all "missing scenarios on existing tools": B at prior-disavow-lookup review-B.md:19,:29 ruled the capture/replay at the consumer boundary to be machinery, and promotion-script review-B.md:46 needed a later leaf's consumer. If the operator says yes to Q1, bound it to the plan's own proxy defect (plan.md criterion proven by a proxy, F5), with the red shown against a deliberate break of the product, not of the test, and the Test-Change trailer citing the brief line; otherwise Q1 recreates the formspark-build-wiring pattern the rule was written against.
+
+X3 Q5: removing the cap is the whole fix for D8; with no cap, `akrogon verify` blocks in one call (src/verify.ts:108-200) and the nohup/poll paragraph at skills/implement-issue/SKILL.md:45 can be deleted. A `wait-run` slice command (E) should not be built if Q5 is answered yes.
+
+No other disagreement. D2-D7, F1-F6, Q2-Q4 match my rebuttal.

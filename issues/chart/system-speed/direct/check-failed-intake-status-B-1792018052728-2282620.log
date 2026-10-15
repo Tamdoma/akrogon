@@ -1,0 +1,10 @@
+bun test v1.4.3 (c6da4a4d3)
+
+../../../../../Work/infra/akrogon/tests/status.test.ts:
+(pass) failed leaves show cause and reason in NOTE and terminal phases suppress busy [61.02ms]
+
+ 1 pass
+ 30 filtered out
+ 0 fail
+ 7 expect() calls
+Ran 1 test across 1 file. [84.00ms]

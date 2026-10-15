@@ -1,0 +1,21 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/docs-links.test.ts:
+(pass) README and guide links resolve to files and anchors [1.39ms]
+(pass) lesson write sites link the shared lesson rule [0.07ms]
+(pass) broken relative link is reported [0.06ms]
+(pass) missing anchors with and without a path part are reported [0.06ms]
+
+tests/status.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find package 'zod' from '/home/ivan/.claude/jobs/6a0d8d81/tmp/wt-failed-intake/tests/status.test.ts'
+-------------------------------
+
+
+ 4 pass
+ 1 fail
+ 1 error
+ 9 expect() calls
+Ran 5 tests across 2 files. [5.00ms]

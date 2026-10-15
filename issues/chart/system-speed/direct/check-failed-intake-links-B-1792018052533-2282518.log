@@ -1,0 +1,12 @@
+bun test v1.4.3 (c6da4a4d3)
+
+tests/docs-links.test.ts:
+(pass) README and guide links resolve to files and anchors [1.42ms]
+(pass) lesson write sites link the shared lesson rule [0.08ms]
+(pass) broken relative link is reported [0.05ms]
+(pass) missing anchors with and without a path part are reported [0.06ms]
+
+ 4 pass
+ 0 fail
+ 9 expect() calls
+Ran 4 tests across 1 file. [4.00ms]
