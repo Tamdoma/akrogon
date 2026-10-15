@@ -62,6 +62,7 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
       'TMPDIR',
       'AKROGON_BASE',
       'AKROGON_RUN',
+      'AKROGON_HOME',
       'DBUS_SESSION_BUS_ADDRESS',
       'CHECK_TOKEN',
       'PWD',

@@ -37,6 +37,9 @@ const copied: readonly string[] = [
   'XDG_CACHE_HOME',
   'NODE_DISABLE_COMPILE_CACHE',
   'FAKE_SYSTEMD_RUN_LOG',
+  // An akrogon invocation inside a checked command shares the caller's state
+  // home; without it a nested call resolves HOME/.akrogon and can re-cutover.
+  'AKROGON_HOME',
 ];
 
 function bunfigs(): string[] {
