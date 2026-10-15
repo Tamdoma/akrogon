@@ -326,10 +326,12 @@ test.serial('a holder already on the base produces the base without a rebase', a
 });
 
 // The build owner record exists before the copy does, so a build paused
-// mid-creation is never taken as a stray by a reconcile pass.
+// mid-creation is never taken as a stray by a reconcile pass. buildStack
+// runs in a spawned child whose PATH holds a git shim that pauses
+// `worktree add` until the gate file appears; the parent then observes the
+// record existing while the copy does not.
 test.serial('buildStack writes its owner record before the copy and removes both in finally', async () => {
-  const { f, repo, builtOn } = await batchFixture();
-  const originalPath: string | undefined = process.env.PATH;
+  const { f, builtOn } = await batchFixture();
   try {
     const shimBin: string = resolve(f.home, 'shimbin');
     mkdirSync(shimBin, { recursive: true });
@@ -351,11 +353,23 @@ fi
 exec '${git}' "$@"
 `,
     );
+    const driver: string = resolve(f.home, 'driver.ts');
+    writeFileSync(
+      driver,
+      `import { buildStack } from '${resolve(import.meta.dir, '../src/batch')}';
+import { readRepo } from '${resolve(import.meta.dir, '../src/config')}';
+const repo = readRepo('repo', process.argv[2]!);
+const result = await buildStack(repo, process.argv[3]!, process.argv[3]!);
+console.log(JSON.stringify(result));
+`,
+    );
     await command(['chmod', '+x', resolve(shimBin, 'git')]);
-    process.env.PATH = `${shimBin}:${originalPath}`;
-    const built: Promise<Awaited<ReturnType<typeof buildStack>>> = buildStack(repo, builtOn, builtOn);
-    const settled: Promise<Awaited<ReturnType<typeof buildStack>>> = built;
-    settled.catch(() => undefined);
+    const child: Bun.Subprocess = Bun.spawn([process.execPath, driver, f.root, builtOn], {
+      cwd: f.root,
+      env: { ...process.env, PATH: `${shimBin}:${process.env.PATH}`, HOME: f.home },
+      stdout: 'inherit',
+      stderr: 'inherit',
+    });
     for (let i: number = 0; i < 300 && !existsSync(record); i++) await Bun.sleep(10);
     if (!existsSync(record)) writeFileSync(gate, 'go');
     expect(existsSync(record)).toBe(true);
@@ -364,16 +378,13 @@ exec '${git}' "$@"
       : [];
     expect(owners).toHaveLength(1);
     const owner = JSON.parse(readFileSync(resolve(storeDir(f), owners[0]), 'utf8'));
-    expect(owner.pid).toBe(process.pid);
+    expect(owner.pid).toBe(child.pid);
     expect(existsSync(resolve(storeDir(f), owners[0].replace(/\.owner$/, '')))).toBe(false);
     writeFileSync(gate, 'go');
-    const result: Awaited<ReturnType<typeof buildStack>> = await settled;
-    expect(result.ok).toBe(true);
+    expect(await child.exited).toBe(0);
     expect(readdirSync(storeDir(f)).filter((name) => name.startsWith('batch-'))).toEqual([]);
     noLeftoverWorktrees(f);
   } finally {
-    if (originalPath === undefined) delete process.env.PATH;
-    else process.env.PATH = originalPath;
     f.clean();
   }
 });

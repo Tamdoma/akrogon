@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, rmdirSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
 import { worktreeStore, type GlobalConfig, type Repo } from './config';
+import { checkLocation } from './guard';
 import { type BatchMember, type Leaf } from './state';
 import { command, run, CommandError, type Result } from './shell';
 import { removeRetiredLessons } from './lessons';
@@ -115,6 +116,7 @@ export async function buildStack(
 ): Promise<StackResult> {
   const dir: string = resolve(worktreeStore(repo), 'batch-' + attemptId());
   const owner: string = `${dir}.owner`;
+  checkLocation(dir);
   mkdirSync(dirname(dir), { recursive: true });
   writeOwner(owner);
   try {
