@@ -818,7 +818,16 @@ export async function phaseCommand(
             throw new Error('A required --slot is missing or invalid');
           await move(repo, state.slug, record.holder.head, leaf);
           appendAttempt(repo, leaf.state.slug, record, 'red', end);
-          saveState(leaf.path, { ...state, batch: undefined });
+          saveState(leaf.path, {
+            ...state,
+            batch: {
+              attempt: record.attempt,
+              built_on: record.built_on,
+              holder: record.holder,
+              members: [],
+              applied: false,
+            },
+          });
           console.log('stack red; holder turn restarts alone');
           onCommitted();
         } else

@@ -1020,12 +1020,6 @@ async function mergeTurn(
     await dispatchMergeLeaf(global, repo, holder, invocation, mergeContext(recorded), isAutomatic, recorded.attempt);
     return;
   }
-  if (recorded !== undefined)
-    await withLock(resolve(globalHome(), '.lock'), async () => {
-      if (isAutomatic && isPaused(repo.name)) return;
-      const fresh: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
-      if (fresh?.state.batch?.attempt === recorded.attempt) saveState(fresh.path, { ...fresh.state, batch: undefined });
-    });
   const fetched: Result = await run(['git', 'fetch', repo.config.remote], repo.root);
   if (isAutomatic && isPaused(repo.name)) return;
   if (fetched.code !== 0)
@@ -1043,11 +1037,17 @@ async function mergeTurn(
     if (isAutomatic && isPaused(repo.name)) return;
     const leaves: Leaf[] = allLeaves(repo);
     const fresh: Leaf | undefined = leaves.find((item) => item.state.slug === holder.state.slug);
-    if (fresh?.state.phase !== 'merge' || fresh.state.batch !== undefined) return;
+    if (
+      fresh?.state.phase !== 'merge' ||
+      fresh.state.batch?.attempt !== recorded?.attempt ||
+      fresh.state.batch?.applied === true
+    )
+      return;
     if (mergeQueue(global, leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== holder.state.slug) return;
     const start: PressureSnapshot | undefined = readPressure(pressureDir);
     const builtOn: string = await localBase(repo);
-    const members: BatchMember[] = await pickMembers(repo, global, leaves, builtOn);
+    const members: BatchMember[] =
+      recorded === undefined ? await pickMembers(repo, global, leaves, builtOn) : recorded.members;
     const holderHead: string = (await branchSha(repo, holder.state.slug)) ?? builtOn;
     const tools: Tool[] | undefined = repo.config.tools.length > 0 ? await resolveTools(repo) : undefined;
     const next: Batch = {
