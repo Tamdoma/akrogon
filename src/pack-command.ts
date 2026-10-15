@@ -96,16 +96,16 @@ async function trackedRefusals(repo: Repo, owner: string): Promise<string[]> {
 }
 
 async function packOne(repo: Repo, target: Target): Promise<void> {
-  if (target.kind === 'closed') {
-    const refusals: string[] = await trackedRefusals(repo, target.folder);
-    if (refusals.length > 0) {
-      for (const reason of refusals) console.error(`refused ${target.arg}: ${reason}`);
-      throw new RefusalError();
-    }
-  }
   const marker: string = resolve(target.folder, '.closing');
-  writeFileSync(marker, '');
   try {
+    if (target.kind === 'closed') {
+      const refusals: string[] = await trackedRefusals(repo, target.folder);
+      if (refusals.length > 0) {
+        for (const reason of refusals) console.error(`refused ${target.arg}: ${reason}`);
+        throw new RefusalError();
+      }
+    }
+    writeFileSync(marker, '');
     const plain: string[] = plainLogs(target.packDir);
     const tracked: Set<string> =
       target.kind === 'closed'
@@ -126,7 +126,7 @@ async function packOne(repo: Repo, target: Target): Promise<void> {
   } catch (error) {
     if (error instanceof RefusalError) throw error;
     console.error(`failed ${target.arg}: ${error instanceof Error ? error.message : String(error)}`);
-    console.error(`closing marker kept: ${marker}`);
+    if (existsSync(marker)) console.error(`closing marker kept: ${marker}`);
     throw new PackFailure();
   }
 }
