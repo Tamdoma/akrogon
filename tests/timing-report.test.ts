@@ -48,8 +48,12 @@ function records(f: Fixture, file: 'log' | 'timings' | 'merge-attempts', rows: R
   writeFileSync(resolve(f.root, 'issues', `${file}.jsonl`), `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
 }
 
-async function timing(f: Fixture, args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
-  return cli(f, ['timing', ...args]);
+async function timing(
+  f: Fixture,
+  args: string[],
+  env: NodeJS.ProcessEnv = {},
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return cli(f, ['timing', ...args], f.root, env);
 }
 
 test('slug report: each closed visit decomposes into priority waits, prompted time and unattributed waiting', async () => {
@@ -460,11 +464,11 @@ test('flow report: carried issues print one sorted line each with day spans and 
       },
       { stdout: '[[]]', args: listingArgs('other/repo') },
     ]);
-    const result: { code: number; stdout: string; stderr: string } = await timing(f, [
-      '--flow',
-      '--since',
-      '2026-10-10',
-    ]);
+    const result: { code: number; stdout: string; stderr: string } = await timing(
+      f,
+      ['--flow', '--since', '2026-10-10'],
+      gh.env,
+    );
     expect(result.code).toBe(0);
     expect(result.stdout).toBe(
       [
@@ -507,11 +511,11 @@ test('flow report: parked-carried and open-carried issues stay carried while ope
         args: listingArgs('acme/project'),
       },
     ]);
-    const result: { code: number; stdout: string; stderr: string } = await timing(f, [
-      '--flow',
-      '--since',
-      '2026-10-10',
-    ]);
+    const result: { code: number; stdout: string; stderr: string } = await timing(
+      f,
+      ['--flow', '--since', '2026-10-10'],
+      gh.env,
+    );
     expect(result.code).toBe(0);
     const lines: string[] = result.stdout.split('\n');
     expect(lines).toHaveLength(8);
@@ -548,11 +552,11 @@ test('flow report: a failed listing retries once then exits non-zero with comman
       { stdout: '', code: 1, stderr: 'boom one' },
       { stdout: '', code: 1, stderr: 'boom two' },
     ]);
-    const result: { code: number; stdout: string; stderr: string } = await timing(f, [
-      '--flow',
-      '--since',
-      '2026-10-10',
-    ]);
+    const result: { code: number; stdout: string; stderr: string } = await timing(
+      f,
+      ['--flow', '--since', '2026-10-10'],
+      gh.env,
+    );
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('boom one');
     expect(result.stderr).toContain('boom two');
