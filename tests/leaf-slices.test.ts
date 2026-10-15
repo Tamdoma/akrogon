@@ -92,6 +92,83 @@ test('bad leaf ownership keeps uncertain slices without aborting failed-unit cle
 const realRuntime: string = `/run/user/${uid}`;
 const realBus: string = `unix:path=${realRuntime}/bus`;
 
+test('a shell run admitted while another slice stops protects its own slice', async () => {
+  const f: SliceFixture = await slicesFixture();
+  const gate: string = resolve(f.home, 'continue-stop');
+  const release: string = resolve(f.home, 'release-run');
+  try {
+    leaf(f, 'a-control', 'merged');
+    leaf(f, 'z-protected', 'merged');
+    const control: string = leafSlice({ name: 'repo' }, 'a-control');
+    const protectedSlice: string = leafSlice({ name: 'repo' }, 'z-protected');
+    const stopping: string = resolve(f.home, 'stopping');
+    const held: string = resolve(f.home, 'run-held');
+    const db: string = resolve(f.home, 'systemctl.json');
+    const log: string = resolve(f.home, 'systemctl.log');
+    writeFileSync(
+      db,
+      JSON.stringify({
+        units: [
+          { unit: control, sub: 'active' },
+          { unit: protectedSlice, sub: 'active' },
+        ],
+      }),
+    );
+    writeFileSync(
+      resolve(f.home, 'bin/systemctl'),
+      [
+        '#!/usr/bin/env bun',
+        'import { existsSync, writeFileSync } from "node:fs";',
+        'const args = process.argv.slice(2);',
+        `if (args.includes('stop') && args.includes(${JSON.stringify(control)})) {`,
+        `  writeFileSync(${JSON.stringify(stopping)}, '');`,
+        `  while (!existsSync(${JSON.stringify(gate)})) await Bun.sleep(10);`,
+        '}',
+        `const child = Bun.spawn([${JSON.stringify(process.execPath)}, ${JSON.stringify(resolve(import.meta.dir, 'fake-systemctl.ts'))}, ...args], { stdout: 'inherit', stderr: 'inherit' });`,
+        'process.exit(await child.exited);',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    const env: NodeJS.ProcessEnv = { ...f.env, FAKE_SYSTEMCTL_DB: db, FAKE_SYSTEMCTL_LOG: log };
+    const pass: Promise<Result> = cli(f, ['next', '--all'], f.root, env, 15000);
+    try {
+      await waitFor(async () => existsSync(stopping));
+      const run: Promise<Result> = cli(
+        f,
+        [
+          'run-check',
+          '--leaf',
+          resolve(f.root, 'issues/closed/issue/z-protected'),
+          '--',
+          'sh',
+          '-c',
+          `touch ${held}; while [ ! -e ${release} ]; do sleep 0.02; done`,
+        ],
+        f.root,
+        env,
+        15000,
+      );
+      try {
+        await waitFor(async () => existsSync(held));
+        writeFileSync(gate, '');
+        const result: Result = await pass;
+        expect(result.code, result.stderr).toBe(0);
+        expect(readFileSync(log, 'utf8')).not.toContain(`stop ${protectedSlice}`);
+      } finally {
+        writeFileSync(gate, '');
+        writeFileSync(release, '');
+        const result: Result = await run;
+        expect(result.code, result.stderr).toBe(0);
+      }
+    } finally {
+      writeFileSync(gate, '');
+      await pass;
+    }
+  } finally {
+    f.clean();
+  }
+}, 25000);
+
 async function slicesFixture(): Promise<SliceFixture> {
   const f: Fixture = await fixture();
   return { ...f, ...fakeHerdr(f) };
