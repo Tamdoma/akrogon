@@ -1,0 +1,35 @@
+slug: store-sweep
+phase: merged
+created: 2026-10-15
+repo: akrogon
+debate: "no"
+blocked-by:
+  - scratch-copy-removal
+  - kept-status
+  - finished-leaf-processes
+sources:
+  - "Tamdoma/akrogon#93"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tCN
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pQR
+  B: w8:pQS
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-15T23:25:39.215Z
+frozen:
+  tests/command-reference.test.ts: 49449ce7da8087a407f323291e991dec57972cb7
+  tests/leaf-slices.test.ts: b5e3ad423d09a5508f28248012acd352ed1f0e3e
+  tests/reconcile.test.ts: 07a0a60af7d85b6efa9cb64f4e691ca73508a934
+  tests/status.test.ts: 5149c771ad42fa0d011d711deb47be95525b095c
+frozen_cited: []

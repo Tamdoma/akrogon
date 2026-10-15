@@ -1,4 +1,0 @@
-Checking formatting...
-[warn] tests/isolation.test.ts
-[warn] tests/isolation.ts
-[warn] Code style issues found in 2 files. Run Prettier with --write to fix.

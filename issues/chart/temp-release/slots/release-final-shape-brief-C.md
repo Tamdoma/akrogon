@@ -1,0 +1,3 @@
+# Final-shape check, slot C
+
+Read /home/ivan/Work/infra/akrogon/issues/chart/temp-release/slots/release-final-shape-draft.md. Check it against your notes and rebuttal and today's main (git fetch first). Report only a wrong, missing, unsafe or unimplementable item, each with file:line evidence and the exact fix, or "no disagreements". In particular check races between a reconcile pass and a dispatch that has recorded the tab but not yet adopted seats, and the re-dispatch after a stop. Write to /home/ivan/Work/infra/akrogon/issues/chart/temp-release/slots/release-final-shape-C.md. Edit no other file.

@@ -19,3 +19,5 @@ Q1. Should leaf temp stay a per-leaf folder on `/tmp` with a shorter name (`/tmp
 2026-10-02, operator, verbatim: "1a"
 
 Leaf temp stays one folder per leaf on `/tmp`, renamed to `/tmp/akrogon-<uid>/<hash12>` (12 hex of sha256(repo.root + "\n" + slug)), still derived by `leafTemp`, never stored, created 0700. The handoff checks the full nested socket path (framework page-measure plus browser-core) against the Linux 107-byte limit for a 10-digit uid. Running panes move to the new path only when their tab restarts. Reason: same RAM as plain `/tmp`, keeps an owner for deletion, and fits the nested socket. Foreclosed: 1b plain system `/tmp`, 1c separate short browser folder. Reopens test-time-and-temp leaf-temp's `<slug20>-<hash12>` name.
+
+Superseded 2026-10-16: delivered code moved leaf temp to `/var/tmp/akr-<uid>/<4 hex>/<8 hex>` (2c3a0af shortened it for the socket limit, c698170 moved it to disk after tmpfs temp held admission closed overnight). Release fork Q3 (3a) keeps the disk location.

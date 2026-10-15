@@ -1,0 +1,3 @@
+# Leaf review, slot B
+
+The Release fork is settled (A on operator autopilot: 1a 2a 3a, final shape in /home/ivan/Work/infra/akrogon/issues/chart/temp-release/forks/release.md, Taken). Review the draft as the implementer who must build it: /home/ivan/.claude/jobs/6a0d8d81/tmp/tr/ISSUE.md and every file under /home/ivan/.claude/jobs/6a0d8d81/tmp/tr/release-any-phase/. Check it against the Taken final shape and today's main (git fetch first). Report only a criterion that is wrong, missing, untestable, contradicts the Taken shape, or leaves the implementer guessing, each with file:line evidence and the exact fix, or "no disagreements". Write to /home/ivan/Work/infra/akrogon/issues/chart/temp-release/slots/leaf-review-B.md. Edit no other file.
