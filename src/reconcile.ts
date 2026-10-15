@@ -623,14 +623,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) keep(path, 'delete failed: path still present');
     else removed.push(path);
   };
-  const repoRunning: boolean = leaves.some((leaf) => !finished(leaf));
-  // Unowned entries delete under one shared rule: idle repo, pane list
-  // available, no pane cwd or process inside (D1.5, D3, D5).
-  const dropUnowned = async (path: string): Promise<void> => {
-    if (repoRunning) {
-      keep(path, 'unowned entry', 'removed once no leaf of the repo is running');
-      return;
-    }
+  const dropChecked = (path: string): void => {
     if (live === null) {
       keep(path, 'pane list unavailable');
       return;
@@ -645,6 +638,14 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       return;
     }
     drop(path);
+  };
+  const repoRunning: boolean = leaves.some((leaf) => !finished(leaf));
+  const dropUnowned = async (path: string): Promise<void> => {
+    if (repoRunning) {
+      keep(path, 'unowned entry', 'removed once no leaf of the repo is running');
+      return;
+    }
+    dropChecked(path);
   };
 
   const candidates: Set<string> = new Set();
@@ -761,7 +762,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         keep(path, 'live pane inside');
         continue;
       }
-      drop(path);
+      dropChecked(path);
       continue;
     }
     if (ownerSlug !== undefined) {
@@ -775,7 +776,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       const record: Owner | undefined = readOwner(path);
       if (record !== undefined && !ownerDead(record)) keep(path, 'live owner', 'removed once the owner exits');
       else if (live === null) keep(path, 'pane list unavailable');
-      else drop(path);
+      else dropChecked(path);
       continue;
     }
     // Write-then-rename leftovers: only a dead writer's file is droppable.
@@ -857,7 +858,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
             )
               keep(dir, 'slice holds a running unit', 'removed once the unit exits');
             else {
-              drop(dir);
+              dropChecked(dir);
               continue;
             }
           }
@@ -874,7 +875,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       if (kept.length === keptBefore) await dropUnowned(dir);
     }
     // An emptied repo-hash dir is itself junk.
-    if (existsSync(scratchRoot) && readdirSync(scratchRoot).length === 0) drop(scratchRoot);
+    if (existsSync(scratchRoot) && readdirSync(scratchRoot).length === 0) dropChecked(scratchRoot);
   }
 
   // Prune on any removal: rmSync'd scratch dirs can hold inner worktrees whose
@@ -890,7 +891,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       if (!existsSync(lock)) continue;
       const inside: number[] = pidsInside(targets(), lock);
       if (inside.length > 0) keep(lock, `process ${inside.join(', ')} inside`);
-      else drop(lock);
+      else dropChecked(lock);
     }
 
   if (removed.length > 0) await command(['git', 'worktree', 'prune'], repo.root);
