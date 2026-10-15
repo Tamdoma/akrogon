@@ -3,8 +3,10 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
   type Dirent,
 } from 'node:fs';
@@ -13,7 +15,7 @@ import { z } from 'zod';
 import { globalHome, leafTemp, within, worktreeStore, type Repo } from './config';
 import { readVerifyRuns, type VerifyRun } from './verify';
 import { allLeaves, leavesUnder, readState, saveState, type Leaf, type State } from './state';
-import { cgroupRoot, leafSlice, ownSlices, sessionBusAddress } from './scope';
+import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
 import { liveRuns, withAdmissionLock } from './admission';
 import { command, herdrError, run, spawnCaptured, type Pane, type Result } from './shell';
 
@@ -199,6 +201,23 @@ const ownerSchema = z.object({
   started: z.string(),
 });
 
+export type Owner = z.infer<typeof ownerSchema>;
+
+export function readOwner(path: string): Owner | undefined {
+  try {
+    return ownerSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+  } catch {
+    return undefined;
+  }
+}
+
+export function writeOwner(path: string): void {
+  const record: Owner = { pid: process.pid, boot_id: currentBoot(), started: new Date().toISOString() };
+  const temporary: string = `${path}.${process.pid}.tmp`;
+  writeFileSync(temporary, JSON.stringify(record) + '\n');
+  renameSync(temporary, path);
+}
+
 function currentBoot(): string {
   const file: string = '/proc/sys/kernel/random/boot_id';
   return existsSync(file) ? readFileSync(file, 'utf8').trim() : '';
@@ -215,6 +234,40 @@ function pidAlive(pid: number): boolean {
 
 function ownerDead(owner: { pid: number; boot_id: string }): boolean {
   return !pidAlive(owner.pid) || (owner.boot_id !== '' && owner.boot_id !== currentBoot());
+}
+
+// One scan of this uid's processes: pid to the targets of its cwd and open
+// fds. Unreadable entries and dead pids are skipped; fd targets like
+// "socket:[123]" that never resolve simply match no path.
+function procTargets(): Map<number, string[]> {
+  const targets: Map<number, string[]> = new Map();
+  for (const entry of readdirSync(procRoot(), { withFileTypes: true })) {
+    if (!entry.isDirectory() || !/^\d+$/.test(entry.name)) continue;
+    const pid: number = Number(entry.name);
+    if (!pidAlive(pid)) continue;
+    const dir: string = resolve(procRoot(), entry.name);
+    try {
+      if (statSync(dir).uid !== process.getuid!()) continue;
+      const found: string[] = [readlinkSync(resolve(dir, 'cwd'))];
+      for (const fd of readdirSync(resolve(dir, 'fd')))
+        found.push(readlinkSync(resolve(dir, 'fd', fd)));
+      targets.set(pid, found);
+    } catch {
+      continue;
+    }
+  }
+  return targets;
+}
+
+function pidsInside(targets: Map<number, string[]>, path: string): number[] {
+  return [...targets.entries()]
+    .filter(([, found]) => found.some((target) => within(target, path)))
+    .map(([pid]) => pid);
+}
+
+export function processesInside(paths: string[]): Set<string> {
+  const targets: Map<number, string[]> = procTargets();
+  return new Set(paths.filter((path) => pidsInside(targets, path).length > 0));
 }
 
 export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null): Promise<boolean> {
@@ -310,9 +363,6 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   }
   const leafSlugs: Set<string> = new Set(leaves.map((leaf) => leaf.state.slug));
 
-  const batchAttempts: Set<string> = new Set(
-    leaves.flatMap((leaf) => (leaf.state.batch === undefined ? [] : [leaf.state.batch.attempt])),
-  );
   const verifyRuns: VerifyRun[] = readVerifyRuns(repo);
   const leafBySlug: Map<string, Leaf> = new Map(leaves.map((leaf) => [leaf.state.slug, leaf]));
 
@@ -339,13 +389,15 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     }
   }
 
-  async function removeWorktree(path: string): Promise<boolean> {
-    const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
-    if (!verdict.ok) {
-      keep(path, verdict.reason);
-      return false;
+  async function removeWorktree(path: string, force: boolean): Promise<boolean> {
+    if (!force) {
+      const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
+      if (!verdict.ok) {
+        keep(path, verdict.reason);
+        return false;
+      }
     }
-    const result: Result = await run(['git', 'worktree', 'remove', path], repo.root);
+    const result: Result = await run(['git', 'worktree', 'remove', ...(force ? ['--force'] : []), path], repo.root);
     if (result.code !== 0) {
       keep(path, result.stderr || `git worktree remove exited ${result.code}`);
       return false;
@@ -355,7 +407,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   }
 
   async function removeMergedWorktree(leaf: Leaf, worktree: string): Promise<void> {
-    if (!(await removeWorktree(worktree))) return;
+    if (!(await removeWorktree(worktree, false))) return;
     saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
     const slug: string = leaf.state.slug;
     const branch: Result = await run(['git', 'show-ref', '--verify', '--quiet', `refs/heads/${slug}`], repo.root);
@@ -375,6 +427,9 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
 
   const handled: Set<string> = new Set();
   const panes: Pane[] = live ?? [];
+  // One /proc scan per pass, run only when a candidate reaches removal.
+  let scanned: Map<number, string[]> | undefined;
+  const targets = (): Map<number, string[]> => scanned ?? (scanned = procTargets());
 
   async function mergedWorktree(leaf: Leaf, worktree: string, open: boolean): Promise<void> {
     if (leaf.state.batch !== undefined) {
@@ -447,7 +502,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         keep(worktree, 'live pane inside');
         continue;
       }
-      if (await removeWorktree(worktree)) saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
+      if (await removeWorktree(worktree, false))
+        saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
       continue;
     }
     if (within(worktree, store)) {
@@ -468,7 +524,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(worktree, 'live pane inside');
       continue;
     }
-    if (await removeWorktree(worktree)) saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
+    if (await removeWorktree(worktree, false))
+      saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
   }
 
   const candidates: Set<string> = new Set();
@@ -507,35 +564,62 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         if (live === null) keep(path, 'pane list unavailable');
         else if (tabLive(panes, leaf.state.tab) || foreignPaneInside(panes, path, leaf.state.tab))
           keep(path, 'live pane inside');
-        else await removeWorktree(path);
+        else await removeWorktree(path, false);
         continue;
       }
       keep(path, 'active leaf');
       continue;
     }
-    if (name.startsWith('verify-')) {
-      const record: VerifyRun | undefined = verifyRuns.find((item) => item.run === name.slice('verify-'.length));
-      if (record !== undefined) {
-        if (record.end === undefined && !ownerDead({ pid: record.pid, boot_id: record.boot_id })) {
-          keep(path, `verify ${record.run} in progress`);
-          continue;
-        }
-      }
-    }
-    if (name.startsWith('batch-') && batchAttempts.has(name.slice('batch-'.length))) {
-      keep(path, 'state.batch');
-      continue;
-    }
     // A delegated worker runs at <slug>-u<N> from the seat's own pane, so no pane sits inside it.
-    const owner: Leaf | undefined = /-u\d+$/.test(name) ? leafBySlug.get(name.replace(/-u\d+$/, '')) : undefined;
+    const owner: Leaf | undefined =
+      leaf === undefined && /-u\d+$/.test(name) ? leafBySlug.get(name.replace(/-u\d+$/, '')) : undefined;
     if (owner !== undefined && owner.state.phase !== 'merged' && owner.state.phase !== 'failed') {
       keep(path, 'active leaf worker');
       continue;
     }
-    if (live === null) keep(path, 'pane list unavailable');
-    else if (livePaneInside(panes, path)) keep(path, 'live pane inside');
-    else await removeWorktree(path);
+    let force: boolean = owner?.state.phase === 'merged';
+    if (name.startsWith('verify-')) {
+      const record: VerifyRun | undefined = verifyRuns.find((item) => item.run === name.slice('verify-'.length));
+      if (record !== undefined && record.end === undefined && !ownerDead(record)) {
+        keep(path, `verify ${record.run} in progress`);
+        continue;
+      }
+      force = true;
+    }
+    if (name.startsWith('batch-')) {
+      const record: Owner | undefined = readOwner(`${path}.owner`);
+      if (record !== undefined && !ownerDead(record)) continue; // live builder owns this copy
+      force = true;
+    }
+    if (live === null) {
+      keep(path, 'pane list unavailable');
+      continue;
+    }
+    if (livePaneInside(panes, path)) {
+      keep(path, 'live pane inside');
+      continue;
+    }
+    const inside: number[] = pidsInside(targets(), path);
+    if (inside.length > 0) {
+      keep(path, `process ${inside.join(', ')} inside`);
+      continue;
+    }
+    await removeWorktree(path, force);
   }
+
+  // A batch-<id>.owner record with no copy directory is swept with the copy's
+  // own rule: a live owner may precede a copy still being created, a dead or
+  // unreadable one is dropped.
+  if (existsSync(store))
+    for (const entry of readdirSync(store, { withFileTypes: true })) {
+      if (!entry.isFile() || !/^batch-.*\.owner$/.test(entry.name)) continue;
+      const file: string = resolve(store, entry.name);
+      if (existsSync(resolve(store, entry.name.slice(0, -'.owner'.length)))) continue;
+      const record: Owner | undefined = readOwner(file);
+      if (record !== undefined && !ownerDead(record)) continue;
+      rmSync(file, { force: true });
+      removed.push(file);
+    }
 
   const scratchRoot: string = resolve(leafTemp(repo, 'x'), '..');
   if (existsSync(scratchRoot)) {
@@ -558,10 +642,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
           keep(runRoot, 'no .owner record');
           continue;
         }
-        let owner: { pid: number; boot_id: string; started: string };
-        try {
-          owner = ownerSchema.parse(JSON.parse(readFileSync(ownerFile, 'utf8')));
-        } catch {
+        const owner: Owner | undefined = readOwner(ownerFile);
+        if (owner === undefined) {
           keep(runRoot, 'invalid .owner record');
           continue;
         }
