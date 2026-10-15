@@ -181,7 +181,7 @@ foreclosed alternatives>
 <installed path of standing-design.md, then the current interpretation: how its rules apply to this leaf>
 
 ## Leaf architecture
-<owned surfaces, literal interfaces, exclusions and necessary dependencies>
+<owned surfaces, literal interfaces, exclusions with their owners and necessary dependencies; for each state or precondition the change alters, the consumer (file and function) that relies on it and either the decision or an `Open for the plan:` question; existing code is called reusable only when its preconditions were checked against the changed state, otherwise it is an `Open for the plan:` question; functions are named without line numbers>
 ```
 
 Each design is self-contained. Copy every binding decision into each affected leaf, with explicit exclusions for binding decisions that do not belong there. Cross-leaf claims name an owner whose own brief/design accepts that responsibility. Known human-only prerequisites have a named owner and recorded completion before handoff.
