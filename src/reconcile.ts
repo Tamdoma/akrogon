@@ -21,22 +21,36 @@ import { command, herdrError, run, spawnCaptured, type Pane, type Result } from 
 
 export type Reconciled = { removed: string[]; kept: { path: string; reason: string }[] };
 
-const keptReportSchema = z.strictObject({ kept: z.array(z.strictObject({ path: z.string(), reason: z.string() })) });
+export type RemovedRecord = { path: string; head: string; rule: string; branch?: string };
+
+type WorktreeRow = { head: string; branch?: string; locked: string | false };
+
+const removedRecordSchema = z.strictObject({
+  path: z.string(),
+  head: z.string(),
+  rule: z.string(),
+  branch: z.string().optional(),
+});
+
+const keptReportSchema = z.strictObject({
+  kept: z.array(z.strictObject({ path: z.string(), reason: z.string() })),
+  removed: z.array(removedRecordSchema).optional(),
+});
 
 export function keptReportPath(repo: Repo): string {
   return resolve(globalHome(), 'reconcile', `${repo.name}.json`);
 }
 
-function readReport(file: string): { path: string; reason: string }[] {
+function readReport(file: string): z.infer<typeof keptReportSchema> {
   let raw: string;
   try {
     raw = readFileSync(file, 'utf8');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { kept: [] };
     throw error;
   }
   try {
-    return keptReportSchema.parse(JSON.parse(raw)).kept;
+    return keptReportSchema.parse(JSON.parse(raw));
   } catch (error) {
     throw new Error(`invalid kept report ${file}: ${error instanceof Error ? error.message : String(error)}`, {
       cause: error,
@@ -45,24 +59,28 @@ function readReport(file: string): { path: string; reason: string }[] {
 }
 
 export function readKept(repo: Repo): { path: string; reason: string }[] {
-  return readReport(keptReportPath(repo));
+  return readReport(keptReportPath(repo)).kept;
 }
 
-function writeKept(file: string, kept: { path: string; reason: string }[]): void {
+export function readRemoved(repo: Repo): RemovedRecord[] {
+  return readReport(keptReportPath(repo)).removed ?? [];
+}
+
+function writeKept(file: string, kept: { path: string; reason: string }[], removed?: RemovedRecord[]): void {
   mkdirSync(dirname(file), { recursive: true });
   const temporary: string = `${file}.${process.pid}.tmp`;
-  writeFileSync(temporary, JSON.stringify({ kept }, null, 2) + '\n');
+  writeFileSync(temporary, JSON.stringify(removed === undefined ? { kept } : { kept, removed }, null, 2) + '\n');
   renameSync(temporary, file);
 }
 
-function writeKeptReport(repo: Repo, kept: { path: string; reason: string }[]): void {
-  writeKept(keptReportPath(repo), kept);
+function writeKeptReport(repo: Repo, kept: { path: string; reason: string }[], removed: RemovedRecord[]): void {
+  writeKept(keptReportPath(repo), kept, removed);
 }
 
 const hostReportPath = (): string => resolve(globalHome(), 'reconcile-host.json');
 
 export function readHostKept(): { path: string; reason: string }[] {
-  return readReport(hostReportPath());
+  return readReport(hostReportPath()).kept;
 }
 
 // The manager's bus address is pinned because callers inside a run-check cut
@@ -337,18 +355,34 @@ export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<b
 
 export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null): Promise<Reconciled> {
   const removed: string[] = [];
+  const removedWorktrees: RemovedRecord[] = [];
   const kept: { path: string; reason: string }[] = [];
   const keep = (path: string, reason: string): void => {
     kept.push({ path, reason });
   };
 
   const listed: string = await command(['git', 'worktree', 'list', '--porcelain'], repo.root);
-  const registered: Set<string> = new Set(
+  const registered: Map<string, WorktreeRow> = new Map(
     listed
-      .split('\n')
-      .filter((line) => line.startsWith('worktree '))
-      .map((line) => line.slice('worktree '.length)),
+      .split('\n\n')
+      .filter((stanza) => stanza.startsWith('worktree '))
+      .map((stanza): [string, WorktreeRow] => {
+        const lines: string[] = stanza.split('\n');
+        const branchLine: string | undefined = lines.find((line) => line.startsWith('branch refs/heads/'));
+        const lockLine: string | undefined = lines.find((line) => line === 'locked' || line.startsWith('locked '));
+        return [
+          lines[0].slice('worktree '.length),
+          {
+            head: lines.find((line) => line.startsWith('HEAD '))!.slice('HEAD '.length),
+            ...(branchLine === undefined ? {} : { branch: branchLine.slice('branch refs/heads/'.length) }),
+            locked: lockLine === undefined ? false : lockLine.slice('locked '.length),
+          },
+        ];
+      }),
   );
+
+  const keepLocked = (path: string, locked: string): void =>
+    keep(path, locked === '' ? 'locked worktree' : `locked worktree (${locked})`);
 
   const store: string = worktreeStore(repo);
   const oldRoot: string = resolve(repo.root, 'issues/worktrees');
@@ -406,7 +440,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     }
   }
 
-  async function removeWorktree(path: string, force: boolean): Promise<boolean> {
+  async function removeWorktree(path: string, force: boolean, rule: string): Promise<boolean> {
     if (!force) {
       const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
       if (!verdict.ok) {
@@ -420,11 +454,13 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       return false;
     }
     removed.push(path);
+    const row: WorktreeRow = registered.get(path)!;
+    removedWorktrees.push({ path, head: row.head, rule, ...(row.branch === undefined ? {} : { branch: row.branch }) });
     return true;
   }
 
   async function removeMergedWorktree(leaf: Leaf, worktree: string): Promise<void> {
-    if (!(await removeWorktree(worktree, false))) return;
+    if (!(await removeWorktree(worktree, false, 'merged leaf'))) return;
     saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
     const slug: string = leaf.state.slug;
     const branch: Result = await run(['git', 'show-ref', '--verify', '--quiet', `refs/heads/${slug}`], repo.root);
@@ -498,8 +534,13 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       else keep(worktree, 'unmanaged worktree');
       continue;
     }
-    if (!registered.has(worktree)) {
+    const row: WorktreeRow | undefined = registered.get(worktree);
+    if (row === undefined) {
       keep(worktree, 'unregistered worktree directory');
+      continue;
+    }
+    if (row.locked !== false) {
+      keepLocked(worktree, row.locked);
       continue;
     }
     if (state.batch !== undefined) {
@@ -519,7 +560,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         keep(worktree, 'live pane inside');
         continue;
       }
-      if (await removeWorktree(worktree, false)) saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
+      if (await removeWorktree(worktree, false, 'failed leaf'))
+        saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
       continue;
     }
     if (within(worktree, store)) {
@@ -540,7 +582,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(worktree, 'live pane inside');
       continue;
     }
-    if (await removeWorktree(worktree, false)) saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
+    if (await removeWorktree(worktree, false, 'old-root migration'))
+      saveState(leaf.path, { ...readState(leaf.path), worktree: undefined });
   }
 
   const candidates: Set<string> = new Set();
@@ -549,7 +592,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     for (const entry of readdirSync(root, { withFileTypes: true }))
       if (entry.isDirectory()) candidates.add(resolve(root, entry.name));
   }
-  for (const path of registered) {
+  for (const path of registered.keys()) {
     if (path === repo.root || handled.has(path)) continue;
     if (!existsSync(path)) continue; // stale registration, pruned below when anything was removed
     if (underRoot(path)) candidates.add(path);
@@ -559,11 +602,16 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     if (!existsSync(path) || handled.has(path)) continue;
     const name: string = basename(path);
     const leaf: Leaf | undefined = leafBySlug.get(name);
-    if (!leafSlugs.has(name) && knownSlugs.has(name)) {
+    const row: WorktreeRow | undefined = registered.get(path);
+    if (row === undefined) {
       keep(path, 'unknown directory');
       continue;
     }
-    if (!registered.has(path)) {
+    if (row.locked !== false) {
+      keepLocked(path, row.locked);
+      continue;
+    }
+    if (!leafSlugs.has(name) && knownSlugs.has(name)) {
       keep(path, 'unknown directory');
       continue;
     }
@@ -579,7 +627,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         if (live === null) keep(path, 'pane list unavailable');
         else if (tabLive(panes, leaf.state.tab) || foreignPaneInside(panes, path, leaf.state.tab))
           keep(path, 'live pane inside');
-        else await removeWorktree(path, false);
+        else await removeWorktree(path, false, 'failed leaf');
         continue;
       }
       keep(path, 'active leaf');
@@ -592,7 +640,12 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(path, 'active leaf worker');
       continue;
     }
+    if (owner === undefined && !name.startsWith('verify-') && !name.startsWith('batch-')) {
+      keep(path, 'unmanaged worktree');
+      continue;
+    }
     let force: boolean = owner?.state.phase === 'merged';
+    let rule: string = 'worker of finished leaf';
     if (name.startsWith('verify-')) {
       const record: VerifyRun | undefined = verifyRuns.find((item) => item.run === name.slice('verify-'.length));
       if (record !== undefined && record.end === undefined && !ownerDead(record)) {
@@ -600,11 +653,13 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         continue;
       }
       force = true;
+      rule = 'ended verify';
     }
     if (name.startsWith('batch-')) {
       const record: Owner | undefined = readOwner(`${path}.owner`);
       if (record !== undefined && !ownerDead(record)) continue; // live builder owns this copy
       force = true;
+      rule = existsSync(`${path}.owner`) ? 'dead batch owner' : 'unrecorded batch';
     }
     if (live === null) {
       keep(path, 'pane list unavailable');
@@ -619,7 +674,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(path, `process ${inside.join(', ')} inside`);
       continue;
     }
-    await removeWorktree(path, force);
+    await removeWorktree(path, force, rule);
   }
 
   // A batch-<id>.owner record with no copy directory is swept with the copy's
@@ -697,8 +752,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     }
   }
 
-  if (removed.length > 0) await command(['git', 'worktree', 'prune'], repo.root);
-  writeKeptReport(repo, kept);
+  if (removedWorktrees.length > 0) await command(['git', 'worktree', 'prune'], repo.root);
+  writeKeptReport(repo, kept, removedWorktrees);
   return { removed, kept };
 }
 
