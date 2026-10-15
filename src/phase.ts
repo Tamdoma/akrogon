@@ -732,7 +732,7 @@ async function finishPush(
       if (batch.recorded !== true) appendAttempt(repo, slug, batch, 'merged', pending.end);
       saveState(leaf.path, {
         ...leaf.state,
-        batch: { ...batch, applied: true, top: pending.candidate, recorded: true },
+        batch: { ...batch, applied: true, top: pending.candidate, candidate: pending.candidate, recorded: true },
       });
       for (const member of batch.members) {
         const item: Leaf | undefined = allLeaves(repo).find((entry) => entry.state.slug === member.slug);
