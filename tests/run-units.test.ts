@@ -576,6 +576,7 @@ test.serial('skills name the run-check keeping rule, its log reader and its exem
   expect(checkIssue, 'check-issue allows direct-route logs at the chart holder').toMatch(/<chart>\/direct/);
   const implementIssue: string = readFileSync(resolve(root, 'skills/implement-issue/SKILL.md'), 'utf8');
   expect(implementIssue, 'implement-issue keeps standalone outside the rule').toMatch(/standalone[^\n]*outside/i);
+  expect(implementIssue, 'implement-issue names the direct-route holder').toContain('--holder <chart>/direct');
 });
 
 test.serial('skills name akrogon stop-run instead of the recorded-PID stop rule', () => {
