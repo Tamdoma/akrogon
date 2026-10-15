@@ -112,9 +112,7 @@ function foreignProcess(root: string): boolean {
 }
 
 async function underLocks<T>(paths: string[], index: number, action: () => Promise<T>): Promise<T> {
-  return index === paths.length
-    ? action()
-    : withLock(paths[index], () => underLocks(paths, index + 1, action));
+  return index === paths.length ? action() : withLock(paths[index], () => underLocks(paths, index + 1, action));
 }
 
 export async function migrateStateHome(): Promise<void> {

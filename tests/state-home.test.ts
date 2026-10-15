@@ -168,6 +168,5 @@ test('cutover leaves no tracked file of the checkout modified or deleted', async
   await cli(root, home, ['config']);
   const status: string = await command(['git', 'status', '--porcelain'], root);
   const tracked: string = await command(['git', 'ls-files'], root);
-  for (const line of status.split('\n').filter(Boolean))
-    expect(tracked.split('\n')).toContain(line.slice(3));
+  for (const line of status.split('\n').filter(Boolean)) expect(tracked.split('\n')).toContain(line.slice(3));
 });
