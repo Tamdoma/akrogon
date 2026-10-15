@@ -155,20 +155,17 @@ export async function runCheck(
 
 export class PublishRefusedError extends Error {}
 
-// A leaf publish target sits under an owner dir that may still be open, may be
-// closing, or may already be packed under issues/closed; the leaf name is the
-// member's first segment, so both areas can exist while only one holds the
-// leaf. Chart-direct holders resolve to a single owner dir and stay allowed.
-// The late rule adds the vanished-leaf case: the owner moved it while the
-// command ran.
+// A publish target under an owner that already sits in issues/closed, or that
+// holds .closing while packing, is refused; chart-direct holders resolve to a
+// single owner dir and stay allowed. The late rule adds the vanished-owner
+// case: the owner moved to closed while the command ran.
 async function ownerRefusal(target: string, repo: Repo, late: boolean): Promise<string | undefined> {
   const found = await locate(target, repo.root, repo);
   if (found === null || found.ownerDirs.length === 1) return undefined;
   const [open, closed]: string[] = found.ownerDirs;
-  const leafDir: string = found.member.split('/')[0];
-  if (existsSync(resolve(closed, leafDir))) return `owner closed: ${target}`;
+  if (existsSync(closed)) return `owner closed: ${target}`;
   if (existsSync(resolve(open, '.closing'))) return `owner closing: ${target}`;
-  if (late && !existsSync(resolve(open, leafDir))) return `owner gone: ${target}`;
+  if (late && !existsSync(open)) return `owner gone: ${target}`;
   return undefined;
 }
 

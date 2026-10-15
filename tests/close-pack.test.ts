@@ -117,7 +117,7 @@ test('completion packs every log into evidence.tar.zst and a logless owner gets 
     const reread = await logBytes(f, resolve(f.root, 'issues/open/issue/packed/implementation/check-a-1.log'));
     expect(reread.code).toBe(0);
     expect(reread.bytes.toString()).toBe('alpha\n');
-    expect(readFileSync(resolve(closed, 'notes.txt'), 'utf8')).toBe('not a log\n');
+    expect(readFileSync(resolve(closed, 'packed/notes.txt'), 'utf8')).toBe('not a log\n');
     expect(readFileSync(resolve(f.root, 'issues/closed/issue2/notes.txt'), 'utf8')).toBe('plain\n');
     expect(readState(resolve(closed, 'packed')).phase).toBe('merged');
     const noLogs: string = resolve(f.root, 'issues/closed/issue2');
@@ -220,7 +220,7 @@ test('run-check refuses closed and closing owners at start and right before publ
     expect(early.code).not.toBe(0);
     expect(existsSync(mark)).toBe(false);
     expect(existsSync(resolve(closing, 'implementation'))).toBe(false);
-    rmSync(resolve(f.root, 'issues/open/issue2/.closing'));
+    rmSync(resolve(f.root, 'issues/open/issue2'), { recursive: true });
 
     // Late refusal: the leaf's own merge lands mid-run and closes the owner.
     yaml(resolve(f.root, 'issues/config.yaml'), {
@@ -252,7 +252,8 @@ test('run-check refuses closed and closing owners at start and right before publ
     expect(existsSync(runRoot)).toBe(true);
     expect(existsSync(resolve(runRoot, '.owner'))).toBe(false);
     expect(readFileSync(resolve(runRoot, 'refusal.json'), 'utf8')).toContain('racer');
-    expect((await cli(f, ['next'])).code).toBe(0);
+    const next = await cli(f, ['next']);
+    expect(next.code).toBe(0);
     expect(readFileSync(outLog![1], 'utf8')).toContain('before-close');
     const kept: { path: string; reason: string }[] = JSON.parse(
       readFileSync(resolve(f.home, 'reconcile/repo.json'), 'utf8'),
