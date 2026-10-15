@@ -2,14 +2,51 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { cli, entry, fixture, leaf, fakeHerdr, holding, leafTempRoot, storeDir, type Fixture } from './helpers';
+import { cli, entry, fixture, leaf, fakeHerdr, holding, leafTempRoot, storeDir, yaml, type Fixture } from './helpers';
 import { finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import { leafSlice } from '../src/scope';
+import { globalSchema, type GlobalConfig } from '../src/config';
 import { readState, saveState, type State } from '../src/state';
 import type { Database } from './fake-herdr';
 
 type SliceFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 type Cap = { proc: Bun.Subprocess; result: Promise<SpawnResult> };
+
+test('a repo-local pass preserves another registered repo slice with a live tab', async () => {
+  const f: SliceFixture = await slicesFixture();
+  const other: Fixture = await fixture();
+  try {
+    const config: GlobalConfig = globalSchema.parse(
+      Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')),
+    );
+    yaml(resolve(f.home, 'config.yaml'), { ...config, repos: { repo: f.root, other: other.root } });
+    leaf(other, 'other-finished', 'merged', { repo: 'other', tab: 'w1:t8' });
+    saveDatabase(f, {
+      ...database(f),
+      tabs: [{ tab_id: 'w1:t8', label: 'other-finished', focused: false }],
+      panes: [{ pane_id: 'w1:p8', tab_id: 'w1:t8', cwd: null, agent: null, agent_status: 'idle' }],
+    });
+    const slice: string = leafSlice({ name: 'other' }, 'other-finished');
+    const cgRoot: string = resolve(f.home, 'cgroups');
+    mkdirSync(resolve(cgRoot, 'other'), { recursive: true });
+    writeFileSync(resolve(cgRoot, 'other/cgroup.procs'), '');
+    symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(f.home, 'bin/systemctl'));
+    const db: string = resolve(f.home, 'systemctl.json');
+    const log: string = resolve(f.home, 'systemctl.log');
+    writeFileSync(db, JSON.stringify({ units: [{ unit: slice, sub: 'active', cgroup: '/other' }] }));
+    const result: Result = await cli(f, ['next', '--all'], f.root, {
+      ...f.env,
+      FAKE_SYSTEMCTL_DB: db,
+      FAKE_SYSTEMCTL_LOG: log,
+      AKROGON_CGROUP_ROOT: cgRoot,
+    });
+    expect(result.code, result.stderr).toBe(0);
+    expect(readFileSync(log, 'utf8')).not.toContain(`stop ${slice}`);
+  } finally {
+    f.clean();
+    other.clean();
+  }
+});
 
 const uid: number = process.getuid!();
 const realRuntime: string = `/run/user/${uid}`;
