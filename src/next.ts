@@ -1335,7 +1335,7 @@ async function reconcileRepos(
       report(invocation, repo.name, repo.root, error);
     }
   }
-  await reconcileHost(repos, null, panesOnce);
+  await reconcileHost(registeredRepos(readGlobal(), invocation).repos, null, panesOnce);
 }
 
 async function paneOwners(
