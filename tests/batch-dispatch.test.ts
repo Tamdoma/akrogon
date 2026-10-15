@@ -1058,3 +1058,121 @@ test('a red stack restarts only its holder when another leaf enters merge during
     f.clean();
   }
 }, 30000);
+
+test('a landed stack closes each member tab and wakes member dependents at once', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+    yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 7 });
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
+    const cc: { path: string; b: string } = await allocatedLeaf(f, 'cc', 'issue-cc');
+    await commitFile(f, aa.path, 'aa-file', 'aa\n');
+    await commitFile(f, bb.path, 'bb-file', 'bb\n');
+    await commitFile(f, cc.path, 'cc-file', 'cc\n');
+    const aaTab: string = z.string().parse(readState(aa.path).tab);
+    const bbTab: string = z.string().parse(readState(bb.path).tab);
+    const ccTab: string = z.string().parse(readState(cc.path).tab);
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    toMerge(cc.path, '2026-09-13T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, [])).code).toBe(0);
+    const record = readState(aa.path).batch!;
+    expect(stacked(aa.path)!.map((member) => member.slug)).toEqual(['bb', 'cc']);
+    // Dependents enter after the queue snapshot: blocked-by counts otherwise
+    // reorder the merge queue and bb would hold the turn instead of aa.
+    const depb: string = leaf(f, 'depb', 'plan.synthesis', { 'blocked-by': ['bb'] }, 'issue-depb');
+    const depcc: string = leaf(f, 'depcc', 'plan.synthesis', { 'blocked-by': ['cc'] }, 'issue-depcc');
+    idleAll(f);
+    await verified(f, 'aa', 'merge');
+    expect(
+      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', record.attempt], f.root, f.env))
+        .code,
+    ).toBe(0);
+    expect(
+      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', record.attempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect(leafState(aa.path).phase).toBe('merged');
+    expect(leafState(bb.path).phase).toBe('merged');
+    expect(leafState(cc.path).phase).toBe('merged');
+    // The merge pass itself closed both member tabs; the holder's stays for its idle path.
+    expect(database(f).tabs.map((tab) => tab.tab_id)).toEqual([aaTab]);
+    expect([bbTab, ccTab].some((tab) => database(f).tabs.some((item) => item.tab_id === tab))).toBe(false);
+    // Each merged member dispatched its dependents in the same wake, with no hook event.
+    const planPrompts = database(f)
+      .prompts.filter((prompt) => prompt.text.startsWith('plan-issue'))
+      .map((prompt) => prompt.text)
+      .sort();
+    expect(planPrompts).toEqual(
+      [
+        `plan-issue depb slot=A phase=plan.synthesis leaf=${depb}`,
+        `plan-issue depcc slot=A phase=plan.synthesis leaf=${depcc}`,
+      ].sort(),
+    );
+    // A later pass re-dispatches nothing: the dependents started exactly once.
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(database(f).prompts.filter((prompt) => prompt.text.startsWith('plan-issue'))).toHaveLength(2);
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
+test('a push reported lost but landed closes member tabs in the recovery wake', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+    yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 7 });
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
+    await commitFile(f, aa.path, 'aa-file', 'aa\n');
+    await commitFile(f, bb.path, 'bb-file', 'bb\n');
+    const aaTab: string = z.string().parse(readState(aa.path).tab);
+    const bbTab: string = z.string().parse(readState(bb.path).tab);
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-12T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, [])).code).toBe(0);
+    const record = readState(aa.path).batch!;
+    expect(stacked(aa.path)!.map((member) => member.slug)).toEqual(['bb']);
+    const depb: string = leaf(f, 'depb', 'plan.synthesis', { 'blocked-by': ['bb'] }, 'issue-depb');
+    idleAll(f);
+    await verified(f, 'aa', 'merge');
+    expect(
+      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', record.attempt], f.root, f.env))
+        .code,
+    ).toBe(0);
+    // The push lands but its reply is lost: the real git ran, the CLI saw exit 1.
+    const git: string = await command(['sh', '-c', 'command -v git']);
+    writeFileSync(
+      resolve(f.home, 'bin/git'),
+      `#!/bin/sh
+if [ "$1" = push ]; then
+  "${git}" "$@"
+  exit 1
+fi
+exec "${git}" "$@"
+`,
+    );
+    chmodSync(resolve(f.home, 'bin/git'), 0o755);
+    const merged: Result = await cli(
+      f,
+      ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', record.attempt],
+      f.root,
+      f.env,
+    );
+    expect(merged.code).toBe(0);
+    expect(leafState(aa.path).phase).toBe('merged');
+    expect(leafState(bb.path).phase).toBe('merged');
+    // The recovery wake reconciled the landed push and closed the member tab itself.
+    expect(database(f).tabs.map((tab) => tab.tab_id)).toEqual([aaTab]);
+    expect(database(f).tabs.some((tab) => tab.tab_id === bbTab)).toBe(false);
+    expect(
+      database(f)
+        .prompts.filter((prompt) => prompt.text.startsWith('plan-issue'))
+        .map((prompt) => prompt.text),
+    ).toEqual([`plan-issue depb slot=A phase=plan.synthesis leaf=${depb}`]);
+  } finally {
+    f.clean();
+  }
+}, 30000);
