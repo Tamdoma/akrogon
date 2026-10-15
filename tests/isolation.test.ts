@@ -41,7 +41,7 @@ test.serial('a killed child leaves no descendant: the orphan is adopted by this 
   let grandchild: number | undefined;
   for (let i: number = 0; i < 100 && grandchild === undefined; i += 1) {
     try {
-      const kids: string = readFileSync(`/proc/${child.pid}/children`, 'utf8').trim();
+      const kids: string = readFileSync(`/proc/${child.pid}/task/${child.pid}/children`, 'utf8').trim();
       if (kids !== '') grandchild = Number(kids.split(' ')[0]);
     } catch {
       // child not visible yet
