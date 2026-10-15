@@ -1,11 +1,24 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { cli, entry, fixture, leaf, fakeHerdr, holding, leafTempRoot, storeDir, yaml, type Fixture } from './helpers';
+import {
+  cli,
+  entry,
+  fixture,
+  leaf,
+  fakeHerdr,
+  holding,
+  leafTempRoot,
+  procRoot,
+  storeDir,
+  yaml,
+  type Fixture,
+} from './helpers';
 import { finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import { leafSlice } from '../src/scope';
-import { globalSchema, type GlobalConfig } from '../src/config';
+import { globalSchema, readRepo, leafTemp, type GlobalConfig } from '../src/config';
 import { readState, saveState, type State } from '../src/state';
 import type { Database } from './fake-herdr';
 
@@ -577,6 +590,140 @@ test('the run guard unit is submitted with CollectMode=inactive-or-failed', asyn
     const guard: string | undefined = lines.find((line) => line.includes('-guard'));
     expect(guard).toBeDefined();
     expect(guard).toContain('CollectMode=inactive-or-failed');
+  } finally {
+    f.clean();
+  }
+});
+
+function hostKept(f: Fixture): { path: string; reason: string }[] {
+  const file: string = resolve(f.home, 'reconcile-host.json');
+  if (!existsSync(file)) return [];
+  return z
+    .object({ kept: z.array(z.object({ path: z.string(), reason: z.string() })) })
+    .parse(JSON.parse(readFileSync(file, 'utf8'))).kept;
+}
+
+// store-sweep criterion 2: the host step removes retired akrogon leftovers —
+// the retired temp root, unregistered worktree-store dirs, leaf-temp dirs of
+// unregistered repos, runs/last-start, dead-pid tmp files and retired locks —
+// and keeps what it cannot prove safe.
+test('the host step removes retired leftovers and keeps unprovable items', async () => {
+  const f: SliceFixture = await slicesFixture();
+  const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
+  const retired: string = resolve(f.home, 'retired');
+  try {
+    leaf(f, 'gone-leaf', 'merged');
+    mkdirSync(retired, { recursive: true });
+    writeFileSync(resolve(retired, 'x'), 'x');
+    const worktrees: string = resolve(f.home, '.akrogon/worktrees');
+    mkdirSync(resolve(worktrees, 'oldname'), { recursive: true });
+    mkdirSync(resolve(worktrees, 'gone-repo', 'wt'), { recursive: true });
+    writeFileSync(resolve(worktrees, 'gone-repo', 'wt', '.git'), 'gitdir: x');
+    mkdirSync(resolve(worktrees, 'keeper', 'inner'), { recursive: true });
+    writeFileSync(resolve(worktrees, 'keeper', 'inner', '.git'), 'gitdir: x');
+    const tempRoot: string = leafTempRoot(f);
+    mkdirSync(resolve(tempRoot, 'aaaa', 'bbbb'), { recursive: true });
+    const runs: string = resolve(f.home, 'runs');
+    mkdirSync(runs, { recursive: true });
+    writeFileSync(resolve(runs, 'last-start'), '1');
+    writeFileSync(resolve(f.home, 'x.4194303.tmp'), 'x');
+    writeFileSync(resolve(runs, `y.${child.pid}.tmp`), 'x');
+    writeFileSync(resolve(f.home, 'z.4194303.tmp'), 'x');
+    const locks: string = resolve(f.home, '.akrogon');
+    writeFileSync(resolve(locks, 'run.lock'), '');
+    writeFileSync(resolve(locks, 'framework-tests.lock'), '');
+    const heldLock: string = resolve(f.root, '.git/akrogon-base-runs.lock');
+    writeFileSync(heldLock, '');
+    writeFileSync(resolve(f.root, 'issues/.lock'), '');
+    writeFileSync(resolve(f.root, '.git/akrogon-install.lock'), '');
+    mkdirSync(resolve(f.home, 'reconcile'), { recursive: true });
+    writeFileSync(
+      resolve(f.home, 'reconcile', 'repo.json'),
+      JSON.stringify({ kept: [{ path: resolve(f.home, 'gone'), reason: 'unknown directory' }] }) + '\n',
+    );
+    writeFileSync(
+      resolve(f.home, 'reconcile-host.json'),
+      JSON.stringify({ kept: [{ path: resolve(f.home, 'gone'), reason: 'stale' }] }) + '\n',
+    );
+    const procDir: string = resolve(procRoot(f), String(child.pid));
+    mkdirSync(resolve(procDir, 'fd'), { recursive: true });
+    symlinkSync(heldLock, resolve(procDir, 'fd', '9'));
+    symlinkSync('/tmp', resolve(procDir, 'cwd'));
+    const sysDb: string = resolve(f.home, 'systemctl.json');
+    writeFileSync(sysDb, JSON.stringify({ units: [] }));
+    const log: string = resolve(f.home, 'systemctl.log');
+    symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(f.home, 'bin', 'systemctl'));
+    const result: Result = await cli(f, ['next', '--all'], f.root, {
+      ...f.env,
+      FAKE_SYSTEMCTL_DB: sysDb,
+      FAKE_SYSTEMCTL_LOG: log,
+      AKROGON_RETIRED_TEMP_ROOT: retired,
+      AKROGON_CGROUP_ROOT: resolve(f.home, 'cgroups'),
+    });
+    expect(result.code).toBe(0);
+    expect(existsSync(retired)).toBe(false);
+    expect(existsSync(resolve(worktrees, 'oldname'))).toBe(false);
+    expect(existsSync(resolve(worktrees, 'gone-repo'))).toBe(true);
+    expect(existsSync(resolve(worktrees, 'keeper'))).toBe(true);
+    expect(existsSync(resolve(tempRoot, 'aaaa'))).toBe(false);
+    expect(existsSync(resolve(runs, 'last-start'))).toBe(false);
+    expect(existsSync(resolve(f.home, 'x.4194303.tmp'))).toBe(false);
+    expect(existsSync(resolve(f.home, 'z.4194303.tmp'))).toBe(false);
+    expect(existsSync(resolve(runs, `y.${child.pid}.tmp`))).toBe(true);
+    expect(existsSync(resolve(locks, 'run.lock'))).toBe(false);
+    expect(existsSync(resolve(locks, 'framework-tests.lock'))).toBe(false);
+    expect(existsSync(heldLock)).toBe(true);
+    expect(existsSync(resolve(f.root, 'issues/.lock'))).toBe(false);
+    expect(existsSync(resolve(f.root, '.git/akrogon-install.lock'))).toBe(true);
+    const host: { path: string; reason: string }[] = hostKept(f);
+    expect(host.some((entry) => entry.path === resolve(f.home, 'gone'))).toBe(false);
+    const repoKept = z
+      .object({ kept: z.array(z.object({ path: z.string(), reason: z.string() })) })
+      .parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile', 'repo.json'), 'utf8'))).kept;
+    expect(repoKept.some((entry) => entry.path === resolve(f.home, 'gone'))).toBe(false);
+  } finally {
+    child.kill('SIGKILL');
+    await child.exited;
+    f.clean();
+  }
+});
+
+// store-sweep criteria 1 and 6: a finished leaf's temp stays while its slice
+// holds a running unit, and goes once the unit is gone.
+test('a finished leaf temp stays while its slice holds a running unit', async () => {
+  const f: SliceFixture = await slicesFixture();
+  try {
+    leaf(f, 'busy-temp', 'merged', { tab: 'w1:t9' });
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      tabs: [...db.tabs, { tab_id: 'w1:t9', label: 'busy-temp', focused: false }],
+      panes: [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' }],
+    });
+    const temp: string = leafTemp(readRepo('repo', f.root), 'busy-temp');
+    mkdirSync(temp, { recursive: true });
+    const slice: string = leafSlice({ name: 'repo' }, 'busy-temp');
+    const cgRoot: string = resolve(f.home, 'cgroups');
+    mkdirSync(resolve(cgRoot, 'busy'), { recursive: true });
+    writeFileSync(resolve(cgRoot, 'busy', 'cgroup.procs'), `${process.pid}\n`);
+    const sysDb: string = resolve(f.home, 'systemctl.json');
+    writeFileSync(sysDb, JSON.stringify({ units: [{ unit: slice, sub: 'active', cgroup: '/busy' }] }));
+    const log: string = resolve(f.home, 'systemctl.log');
+    symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(f.home, 'bin', 'systemctl'));
+    const env: NodeJS.ProcessEnv = {
+      ...f.env,
+      FAKE_SYSTEMCTL_DB: sysDb,
+      FAKE_SYSTEMCTL_LOG: log,
+      AKROGON_CGROUP_ROOT: cgRoot,
+    };
+    expect((await cli(f, ['next', '--all'], f.root, env)).code).toBe(0);
+    // The slice stays because the tab is live; the temp stays because the slice
+    // still holds a running unit.
+    expect(existsSync(temp)).toBe(true);
+    closeTab(f, 'w1:t9');
+    writeFileSync(resolve(cgRoot, 'busy', 'cgroup.procs'), '');
+    expect((await cli(f, ['next', '--all'], f.root, env)).code).toBe(0);
+    expect(existsSync(temp)).toBe(false);
   } finally {
     f.clean();
   }

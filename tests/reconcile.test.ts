@@ -1,7 +1,17 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { dirname, resolve } from 'node:path';
 import {
   fixture,
   cli,
@@ -11,11 +21,13 @@ import {
   yaml,
   leafTempRoot,
   procRoot,
+  registerTemp,
   storeDir,
   type Fixture,
 } from './helpers';
 import { readState, saveState } from '../src/state';
-import { command, run, type Result } from '../src/shell';
+import { leafTemp, readRepo } from '../src/config';
+import { command, run, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 import { z } from 'zod';
 import type { Database } from './fake-herdr';
 
@@ -85,6 +97,23 @@ async function dispatchLeaf(f: DispatchFixture, slug: string, extra: object = {}
   return path;
 }
 
+// store-sweep fixtures: the repo-hash dir under the leaf temp root and an
+// owner record in the reconcile shape.
+function repoTempDir(f: DispatchFixture): string {
+  return dirname(leafTemp(readRepo('repo', f.root), 'x'));
+}
+function ownerRecord(pid: number): string {
+  const boot: string = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+  return JSON.stringify({ pid, boot_id: boot, started: new Date().toISOString() });
+}
+function keptReport(f: DispatchFixture, repo: string = 'repo'): { path: string; reason: string }[] {
+  const file: string = resolve(f.home, 'reconcile', `${repo}.json`);
+  if (!existsSync(file)) return [];
+  return z
+    .object({ kept: z.array(z.object({ path: z.string(), reason: z.string() })) })
+    .parse(JSON.parse(readFileSync(file, 'utf8'))).kept;
+}
+
 // DC1: merged leaf, clean worktree, reachable head → worktree removed, branch -d.
 // Covered by next.test.ts ("bare next …", "typed next …"). Failed variant here:
 test('failed leaf worktree is removed and its branch is kept', async () => {
@@ -121,6 +150,9 @@ test('dirty merged worktree is kept and reported with path and reason', async ()
     const out: Result = await status(f, 'dirty-leaf');
     expect(out.stdout).toContain(worktree);
     expect(out.stdout).toContain('uncommitted');
+    const board: Result = await cli(f, ['status'], f.root, f.env);
+    expect(board.code).toBe(0);
+    expect(board.stdout).not.toContain('Kept by last cleanup');
     const plain: Result = await cli(f, ['leftovers'], f.root, f.env);
     expect(plain.code).toBe(0);
     expect(plain.stdout).toContain(`  uncommitted changes\n    ${worktree.replace(f.home, '~')}`);
@@ -196,18 +228,21 @@ test('worktree with a live pane inside is kept and reported', async () => {
   }
 });
 
-test('an unknown directory inside the store is reported, never removed', async () => {
+// A stray entry in the store is unowned: kept while a leaf of the repo runs,
+// removed once the repo is idle.
+test('an unowned directory inside the store is kept while a leaf runs, removed once idle', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    await dispatchLeaf(f, 'seed-leaf');
+    const path: string = await dispatchLeaf(f, 'seed-leaf');
     const stray: string = resolve(storeDir(f), 'not-a-leaf');
     mkdirSync(stray, { recursive: true });
     writeFileSync(resolve(stray, 'file'), 'x');
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(stray)).toBe(true);
-    const out: Result = await status(f, 'seed-leaf');
-    expect(out.stdout).toContain(stray);
-    expect(out.stdout).toContain('unknown');
+    closeTab(f, readState(path).tab!);
+    saveState(path, { ...readState(path), phase: 'merged' });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(stray)).toBe(false);
   } finally {
     f.clean();
   }
@@ -451,7 +486,7 @@ test('unconfirmed verify worktrees are removed once the run ends', async () => {
 test('store variants are kept as unmanaged through live, unavailable and absent panes', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    await dispatchLeaf(f, 'variant-holder');
+    const path: string = await dispatchLeaf(f, 'variant-holder');
     const variant: string = resolve(storeDir(f), 'variant-holder-v0');
     await command(['git', 'worktree', 'add', '--detach', variant], f.root);
     const db: Database = database(f);
@@ -468,9 +503,14 @@ test('store variants are kept as unmanaged through live, unavailable and absent 
     expect(existsSync(variant)).toBe(true);
     expect((await status(f, 'variant-holder')).stdout).toContain('unmanaged worktree');
     saveDatabase(f, { ...db, panes: db.panes });
+    closeTab(f, readState(path).tab!);
+    saveState(path, { ...readState(path), phase: 'merged' });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(variant)).toBe(true);
     expect((await status(f, 'variant-holder')).stdout).toContain('unmanaged worktree');
+    expect(keptReport(f).some((entry) => entry.path === variant && entry.reason === 'unmanaged worktree')).toBe(
+      true,
+    );
   } finally {
     f.clean();
   }
@@ -526,6 +566,9 @@ test('targeted next keeps unused registered variants', async () => {
     expect((await next(f, ['typed-holder'])).code).toBe(0);
     expect(existsSync(variant)).toBe(true);
     expect((await status(f, 'typed-holder')).stdout).toContain('unmanaged worktree');
+    expect(keptReport(f).some((entry) => entry.path === variant && entry.reason === 'unmanaged worktree')).toBe(
+      true,
+    );
   } finally {
     f.clean();
   }
@@ -869,6 +912,263 @@ test('configured destination store migrates a clean old managed worktree', async
     expect(readState(path).worktree).toBeUndefined();
     expect((await next(f, ['configured-migration'])).code).toBe(0);
     expect(readState(path).worktree).toBe(resolve(storeDir(f), 'configured-migration'));
+  } finally {
+    f.clean();
+  }
+});
+
+// store-sweep criterion 1: with no running leaf a pass deletes unregistered
+// and stray junk in the store, the legacy root and the leaf temp tree.
+test('unregistered and stray entries are deleted when no leaf of the repo runs', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'gone-leaf', 'merged');
+    leaf(f, 'lost-leaf', 'failed', {
+      failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'test' },
+    });
+    const legacy: string = resolve(f.root, 'issues/worktrees');
+    const temp: string = repoTempDir(f);
+    for (const root of [storeDir(f), legacy]) {
+      mkdirSync(resolve(root, 'junk'), { recursive: true });
+      writeFileSync(resolve(root, 'junk', 'file'), 'x');
+      symlinkSync(resolve(f.home, 'gone-target'), resolve(root, 'old-link'));
+      writeFileSync(resolve(root, 'stray.txt'), 'x');
+    }
+    mkdirSync(resolve(temp, 'gone-leaf-tmp'), { recursive: true });
+    const runDead: string = mkdtempSync(resolve(temp, 'run-'));
+    writeFileSync(resolve(runDead, '.owner'), ownerRecord(4194303));
+    writeFileSync(resolve(temp, 'stray.file'), 'x');
+    mkdirSync(resolve(temp, 'wrench.42.tmp'));
+    mkdirSync(resolve(temp, 'other.abc'));
+    expect((await next(f, ['--all'])).code).toBe(0);
+    for (const root of [storeDir(f), legacy]) {
+      expect(existsSync(resolve(root, 'junk'))).toBe(false);
+      expect(existsSync(resolve(root, 'old-link'))).toBe(false);
+      expect(existsSync(resolve(root, 'stray.txt'))).toBe(false);
+    }
+    expect(existsSync(runDead)).toBe(false);
+    // The repo-hash dir emptied after sweeping its children.
+    expect(existsSync(temp)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+// store-sweep criterion 3: entries tied to a running leaf stay; a finished
+// owner loses its unregistered leaf-named entries.
+test('a running leaf keeps its temp, its slug entries and unowned entries', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = await dispatchLeaf(f, 'guard-leaf');
+    const store: string = storeDir(f);
+    mkdirSync(resolve(store, 'guard-leaf-old'), { recursive: true });
+    writeFileSync(resolve(store, 'stray.txt'), 'x');
+    const temp: string = repoTempDir(f);
+    mkdirSync(resolve(temp, 'guard-tmp'), { recursive: true });
+    writeFileSync(resolve(temp, 'guard-tmp', 'x'), 'x');
+    expect((await next(f, ['--all'])).code).toBe(0);
+    for (const item of ['guard-leaf-old', 'stray.txt']) expect(existsSync(resolve(store, item))).toBe(true);
+    expect(existsSync(resolve(temp, 'guard-tmp'))).toBe(true);
+    closeTab(f, readState(path).tab!);
+    saveState(path, { ...readState(path), phase: 'merged' });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(resolve(store, 'guard-leaf-old'))).toBe(false);
+    expect(existsSync(resolve(store, 'stray.txt'))).toBe(false);
+    expect(existsSync(temp)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+// store-sweep criterion 4: live owner records protect their items even with
+// the leaf done, the enclosing dir a candidate and a missing tab.
+test('live owners keep run dirs and build records; a young ownerless run dir stays', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
+  try {
+    const path: string = await dispatchLeaf(f, 'owner-leaf');
+    const scratch: string = scratchFor(f, 'owner-leaf');
+    closeTab(f, readState(path).tab!);
+    saveState(path, { ...readState(path), phase: 'merged' });
+    const runLive: string = mkdtempSync(resolve(scratch, 'run-'));
+    writeFileSync(resolve(runLive, '.owner'), ownerRecord(child.pid));
+    const runYoung: string = mkdtempSync(resolve(scratch, 'run-'));
+    const runDead: string = mkdtempSync(resolve(scratch, 'run-'));
+    writeFileSync(resolve(runDead, '.owner'), ownerRecord(4194303));
+    const orphan: string = resolve(storeDir(f), 'batch-gone.owner');
+    writeFileSync(orphan, ownerRecord(child.pid));
+    expect((await next(f, ['--all'])).code).toBe(0);
+    // The live-owner run keeps the leaf temp alive too.
+    expect(existsSync(scratch)).toBe(true);
+    expect(existsSync(runLive)).toBe(true);
+    expect(existsSync(runYoung)).toBe(true);
+    expect(existsSync(runDead)).toBe(false);
+    expect(existsSync(orphan)).toBe(true);
+    const kept: { path: string; reason: string }[] = keptReport(f);
+    expect(kept.some((entry) => entry.path === orphan)).toBe(true);
+  } finally {
+    child.kill('SIGKILL');
+    await child.exited;
+    f.clean();
+  }
+});
+
+// store-sweep criteria 5 and 6: a dead-owner run dir goes on every pass, even
+// while the leaf is active and the pane list is unavailable; everything else
+// stays under an unavailable pane list. The leaf is called in its temp dir so
+// the sweep sees an active leaf without dispatching it.
+test('a dead-owner run dir is removed under an unavailable pane list, strays stay', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = await dispatchLeaf(f, 'active-leaf');
+    const scratch: string = scratchFor(f, 'active-leaf');
+    const runDead: string = mkdtempSync(resolve(scratch, 'run-'));
+    writeFileSync(resolve(runDead, '.owner'), ownerRecord(4194303));
+    const strayFile: string = resolve(scratch, 'old.log');
+    writeFileSync(strayFile, 'x');
+    const orphan: string = resolve(storeDir(f), 'batch-held.owner');
+    writeFileSync(orphan, ownerRecord(4194303));
+    writeFileSync(resolve(storeDir(f), 'stray.txt'), 'x');
+    expect(readState(path).phase).toBe('plan.synthesis');
+    saveDatabase(f, { ...database(f), paneListStdout: 'unavailable' });
+    // Reconcile in a subprocess with the fixture env: live === null is the
+    // unavailable pane list.
+    const src = (name: string): string => JSON.stringify(resolve(import.meta.dir, `../src/${name}.ts`));
+    const pass: SpawnResult = await spawnCaptured(
+      [
+        process.execPath,
+        '-e',
+        `const {reconcile}=await import(${src('reconcile')});const {allLeaves}=await import(${src('state')});const {readRepo}=await import(${src('config')});const r=readRepo('repo',process.cwd());const out=await reconcile(r,allLeaves(r),null);console.log(JSON.stringify(out));`,
+      ],
+      {
+        cwd: f.root,
+        env: {
+          ...process.env,
+          ...f.env,
+          AKROGON_HOME: f.home,
+          HOME: f.home,
+          HERDR_PANE_ID: '',
+          AKROGON_RUN: '',
+          AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+        },
+      },
+    );
+    expect(pass.code).toBe(0);
+    const { removed, kept } = z
+      .object({
+        removed: z.array(z.string()),
+        kept: z.array(z.object({ path: z.string(), reason: z.string() })),
+      })
+      .parse(JSON.parse(pass.stdout.trim().split('\n').at(-1)!));
+    expect(removed).toContain(runDead);
+    expect(removed).not.toContain(orphan);
+    expect(removed).not.toContain(resolve(storeDir(f), 'stray.txt'));
+    expect(existsSync(runDead)).toBe(false);
+    expect(existsSync(strayFile)).toBe(true);
+    expect(existsSync(orphan)).toBe(true);
+    expect(existsSync(resolve(storeDir(f), 'stray.txt'))).toBe(true);
+    expect(kept.some((entry) => entry.path === orphan)).toBe(true);
+    expect(kept.some((entry) => entry.path === resolve(storeDir(f), 'stray.txt'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+// store-sweep criterion 6: an unowned item with a live pane or a surviving
+// process inside stays, recorded with the pane or pid.
+test('unowned entries stay while a pane or process sits inside', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
+  try {
+    const path: string = await dispatchLeaf(f, 'idle-leaf');
+    closeTab(f, readState(path).tab!);
+    saveState(path, { ...readState(path), phase: 'merged' });
+    const junkFree: string = resolve(storeDir(f), 'junk-free');
+    const junkPane: string = resolve(storeDir(f), 'junk-pane');
+    const junkProc: string = resolve(storeDir(f), 'junk-proc');
+    for (const dir of [junkFree, junkPane, junkProc]) {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(resolve(dir, 'x'), 'x');
+    }
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      panes: [
+        ...db.panes,
+        { pane_id: 'w1:p700', tab_id: 'w1:t700', cwd: junkPane, agent: null, agent_status: 'idle' },
+      ],
+    });
+    const procDir: string = resolve(procRoot(f), String(child.pid));
+    mkdirSync(resolve(procDir, 'fd'), { recursive: true });
+    symlinkSync(junkProc, resolve(procDir, 'cwd'));
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(junkFree)).toBe(false);
+    expect(existsSync(junkPane)).toBe(true);
+    expect(existsSync(junkProc)).toBe(true);
+    const kept: { path: string; reason: string }[] = keptReport(f);
+    expect(kept.some((entry) => entry.path === junkPane && entry.reason === 'live pane inside')).toBe(true);
+    expect(kept.some((entry) => entry.path === junkProc && entry.reason.includes(String(child.pid)))).toBe(true);
+  } finally {
+    child.kill('SIGKILL');
+    await child.exited;
+    f.clean();
+  }
+});
+
+// store-sweep criterion 7: a registered worktree matching no leaf or scratch
+// kind is kept and listed, never removed — a locked one doubly so.
+test('unknown registered worktrees are kept unmanaged; locked ones are never removed', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const mystery: string = resolve(storeDir(f), 'mystery');
+    await command(['git', 'worktree', 'add', '--detach', mystery], f.root);
+    const locked: string = resolve(storeDir(f), 'locked');
+    await command(['git', 'worktree', 'add', '--detach', '--lock', locked], f.root);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(mystery)).toBe(true);
+    expect(existsSync(locked)).toBe(true);
+    const kept: { path: string; reason: string }[] = keptReport(f);
+    expect(kept.some((entry) => entry.path === mystery)).toBe(true);
+    await command(['git', 'worktree', 'unlock', locked], f.root);
+  } finally {
+    f.clean();
+  }
+});
+
+// store-sweep criterion 9: a deletion that fails is reported with path and
+// error, and nothing absent from disk is claimed removed.
+test('a failed delete is reported with path and error and the item remains', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'gone-leaf', 'merged');
+    mkdirSync(storeDir(f), { recursive: true });
+    const junk: string = resolve(storeDir(f), 'junk');
+    mkdirSync(junk, { recursive: true });
+    writeFileSync(resolve(junk, 'x'), 'x');
+    chmodSync(storeDir(f), 0o555);
+    try {
+      expect((await next(f, ['--all'])).code).toBe(0);
+    } finally {
+      chmodSync(storeDir(f), 0o755);
+    }
+    expect(existsSync(junk)).toBe(true);
+    const kept: { path: string; reason: string }[] = keptReport(f);
+    expect(kept.some((entry) => entry.path === junk && entry.reason.includes('delete failed'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+// store-sweep criterion 10: a pass whose only candidate is a new kind fetches
+// the pane list rather than judging it with an empty one.
+test('a stray-file-only pass fetches the pane list before deleting', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    mkdirSync(storeDir(f), { recursive: true });
+    writeFileSync(resolve(storeDir(f), 'stray.txt'), 'x');
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(calls(f).some((args) => args[0] === 'pane' && args[1] === 'list')).toBe(true);
+    expect(existsSync(resolve(storeDir(f), 'stray.txt'))).toBe(false);
   } finally {
     f.clean();
   }

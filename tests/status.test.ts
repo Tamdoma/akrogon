@@ -204,7 +204,7 @@ for (const directory of ['missing', 'empty']) {
   });
 }
 
-test('leftovers lists kept paths by reason per repo and kept units, skips missing paths and in-use work, and writes nothing', async () => {
+test('leftovers lists kept paths by reason and host items, skips missing paths and in-use work, and writes nothing', async () => {
   const f: Fixture = await fixture();
   try {
     const keptDir: string = registerTemp(resolve(f.home, 'kept-worktree'));
@@ -237,19 +237,39 @@ test('leftovers lists kept paths by reason per repo and kept units, skips missin
           { path: 'akrogon-lrun.slice', reason: 'live run record' },
           { path: 'akrogon-ltab.slice', reason: 'live tab' },
           { path: 'akrogon-lpanes.slice', reason: 'pane list unavailable' },
+          { path: resolve(f.home, 'host-gone'), reason: 'retired' },
+          { path: resolve(f.home, 'host-junk'), reason: 'retired' },
         ],
       }) + '\n',
     );
+    mkdirSync(resolve(f.home, 'host-junk'), { recursive: true });
     const before: Record<string, string> = snapshot(f.home);
     const result: Result = await cli(f, ['leftovers'], f.home);
     expect(result.code).toBe(0);
     expect(result.stdout).toBe(
-      'repo\n  uncommitted changes\n    ~/kept-worktree\n\nsystemd units\n  pane list unavailable\n    akrogon-lpanes.slice\n  process inside\n    akrogon-lstray.slice',
+      'repo\n' +
+        '  uncommitted changes\n' +
+        '    ~/kept-worktree\n\n' +
+        'host\n' +
+        '  pane list unavailable\n' +
+        '    akrogon-lpanes.slice\n' +
+        '  process inside\n' +
+        '    akrogon-lstray.slice\n' +
+        '  retired\n' +
+        '    ~/host-junk',
     );
     const board: Result = await cli(f, ['status'], f.home);
     expect(board.code).toBe(0);
     expect(board.stdout).toBe('repo\n  no open leaves');
     expect(snapshot(f.home)).toEqual(before);
+    // Host items still list with zero registered repos.
+    const global: object = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: {} });
+    const empty: Result = await cli(f, ['leftovers'], f.home);
+    expect(empty.code).toBe(0);
+    expect(empty.stdout).toContain('host');
+    expect(empty.stdout).toContain('akrogon-lstray.slice');
+    expect(empty.stdout).not.toContain('repo\n');
   } finally {
     f.clean();
   }
