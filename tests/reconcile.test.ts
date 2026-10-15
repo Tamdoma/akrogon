@@ -444,7 +444,11 @@ test('unconfirmed verify worktrees are removed once the run ends', async () => {
   }
 });
 
-test('store variants survive live or unavailable pane inventories', async () => {
+// DC1: a registered store worktree that is no leaf slug and no scratch kind is
+// unmanaged; it stays whether a pane sits inside, the pane list is down or no
+// pane is anywhere near it. Rewritten under worktree-keep-rule: the old sweep
+// removed it, which is the #94 deletion this leaf ends.
+test('store variants are kept as unmanaged through live, unavailable and absent panes', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     await dispatchLeaf(f, 'variant-holder');
@@ -458,14 +462,15 @@ test('store variants survive live or unavailable pane inventories', async () => 
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(variant)).toBe(true);
     expect((await status(f, 'variant-holder')).stdout).toContain(variant);
-    expect((await status(f, 'variant-holder')).stdout).toContain('live pane inside');
+    expect((await status(f, 'variant-holder')).stdout).toContain('unmanaged worktree');
     saveDatabase(f, { ...database(f), paneListStdout: 'unavailable' });
     await next(f, ['--all']);
     expect(existsSync(variant)).toBe(true);
-    expect((await status(f, 'variant-holder')).stdout).toContain('pane list unavailable');
+    expect((await status(f, 'variant-holder')).stdout).toContain('unmanaged worktree');
     saveDatabase(f, { ...db, panes: db.panes });
     expect((await next(f, ['--all'])).code).toBe(0);
-    expect(existsSync(variant)).toBe(false);
+    expect(existsSync(variant)).toBe(true);
+    expect((await status(f, 'variant-holder')).stdout).toContain('unmanaged worktree');
   } finally {
     f.clean();
   }
@@ -509,14 +514,18 @@ test('failed leaf scratch preserves an actual running verify command', async () 
   }
 });
 
-test('targeted next sweeps unused registered variants', async () => {
+// DC1: a targeted next pass reconciles too; a registered variant is kept as
+// unmanaged. Rewritten under worktree-keep-rule — the sweep this pinned is the
+// deletion rule the brief ends.
+test('targeted next keeps unused registered variants', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     await dispatchLeaf(f, 'typed-holder');
     const variant: string = resolve(storeDir(f), 'typed-holder-v1');
     await command(['git', 'worktree', 'add', '--detach', variant], f.root);
     expect((await next(f, ['typed-holder'])).code).toBe(0);
-    expect(existsSync(variant)).toBe(false);
+    expect(existsSync(variant)).toBe(true);
+    expect((await status(f, 'typed-holder')).stdout).toContain('unmanaged worktree');
   } finally {
     f.clean();
   }
