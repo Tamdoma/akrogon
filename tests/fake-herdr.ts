@@ -8,7 +8,20 @@ import { OUTSIDE_CGROUP, boxedCgroup, expectedScope, expectedSlice, procDir, see
 const rectSchema = z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() });
 type Rect = z.infer<typeof rectSchema>;
 const ROOT_RECT: Rect = { x: 0, y: 0, width: 120, height: 40 };
-const fakePaneSchema = paneSchema.extend({ rect: rectSchema.optional(), focused: z.boolean().optional() });
+const fakePaneSchema = paneSchema.extend({
+  rect: rectSchema.optional(),
+  focused: z.boolean().optional(),
+  screen_detection_skipped: z.boolean().nullable().optional(),
+  agent_session: z
+    .object({
+      kind: z.enum(['id', 'path']),
+      value: z.string(),
+      source: z.string().optional(),
+      agent: z.string().optional(),
+    })
+    .nullable()
+    .optional(),
+});
 type FakePane = z.infer<typeof fakePaneSchema>;
 const fakeTabSchema = tabSchema.extend({
   focused: z.boolean().optional(),
@@ -20,10 +33,15 @@ const scriptEntrySchema = z.object({
   message: z.string().optional(),
   stderr: z.string().optional(),
   append: z.string().optional(),
+  appendTo: z.string().optional(),
 });
 const waitEntrySchema = scriptEntrySchema.extend({
   status: paneSchema.shape.agent_status.optional(),
   sleepMs: z.number().optional(),
+  session: z.string().nullable().optional(),
+  kind: z.string().optional(),
+  dropAgent: z.boolean().optional(),
+  screenSkipped: z.boolean().nullable().optional(),
 });
 const databaseSchema = z.object({
   panes: z.array(fakePaneSchema),
@@ -232,8 +250,10 @@ if (args[0] === 'agent' && args[1] === 'prompt') {
   if (flag('--until') !== 'working' || !args.includes('--wait') || flag('--timeout') !== '5000')
     throw new Error('Wrong prompt wait contract');
   const scripted = db.promptScript.shift();
-  if (scripted?.append !== undefined && target.agent_session?.kind === 'path') {
-    appendFileSync(target.agent_session.value, scripted.append);
+  if (scripted?.append !== undefined) {
+    const target_path: string | undefined =
+      scripted.appendTo ?? (target.agent_session?.kind === 'path' ? target.agent_session.value : undefined);
+    if (target_path !== undefined) appendFileSync(target_path, scripted.append);
   }
   scriptedFailure(scripted);
   db.prompts.push({ pane: target.pane_id, text: args[3] });
@@ -248,7 +268,20 @@ if (args[0] === 'agent' && args[1] === 'wait') {
   const sleepMs: number =
     entry?.sleepMs ?? (entry === undefined && target.agent_status === 'working' ? Number(flag('--timeout')) : 0);
   if (sleepMs > 0) Bun.sleepSync(sleepMs);
-  if (entry?.append !== undefined) appendFileSync(entry.append, `${target.pane_id}\n`);
+  if (entry?.append !== undefined) appendFileSync(entry.appendTo ?? entry.append, `${target.pane_id}\n`);
+  if (entry !== undefined) {
+    if (entry.status !== undefined) target.agent_status = entry.status;
+    if (entry.kind !== undefined) target.agent = entry.kind;
+    if (entry.session !== undefined)
+      target.agent_session =
+        entry.session === null ? null : { kind: 'id', value: entry.session, source: target.agent_session?.source };
+    if (entry.screenSkipped !== undefined) target.screen_detection_skipped = entry.screenSkipped;
+    if (entry.dropAgent === true) {
+      target.agent = null;
+      target.agent_session = null;
+      target.agent_status = 'unknown';
+    }
+  }
   scriptedFailure(entry);
   if (entry?.status !== undefined) result({ agent: { ...target, agent_status: entry.status } });
   const untils: string[] = args.flatMap((a, i) => (a === '--until' ? [args[i + 1]] : []));
@@ -269,7 +302,17 @@ if (args[0] === 'agent' && args[1] === 'list') {
     agents: db.panes.flatMap((p) =>
       p.agent === null
         ? []
-        : [{ pane_id: p.pane_id, agent: p.agent, ...(p.agent_session ? { agent_session: p.agent_session } : {}) }],
+        : [
+            {
+              pane_id: p.pane_id,
+              agent: p.agent,
+              agent_status: p.agent_status,
+              ...(p.agent_session ? { agent_session: p.agent_session } : {}),
+              ...(p.screen_detection_skipped !== undefined
+                ? { screen_detection_skipped: p.screen_detection_skipped }
+                : {}),
+            },
+          ],
     ),
   });
 }
