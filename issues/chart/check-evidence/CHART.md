@@ -23,6 +23,7 @@ none
 
 ## Pending steps
 - Migrate akrogon, then framework, per [existing-backlog](forks/existing-backlog.md) Taken item 7, once the leaf delivering `akrogon pack` for closed owners is merged and installed. Owner: the door.
+  - akrogon done 2026-10-16: `.gitignore` 9a4c7a4 (init's issues/config.yaml normalization discarded, not committed); 34 folders packed, status lists none; flaky output unchanged; 29 closed owners each read back one tracked log through `akrogon log` equal to `git show HEAD`, plus one chart-direct log; 9 system-speed scraps deleted; archives 8c99509. Framework waits: its chart door is active on the framework main checkout, and item 7 needs no other door writing meanwhile.
 - After both migrations verify, run `akrogon close Tamdoma/akrogon#92 --by "check-evidence leaves and migration <akrogon sha>, <framework sha>"`. Owner: the door. Check: `gh issue view 92 -R Tamdoma/akrogon --json state` prints CLOSED.
 
 Handed off 2026-10-15

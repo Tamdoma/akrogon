@@ -16,7 +16,11 @@ Note for review: the design consumes `akrogon leftovers` as landed by kept-statu
 - D2. Leaf temp sweep extends today's `scratchRoot` (`<root>/<repoHash>`) block:
   - `run-*` inside any leaf dir: unchanged rules plus a `run-*` dir with **no** `.owner` younger than 60 s is kept as `run younger than 60s` (the mkdtemp→`.owner` write gap); an older ownerless `run-*` is an unowned entry deleted under D5 vetoes. Dead-owner `run-*` dirs are still deleted unconditionally, without consulting `live` (criteria 4, 5).
   - Stray entries inside a known leaf's temp dir belong to the leaf: kept silently while the leaf is active; removed with the temp when the leaf's temp rule fires.
-  - Finished-leaf temp removal gains the slice check: `leafTemp` goes when the leaf is `merged`/`failed`, tab gone, no pane inside, **and its slice holds no running unit** — read as `loaded.has(leafSlice)` && `sliceHasProcess` from the slice-step inventory (D7). An unavailable slice inventory keeps the temp. `kept.length === keptBefore` still gates the removal.
+  - Finished-leaf temp removal gains the slice check: `leafTemp` goes when the leaf is `merged`/`failed`, tab gone, no pane inside, **and its slice holds no running unit** — read as `loaded.has(leafSlice)` && `sliceHasProcess` from the slice-step inventory (D7). `kept.length === keptBefore` still gates the removal.
+
+## Implementation notes
+
+- 2026-10-16 (U1 worker, recorded by A): `loaded === null` (no user systemd manager reachable, the fixture reality) removes the finished temp rather than keeping it. Rationale: `null` conflates "manager missing" with "inventory unreadable", and keeping would regress the existing `a failed leaf temp stays while its tab lives` family whose fixture has no manager. Refines D2's "unavailable slice inventory keeps the temp" to "a loaded busy slice keeps the temp".
   - Stray entries directly under the repo-hash dir (stray files, `.tmp*` dirs, unknown dirs): unowned; deleted when the repo is idle under D5.
   - After children are swept, a repo-hash dir left empty is removed (covers the F1 empty-repo-dir junk). Repo dirs for repos no longer registered are host items (D6).
   - `checkout`/`self-update` leaf dirs are akrogon's own: kept while holding a live-owner `run-*`, a registered worktree or a live process; deleted as unowned when the repo is idle.
@@ -110,6 +114,8 @@ All proofs run through `akrogon run-check --name <label> -- <cmd>`; commands use
 | 1/6 (slice) | Finished temp kept while slice busy | `merged` leaf temp + fake-systemctl loaded slice with `cgroup.procs` populated → kept; emptied → next pass removes | folded into sweep-c2 test file: `akrogon run-check --name sweep-c2b -- bun test tests/leaf-slices.test.ts -t 'slice holds a running unit'` | seconds | `src/reconcile.ts` |
 
 Suite checks `format`, `test`, `typecheck` run through `akrogon verify` at implement end; no criterion names a whole run.
+
+- 2026-10-16 (A, worker mismatch M1): two planned-test corrections landed in `aa2a072`: `repoTempDir()`/busy-temp `leafTemp()` resolved under the suite's env root while `cli()` children use `leafTempRoot(f)` — corrected to hash under `leafTempRoot(f)`; `lost-leaf` seeds a dead `tab` so the `src/next.ts:786` failed-leaf recovery guard lets `next --all` exit 0. Expectations unchanged.
 
 ## Red evidence (recorded at plan.synthesis via `akrogon run-check`)
 
