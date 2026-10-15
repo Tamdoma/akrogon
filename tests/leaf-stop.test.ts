@@ -43,7 +43,11 @@ function saveDatabase(f: StopFixture, db: Database): void {
 }
 
 function systemctlCalls(f: StopFixture): string[] {
-  return existsSync(f.systemctlLog) ? readFileSync(f.systemctlLog, 'utf8').trim().split('\n').filter(Boolean) : [];
+  // Reconcile also calls the fake (list-units, reset-failed); only stop calls
+  // prove the leaf's slice was stopped.
+  return existsSync(f.systemctlLog)
+    ? readFileSync(f.systemctlLog, 'utf8').trim().split('\n').filter((line) => line.includes(' stop '))
+    : [];
 }
 
 function stoppedKeys(f: StopFixture): string[] {
