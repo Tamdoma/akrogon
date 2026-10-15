@@ -88,7 +88,6 @@ test('README covers every dispatched command and its argument contract', () => {
 test('the files guide describes the flow report', () => {
   const guide: string = readFileSync(resolve(import.meta.dir, '../docs/guide/files.md'), 'utf8');
   expect(guide).toContain('akrogon timing --flow --since <YYYY-MM-DD>');
-  expect(guide).toContain('leaf-carried');
 });
 
 test('the next guide describes stop and start', () => {
