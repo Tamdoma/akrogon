@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { readRepo, type Repo } from '../src/config';
 import { flakyLines } from '../src/flaky';
 import { type VerifyRun } from '../src/verify';
@@ -36,13 +36,13 @@ test('flaky lists a command red then green on the same tree by failed test, and 
   const f: Fixture = await fixture();
   try {
     const repo: Repo = readRepo('repo', f.root);
-    const redLog: string = resolve(f.root, 'issues/open/leaf/red.log');
-    mkdirSync(resolve(f.root, 'issues/open/leaf'), { recursive: true });
+    const redLog: string = resolve(f.root, 'issues/open/issue/leaf/red.log');
+    mkdirSync(resolve(f.root, 'issues/open/issue/leaf'), { recursive: true });
     writeFileSync(
       redLog,
       'test:owner | (pass) fine [1.00ms]\ntest:owner | (fail) browser owner > dies with run [5012.00ms]\n',
     );
-    const green: string = resolve(f.root, 'issues/open/leaf/green.log');
+    const green: string = resolve(f.root, 'issues/open/issue/leaf/green.log');
     const steps: Step[] = [
       // Listed: red then green on tree A, recorded out of order so only end time orders them.
       { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
@@ -87,7 +87,7 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
     expect((await flakyLines(repo, flip.map(run))).sort((a, b) => a.test.localeCompare(b.test))).toEqual(names);
 
     rmSync(log);
-    await packEvidence(dir, { 'check-test.log': content });
+    await packEvidence(dirname(dir), { 'leaf/check-test.log': content });
     expect((await flakyLines(repo, flip.map(run))).sort((a, b) => a.test.localeCompare(b.test))).toEqual(names);
 
     const gone: Step[] = [
@@ -95,7 +95,7 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
         tree: 'A',
         command: 'bun test',
         exit: 1,
-        log: resolve(f.root, 'issues/open/none/x.log'),
+        log: resolve(f.root, 'issues/open/none/leaf/x.log'),
         end: '2026-10-14T01:00:00.000Z',
       },
       { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
@@ -112,7 +112,7 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
         tree: 'A',
         command: 'bun test',
         exit: 1,
-        log: resolve(f.root, 'issues/open/bad/check.log'),
+        log: resolve(f.root, 'issues/open/bad/leaf/check.log'),
         end: '2026-10-14T01:00:00.000Z',
       },
       { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
@@ -126,7 +126,7 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
         tree: 'A',
         command: 'bun test',
         exit: 1,
-        log: resolve(f.root, 'issues/open/present/check.log'),
+        log: resolve(f.root, 'issues/open/present/leaf/check.log'),
         end: '2026-10-14T01:00:00.000Z',
       },
       { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },

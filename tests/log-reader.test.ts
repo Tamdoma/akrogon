@@ -43,12 +43,13 @@ test('log prints plain log bytes from any checkout path form', async (): Promise
     writeLog(nested);
     const wt: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', wt, '-b', 'wt-branch'], f.root);
+    const rel: string = 'issues/open/issue/owner/check-1.log';
     const cases: [string, string][] = [
       [file, f.root],
-      [resolve(wt, 'issues/open/owner/check-1.log'), f.root],
-      ['issues/open/owner/check-1.log', f.root],
+      [resolve(wt, rel), f.root],
+      [rel, f.root],
       ['check-1.log', dir],
-      [resolve(f.root, 'issues/open/owner/issues/chart/c/direct/nested/issues/check-x.log'), f.root],
+      [resolve(f.root, 'issues/open/issue/owner/issues/chart/c/direct/nested/issues/check-x.log'), f.root],
     ];
     for (const [arg, cwd] of cases) {
       const run = await logRun(f, arg, cwd);
@@ -65,17 +66,17 @@ test('log reads the member of evidence.tar.zst for closed, parked and chart owne
   try {
     const openDir: string = leaf(f, 'owner', 'merge');
     writeLog(resolve(openDir, 'check-a.log'));
-    const closedDir: string = resolve(f.root, 'issues/closed/owner');
     mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
-    renameSync(openDir, closedDir);
-    await packEvidence(closedDir, { 'check-a.log': BYTES });
-    rmSync(resolve(closedDir, 'check-a.log'));
+    renameSync(resolve(f.root, 'issues/open/issue'), resolve(f.root, 'issues/closed/issue'));
+    const closedDir: string = resolve(f.root, 'issues/closed/issue');
+    await packEvidence(closedDir, { 'owner/check-a.log': BYTES });
+    rmSync(resolve(closedDir, 'owner/check-a.log'));
     const parkedDir: string = resolve(f.root, 'issues/parked/rested');
     await packEvidence(parkedDir, { 'nested/b.log': BYTES });
     const directDir: string = resolve(f.root, 'issues/chart/big/direct');
     await packEvidence(directDir, { 'check-v.log': BYTES });
     const cases: string[] = [
-      'issues/open/owner/check-a.log',
+      'issues/open/issue/owner/check-a.log',
       'issues/parked/rested/nested/b.log',
       'issues/chart/big/direct/check-v.log',
     ];
@@ -102,9 +103,9 @@ test('log resolves against every registered repo outside one and names matches o
     global.repos.repo2 = second;
     writeFileSync(resolve(f.home, 'config.yaml'), Bun.YAML.stringify(global));
 
-    const onlySecond: string = resolve(second, 'issues/open/owner2/only.log');
+    const onlySecond: string = resolve(second, 'issues/open/owner2/leaf/only.log');
     writeLog(onlySecond);
-    const shared: string = 'issues/open/shared/check.log';
+    const shared: string = 'issues/open/shared/leaf/check.log';
     writeLog(resolve(f.root, shared), Buffer.from('first'));
     writeLog(resolve(second, shared), Buffer.from('second'));
     const broken: string = resolve(f.root, 'issues/open/bad/evidence.tar.zst');
@@ -120,11 +121,11 @@ test('log resolves against every registered repo outside one and names matches o
     expect(ambiguous.stderr).toContain('repo');
     expect(ambiguous.stderr).toContain('repo2');
 
-    const missing: Awaited<ReturnType<typeof logRun>> = await logRun(f, 'issues/open/ghost/x.log', f.home);
+    const missing: Awaited<ReturnType<typeof logRun>> = await logRun(f, 'issues/open/ghost/leaf/x.log', f.home);
     expect(missing.code).not.toBe(0);
-    expect(missing.stderr).toContain('issues/open/ghost/x.log');
+    expect(missing.stderr).toContain('issues/open/ghost/leaf/x.log');
 
-    const corrupt: Awaited<ReturnType<typeof logRun>> = await logRun(f, 'issues/open/bad/check.log', f.home);
+    const corrupt: Awaited<ReturnType<typeof logRun>> = await logRun(f, 'issues/open/bad/leaf/check.log', f.home);
     expect(corrupt.code).not.toBe(0);
     expect(corrupt.stderr).toContain('issues/open/bad');
   } finally {
