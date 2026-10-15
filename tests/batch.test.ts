@@ -62,8 +62,30 @@ test.serial('stateSchema rejects unknown or missing-required batch fields', () =
     }),
   ).toThrow();
   expect(() => stateSchema.parse({ ...baseState, batch: { ...record, attempt: '' } })).toThrow();
-  expect(() => stateSchema.parse({ ...baseState, batch: { ...record, members: [] } })).toThrow();
+  const withMembers = stateSchema.parse({
+    ...baseState,
+    batch: {
+      ...record,
+      members: [{ slug: 'bb', base: 'sha0', head: 'shaB', tip: 'shaB' }],
+    },
+  });
+  expect(withMembers.batch?.members).toHaveLength(1);
+  expect(stateSchema.parse({ ...baseState, batch: { ...record, members: [] } }).batch?.members).toEqual([]);
+  expect(stateSchema.parse({ ...baseState, batch: record }).batch?.members).toEqual([]);
+  expect(() =>
+    stateSchema.parse({
+      ...baseState,
+      batch: { ...record, members: [{ slug: 'bb', base: 'sha0', head: 'shaB' }] },
+    }),
+  ).toThrow();
+  expect(() =>
+    stateSchema.parse({
+      ...baseState,
+      batch: { ...record, members: [{ slug: 'bb', base: 'sha0', head: 'shaB', tip: 'shaB', extra: 1 }] },
+    }),
+  ).toThrow();
   expect(() => stateSchema.parse({ ...baseState, batch: { ...record, solo: true } })).toThrow();
+  expect(() => stateSchema.parse({ ...baseState, batch: { ...record, excluded: ['bb'] } })).toThrow();
   expect(() => stateSchema.parse({ ...baseState, batch_limit: 2 })).toThrow();
   expect(() => stateSchema.parse({ ...baseState, batch: record, bogus: 1 })).toThrow();
   expect(() => stateSchema.parse({ ...baseState, solo: 'yes' })).toThrow();
