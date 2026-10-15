@@ -83,6 +83,19 @@ const IGNORE_LINES: readonly string[] = [
   'issues/chart/*/direct/**/*.log',
 ];
 
+test('run-check accepts an open owner with a closed namesake', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const open: string = leaf(f, 'fresh', 'implement');
+    mkdirSync(resolve(f.root, 'issues/closed/issue/old'), { recursive: true });
+    const result = await cli(f, ['run-check', '--leaf', open, '--', 'echo', 'fresh-output']);
+    expect(result.code, result.stderr).toBe(0);
+    expect(readdirSync(resolve(open, 'implementation')).some((name) => name.endsWith('.log'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
 test('completion packs every log into evidence.tar.zst and a logless owner gets no archive', async () => {
   const f: Fixture = await fixture();
   try {
