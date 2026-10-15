@@ -75,6 +75,10 @@ test('registered worktrees that are no leaf or scratch kind stay through both pa
     const out: Result = await status(f, 'keeper');
     expect(out.stdout).toContain(`Kept: ${manual} — unmanaged worktree`);
     expect(out.stdout).toContain(`Kept: ${legacy} — unmanaged worktree`);
+    const leftovers: Result = await cli(f, ['leftovers'], f.root, f.env);
+    expect(leftovers.stdout).toContain('unmanaged worktree');
+    expect(leftovers.stdout).toContain('manual-copy');
+    expect(leftovers.stdout).toContain('legacy-copy');
     // The tab_closed hook runs reconcile on the owner's repo; unmanaged names stay.
     const tab: string = readState(path).tab!;
     closeTab(f, tab);
@@ -123,6 +127,9 @@ test('locked worktrees stay whatever their name and report the lock reason', asy
     expect(out.stdout).toContain(`${batch} — locked worktree (held batch)`);
     expect(out.stdout).toContain(`${nonKind} — locked worktree (held copy)`);
     expect(out.stdout).toContain(`${lockedOwn} — locked worktree (held leaf)`);
+    const leftovers: Result = await cli(f, ['leftovers'], f.root, f.env);
+    for (const reason of ['held worker', 'held run', 'held batch', 'held copy', 'held leaf'])
+      expect(leftovers.stdout).toContain(reason);
     for (const wt of [worker, verify, batch]) await command(['git', 'worktree', 'unlock', wt], f.root);
     expect((await next(f, ['--all'])).code).toBe(0);
     for (const wt of [worker, verify, batch]) expect(existsSync(wt)).toBe(false);
