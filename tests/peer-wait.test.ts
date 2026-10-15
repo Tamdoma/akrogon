@@ -45,7 +45,10 @@ const seed = (kind: string, session: string | null = null): Exchange => ({
   turn: null,
 });
 
-function setup(panes: PaneSeed[], waitScript: (file: string, home: string) => WaitEntry[] = (): WaitEntry[] => []): Setup {
+function setup(
+  panes: PaneSeed[],
+  waitScript: (file: string, home: string) => WaitEntry[] = (): WaitEntry[] => [],
+): Setup {
   const dir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'peer-wait-')));
   const home: string = resolve(dir, 'home');
   mkdirSync(home);
@@ -63,12 +66,8 @@ function setup(panes: PaneSeed[], waitScript: (file: string, home: string) => Wa
         cwd: '/tmp',
         agent: p.agent,
         agent_status: p.agent_status,
-        ...(p.agent_session === undefined || p.agent_session === null
-          ? {}
-          : { agent_session: p.agent_session }),
-        ...(p.screen_detection_skipped === undefined
-          ? {}
-          : { screen_detection_skipped: p.screen_detection_skipped }),
+        ...(p.agent_session === undefined || p.agent_session === null ? {} : { agent_session: p.agent_session }),
+        ...(p.screen_detection_skipped === undefined ? {} : { screen_detection_skipped: p.screen_detection_skipped }),
       })),
       tabs: [],
       serial: 0,
@@ -99,7 +98,10 @@ function eventLine(type: string, turn: string): string {
 }
 
 function writeRollout(home: string, session: string, lines: string, variant = 0): string {
-  const path: string = resolve(home, `.codex/sessions/2026/10/16/rollout-2026-10-16T00-00-0${variant}-${session}.jsonl`);
+  const path: string = resolve(
+    home,
+    `.codex/sessions/2026/10/16/rollout-2026-10-16T00-00-0${variant}-${session}.jsonl`,
+  );
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, lines);
   return path;
@@ -124,7 +126,9 @@ function expectOutcome(
 }
 
 test('passes a non-timeout herdr failure through unchanged', async (): Promise<void> => {
-  const s: Setup = setup([{ agent: 'fake', agent_status: 'working' }], (): WaitEntry[] => [{ stderr: 'raw failure text' }]);
+  const s: Setup = setup([{ agent: 'fake', agent_status: 'working' }], (): WaitEntry[] => [
+    { stderr: 'raw failure text' },
+  ]);
   try {
     const result: RunResult = await s.run(pane, s.file, '10');
     expect(result).toEqual({ code: 1, stdout: '', stderr: 'raw failure text\n' });
@@ -139,7 +143,12 @@ test('blocked wins over a non-empty return file', async (): Promise<void> => {
     writeFileSync(s.file, 'peer reply\n');
     const result: RunResult = await s.run(pane, s.file, '10');
     expectOutcome(result, {
-      outcome: 'blocked', pane, file: s.file, status: 'blocked', signal: 'proven', exchange: seed('fake'),
+      outcome: 'blocked',
+      pane,
+      file: s.file,
+      status: 'blocked',
+      signal: 'proven',
+      exchange: seed('fake'),
     });
   } finally {
     s.clean();
@@ -147,11 +156,18 @@ test('blocked wins over a non-empty return file', async (): Promise<void> => {
 });
 
 test('done when the return file is written during a timed-out wait', async (): Promise<void> => {
-  const s: Setup = setup([{ agent: 'fake', agent_status: 'working' }], (file: string): WaitEntry[] => [{ append: file }]);
+  const s: Setup = setup([{ agent: 'fake', agent_status: 'working' }], (file: string): WaitEntry[] => [
+    { append: file },
+  ]);
   try {
     const result: RunResult = await s.run(pane, s.file, '10');
     expectOutcome(result, {
-      outcome: 'done', pane, file: s.file, status: null, signal: 'proven', exchange: seed('fake'),
+      outcome: 'done',
+      pane,
+      file: s.file,
+      status: null,
+      signal: 'proven',
+      exchange: seed('fake'),
     });
   } finally {
     s.clean();
@@ -165,7 +181,12 @@ test('done while herdr still reports working', async (): Promise<void> => {
   try {
     const result: RunResult = await s.run(pane, s.file, '10');
     expectOutcome(result, {
-      outcome: 'done', pane, file: s.file, status: 'working', signal: 'proven', exchange: seed('fake'),
+      outcome: 'done',
+      pane,
+      file: s.file,
+      status: 'working',
+      signal: 'proven',
+      exchange: seed('fake'),
     });
   } finally {
     s.clean();
@@ -178,7 +199,12 @@ test('unproven kind waits out the budget on idle', async (): Promise<void> => {
   try {
     const result: RunResult = await s.run(pane, s.file, '11');
     expectOutcome(result, {
-      outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'unproven', exchange: seed('fake'),
+      outcome: 'budget',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'unproven',
+      exchange: seed('fake'),
     });
   } finally {
     s.clean();
@@ -191,7 +217,12 @@ test('unproven kind waits out the budget on done with a 0-byte return file', asy
     writeFileSync(s.file, '');
     const result: RunResult = await s.run(pane, s.file, '11');
     expectOutcome(result, {
-      outcome: 'budget', pane, file: s.file, status: 'done', signal: 'unproven', exchange: seed('fake'),
+      outcome: 'budget',
+      pane,
+      file: s.file,
+      status: 'done',
+      signal: 'unproven',
+      exchange: seed('fake'),
     });
   } finally {
     s.clean();
@@ -206,7 +237,12 @@ test('unproven peer that answers during the grace ends done', async (): Promise<
   try {
     const result: RunResult = await s.run(pane, s.file, '12');
     expectOutcome(result, {
-      outcome: 'done', pane, file: s.file, status: 'idle', signal: 'proven', exchange: seed('fake'),
+      outcome: 'done',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'proven',
+      exchange: seed('fake'),
     });
   } finally {
     s.clean();
@@ -224,12 +260,21 @@ const piAuthority: PaneSeed = {
 test('pi peer fails on idle only while hook authority holds', async (): Promise<void> => {
   const s: Setup = setup([
     piAuthority,
-    { agent: 'codex', agent_status: 'idle', agent_session: { kind: 'id', value: 'c-sib', source: 'herdr:codex', agent: 'codex' }, screen_detection_skipped: null },
+    {
+      agent: 'codex',
+      agent_status: 'idle',
+      agent_session: { kind: 'id', value: 'c-sib', source: 'herdr:codex', agent: 'codex' },
+      screen_detection_skipped: null,
+    },
   ]);
   try {
     const result: RunResult = await s.run(pane, s.file, '12');
     expectOutcome(result, {
-      outcome: 'failure', pane, file: s.file, status: 'idle', signal: 'proven',
+      outcome: 'failure',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'proven',
       exchange: { kind: 'pi', session: '/tmp/s-pi.jsonl', boundary: null, turn: null },
     });
   } finally {
@@ -238,13 +283,14 @@ test('pi peer fails on idle only while hook authority holds', async (): Promise<
 });
 
 test.each<[string, PaneSeed]>([
-  [
-    'screen_detection_skipped null',
-    { ...piAuthority, screen_detection_skipped: null },
-  ],
+  ['screen_detection_skipped null', { ...piAuthority, screen_detection_skipped: null }],
   [
     'screen_detection_skipped absent',
-    { agent: 'pi', agent_status: 'idle', agent_session: { kind: 'path', value: '/tmp/s-pi.jsonl', source: 'herdr:pi', agent: 'pi' } },
+    {
+      agent: 'pi',
+      agent_status: 'idle',
+      agent_session: { kind: 'path', value: '/tmp/s-pi.jsonl', source: 'herdr:pi', agent: 'pi' },
+    },
   ],
   [
     'source not herdr:pi',
@@ -255,7 +301,11 @@ test.each<[string, PaneSeed]>([
   try {
     const result: RunResult = await s.run(pane, s.file, '11');
     expectOutcome(result, {
-      outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'unproven',
+      outcome: 'budget',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'unproven',
       exchange: { kind: 'pi', session: '/tmp/s-pi.jsonl', boundary: null, turn: null },
     });
   } finally {
@@ -275,14 +325,22 @@ const codexSession: string = 'session-codex-1';
 test('codex peer fails on its bound turn task_complete', async (): Promise<void> => {
   const s: Setup = setup([codexPane(codexSession)]);
   try {
-    const rollout: string = writeRollout(s.home, codexSession, eventLine('task_started', 'old-turn') + eventLine('task_complete', 'old-turn'));
+    const rollout: string = writeRollout(
+      s.home,
+      codexSession,
+      eventLine('task_started', 'old-turn') + eventLine('task_complete', 'old-turn'),
+    );
     const boundary: number = readFileSync(rollout, 'utf8').length;
     const exchange: Exchange = { kind: 'codex', session: codexSession, boundary, turn: null };
     const { appendFileSync } = await import('node:fs');
     appendFileSync(rollout, eventLine('task_started', 'new-turn') + eventLine('task_complete', 'new-turn'));
     const result: RunResult = await s.run(pane, s.file, '12', JSON.stringify(exchange));
     expectOutcome(result, {
-      outcome: 'failure', pane, file: s.file, status: 'idle', signal: 'proven',
+      outcome: 'failure',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'proven',
       exchange: { kind: 'codex', session: codexSession, boundary, turn: 'new-turn' },
     });
   } finally {
@@ -299,7 +357,11 @@ test('codex peer fails on its bound turn turn_aborted', async (): Promise<void> 
     appendFileSync(rollout, eventLine('task_started', 'aborted-turn') + eventLine('turn_aborted', 'aborted-turn'));
     const result: RunResult = await s.run(pane, s.file, '12', JSON.stringify(exchange));
     expectOutcome(result, {
-      outcome: 'failure', pane, file: s.file, status: 'idle', signal: 'proven',
+      outcome: 'failure',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'proven',
       exchange: { kind: 'codex', session: codexSession, boundary: 0, turn: 'aborted-turn' },
     });
   } finally {
@@ -311,8 +373,14 @@ test.each<[string, (s: Setup) => { exchange: Exchange } | { exchange: Exchange; 
   [
     'task completed before the boundary never ends the wait',
     (s: Setup) => {
-      const rollout: string = writeRollout(s.home, codexSession, eventLine('task_started', 'old') + eventLine('task_complete', 'old'));
-      return { exchange: { kind: 'codex', session: codexSession, boundary: readFileSync(rollout, 'utf8').length, turn: null } };
+      const rollout: string = writeRollout(
+        s.home,
+        codexSession,
+        eventLine('task_started', 'old') + eventLine('task_complete', 'old'),
+      );
+      return {
+        exchange: { kind: 'codex', session: codexSession, boundary: readFileSync(rollout, 'utf8').length, turn: null },
+      };
     },
   ],
   [
@@ -331,7 +399,9 @@ test.each<[string, (s: Setup) => { exchange: Exchange } | { exchange: Exchange; 
     'no task_started after the boundary',
     (s: Setup) => {
       const rollout: string = writeRollout(s.home, codexSession, eventLine('task_started', 'old'));
-      return { exchange: { kind: 'codex', session: codexSession, boundary: readFileSync(rollout, 'utf8').length, turn: null } };
+      return {
+        exchange: { kind: 'codex', session: codexSession, boundary: readFileSync(rollout, 'utf8').length, turn: null },
+      };
     },
   ],
   [
@@ -341,27 +411,42 @@ test.each<[string, (s: Setup) => { exchange: Exchange } | { exchange: Exchange; 
       return { exchange: { kind: 'codex', session: codexSession, boundary: null, turn: null } };
     },
   ],
-])('codex peer is unproven: %s', async (_name: string, fixture: (s: Setup) => { exchange: Exchange }): Promise<void> => {
-  const s: Setup = setup([codexPane(codexSession)]);
-  try {
-    const { exchange } = fixture(s);
-    const result: RunResult = await s.run(pane, s.file, '11', JSON.stringify(exchange));
-    expectOutcome(result, {
-      outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'unproven', exchange,
-    });
-  } finally {
-    s.clean();
-  }
-});
+])(
+  'codex peer is unproven: %s',
+  async (_name: string, fixture: (s: Setup) => { exchange: Exchange }): Promise<void> => {
+    const s: Setup = setup([codexPane(codexSession)]);
+    try {
+      const { exchange } = fixture(s);
+      const result: RunResult = await s.run(pane, s.file, '11', JSON.stringify(exchange));
+      expectOutcome(result, {
+        outcome: 'budget',
+        pane,
+        file: s.file,
+        status: 'idle',
+        signal: 'unproven',
+        exchange,
+      });
+    } finally {
+      s.clean();
+    }
+  },
+);
 
 test('codex peer with no session is unproven', async (): Promise<void> => {
   const s: Setup = setup([{ agent: 'codex', agent_status: 'idle' }]);
   try {
     const result: RunResult = await s.run(
-      pane, s.file, '11', JSON.stringify({ kind: 'codex', session: null, boundary: null, turn: null }),
+      pane,
+      s.file,
+      '11',
+      JSON.stringify({ kind: 'codex', session: null, boundary: null, turn: null }),
     );
     expectOutcome(result, {
-      outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'unproven',
+      outcome: 'budget',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'unproven',
       exchange: { kind: 'codex', session: null, boundary: null, turn: null },
     });
   } finally {
@@ -371,22 +456,44 @@ test('codex peer with no session is unproven', async (): Promise<void> => {
 
 // Criterion 4: claude keeps the transcript check.
 test('claude peer keeps the transcript check', async (): Promise<void> => {
-  const open: Setup = setup([{ agent: 'claude', agent_status: 'idle', agent_session: { kind: 'id', value: 'sess-open', source: 'herdr:claude' } }]);
+  const open: Setup = setup([
+    {
+      agent: 'claude',
+      agent_status: 'idle',
+      agent_session: { kind: 'id', value: 'sess-open', source: 'herdr:claude' },
+    },
+  ]);
   try {
     writeTranscript(open.home, 'sess-open', false);
     const result: RunResult = await open.run(pane, open.file, '11');
     expectOutcome(result, {
-      outcome: 'budget', pane, file: open.file, status: 'idle', signal: 'proven', exchange: seed('claude', 'sess-open'),
+      outcome: 'budget',
+      pane,
+      file: open.file,
+      status: 'idle',
+      signal: 'proven',
+      exchange: seed('claude', 'sess-open'),
     });
   } finally {
     open.clean();
   }
-  const closed: Setup = setup([{ agent: 'claude', agent_status: 'idle', agent_session: { kind: 'id', value: 'sess-closed', source: 'herdr:claude' } }]);
+  const closed: Setup = setup([
+    {
+      agent: 'claude',
+      agent_status: 'idle',
+      agent_session: { kind: 'id', value: 'sess-closed', source: 'herdr:claude' },
+    },
+  ]);
   try {
     writeTranscript(closed.home, 'sess-closed', true);
     const result: RunResult = await closed.run(pane, closed.file, '12');
     expectOutcome(result, {
-      outcome: 'failure', pane, file: closed.file, status: 'idle', signal: 'proven', exchange: seed('claude', 'sess-closed'),
+      outcome: 'failure',
+      pane,
+      file: closed.file,
+      status: 'idle',
+      signal: 'proven',
+      exchange: seed('claude', 'sess-closed'),
     });
   } finally {
     closed.clean();
@@ -402,7 +509,12 @@ test('blocked read at a grace check ends the wait blocked', async (): Promise<vo
   try {
     const result: RunResult = await s.run(pane, s.file, '12');
     expectOutcome(result, {
-      outcome: 'blocked', pane, file: s.file, status: 'blocked', signal: 'proven', exchange: seed('fake'),
+      outcome: 'blocked',
+      pane,
+      file: s.file,
+      status: 'blocked',
+      signal: 'proven',
+      exchange: seed('fake'),
     });
   } finally {
     s.clean();
@@ -445,14 +557,15 @@ test.each<[string, string]>([
 });
 
 test('a pi session change is ignored while hook authority holds', async (): Promise<void> => {
-  const s: Setup = setup([piAuthority], (): WaitEntry[] => [
-    { status: 'idle' },
-    { session: '/tmp/s-pi-other.jsonl' },
-  ]);
+  const s: Setup = setup([piAuthority], (): WaitEntry[] => [{ status: 'idle' }, { session: '/tmp/s-pi-other.jsonl' }]);
   try {
     const result: RunResult = await s.run(pane, s.file, '12');
     expectOutcome(result, {
-      outcome: 'failure', pane, file: s.file, status: 'idle', signal: 'proven',
+      outcome: 'failure',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'proven',
       exchange: { kind: 'pi', session: '/tmp/s-pi.jsonl', boundary: null, turn: null },
     });
   } finally {
@@ -461,14 +574,15 @@ test('a pi session change is ignored while hook authority holds', async (): Prom
 });
 
 test('a pi losing hook authority turns unproven', async (): Promise<void> => {
-  const s: Setup = setup([piAuthority], (): WaitEntry[] => [
-    { status: 'idle' },
-    { screenSkipped: false },
-  ]);
+  const s: Setup = setup([piAuthority], (): WaitEntry[] => [{ status: 'idle' }, { screenSkipped: false }]);
   try {
     const result: RunResult = await s.run(pane, s.file, '11');
     expectOutcome(result, {
-      outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'unproven',
+      outcome: 'budget',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'unproven',
       exchange: { kind: 'pi', session: '/tmp/s-pi.jsonl', boundary: null, turn: null },
     });
   } finally {
@@ -484,7 +598,12 @@ test('a session null at start and set later is adopted', async (): Promise<void>
   try {
     const result: RunResult = await s.run(pane, s.file, '12');
     expectOutcome(result, {
-      outcome: 'failure', pane, file: s.file, status: 'idle', signal: 'proven', exchange: seed('claude', 'sess-late'),
+      outcome: 'failure',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'proven',
+      exchange: seed('claude', 'sess-late'),
     });
   } finally {
     s.clean();
@@ -513,22 +632,49 @@ test('carried exchange binds the original turn on rerun', async (): Promise<void
     const { appendFileSync } = await import('node:fs');
     // First run binds turn-A which stays open: budget, proven.
     appendFileSync(rollout, eventLine('task_started', 'turn-A'));
-    const first: RunResult = await s.run(pane, s.file, '11', JSON.stringify({ kind: 'codex', session: codexSession, boundary: 0, turn: null }));
+    const first: RunResult = await s.run(
+      pane,
+      s.file,
+      '11',
+      JSON.stringify({ kind: 'codex', session: codexSession, boundary: 0, turn: null }),
+    );
     expectOutcome(first, {
-      outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'proven',
+      outcome: 'budget',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'proven',
       exchange: { kind: 'codex', session: codexSession, boundary: 0, turn: 'turn-A' },
     });
     // A later turn starts and completes; the rerun must still watch turn-A, so no failure yet.
     appendFileSync(rollout, eventLine('task_started', 'turn-B') + eventLine('task_complete', 'turn-B'));
-    const second: RunResult = await s.run(pane, s.file, '11', JSON.stringify({ kind: 'codex', session: codexSession, boundary: 0, turn: 'turn-A' }));
+    const second: RunResult = await s.run(
+      pane,
+      s.file,
+      '11',
+      JSON.stringify({ kind: 'codex', session: codexSession, boundary: 0, turn: 'turn-A' }),
+    );
     expectOutcome(second, {
-      outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'proven',
+      outcome: 'budget',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'proven',
       exchange: { kind: 'codex', session: codexSession, boundary: 0, turn: 'turn-A' },
     });
     appendFileSync(rollout, eventLine('turn_aborted', 'turn-A'));
-    const third: RunResult = await s.run(pane, s.file, '12', JSON.stringify({ kind: 'codex', session: codexSession, boundary: 0, turn: 'turn-A' }));
+    const third: RunResult = await s.run(
+      pane,
+      s.file,
+      '12',
+      JSON.stringify({ kind: 'codex', session: codexSession, boundary: 0, turn: 'turn-A' }),
+    );
     expectOutcome(third, {
-      outcome: 'failure', pane, file: s.file, status: 'idle', signal: 'proven',
+      outcome: 'failure',
+      pane,
+      file: s.file,
+      status: 'idle',
+      signal: 'proven',
       exchange: { kind: 'codex', session: codexSession, boundary: 0, turn: 'turn-A' },
     });
   } finally {
@@ -540,13 +686,19 @@ test('a carried kind or session that no longer matches is an error', async (): P
   const s: Setup = setup([codexPane(codexSession)]);
   try {
     const kindMismatch: RunResult = await s.run(
-      pane, s.file, '11', JSON.stringify({ kind: 'pi', session: codexSession, boundary: 0, turn: null }),
+      pane,
+      s.file,
+      '11',
+      JSON.stringify({ kind: 'pi', session: codexSession, boundary: 0, turn: null }),
     );
     expect(kindMismatch.code).toBe(1);
     expect(kindMismatch.stderr).toContain('pi');
     expect(kindMismatch.stderr).toContain('codex');
     const sessionMismatch: RunResult = await s.run(
-      pane, s.file, '11', JSON.stringify({ kind: 'codex', session: 'other-session', boundary: 0, turn: null }),
+      pane,
+      s.file,
+      '11',
+      JSON.stringify({ kind: 'codex', session: 'other-session', boundary: 0, turn: null }),
     );
     expect(sessionMismatch.code).toBe(1);
     expect(sessionMismatch.stderr).toContain('other-session');
@@ -564,7 +716,12 @@ test('budget clamps each wait timeout to the remaining budget', async (): Promis
     const result: RunResult = await s.run(pane, s.file, String(budgetMs / 1000));
     const elapsed: number = performance.now() - start;
     expectOutcome(result, {
-      outcome: 'budget', pane, file: s.file, status: null, signal: 'unproven', exchange: seed('fake'),
+      outcome: 'budget',
+      pane,
+      file: s.file,
+      status: null,
+      signal: 'unproven',
+      exchange: seed('fake'),
     });
     expect(elapsed).toBeGreaterThanOrEqual(budgetMs);
     const timeouts: number[] = s
@@ -589,7 +746,12 @@ test('budget keeps the last status herdr returned', async (): Promise<void> => {
   try {
     const result: RunResult = await s.run(pane, s.file, '0.3');
     expectOutcome(result, {
-      outcome: 'budget', pane, file: s.file, status: 'working', signal: 'unproven', exchange: seed('fake'),
+      outcome: 'budget',
+      pane,
+      file: s.file,
+      status: 'working',
+      signal: 'unproven',
+      exchange: seed('fake'),
     });
   } finally {
     s.clean();

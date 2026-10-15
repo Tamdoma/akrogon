@@ -58,9 +58,7 @@ function setup(
         agent: p.agent,
         agent_status: p.agent_status,
         ...(p.agent_session === undefined ? {} : { agent_session: p.agent_session }),
-        ...(p.screen_detection_skipped === undefined
-          ? {}
-          : { screen_detection_skipped: p.screen_detection_skipped }),
+        ...(p.screen_detection_skipped === undefined ? {} : { screen_detection_skipped: p.screen_detection_skipped }),
       })),
       tabs: [],
       serial: 0,
@@ -98,7 +96,10 @@ function eventLine(type: string, turn: string): string {
 }
 
 test('prompts, then waits for the answer in the same call', async (): Promise<void> => {
-  const s: Setup = setup((): ScriptEntry[] => [{}], (fileB: string): ScriptEntry[] => [{ append: fileB }]);
+  const s: Setup = setup(
+    (): ScriptEntry[] => [{}],
+    (fileB: string): ScriptEntry[] => [{ append: fileB }],
+  );
   try {
     const result: RunResult = await s.run('10', paneB, s.fileB, 'read the brief');
     expect(result.code).toBe(0);
@@ -127,7 +128,9 @@ test('seeds the codex boundary before prompting', async (): Promise<void> => {
       const rollout: string = resolve(home, `.codex/sessions/2026/10/16/rollout-2026-10-16T00-00-00-${session}.jsonl`);
       mkdirSync(dirname(rollout), { recursive: true });
       writeFileSync(rollout, '');
-      return [{ appendTo: rollout, append: eventLine('task_started', 'turn-A') + eventLine('task_complete', 'turn-A') }];
+      return [
+        { appendTo: rollout, append: eventLine('task_started', 'turn-A') + eventLine('task_complete', 'turn-A') },
+      ];
     },
     (): ScriptEntry[] => [{ status: 'idle' }, {}],
     [
@@ -196,7 +199,10 @@ test('a pane missing from agent list is reported like a failed prompt', async ()
 });
 
 test('refuses a reused return file before prompting anyone', async (): Promise<void> => {
-  const s: Setup = setup((): ScriptEntry[] => [], (): ScriptEntry[] => []);
+  const s: Setup = setup(
+    (): ScriptEntry[] => [],
+    (): ScriptEntry[] => [],
+  );
   try {
     writeFileSync(s.fileC, 'old answer\n');
     const result: RunResult = await s.run('10', paneB, s.fileB, 'brief B', paneC, s.fileC, 'brief C');
@@ -209,7 +215,10 @@ test('refuses a reused return file before prompting anyone', async (): Promise<v
 });
 
 test('rejects missing args and a bad budget before prompting', async (): Promise<void> => {
-  const s: Setup = setup((): ScriptEntry[] => [], (): ScriptEntry[] => []);
+  const s: Setup = setup(
+    (): ScriptEntry[] => [],
+    (): ScriptEntry[] => [],
+  );
   try {
     for (const args of [
       ['10', paneB, s.fileB],
@@ -228,7 +237,10 @@ test('rejects missing args and a bad budget before prompting', async (): Promise
 });
 
 test('refuses two peers sharing one return file before prompting anyone', async (): Promise<void> => {
-  const s: Setup = setup((): ScriptEntry[] => [], (): ScriptEntry[] => []);
+  const s: Setup = setup(
+    (): ScriptEntry[] => [],
+    (): ScriptEntry[] => [],
+  );
   try {
     const same: string = s.fileB.replace(/return-B\.md$/, './return-B.md');
     const result: RunResult = await s.run('10', paneB, s.fileB, 'brief B', paneC, same, 'brief C');

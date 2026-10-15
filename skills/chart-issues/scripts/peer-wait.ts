@@ -133,11 +133,7 @@ async function readPeerAgent(pane: string): Promise<ListAgent> {
 }
 
 function piAuthority(live: ListAgent): boolean {
-  return (
-    live.agent === 'pi' &&
-    live.agent_session?.source === 'herdr:pi' &&
-    live.screen_detection_skipped === true
-  );
+  return live.agent === 'pi' && live.agent_session?.source === 'herdr:pi' && live.screen_detection_skipped === true;
 }
 
 // Pane identity is re-read at each grace check against the carried exchange: a kind change is an
@@ -145,15 +141,9 @@ function piAuthority(live: ListAgent): boolean {
 // codex (pi ignores it and lets the hook-authority check decide), and a session appearing later
 // is adopted.
 function checkIdentity(pane: string, live: ListAgent, exchange: Exchange): void {
-  if (live.agent !== exchange.kind)
-    throw new Error(`Peer pane ${pane} changed kind: ${exchange.kind} → ${live.agent}`);
+  if (live.agent !== exchange.kind) throw new Error(`Peer pane ${pane} changed kind: ${exchange.kind} → ${live.agent}`);
   const liveSession: string | null = live.agent_session?.value ?? null;
-  if (
-    exchange.session !== null &&
-    liveSession !== null &&
-    liveSession !== exchange.session &&
-    exchange.kind !== 'pi'
-  ) {
+  if (exchange.session !== null && liveSession !== null && liveSession !== exchange.session && exchange.kind !== 'pi') {
     throw new Error(`Peer pane ${pane} changed session: ${exchange.session} → ${liveSession}`);
   }
   if (exchange.session === null && liveSession !== null) exchange.session = liveSession;
@@ -194,11 +184,7 @@ function codexEnded(exchange: Exchange): Verdict {
   const rollout: string | null = codexRollout(exchange.session);
   if (rollout === null) return 'unproven';
   // the boundary is a byte length recorded before the prompt, so slice the buffer not the string
-  const lines: string[] = readFileSync(rollout)
-    .subarray(exchange.boundary)
-    .toString('utf8')
-    .trimEnd()
-    .split('\n');
+  const lines: string[] = readFileSync(rollout).subarray(exchange.boundary).toString('utf8').trimEnd().split('\n');
   if (exchange.turn === null) {
     for (const line of lines) {
       const parsed = rolloutLineSchema.safeParse(parseJson(line));
@@ -213,10 +199,7 @@ function codexEnded(exchange: Exchange): Verdict {
     const parsed = rolloutLineSchema.safeParse(parseJson(line));
     if (!parsed.success) continue;
     const payload = parsed.data.payload;
-    if (
-      payload?.turn_id === exchange.turn &&
-      (payload.type === 'task_complete' || payload.type === 'turn_aborted')
-    )
+    if (payload?.turn_id === exchange.turn && (payload.type === 'task_complete' || payload.type === 'turn_aborted'))
       return 'ended';
   }
   return 'open';
@@ -305,34 +288,36 @@ async function main(): Promise<void> {
       // herdr can report a peer idle or done inside one open turn, so a turn counts as ended only
       // when the pane stays out of working for the grace period and the kind's proven signal agrees.
       const graceMs: number = Math.floor(Math.min(IDLE_GRACE_MS, deadline - performance.now()));
-      if (graceMs <= 0)
-        return finish('budget', pane, file, lastStatus, lastProven ? 'proven' : 'unproven', exchange);
+      if (graceMs <= 0) return finish('budget', pane, file, lastStatus, lastProven ? 'proven' : 'unproven', exchange);
       const resumed: RunResult | null = await runWait(pane, graceMs, ['working']);
       if (resumed !== null && resumed.code !== 0 && !isTimeoutError(resumed.stderr)) {
         process.stderr.write(resumed.stderr);
         process.exit(resumed.code);
       }
-      if (fileNonEmpty(file))
-        return finish('done', pane, file, lastStatus, 'proven', exchange);
+      if (fileNonEmpty(file)) return finish('done', pane, file, lastStatus, 'proven', exchange);
       const live: ListAgent = await readPeerAgent(pane);
       checkIdentity(pane, live, exchange);
-      if (live.agent_status === 'blocked')
-        return finish('blocked', pane, file, 'blocked', 'proven', exchange);
-      const liveWorking: boolean =
-        live.agent_status === 'working' || (resumed !== null && resumed.code === 0);
+      if (live.agent_status === 'blocked') return finish('blocked', pane, file, 'blocked', 'proven', exchange);
+      const liveWorking: boolean = live.agent_status === 'working' || (resumed !== null && resumed.code === 0);
       if (liveWorking) {
         lastStatus = 'working';
       } else {
         const { verdict, proven } = turnVerdict(live, exchange);
         if (verdict === 'ended')
-          return finish(graceMs < IDLE_GRACE_MS ? 'budget' : 'failure', pane, file, live.agent_status, 'proven', exchange);
+          return finish(
+            graceMs < IDLE_GRACE_MS ? 'budget' : 'failure',
+            pane,
+            file,
+            live.agent_status,
+            'proven',
+            exchange,
+          );
         lastProven = proven;
         if (proven) lastStatus = live.agent_status;
       }
     }
     remaining = deadline - performance.now();
-    if (remaining <= 0)
-      return finish('budget', pane, file, lastStatus, lastProven ? 'proven' : 'unproven', exchange);
+    if (remaining <= 0) return finish('budget', pane, file, lastStatus, lastProven ? 'proven' : 'unproven', exchange);
   }
   return finish('budget', pane, file, lastStatus, lastProven ? 'proven' : 'unproven', exchange);
 }
