@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, renameSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { readGlobal, requireRepo, target, globalHome, type GlobalConfig, type Repo, within } from './config';
@@ -38,6 +38,7 @@ import { trackingRef } from './preflight';
 import { retiredLessonsPresent } from './lessons';
 import { applyTop, branchSha, buildStack, isAncestor, move, pickMembers } from './batch';
 import { requireGreenReceipt } from './verify';
+import { packFolder } from './pack';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
   try {
@@ -220,8 +221,11 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   }
   if (!complete) return;
   if (justMerged) console.log(`${owner === issue ? 'issue' : 'epic'} complete ${basename(owner)}`);
+  writeFileSync(resolve(owner, '.closing'), '');
+  await packFolder(repo, owner, leaf.path);
   mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
   renameSync(owner, destination);
+  rmSync(resolve(destination, '.closing'));
 }
 
 export async function transition(
