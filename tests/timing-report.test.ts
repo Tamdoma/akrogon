@@ -540,6 +540,41 @@ test('flow report: parked-carried and open-carried issues stay carried while ope
   }
 });
 
+test('flow report: foreign open issues stay out of the origin backlog while foreign closed issues count', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const gh: GhFixture = fakeGh(f);
+    await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
+    carrier(f, 'open', 'foreign', 'f1', '2026-10-12', ['other/repo#1']);
+    ghScript(gh, [
+      { stdout: '[[]]', args: listingArgs('acme/project') },
+      {
+        stdout: JSON.stringify([
+          [
+            gissue(1, '2026-10-07T00:00:00Z', 'open'),
+            gissue(2, '2026-10-01T00:00:00Z', 'open'),
+            gissue(3, '2026-10-02T00:00:00Z', 'closed'),
+          ],
+        ]),
+        args: listingArgs('other/repo'),
+      },
+    ]);
+    const result: { code: number; stdout: string; stderr: string } = await timing(
+      f,
+      ['--flow', '--since', '2026-10-10'],
+      gh.env,
+    );
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('other/repo#1 filed 2026-10-07T00:00:00Z handoff 2026-10-12 merged open');
+    expect(result.stdout).toContain('summary backlog: 0 median - oldest -');
+    expect(result.stdout).not.toContain('other/repo#2');
+    expect(result.stdout).toContain('summary uncarried closed: 1');
+    expect(ghCalls(gh).map((call) => call.args)).toEqual([listingArgs('acme/project'), listingArgs('other/repo')]);
+  } finally {
+    f.clean();
+  }
+});
+
 test('flow report: a failed listing retries once then exits non-zero with command and output', async () => {
   const f: Fixture = await fixture();
   try {
