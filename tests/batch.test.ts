@@ -1,6 +1,6 @@
 import { test, expect, afterEach } from 'bun:test';
 import { resolve } from 'node:path';
-import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fixture, leaf, leafTempRoot, storeDir, yaml, type Fixture } from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, stateSchema, type Leaf, type State } from '../src/state';
@@ -311,6 +311,59 @@ test.serial('a holder already on the base produces the base without a rebase', a
     expect(await buildStack(repo, builtOn, builtOn)).toMatchObject({ ok: true, top: builtOn });
     noLeftoverWorktrees(f);
   } finally {
+    f.clean();
+  }
+});
+
+// The build owner record exists before the copy does, so a build paused
+// mid-creation is never taken as a stray by a reconcile pass.
+test.serial('buildStack writes its owner record before the copy and removes both in finally', async () => {
+  const { f, repo, builtOn } = await batchFixture();
+  const originalPath: string | undefined = process.env.PATH;
+  try {
+    const shimBin: string = resolve(f.home, 'shimbin');
+    mkdirSync(shimBin, { recursive: true });
+    const gate: string = resolve(f.home, 'release-git');
+    const record: string = resolve(f.home, 'record-seen');
+    const git: string = await command(['sh', '-c', 'command -v git']);
+    writeFileSync(
+      resolve(shimBin, 'git'),
+      `#!/bin/sh
+if [ "$1" = worktree ] && [ "$2" = add ]; then
+  copy=""
+  for arg do prev="$copy"; copy="$arg"; done
+  copy="$prev"
+  case "$copy" in */batch-*) :;; *) echo "worktree add target is not a batch copy: $copy" >&2; exit 42;; esac
+  if [ ! -f "$copy.owner" ]; then echo 'batch owner record missing at worktree add' >&2; exit 42; fi
+  touch '${record}'
+  while [ ! -f '${gate}' ]; do sleep 0.01; done
+fi
+exec '${git}' "$@"
+`,
+    );
+    await command(['chmod', '+x', resolve(shimBin, 'git')]);
+    process.env.PATH = `${shimBin}:${originalPath}`;
+    const built: Promise<Awaited<ReturnType<typeof buildStack>>> = buildStack(repo, builtOn, builtOn);
+    const settled: Promise<Awaited<ReturnType<typeof buildStack>>> = built;
+    settled.catch(() => undefined);
+    for (let i: number = 0; i < 300 && !existsSync(record); i++) await Bun.sleep(10);
+    if (!existsSync(record)) writeFileSync(gate, 'go');
+    expect(existsSync(record)).toBe(true);
+    const owners: string[] = existsSync(storeDir(f))
+      ? readdirSync(storeDir(f)).filter((name) => name.endsWith('.owner'))
+      : [];
+    expect(owners).toHaveLength(1);
+    const owner = JSON.parse(readFileSync(resolve(storeDir(f), owners[0]), 'utf8'));
+    expect(owner.pid).toBe(process.pid);
+    expect(existsSync(resolve(storeDir(f), owners[0].replace(/\.owner$/, '')))).toBe(false);
+    writeFileSync(gate, 'go');
+    const result: Awaited<ReturnType<typeof buildStack>> = await settled;
+    expect(result.ok).toBe(true);
+    expect(readdirSync(storeDir(f)).filter((name) => name.startsWith('batch-'))).toEqual([]);
+    noLeftoverWorktrees(f);
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
     f.clean();
   }
 });

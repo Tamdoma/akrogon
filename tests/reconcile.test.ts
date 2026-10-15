@@ -1,8 +1,27 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { fixture, cli, leaf, fakeHerdr, fakeAkrogon, yaml, leafTempRoot, storeDir, type Fixture } from './helpers';
+import {
+  fixture,
+  cli,
+  leaf,
+  fakeHerdr,
+  fakeAkrogon,
+  yaml,
+  leafTempRoot,
+  procRoot,
+  storeDir,
+  type Fixture,
+} from './helpers';
 import { readState, saveState } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import { z } from 'zod';
@@ -385,8 +404,16 @@ test('recorded worktree that is not a registered git worktree is kept, not remov
   }
 });
 
-// DC6: an unconfirmed verify checkout is removed only under the removal rules.
-test('unconfirmed verify worktree is removed when clean, kept when dirty', async () => {
+// A verify scratch copy at an unreachable commit needs a dangling detached head.
+async function unreachable(path: string, cwd: string): Promise<void> {
+  await command(['git', '-C', path, 'checkout', '--detach'], cwd);
+  writeFileSync(resolve(path, 'unreach'), 'x');
+  await command(['git', '-C', path, 'add', 'unreach'], cwd);
+  await command(['git', '-C', path, 'commit', '-m', 'unreachable'], cwd);
+}
+
+// Ended verify runs leave scratch copies: clean or dirty, both are removed.
+test('unconfirmed verify worktrees are removed once the run ends', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     await dispatchLeaf(f, 'holder-leaf');
@@ -416,10 +443,10 @@ test('unconfirmed verify worktree is removed when clean, kept when dirty', async
     );
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(clean)).toBe(false);
-    expect(existsSync(dirty)).toBe(true);
+    // An ended verify run's copy is scratch: removed force, dirty or not.
+    expect(existsSync(dirty)).toBe(false);
     const out: Result = await status(f, 'holder-leaf');
-    expect(out.stdout).toContain(dirty);
-    expect(out.stdout).toContain('uncommitted');
+    expect(out.stdout).not.toContain(dirty);
   } finally {
     f.clean();
   }
@@ -521,6 +548,259 @@ test('a worker worktree of an active leaf is kept until the leaf fails', async (
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worker)).toBe(false);
   } finally {
+    f.clean();
+  }
+});
+
+// Scratch copies are removed by owner state: a killed verify run's copy goes even
+// at an unreachable commit; a live run's copy stays, even dirty.
+test('verify scratch copies are removed by owner state and kept while the run is live', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    await dispatchLeaf(f, 'scratch-holder');
+    const boot: string = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+    const dead: string = resolve(storeDir(f), 'verify-dead-run');
+    const live: string = resolve(storeDir(f), 'verify-live-run');
+    await command(['git', 'worktree', 'add', '--detach', dead], f.root);
+    await command(['git', 'worktree', 'add', '--detach', live], f.root);
+    await unreachable(dead, f.root);
+    writeFileSync(resolve(live, 'untracked'), 'dirty');
+    const record = (id: string, path: string, pid: number, end?: string): string =>
+      JSON.stringify({
+        run: id,
+        repo: 'repo',
+        leaf: 'scratch-holder',
+        sha: 'x',
+        tree: 'x',
+        scope: 'leaf',
+        path,
+        pid,
+        boot_id: boot,
+        commands: [],
+        start: new Date().toISOString(),
+        ...(end === undefined ? {} : { end }),
+      });
+    writeFileSync(
+      resolve(f.root, 'issues/verify-runs.jsonl'),
+      record('dead-run', dead, 4194303) + '\n' + record('live-run', live, process.pid) + '\n',
+    );
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(dead)).toBe(false);
+    expect(existsSync(live)).toBe(true);
+    const out: Result = await status(f, 'scratch-holder');
+    expect(out.stdout).toContain(live);
+    expect(out.stdout).toContain('verify live-run in progress');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a verify scratch copy with no record is removed like a dead-owner copy', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    await dispatchLeaf(f, 'stray-holder');
+    const stray: string = resolve(storeDir(f), 'verify-no-record');
+    await command(['git', 'worktree', 'add', '--detach', stray], f.root);
+    await unreachable(stray, f.root);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(stray)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+// The build owner record keeps a paused build's copy across passes; a dead
+// builder loses copy and record together, and a copy with no record is a stray.
+test('batch copies follow their owner record: live kept, dead and absent removed', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
+  try {
+    await dispatchLeaf(f, 'batch-holder');
+    const boot: string = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+    const owned: string = resolve(storeDir(f), 'batch-owned');
+    await command(['git', 'worktree', 'add', '--detach', owned], f.root);
+    writeFileSync(resolve(owned, 'untracked'), 'dirty');
+    const ownerFile: string = `${owned}.owner`;
+    const writeOwner = (pid: number): void => {
+      writeFileSync(ownerFile, JSON.stringify({ pid, boot_id: boot, started: new Date().toISOString() }));
+    };
+    writeOwner(child.pid);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(owned)).toBe(true);
+    expect(existsSync(ownerFile)).toBe(true);
+    child.kill('SIGKILL');
+    await child.exited;
+    const stray: string = resolve(storeDir(f), 'batch-stray');
+    await command(['git', 'worktree', 'add', '--detach', stray], f.root);
+    writeFileSync(resolve(stray, 'untracked'), 'dirty');
+    const orphaned: string = resolve(storeDir(f), 'batch-gone.owner');
+    writeFileSync(orphaned, JSON.stringify({ pid: 4194303, boot_id: boot, started: new Date().toISOString() }));
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(owned)).toBe(false);
+    expect(existsSync(ownerFile)).toBe(false);
+    expect(existsSync(stray)).toBe(false);
+    expect(existsSync(orphaned)).toBe(false);
+    expect((await status(f, 'batch-holder')).stdout).not.toContain('batch-owned');
+  } finally {
+    child.kill('SIGKILL');
+    f.clean();
+  }
+});
+
+// A worker copy is scratch once its leaf merged: removed with --force even with
+// unreachable commits and untracked files. A failed owner keeps today's guard.
+test('worker copies follow the owner leaf: merged removes, failed keeps the guard', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = await dispatchLeaf(f, 'done-holder');
+    const worker: string = resolve(storeDir(f), 'done-holder-u1');
+    await command(['git', 'worktree', 'add', '--detach', worker], f.root);
+    await unreachable(worker, f.root);
+    mkdirSync(resolve(worker, '__pycache__'));
+    writeFileSync(resolve(worker, '__pycache__/x.pyc'), 'x');
+    closeTab(f, readState(path).tab!);
+    saveState(path, { ...readState(path), phase: 'merged' });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(worker)).toBe(false);
+    saveState(path, {
+      ...readState(path),
+      phase: 'failed',
+      failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'test' },
+    });
+    const kept: string = resolve(storeDir(f), 'done-holder-u2');
+    await command(['git', 'worktree', 'add', '--detach', kept], f.root);
+    await unreachable(kept, f.root);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(kept)).toBe(true);
+    const out: Result = await status(f, 'done-holder');
+    expect(out.stdout).toContain(kept);
+    expect(out.stdout).toMatch(/unreachable commit/);
+  } finally {
+    f.clean();
+  }
+});
+
+// A leaf whose own slug ends in -u<N> keeps its leaf rules: a store directory
+// named after it is adopted as that leaf's worktree, not read as a worker copy
+// of the same-named owner.
+test('a leaf slug ending in -u<N> is handled as that leaf, not as a worker copy', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const strayPath: string = await dispatchLeaf(f, 'mine-u1');
+    const stray: string = readState(strayPath).worktree!;
+    await command(['git', 'worktree', 'remove', '--force', stray], f.root);
+    closeTab(f, readState(strayPath).tab!);
+    saveState(strayPath, { ...readState(strayPath), phase: 'merged', worktree: undefined });
+    const path: string = await dispatchLeaf(f, 'mine');
+    closeTab(f, readState(path).tab!);
+    saveState(path, { ...readState(path), phase: 'merged' });
+    await command(['git', 'worktree', 'add', '--detach', stray], f.root);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(stray)).toBe(false);
+    const closed: string = resolve(f.root, 'issues/closed/issue/mine-u1');
+    expect(existsSync(resolve(closed, 'state.yaml'))).toBe(true);
+    expect(readState(closed).worktree).toBeUndefined();
+    // Handled as the leaf itself: a second pass drops the merged branch; a
+    // worker-copy reading would keep it forever.
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect((await branchExists(f, 'mine-u1')).code).toBe(1);
+  } finally {
+    f.clean();
+  }
+});
+
+// No scratch copy is removed while a live pane sits inside it, or while the
+// pane list is unavailable.
+test('scratch copies stay while a pane is inside or the pane list is unavailable', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    await dispatchLeaf(f, 'pane-holder');
+    const boot: string = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+    const dead: string = resolve(storeDir(f), 'verify-pane');
+    await command(['git', 'worktree', 'add', '--detach', dead], f.root);
+    writeFileSync(
+      resolve(f.root, 'issues/verify-runs.jsonl'),
+      JSON.stringify({
+        run: 'pane',
+        repo: 'repo',
+        leaf: 'pane-holder',
+        sha: 'x',
+        tree: 'x',
+        scope: 'leaf',
+        path: dead,
+        pid: 4194303,
+        boot_id: boot,
+        commands: [],
+        start: new Date().toISOString(),
+      }) + '\n',
+    );
+    const stray: string = resolve(storeDir(f), 'batch-pane');
+    await command(['git', 'worktree', 'add', '--detach', stray], f.root);
+    saveDatabase(f, { ...database(f), paneListStdout: 'unavailable' });
+    // The pass reports the failed pane listing; nothing is removed without it.
+    await next(f, ['--all']);
+    expect(existsSync(dead)).toBe(true);
+    expect(existsSync(stray)).toBe(true);
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      paneListStdout: undefined,
+      panes: [...db.panes, { pane_id: 'w1:p500', tab_id: 'w1:t500', cwd: dead, agent: null, agent_status: 'idle' }],
+    });
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(dead)).toBe(true);
+    expect(existsSync(stray)).toBe(false);
+    const out: Result = await status(f, 'pane-holder');
+    expect(out.stdout).toContain(dead);
+    expect(out.stdout).toContain('live pane');
+  } finally {
+    f.clean();
+  }
+});
+
+// A surviving process with cwd or an open file inside a dead copy keeps it,
+// recorded with that pid as the reason.
+test('a scratch copy with a process inside stays, recorded with the pid', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
+  try {
+    await dispatchLeaf(f, 'proc-holder');
+    const boot: string = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+    const dead: string = resolve(storeDir(f), 'verify-proc');
+    await command(['git', 'worktree', 'add', '--detach', dead], f.root);
+    writeFileSync(
+      resolve(f.root, 'issues/verify-runs.jsonl'),
+      JSON.stringify({
+        run: 'proc',
+        repo: 'repo',
+        leaf: 'proc-holder',
+        sha: 'x',
+        tree: 'x',
+        scope: 'leaf',
+        path: dead,
+        pid: 4194303,
+        boot_id: boot,
+        commands: [],
+        start: new Date().toISOString(),
+      }) + '\n',
+    );
+    const procDir: string = resolve(procRoot(f), String(child.pid));
+    mkdirSync(resolve(procDir, 'fd'), { recursive: true });
+    symlinkSync(dead, resolve(procDir, 'cwd'));
+    writeFileSync(resolve(dead, 'open-file'), 'x');
+    symlinkSync(resolve(dead, 'open-file'), resolve(procDir, 'fd/3'));
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(dead)).toBe(true);
+    const out: Result = await status(f, 'proc-holder');
+    expect(out.stdout).toContain(dead);
+    expect(out.stdout).toContain(String(child.pid));
+    child.kill('SIGKILL');
+    await child.exited;
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(dead)).toBe(false);
+  } finally {
+    child.kill('SIGKILL');
     f.clean();
   }
 });
