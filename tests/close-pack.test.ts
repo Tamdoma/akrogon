@@ -96,6 +96,48 @@ test('run-check accepts an open owner with a closed namesake', async () => {
   }
 });
 
+test('run-check refuses owner-root holders before running and after completion', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const closing: string = resolve(f.root, 'issues/open/closing');
+    const closed: string = resolve(f.root, 'issues/closed/finished');
+    mkdirSync(closing, { recursive: true });
+    mkdirSync(closed, { recursive: true });
+    writeFileSync(resolve(closing, '.closing'), '');
+    for (const target of [closing, closed]) {
+      const marker: string = resolve(f.home, 'command-ran');
+      const result = await cli(f, ['run-check', '--holder', target, '--', 'touch', marker]);
+      expect(result.code).not.toBe(0);
+      expect(existsSync(marker)).toBe(false);
+      expect(findLogs(target)).toEqual([]);
+    }
+    rmSync(closing, { recursive: true });
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      env: ['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT'],
+      checks: {},
+      grounding: 'none',
+    });
+    await mergingLeaf(f, 'root-racer', 'racing');
+    const owner: string = resolve(f.root, 'issues/open/racing');
+    const result = await cli(
+      f,
+      ['run-check', '--holder', owner, '--', 'sh', '-c', 'echo root-output; akrogon phase root-racer merged'],
+      f.root,
+      { ...shimEnv(f), AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) },
+    );
+    expect(result.code).not.toBe(0);
+    expect(existsSync(owner)).toBe(false);
+    expect(existsSync(resolve(f.root, 'issues/closed/racing'))).toBe(true);
+    const capture: RegExpMatchArray | null = result.stderr.match(/(\S*run-[^/\s]*\/out\.log)/);
+    expect(capture).not.toBeNull();
+    expect(readFileSync(capture![1], 'utf8')).toContain('root-output');
+    expect((await cli(f, ['next'])).code).toBe(0);
+    expect(readFileSync(capture![1], 'utf8')).toContain('root-output');
+  } finally {
+    f.clean();
+  }
+});
+
 test('completion packs every log into evidence.tar.zst and a logless owner gets no archive', async () => {
   const f: Fixture = await fixture();
   try {
