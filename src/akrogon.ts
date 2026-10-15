@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { effectiveConfig, readGlobal, requireRepo, type Repo } from './config';
+import { currentRepo, effectiveConfig, readGlobal, requireRepo, type GlobalConfig, type Repo } from './config';
 import { initialize } from './init';
 import { sourcePattern } from './state';
 import { type Phase } from './routing';
@@ -172,6 +172,18 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./flaky')).flakyCommand(process.cwd());
     break;
+  case 'log': {
+    const [recorded]: [string] = z.tuple([z.string()]).parse(positionals);
+    const global: GlobalConfig = readGlobal();
+    const repo: Repo | null = await currentRepo(global, process.cwd());
+    const { readLog, readLogAcross } = await import('./evidence');
+    const bytes: Uint8Array =
+      repo === null
+        ? await readLogAcross(global, recorded, process.cwd())
+        : await readLog(repo, recorded, process.cwd());
+    process.stdout.write(bytes);
+    break;
+  }
   case 'run-check': {
     const optional: z.ZodOptional<z.ZodString> = z.string().optional();
     process.exitCode = await (
@@ -198,6 +210,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|timing|flaky|run-check|verify|guard>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|timing|flaky|log|run-check|verify|guard>',
     );
 }

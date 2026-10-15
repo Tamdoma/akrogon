@@ -148,6 +148,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon stop-run [<run-id>]` | Stop a run the caller's pane scope launched, by the id on the `run` line printed at run start. With no id, list matching runs and stop only when exactly one is live. |
 | `akrogon start <slug>` | Clear a leaf's stopped mark and run the targeted next pass for that leaf. |
 | `akrogon flaky` | List each verify command and failed test that went red then green on the same tree, with its count and last time, newest first. |
+| `akrogon log <path>` | Print a recorded check or verify log's bytes, resolving the path against the current or every registered repo, plain file first then the owner's `evidence.tar.zst`. |
 | `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Register the run, start a command at once under the constructed check environment, and log output into the leaf. |
 | `akrogon verify [--sha <rev>] [--attempt <id>] [--holder <dir>]` | Check the commit out fresh in the worktree store, run every configured check for the caller's scope under the constructed environment, log each into the leaf or holder, write one receipt to `issues/verify-runs.jsonl` and remove the checkout. Exits 0 only when every command passed. |
 | `akrogon guard <ancestors\|own-modules>` | Refuse when a canonical ancestor holds node_modules or package.json, or a checkout with a package.json at its top is missing its own node_modules. |
