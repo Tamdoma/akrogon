@@ -74,7 +74,8 @@ export async function readLog(repo: Repo, recorded: string, cwd: string): Promis
     if (existsSync(plain)) return readFileSync(plain);
     if (firstExisting === undefined && existsSync(ownerDir)) firstExisting = ownerDir;
   }
-  if (firstExisting === undefined) throw new LogError('nomatch', `no log for recorded path: ${recorded}`);
+  if (firstExisting === undefined || !existsSync(resolve(firstExisting, 'evidence.tar.zst')))
+    throw new LogError('nomatch', `no log for recorded path: ${recorded}`);
   return readMember(firstExisting, target.member);
 }
 
