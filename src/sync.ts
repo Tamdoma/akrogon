@@ -8,6 +8,8 @@ export function eligibleRecord(root: string, worktree: string, path: string): bo
     path.startsWith('issues/') &&
     !within(resolve(root, path), resolve(root, 'issues/seeds')) &&
     basename(path) !== '.lock' &&
+    basename(path) !== '.closing' &&
+    !basename(path).endsWith('.tar.zst.tmp') &&
     !(within(worktree, root) && within(resolve(root, path), worktree))
   );
 }

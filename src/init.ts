@@ -71,6 +71,9 @@ export async function initialize(
     ...(worktreeRoot !== root && within(worktreeRoot, root) ? [`${relative(root, worktreeRoot)}/`] : []),
     'issues/seeds/',
     '.lock',
+    'issues/open/**/*.log',
+    'issues/parked/**/*.log',
+    'issues/chart/*/direct/**/*.log',
   ].filter((line) => !prior.split('\n').includes(line));
   if (additions.length > 0)
     writeFileSync(ignore, prior + (prior !== '' && !prior.endsWith('\n') ? '\n' : '') + additions.join('\n') + '\n');
