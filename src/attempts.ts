@@ -95,7 +95,7 @@ export function appendAttempt(
     tested_top: batch.tested_top,
     outcome,
     members:
-      batch.members === undefined || batch.members.length === 0
+      batch.members.length === 0
         ? undefined
         : batch.members.map((member) => ({ slug: member.slug, head: member.head })),
     start: batch.started,

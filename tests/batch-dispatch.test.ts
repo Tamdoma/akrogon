@@ -69,7 +69,11 @@ function expectedPrompt(path: string, pane: string): { pane: string; text: strin
   const batch = state.batch;
   expect(batch).toBeDefined();
   const members: string =
-    (stacked(path) ?? []).length > 0 ? ` members=${stacked(path)!.map((member) => member.slug).join(',')}` : '';
+    (stacked(path) ?? []).length > 0
+      ? ` members=${stacked(path)!
+          .map((member) => member.slug)
+          .join(',')}`
+      : '';
   const context: string =
     batch!.top === undefined
       ? `attempt=${batch!.attempt} solo`
@@ -79,8 +83,7 @@ function expectedPrompt(path: string, pane: string): { pane: string; text: strin
 
 function stacked(path: string): { slug: string; head: string; tip: string }[] | undefined {
   const batch: { members?: { slug: string; head: string; tip: string }[] } | undefined = readState(path).batch as
-    | { members?: { slug: string; head: string; tip: string }[] }
-    | undefined;
+    { members?: { slug: string; head: string; tip: string }[] } | undefined;
   return batch?.members;
 }
 
@@ -179,6 +182,7 @@ test('an interrupted build is discarded and rebuilt under a new attempt', async 
         built_on: builtOn,
         holder: { base: builtOn, head: aaHead },
         applied: false,
+        members: [],
       },
     });
     saveDatabase(f, { ...database(f), prompts: [] });
@@ -623,7 +627,6 @@ test('a clean waiting leaf stacks under the holder and lands with it in one push
     expect(members.map((member) => member.slug)).toEqual(['bb']);
     expect(members[0].head).toBe(bbHead);
     expect(members[0].tip).not.toBe(bbHead);
-    expect((await run(['git', 'merge-base', '--is-ancestor', bbHead, record.top!], f.root)).code).toBe(0);
     expect((await run(['git', 'merge-base', '--is-ancestor', members[0].tip, record.top!], f.root)).code).toBe(0);
     expect(mergePrompts(f)).toHaveLength(1);
     expect(mergePrompts(f)[0].text).toBe(expectedPrompt(aa.path, aa.b).text);
@@ -635,12 +638,7 @@ test('a clean waiting leaf stacks under the holder and lands with it in one push
     expect(
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', attempt], f.root, f.env)).code,
     ).toBe(0);
-    const merged: Result = await cli(
-      f,
-      ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', attempt],
-      f.root,
-      f.env,
-    );
+    const merged: Result = await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', attempt], f.root, f.env);
     expect(merged.code).toBe(0);
     expect(merged.stdout).toContain('issue complete issue-aa');
     expect(merged.stdout).toContain('issue complete issue-bb');
@@ -652,6 +650,8 @@ test('a clean waiting leaf stacks under the holder and lands with it in one push
     expect(attempts).toHaveLength(1);
     expect(attempts[0].outcome).toBe('merged');
     expect(attempts[0].members).toEqual([{ slug: 'bb', head: bbHead }]);
+    // bb landed with the stack, so no leaf holds a turn and nothing was prompted again.
+    expect(mergePrompts(f)).toHaveLength(1);
   } finally {
     f.clean();
   }
@@ -686,13 +686,12 @@ test('a member that conflicts with the stack is skipped and merges in a later tu
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', attempt], f.root, f.env)).code,
     ).toBe(0);
     expect((await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', attempt], f.root, f.env)).code).toBe(0);
-    saveDatabase(f, { ...database(f), prompts: [] });
-    expect((await next(f, [])).code).toBe(0);
+    // The landed push woke bb's own turn at once: it holds the queue now.
     expect(readState(bb.path).batch).toBeDefined();
-    expect(mergePrompts(f)).toHaveLength(1);
-    expect(mergePrompts(f)[0].pane).toBe(bb.b);
-    expect(mergePrompts(f)[0].text).toContain('attempt=');
-    expect(mergePrompts(f)[0].text).toContain('solo');
+    expect(mergePrompts(f)).toHaveLength(2);
+    expect(mergePrompts(f)[1].pane).toBe(bb.b);
+    expect(mergePrompts(f)[1].text).toContain('attempt=');
+    expect(mergePrompts(f)[1].text).toContain('solo');
   } finally {
     f.clean();
   }
@@ -754,12 +753,16 @@ test('a stopped waiting leaf is never stacked', async () => {
 test('a red stack records member heads, clears the batch and restarts the holder alone', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
+    const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+    yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 5 });
     const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
     const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
     const cc: { path: string; b: string } = await allocatedLeaf(f, 'cc', 'issue-cc');
+    const dd: { path: string; b: string } = await allocatedLeaf(f, 'dd', 'issue-dd');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     await commitFile(f, bb.path, 'bb-file', 'bb\n');
     await commitFile(f, cc.path, 'cc-file', 'cc\n');
+    await commitFile(f, dd.path, 'dd-file', 'dd\n');
     const bbHead: string = await head(f, 'bb');
     const ccHead: string = await head(f, 'cc');
     const bbWorktree: string = z.string().parse(readState(bb.path).worktree);
@@ -768,10 +771,12 @@ test('a red stack records member heads, clears the batch and restarts the holder
     toMerge(cc.path, '2026-09-13T00:00:00.000Z');
     saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, [])).code).toBe(0);
+
     const record = readState(aa.path).batch!;
     const base: string = record.built_on;
     expect(stacked(aa.path)!.map((member) => member.slug)).toEqual(['bb', 'cc']);
     expect(mergePrompts(f)[0].text).toContain('members=bb,cc');
+
     idleAllNewSession(f);
     const red: Result = await cli(
       f,
@@ -781,6 +786,7 @@ test('a red stack records member heads, clears the batch and restarts the holder
     );
     expect(red.code).toBe(0);
     expect(red.stdout).toBe('stack red; holder turn restarts alone');
+
     const attempts = attemptLines(f);
     expect(attempts).toHaveLength(1);
     expect(attempts[0].outcome).toBe('red');
@@ -795,13 +801,79 @@ test('a red stack records member heads, clears the batch and restarts the holder
     expect(await head(f, 'bb')).toBe(bbHead);
     // The same check.fix call restarted the holder's turn at once: a new batch,
     // holder alone since the recorded heads are skipped on the same base.
+
     const rebuilt = readState(aa.path).batch!;
     expect(rebuilt.applied).toBe(true);
+    expect(rebuilt.built_on).toBe(base);
     expect(stacked(aa.path)).toEqual([]);
     expect(mergePrompts(f)).toHaveLength(2);
     expect(mergePrompts(f)[1].text).toContain(`attempt=${rebuilt.attempt}`);
     expect(mergePrompts(f)[1].text).not.toContain('members=');
-    // The holder alone lands; its push moves the base so cc becomes stackable again.
+    // A fresh waiter joins before the holder's solo turn ends red too.
+    toMerge(dd.path, '2026-09-14T00:00:00.000Z');
+    expect(
+      (await cli(f, ['phase', 'aa', 'check.fix', '--slot', 'B', '--attempt', rebuilt.attempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect(attemptLines(f).map((line) => line.outcome)).toEqual(['red', 'red']);
+    expect(attemptLines(f)[1].members).toBeUndefined();
+    expect(leafState(aa.path).phase).toBe('check.fix');
+    // The wake ran bb's turn on the same base: cc's recorded head is skipped, dd is not.
+
+    const bbBatch = readState(bb.path).batch!;
+    expect(bbBatch.built_on).toBe(base);
+    expect(stacked(bb.path)!.map((member) => member.slug)).toEqual(['dd']);
+    // A changed member head clears the skip on the same base: the next restack
+    // re-snapshots the queue and cc rides again under its new head.
+    const bbAttempt: string = bbBatch.attempt;
+    await verified(f, 'bb', 'merge');
+    expect(
+      (await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--check', '--attempt', bbAttempt], f.root, f.env)).code,
+    ).toBe(0);
+    await commitFile(f, cc.path, 'cc-new', 'cc2\n');
+    await commitFile(f, dd.path, 'dd-new', 'dd2\n');
+    const ccHead2: string = await head(f, 'cc');
+
+    const rerun: Result = await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--attempt', bbAttempt], f.root, f.env);
+    expect(rerun.code).toBe(0);
+    expect(rerun.stdout).toMatch(/^rerun /);
+    const restacked = readState(bb.path).batch!;
+    expect(restacked.built_on).toBe(base);
+    expect(restacked.top).toBeTruthy();
+    expect(stacked(bb.path)!.map((member) => member.slug)).toEqual(['cc', 'dd']);
+    expect(stacked(bb.path)![0].head).toBe(ccHead2);
+  } finally {
+    f.clean();
+  }
+}, 40000);
+
+test('a member head red on the old base stacks on the moved base', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
+    const cc: { path: string; b: string } = await allocatedLeaf(f, 'cc', 'issue-cc');
+    await commitFile(f, aa.path, 'aa-file', 'aa\n');
+    await commitFile(f, bb.path, 'bb-file', 'bb\n');
+    await commitFile(f, cc.path, 'cc-file', 'cc\n');
+    const bbHead: string = await head(f, 'bb');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    toMerge(cc.path, '2026-09-12T00:00:00.000Z');
+    toMerge(bb.path, '2026-09-13T00:00:00.000Z');
+    saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, [])).code).toBe(0);
+    const record = readState(aa.path).batch!;
+    const base: string = record.built_on;
+    expect(stacked(aa.path)!.map((member) => member.slug)).toEqual(['cc', 'bb']);
+    idleAllNewSession(f);
+    expect(
+      (await cli(f, ['phase', 'aa', 'check.fix', '--slot', 'B', '--attempt', record.attempt], f.root, f.env)).code,
+    ).toBe(0);
+    expect(attemptLines(f)[0].members).toEqual([
+      { slug: 'cc', head: await head(f, 'cc') },
+      { slug: 'bb', head: bbHead },
+    ]);
+    // The holder alone lands; the push moves the base so the recorded heads stack again.
+    const rebuilt = readState(aa.path).batch!;
     await verified(f, 'aa', 'merge');
     expect(
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', rebuilt.attempt], f.root, f.env))
@@ -811,15 +883,14 @@ test('a red stack records member heads, clears the batch and restarts the holder
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', rebuilt.attempt], f.root, f.env)).code,
     ).toBe(0);
     expect(leafState(aa.path).phase).toBe('merged');
-    // A head change clears the skip even on the same base: commit on cc before bb's turn.
-    await commitFile(f, cc.path, 'cc-new', 'cc2\n');
-    saveDatabase(f, { ...database(f), prompts: [] });
-    expect((await next(f, [])).code).toBe(0);
-    const bbBatch = readState(bb.path).batch!;
-    expect(bbBatch).toBeDefined();
-    expect(stacked(bb.path)!.map((member) => member.slug)).toEqual(['cc']);
-    expect(stacked(bb.path)![0].head).toBe(await head(f, 'cc'));
-    expect(mergePrompts(f)[0].text).toContain('members=cc');
+    // The wake ran cc's turn on the moved base: bb's red head is no longer skipped.
+    const ccBatch = readState(cc.path).batch!;
+    expect(ccBatch.built_on).not.toBe(base);
+    expect(ccBatch.built_on).toBe(await remoteTip(f));
+    expect(stacked(cc.path)!.map((member) => member.slug)).toEqual(['bb']);
+    expect(stacked(cc.path)![0].head).toBe(bbHead);
+    expect(await head(f, 'bb')).toBe(bbHead);
+    expect(mergePrompts(f)[mergePrompts(f).length - 1].text).toContain('members=bb');
   } finally {
     f.clean();
   }
@@ -910,13 +981,14 @@ test('reconcile moves every still-merge stacked member to merged exactly once', 
     expect(leafState(bb.path).phase).toBe('merged');
     expect(leafState(cc.path).phase).toBe('merged');
     expect(leafState(aa.path).batch).toBeUndefined();
-    expect(await head(f, 'bb')).toBe(tips.get('bb'));
-    expect(await head(f, 'cc')).toBe(tips.get('cc'));
+    // The member tips were moved onto the branch before merged cleanup reaped it.
+    const remote: string = await remoteTip(f);
+    expect((await run(['git', 'merge-base', '--is-ancestor', tips.get('bb')!, remote], f.root)).code).toBe(0);
+    expect((await run(['git', 'merge-base', '--is-ancestor', tips.get('cc')!, remote], f.root)).code).toBe(0);
     expect(attemptLines(f).map((line) => line.outcome)).toEqual(['merged']);
     // A second pass does not move or record anything again.
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(attemptLines(f).map((line) => line.outcome)).toEqual(['merged']);
-    expect(await head(f, 'bb')).toBe(tips.get('bb'));
   } finally {
     f.clean();
   }

@@ -54,7 +54,7 @@ for (const area of ['open', 'closed', 'parked']) {
           renameSync(created, path);
         }
         const supported: State = {
-          ...canonical,
+          ...stateSchema.parse(canonical),
           sources: ['team/project#1'],
           busy_since: { A: '2026-09-10T10:00:00Z' },
           busy_notified: { A: '2026-09-10T10:00:00Z' },

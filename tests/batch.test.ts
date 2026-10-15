@@ -308,7 +308,7 @@ test.serial('buildStack refuses a store path under an ancestor holding node_modu
 test.serial('a holder already on the base produces the base without a rebase', async () => {
   const { f, repo, builtOn } = await batchFixture();
   try {
-    expect(await buildStack(repo, builtOn, builtOn)).toEqual({ ok: true, top: builtOn });
+    expect(await buildStack(repo, builtOn, builtOn)).toMatchObject({ ok: true, top: builtOn });
     noLeftoverWorktrees(f);
   } finally {
     f.clean();

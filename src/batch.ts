@@ -90,17 +90,20 @@ export async function pickMembers(
   const members: BatchMember[] = [];
   for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root)).slice(1)) {
     const slug: string = candidate.leaf.state.slug;
-    // Only leaves carrying commits beyond the base can stack; a branch at or
-    // below the base adds nothing to the turn.
     const sha: string | undefined = await branchSha(repo, slug);
-    if (sha === undefined || sha === builtOn) continue;
-    if (red.has(sha)) continue;
-    members.push({ slug, base: await memberBase(repo, builtOn, sha), head: sha, tip: sha });
+    const head: string = sha ?? builtOn;
+    if (red.has(head)) continue;
+    members.push({
+      slug,
+      base: sha === undefined || head === builtOn ? head : await memberBase(repo, builtOn, head),
+      head,
+      tip: head,
+    });
   }
   return members;
 }
 
-export type StackResult = { ok: true; top: string; tips?: Map<string, string> } | { ok: false };
+export type StackResult = { ok: true; top: string; tips: Map<string, string> } | { ok: false };
 
 export async function buildStack(
   repo: Repo,
@@ -129,9 +132,9 @@ export async function buildStack(
         stacked.push(member);
         continue;
       }
-      const merged: Result = await run(['git', 'merge', '--no-edit', member.head], dir);
-      if (merged.code !== 0) {
-        await run(['git', 'merge', '--abort'], dir);
+      const rebased: Result = await run(['git', 'rebase', '--onto', tip, member.base, member.head], dir);
+      if (rebased.code !== 0) {
+        await run(['git', 'rebase', '--abort'], dir);
         continue;
       }
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
@@ -147,10 +150,7 @@ export async function buildStack(
       await command(['git', 'commit', '-m', 'lessons: retire applied lines'], dir);
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
     }
-    // tips stays non-enumerable so equality checks on {ok, top} keep working.
-    const result: Extract<StackResult, { ok: true }> = { ok: true, top: tip, tips };
-    Object.defineProperty(result, 'tips', { value: tips, enumerable: false });
-    return result;
+    return { ok: true, top: tip, tips };
   } finally {
     await command(['git', 'worktree', 'remove', '--force', dir], repo.root);
   }

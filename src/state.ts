@@ -71,8 +71,7 @@ export const batchSchema = z.strictObject({
   applied: z.boolean(),
 });
 
-// Records assembled in code may omit members; parsing fills the default.
-export type Batch = Omit<z.infer<typeof batchSchema>, 'members'> & { members?: BatchMember[] };
+export type Batch = z.infer<typeof batchSchema>;
 
 export const stateSchema = z
   .strictObject({
@@ -105,7 +104,7 @@ export const stateSchema = z
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
 
-export type State = Omit<z.infer<typeof stateSchema>, 'batch'> & { batch?: Batch };
+export type State = z.infer<typeof stateSchema>;
 
 export type Leaf = { path: string; state: State };
 
@@ -126,20 +125,6 @@ export function readState(path: string): State {
         )
       : parsed,
   );
-  // Preserve record identity: a batch written without members reads back
-  // without members even though the schema default fills [] for checks.
-  const batch: unknown =
-    parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>).batch
-      : undefined;
-  if (
-    state.batch !== undefined &&
-    batch !== null &&
-    typeof batch === 'object' &&
-    !Array.isArray(batch) &&
-    !('members' in batch)
-  )
-    delete state.batch.members;
   return state;
 }
 
