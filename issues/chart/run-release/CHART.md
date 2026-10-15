@@ -3,7 +3,9 @@
 ## Destination
 The installed `akrogon` command runs a complete release built from merged main, behind one `current` pointer. A workspace edit never goes live, never blocks a deploy and is never undone into a "revert". Work, charts and records stay in the workspace.
 
-Route: undecided
+Route: lifecycle (debate no)
+
+Handoff review 2026-10-16: operator `r1a`. Leaf drafts reviewed by [B](slots/leaf-review-B.md) and [C](slots/leaf-review-C.md); applied: cutover under the old global and admission locks with no live run record (B F1); hold reader moved into release-deploy and manual rollback steps for a broken current (B F2, C F1); link restore on rollback (B F3); schema error naming file and key with `readGlobal` owned by release-rollback (C F2). Leaves: issues/open/run-release/{state-home, release-deploy, release-rollback}.
 
 ## Forks taken
 - [run-location](forks/run-location.md): release folders behind `current` (O1b).
@@ -19,4 +21,6 @@ none
 - Compiled single binary, read-only files, dirty-root refusal, stash/reset on update: see run-location Foreclosed.
 
 ## Pending steps
-none
+- After state-home merges and the host runs from `~/.akrogon` (`~/.akrogon/config.yaml` present and `akrogon status` works): remove the tracked tool-root `config.yaml`, `held.yaml`, `admission.lock` and `runs/last-start` from the akrogon repo, in a separate worktree, B review, push. Owner: the door. Check: `git ls-files config.yaml held.yaml admission.lock runs/last-start` prints nothing on origin/main and `akrogon status` still works.
+
+Handed off 2026-10-16

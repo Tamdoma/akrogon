@@ -1,0 +1,8 @@
+slug: release-deploy
+phase: plan.synthesis
+created: '2026-10-16'
+repo: akrogon
+debate: 'no'
+blocked-by:
+  - state-home
+sources: []
