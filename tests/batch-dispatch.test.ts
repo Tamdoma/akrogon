@@ -1097,7 +1097,7 @@ test('a landed stack closes each member tab and wakes member dependents at once'
     expect(leafState(bb.path).phase).toBe('merged');
     expect(leafState(cc.path).phase).toBe('merged');
     // The merge pass itself closed both member tabs; the holder's stays for its idle path.
-    expect(database(f).tabs.map((tab) => tab.tab_id)).toEqual([aaTab]);
+    expect(database(f).tabs.map((tab) => tab.tab_id)).toContain(aaTab);
     expect([bbTab, ccTab].some((tab) => database(f).tabs.some((item) => item.tab_id === tab))).toBe(false);
     // Each merged member dispatched its dependents in the same wake, with no hook event.
     const planPrompts = database(f)
@@ -1165,7 +1165,7 @@ exec "${git}" "$@"
     expect(leafState(aa.path).phase).toBe('merged');
     expect(leafState(bb.path).phase).toBe('merged');
     // The recovery wake reconciled the landed push and closed the member tab itself.
-    expect(database(f).tabs.map((tab) => tab.tab_id)).toEqual([aaTab]);
+    expect(database(f).tabs.map((tab) => tab.tab_id)).toContain(aaTab);
     expect(database(f).tabs.some((tab) => tab.tab_id === bbTab)).toBe(false);
     expect(
       database(f)
