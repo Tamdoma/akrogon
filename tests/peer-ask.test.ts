@@ -141,7 +141,7 @@ test('seeds the codex boundary before prompting', async (): Promise<void> => {
     ],
   );
   try {
-    const result: RunResult = await s.run('10', paneB, s.fileB, 'read the brief');
+    const result: RunResult = await s.run('12', paneB, s.fileB, 'read the brief');
     expect(result.code).toBe(0);
     const line = JSON.parse(result.stdout);
     expect(line.outcome).toBe('failure');
