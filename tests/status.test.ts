@@ -1010,3 +1010,57 @@ for (const [name, content] of Object.entries(malformedIndexes)) {
     }
   });
 }
+
+test('unpacked folders are listed with their pack command and open .closing names next', async () => {
+  const f: Fixture = await fixture();
+  try {
+    register(f, { repo: f.root });
+    const closedLog: string = resolve(f.root, 'issues/closed/finished/leaf/check-a-1.log');
+    mkdirSync(resolve(closedLog, '..'), { recursive: true });
+    writeFileSync(closedLog, 'alpha\n');
+    const closedMarker: string = resolve(f.root, 'issues/closed/moved');
+    mkdirSync(closedMarker, { recursive: true });
+    writeFileSync(resolve(closedMarker, '.closing'), '');
+    const ended: string = resolve(f.root, 'issues/chart/ended');
+    mkdirSync(resolve(ended, 'direct'), { recursive: true });
+    writeFileSync(resolve(ended, 'CHART.md'), '# Chart: ended\n\n## Fog\n- None.\n\nClosed 2026-10-15\n');
+    writeFileSync(resolve(ended, 'direct/check-d-1.log'), 'chart\n');
+    const chartMarker: string = resolve(f.root, 'issues/chart/halted');
+    mkdirSync(chartMarker, { recursive: true });
+    writeFileSync(resolve(chartMarker, 'CHART.md'), '# Chart: halted\n\n## Fog\n- None.\n\nHeld 2026-10-15\n');
+    writeFileSync(resolve(chartMarker, '.closing'), '');
+    const openChart: string = resolve(f.root, 'issues/chart/live');
+    mkdirSync(resolve(openChart, 'direct'), { recursive: true });
+    writeFileSync(resolve(openChart, 'CHART.md'), '# Chart: live\n\n## Fog\n- a gap\n');
+    writeFileSync(resolve(openChart, 'direct/check-e-1.log'), 'live\n');
+    const merged: string = leaf(f, 'done-leaf', 'merged', {}, 'issue');
+    leaf(f, 'quiet-leaf', 'implement', {}, 'calm');
+    writeFileSync(resolve(merged, '../../.closing'), '');
+
+    const listed: Result = await cli(f, ['status']);
+    expect(listed.code).toBe(0);
+    const unpacked: string[] = listed.stdout.split('\n').filter((line) => line.startsWith('Unpacked: '));
+    expect(unpacked.length).toBe(4);
+    expect(unpacked.some((line) => line.includes('issues/closed/finished') && line.includes('pack'))).toBe(true);
+    expect(unpacked.some((line) => line.includes('issues/closed/moved') && line.includes('pack'))).toBe(true);
+    expect(unpacked.some((line) => line.includes('issues/chart/ended') && line.includes('pack'))).toBe(true);
+    expect(unpacked.some((line) => line.includes('issues/chart/halted') && line.includes('pack'))).toBe(true);
+    expect(
+      listed.stdout.split('\n').some(
+        (line) => line.startsWith('Unpacked: ') && line.includes('issues/open/issue') && line.includes('next') && line.includes('done-leaf'),
+      ),
+    ).toBe(true);
+    expect(unpacked.some((line) => line.includes('issues/chart/live'))).toBe(false);
+    expect(unpacked.some((line) => line.includes('issues/open/') && line.includes('calm'))).toBe(false);
+
+    expect((await cli(f, ['pack', 'issues/closed/finished', 'issues/chart/ended'])).code).toBe(0);
+    const after: Result = await cli(f, ['status']);
+    const remaining: string[] = after.stdout.split('\n').filter((line) => line.startsWith('Unpacked: '));
+    expect(remaining.some((line) => line.includes('finished'))).toBe(false);
+    expect(remaining.some((line) => line.includes('ended'))).toBe(false);
+    expect(remaining.some((line) => line.includes('moved'))).toBe(true);
+    expect(remaining.some((line) => line.includes('halted'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});

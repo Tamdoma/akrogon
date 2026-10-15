@@ -31,6 +31,7 @@ const contracts: Record<string, string> = {
   'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
   verify: '[--sha <rev>] [--attempt <id>] [--holder <dir>]',
   'stop-run': '[<run-id>]',
+  pack: '<folder>...',
   guard: '<ancestors|own-modules>',
 };
 
