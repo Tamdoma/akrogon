@@ -644,6 +644,17 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       const keptBefore: number = kept.length;
       for (const child of runEntries) {
         const runRoot: string = resolve(dir, child.name);
+        const refusalFile: string = resolve(runRoot, 'refusal.json');
+        if (existsSync(refusalFile)) {
+          let reason: string = 'publish refused';
+          try {
+            reason = 'publish refused: ' + z.object({ reason: z.string() }).parse(JSON.parse(readFileSync(refusalFile, 'utf8'))).reason;
+          } catch {
+            // an unreadable refusal file still keeps the run root
+          }
+          keep(runRoot, reason);
+          continue;
+        }
         const ownerFile: string = resolve(runRoot, '.owner');
         if (!existsSync(ownerFile)) {
           keep(runRoot, 'no .owner record');

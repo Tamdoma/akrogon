@@ -17,6 +17,7 @@ import { allLeaves, readState, type Leaf, type State } from './state';
 import { command, spawnCaptured, type Result } from './shell';
 import { appendTiming } from './timing';
 import { callerScope, withAdmission } from './admission';
+import { locate } from './evidence';
 import { leafSlice, runSlice, runUnitArgv, runUnitBase, sessionBusAddress, startRunGuard, stopRunUnits } from './scope';
 import { type Phase } from './routing';
 
@@ -152,6 +153,25 @@ export async function runCheck(
   return result.code;
 }
 
+export class PublishRefusedError extends Error {}
+
+// A leaf publish target sits under an owner dir that may still be open, may be
+// closing, or may already be packed under issues/closed; the leaf name is the
+// member's first segment, so both areas can exist while only one holds the
+// leaf. Chart-direct holders resolve to a single owner dir and stay allowed.
+// The late rule adds the vanished-leaf case: the owner moved it while the
+// command ran.
+async function ownerRefusal(target: string, repo: Repo, late: boolean): Promise<string | undefined> {
+  const found = await locate(target, repo.root, repo);
+  if (found === null || found.ownerDirs.length === 1) return undefined;
+  const [open, closed]: string[] = found.ownerDirs;
+  const leafDir: string = found.member.split('/')[0];
+  if (existsSync(resolve(closed, leafDir))) return `owner closed: ${target}`;
+  if (existsSync(resolve(open, '.closing'))) return `owner closing: ${target}`;
+  if (late && !existsSync(resolve(open, leafDir))) return `owner gone: ${target}`;
+  return undefined;
+}
+
 export async function checkedRun(
   repo: Repo,
   { slug, target, scope, unit, phase, attempt }: LeafTarget,
@@ -160,7 +180,10 @@ export async function checkedRun(
   argv: string[],
   cwd: string,
 ): Promise<{ code: number; log: string; stderr_final_nl: boolean }> {
+  const early: string | undefined = await ownerRefusal(target, repo, false);
+  if (early !== undefined) throw new PublishRefusedError(early);
   const runRoot: string = mkdtempSync(resolve(ensureLeafTemp(repo, slug), 'run-'));
+  let refused: boolean = false;
   try {
     const boot: string = existsSync('/proc/sys/kernel/random/boot_id')
       ? readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
@@ -213,6 +236,13 @@ export async function checkedRun(
               })();
         process.stdout.write(result.stdout);
         process.stderr.write(result.stderr);
+        const refusedReason: string | undefined = await ownerRefusal(target, repo, true);
+        if (refusedReason !== undefined) {
+          writeFileSync(resolve(runRoot, 'refusal.json'), JSON.stringify({ reason: refusedReason }));
+          rmSync(resolve(runRoot, '.owner'));
+          refused = true;
+          throw new PublishRefusedError(`${refusedReason}; captured output stays in ${log}`);
+        }
         mkdirSync(target, { recursive: true });
         const kept: string = resolve(target, `check-${encodeURIComponent(name)}-${Date.now()}-${process.pid}.log`);
         copyFileSync(log, kept);
@@ -227,6 +257,6 @@ export async function checkedRun(
       },
     );
   } finally {
-    rmSync(runRoot, { recursive: true, force: true });
+    if (!refused) rmSync(runRoot, { recursive: true, force: true });
   }
 }
