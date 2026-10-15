@@ -34,7 +34,7 @@ export async function guard(cwd: string, positionals: string[]): Promise<number>
     return 0;
   }
   const own: string = join(top, 'node_modules');
-  if (!existsSync(own)) {
+  if (existsSync(join(top, 'package.json')) && !existsSync(own)) {
     console.error(`missing own node_modules: ${own}`);
     return 1;
   }

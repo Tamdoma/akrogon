@@ -37,6 +37,9 @@ test('guard ancestors accepts package.json at the toplevel and refuses a parent 
 test('guard own-modules refuses naming the missing node_modules and accepts it once created', async () => {
   const f: Fixture = await fixture();
   try {
+    const noPackage: Result = await cli(f, ['guard', 'own-modules']);
+    expect(noPackage.code).toBe(0);
+    writeFileSync(resolve(f.root, 'package.json'), '{"name":"repo"}\n');
     const missing: Result = await cli(f, ['guard', 'own-modules']);
     expect(missing.code).toBe(1);
     expect(missing.stderr).toContain(resolve(realpathSync(f.root), 'node_modules'));
@@ -119,6 +122,7 @@ test('printed check refuses naming missing own node_modules and never runs the c
     });
     const worktree: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', '--detach', worktree, 'HEAD'], f.root);
+    writeFileSync(resolve(worktree, 'package.json'), '{"name":"repo"}\n');
     leaf(f, 'check', 'implement', { worktree });
     const printed: string = (
       Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout) as { checks: Record<string, string> }

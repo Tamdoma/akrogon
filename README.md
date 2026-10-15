@@ -150,7 +150,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon flaky` | List each verify command and failed test that went red then green on the same tree, with its count and last time, newest first. |
 | `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Register the run, start a command at once under the constructed check environment, and log output into the leaf. |
 | `akrogon verify [--sha <rev>] [--attempt <id>] [--holder <dir>]` | Check the commit out fresh in the worktree store, run every configured check for the caller's scope under the constructed environment, log each into the leaf or holder, write one receipt to `issues/verify-runs.jsonl` and remove the checkout. Exits 0 only when every command passed. |
-| `akrogon guard <ancestors\|own-modules>` | Refuse when a canonical ancestor holds node_modules or package.json, or the checkout's own node_modules is missing. |
+| `akrogon guard <ancestors\|own-modules>` | Refuse when a canonical ancestor holds node_modules or package.json, or a checkout with a package.json at its top is missing its own node_modules. |
 ```
 
 A normal starting point for CSV export is:
