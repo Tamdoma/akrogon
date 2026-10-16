@@ -399,8 +399,10 @@ export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<b
   // that is finished or has a recorded tab is a slice-stop candidate either
   // way, and an unreadable unit inventory forces the conservative fetch.
   if (
-    leaves.some((leaf) => leaf.state.phase === 'merged' || leaf.state.phase === 'failed') &&
-    leaves.some((leaf) => leaf.state.tab !== undefined)
+    leaves.some(
+      (leaf) =>
+        (leaf.state.phase === 'merged' || leaf.state.phase === 'failed') && leaf.state.tab !== undefined,
+    )
   )
     return true;
   const candidates: Leaf[] = leaves.filter((leaf) => finished(leaf) || leaf.state.tab !== undefined);
