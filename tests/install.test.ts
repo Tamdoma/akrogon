@@ -56,12 +56,12 @@ function calls(f: Fixture): string[][] {
     .map((line) => z.array(z.string()).parse(JSON.parse(line)));
 }
 
-function expectedCalls(): string[][] {
+function expectedCalls(f: Fixture): string[][] {
   return [
     ['integration', 'install', 'claude'],
     ['integration', 'install', 'codex'],
     ['integration', 'install', 'pi'],
-    ['plugin', 'link', resolve(toolRoot, 'plugin')],
+    ['plugin', 'link', resolve(f.home, 'current', 'plugin')],
   ];
 }
 
@@ -124,10 +124,10 @@ test('install creates all four absent harness roots and repeats without changing
         expect(realpathSync(destination)).toBe(resolve(toolRoot, 'skills', skill));
       }
     }
-    expect(calls(f)).toEqual(expectedCalls());
+    expect(calls(f)).toEqual(expectedCalls(f));
     expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0, stderr: '' });
     expect(destinations.map((destination) => readlinkSync(destination))).toEqual(targets);
-    expect(calls(f)).toEqual([...expectedCalls(), ...expectedCalls()]);
+    expect(calls(f)).toEqual([...expectedCalls(f), ...expectedCalls(f)]);
   } finally {
     f.clean();
   }
@@ -179,7 +179,7 @@ test('install prunes only dangling owned links and preserves real entries and fo
       for (const skill of skills)
         expect(realpathSync(resolve(directory, skill))).toBe(resolve(toolRoot, 'skills', skill));
     }
-    expect(calls(f)).toEqual(expectedCalls());
+    expect(calls(f)).toEqual(expectedCalls(f));
     mkdirSync(dirname(artifact), { recursive: true });
     writeFileSync(
       artifact,
@@ -215,7 +215,7 @@ test('install prunes only dangling owned links and preserves real entries and fo
 });
 
 for (const root of roots) {
-  for (const kind of ['directory', 'foreign-link', 'wrong-owned-link']) {
+  for (const kind of ['directory', 'foreign-link']) {
     test(`install prunes before refusing ${kind} at ${root} without installing links or calling herdr`, async () => {
       const f: Fixture = await fixture();
       try {
@@ -244,6 +244,23 @@ for (const root of roots) {
       }
     });
   }
+
+  test(`install repoints an owned link at ${root} instead of refusing it`, async () => {
+    const f: Fixture = await fixture();
+    try {
+      const env: NodeJS.ProcessEnv = installEnv(f);
+      const directory: string = resolve(f.home, root);
+      mkdirSync(directory, { recursive: true });
+      const destination: string = resolve(directory, skills[0]);
+      symlinkSync(resolve(toolRoot, 'skills', skills[1]), destination);
+      const result: Result = await cli(f, ['install'], f.root, env);
+      expect(result).toMatchObject({ code: 0, stderr: '' });
+      expect(readlinkSync(destination)).toBe(resolve(f.home, 'current', 'skills', skills[0]));
+      expect(realpathSync(destination)).toBe(resolve(toolRoot, 'skills', skills[0]));
+    } finally {
+      f.clean();
+    }
+  });
 }
 
 test('install still refuses an executable destination conflict before linking or herdr calls', async () => {
@@ -348,11 +365,14 @@ describe('self-update', () => {
     if (!existsSync(bin)) {
       mkdirSync(bin);
       symlinkSync(resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(bin, 'systemctl'));
+      symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
+      writeFileSync(resolve(home, 'herdr.json'), JSON.stringify({ panes: [], tabs: [], serial: 0 }));
     }
     process.env.AKROGON_HOME = home;
     process.env.PATH = `${bin}:${previousPath}`;
     process.env.FAKE_SYSTEMCTL_LOG = resolve(home, 'systemctl.log');
     process.env.FAKE_SLICE_LINK = resolve(home, '.config/systemd/user/akrogon.slice');
+    process.env.FAKE_HERDR = resolve(home, 'herdr.json');
     try {
       await body();
     } finally {
@@ -361,6 +381,7 @@ describe('self-update', () => {
       process.env.PATH = previousPath;
       delete process.env.FAKE_SYSTEMCTL_LOG;
       delete process.env.FAKE_SLICE_LINK;
+      delete process.env.FAKE_HERDR;
     }
   }
 
@@ -386,16 +407,21 @@ describe('self-update', () => {
         writeFileSync(resolve(f.seed, 'file'), 'changed\n');
       });
       writeFileSync(resolve(f.clone, 'skills/skill-one/SKILL.md'), 'local edit\n');
-      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
-      expect(logs).toEqual([`deployed ${oldSha.slice(0, 12)}..${newSha.slice(0, 12)}`]);
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
+      expect(logs).toEqual([
+        `deployed ${oldSha.slice(0, 12)}..${newSha.slice(0, 12)}; deployed ${newSha.slice(0, 12)}; switched from checkout to release`,
+      ]);
       expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(newSha);
       expect(readFileSync(resolve(f.clone, 'skills/skill-one/SKILL.md'), 'utf8')).toBe('local edit\n');
+      expect(realpathSync(resolve(f.home, 'current'))).toBe(resolve(f.home, 'releases', newSha));
       for (const root of roots) {
         const link: string = resolve(f.home, root, 'skill-one');
         expect(lstatSync(link).isSymbolicLink()).toBe(true);
-        expect(realpathSync(link)).toBe(resolve(f.clone, 'skills/skill-one'));
+        expect(realpathSync(link)).toBe(resolve(f.home, 'releases', newSha, 'skills/skill-one'));
       }
-      expect(realpathSync(resolve(f.home, '.local/bin/akrogon'))).toBe(resolve(f.clone, 'src/akrogon.ts'));
+      expect(realpathSync(resolve(f.home, '.local/bin/akrogon'))).toBe(
+        resolve(f.home, 'releases', newSha, 'src/akrogon.ts'),
+      );
       expect(existsSync(resolve(f.clone, '.git/akrogon-install.lock'))).toBe(true);
       expect(existsSync(resolve(f.home, '.lock'))).toBe(true);
     } finally {
@@ -507,29 +533,28 @@ describe('self-update', () => {
     }
   });
 
-  test.serial('reports a failed install and reports current once the lockfile is restored', async () => {
-    const f: SelfUpdateFixture = await selfUpdateFixture();
-    try {
-      const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
-      writeFileSync(resolve(f.clone, 'bun.lock'), 'garbage\n');
-      const first: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
-      expect(first).toHaveLength(1);
-      expect(first[0]).toContain('install');
-      expect(first[0]).toContain('failed');
-      expect(first[0]).toContain('error:');
-      expect(first[0]).toContain('bun.lock');
-      expect(first[0]).not.toContain('\n');
-      expect(first[0]).toContain('0 behind origin/main');
-      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
-      writeFileSync(resolve(f.clone, 'bun.lock'), readFileSync(resolve(f.seed, 'bun.lock'), 'utf8'));
-      const second: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
-      expect(second).toEqual([`current ${head.slice(0, 12)}`]);
-    } finally {
-      f.clean();
-    }
-  });
+  test.serial(
+    'ignores a dirty workspace lockfile and reports current once the release is already deployed',
+    async () => {
+      const f: SelfUpdateFixture = await selfUpdateFixture();
+      try {
+        const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
+        writeFileSync(resolve(f.clone, 'bun.lock'), 'garbage\n');
+        const first: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
+        expect(first).toHaveLength(1);
+        expect(first[0]).toContain(`deployed ${head.slice(0, 12)}`);
+        expect(first[0]).not.toContain('failed');
+        expect(readFileSync(resolve(f.clone, 'bun.lock'), 'utf8')).toBe('garbage\n');
+        writeFileSync(resolve(f.clone, 'bun.lock'), readFileSync(resolve(f.seed, 'bun.lock'), 'utf8'));
+        const second: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
+        expect(second).toEqual([`current ${head.slice(0, 12)}`]);
+      } finally {
+        f.clean();
+      }
+    },
+  );
 
-  test.serial('runs the git stage but skips install and links when repo.root is not ownRoot', async () => {
+  test.serial('runs the git stage but skips install and links when the repo is not akrogon', async () => {
     const f: SelfUpdateFixture = await selfUpdateFixture();
     try {
       mkdirSync(resolve(f.clone, 'issues'), { recursive: true });
@@ -537,13 +562,14 @@ describe('self-update', () => {
       await command(['git', 'add', '--', 'issues/record'], f.clone);
       await command(['git', 'commit', '-m', 'record'], f.clone);
       const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
-      const elsewhere: string = mkdtempSync(resolve(f.home, 'elsewhere-'));
-      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, elsewhere, f.home));
+      const repo: Repo = { ...f.repo, name: 'other' };
+      const logs: string[] = await captured(f.home, () => selfUpdate(repo, f.home));
       expect(logs).toHaveLength(1);
       expect(logs[0]).toContain('pushed');
       expect(await command(['git', 'rev-parse', 'main'], f.remote)).toBe(head);
       expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
       expect(existsSync(resolve(f.home, '.local/bin'))).toBe(false);
+      expect(existsSync(resolve(f.home, 'current'))).toBe(false);
       expect(existsSync(resolve(f.clone, '.git/akrogon-install.lock'))).toBe(false);
     } finally {
       f.clean();
@@ -563,15 +589,19 @@ describe('self-update', () => {
         writeFileSync(resolve(f.seed, 'skills/skill-three/SKILL.md'), 'three\n');
         rmSync(resolve(f.seed, 'skills/skill-two'), { recursive: true, force: true });
       });
-      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
       expect(logs).toHaveLength(1);
-      expect(logs[0]).toMatch(/^deployed [0-9a-f]{12}\.\.[0-9a-f]{12}$/);
+      expect(logs[0]).toContain(`deployed ${newSha.slice(0, 12)}`);
       expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(newSha);
       for (const root of roots) {
         const directory: string = resolve(f.home, root);
         expect(lstatSync(resolve(directory, 'skill-two'), { throwIfNoEntry: false })).toBeUndefined();
-        expect(realpathSync(resolve(directory, 'skill-three'))).toBe(resolve(f.clone, 'skills/skill-three'));
-        expect(realpathSync(resolve(directory, 'skill-one'))).toBe(resolve(f.clone, 'skills/skill-one'));
+        expect(realpathSync(resolve(directory, 'skill-three'))).toBe(
+          resolve(f.home, 'releases', newSha, 'skills/skill-three'),
+        );
+        expect(realpathSync(resolve(directory, 'skill-one'))).toBe(
+          resolve(f.home, 'releases', newSha, 'skills/skill-one'),
+        );
       }
     } finally {
       f.clean();
@@ -582,18 +612,23 @@ describe('self-update', () => {
     const f: SelfUpdateFixture = await selfUpdateFixture();
     try {
       mkdirSync(resolve(f.home, '.claude/skills/skill-one'), { recursive: true });
-      await pushSeed(f, () => {
+      const newSha: string = await pushSeed(f, () => {
         writeFileSync(resolve(f.seed, 'file'), 'changed\n');
       });
-      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
       expect(logs).toHaveLength(1);
+      expect(logs[0]).toContain('deploy failed');
       expect(logs[0]).toContain('links');
       expect(logs[0]).toContain(resolve(f.home, '.claude/skills/skill-one'));
       expect(logs[0]).toContain('remove');
       expect(lstatSync(resolve(f.home, '.claude/skills/skill-one')).isDirectory()).toBe(true);
       for (const root of roots.filter((root) => root !== '.claude/skills'))
-        expect(realpathSync(resolve(f.home, root, 'skill-one'))).toBe(resolve(f.clone, 'skills/skill-one'));
-      expect(realpathSync(resolve(f.home, '.local/bin/akrogon'))).toBe(resolve(f.clone, 'src/akrogon.ts'));
+        expect(realpathSync(resolve(f.home, root, 'skill-one'))).toBe(
+          resolve(f.home, 'releases', newSha, 'skills/skill-one'),
+        );
+      expect(realpathSync(resolve(f.home, '.local/bin/akrogon'))).toBe(
+        resolve(f.home, 'releases', newSha, 'src/akrogon.ts'),
+      );
     } finally {
       f.clean();
     }

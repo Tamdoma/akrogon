@@ -146,9 +146,7 @@ for (const own of [true, false]) {
       await commitRecord(f, 'issues/log.jsonl', '{"ts":"now"}\n');
       await commitRecord(f, 'issues/open/x/brief.md', 'brief\n');
       const repo: Repo = own ? f.repo : { ...f.repo, name: 'other' };
-      const logs: string[] = await captured(f.home, () =>
-        selfUpdate(repo, own ? f.clone : resolve(f.home, 'elsewhere'), f.home),
-      );
+      const logs: string[] = await captured(f.home, () => selfUpdate(repo, f.home));
       expect(logs).toHaveLength(1);
       expect(logs[0]).toContain('pushed');
       expect(logs[0]).toContain('record');
@@ -174,7 +172,7 @@ test.serial('self-update pushes then reports a pending checkout the next trigger
     await commitRecord(f, 'issues/log.jsonl', '{"ts":"now"}\n');
     const localTip: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
     writeFileSync(resolve(f.clone, 'file'), 'dirty\n');
-    const first: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    const first: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
     expect(first).toHaveLength(1);
     expect(first[0]).toContain('pushed');
     expect(first[0]).toContain('pending');
@@ -187,7 +185,7 @@ test.serial('self-update pushes then reports a pending checkout the next trigger
     expect((await run(['git', 'stash', 'list'], f.clone)).stdout).toBe('');
     expect(await worktreeCount(f)).toBe(1);
     writeFileSync(resolve(f.clone, 'file'), 'incoming\n');
-    const second: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    const second: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
     expect(second).toHaveLength(1);
     expect(second[0]).not.toContain('pushed');
     expect(await remoteHead(f)).toBe(pushedTip);
@@ -206,7 +204,7 @@ test.serial('self-update reports a pending checkout on a behind-only move withou
     await pushSeed(f, 'file', 'incoming\n');
     const remoteBefore: string = await remoteHead(f);
     writeFileSync(resolve(f.clone, 'file'), 'dirty\n');
-    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
     expect(logs).toHaveLength(1);
     expect(logs[0]).not.toContain('pushed');
     expect(logs[0]).toContain('pending');
@@ -229,7 +227,7 @@ test.serial('a record commit landed while the lock waits is replayed, not droppe
     const lockPath: string = resolve(f.home, '.lock');
     writeFileSync(lockPath, '');
     const held: Bun.Subprocess = Bun.spawn(['flock', '-x', lockPath, 'sleep', '3']);
-    const update: Promise<string[]> = captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    const update: Promise<string[]> = captured(f.home, () => selfUpdate(f.repo, f.home));
     await Bun.sleep(500);
     await commitRecord(f, 'issues/open/y/brief.md', 'brief\n');
     await held.exited;
@@ -273,7 +271,7 @@ test.serial('a record commit landed at the branch write is pending, not dropped'
       `import { repoSchema } from '${resolve(process.cwd(), 'src/config.ts')}';\n` +
         `import { selfUpdate } from '${resolve(process.cwd(), 'src/self-update.ts')}';\n` +
         `import { readFileSync } from 'node:fs';\n` +
-        `await selfUpdate({ name: 'akrogon', root: '${f.clone}', config: repoSchema.parse({ grounding: 'none' }) }, '${f.clone}', '${f.home}');\n`,
+        `await selfUpdate({ name: 'akrogon', root: '${f.clone}', config: repoSchema.parse({ grounding: 'none' }) }, '${f.home}');\n`,
     );
     const child: Bun.Subprocess = Bun.spawn([process.execPath, 'run', runner], {
       cwd: f.home,
@@ -313,7 +311,7 @@ test.serial('a staged edit on an unrelated path survives the checkout move', asy
     await pushSeed(f, 'other.ts', 'incoming\n');
     writeFileSync(resolve(f.clone, 'code.ts'), 'export const x = 2;\n');
     await command(['git', 'add', 'code.ts'], f.clone);
-    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
     expect(logs.join(' ')).toContain('deployed');
     expect(readFileSync(resolve(f.clone, 'code.ts'), 'utf8')).toBe('export const x = 2;\n');
     expect(await command(['git', 'status', '--porcelain'], f.clone)).toBe('M  code.ts');
@@ -337,7 +335,7 @@ test.serial('a local code commit ahead leaves the checkout and remote unchanged'
     await command(['git', 'rm', '-f', 'code.ts'], f.clone);
     await command(['git', 'commit', '-m', 'undo code change'], f.clone);
     const localTip: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
-    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
     expect(logs).toHaveLength(1);
     expect(logs[0]).toContain('skipped');
     expect(logs[0]).not.toContain('pushed');
@@ -363,7 +361,7 @@ test.serial('an incoming tracked active lock path refuses a behind-only move', a
     mkdirSync(home, { recursive: true });
     writeFileSync(resolve(home, 'config.yaml'), 'repos: {}\n');
     writeFileSync(resolve(home, '.lock'), '');
-    const logs: string[] = await captured(home, () => selfUpdate(f.repo, f.clone, f.home));
+    const logs: string[] = await captured(home, () => selfUpdate(f.repo, f.home));
     expect(logs).toHaveLength(1);
     expect(logs[0]).toContain('coordination lock');
     expect(logs[0]).toContain('settings/.lock');
@@ -387,7 +385,7 @@ test.serial('an incoming tracked path colliding with an ignored file refuses a b
     await command(['git', 'push', 'origin', 'HEAD:main'], f.seed);
     writeFileSync(resolve(f.clone, '.gitignore'), 'node_modules/\ncollision*\n');
     writeFileSync(resolve(f.clone, 'collision'), 'operator ignored bytes\n');
-    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
     expect(logs).toHaveLength(1);
     expect(logs[0]).toContain('ignored operator path');
     expect(logs[0]).toContain('collision');
@@ -408,7 +406,7 @@ test.serial('a record changed on both sides pushes nothing and names the path an
     const remoteBefore: string = await remoteHead(f);
     await pushSeed(f, 'issues/log.jsonl', 'remote version\n');
     await commitRecord(f, 'issues/log.jsonl', 'local version\n');
-    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
     expect(logs).toHaveLength(1);
     expect(logs[0]).toContain('issues/log.jsonl');
     expect(logs[0]).toContain('akrogon sync');
@@ -434,11 +432,10 @@ test.serial('another repo finishes a pending checkout after its records are alre
     await commitRecord(f, 'issues/log.jsonl', '{"ts":"now"}\n');
     writeFileSync(resolve(f.clone, 'file'), 'dirty\n');
     const repo: Repo = { ...f.repo, name: 'other' };
-    const ownRoot: string = resolve(f.home, 'elsewhere');
-    await captured(f.home, () => selfUpdate(repo, ownRoot, f.home));
+    await captured(f.home, () => selfUpdate(repo, f.home));
     const pushedTip: string = await remoteHead(f);
     await command(['git', 'restore', 'file'], f.clone);
-    await captured(f.home, () => selfUpdate(repo, ownRoot, f.home));
+    await captured(f.home, () => selfUpdate(repo, f.home));
     expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(pushedTip);
     expect(await remoteHead(f)).toBe(pushedTip);
     expect(readFileSync(resolve(f.clone, 'file'), 'utf8')).toBe('incoming\n');
@@ -461,13 +458,13 @@ test.serial('a content-equal overlap does not report deployment with another inc
     await pushSeed(f, 'file', 'incoming\n');
     const incoming: string = await pushSeed(f, 'second', 'incoming second\n');
     writeFileSync(resolve(f.clone, 'file'), 'incoming\n');
-    await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    await captured(f.home, () => selfUpdate(f.repo, f.home));
     expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
     expect(readFileSync(resolve(f.clone, 'file'), 'utf8')).toBe('incoming\n');
     expect(readFileSync(resolve(f.clone, 'second'), 'utf8')).toBe('old second\n');
     expect(await command(['git', 'status', '--porcelain'], f.clone)).toBe(' M file');
     await command(['git', 'restore', 'file'], f.clone);
-    await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    await captured(f.home, () => selfUpdate(f.repo, f.home));
     expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(incoming);
     expect(readFileSync(resolve(f.clone, 'file'), 'utf8')).toBe('incoming\n');
     expect(readFileSync(resolve(f.clone, 'second'), 'utf8')).toBe('incoming second\n');
@@ -482,7 +479,7 @@ test.serial('self-update links akrogon.slice from the deployed checkout and relo
   const f: SelfUpdateFixture = await selfUpdateFixture();
   try {
     await pushSeed(f, 'systemd/akrogon.slice', '[Slice]\nCPUWeight=20\n');
-    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
     expect(logs.join(' ')).toContain('deployed');
     const link: string = resolve(f.home, '.config/systemd/user/akrogon.slice');
     expect(lstatSync(link).isSymbolicLink()).toBe(true);

@@ -51,6 +51,8 @@ async function deployFixture(): Promise<DeployFixture> {
   await command(['git', 'push', 'origin', 'HEAD:main'], seed);
   await command(['git', 'fetch', 'origin', 'main'], f.root);
   await command(['git', 'merge', '--ff-only', 'origin/main'], f.root);
+  const global = Bun.YAML.parse(readFileSync(resolve(home, 'config.yaml'), 'utf8')) as object;
+  writeFileSync(resolve(home, 'config.yaml'), Bun.YAML.stringify({ ...global, repos: { akrogon: f.root } }));
   const herdr = fakeHerdr(f);
   symlinkSync(resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(home, 'bin/systemctl'));
   const env: NodeJS.ProcessEnv = {
@@ -272,9 +274,8 @@ test.serial('skill steps resolve the akrogon root through the release, never thr
     const global = Bun.YAML.parse(readFileSync(resolve(d.home, 'config.yaml'), 'utf8')) as {
       repos: { [key: string]: string };
     };
-    const workspace: string | undefined = Object.values(global.repos).find((path) =>
-      existsSync(resolve(path as string, 'src/akrogon.ts')),
-    ) as string | undefined;
+    const workspace: string | undefined = global.repos['akrogon'];
+    expect(workspace).toBeDefined();
     expect(realpathSync(workspace as string)).toBe(realpathSync(d.f.root));
   } finally {
     d.f.clean();
