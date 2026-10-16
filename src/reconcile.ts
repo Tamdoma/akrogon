@@ -16,11 +16,20 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { globalHome, leafTemp, leafTempRoot, retiredLeafTempRoot, within, worktreeStore, type Repo } from './config';
+import {
+  globalHome,
+  leafTemp,
+  leafTempRoot,
+  retiredLeafTempRoot,
+  target,
+  within,
+  worktreeStore,
+  type Repo,
+} from './config';
 import { readVerifyRuns, type VerifyRun } from './verify';
 import { allLeaves, leavesUnder, readState, saveState, type Leaf, type State } from './state';
 import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
-import { liveRuns, withAdmissionLock } from './admission';
+import { liveRuns, liveStartTime, withAdmissionLock } from './admission';
 import { command, herdrError, run, spawnCaptured, type Pane, type Result } from './shell';
 
 export type Reconciled = { removed: string[]; kept: { path: string; reason: string; clears?: string }[] };
@@ -364,6 +373,14 @@ export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null
 export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<boolean> {
   const store: string = worktreeStore(repo);
   const oldRoot: string = resolve(repo.root, 'issues/worktrees');
+  // A registered Claude agent worktree is a pane-dependent candidate. The
+  // directory check stands in for listing registered worktree paths.
+  const agentRoot: string = resolve(repo.root, '.claude/worktrees');
+  if (
+    existsSync(agentRoot) &&
+    readdirSync(agentRoot).some((name) => name.startsWith('agent-') && existsSync(resolve(agentRoot, name)))
+  )
+    return true;
   for (const leaf of leaves) {
     if (existsSync(leafTemp(repo, leaf.state.slug))) return true;
     const worktree: string | undefined = leaf.state.worktree;
@@ -504,7 +521,10 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     }
   }
 
-  async function removeWorktree(path: string, force: boolean, rule: string): Promise<boolean> {
+  // `unlock` carries a git lock reason: present means the worktree is git
+  // locked, unlocks after the veto and cleanliness checks, and re-locks with
+  // that reason when the unlocked removal fails.
+  async function removeWorktree(path: string, force: boolean, rule: string, unlock?: string): Promise<boolean> {
     const inside: number[] = pidsInside(targets(), path);
     if (inside.length > 0) {
       keep(
@@ -532,8 +552,22 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
         return false;
       }
     }
+    if (unlock !== undefined) {
+      const unlocked: Result = await run(['git', 'worktree', 'unlock', path], repo.root);
+      if (unlocked.code !== 0) {
+        keep(
+          path,
+          unlocked.stderr || `git worktree unlock exited ${unlocked.code}`,
+          'resolve the Git unlock error and retry cleanup',
+        );
+        return false;
+      }
+    }
     const result: Result = await run(['git', 'worktree', 'remove', ...(force ? ['--force'] : []), path], repo.root);
     if (result.code !== 0) {
+      // Best-effort re-lock: a remove that unregistered first has nothing to
+      // lock, and the removal error is already the recorded keep reason.
+      if (unlock !== undefined) await run(['git', 'worktree', 'lock', '--reason', unlock, path], repo.root);
       keep(
         path,
         result.stderr || `git worktree remove exited ${result.code}`,
@@ -561,6 +595,63 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
           'resolve the branch deletion error and retry cleanup',
         );
     }
+  }
+
+  // A registered Claude Code agent worktree at <repo>/.claude/worktrees/agent-<id>
+  // whose `claude agent` lock owner is provably dead — pid gone or start time
+  // changed — and whose commits all landed on the target is removed and its
+  // branch deleted bound to the proven head. Returns true when the path is an
+  // agent candidate this rule handled (removed or vetoed); false falls the
+  // caller through to today's `unmanaged worktree` keep. A /proc read error
+  // counts as a live owner: an unprovable lock is honored, never bypassed.
+  async function endedAgentWorktree(path: string): Promise<boolean> {
+    const agentRoot: string = resolve(repo.root, '.claude/worktrees');
+    if (dirname(path) !== agentRoot) return false;
+    const id: string | undefined = basename(path).match(/^agent-([0-9a-z]+)$/)?.[1];
+    if (id === undefined) return false;
+    const row: WorktreeRow | undefined = registered.get(path);
+    if (row === undefined || row.locked === false) return false;
+    const lock: RegExpMatchArray | null = row.locked.match(
+      /^claude agent agent-([0-9a-z]+) \(pid (\d+) start (\d+)\)$/,
+    );
+    if (lock === null || lock[1] !== id) return false;
+    const released: boolean = ((): boolean => {
+      try {
+        return liveStartTime(Number(lock[2])) !== lock[3];
+      } catch {
+        return false;
+      }
+    })();
+    if (!released) return false;
+    if (row.branch === undefined || row.branch === repo.config.default_branch) return false;
+    const targetRef: string = `refs/remotes/${target(repo)}`;
+    const merges: Result = await run(
+      ['git', '-C', path, 'rev-list', '--merges', '--count', `${targetRef}..HEAD`],
+      repo.root,
+    );
+    if (merges.code !== 0 || Number.parseInt(merges.stdout.trim(), 10) !== 0) return false;
+    const landed: Result = await run(['git', '-C', path, 'cherry', targetRef, 'HEAD'], repo.root);
+    if (landed.code !== 0 || landed.stdout.split('\n').some((line) => line.startsWith('+'))) return false;
+    if (live === null) {
+      keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      return true;
+    }
+    if (livePaneInside(panes, path)) {
+      keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
+      return true;
+    }
+    if (!(await removeWorktree(path, false, 'ended agent worktree', row.locked))) return true;
+    const dropped: Result = await run(['git', 'update-ref', '-d', `refs/heads/${row.branch}`, row.head], repo.root);
+    if (dropped.code !== 0) {
+      const ref: Result = await run(['git', 'rev-parse', '--verify', `refs/heads/${row.branch}`], repo.root);
+      if (ref.code === 0 && ref.stdout.trim() === row.head)
+        keep(
+          repo.root,
+          `delete ${row.branch}: ${dropped.stderr || `git update-ref exited ${dropped.code}`}`,
+          'resolve the ref error and delete the branch explicitly',
+        );
+    }
+    return true;
   }
 
   async function closeTab(worktree: string, tab: string): Promise<boolean> {
@@ -763,7 +854,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     if (path === repo.root || handled.has(path)) continue;
     if (!existsSync(path)) continue; // stale registration, pruned below when anything was removed
     if (underRoot(path)) candidates.add(path);
-    else keep(path, 'unmanaged worktree', 'remove this worktree explicitly with git worktree remove');
+    else if (!(await endedAgentWorktree(path)))
+      keep(path, 'unmanaged worktree', 'remove this worktree explicitly with git worktree remove');
   }
   // Longest known slug the entry name matches exactly or as <slug>-<rest>
   // (D1.2); undefined when no leaf record claims the name.

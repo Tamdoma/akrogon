@@ -57,7 +57,7 @@ function startTime(pid: number): string {
   return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
 }
 
-function liveStartTime(pid: number): string | undefined {
+export function liveStartTime(pid: number): string | undefined {
   try {
     return startTime(pid);
   } catch (error) {
