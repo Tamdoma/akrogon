@@ -68,13 +68,13 @@ export async function migrateStateHome(): Promise<void> {
   const needed = (): boolean => !existsSync(resolve(stateHome, 'config.yaml'));
   if (stateHome === toolRoot || !needed() || !existsSync(resolve(toolRoot, 'config.yaml'))) return;
   const settled = (): boolean => liveRecords(resolve(toolRoot, 'runs')) === 0;
-  const move = async (): Promise<void> => {
-    if (!needed() || !settled()) return;
+  const move = async (): Promise<boolean> => {
+    if (!needed() || !settled()) return false;
     for (const entry of copiedEntries) {
       const source: string = resolve(toolRoot, entry);
       if (existsSync(source)) cpSync(source, resolve(stateHome, entry), { recursive: true });
     }
-    if (!settled()) return;
+    if (!settled()) return false;
     const config = z
       .looseObject({ repos: z.record(z.string(), z.string()).default({}) })
       .parse(Bun.YAML.parse(readFileSync(resolve(toolRoot, 'config.yaml'), 'utf8')));
@@ -85,15 +85,23 @@ export async function migrateStateHome(): Promise<void> {
     // stderr: the line must not pollute consumers of stdout (`config` YAML,
     // run-check output). Criterion 3 names a printed line, not a stream.
     console.error(`moved state home: ${toolRoot} -> ${stateHome}`);
+    return true;
   };
   const mainLock: string = resolve(toolRoot, '.lock');
-  await withLock(mainLock, async (): Promise<void> => {
-    const locksDir: string = resolve(toolRoot, 'runs/locks');
-    const sliceLocks: string[] = existsSync(locksDir)
+  const locksDir: string = resolve(toolRoot, 'runs/locks');
+  const sliceLocks = (): string[] =>
+    existsSync(locksDir)
       ? readdirSync(locksDir)
           .sort()
           .map((name) => resolve(locksDir, name))
       : [];
-    await underLocks(sliceLocks, 0, move);
+  await withLock(mainLock, async (): Promise<void> => {
+    if (!(await underLocks(sliceLocks(), 0, move))) return;
+    // An admission on a slice lock created during the copy wrote its record to
+    // the tool root before publication; every admission after it resolves the
+    // new home. Holding every slice lock now waits those writes out.
+    await underLocks(sliceLocks(), 0, async (): Promise<void> => {
+      cpSync(resolve(toolRoot, 'runs'), resolve(stateHome, 'runs'), { recursive: true, force: false });
+    });
   });
 }
