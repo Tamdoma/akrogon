@@ -400,8 +400,7 @@ export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<b
   // way, and an unreadable unit inventory forces the conservative fetch.
   if (
     leaves.some(
-      (leaf) =>
-        (leaf.state.phase === 'merged' || leaf.state.phase === 'failed') && leaf.state.tab !== undefined,
+      (leaf) => (leaf.state.phase === 'merged' || leaf.state.phase === 'failed') && leaf.state.tab !== undefined,
     )
   )
     return true;
