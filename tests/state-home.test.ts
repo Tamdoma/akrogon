@@ -187,3 +187,36 @@ test('an explicit empty state home keeps using the tool root while cutover is de
   expect(moved.code).toBe(0);
   expect(existsSync(resolve(destination, 'config.yaml'))).toBe(true);
 });
+
+test('cutover takes the global and admission locks even when the global lock file is absent', async () => {
+  const home: string = temp();
+  const root: string = toolCopy(home, globalConfig);
+  const locks: string = resolve(root, 'runs/locks');
+  mkdirSync(locks, { recursive: true });
+  const holder: Bun.Subprocess<'pipe', 'pipe', 'pipe'> = Bun.spawn(
+    ['flock', '-x', resolve(locks, 'akrogon.slice'), 'sh', '-c', 'printf locked; cat >/dev/null'],
+    { cwd: home, stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
+  );
+  const reader: ReadableStreamDefaultReader<Uint8Array> = holder.stdout.getReader();
+  expect((await reader.read()).done).toBe(false);
+  let finished: boolean = false;
+  const pending: Promise<SpawnResult> = cli(root, home, ['config']).then((result: SpawnResult): SpawnResult => {
+    finished = true;
+    return result;
+  });
+  const mainLock: string = resolve(root, '.lock');
+  try {
+    const deadline: number = Date.now() + 5000;
+    while (!existsSync(mainLock) && !finished && Date.now() < deadline) await Bun.sleep(10);
+    expect(existsSync(mainLock)).toBe(true);
+    const competing: SpawnResult = await spawnCaptured(['flock', '-n', mainLock, 'true'], { cwd: home });
+    expect(competing.code).toBe(1);
+    expect(finished).toBe(false);
+    expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(false);
+  } finally {
+    holder.stdin.end();
+    reader.releaseLock();
+    expect(await holder.exited).toBe(0);
+    await pending;
+  }
+});
