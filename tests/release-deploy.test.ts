@@ -254,6 +254,39 @@ test.serial('a failed release build keeps current, reports in status and retries
   }
 });
 
+test.serial('an interrupted deploy is shown in status and finished by the next pass', async () => {
+  const d: DeployFixture = await deployFixture();
+  try {
+    const sha: string = await head(d);
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    expect(realpathSync(resolve(d.home, 'current'))).toBe(resolve(releases(d), sha));
+    // A deploy that reached the flip but never recorded success still has a
+    // failure (or stale) record; it must be visible and retried, not skipped.
+    writeFileSync(
+      resolve(d.home, 'deploy.yaml'),
+      Bun.YAML.stringify({
+        attempted: sha,
+        ok: false,
+        step: 'reload',
+        error: 'interrupted',
+        at: new Date().toISOString(),
+      }),
+    );
+    const status: Result = await cli(d.f, ['status'], d.f.root, d.env);
+    expect(status.stdout).toContain(
+      `deploy failed: attempted ${sha.slice(0, 12)}, active ${sha.slice(0, 12)}, step reload`,
+    );
+    const pass: Result = await cli(d.f, ['next', '--all'], d.f.root, d.env);
+    expect(pass.code).toBe(0);
+    expect(pass.stdout).toContain(`deployed ${sha.slice(0, 12)}`);
+    expect(deployRecord(d)).toMatchObject({ commit: sha, ok: true });
+    const clean: Result = await cli(d.f, ['status'], d.f.root, d.env);
+    expect(clean.stdout).not.toContain('deploy failed');
+  } finally {
+    d.f.clean();
+  }
+});
+
 test.serial('releases other than current and previous are deleted 24 hours after replacement', async () => {
   const d: DeployFixture = await deployFixture();
   try {

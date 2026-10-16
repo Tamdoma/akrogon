@@ -622,12 +622,25 @@ describe('self-update', () => {
       expect(logs[0]).toContain(resolve(f.home, '.claude/skills/skill-one'));
       expect(logs[0]).toContain('remove');
       expect(lstatSync(resolve(f.home, '.claude/skills/skill-one')).isDirectory()).toBe(true);
+      // A failed deploy must not activate the release: no current flip.
+      expect(existsSync(resolve(f.home, 'current'))).toBe(false);
       for (const root of roots.filter((root) => root !== '.claude/skills'))
-        expect(realpathSync(resolve(f.home, root, 'skill-one'))).toBe(
-          resolve(f.home, 'releases', newSha, 'skills/skill-one'),
+        expect(readlinkSync(resolve(f.home, root, 'skill-one'))).toBe(
+          resolve(f.home, 'current/skills/skill-one'),
         );
+      // Removing the conflict lets the next pass finish the deploy.
+      rmSync(resolve(f.home, '.claude/skills/skill-one'), { recursive: true });
+      const retried: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
+      expect(retried).toHaveLength(1);
+      expect(retried[0]).toContain(`deployed ${newSha.slice(0, 12)}`);
+      expect(realpathSync(resolve(f.home, 'current'))).toBe(
+        resolve(f.home, 'releases', newSha),
+      );
       expect(realpathSync(resolve(f.home, '.local/bin/akrogon'))).toBe(
         resolve(f.home, 'releases', newSha, 'src/akrogon.ts'),
+      );
+      expect(realpathSync(resolve(f.home, '.claude/skills/skill-one'))).toBe(
+        resolve(f.home, 'releases', newSha, 'skills/skill-one'),
       );
     } finally {
       f.clean();
