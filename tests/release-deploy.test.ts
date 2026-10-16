@@ -12,6 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
+import { z } from 'zod';
 import { fixture, cli, fakeHerdr, type Fixture } from './helpers';
 import { command, run, spawnCaptured, type Result } from '../src/shell';
 
@@ -109,6 +110,36 @@ test.serial('a records fetch failure persists the attempted deployment and retri
     expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
     expect(deployRecord(d)).toMatchObject({ commit: attempted, ok: true });
     expect(realpathSync(resolve(d.home, 'current'))).toBe(resolve(releases(d), attempted));
+  } finally {
+    d.f.clean();
+  }
+});
+
+test.serial('replacement timestamps start at the flip and unchanged main prunes expired releases', async () => {
+  const d: DeployFixture = await deployFixture();
+  try {
+    const first: string = await head(d);
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    const second: string = await pushSeed(d, () => writeFileSync(resolve(d.seed, 'file'), 'second\n'));
+    const before: number = Date.now();
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    const replacedSchema = z.record(z.string(), z.iso.datetime());
+    const replaced: Record<string, string> = replacedSchema.parse(deployRecord(d).replaced);
+    expect(Object.keys(replaced)).toContain(first);
+    expect(Date.parse(replaced[first])).toBeGreaterThanOrEqual(before);
+    expect(Date.parse(replaced[first])).toBeLessThanOrEqual(Date.now());
+    const third: string = await pushSeed(d, () => writeFileSync(resolve(d.seed, 'file'), 'third\n'));
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    const record = deployRecord(d);
+    const timestamps: Record<string, string> = replacedSchema.parse(record.replaced);
+    const aged: string = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    writeFileSync(
+      resolve(d.home, 'deploy.yaml'),
+      Bun.YAML.stringify({ ...record, replaced: { ...timestamps, [first]: aged, [second]: aged } }),
+    );
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    expect(readdirSync(releases(d)).sort()).toEqual([second, third].sort());
+    expect(deployRecord(d)).toMatchObject({ commit: third, previous: second, ok: true });
   } finally {
     d.f.clean();
   }
