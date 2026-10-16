@@ -1301,6 +1301,9 @@ test('agent worktrees failing one check stay locked as unmanaged', async () => {
     const bareLock: string = resolve(f.root, '.claude/worktrees/agent-bare');
     await command(['git', 'worktree', 'add', '-b', 'agent-bare', bareLock], f.root);
     await command(['git', 'worktree', 'lock', bareLock], f.root);
+    // A claude-form lock naming a different agent id is not this worktree's
+    // lock contract: it stays exactly as found.
+    const mismatch: string = await agentWorktree(f, 'mismatch', 'claude agent agent-other (pid 4194303 start 0)');
     const otherForm: string = resolve(f.root, '.claude/worktrees/agent-operator');
     await command(['git', 'worktree', 'add', '-b', 'agent-operator', otherForm], f.root);
     await command(['git', 'worktree', 'lock', '--reason', 'operator hold', otherForm], f.root);
@@ -1308,7 +1311,7 @@ test('agent worktrees failing one check stay locked as unmanaged', async () => {
     await command(['git', 'worktree', 'add', '-b', 'agent-outside', outside], f.root);
     await command(['git', 'worktree', 'lock', '--reason', deadAgentLock('outside'), outside], f.root);
     expect((await next(f, ['--all'])).code).toBe(0);
-    for (const dir of [unlanded, dirty, untracked, mergeDir, detached, bareLock, otherForm, outside]) {
+    for (const dir of [unlanded, dirty, untracked, mergeDir, detached, bareLock, mismatch, otherForm, outside]) {
       expect(existsSync(dir)).toBe(true);
       expect(await agentLockText(f, dir)).toContain('locked');
       expect(keptReport(f).some((entry) => entry.path === dir)).toBe(true);
@@ -1393,6 +1396,21 @@ test('stuck agent branch ref reports the delete error; failed unlock leaves the 
     expect(keptReport(f).some((entry) => entry.path === unlockable && entry.reason !== 'unmanaged worktree')).toBe(
       true,
     );
+    // A remove that fails after git already unregistered the worktree leaves
+    // the directory recorded with the removal error, unregistered and
+    // unlocked: the lock cannot be restored because git dropped the
+    // registration first (locked-design caveat in plan.md).
+    const partial: string = await agentWorktree(f, 'partial');
+    const parent: string = dirname(partial);
+    chmodSync(parent, 0o555);
+    try {
+      expect((await next(f, ['--all'])).code).toBe(0);
+    } finally {
+      chmodSync(parent, 0o755);
+    }
+    expect(existsSync(partial)).toBe(true);
+    expect((await worktreeList(f)).split('\n\n').some((s) => s.startsWith(`worktree ${partial}`))).toBe(false);
+    expect(keptReport(f).some((entry) => entry.path === partial)).toBe(true);
   } finally {
     f.clean();
   }
