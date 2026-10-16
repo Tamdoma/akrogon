@@ -1189,7 +1189,7 @@ const deadAgentLock = (id: string): string => `claude agent agent-${id} (pid 419
 async function agentWorktree(f: DispatchFixture, id: string, lock?: string): Promise<string> {
   const dir: string = resolve(f.root, '.claude/worktrees', `agent-${id}`);
   await command(['git', 'worktree', 'add', '-b', `agent-${id}`, dir], f.root);
-  await command(['git', 'worktree', 'lock', ...(lock === undefined ? [] : ['--reason', lock]), dir], f.root);
+  await command(['git', 'worktree', 'lock', '--reason', lock ?? deadAgentLock(id), dir], f.root);
   return dir;
 }
 async function agentLockText(f: DispatchFixture, dir: string): Promise<string | null> {
@@ -1225,7 +1225,7 @@ test('ended claude agent worktree is removed and its landed branch deleted', asy
     const head: string = (await command(['git', '-C', landed, 'rev-parse', 'HEAD'], f.root)).trim();
     await command(['git', 'cherry-pick', '--no-commit', 'agent-landed'], f.root);
     await command(['git', 'commit', '-m', 'agent work'], f.root);
-    await command(['git', 'update-ref', 'refs/remotes/origin/main', 'HEAD'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(empty)).toBe(false);
     expect(existsSync(landed)).toBe(false);
@@ -1295,10 +1295,12 @@ test('agent worktrees failing one check stay locked as unmanaged', async () => {
     await command(['git', 'commit', '-m', 'side'], f.root);
     await command(['git', 'cherry-pick', '--no-commit', 'agent-merge^1'], f.root);
     await command(['git', 'commit', '-m', 'feat'], f.root);
-    await command(['git', 'update-ref', 'refs/remotes/origin/main', 'HEAD'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     const detached: string = await agentWorktree(f, 'detached');
     await command(['git', '-C', detached, 'checkout', '--detach'], f.root);
-    const bareLock: string = await agentWorktree(f, 'bare');
+    const bareLock: string = resolve(f.root, '.claude/worktrees/agent-bare');
+    await command(['git', 'worktree', 'add', '-b', 'agent-bare', bareLock], f.root);
+    await command(['git', 'worktree', 'lock', bareLock], f.root);
     const otherForm: string = resolve(f.root, '.claude/worktrees/agent-operator');
     await command(['git', 'worktree', 'add', '-b', 'agent-operator', otherForm], f.root);
     await command(['git', 'worktree', 'lock', '--reason', 'operator hold', otherForm], f.root);
