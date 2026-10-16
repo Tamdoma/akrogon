@@ -33,6 +33,7 @@ const contracts: Record<string, string> = {
   'stop-run': '[<run-id>]',
   pack: '<folder>...',
   guard: '<ancestors|own-modules>',
+  rollback: '',
 };
 
 function commandRows(markdown: string): CommandRow[] {
