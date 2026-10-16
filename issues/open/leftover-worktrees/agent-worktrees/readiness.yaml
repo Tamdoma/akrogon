@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: git worktree lock/unlock/remove, git status --porcelain with ignored files, git update-ref -d with expected old value
+    command: see record
+    identity: operator uid 1000, local git
+    target: throwaway repo under the job temp dir
+    version: git 2.56.0
+    date: '2026-10-16'
+    result: locked remove refused; untracked file refused; re-lock restores reason; ignored files do not block; update-ref with wrong old value exits 1 and keeps the branch
+    cleanup: throwaway dir removed and verified absent
+    limits: Claude Code lock text across versions; git cherry on merge ranges (merges excluded by the leaf)
+    record: issues/chart/leftover-worktrees/forks/auto-remove.md

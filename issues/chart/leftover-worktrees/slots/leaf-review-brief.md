@@ -1,0 +1,4 @@
+# Leaf review brief
+
+You are slot B or C. Review the leaf drafts as the implementer who must build them: /home/ivan/.claude/jobs/6a0d8d81/tmp/leftover-worktrees/ISSUE.md and /home/ivan/.claude/jobs/6a0d8d81/tmp/leftover-worktrees/agent-worktrees/{brief.md,design.md,readiness.yaml,state.yaml}. Code at /home/ivan/Work/infra/akrogon main d0a4bc9. Do not reargue the operator's binding decisions. Return disagreements only, each with evidence (path:line): a criterion that cannot pass in scope, a wrong code claim, a missing binding decision, a criterion naming a test file or count, a missing Open-for-the-plan question. Or "no disagreements". Under 25 lines. Do not edit any file except your return file.
+Return path: slot B -> /home/ivan/Work/infra/akrogon/issues/chart/leftover-worktrees/slots/leaf-review-B.md ; slot C -> /home/ivan/Work/infra/akrogon/issues/chart/leftover-worktrees/slots/leaf-review-C.md
