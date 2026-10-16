@@ -28,3 +28,6 @@ Input for a possible future chart: autopilot mode for a fully hands-off charting
 - 2026-10-16 ~04:00 local: run-release Pending step done (a813007): tracked machine state removed from the repo, plus a test that read the operator's machine config. B ready, deployed, root folder clean.
 - Friction seen: B's reviews kept finding real gaps in rollout safety that my first shapes skipped (copy-window race, pre-barrier processes). Each round cost ~5 min. A rule for the future autopilot chart: for any one-time host migration, design the drain/hold step before the code.
 - Off route seen: 22 leaked test helper shells (`sh -c touch /tmp/akrogon-*/marks/...`) alive since 2026-10-13.
+- 2026-10-16 ~04:47 local: temp-release/release-any-phase merged (one review fix round). Chart temp-release closed by the lifecycle.
+- 2026-10-16 06:33 local: run-release/release-deploy merged (2 fix rounds). 06:35 the next deploy switched akrogon from the checkout to a release: `~/.local/bin/akrogon` -> `~/.akrogon/current` -> `releases/4e2ecd2`; skills link into the release; status and config read `~/.akrogon/config.yaml`. release-rollback started planning.
+- Friction seen: my watch loop treated a leaf that left `akrogon status` (closed issue) as merged; it happened to be right. A watch should read the leaf's state.yaml, not status rows.
