@@ -282,7 +282,11 @@ test('an already-running command that admits a nested checked run defers cutover
     // The nested checked run completed inside the outer check: its own
     // "check run: 0" line was captured in the outer's log.
     const outerErr: string = await new Response(outer.stderr).text();
-    const outerLog: string = outerErr.trim().split('\n').pop()!.replace(/^.*check run: \d+ /, '');
+    const outerLog: string = outerErr
+      .trim()
+      .split('\n')
+      .pop()!
+      .replace(/^.*check run: \d+ /, '');
     expect(readFileSync(outerLog, 'utf8')).toContain('check run: 0');
   } finally {
     if (outer.exitCode === null) outer.kill();
