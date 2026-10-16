@@ -15,7 +15,7 @@ learnings/history/
 
 For example, a lesson could record how a tested CSV library handled embedded newlines that an earlier implementation missed. Include the evidence so later agents can check whether it applies.
 
-Plans read the lesson list. Lessons are observations to verify, not permanent rules. A new lesson is written under the [lesson rule](../../skills/lesson-rule.md): write-time matching against the active list, a filed seed for checkable lessons, and akrogon lessons written into akrogon's own learnings. Its retirement clause makes the guard leaf the normal exit: the leaf that lands a guard covering the mechanism on every reachable path removes the line and appends `Applied` to its history file, in the leaf's own diff. `/learn-issues` triages the backlog that remains.
+Plans read the lesson list. Lessons are observations to verify, not permanent rules. A new lesson is written under the [lesson rule](../../skills/lesson-rule.md): write-time matching against the active list, a filed seed for checkable lessons, and akrogon lessons written into akrogon's own learnings. Its retirement clause makes the stopping leaf the normal exit: the leaf that stops the mechanism on every reachable path, by removing it, by a loud refusal at the point of use or by a running guard, removes the line and appends `Applied` to its history file, in the leaf's own diff. `/learn-issues` triages the backlog that remains and can move a judgment lesson into its live review step in the same repo when the operator approves the diff.
 
 **A seed** records work to investigate later. If large exports need streaming, file that as a separate observation rather than expanding the current leaf during review:
 

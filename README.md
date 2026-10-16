@@ -219,4 +219,4 @@ A report whose named failure path lives under the installed akrogon root routes 
 | [broadcast-issue](skills/broadcast-issue/SKILL.md) | Send a completed-issue-or-epic update to Discord.            |
 | [init-akrogon](skills/init-akrogon/SKILL.md)       | Inspect a repository and set up its lifecycle.               |
 | [watch-issues](skills/watch-issues/SKILL.md)       | Watch open leaves on an optional 20-minute Claude Code cron. |
-| [learn-issues](skills/learn-issues/SKILL.md)       | Remove guarded lessons and seed checkable ones.              |
+| [learn-issues](skills/learn-issues/SKILL.md)       | Remove stopped lessons, transfer judgment ones, seed others. |

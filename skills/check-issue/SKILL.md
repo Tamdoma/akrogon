@@ -58,7 +58,7 @@ B checks that the implementation report runs the planned tests through the comma
 
 A case outside the done-criteria with no realistic source stays a Nit: it does not block, and it gets no test and no new issue.
 
-A `learnings/LESSONS.md` line removal is accepted only when the diff carries a running mechanical guard covering the lesson's mechanism on every reachable path; a removal beside an uncalled or partial guard is a Fix, and any removal tied to report closure, duplicate or rejection is a Fix.
+A `learnings/LESSONS.md` line removal is accepted only when the diff stops the lesson's mechanism on every reachable path by one of the [lesson rule](../lesson-rule.md)'s Retire exits (removal, a loud refusal at the point of use before the harm, or a running mechanical guard) and appends the matching `Applied` line; a removal beside an uncalled or partial guard, a deleted site with the pattern reachable elsewhere, a failure after the harm, a `Transferred` line in a leaf diff, and any removal tied to report closure, duplicate or rejection are each a Fix.
 
 Failed `checks` commands always block, and scenarios a done-criterion names always block by citing that check or criterion instead of a realistic source, where a scenario a criterion names blocks as an outcome the criterion names, never as a named test, because a criterion names a result, not a test file; optional `advisory` failures are Nits, and a report gap blocks only when material to correctness or verification. Output from a run outside the printed `checks` command can prove the specific done outcome it exercises but never replaces a required `checks` result.
 
