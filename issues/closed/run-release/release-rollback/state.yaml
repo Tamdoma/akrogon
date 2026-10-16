@@ -1,0 +1,32 @@
+slug: release-rollback
+phase: merged
+created: 2026-10-16
+repo: akrogon
+debate: "no"
+blocked-by:
+  - release-deploy
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: w8:tCW
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pR6
+  B: w8:pR7
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-16T05:39:47.095Z
+frozen:
+  tests/command-reference.test.ts: 103d47757603b54dad05f20824ba25f585f86050
+  tests/deploy-fixture.ts: 38024b1d5ae61d585de3f6946b2a49c13f8aab8b
+  tests/release-deploy.test.ts: 2153581959403a9956ec8c5235a50ac0993fa962
+  tests/rollback.test.ts: 95a8e501782599998e71f052781f297e7fde408b
+frozen_cited: []

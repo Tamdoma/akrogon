@@ -31,3 +31,4 @@ Input for a possible future chart: autopilot mode for a fully hands-off charting
 - 2026-10-16 ~04:47 local: temp-release/release-any-phase merged (one review fix round). Chart temp-release closed by the lifecycle.
 - 2026-10-16 06:33 local: run-release/release-deploy merged (2 fix rounds). 06:35 the next deploy switched akrogon from the checkout to a release: `~/.local/bin/akrogon` -> `~/.akrogon/current` -> `releases/4e2ecd2`; skills link into the release; status and config read `~/.akrogon/config.yaml`. release-rollback started planning.
 - Friction seen: my watch loop treated a leaf that left `akrogon status` (closed issue) as merged; it happened to be right. A watch should read the leaf's state.yaml, not status rows.
+- 2026-10-16 07:40 local: run-release/release-rollback merged (implement to merged ~35 min, 2 fix rounds). No open akrogon leaves left.
