@@ -1175,3 +1175,223 @@ test('a stray-file-only pass fetches the pane list before deleting', async () =>
     f.clean();
   }
 });
+
+// agent-worktrees: reconcile removes a registered Claude Code agent worktree at
+// <repo>/.claude/worktrees/agent-<id> once its lock's owner is provably dead and
+// every commit is landed on origin/main. Fixtures use real git; the owner check
+// reads the real /proc, so dead owners are picked-up unclaimed pids and live
+// ones are spawned children with field-22 start times.
+function procStartTime(pid: number): string {
+  const stat: string = readFileSync(`/proc/${pid}/stat`, 'utf8');
+  return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+}
+const deadAgentLock = (id: string): string => `claude agent agent-${id} (pid 4194303 start 0)`;
+async function agentWorktree(f: DispatchFixture, id: string, lock?: string): Promise<string> {
+  const dir: string = resolve(f.root, '.claude/worktrees', `agent-${id}`);
+  await command(['git', 'worktree', 'add', '-b', `agent-${id}`, dir], f.root);
+  await command(['git', 'worktree', 'lock', ...(lock === undefined ? [] : ['--reason', lock]), dir], f.root);
+  return dir;
+}
+async function agentLockText(f: DispatchFixture, dir: string): Promise<string | null> {
+  const porcelain: string = await command(['git', 'worktree', 'list', '--porcelain'], f.root);
+  const stanza: string | undefined = porcelain.split('\n\n').find((block) => block.startsWith(`worktree ${dir}\n`));
+  const line: string | undefined = stanza?.split('\n').find((row) => row === 'locked' || row.startsWith('locked '));
+  return line === undefined ? null : line;
+}
+function removedReport(f: DispatchFixture): { path: string; head: string; rule: string; branch?: string }[] {
+  const file: string = resolve(f.home, 'reconcile', 'repo.json');
+  if (!existsSync(file)) return [];
+  return (
+    z
+      .object({
+        removed: z
+          .array(z.object({ path: z.string(), head: z.string(), rule: z.string(), branch: z.string().optional() }))
+          .optional(),
+      })
+      .parse(JSON.parse(readFileSync(file, 'utf8'))).removed ?? []
+  );
+}
+
+// Criterion 1: a dead-owner agent worktree whose commits are all on the target —
+// the empty range and the same-patch case — is removed and its branch deleted.
+test('ended claude agent worktree is removed and its landed branch deleted', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const empty: string = await agentWorktree(f, 'empty');
+    const landed: string = await agentWorktree(f, 'landed');
+    writeFileSync(resolve(landed, 'agent.txt'), 'x');
+    await command(['git', '-C', landed, 'add', 'agent.txt'], f.root);
+    await command(['git', '-C', landed, 'commit', '-m', 'agent work'], f.root);
+    const head: string = (await command(['git', '-C', landed, 'rev-parse', 'HEAD'], f.root)).trim();
+    await command(['git', 'cherry-pick', '--no-commit', 'agent-landed'], f.root);
+    await command(['git', 'commit', '-m', 'agent work'], f.root);
+    await command(['git', 'update-ref', 'refs/remotes/origin/main', 'HEAD'], f.root);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(empty)).toBe(false);
+    expect(existsSync(landed)).toBe(false);
+    expect(await worktreeList(f)).not.toContain(landed);
+    expect((await branchExists(f, 'agent-empty')).code).toBe(1);
+    expect((await branchExists(f, 'agent-landed')).code).toBe(1);
+    expect(
+      removedReport(f).some(
+        (entry) => entry.path === landed && entry.head === head && entry.rule === 'ended agent worktree',
+      ),
+    ).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+// Criterion 2: a lock whose owner pid is alive with the same start time keeps
+// the worktree; a live pid with a different start time counts as released.
+test('agent worktree with a live lock owner stays, recycled pid releases', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
+  try {
+    const start: string = procStartTime(child.pid);
+    const liveDir: string = await agentWorktree(f, 'live', `claude agent agent-live (pid ${child.pid} start ${start})`);
+    const recycled: string = await agentWorktree(
+      f,
+      'recycled',
+      `claude agent agent-recycled (pid ${child.pid} start ${Number(start) + 1})`,
+    );
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(liveDir)).toBe(true);
+    expect(await agentLockText(f, liveDir)).toContain('locked');
+    expect(keptReport(f).some((entry) => entry.path === liveDir)).toBe(true);
+    expect(existsSync(recycled)).toBe(false);
+    expect((await branchExists(f, 'agent-recycled')).code).toBe(1);
+  } finally {
+    child.kill('SIGKILL');
+    await child.exited;
+    f.clean();
+  }
+});
+
+// Criterion 3: each single blocker keeps the worktree with its lock untouched.
+test('agent worktrees failing one check stay locked as unmanaged', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const unlanded: string = await agentWorktree(f, 'unlanded');
+    writeFileSync(resolve(unlanded, 'new.txt'), 'x');
+    await command(['git', '-C', unlanded, 'add', 'new.txt'], f.root);
+    await command(['git', '-C', unlanded, 'commit', '-m', 'unlanded'], f.root);
+    const dirty: string = await agentWorktree(f, 'dirty');
+    writeFileSync(resolve(dirty, 'file'), 'changed\n');
+    const untracked: string = await agentWorktree(f, 'untracked');
+    writeFileSync(resolve(untracked, 'stray'), 'x');
+    // Landed diff but a merge commit in the range: rev-list --merges keeps it.
+    await command(['git', 'checkout', '-b', 'agent-merge-side'], f.root);
+    writeFileSync(resolve(f.root, 'side.txt'), 's');
+    await command(['git', 'add', 'side.txt'], f.root);
+    await command(['git', 'commit', '-m', 'side'], f.root);
+    await command(['git', 'checkout', 'main'], f.root);
+    const mergeDir: string = await agentWorktree(f, 'merge');
+    writeFileSync(resolve(mergeDir, 'feat.txt'), 'f');
+    await command(['git', 'add', 'feat.txt'], mergeDir);
+    await command(['git', 'commit', '-m', 'feat'], mergeDir);
+    await command(['git', 'merge', '--no-ff', 'agent-merge-side', '-m', 'merge'], mergeDir);
+    await command(['git', 'cherry-pick', '--no-commit', 'agent-merge-side'], f.root);
+    await command(['git', 'commit', '-m', 'side'], f.root);
+    await command(['git', 'cherry-pick', '--no-commit', 'agent-merge^1'], f.root);
+    await command(['git', 'commit', '-m', 'feat'], f.root);
+    await command(['git', 'update-ref', 'refs/remotes/origin/main', 'HEAD'], f.root);
+    const detached: string = await agentWorktree(f, 'detached');
+    await command(['git', '-C', detached, 'checkout', '--detach'], f.root);
+    const bareLock: string = await agentWorktree(f, 'bare');
+    const otherForm: string = resolve(f.root, '.claude/worktrees/agent-operator');
+    await command(['git', 'worktree', 'add', '-b', 'agent-operator', otherForm], f.root);
+    await command(['git', 'worktree', 'lock', '--reason', 'operator hold', otherForm], f.root);
+    const outside: string = resolve(f.home, 'agent-outside');
+    await command(['git', 'worktree', 'add', '-b', 'agent-outside', outside], f.root);
+    await command(['git', 'worktree', 'lock', '--reason', deadAgentLock('outside'), outside], f.root);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    for (const dir of [unlanded, dirty, untracked, mergeDir, detached, bareLock, otherForm, outside]) {
+      expect(existsSync(dir)).toBe(true);
+      expect(await agentLockText(f, dir)).toContain('locked');
+      expect(keptReport(f).some((entry) => entry.path === dir)).toBe(true);
+    }
+  } finally {
+    f.clean();
+  }
+});
+
+// Criterion 3 vetoes and needsPanes: an otherwise-eligible worktree stays while
+// a pane or a surviving process sits inside; the pane case also proves a
+// registered agent dir alone makes the pass fetch the pane list.
+test('eligible agent worktree stays while a pane or process sits inside', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
+  try {
+    const paneDir: string = await agentWorktree(f, 'pane');
+    const procDir: string = await agentWorktree(f, 'proc');
+    const db: Database = database(f);
+    saveDatabase(f, {
+      ...db,
+      panes: [{ pane_id: 'w1:p1', tab_id: 'w1:t1', cwd: paneDir, agent: null, agent_status: 'idle', focused: false }],
+    });
+    const procEntry: string = resolve(procRoot(f), String(child.pid));
+    mkdirSync(resolve(procEntry, 'fd'), { recursive: true });
+    symlinkSync(procDir, resolve(procEntry, 'cwd'));
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(calls(f).some((args) => args[0] === 'pane' && args[1] === 'list')).toBe(true);
+    expect(existsSync(paneDir)).toBe(true);
+    expect(existsSync(procDir)).toBe(true);
+    const kept: { path: string; reason: string }[] = keptReport(f);
+    expect(kept.some((entry) => entry.path === paneDir && entry.reason === 'live pane inside')).toBe(true);
+    expect(kept.some((entry) => entry.path === procDir && entry.reason.includes(String(child.pid)))).toBe(true);
+  } finally {
+    child.kill('SIGKILL');
+    await child.exited;
+    f.clean();
+  }
+});
+
+// Criterion 5: ignored files inside the worktree do not block removal.
+test('ignored files do not block agent worktree removal', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const dir: string = await agentWorktree(f, 'ignored');
+    writeFileSync(resolve(f.root, '.git/info/exclude'), 'node_modules/\n');
+    mkdirSync(resolve(dir, 'node_modules/pkg'), { recursive: true });
+    writeFileSync(resolve(dir, 'node_modules/pkg/index.js'), 'x');
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(dir)).toBe(false);
+    expect((await branchExists(f, 'agent-ignored')).code).toBe(1);
+  } finally {
+    f.clean();
+  }
+});
+
+// Criterion 4 and the leave-as-found binding: the branch delete is bound to the
+// proven head, so a ref the delete cannot take (stale lock file) is reported on
+// the repo, never silently dropped; an unlock that fails keeps the worktree
+// with its original lock, never forcing a remove past a live lock.
+test('stuck agent branch ref reports the delete error; failed unlock leaves the lock', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const stuck: string = await agentWorktree(f, 'stuck');
+    writeFileSync(resolve(f.root, '.git/refs/heads/agent-stuck.lock'), '');
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(stuck)).toBe(false);
+    expect((await branchExists(f, 'agent-stuck')).code).toBe(0);
+    const kept: { path: string; reason: string }[] = keptReport(f);
+    expect(kept.some((entry) => entry.path === f.root && entry.reason !== 'unmanaged worktree')).toBe(true);
+    rmSync(resolve(f.root, '.git/refs/heads/agent-stuck.lock'), { force: true });
+    const unlockable: string = await agentWorktree(f, 'unlockable');
+    const admin: string = resolve(f.root, '.git/worktrees/agent-unlockable');
+    chmodSync(admin, 0o555);
+    try {
+      expect((await next(f, ['--all'])).code).toBe(0);
+    } finally {
+      chmodSync(admin, 0o755);
+    }
+    expect(existsSync(unlockable)).toBe(true);
+    expect(await agentLockText(f, unlockable)).toContain('claude agent agent-unlockable');
+    expect(keptReport(f).some((entry) => entry.path === unlockable && entry.reason !== 'unmanaged worktree')).toBe(
+      true,
+    );
+  } finally {
+    f.clean();
+  }
+});
