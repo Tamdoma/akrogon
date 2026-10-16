@@ -1,10 +1,22 @@
-import { existsSync, realpathSync, rmSync } from 'node:fs';
+import { realpathSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
-import { ensureLeafTemp, leafTemp, toolRoot, worktreeStore, type Repo } from './config';
+import { ensureLeafTemp, expandPath, leafTemp, toolRoot, worktreeStore, type Repo } from './config';
 import { applySkillLinks, planSkillLinks, type Link } from './install';
+import {
+  buildRelease,
+  clearReleaseHold,
+  currentLink,
+  currentReleaseCommit,
+  flip,
+  pruneReleases,
+  readReleaseHold,
+  releasesDir,
+  writeDeployFailure,
+  writeDeploySuccess,
+} from './release';
 import { eligibleRecord, integrate } from './sync';
-import { command, run, spawnCaptured, CommandError, type Result } from './shell';
+import { command, run, spawnCaptured, CommandError, type Result, type SpawnResult } from './shell';
 import { withLock } from './state';
 
 function errorLine(result: Result): string {
@@ -185,30 +197,95 @@ async function moveCheckout(repo: Repo, moveTo: string, base: string): Promise<M
   return { state: 'pending', detail: `the checkout moved to ${now.slice(0, 12)} during integration` };
 }
 
-async function installStage(root: string, ownRoot: string, home: string): Promise<string | null> {
-  const installed: Result = await run([process.execPath, 'install', '--frozen-lockfile'], root);
-  if (installed.code !== 0) return `install failed: ${errorLine(installed)}`;
-  try {
-    const planned: { links: Link[]; conflicts: Link[] } = planSkillLinks(home, ownRoot);
-    const blocked: Set<string> = new Set(planned.conflicts.map((link: Link) => link.destination));
-    applySkillLinks(planned.links.filter((link: Link) => !blocked.has(link.destination)));
-    const reloaded: Result = await spawnCaptured(['systemctl', '--user', 'daemon-reload'], {
-      cwd: root,
-      env: process.env,
-    });
-    if (planned.conflicts.length > 0)
-      return `links failed: ${planned.conflicts.map((link: Link) => link.destination).join(', ')}; remove the conflicting paths`;
-    if (reloaded.code !== 0) return `reload failed: ${errorLine(reloaded)}`;
-  } catch (error) {
-    return `links failed: ${describeError(error)}`;
+// Carries the failing step's name out of deployStage's catch so deploy.yaml
+// records the stage that stopped the deploy.
+class DeployStepError extends Error {
+  constructor(
+    readonly step: string,
+    cause: unknown,
+  ) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
   }
-  return null;
 }
 
-export async function selfUpdate(repo: Repo, ownRoot: string = toolRoot, home: string = homedir()): Promise<void> {
+// Deploys the remote's tip into the state home for the akrogon repo only.
+// Returns the printed fragment: null when not-own or already at the target,
+// the held/deployed text on success, the recorded 'deploy failed' text
+// otherwise. Runs under the caller's install lock.
+async function deployStage(repo: Repo, home: string): Promise<string | null> {
+  if (repo.name !== 'akrogon') return null;
+  const root: string = repo.root;
+  const step = async <T>(name: string, action: () => T | Promise<T>): Promise<T> => {
+    try {
+      return await action();
+    } catch (error) {
+      throw new DeployStepError(name, error);
+    }
+  };
+  let sha: string = '';
+  let previous: string | null = null;
+  try {
+    await step('resolve', () => command(['git', 'fetch', repo.config.remote, repo.config.default_branch], root));
+    sha = await step('resolve', () =>
+      command(['git', 'rev-parse', `refs/remotes/${repo.config.remote}/${repo.config.default_branch}^{commit}`], root),
+    );
+    previous = await step('resolve', () => currentReleaseCommit());
+    if (previous === sha) return null;
+    if ((await step('hold', () => readReleaseHold())) === sha)
+      return `deploy held: ${sha.slice(0, 12)} (rollback hold)`;
+    await step('build', () => buildRelease(repo, sha));
+    await step('flip', () => flip(sha));
+    await step('links', () => {
+      const ownedRoots: string[] = [currentLink(), releasesDir(), toolRoot, realpathSync(expandPath(repo.root))];
+      const planned: { links: Link[]; conflicts: Link[] } = planSkillLinks(home, currentLink(), ownedRoots);
+      const blocked: Set<string> = new Set(planned.conflicts.map((link: Link) => link.destination));
+      applySkillLinks(planned.links.filter((link: Link) => !blocked.has(link.destination)));
+      if (planned.conflicts.length > 0)
+        throw new Error(
+          `${planned.conflicts.map((link: Link) => link.destination).join(', ')}; remove the conflicting paths`,
+        );
+    });
+    await step('reload', async () => {
+      // env: process.env is load-bearing: Bun.spawn with env undefined forks the
+      // startup environment, so in-process callers that mutate PATH or fake-env
+      // vars (every test fixture) would silently hit real systemctl/herdr.
+      const reloaded: SpawnResult = await spawnCaptured(['systemctl', '--user', 'daemon-reload'], {
+        cwd: root,
+        env: process.env,
+      });
+      if (reloaded.code !== 0) throw new CommandError(['systemctl', '--user', 'daemon-reload'], root, reloaded);
+      const linked: SpawnResult = await spawnCaptured(['herdr', 'plugin', 'link', resolve(currentLink(), 'plugin')], {
+        cwd: root,
+        env: process.env,
+      });
+      if (linked.code !== 0)
+        throw new CommandError(['herdr', 'plugin', 'link', resolve(currentLink(), 'plugin')], root, linked);
+    });
+    await step('record', () => {
+      writeDeploySuccess(sha, previous);
+      clearReleaseHold();
+      pruneReleases();
+    });
+    return `deployed ${sha.slice(0, 12)}${previous === null ? '; switched from checkout to release' : ''}`;
+  } catch (error) {
+    const failed: string =
+      error instanceof DeployStepError && error.step === 'build'
+        ? error.cause instanceof CommandError && (error.cause.argv[0] === 'git' || error.cause.argv[0] === 'tar')
+          ? 'archive'
+          : 'install'
+        : error instanceof DeployStepError
+          ? error.step
+          : 'record';
+    const text: string = describeError(error instanceof DeployStepError ? error.cause : error);
+    writeDeployFailure(sha, failed, text);
+    return `deploy failed: ${failed}: ${text}; retried at the next trigger`;
+  }
+}
+
+export async function selfUpdate(repo: Repo, home: string = homedir()): Promise<void> {
   try {
     const root: string = repo.root;
-    const own: boolean = realpathSync(root) === (existsSync(ownRoot) ? realpathSync(ownRoot) : resolve(ownRoot));
+    const own: boolean = repo.name === 'akrogon';
     const target: string = `${repo.config.remote}/${repo.config.default_branch}`;
     const lag = async (): Promise<string> => {
       const result: Result = await run(['git', 'rev-list', '--left-right', '--count', `HEAD...${target}`], root);
@@ -217,37 +294,45 @@ export async function selfUpdate(repo: Repo, ownRoot: string = toolRoot, home: s
       return `${behind} behind ${target}`;
     };
     const body = async (): Promise<string | null> => {
-      let git: GitResult;
+      let git: GitResult | null = null;
+      let gitFragment: string | null = null;
       try {
         git = await gitStage(repo, target, lag);
       } catch (error) {
         if (error instanceof CommandError && (error.argv[1] === 'fetch' || error.argv[1] === 'push'))
           return `${error.argv[1]} failed: ${errorLine(error.result)}; ${await lag()}; retried at the next trigger`;
-        if (error instanceof Error && error.message.startsWith('record conflict:')) return error.message;
-        throw error;
+        if (!(error instanceof Error && error.message.startsWith('record conflict:'))) throw error;
+        gitFragment = error.message;
       }
-      const move: Move = git.kind === 'done' ? git.move : { state: 'none' };
-      const failure: string | null = own ? await installStage(root, ownRoot, home) : null;
-      if (git.kind === 'skipped') return `self-update skipped: ${git.skip}`;
-      if (failure !== null) return `${failure}; ${await lag()}; retried at the next trigger`;
-      const outcome: string[] =
-        git.kind !== 'done' || git.pushed === null
-          ? []
-          : [
-              `pushed ${await command(['git', 'rev-list', '--count', `${git.incoming}..${git.pushed}`], root)} record commit(s) to ${target}`,
-            ];
-      if (move.state === 'moved') {
-        const head: string = (await command(['git', 'rev-parse', 'HEAD'], root)).slice(0, 12);
-        return [...outcome, `deployed ${move.old.slice(0, 12)}..${head}`].join('; ');
+      if (git !== null) {
+        if (git.kind === 'skipped') {
+          gitFragment = `self-update skipped: ${git.skip}`;
+        } else {
+          const outcome: string[] =
+            git.pushed === null
+              ? []
+              : [
+                  `pushed ${await command(['git', 'rev-list', '--count', `${git.incoming}..${git.pushed}`], root)} record commit(s) to ${target}`,
+                ];
+          if (git.move.state === 'moved') {
+            const head: string = (await command(['git', 'rev-parse', 'HEAD'], root)).slice(0, 12);
+            gitFragment = [...outcome, `deployed ${git.move.old.slice(0, 12)}..${head}`].join('; ');
+          } else if (git.move.state === 'pending') {
+            gitFragment = [
+              ...outcome,
+              `checkout pending: ${git.move.detail}; ${await lag()}; commit or finish the overlapping edit`,
+            ].join('; ');
+          } else if (own || outcome.length > 0) {
+            const head: string = (await command(['git', 'rev-parse', 'HEAD'], root)).slice(0, 12);
+            gitFragment = [...outcome, `current ${head}`].join('; ');
+          }
+        }
       }
-      if (move.state === 'pending')
-        return [
-          ...outcome,
-          `checkout pending: ${move.detail}; ${await lag()}; commit or finish the overlapping edit`,
-        ].join('; ');
-      if (!own && outcome.length === 0) return null;
-      const head: string = (await command(['git', 'rev-parse', 'HEAD'], root)).slice(0, 12);
-      return [...outcome, `current ${head}`].join('; ');
+      const deploy: string | null = await deployStage(repo, home);
+      const line: string = [gitFragment, deploy]
+        .filter((part: string | null): part is string => part !== null)
+        .join('; ');
+      return line === '' ? null : line;
     };
     const line: string | null = own
       ? await withLock(
