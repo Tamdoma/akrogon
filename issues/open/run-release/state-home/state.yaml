@@ -1,31 +1,28 @@
 slug: state-home
-phase: implement
+phase: merged
 created: 2026-10-16
 repo: akrogon
 debate: "no"
 blocked-by: []
 sources: []
-busy_since:
-  A: 2026-10-15T23:13:34.615Z
+busy_since: {}
 busy_notified: {}
 attempts:
   A: 0
   B: 0
 done: []
-fix_rounds: 0
+fix_rounds: 3
 verdict: {}
 tab: w8:tCR
-worktree: /home/ivan/.akrogon/worktrees/akrogon/state-home
 env_names: []
 env_generation: 0
 pane:
   A: w8:pQY
   B: w8:pQZ
-prompted:
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-state-home--/2026-10-15T23-03-02-858Z_01a141ce-03c9-701f-9416-da2e46a9d095.jsonl
-prompted_at:
-  A: 2026-10-15T23:13:34.615Z
+prompted: {}
+prompted_at: {}
 delivery_error: {}
+merge_stamp: 2026-10-16T00:54:47.644Z
 frozen:
   tests/state-home.test.ts: da12ce63ddee30ff5c522a295770d6066fe7f5d2
 frozen_cited: []

@@ -1,0 +1,2 @@
+# Final-shape check, slot B
+Read /home/ivan/Work/infra/akrogon/issues/chart/state-cutover/forks/writer-gate.md (Taken section) and /home/ivan/Work/infra/akrogon/issues/chart/state-cutover/CHART.md against main 83b9279. Return only a mechanism or contract error that would make the move unsafe or fail, with file:line and the exact fix, or "no disagreements". Do not reargue O2/O3 preferences already recorded. Write to /home/ivan/Work/infra/akrogon/issues/chart/state-cutover/slots/final-B.md. Edit no other file.

@@ -1,0 +1,3 @@
+# Opening map, slot C
+
+Read the intake at /home/ivan/Work/infra/akrogon/issues/chart/state-cutover/INTAKE.md and the live code on main (git fetch first; state-home merged): src/state-home.ts, src/config.ts:195-206, src/akrogon.ts:1-15, tests/state-home.test.ts, and the state-home leaf at issues/open/run-release/state-home/ (brief.md criterion 4, design.md, review-B.md). Map independently: what the cutover gate must prove (which processes can still write tool-root state after the move), the simplest gate that opens on this host and still keeps criterion 4, the options and what each could break later, and pitfalls. Cite file:line. Write to /home/ivan/Work/infra/akrogon/issues/chart/state-cutover/slots/map-C.md. Edit no other file.

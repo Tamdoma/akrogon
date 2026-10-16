@@ -77,3 +77,7 @@ Between the final post-copy re-check and the `config.yaml` commit rename, a bran
 - docs/guide/install.md — "Global config" section (U2)
 - src/AREA.md — one line naming `src/state-home.ts` and the moved home (U1)
 - No skill files affected (skills read config only through `globalHome()`).
+
+## Implementation notes
+
+- 2026-10-16 check.repair: apply the pre-cutover tool-root resolution to an empty explicit AKROGON_HOME as well as the default destination, as brief criterion 4 and design's "Until it completes, globalHome() keeps resolving the tool root" require.

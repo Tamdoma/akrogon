@@ -21,6 +21,6 @@ none
 - Compiled single binary, read-only files, dirty-root refusal, stash/reset on update: see run-location Foreclosed.
 
 ## Pending steps
-- After state-home merges and the host runs from `~/.akrogon` (`~/.akrogon/config.yaml` present and `akrogon status` works): remove the tracked tool-root `config.yaml`, `held.yaml`, `admission.lock` and `runs/last-start` from the akrogon repo, in a separate worktree, B review, push. Owner: the door. Check: `git ls-files config.yaml held.yaml admission.lock runs/last-start` prints nothing on origin/main and `akrogon status` still works.
+- After state-home merges and the host runs from `~/.akrogon` (`~/.akrogon/config.yaml` present and `akrogon status` works): remove the tracked tool-root `config.yaml`, `held.yaml`, `admission.lock` and `runs/last-start` from the akrogon repo, in a separate worktree, B review, push. Owner: the door. Check: `git ls-files config.yaml held.yaml admission.lock runs/last-start` prints nothing on origin/main and `akrogon status` still works. Done 2026-10-16 ~04:00 local: a813007 removed config.yaml, held.yaml, admission.lock, reconcile-host.json and runs/** (same class, wider than named) and the test that read the tracked config (tests/harness-template.test.ts; the claude template is machine state); B review ready (pending/review-B-1.md); verify green; deployed; origin/main lists none of them; root copies and dead ignored state (paused.yaml, stopped.yaml, reconcile/, .lock) removed from the tool root; `akrogon status` works.
 
 Handed off 2026-10-16

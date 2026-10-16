@@ -76,6 +76,10 @@ Docs: `questions.md` and the two learnings files above are the only affected doc
 
 Open limitations carried: none in scope. Known surface left as designed: a codex peer prompted through a path other than peer-ask has no boundary and is unproven (D3).
 
+## Implementation notes
+
+- 2026-10-16 check.repair: run the planned peer-wait/peer-ask boundary proofs with `--timeout=30000`, matching configured checks, to exercise brief C1's budget waits and C7's multi-run exchange proof beyond Bun's default five-second test timeout.
+
 ## Test red results (recorded at synthesis)
 
 - `check plan-red peer-wait: 1` — `bun test tests/peer-wait.test.ts`: 2 pass, 31 fail. Failures: outcome `failure` where `budget`/`blocked` expected (C1, C3 unproven, C5, pi unproven, authority loss), missing `signal`/`exchange` fields on every line, missing identity errors (kind/session change, dropAgent, carried mismatch), argv[5] rejected (`Expected 5 args` usage exit), adoption absent. Log: `implementation/check-plan-red%20peer-wait-1792107861103-248301.log`.
