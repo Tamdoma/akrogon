@@ -86,11 +86,11 @@ test.serial('the hold blocks redeploy of the rolled-back commit until main moves
 test.serial('the README manual steps roll a broken release back using the real previous release', async () => {
   const d: DeployFixture = await deployFixture();
   try {
-    // The real predecessor: the shared main commit before this leaf's work,
-    // built by release-deploy's builder so install, the hold reader and next
-    // all run its own modules (ROLLBACK_BREAK_PREV removes install.ts, which
-    // turns this proof red only when the predecessor code actually runs).
-    const base: string = await command(['git', 'merge-base', 'origin/main', 'HEAD'], resolve(import.meta.dir, '..'));
+    // The real predecessor: the newest commit before the rollback work,
+    // pinned so the proof still selects a pre-rollback tree after this leaf
+    // lands on main (ROLLBACK_BREAK_PREV removes install.ts, which turns this
+    // proof red only when the predecessor code actually runs).
+    const base: string = '6121559ee158f559842715a552248645f05bd026';
     const homeEnv: NodeJS.ProcessEnv = {
       ...process.env,
       ...d.env,
