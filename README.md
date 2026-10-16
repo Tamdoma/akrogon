@@ -83,6 +83,22 @@ The links — command, skills, slice and plugin — point through `~/.akrogon/cu
 
 Follow the reported remedy when the checkout is on another branch or detached, ahead with commits touching more than issue records (`akrogon sync`), or blocked by an overlapping edit (commit or finish the edit). See the [install guide](docs/guide/install.md) for details.
 
+## Rollback
+
+A deployed release can break the installed command itself. `akrogon rollback` points `~/.akrogon/current` back at the previous release, writes a hold record so the next deploy pass skips the rolled-away commit while it is still main, and restores the previous release's command, skill and plugin links. Once main moves to a newer commit that commit deploys normally and the hold ends. With no previous release the command refuses and changes nothing.
+
+When the current release cannot even start, do the same steps by hand — none of them needs code from the current release. The previous release is the `previous:` field in `~/.akrogon/deploy.yaml`:
+
+```sh
+cd ~/.akrogon
+ln -s releases/<previous> .next-current
+mv -T .next-current current
+printf 'commit: <rolled-away-commit>\n' > release-hold.yaml
+bun releases/<previous>/src/akrogon.ts install
+```
+
+The temporary link renamed onto `current` flips it atomically, the hold record names the commit that must not redeploy (the release you are leaving), and the previous release's own `install` rebuilds its links.
+
 ## Initialize a repository
 
 Run [init-akrogon](skills/init-akrogon/SKILL.md) from the project root. It inspects the project and proposes its branch, checks and grounding documents.
@@ -154,6 +170,7 @@ Run commands from the registered repository unless a command says otherwise. Ang
 | `akrogon verify [--sha <rev>] [--attempt <id>] [--holder <dir>]` | Check the commit out fresh in the worktree store, run every configured check for the caller's scope under the constructed environment, log each into the leaf or holder, write one receipt to `issues/verify-runs.jsonl` and remove the checkout. Exits 0 only when every command passed. |
 | `akrogon guard <ancestors\|own-modules>` | Refuse when a canonical ancestor holds node_modules or package.json, or a checkout with a package.json at its top is missing its own node_modules. |
 | `akrogon pack <folder>...` | Pack a closed owner's or a chart `direct/` folder's `*.log` files into `evidence.tar.zst` under a `.closing` marker, refusing a closed owner whose tracked logs changed or vanished on disk without matching archive bytes; reports packed, tracked, untracked and deleted counts per folder. |
+| `akrogon rollback` | Point `current` at the previous release, hold the rolled-away commit from redeploy until main moves past it, and restore the previous release's links. |
 ```
 
 A normal starting point for CSV export is:

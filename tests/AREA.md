@@ -7,7 +7,7 @@
 
 ## Key files
 
-- `tests/helpers.ts` supplies temporary repos, CLI invocations and leaf fixtures.
+- `tests/helpers.ts` supplies temporary repos, CLI invocations and leaf fixtures; `tests/deploy-fixture.ts` builds the deployed-release fixture (seed repo, release stub, `deployedPair`).
 - `tests/isolation.ts` is the `bunfig.toml` `[test]` preload: per-worker scratch HOME and leaf-temp, a subreaper plus descendant sweep so the suite never reaches real HOME or `/var/tmp/akr-<uid>` and leaves no process.
 - `tests/phase.test.ts` checks real transitions, races and handoff refusal.
 - `tests/command-reference.test.ts` checks README command argument contracts against the dispatched verbs.
@@ -28,6 +28,7 @@
 - `tests/log-reader.test.ts` checks `akrogon log` byte output, archive members, outside-repo resolution and the skill/doc mentions.
 - `tests/hold-retired.test.ts` checks the retired merge verbs refuse, a legacy hold record stays inert, and the docs carry no retired surface.
 - `tests/close-pack.test.ts` checks the `.closing` marker, packing `*.log` into `evidence.tar.zst`, sync exclusions, init log ignores and the run-check closed/closing refusal; `tests/folder-pack.test.ts` checks `akrogon pack` on chart `direct/` and closed owners, tracked-log refusals, `.closing` retries and refusal forms.
+- `tests/rollback.test.ts` checks `akrogon rollback` end to end: flip and hold, the held-deploy loop, the manual README path on a broken release, the no-previous and bad-config refusals, and link restore with its failure leaving `current` on the previous release.
 
 ## Non-obvious patterns
 

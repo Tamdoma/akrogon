@@ -222,8 +222,12 @@ switch (verb) {
   case 'guard':
     process.exitCode = await (await import('./guard')).guard(process.cwd(), positionals);
     break;
+  case 'rollback':
+    z.tuple([]).parse(positionals);
+    await (await import('./rollback')).rollback();
+    break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack>',
+      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|rollback>',
     );
 }

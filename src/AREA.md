@@ -12,7 +12,7 @@
 
 - `src/akrogon.ts` validates CLI arguments and dispatches commands.
 - `src/state-home.ts` moves the state home out of the tool root to `~/.akrogon` (or `AKROGON_HOME`) on the first command after deploy, gated on live run records and foreign processes and committed last via the rewritten `config.yaml`.
-- `src/release.ts` owns the deploy filesystem: it builds a release (`git archive`, `tar`, `bun install`) into `releases/<sha>`, flips the `current` symlink atomically, and writes the deploy record, hold and prune state.
+- `src/release.ts` owns the deploy filesystem: it builds a release (`git archive`, `tar`, `bun install`) into `releases/<sha>`, flips the `current` symlink atomically, and writes the deploy record, hold and prune state; `src/rollback.ts` runs `akrogon rollback` — flip to the recorded previous release, hold the rolled-away commit and restore links through `install()`, under the same install lock deployStage takes.
 - `src/self-update.ts` pushes record commits and fast-forwards the workspace checkout, then deploys the remote tip for the akrogon repo: deploy builds releases behind `current`, re-links through it and records failures in `deploy.yaml`, all under the install lock.
 - `src/preflight.ts` verifies the configured base remote branch and local tracking ref; `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
 - `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file; `src/readiness.ts` owns the readiness contract schema and gap computation.

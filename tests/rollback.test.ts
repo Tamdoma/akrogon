@@ -21,7 +21,7 @@ import {
   roots,
   type DeployFixture,
 } from './deploy-fixture';
-import { spawnCaptured, type Result, type SpawnResult } from '../src/shell';
+import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 
 // The end-state contract every rollback path must reach: current on the
 // previous release, the rolled-away commit held, links resolved through
@@ -97,8 +97,8 @@ test.serial('the README manual steps roll a broken release back to the same end 
     // The three manual steps from the README's rollback section, verbatim
     // against the fixture's state home: flip via temp link, write the hold,
     // run the previous release's install.
-    await Bun.$`ln -s ${resolve(releases(d), previous)} ${resolve(d.home, '.next-current')}`.quiet();
-    await Bun.$`mv -T ${resolve(d.home, '.next-current')} ${resolve(d.home, 'current')}`.quiet();
+    await command(['ln', '-s', resolve(releases(d), previous), '.next-current'], d.home);
+    await command(['mv', '-T', '.next-current', 'current'], d.home);
     writeFileSync(resolve(d.home, 'release-hold.yaml'), `commit: ${current}\n`);
     const install: SpawnResult = await spawnCaptured(
       [process.execPath, resolve(releases(d), previous, 'src/akrogon.ts'), 'install'],
@@ -133,8 +133,8 @@ test.serial('rollback with a global config key the schema rejects fails naming f
   try {
     await deployedPair(d);
     const configPath: string = resolve(d.home, 'config.yaml');
-    const good: string = readFileSync(configPath, 'utf8');
-    writeFileSync(configPath, `${good}bogus_key: true\n`);
+    const good: object = Bun.YAML.parse(readFileSync(configPath, 'utf8')) as object;
+    writeFileSync(configPath, Bun.YAML.stringify({ ...good, bogus_key: true }));
     const currentBefore: string = realpathSync(resolve(d.home, 'current'));
     const result: Result = await cli(d.f, ['rollback'], d.f.root, d.env);
     expect(result.code).not.toBe(0);

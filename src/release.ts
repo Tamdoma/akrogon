@@ -139,6 +139,10 @@ export function readReleaseHold(): string | null {
   return releaseHoldSchema.parse(Bun.YAML.parse(readFileSync(path, 'utf8'))).commit;
 }
 
+export function writeReleaseHold(commit: string): void {
+  writeYaml(releaseHoldPath(), { commit });
+}
+
 export function clearReleaseHold(): void {
   rmSync(releaseHoldPath(), { force: true });
 }

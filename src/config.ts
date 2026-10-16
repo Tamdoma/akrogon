@@ -206,7 +206,14 @@ export function expandPath(path: string, base: string = process.cwd()): string {
 }
 
 export function readGlobal(): GlobalConfig {
-  return globalSchema.parse(Bun.YAML.parse(readFileSync(resolve(globalHome(), 'config.yaml'), 'utf8')));
+  const file: string = resolve(globalHome(), 'config.yaml');
+  try {
+    return globalSchema.parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+  } catch (error) {
+    if (!(error instanceof Error)) throw new Error(`Invalid ${file}: ${String(error)}`, { cause: error });
+    error.message = `Invalid ${file}: ${error.message}`;
+    throw error;
+  }
 }
 
 export function readRepo(name: string, path: string): Repo {
