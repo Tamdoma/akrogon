@@ -104,12 +104,16 @@ export function readDeployRecord(): DeployRecord | null {
 
 export function writeDeploySuccess(sha: string, previous: string | null): void {
   const existing: DeployRecord | null = readDeployRecord();
+  const at: string = new Date().toISOString();
   writeYaml(deployRecordPath(), {
     commit: sha,
     previous,
     ok: true,
-    at: new Date().toISOString(),
-    replaced: existing?.replaced ?? {},
+    at,
+    replaced: {
+      ...(existing?.replaced ?? {}),
+      ...(previous !== null && previous !== sha ? { [previous]: at } : {}),
+    },
   });
 }
 

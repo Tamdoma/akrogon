@@ -241,7 +241,10 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
       command(['git', 'rev-parse', `refs/remotes/${repo.config.remote}/${repo.config.default_branch}^{commit}`], root),
     );
     previous = await step('resolve', () => currentReleaseCommit());
-    if (previous === sha) return null;
+    if (previous === sha) {
+      await step('record', () => pruneReleases());
+      return null;
+    }
     if ((await step('hold', () => readReleaseHold())) === sha)
       return `deploy held: ${sha.slice(0, 12)} (rollback hold)`;
     await step('build', () => buildRelease(repo, sha));
