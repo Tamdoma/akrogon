@@ -32,6 +32,7 @@ import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 import { readPaused } from './pause';
 import { readStopped } from './stop';
 import { readHostKept, readKept } from './reconcile';
+import { currentReleaseCommit, readDeployRecord } from './release';
 
 type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
 type Scan =
@@ -421,6 +422,12 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   for (const scan of scans) {
     if (!scan.ok) console.log(JSON.stringify({ unreadable: scan.repo, path: scan.path, error: scan.error }));
   }
+  const deploy: ReturnType<typeof readDeployRecord> = readDeployRecord();
+  const active: string | null = currentReleaseCommit();
+  if (deploy !== null && !deploy.ok && deploy.attempted !== undefined && deploy.attempted !== active)
+    console.log(
+      `deploy failed: attempted ${deploy.attempted.slice(0, 12)}, active ${active?.slice(0, 12) ?? 'none'}, step ${deploy.step ?? 'unknown'}: ${(deploy.error ?? '').replaceAll('\n', ' ').slice(0, 120)}`,
+    );
   for (const scan of scans) {
     if (scan.ok) {
       for (const leaf of scan.leaves.filter((leaf) => leaf.state.phase === 'failed'))
