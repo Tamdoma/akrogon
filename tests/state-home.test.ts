@@ -167,8 +167,86 @@ test('cutover leaves no tracked file of the checkout modified or deleted', async
   await command(['git', 'commit', '-m', 'c'], root);
   await cli(root, home, ['config']);
   const status: string = await command(['git', 'status', '--porcelain'], root);
-  const tracked: string = await command(['git', 'ls-files'], root);
-  for (const line of status.split('\n').filter(Boolean)) expect(tracked.split('\n')).toContain(line.slice(3));
+  // Tracked files must be untouched; untracked additions (a created .lock,
+  // node_modules) are ignored state, not checkout changes.
+  const trackedChanges: string[] = status.split('\n').filter((line) => line !== '' && !line.startsWith('??'));
+  expect(trackedChanges).toEqual([]);
+});
+
+test('init registers into the state home config and leaves the checkout untouched', async () => {
+  const home: string = temp();
+  const root: string = toolCopy(home, globalConfig);
+  await cli(root, home, ['config']); // cut over first
+  await command(['git', 'init', '-b', 'main', root]);
+  await command(['git', 'config', 'user.email', 't@t'], root);
+  await command(['git', 'config', 'user.name', 't'], root);
+  await command(['git', 'add', '.'], root);
+  await command(['git', 'commit', '-m', 'c'], root);
+  const repo: string = resolve(home, 'initrepo');
+  mkdirSync(resolve(repo, 'issues/open'), { recursive: true });
+  await command(['git', 'init', '-b', 'main', repo]);
+  await command(['git', 'config', 'user.email', 't@t'], repo);
+  await command(['git', 'config', 'user.name', 't'], repo);
+  writeFileSync(resolve(repo, 'proposal.yaml'), 'grounding: none\n');
+  const init: SpawnResult = await cli(root, home, ['init', '--from', 'proposal.yaml'], repo);
+  expect(init.code).toBe(0);
+  const config = Bun.YAML.parse(readFileSync(resolve(home, '.akrogon/config.yaml'), 'utf8')) as {
+    repos: Record<string, string>;
+  };
+  expect(config.repos.initrepo).toBe(repo);
+  expect(readFileSync(resolve(root, 'config.yaml'), 'utf8')).toBe(Bun.YAML.stringify(globalConfig));
+  const status: string = await command(['git', 'status', '--porcelain'], root);
+  expect(status.split('\n').filter((line) => line !== '' && !line.startsWith('??'))).toEqual([]);
+});
+
+test('a command running at cutover defers it; after it ends, cutover proceeds and nothing writes the tool root', async () => {
+  const home: string = temp();
+  const root: string = toolCopy(home, globalConfig);
+  mkdirSync(resolve(root, 'runs/locks'), { recursive: true });
+  writeFileSync(resolve(root, 'runs/locks/holder.slice'), '');
+  const holder = Bun.spawn([process.execPath, '-e', 'setTimeout(() => {}, 30000)'], { cwd: root });
+  const stat: string = readFileSync(`/proc/${holder.pid}/stat`, 'utf8');
+  const recordFile: string = resolve(root, `runs/${'b'.repeat(64)}.yaml`);
+  writeFileSync(
+    recordFile,
+    Bun.YAML.stringify({
+      token_hash: 'b'.repeat(64),
+      pid: holder.pid,
+      start_time: stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19],
+      boot_id: readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(),
+      repo: 'r',
+      leaf: 'l',
+      check: 'c',
+      state: 'live',
+      run: 'run-held',
+      slice: 'holder.slice',
+      scope: '',
+      unit: 'u',
+      since: new Date().toISOString(),
+    }),
+  );
+  const deferred: SpawnResult = await cli(root, home, ['config']);
+  expect(deferred.code).toBe(0);
+  expect(deferred.stderr).not.toContain('moved state home');
+  expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(false);
+  // The old-code run ends: its record is removed, its lock file stays.
+  rmSync(recordFile);
+  holder.kill();
+  await holder.exited;
+  const moved: SpawnResult = await cli(root, home, ['config']);
+  expect(moved.stderr).toContain('moved state home');
+  expect(existsSync(resolve(home, '.akrogon/runs/locks/holder.slice'))).toBe(true);
+  // Cutover is done; a marker newer than every tool-root file, then a later
+  // command must write nothing to the tool root.
+  const marker: string = resolve(home, 'marker');
+  writeFileSync(marker, 'x');
+  await new Promise((r) => setTimeout(r, 50)); // ordering guarantee for -newer
+  await cli(root, home, ['config']);
+  const stray: string = await command(
+    ['sh', '-c', `find . -newer '${marker}' -not -path './node_modules/*' -type f`],
+    root,
+  );
+  expect(stray.trim()).toBe('');
 });
 
 test('an explicit empty state home keeps using the tool root while cutover is deferred', async () => {
