@@ -1,14 +1,5 @@
 import { test, expect } from 'bun:test';
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnCaptured, command, type SpawnResult } from '../src/shell';
@@ -208,9 +199,7 @@ test('init registers into the state home config and leaves the checkout untouche
   expect(status.split('\n').filter((line) => line !== '' && !line.startsWith('??'))).toEqual([]);
 });
 
-test(
-  'an already-running command that admits a nested checked run defers cutover; after it ends, cutover proceeds and nothing writes the tool root',
-  async () => {
+test('an already-running command that admits a nested checked run defers cutover; after it ends, cutover proceeds and nothing writes the tool root', async () => {
   const home: string = temp();
   const remote: string = resolve(home, 'remote.git');
   await command(['git', 'init', '--bare', '-b', 'main', remote]);
@@ -297,9 +286,7 @@ test(
   // state file (the slice locks its admission used) moves to the state home.
   const moved: SpawnResult = await cli(root, home, ['config']);
   expect(moved.stderr).toContain('moved state home');
-  expect(
-    readdirSync(resolve(home, '.akrogon/runs/locks')).length,
-  ).toBeGreaterThan(0);
+  expect(readdirSync(resolve(home, '.akrogon/runs/locks')).length).toBeGreaterThan(0);
   // Nothing writes the tool root after cutover.
   const marker: string = resolve(home, 'marker');
   writeFileSync(marker, 'x');
@@ -310,9 +297,7 @@ test(
     root,
   );
   expect(stray.trim()).toBe('');
-  },
-  30000,
-);
+}, 30000);
 
 test('an explicit empty state home keeps using the tool root while cutover is deferred', async () => {
   const home: string = temp();
