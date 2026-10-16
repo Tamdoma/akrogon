@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
@@ -8,11 +9,12 @@ import {
   leaf,
   fakeHerdr,
   holding,
+  leafTempRoot,
   type Fixture,
 } from './helpers';
 import { writeYaml, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
-import { leafTemp, readRepo, type Repo } from '../src/config';
+import { readRepo, type Repo } from '../src/config';
 import { readState } from '../src/state';
 import type { Database } from './fake-herdr';
 import type { BusctlCall } from './fake-busctl';
@@ -25,6 +27,14 @@ async function fakes(): Promise<F> {
 }
 
 const repo = (f: Fixture): Repo => readRepo('repo', f.root);
+
+// The leaf temp path the subprocess computes: leafTemp(repo, slug) resolves
+// under AKROGON_LEAF_TEMP_ROOT, which cli() sets to leafTempRoot(f), not the
+// suite's own root.
+function tempFor(f: Fixture, slug: string): string {
+  const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
+  return resolve(leafTempRoot(f), hex(f.root).slice(0, 4), hex(`${f.root}\n${slug}`).slice(0, 8));
+}
 
 function database(f: F): Database {
   return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
@@ -134,7 +144,7 @@ test('an unfinished leaf slice is stopped and its temp removed once its recorded
     busyCgroup(f, 'busy-open');
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/busy-open' }]);
     systemctlBin(f);
-    const temp: string = leafTemp(repo(f), 'open-slice');
+    const temp: string = tempFor(f, 'open-slice');
     mkdirSync(temp, { recursive: true });
     const result: Result = await cli(f, ['next', '--all'], f.root, env(f, db, log));
     expect(result.code).toBe(1); // the stopped leaf reports a skip; the pass still ran
@@ -157,7 +167,7 @@ test('a live run record keeps an unfinished leaf slice and its temp', async () =
     busyCgroup(f, 'busy-run');
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/busy-run' }]);
     systemctlBin(f);
-    const temp: string = leafTemp(repo(f), 'run-held');
+    const temp: string = tempFor(f, 'run-held');
     mkdirSync(temp, { recursive: true });
     const stat: string = readFileSync(`/proc/${child.pid}/stat`, 'utf8');
     const runs: string = resolve(f.home, 'runs');
@@ -212,7 +222,7 @@ test('an unfinished leaf with a live tab keeps its slice, with or without a temp
     emptyCgroup(f, 'temped');
     emptyCgroup(f, 'untemped');
     systemctlBin(f);
-    const temp: string = leafTemp(repo(f), 'temped');
+    const temp: string = tempFor(f, 'temped');
     mkdirSync(temp, { recursive: true });
     const result: Result = await cli(f, ['next', '--all'], f.root, env(f, db, log));
     expect(result.code).toBe(1);
@@ -246,7 +256,7 @@ test('an unfinished leaf keeps slice and temp when the pane list is unavailable'
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/no-panes' }]);
     emptyCgroup(f, 'no-panes');
     systemctlBin(f);
-    const temp: string = leafTemp(repo(f), 'no-panes');
+    const temp: string = tempFor(f, 'no-panes');
     mkdirSync(temp, { recursive: true });
     const result: Result = await cli(f, ['next', '--all'], f.root, env(f, db, log));
     expect(result.code).toBe(1);
@@ -293,7 +303,7 @@ test('an unreadable unit list keeps merged, failed and unfinished leaf temps', a
     leaf(f, 'open-temp', 'implement');
     stopLeaf(f, 'open-temp');
     const temps: string[] = ['merged-temp', 'failed-temp', 'open-temp'].map((slug) => {
-      const temp: string = leafTemp(repo(f), slug);
+      const temp: string = tempFor(f, slug);
       mkdirSync(temp, { recursive: true });
       return temp;
     });
@@ -341,7 +351,7 @@ test('the host slice step keeps unfinished leaf slices under the same tab rules'
     emptyCgroup(f, 'host-tab');
     busyCgroup(f, 'host-note');
     systemctlBin(f);
-    const temp: string = leafTemp(repo(f), 'host-tab');
+    const temp: string = tempFor(f, 'host-tab');
     mkdirSync(temp, { recursive: true });
     const result: Result = await cli(f, ['next', '--all'], f.root, env(f, db, log));
     expect(result.code).toBe(1);
@@ -377,7 +387,7 @@ test('a manual merge dispatch holds the global lock while it records the tab and
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/idle' }]);
     emptyCgroup(f, 'idle');
     systemctlBin(f);
-    mkdirSync(leafTemp(repo(f), 'merging'), { recursive: true });
+    mkdirSync(tempFor(f, 'merging'), { recursive: true });
     // Park the dispatch inside `herdr tab create` — after the old tab is dead
     // and before the new tab exists in the fake database.
     const bin: string = resolve(f.home, 'bin');
@@ -423,7 +433,7 @@ test('a manual merge dispatch holds the global lock while it records the tab and
     expect(database(f).tabs.some((item) => item.tab_id === tab)).toBe(true);
     expect(busctlCalls(f).filter((call) => call.slice === slice).length).toBe(2);
     expect(unitsIn(db)).toContain(slice);
-    expect(existsSync(leafTemp(repo(f), 'merging'))).toBe(true);
+    expect(existsSync(tempFor(f, 'merging'))).toBe(true);
     expect(repoKept(f).some((entry) => entry.path === slice && entry.reason === 'live tab')).toBe(true);
   } finally {
     if (!existsSync(gate)) writeFileSync(gate, '');
@@ -467,7 +477,7 @@ test('a tab_closed pass re-dispatches seats into the same slice and the next pas
     expect(calls(log).some((line) => line.includes('stop') && line.includes(slice))).toBe(false);
     expect(unitsIn(db)).toContain(slice);
     expect(repoKept(f).some((entry) => entry.path === slice && entry.reason === 'live tab')).toBe(true);
-    expect(existsSync(leafTemp(repo(f), 'lost-tab'))).toBe(true);
+    expect(existsSync(tempFor(f, 'lost-tab'))).toBe(true);
   } finally {
     f.clean();
   }
@@ -486,7 +496,7 @@ test('a failed leaf with a live tab keeps its tab, slice and temp', async () => 
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/failed' }]);
     busyCgroup(f, 'failed');
     systemctlBin(f);
-    const temp: string = leafTemp(repo(f), 'failed-live');
+    const temp: string = tempFor(f, 'failed-live');
     mkdirSync(temp, { recursive: true });
     const result: Result = await cli(f, ['next', '--all'], f.root, env(f, db, log));
     expect(result.code).toBe(1); // the failed live leaf reports "needs phase recovery"
