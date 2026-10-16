@@ -1,32 +1,29 @@
 slug: release-deploy
-phase: implement
+phase: merged
 created: 2026-10-16
 repo: akrogon
 debate: "no"
 blocked-by:
   - state-home
 sources: []
-busy_since:
-  A: 2026-10-16T01:29:14.987Z
+busy_since: {}
 busy_notified: {}
 attempts:
   A: 0
   B: 0
 done: []
-fix_rounds: 0
+fix_rounds: 2
 verdict: {}
 tab: w8:tCV
-worktree: /home/ivan/.akrogon/worktrees/akrogon/release-deploy
 env_names: []
 env_generation: 0
 pane:
   A: w8:pR4
   B: w8:pR5
-prompted:
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-release-deploy--/2026-10-16T00-55-34-686Z_01a14235-0a1e-70e0-99f0-3fa402f838d9.jsonl
-prompted_at:
-  A: 2026-10-16T01:29:14.987Z
+prompted: {}
+prompted_at: {}
 delivery_error: {}
+merge_stamp: 2026-10-16T04:31:23.845Z
 frozen:
   tests/release-deploy.test.ts: 835dec159aa76851fc80844f8283e2716604e94e
 frozen_cited: []

@@ -1,8 +1,29 @@
 slug: release-rollback
 phase: plan.synthesis
-created: '2026-10-16'
+created: 2026-10-16
 repo: akrogon
-debate: 'no'
+debate: "no"
 blocked-by:
   - release-deploy
 sources: []
+busy_since:
+  A: 2026-10-16T04:34:44.774Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tCW
+worktree: /home/ivan/.akrogon/worktrees/akrogon/release-rollback
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pR6
+  B: w8:pR7
+prompted:
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-release-rollback--/2026-10-16T04-34-41-443Z_01a142fd-a4a3-77ac-bde7-3be6204676d2.jsonl
+prompted_at:
+  A: 2026-10-16T04:34:44.774Z
+delivery_error: {}

@@ -113,3 +113,9 @@ Whole-file check: `akrogon run-check --name release-any-phase-tests -- bun test 
 - Brief vs design: no conflict.
 - Open question answered: `reconcileBatch`'s post-lock `closeMergedTab`/`dispatchDependents` loop is the only other dispatch path outside the global lock (D6); every other `dispatchLeaf` call site is already inside `withLock`.
 - Limitation kept: a leaf whose tab id was recorded but never created (crashed between `saveState` ordering edge) still reads as "tab gone" — same proof rule as today, unchanged.
+
+## Implementation notes
+
+- 2026-10-16 check.fix F1: criterion 6 gained host-only cases in `the host slice step keeps…` — a second registered repo (`other`) reached by `reconcileHost` alone covers the stop (vanished recorded tab, busy slice) and the live-run veto, per B's fix and the design criterion.
+- 2026-10-16 check.fix F2: criterion 7's gate moved to `busctl StartTransientUnit` (the first call after `saveState(tab)` inside `allocate`) and dispatch switched to `next --all`, because `next <slug>` reaches `dispatchLeaf` under the pass-level lock while the changed code is `dispatchMergeLeaf`'s manual `withLock`.
+- 2026-10-16 check.fix F3: criterion 3's no-temp case split into its own test so B1's `needsPanes` variant turns it red without the temped sibling short-circuiting the fetch; planned breaks B1–B5 run against the current file and recorded in `implementation/report.md`.
