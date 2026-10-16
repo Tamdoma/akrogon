@@ -277,6 +277,9 @@ describe('self-update', () => {
 
   async function selfUpdateFixture(): Promise<SelfUpdateFixture> {
     const home: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-self-update-')));
+    // An active state home needs config.yaml; without it globalHome() stays on
+    // the tool root and .lock lands in the checkout, not the fixture home.
+    writeFileSync(resolve(home, 'config.yaml'), 'repos: {}\n');
     const seed: string = resolve(home, 'seed');
     const remote: string = resolve(home, 'remote.git');
     const clone: string = resolve(home, 'clone');
