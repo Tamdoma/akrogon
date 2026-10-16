@@ -90,6 +90,30 @@ function deployRecord(d: DeployFixture): { [key: string]: unknown } {
   };
 }
 
+test.serial('a records fetch failure persists the attempted deployment and retries after recovery', async () => {
+  const d: DeployFixture = await deployFixture();
+  try {
+    const active: string = await head(d);
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    const attempted: string = await pushSeed(d, () => writeFileSync(resolve(d.seed, 'file'), 'incoming\n'));
+    await command(['git', 'fetch', 'origin', 'main'], d.f.root);
+    await command(['git', 'remote', 'set-url', 'origin', resolve(d.home, 'missing.git')], d.f.root);
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    expect(deployRecord(d)).toMatchObject({ attempted, ok: false, step: 'fetch' });
+    expect(realpathSync(resolve(d.home, 'current'))).toBe(resolve(releases(d), active));
+    const status: Result = await cli(d.f, ['status'], d.f.root, d.env);
+    expect(status.stdout).toContain(
+      `deploy failed: attempted ${attempted.slice(0, 12)}, active ${active.slice(0, 12)}, step fetch`,
+    );
+    await command(['git', 'remote', 'set-url', 'origin', resolve(d.home, 'remote.git')], d.f.root);
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    expect(deployRecord(d)).toMatchObject({ commit: attempted, ok: true });
+    expect(realpathSync(resolve(d.home, 'current'))).toBe(resolve(releases(d), attempted));
+  } finally {
+    d.f.clean();
+  }
+});
+
 test.serial('deploy builds a complete release, flips current and prints the deployed commit', async () => {
   const d: DeployFixture = await deployFixture();
   try {
