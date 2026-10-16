@@ -13,13 +13,6 @@ export type DeployFixture = {
   home: string;
 };
 
-// The release stub proves the deployed tree runs and exits non-zero when
-// marked broken; proofs needing the real predecessor build it with the real
-// builder instead of delegating through this stub.
-const stubAkrogon: string = `if (process.env.RELEASE_BROKEN === '1') process.exit(1);
-console.log("release");
-`;
-
 // Builds the plain fixture repo into an akrogon-shaped repo: the real CLI
 // entry point is tests' `entry`, but the deployed release is built from the
 // seed's committed tree, which must carry every file the links point at.
@@ -36,7 +29,7 @@ export async function deployFixture(): Promise<DeployFixture> {
   mkdirSync(resolve(seed, 'plugin'), { recursive: true });
   mkdirSync(resolve(seed, 'vendor/tiny'), { recursive: true });
   writeFileSync(resolve(seed, 'vendor/tiny/package.json'), '{"name":"tiny","version":"1.0.0"}\n');
-  writeFileSync(resolve(seed, 'src/akrogon.ts'), stubAkrogon);
+  writeFileSync(resolve(seed, 'src/akrogon.ts'), 'console.log("release");\n');
   writeFileSync(resolve(seed, 'src/config.ts'), 'export const releaseConfig = true;\n');
   writeFileSync(resolve(seed, 'src/lessons.ts'), 'export const lessonsLoaded = true;\n');
   writeFileSync(resolve(seed, 'skills/skill-one/SKILL.md'), 'one\n');
