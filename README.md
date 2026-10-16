@@ -95,9 +95,10 @@ ln -s releases/<previous> .next-current
 mv -T .next-current current
 printf 'commit: <rolled-away-commit>\n' > release-hold.yaml
 bun releases/<previous>/src/akrogon.ts install
+bun -e 'import { writeDeploySuccess } from "./releases/<previous>/src/release.ts"; writeDeploySuccess("<previous>", "<rolled-away-commit>")'
 ```
 
-The temporary link renamed onto `current` flips it atomically, the hold record names the commit that must not redeploy (the release you are leaving), and the previous release's own `install` rebuilds its links.
+The temporary link renamed onto `current` flips it atomically, the hold record names the commit that must not redeploy (the release you are leaving), and the previous release's own `install` rebuilds its links. After installation succeeds, the previous release's record writer marks the restored release active and the release you left as previous, protecting both from pruning and recording the rollback time. If installation fails, fix the reported conflict and rerun installation before writing the record.
 
 ## Initialize a repository
 

@@ -8,6 +8,7 @@ import {
   readDeployRecord,
   readReleaseHold,
   releasesDir,
+  writeDeploySuccess,
   writeReleaseHold,
 } from './release';
 import { command } from './shell';
@@ -30,8 +31,10 @@ export async function rollback(): Promise<void> {
     // The held commit is the release rolled away from; on a retry after a
     // failed link step (current already on previous) keep or refresh the
     // hold on the deploy record's commit instead of holding the good one.
-    writeReleaseHold(old !== previous ? old : (readReleaseHold() ?? record.commit ?? previous));
+    const held: string = old !== previous ? old : (readReleaseHold() ?? record.commit ?? previous);
+    writeReleaseHold(held);
     await install();
+    writeDeploySuccess(previous, held);
     console.log(`rolled back ${old.slice(0, 12)} -> ${previous.slice(0, 12)}`);
   };
   const akrogonRoot: string | undefined = global.repos['akrogon'];
