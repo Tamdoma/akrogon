@@ -141,20 +141,18 @@ test('cutover is deferred while a live run record exists in the tool root runs/'
   expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(true);
 });
 
-test('cutover is deferred while a foreign process holds the tool root as cwd', async () => {
+test('a process holding the tool root as cwd does not defer cutover', async () => {
   const home: string = temp();
   const root: string = toolCopy(home, globalConfig);
   const sleeper = Bun.spawn(['sleep', '20'], { cwd: root });
   try {
-    const skipped: SpawnResult = await cli(root, home, ['config']);
-    expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(false);
-    expect(skipped.stderr).not.toContain('moved state home');
+    const moved: SpawnResult = await cli(root, home, ['config']);
+    expect(moved.stderr).toContain('moved state home');
+    expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(true);
   } finally {
     sleeper.kill();
     await sleeper.exited;
   }
-  const moved: SpawnResult = await cli(root, home, ['config']);
-  expect(moved.stderr).toContain('moved state home');
 });
 
 test('cutover leaves no tracked file of the checkout modified or deleted', async () => {
