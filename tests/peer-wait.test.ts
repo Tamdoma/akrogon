@@ -682,6 +682,31 @@ test('carried exchange binds the original turn on rerun', async (): Promise<void
   }
 });
 
+test('a carried codex turn becomes unproven when its rollout is missing or ambiguous', async (): Promise<void> => {
+  const s: Setup = setup([codexPane(codexSession)]);
+  try {
+    const rollout: string = writeRollout(s.home, codexSession, eventLine('task_started', 'turn-A'));
+    const first: RunResult = await s.run(
+      pane,
+      s.file,
+      '1',
+      JSON.stringify({ kind: 'codex', session: codexSession, boundary: 0, turn: null }),
+    );
+    const exchange: Exchange = { kind: 'codex', session: codexSession, boundary: 0, turn: 'turn-A' };
+    expectOutcome(first, { outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'proven', exchange });
+    const carried: string = JSON.stringify(JSON.parse(first.stdout).exchange);
+    rmSync(rollout);
+    const missing: RunResult = await s.run(pane, s.file, '1', carried);
+    expectOutcome(missing, { outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'unproven', exchange });
+    writeRollout(s.home, codexSession, eventLine('task_started', 'turn-A'), 0);
+    writeRollout(s.home, codexSession, eventLine('task_started', 'turn-A'), 1);
+    const ambiguous: RunResult = await s.run(pane, s.file, '1', carried);
+    expectOutcome(ambiguous, { outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'unproven', exchange });
+  } finally {
+    s.clean();
+  }
+});
+
 test('a carried kind or session that no longer matches is an error', async (): Promise<void> => {
   const s: Setup = setup([codexPane(codexSession)]);
   try {
