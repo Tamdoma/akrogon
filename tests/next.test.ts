@@ -24,6 +24,7 @@ import {
   yaml,
   fakeGh,
   fakeHerdr,
+  fakeSystemctl,
   leafTempRoot,
   storeDir,
   registerTemp,
@@ -4038,6 +4039,7 @@ test('leaf temp path stays inside the socket budget under /tmp for any slug and 
 
 test('closed tab scratch deletes merged folder and prunes inner worktree', async () => {
   const f: DispatchFixture = await dispatchFixture();
+  f.env = { ...f.env, ...fakeSystemctl(f).env };
   try {
     const path: string = leaf(f, 'scrub', 'plan.synthesis');
     expect((await next(f, ['scrub'])).code).toBe(0);
@@ -4074,6 +4076,7 @@ test('closed tab scratch deletes merged folder and prunes inner worktree', async
 
 test('closed tab scratch sweeps a failed leaf, keeps its branch', async () => {
   const f: DispatchFixture = await dispatchFixture();
+  f.env = { ...f.env, ...fakeSystemctl(f).env };
   try {
     const path: string = leaf(f, 'failed-keep', 'plan.synthesis');
     expect((await next(f, ['failed-keep'])).code).toBe(0);
@@ -4110,6 +4113,7 @@ test('closed tab scratch sweeps a failed leaf, keeps its branch', async () => {
 }, 15000);
 test('sweep scratch catch-up deletes open and closed folders with no live panes', async () => {
   const f: DispatchFixture = await dispatchFixture();
+  f.env = { ...f.env, ...fakeSystemctl(f).env };
   try {
     const openPath: string = leaf(f, 'open-done', 'plan.synthesis', {}, 'epic/first');
     leaf(f, 'hold', 'failed', {}, 'other');
@@ -4162,6 +4166,7 @@ test('sweep scratch catch-up deletes open and closed folders with no live panes'
 
 test('sweep scratch catch-up keeps sentinel with live panes then deletes on later sweep', async () => {
   const f: DispatchFixture = await dispatchFixture();
+  f.env = { ...f.env, ...fakeSystemctl(f).env };
   try {
     const donePath: string = leaf(f, 'live-done', 'plan.synthesis', {}, 'epic/first');
     leaf(f, 'hold', 'failed', {}, 'other');

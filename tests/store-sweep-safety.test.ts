@@ -3,7 +3,18 @@ import { lstatSync, mkdirSync, symlinkSync, existsSync, writeFileSync, readFileS
 import { resolve, relative } from 'node:path';
 import { leafTemp, readRepo, type Repo } from '../src/config';
 import { retiredLeafTempRoot } from '../src/config';
-import { fixture, fakeHerdr, fakeAkrogon, cli, storeDir, leafTempRoot, leaf, procRoot, type Fixture } from './helpers';
+import {
+  fixture,
+  fakeHerdr,
+  fakeSystemctl,
+  fakeAkrogon,
+  cli,
+  storeDir,
+  leafTempRoot,
+  leaf,
+  procRoot,
+  type Fixture,
+} from './helpers';
 import { suiteRoot } from './isolation';
 import { z } from 'zod';
 import { command, spawnCaptured, type Pane, type SpawnResult } from '../src/shell';
@@ -40,6 +51,7 @@ test('F1 dangling entries are removed from stores and the host temp root', async
 test('F2 surviving processes protect leaf entries and leaf temps', async () => {
   const f: Fixture = await fixture();
   const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
+  h.env = { ...h.env, ...fakeSystemctl(f).env };
   const repo: Repo = readRepo('repo', f.root);
   const owned: string = resolve(storeDir(f), 'done-old');
   const temp: string = resolve(leafTempRoot(f), relative(process.env.AKROGON_LEAF_TEMP_ROOT!, leafTemp(repo, 'done')));
@@ -148,7 +160,14 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
     const f: Fixture = await fixture();
     try {
       const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
-      leaf(f, 'seat', scenario === 'finished-tab' ? 'merged' : 'implement', { tab: 'w1:t1' });
+      // busy-slice records no tab: a dead recorded tab now has its slice
+      // stopped before repo activity is checked, which would void the premise.
+      leaf(
+        f,
+        'seat',
+        scenario === 'finished-tab' ? 'merged' : 'implement',
+        scenario === 'busy-slice' ? {} : { tab: 'w1:t1' },
+      );
       const temp: string = resolve(
         leafTempRoot(f),
         relative(process.env.AKROGON_LEAF_TEMP_ROOT!, leafTemp(readRepo('repo', f.root), 'seat')),

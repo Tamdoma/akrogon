@@ -154,6 +154,17 @@ export function fakeHerdr(f: Fixture): HerdrFixture {
   };
 }
 
+export type SystemctlFixture = { db: string; log: string; env: NodeJS.ProcessEnv };
+export function fakeSystemctl(f: Fixture): SystemctlFixture {
+  const bin: string = resolve(f.home, 'bin');
+  mkdirSync(bin, { recursive: true });
+  symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(bin, 'systemctl'));
+  const db: string = resolve(f.home, 'systemctl.json');
+  writeFileSync(db, JSON.stringify({ units: [] }));
+  const log: string = resolve(f.home, 'systemctl.log');
+  return { db, log, env: { FAKE_SYSTEMCTL_DB: db, FAKE_SYSTEMCTL_LOG: log } };
+}
+
 export function fakeAkrogon(f: Fixture): { env: NodeJS.ProcessEnv } {
   const bin: string = resolve(f.home, 'bin');
   mkdirSync(bin, { recursive: true });

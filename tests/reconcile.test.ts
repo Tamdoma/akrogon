@@ -18,6 +18,7 @@ import {
   cli,
   leaf,
   fakeHerdr,
+  fakeSystemctl,
   fakeAkrogon,
   yaml,
   leafTempRoot,
@@ -285,6 +286,7 @@ test('run root with a dead owner pid is removed, live owner kept', async () => {
 
 test('an unfinished leaf temp is removed once its tab is gone and kept silently while its tab lives', async () => {
   const f: DispatchFixture = await dispatchFixture();
+  f.env = { ...f.env, ...fakeSystemctl(f).env };
   try {
     const idle: string = await dispatchLeaf(f, 'idle-leaf');
     const idleScratch: string = scratchFor(f, 'idle-leaf');
@@ -303,6 +305,7 @@ test('an unfinished leaf temp is removed once its tab is gone and kept silently 
 
 test('a failed leaf temp stays while its tab lives, because its seats still use it as TMPDIR', async () => {
   const f: DispatchFixture = await dispatchFixture();
+  f.env = { ...f.env, ...fakeSystemctl(f).env };
   try {
     const path: string = await dispatchLeaf(f, 'failed-live');
     const scratch: string = scratchFor(f, 'failed-live');
@@ -959,6 +962,7 @@ test('unregistered and stray entries are deleted when no leaf of the repo runs',
 // owner loses its unregistered leaf-named entries.
 test('a running leaf keeps its temp, its slug entries and unowned entries', async () => {
   const f: DispatchFixture = await dispatchFixture();
+  f.env = { ...f.env, ...fakeSystemctl(f).env };
   try {
     const path: string = await dispatchLeaf(f, 'guard-leaf');
     const store: string = storeDir(f);

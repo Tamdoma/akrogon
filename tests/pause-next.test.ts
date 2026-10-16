@@ -4,7 +4,18 @@ import { resolve } from 'node:path';
 import { command, finishCaptured, spawnFiles, type Captured, type Result } from '../src/shell';
 import { readState, saveState, type State } from '../src/state';
 import type { Database } from './fake-herdr';
-import { cli, entry, fakeHerdr, fixture, killTree, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
+import {
+  cli,
+  entry,
+  fakeHerdr,
+  fakeSystemctl,
+  fixture,
+  killTree,
+  leaf,
+  leafTempRoot,
+  yaml,
+  type Fixture,
+} from './helpers';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 
@@ -324,6 +335,7 @@ test('unpause relaunches closed seats with the current seat config', async () =>
 
 test('unpause runs deferred merged cleanup', async () => {
   const f: DispatchFixture = await dispatchFixture();
+  f.env = { ...f.env, ...fakeSystemctl(f).env };
   try {
     leaf(f, 'live', 'merged', { tab: 'w1:t9' }, 'issue-a');
     leaf(f, 'dead', 'merged', { tab: 'w1:t8' }, 'issue-b');
