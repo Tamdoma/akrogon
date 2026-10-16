@@ -170,3 +170,20 @@ test('cutover leaves no tracked file of the checkout modified or deleted', async
   const tracked: string = await command(['git', 'ls-files'], root);
   for (const line of status.split('\n').filter(Boolean)) expect(tracked.split('\n')).toContain(line.slice(3));
 });
+
+test('an explicit empty state home keeps using the tool root while cutover is deferred', async () => {
+  const home: string = temp();
+  const root: string = toolCopy(home, globalConfig);
+  const destination: string = resolve(home, 'custom');
+  mkdirSync(resolve(root, 'runs'), { recursive: true });
+  const record: string = resolve(root, `runs/${'a'.repeat(64)}.yaml`);
+  writeFileSync(record, liveRecord());
+  const deferred: SpawnResult = await cli(root, home, ['config'], home, { AKROGON_HOME: destination });
+  expect(deferred.code).toBe(0);
+  expect(Bun.YAML.parse(deferred.stdout)).toMatchObject({ max_active: 3 });
+  expect(existsSync(resolve(destination, 'config.yaml'))).toBe(false);
+  rmSync(record);
+  const moved: SpawnResult = await cli(root, home, ['config'], home, { AKROGON_HOME: destination });
+  expect(moved.code).toBe(0);
+  expect(existsSync(resolve(destination, 'config.yaml'))).toBe(true);
+});
