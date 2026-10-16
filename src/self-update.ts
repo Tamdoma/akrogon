@@ -287,7 +287,10 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
         throw new CommandError(['herdr', 'plugin', 'link', resolve(currentLink(), 'plugin')], root, linked);
     });
     await step('record', () => {
-      writeDeploySuccess(sha, resuming ? (record?.commit ?? null) : previous);
+      writeDeploySuccess(
+        sha,
+        resuming ? (record?.commit === sha ? record.previous : (record?.commit ?? null)) : previous,
+      );
       clearReleaseHold();
       pruneReleases();
     });

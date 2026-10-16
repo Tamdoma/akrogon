@@ -112,7 +112,7 @@ export function writeDeploySuccess(sha: string, previous: string | null): void {
     at,
     replaced: {
       ...(existing?.replaced ?? {}),
-      ...(previous !== null && previous !== sha ? { [previous]: at } : {}),
+      ...(previous !== null && previous !== sha && existing?.commit !== sha ? { [previous]: at } : {}),
     },
   });
 }
