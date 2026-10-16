@@ -10,6 +10,7 @@ import {
   currentReleaseCommit,
   flip,
   pruneReleases,
+  readDeployRecord,
   readReleaseHold,
   releasesDir,
   writeDeployFailure,
@@ -241,17 +242,26 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
       command(['git', 'rev-parse', `refs/remotes/${repo.config.remote}/${repo.config.default_branch}^{commit}`], root),
     );
     previous = await step('resolve', () => currentReleaseCommit());
-    if (previous === sha) {
+    const record: ReturnType<typeof readDeployRecord> = readDeployRecord();
+    const resuming: boolean = previous === sha;
+    if (resuming && record?.ok === true && record.commit === sha) {
       await step('record', () => pruneReleases());
       return null;
     }
-    if ((await step('hold', () => readReleaseHold())) === sha)
+    // A hold blocks only a fresh deploy: when current already carries sha the
+    // commit is active and finishing its links/flip/reload/record is repair,
+    // not a new rollout.
+    if (!resuming && (await step('hold', () => readReleaseHold())) === sha)
       return `deploy held: ${sha.slice(0, 12)} (rollback hold)`;
     await step('build', () => buildRelease(repo, sha));
-    await step('flip', () => flip(sha));
     await step('links', () => {
       const ownedRoots: string[] = [currentLink(), releasesDir(), toolRoot, realpathSync(expandPath(repo.root))];
-      const planned: { links: Link[]; conflicts: Link[] } = planSkillLinks(home, currentLink(), ownedRoots);
+      const planned: { links: Link[]; conflicts: Link[] } = planSkillLinks(
+        home,
+        currentLink(),
+        ownedRoots,
+        resolve(releasesDir(), sha),
+      );
       const blocked: Set<string> = new Set(planned.conflicts.map((link: Link) => link.destination));
       applySkillLinks(planned.links.filter((link: Link) => !blocked.has(link.destination)));
       if (planned.conflicts.length > 0)
@@ -259,6 +269,7 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
           `${planned.conflicts.map((link: Link) => link.destination).join(', ')}; remove the conflicting paths`,
         );
     });
+    await step('flip', () => flip(sha));
     await step('reload', async () => {
       // env: process.env is load-bearing: Bun.spawn with env undefined forks the
       // startup environment, so in-process callers that mutate PATH or fake-env
@@ -276,7 +287,7 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
         throw new CommandError(['herdr', 'plugin', 'link', resolve(currentLink(), 'plugin')], root, linked);
     });
     await step('record', () => {
-      writeDeploySuccess(sha, previous);
+      writeDeploySuccess(sha, resuming ? (record?.commit ?? null) : previous);
       clearReleaseHold();
       pruneReleases();
     });

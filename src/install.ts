@@ -8,7 +8,7 @@ import {
   symlinkSync,
   unlinkSync,
 } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { expandPath, globalHome, readGlobal, toolRoot, within, type GlobalConfig } from './config';
 import { currentLink, ensureCurrent, releasesDir } from './release';
@@ -20,9 +20,10 @@ export function planSkillLinks(
   home: string,
   sourceRoot: string,
   ownedRoots: string[],
+  listRoot: string = sourceRoot,
 ): { links: Link[]; conflicts: Link[] } {
   const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
-  const skills: string[] = readdirSync(resolve(sourceRoot, 'skills'), { withFileTypes: true })
+  const skills: string[] = readdirSync(resolve(listRoot, 'skills'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
   const planned: Link[] = [
@@ -40,6 +41,7 @@ export function planSkillLinks(
   ];
   const releases: string = releasesDir();
   const skillRoots: string[] = ownedRoots.map((root) => resolve(root, 'skills'));
+  const sourceSkills: string = resolve(sourceRoot, 'skills');
   for (const root of roots) {
     const directory: string = resolve(home, root);
     if (!existsSync(directory)) continue;
@@ -47,7 +49,12 @@ export function planSkillLinks(
       const path: string = resolve(directory, entry);
       if (!lstatSync(path).isSymbolicLink()) continue;
       const target: string = resolve(dirname(path), readlinkSync(path));
-      if (within(target, releases) || (!existsSync(target) && skillRoots.some((root) => within(target, root))))
+      // Links into sourceRoot's skills are probed under listRoot so a skill
+      // absent from the new tree is unlinked before current flips onto it.
+      const probe: string = within(target, sourceSkills)
+        ? resolve(listRoot, 'skills', relative(sourceSkills, target))
+        : target;
+      if (within(target, releases) || (!existsSync(probe) && skillRoots.some((root) => within(target, root))))
         unlinkSync(path);
     }
   }
@@ -69,7 +76,9 @@ export function planSkillLinks(
       // (relative links, workspace paths aliasing current) instead of rewriting
       // equivalent targets.
       const same: boolean =
-        existsSync(link.destination) && realpathSync(link.destination) === realpathSync(link.source);
+        existsSync(link.destination) &&
+        existsSync(link.source) &&
+        realpathSync(link.destination) === realpathSync(link.source);
       links.push(same ? link : { ...link, repoint: true });
     } else if (target === link.source) {
       links.push(link);

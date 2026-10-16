@@ -85,7 +85,7 @@ export function flip(sha: string): void {
 
 const deployRecordSchema = z.strictObject({
   commit: z.string().optional(),
-  previous: z.string().nullable(),
+  previous: z.string().nullable().default(null),
   ok: z.boolean(),
   step: z.string().optional(),
   error: z.string().optional(),
@@ -121,6 +121,7 @@ export function writeDeployFailure(attempted: string, step: string, error: strin
   const existing: DeployRecord | null = readDeployRecord();
   writeYaml(deployRecordPath(), {
     attempted,
+    ...(existing?.commit !== undefined ? { commit: existing.commit } : {}),
     previous: existing?.previous ?? null,
     ok: false,
     step,

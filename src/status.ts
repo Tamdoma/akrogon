@@ -424,7 +424,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   }
   const deploy: ReturnType<typeof readDeployRecord> = readDeployRecord();
   const active: string | null = currentReleaseCommit();
-  if (deploy !== null && !deploy.ok && deploy.attempted !== undefined && deploy.attempted !== active)
+  if (deploy !== null && !deploy.ok && deploy.attempted !== undefined)
     console.log(
       `deploy failed: attempted ${deploy.attempted.slice(0, 12)}, active ${active?.slice(0, 12) ?? 'none'}, step ${deploy.step ?? 'unknown'}: ${(deploy.error ?? '').replaceAll('\n', ' ').slice(0, 120)}`,
     );
