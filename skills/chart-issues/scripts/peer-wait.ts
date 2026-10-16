@@ -143,7 +143,12 @@ function piAuthority(live: ListAgent): boolean {
 function checkIdentity(pane: string, live: ListAgent, exchange: Exchange): void {
   if (live.agent !== exchange.kind) throw new Error(`Peer pane ${pane} changed kind: ${exchange.kind} → ${live.agent}`);
   const liveSession: string | null = live.agent_session?.value ?? null;
-  if (exchange.session !== null && liveSession !== null && liveSession !== exchange.session && exchange.kind !== 'pi') {
+  if (
+    exchange.session !== null &&
+    liveSession !== null &&
+    liveSession !== exchange.session &&
+    (exchange.kind === 'claude' || exchange.kind === 'codex')
+  ) {
     throw new Error(`Peer pane ${pane} changed session: ${exchange.session} → ${liveSession}`);
   }
   if (exchange.session === null && liveSession !== null) exchange.session = liveSession;
