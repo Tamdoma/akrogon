@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect } from 'bun:test';
-import { fixture, cli, fakeHerdr, entry, type Fixture } from './helpers';
+import { fixture, cli, fakeHerdr, type Fixture } from './helpers';
 import { command } from '../src/shell';
 
 export const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
@@ -13,20 +13,10 @@ export type DeployFixture = {
   home: string;
 };
 
-// The release stub serves three roles: it proves the deployed tree runs (any
-// deploy test), exits non-zero on demand (a broken current release), and
-// delegates `install` to the real entry point so a previous release restores
-// links exactly as the real program does.
-const stubAkrogon: string = `const arg = process.argv[2];
-if (arg === 'install') {
-  const status = Bun.spawnSync([process.execPath, process.env.AKROGON_FIXTURE_ENTRY ?? '', 'install'], {
-    env: process.env,
-    stdout: 'inherit',
-    stderr: 'inherit',
-  }).exitCode;
-  process.exit(status ?? 1);
-}
-if (process.env.RELEASE_BROKEN === '1') process.exit(1);
+// The release stub proves the deployed tree runs and exits non-zero when
+// marked broken; proofs needing the real predecessor build it with the real
+// builder instead of delegating through this stub.
+const stubAkrogon: string = `if (process.env.RELEASE_BROKEN === '1') process.exit(1);
 console.log("release");
 `;
 
@@ -70,7 +60,6 @@ export async function deployFixture(): Promise<DeployFixture> {
     ...herdr.env,
     FAKE_SYSTEMCTL_LOG: resolve(home, 'systemctl.log'),
     FAKE_SLICE_LINK: resolve(home, '.config/systemd/user/akrogon.slice'),
-    AKROGON_FIXTURE_ENTRY: entry,
   };
   return { f, env, seed, home };
 }

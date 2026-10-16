@@ -10,7 +10,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli } from './helpers';
+import { repoSchema } from '../src/config';
+import { cli, unitBin } from './helpers';
 import {
   deployFixture,
   deployedPair,
@@ -82,30 +83,90 @@ test.serial('the hold blocks redeploy of the rolled-back commit until main moves
   }
 });
 
-test.serial('the README manual steps roll a broken release back to the same end state', async () => {
+test.serial('the README manual steps roll a broken release back using the real previous release', async () => {
   const d: DeployFixture = await deployFixture();
   try {
-    const { previous, current } = await deployedPair(d);
-    // The current release cannot start: its entry exits non-zero.
-    const broken: SpawnResult = await spawnCaptured(
-      [process.execPath, resolve(releases(d), current, 'src/akrogon.ts')],
-      { env: { ...d.env, RELEASE_BROKEN: '1' } },
+    // The real predecessor: the shared main commit before this leaf's work,
+    // built by release-deploy's builder so install, the hold reader and next
+    // all run its own modules (ROLLBACK_BREAK_PREV removes install.ts, which
+    // turns this proof red only when the predecessor code actually runs).
+    const base: string = await command(['git', 'merge-base', 'origin/main', 'HEAD'], resolve(import.meta.dir, '..'));
+    const homeEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...d.env,
+      HOME: d.home,
+      AKROGON_HOME: d.home,
+      AKROGON_RUN: '',
+      HERDR_PANE_ID: '',
+      PATH: `${unitBin(d.f)}:${d.env.PATH}`,
+    };
+    const priorHome: string | undefined = process.env.AKROGON_HOME;
+    process.env.AKROGON_HOME = d.home;
+    const { buildRelease, flip } = await import('../src/release');
+    try {
+      await buildRelease(
+        { name: 'akrogon', root: resolve(import.meta.dir, '..'), config: repoSchema.parse({ grounding: 'none' }) },
+        base,
+      );
+      flip(base);
+    } finally {
+      process.env.AKROGON_HOME = priorHome;
+    }
+    const prevDir: string = resolve(releases(d), base);
+    expect(existsSync(resolve(prevDir, 'node_modules/zod'))).toBe(true);
+    expect(readFileSync(resolve(prevDir, 'src/akrogon.ts'), 'utf8')).not.toContain("case 'rollback'");
+    if (process.env.ROLLBACK_BREAK_PREV === '1') rmSync(resolve(prevDir, 'src/install.ts'));
+    // A normal deploy records the predecessor as previous; the stub release
+    // it replaces is the broken current.
+    const bad: string = await pushSeed(d, () => writeFileSync(resolve(d.seed, 'src/akrogon.ts'), 'process.exit(1);\n'));
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    expect(realpathSync(resolve(d.home, 'current'))).toBe(resolve(releases(d), bad));
+    const cannotStart: SpawnResult = await spawnCaptured(
+      [process.execPath, resolve(releases(d), bad, 'src/akrogon.ts')],
+      { env: homeEnv },
     );
-    expect(broken.code).not.toBe(0);
+    expect(cannotStart.code).not.toBe(0);
+    // The README's manual steps, verbatim against the fixture's state home.
     const readme: string = readFileSync(resolve(import.meta.dir, '../README.md'), 'utf8');
     expect(readme).toContain('release-hold.yaml');
-    // The three manual steps from the README's rollback section, verbatim
-    // against the fixture's state home: flip via temp link, write the hold,
-    // run the previous release's install.
-    await command(['ln', '-s', resolve(releases(d), previous), '.next-current'], d.home);
+    expect(readme).toContain('writeDeploySuccess');
+    await command(['ln', '-s', resolve(releases(d), base), '.next-current'], d.home);
     await command(['mv', '-T', '.next-current', 'current'], d.home);
-    writeFileSync(resolve(d.home, 'release-hold.yaml'), `commit: ${current}\n`);
+    writeFileSync(resolve(d.home, 'release-hold.yaml'), `commit: ${bad}\n`);
     const install: SpawnResult = await spawnCaptured(
-      [process.execPath, resolve(releases(d), previous, 'src/akrogon.ts'), 'install'],
-      { env: { ...d.env, HOME: d.home, AKROGON_HOME: d.home } },
+      [process.execPath, resolve(prevDir, 'src/akrogon.ts'), 'install'],
+      { cwd: d.home, env: homeEnv },
     );
     expect(install.code).toBe(0);
-    expectRolledBack(d, previous, current);
+    const recordWrite: SpawnResult = await spawnCaptured(
+      [
+        process.execPath,
+        '-e',
+        `import { writeDeploySuccess } from "./releases/${base}/src/release.ts"; writeDeploySuccess("${base}", "${bad}")`,
+      ],
+      { cwd: d.home, env: homeEnv },
+    );
+    expect(recordWrite.code).toBe(0);
+    expectRolledBack(d, base, bad, { skills: [] });
+    // The previous release's own skills are linked again through current.
+    for (const skill of ['plan-issue', 'merge-issue']) {
+      const link: string = resolve(d.home, '.claude/skills', skill);
+      expect(realpathSync(link)).toBe(resolve(releases(d), base, 'skills', skill));
+    }
+    expect(deployRecord(d)).toMatchObject({
+      commit: base,
+      previous: bad,
+      ok: true,
+      replaced: { [bad]: expect.any(String) },
+    });
+    // The restored predecessor honors the hold with its own next pass.
+    const held: SpawnResult = await spawnCaptured(
+      [process.execPath, resolve(prevDir, 'src/akrogon.ts'), 'next', '--all'],
+      { cwd: d.f.root, env: homeEnv },
+    );
+    expect(held.code).toBe(0);
+    expect(held.stdout).toContain(`deploy held: ${bad.slice(0, 12)}`);
+    expect(realpathSync(resolve(d.home, 'current'))).toBe(prevDir);
   } finally {
     d.f.clean();
   }

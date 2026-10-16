@@ -116,7 +116,7 @@ test.serial('deploy builds a complete release, flips current and prints the depl
     const current: string = resolve(d.home, 'current');
     expect(lstatSync(current).isSymbolicLink()).toBe(true);
     expect(realpathSync(current)).toBe(resolve(releases(d), sha));
-    expect(readFileSync(resolve(releases(d), sha, 'src/akrogon.ts'), 'utf8')).toContain('console.log("release")');
+    expect(readFileSync(resolve(releases(d), sha, 'src/akrogon.ts'), 'utf8')).toBe('console.log("release");\n');
     expect(existsSync(resolve(releases(d), sha, 'node_modules'))).toBe(true);
     expect(readdirSync(releases(d)).sort()).toEqual([sha]);
   } finally {
