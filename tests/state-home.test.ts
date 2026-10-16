@@ -225,10 +225,13 @@ test('an already-running command that admits a nested checked run defers cutover
     FAKE_SYSTEMCTL_LOG: resolve(home, 'systemctl.log'),
     AKROGON_LEAF_TEMP_ROOT: resolve(home, 'leaf-temp'),
   };
-  // A sentinel foreign process holds the cutover gate closed, so the outer
+  // A seeded live run record holds the cutover gate closed, so the outer
   // run-check defers its own migration and writes its admission record to the
   // tool root — the same shape an old-code command has when new code deploys.
-  const sentinel = Bun.spawn(['sleep', '25'], { cwd: root });
+  const runsDir: string = resolve(root, 'runs');
+  const seed: string = resolve(runsDir, `${'a'.repeat(64)}.yaml`);
+  mkdirSync(runsDir, { recursive: true });
+  writeFileSync(seed, liveRecord());
   const nested: string = `${process.execPath} ${resolve(root, 'src/akrogon.ts')} run-check --holder ${resolve(
     home,
     'holder',
@@ -257,14 +260,10 @@ test('an already-running command that admits a nested checked run defers cutover
   );
   try {
     // Wait until the outer run's admission record exists in the tool root.
-    const runsDir: string = resolve(root, 'runs');
     const deadline: number = Date.now() + 10000;
-    while (
-      Date.now() < deadline &&
-      (!existsSync(runsDir) || readdirSync(runsDir).filter((n) => n.endsWith('.yaml')).length === 0)
-    )
+    while (Date.now() < deadline && readdirSync(runsDir).filter((n) => n.endsWith('.yaml')).length < 2)
       await new Promise((r) => setTimeout(r, 50));
-    expect(existsSync(runsDir)).toBe(true);
+    rmSync(seed);
     const live: string[] = readdirSync(runsDir).filter((n) => n.endsWith('.yaml'));
     expect(live.length).toBe(1);
     // Cutover must defer while the admitted run is live.
@@ -288,8 +287,7 @@ test('an already-running command that admits a nested checked run defers cutover
     expect(readFileSync(outerLog, 'utf8')).toContain('check run: 0');
   } finally {
     if (outer.exitCode === null) outer.kill();
-    sentinel.kill();
-    await sentinel.exited;
+    rmSync(seed, { force: true });
   }
   // After the old-code command ends, cutover proceeds and every remaining
   // state file (the slice locks its admission used) moves to the state home.

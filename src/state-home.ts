@@ -1,8 +1,8 @@
-import { cpSync, existsSync, readdirSync, readFileSync, readlinkSync, realpathSync } from 'node:fs';
+import { cpSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { expandPath, toolRoot, within } from './config';
+import { expandPath, toolRoot } from './config';
 import { withLock } from './state';
 import { writeYaml } from './shell';
 
@@ -59,58 +59,6 @@ function liveRecords(runsDir: string): number {
     }).length;
 }
 
-// A process is foreign unless it is this process, an ancestor, or its own
-// descendant — our held flock children share our cwd.
-function parentPid(pid: number): number {
-  try {
-    const match: RegExpMatchArray | null = readFileSync(`/proc/${pid}/status`, 'utf8').match(/^PPid:\s*(\d+)$/m);
-    return match === null ? 0 : Number(match[1]);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
-    throw error;
-  }
-}
-
-function ownPids(): Set<number> {
-  const pids: Set<number> = new Set([process.pid]);
-  for (let pid: number = parentPid(process.pid); pid > 0; pid = parentPid(pid)) pids.add(pid);
-  return pids;
-}
-
-function spawnedBySelf(pid: number): boolean {
-  for (let cursor: number = pid; cursor > 0; cursor = parentPid(cursor))
-    if (parentPid(cursor) === process.pid || cursor === process.pid) return true;
-  return false;
-}
-
-function foreignProcess(root: string): boolean {
-  const realRoot: string = realpathSync(root);
-  const own: Set<number> = ownPids();
-  for (const name of readdirSync('/proc')) {
-    if (!/^\d+$/.test(name)) continue;
-    const pid: number = Number(name);
-    if (own.has(pid)) continue;
-    let cmdline: string = '';
-    let cwd: string | undefined;
-    try {
-      cmdline = readFileSync(`/proc/${name}/cmdline`, 'utf8');
-    } catch {
-      continue; // gone between scan and read
-    }
-    try {
-      cwd = readlinkSync(`/proc/${name}/cwd`);
-    } catch {
-      cwd = undefined;
-    }
-    if (
-      (cmdline.includes(root) || cmdline.includes(realRoot) || (cwd !== undefined && within(cwd, realRoot))) &&
-      !spawnedBySelf(pid)
-    )
-      return true;
-  }
-  return false;
-}
-
 async function underLocks<T>(paths: string[], index: number, action: () => Promise<T>): Promise<T> {
   return index === paths.length ? action() : withLock(paths[index], () => underLocks(paths, index + 1, action));
 }
@@ -119,7 +67,7 @@ export async function migrateStateHome(): Promise<void> {
   const stateHome: string = resolve(process.env.AKROGON_HOME ?? resolve(homedir(), '.akrogon'));
   const needed = (): boolean => !existsSync(resolve(stateHome, 'config.yaml'));
   if (stateHome === toolRoot || !needed() || !existsSync(resolve(toolRoot, 'config.yaml'))) return;
-  const settled = (): boolean => liveRecords(resolve(toolRoot, 'runs')) === 0 && !foreignProcess(toolRoot);
+  const settled = (): boolean => liveRecords(resolve(toolRoot, 'runs')) === 0;
   const move = async (): Promise<void> => {
     if (!needed() || !settled()) return;
     for (const entry of copiedEntries) {
