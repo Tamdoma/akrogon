@@ -3,15 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import {
-  cli,
-  fixture,
-  leaf,
-  fakeHerdr,
-  holding,
-  leafTempRoot,
-  type Fixture,
-} from './helpers';
+import { cli, fixture, leaf, fakeHerdr, holding, leafTempRoot, type Fixture } from './helpers';
 import { writeYaml, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
 import { readRepo, type Repo } from '../src/config';
@@ -109,7 +101,9 @@ const repoKept = (f: F): { path: string; reason: string }[] => kept(resolve(f.ho
 const hostKept = (f: F): { path: string; reason: string }[] => kept(resolve(f.home, 'reconcile-host.json'));
 
 function unitsIn(db: string): string[] {
-  return z.object({ units: z.array(z.object({ unit: z.string() })) }).parse(JSON.parse(readFileSync(db, 'utf8')))
+  return z
+    .object({ units: z.array(z.object({ unit: z.string() })) })
+    .parse(JSON.parse(readFileSync(db, 'utf8')))
     .units.map((unit) => unit.unit);
 }
 
@@ -120,7 +114,10 @@ function calls(log: string): string[] {
 function busctlCalls(f: F): BusctlCall[] {
   const path: string = resolve(f.home, 'busctl.calls');
   return existsSync(path)
-    ? readFileSync(path, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as BusctlCall)
+    ? readFileSync(path, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as BusctlCall)
     : [];
 }
 
