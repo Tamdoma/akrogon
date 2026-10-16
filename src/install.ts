@@ -21,7 +21,7 @@ export function planSkillLinks(
   sourceRoot: string,
   ownedRoots: string[],
   listRoot: string = sourceRoot,
-): { links: Link[]; conflicts: Link[] } {
+): { links: Link[]; conflicts: Link[]; stale: string[] } {
   const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
   const skills: string[] = readdirSync(resolve(listRoot, 'skills'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -42,6 +42,10 @@ export function planSkillLinks(
   const releases: string = releasesDir();
   const skillRoots: string[] = ownedRoots.map((root) => resolve(root, 'skills'));
   const sourceSkills: string = resolve(sourceRoot, 'skills');
+  // Destinations a planned link will (re)create are not stale: unlinking them
+  // after applySkillLinks would delete the link just written.
+  const plannedDestinations: Set<string> = new Set(planned.map((link) => link.destination));
+  const stale: string[] = [];
   for (const root of roots) {
     const directory: string = resolve(home, root);
     if (!existsSync(directory)) continue;
@@ -54,8 +58,11 @@ export function planSkillLinks(
       const probe: string = within(target, sourceSkills)
         ? resolve(listRoot, 'skills', relative(sourceSkills, target))
         : target;
-      if (within(target, releases) || (!existsSync(probe) && skillRoots.some((root) => within(target, root))))
-        unlinkSync(path);
+      if (
+        (within(target, releases) || (!existsSync(probe) && skillRoots.some((root) => within(target, root)))) &&
+        !plannedDestinations.has(path)
+      )
+        stale.push(path);
     }
   }
   const links: Link[] = [];
@@ -86,7 +93,7 @@ export function planSkillLinks(
       conflicts.push(link);
     }
   }
-  return { links, conflicts };
+  return { links, conflicts, stale };
 }
 
 export function applySkillLinks(links: Link[]): void {
@@ -110,11 +117,16 @@ export async function install(): Promise<void> {
     const expanded: string = expandPath(akrogonRoot, globalHome());
     if (existsSync(expanded)) ownedRoots.push(realpathSync(expanded));
   }
-  const { links, conflicts }: { links: Link[]; conflicts: Link[] } = planSkillLinks(
+  const { links, conflicts, stale }: { links: Link[]; conflicts: Link[]; stale: string[] } = planSkillLinks(
     homedir(),
     currentLink(),
     ownedRoots,
   );
+  // Pruning stale links is safe before the conflict check: it only removes
+  // links, never creates or repoints them. lstatSync, not existsSync: a stale
+  // link is usually dangling, and a target-following probe would skip the very
+  // links meant for removal.
+  for (const path of stale) if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) unlinkSync(path);
   if (conflicts.length > 0) {
     for (const link of conflicts) console.error(`rm -r -- ${quote(link.destination)}`);
     throw new Error('Install destinations conflict. Remove the listed paths before installing.');

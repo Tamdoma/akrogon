@@ -1,4 +1,4 @@
-import { realpathSync, rmSync } from 'node:fs';
+import { lstatSync, realpathSync, rmSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { ensureLeafTemp, expandPath, leafTemp, toolRoot, worktreeStore, type Repo } from './config';
@@ -256,18 +256,20 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
     await step('build', () => buildRelease(repo, sha));
     await step('links', () => {
       const ownedRoots: string[] = [currentLink(), releasesDir(), toolRoot, realpathSync(expandPath(repo.root))];
-      const planned: { links: Link[]; conflicts: Link[] } = planSkillLinks(
+      const planned: { links: Link[]; conflicts: Link[]; stale: string[] } = planSkillLinks(
         home,
         currentLink(),
         ownedRoots,
         resolve(releasesDir(), sha),
       );
-      const blocked: Set<string> = new Set(planned.conflicts.map((link: Link) => link.destination));
-      applySkillLinks(planned.links.filter((link: Link) => !blocked.has(link.destination)));
+      // Conflicts reject before any mutation: links runs before flip, so a
+      // rejected deploy must leave the active installation's links untouched.
       if (planned.conflicts.length > 0)
         throw new Error(
           `${planned.conflicts.map((link: Link) => link.destination).join(', ')}; remove the conflicting paths`,
         );
+      applySkillLinks(planned.links);
+      for (const path of planned.stale) if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) unlinkSync(path);
     });
     await step('flip', () => flip(sha));
     await step('reload', async () => {
