@@ -216,7 +216,7 @@ function turnVerdict(live: ListAgent, exchange: Exchange): { verdict: Verdict; p
       return piAuthority(live) ? { verdict: 'ended', proven: true } : { verdict: 'unproven', proven: false };
     case 'codex': {
       const verdict: Verdict = codexEnded(exchange);
-      return { verdict, proven: exchange.turn !== null };
+      return { verdict, proven: verdict !== 'unproven' };
     }
     default:
       return { verdict: 'unproven', proven: false };
