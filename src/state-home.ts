@@ -138,13 +138,7 @@ export async function migrateStateHome(): Promise<void> {
     // run-check output). Criterion 3 names a printed line, not a stream.
     console.error(`moved state home: ${toolRoot} -> ${stateHome}`);
   };
-  // flock creates its file, so a missing .lock is left missing: the copied
-  // checkout must stay clean for git status.
   const mainLock: string = resolve(toolRoot, '.lock');
-  if (!existsSync(mainLock)) {
-    await move();
-    return;
-  }
   await withLock(mainLock, async (): Promise<void> => {
     const locksDir: string = resolve(toolRoot, 'runs/locks');
     const sliceLocks: string[] = existsSync(locksDir)
