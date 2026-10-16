@@ -1,5 +1,14 @@
 import { test, expect } from 'bun:test';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnCaptured, command, type SpawnResult } from '../src/shell';
@@ -199,55 +208,111 @@ test('init registers into the state home config and leaves the checkout untouche
   expect(status.split('\n').filter((line) => line !== '' && !line.startsWith('??'))).toEqual([]);
 });
 
-test('a command running at cutover defers it; after it ends, cutover proceeds and nothing writes the tool root', async () => {
+test(
+  'an already-running command that admits a nested checked run defers cutover; after it ends, cutover proceeds and nothing writes the tool root',
+  async () => {
   const home: string = temp();
-  const root: string = toolCopy(home, globalConfig);
-  mkdirSync(resolve(root, 'runs/locks'), { recursive: true });
-  writeFileSync(resolve(root, 'runs/locks/holder.slice'), '');
-  const holder = Bun.spawn([process.execPath, '-e', 'setTimeout(() => {}, 30000)'], { cwd: root });
-  const stat: string = readFileSync(`/proc/${holder.pid}/stat`, 'utf8');
-  const recordFile: string = resolve(root, `runs/${'b'.repeat(64)}.yaml`);
-  writeFileSync(
-    recordFile,
-    Bun.YAML.stringify({
-      token_hash: 'b'.repeat(64),
-      pid: holder.pid,
-      start_time: stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19],
-      boot_id: readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(),
-      repo: 'r',
-      leaf: 'l',
-      check: 'c',
-      state: 'live',
-      run: 'run-held',
-      slice: 'holder.slice',
-      scope: '',
-      unit: 'u',
-      since: new Date().toISOString(),
-    }),
+  const remote: string = resolve(home, 'remote.git');
+  await command(['git', 'init', '--bare', '-b', 'main', remote]);
+  const repo: string = resolve(home, 'repo');
+  await command(['git', 'clone', remote, repo]);
+  await command(['git', 'config', 'user.email', 't@t'], repo);
+  await command(['git', 'config', 'user.name', 't'], repo);
+  mkdirSync(resolve(repo, 'issues/open'), { recursive: true });
+  writeFileSync(resolve(repo, 'issues/config.yaml'), 'grounding: none\nenv: ["AKROGON_HOME"]\n');
+  writeFileSync(resolve(repo, 'file'), 'x\n');
+  await command(['git', 'add', '.'], repo);
+  await command(['git', 'commit', '-m', 'c'], repo);
+  await command(['git', 'push', '-u', 'origin', 'main'], repo);
+  const root: string = toolCopy(home, { ...globalConfig, repos: { repo } });
+  mkdirSync(resolve(home, 'holder'), { recursive: true });
+  // Old-code shape: AKROGON_HOME unset, so the copied CLI resolves its state
+  // home to the tool root and writes its admission record under runs/.
+  const bin: string = resolve(home, 'bin');
+  mkdirSync(bin);
+  cpSync(resolve(worktreeRoot, 'tests/fake-systemd-run.sh'), resolve(bin, 'systemd-run'));
+  cpSync(resolve(worktreeRoot, 'tests/fake-systemctl.sh'), resolve(bin, 'systemctl'));
+  const env: NodeJS.ProcessEnv = {
+    PATH: `${bin}:${process.env.PATH}`,
+    FAKE_SYSTEMD_RUN_LOG: resolve(home, 'systemd-run.log'),
+    FAKE_SYSTEMCTL_LOG: resolve(home, 'systemctl.log'),
+    AKROGON_LEAF_TEMP_ROOT: resolve(home, 'leaf-temp'),
+  };
+  // A sentinel foreign process holds the cutover gate closed, so the outer
+  // run-check defers its own migration and writes its admission record to the
+  // tool root — the same shape an old-code command has when new code deploys.
+  const sentinel = Bun.spawn(['sleep', '25'], { cwd: root });
+  const nested: string = `${process.execPath} ${resolve(root, 'src/akrogon.ts')} run-check --holder ${resolve(
+    home,
+    'holder',
+  )} -- sleep 1`;
+  const { AKROGON_HOME: _drop, ...parentEnv } = process.env;
+  const outer = Bun.spawn(
+    [
+      process.execPath,
+      resolve(root, 'src/akrogon.ts'),
+      'run-check',
+      '--holder',
+      resolve(home, 'holder'),
+      '--',
+      'sh',
+      '-c',
+      `${nested}; sleep 6`,
+    ],
+    {
+      cwd: repo,
+      env: { ...parentEnv, HOME: home, ...env },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
   );
-  const deferred: SpawnResult = await cli(root, home, ['config']);
-  expect(deferred.code).toBe(0);
-  expect(deferred.stderr).not.toContain('moved state home');
-  expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(false);
-  // The old-code run ends: its record is removed, its lock file stays.
-  rmSync(recordFile);
-  holder.kill();
-  await holder.exited;
+  try {
+    // Wait until the outer run's admission record exists in the tool root.
+    const runsDir: string = resolve(root, 'runs');
+    const deadline: number = Date.now() + 10000;
+    while (
+      Date.now() < deadline &&
+      (!existsSync(runsDir) || readdirSync(runsDir).filter((n) => n.endsWith('.yaml')).length === 0)
+    )
+      await new Promise((r) => setTimeout(r, 50));
+    expect(existsSync(runsDir)).toBe(true);
+    const live: string[] = readdirSync(runsDir).filter((n) => n.endsWith('.yaml'));
+    expect(live.length).toBe(1);
+    // Cutover must defer while the admitted run is live.
+    const deferred: SpawnResult = await cli(root, home, ['config']);
+    expect(deferred.code).toBe(0);
+    expect(deferred.stderr).not.toContain('moved state home');
+    expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(false);
+    // Still deferred while the nested checked run is being admitted.
+    await new Promise((r) => setTimeout(r, 1500));
+    const deferred2: SpawnResult = await cli(root, home, ['config']);
+    expect(deferred2.stderr).not.toContain('moved state home');
+    expect(await outer.exited).toBe(0);
+  } finally {
+    if (outer.exitCode === null) outer.kill();
+    sentinel.kill();
+    await sentinel.exited;
+  }
+  // After the old-code command ends, cutover proceeds and every remaining
+  // state file (the slice locks its admission used) moves to the state home.
   const moved: SpawnResult = await cli(root, home, ['config']);
   expect(moved.stderr).toContain('moved state home');
-  expect(existsSync(resolve(home, '.akrogon/runs/locks/holder.slice'))).toBe(true);
-  // Cutover is done; a marker newer than every tool-root file, then a later
-  // command must write nothing to the tool root.
+  expect(
+    readdirSync(resolve(home, '.akrogon/runs/locks')).length,
+  ).toBeGreaterThan(0);
+  // Nothing writes the tool root after cutover.
   const marker: string = resolve(home, 'marker');
   writeFileSync(marker, 'x');
-  await new Promise((r) => setTimeout(r, 50)); // ordering guarantee for -newer
+  await new Promise((r) => setTimeout(r, 50));
   await cli(root, home, ['config']);
   const stray: string = await command(
     ['sh', '-c', `find . -newer '${marker}' -not -path './node_modules/*' -type f`],
     root,
   );
   expect(stray.trim()).toBe('');
-});
+  },
+  30000,
+);
 
 test('an explicit empty state home keeps using the tool root while cutover is deferred', async () => {
   const home: string = temp();
