@@ -225,7 +225,18 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
   let sha: string = '';
   let previous: string | null = null;
   try {
-    await step('resolve', () => command(['git', 'fetch', repo.config.remote, repo.config.default_branch], root));
+    await step('fetch', async () => {
+      const argv: string[] = ['git', 'fetch', repo.config.remote, repo.config.default_branch];
+      const fetched: Result = await run(argv, root);
+      if (fetched.code !== 0) {
+        const tracking: Result = await run(
+          ['git', 'rev-parse', `refs/remotes/${repo.config.remote}/${repo.config.default_branch}^{commit}`],
+          root,
+        );
+        sha = tracking.code === 0 ? tracking.stdout : '';
+        throw new CommandError(argv, root, fetched);
+      }
+    });
     sha = await step('resolve', () =>
       command(['git', 'rev-parse', `refs/remotes/${repo.config.remote}/${repo.config.default_branch}^{commit}`], root),
     );
@@ -299,10 +310,13 @@ export async function selfUpdate(repo: Repo, home: string = homedir()): Promise<
       try {
         git = await gitStage(repo, target, lag);
       } catch (error) {
-        if (error instanceof CommandError && (error.argv[1] === 'fetch' || error.argv[1] === 'push'))
-          return `${error.argv[1]} failed: ${errorLine(error.result)}; ${await lag()}; retried at the next trigger`;
-        if (!(error instanceof Error && error.message.startsWith('record conflict:'))) throw error;
-        gitFragment = error.message;
+        if (error instanceof CommandError && (error.argv[1] === 'fetch' || error.argv[1] === 'push')) {
+          gitFragment = `${error.argv[1]} failed: ${errorLine(error.result)}; ${await lag()}; retried at the next trigger`;
+        } else if (error instanceof Error && error.message.startsWith('record conflict:')) {
+          gitFragment = error.message;
+        } else {
+          throw error;
+        }
       }
       if (git !== null) {
         if (git.kind === 'skipped') {
