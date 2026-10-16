@@ -9,6 +9,10 @@ run.lock
 run-holder.yaml
 reconcile/
 .pi-command-logs/
+releases/
+/current
+/deploy.yaml
+/release-hold.yaml
 .env
 issues/open/**/*.log
 issues/parked/**/*.log
