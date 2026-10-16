@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { procDir } from './fake-proc';
@@ -49,6 +49,16 @@ const call: BusctlCall = {
   bus: process.env.DBUS_SESSION_BUS_ADDRESS ?? null,
 };
 appendFileSync(resolve(home, 'busctl.calls'), JSON.stringify(call) + '\n');
+// Starting a unit inside a slice loads that slice in the real manager; the
+// fake needs an explicit upsert for the same outcome.
+if (process.env.FAKE_SYSTEMCTL_DB !== undefined) {
+  const path: string = z.string().parse(process.env.FAKE_SYSTEMCTL_DB);
+  const db: { units: { unit: string; sub: string; cgroup?: string }[] } = JSON.parse(readFileSync(path, 'utf8'));
+  if (!db.units.some((unit) => unit.unit === call.slice)) {
+    db.units.push({ unit: call.slice, sub: 'active' });
+    writeFileSync(path, JSON.stringify(db));
+  }
+}
 if (existsSync(resolve(home, 'busctl.fail'))) {
   console.error('Failed to start transient scope unit: fixture refused');
   process.exit(1);

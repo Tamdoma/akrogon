@@ -17,7 +17,7 @@ const inUse: Set<string> = new Set([
 ]);
 
 // Host keeps mix units and retired filesystem paths; these clear once the run, tab or pass ends.
-const unitInUse: Set<string> = new Set(['own slice', 'live run record', 'live tab']);
+const unitInUse: Set<string> = new Set(['own slice', 'live run record', 'live tab', 'unfinished leaf']);
 
 function leftover(entry: Kept): boolean {
   return (

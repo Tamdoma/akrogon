@@ -996,11 +996,13 @@ async function reconcileBatch(
       )
         closable.push(leaf);
   });
-  if (!(isAutomatic && isPaused(repo.name)))
+  await withLock(resolve(globalHome(), '.lock'), async () => {
+    if (isAutomatic && isPaused(repo.name)) return;
     for (const leaf of [...moved, ...closable]) {
       await closeMergedTab(repo, leaf, await panes());
       await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
     }
+  });
 }
 
 async function mergeTurn(
@@ -1167,7 +1169,9 @@ async function dispatchMergeLeaf(
   attempt: string,
 ): Promise<void> {
   if (!isAutomatic) {
-    await dispatchLeaf(global, repo, leaf, false, invocation, mergeContext, false, attempt);
+    await withLock(resolve(globalHome(), '.lock'), async () => {
+      await dispatchLeaf(global, repo, leaf, false, invocation, mergeContext, false, attempt);
+    });
     return;
   }
   await withLock(resolve(globalHome(), '.lock'), async () => {

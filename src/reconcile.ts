@@ -162,7 +162,7 @@ async function sliceHasProcess(slice: string): Promise<boolean> {
   return subtreeHasProcess(join(cgroupRoot(), group));
 }
 
-// Why a finished leaf's slice survives this pass, or null when it may stop.
+// Why a leaf-matched slice survives this pass, or null when it may stop.
 function sliceKeepReason(
   slice: string,
   leaf: Leaf,
@@ -172,6 +172,7 @@ function sliceKeepReason(
 ): string | null {
   if (own.has(slice)) return 'own slice';
   if (runs.has(slice)) return 'live run record';
+  if (leaf.state.tab === undefined && !finished(leaf)) return 'unfinished leaf';
   if (leaf.state.tab !== undefined) {
     if (live === null) return 'pane list unavailable';
     if (tabLive(live, leaf.state.tab)) return 'live tab';
@@ -394,15 +395,19 @@ export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<b
     )
   )
     return true;
-  // A finished leaf with a recorded tab can only be judged with live panes; a
-  // finished leaf with a loaded slice is a stop candidate either way, and an
-  // unreadable unit inventory forces the conservative fetch.
-  const finishedLeaves: Leaf[] = leaves.filter(finished);
-  if (finishedLeaves.some((leaf) => leaf.state.tab !== undefined)) return true;
-  if (finishedLeaves.length === 0) return false;
+  // A leaf with a recorded tab can only be judged with live panes; a leaf
+  // that is finished or has a recorded tab is a slice-stop candidate either
+  // way, and an unreadable unit inventory forces the conservative fetch.
+  if (
+    leaves.some((leaf) => leaf.state.phase === 'merged' || leaf.state.phase === 'failed') &&
+    leaves.some((leaf) => leaf.state.tab !== undefined)
+  )
+    return true;
+  const candidates: Leaf[] = leaves.filter((leaf) => finished(leaf) || leaf.state.tab !== undefined);
+  if (candidates.length === 0) return false;
   const loaded: Set<string> | null = await loadedLeafSlices();
   if (loaded === null) return true;
-  return finishedLeaves.some((leaf) => loaded.has(leafSlice(repo, leaf.state.slug)));
+  return candidates.some((leaf) => loaded.has(leafSlice(repo, leaf.state.slug)));
 }
 
 export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null): Promise<Reconciled> {
@@ -474,8 +479,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   const leafBySlug: Map<string, Leaf> = new Map(leaves.map((leaf) => [leaf.state.slug, leaf]));
 
   // The slice step runs before leaf temp and unowned-item checks so a later
-  // sweep in the same pass already sees stopped slices. A finished leaf's slice
-  // is stopped outright — killing leftovers is the point — unless it is the
+  // sweep in the same pass already sees stopped slices. A loaded leaf slice is
+  // stopped outright — killing leftovers is the point — unless it is the
   // pass's own, a live run names it, or its tab cannot be proven gone.
   const loadedSlices: Set<string> | null = await loadedLeafSlices();
   const stoppedSlices: Set<string> = new Set();
@@ -483,7 +488,6 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     const own: Set<string> = ownSlices();
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
     for (const leaf of leaves) {
-      if (!finished(leaf)) continue;
       const slice: string = leafSlice(repo, leaf.state.slug);
       if (loadedSlices === null || !loadedSlices.has(slice)) continue;
       const reason: string | null = sliceKeepReason(slice, leaf, live, own, runs);
@@ -958,8 +962,12 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
           } else if (tabLive(live, leaf.state.tab) || livePaneInside(live, dir)) {
             if (done) keep(dir, 'live pane inside', 'removed once the pane closes or leaves this path');
           } else if (kept.length === keptBefore) {
-            // An unreadable unit inventory is no proof of a busy slice: temps
-            // were removed without one before this check existed (D2, D10).
+            // An unreadable unit inventory is no proof of a busy slice, so the
+            // temp is kept for every phase instead of falling to dropChecked.
+            if (loadedSlices === null) {
+              keep(dir, 'unit list unavailable', 'restore the systemd unit inventory and retry cleanup');
+              continue;
+            }
             const slice: string = leafSlice(repo, leaf.state.slug);
             if (
               loadedSlices !== null &&
@@ -1053,7 +1061,6 @@ export async function reconcileHost(
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
     for (const slice of [...loaded].sort()) {
       const match: { repo: Repo; leaf: Leaf } | undefined = leafOf.get(slice);
-      if (match !== undefined && !finished(match.leaf)) continue;
       if (match !== undefined) {
         const view: Pane[] | null = match.leaf.state.tab === undefined ? panes : await livePanes();
         const reason: string | null = sliceKeepReason(slice, match.leaf, view, own, runs);
