@@ -200,9 +200,13 @@ export function findLeaf(repo: Repo, slug: string): Leaf {
   return leaf;
 }
 
-export async function withLock<T>(path: string, action: () => Promise<T>): Promise<T> {
+export async function withLock<T>(
+  path: string,
+  action: () => Promise<T>,
+  mode: 'exclusive' | 'shared' = 'exclusive',
+): Promise<T> {
   const child: Bun.Subprocess<'pipe', 'pipe', 'pipe'> = Bun.spawn(
-    ['flock', '-x', path, 'sh', '-c', 'printf locked; cat >/dev/null'],
+    ['flock', mode === 'shared' ? '-s' : '-x', path, 'sh', '-c', 'printf locked; cat >/dev/null'],
     { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
   );
   const reader: ReadableStreamDefaultReader<Uint8Array> = child.stdout.getReader();

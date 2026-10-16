@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnCaptured, command, type SpawnResult } from '../src/shell';
+import { withAdmissionLock } from '../src/admission';
 
 const worktreeRoot: string = resolve(import.meta.dir, '..');
 const tempDirs: Set<string> = new Set();
@@ -148,6 +149,8 @@ test('a process holding the tool root as cwd does not defer cutover', async () =
   try {
     const moved: SpawnResult = await cli(root, home, ['config']);
     expect(moved.stderr).toContain('moved state home');
+    expect(moved.code).toBe(0);
+    expect(Bun.YAML.parse(moved.stdout)).toMatchObject({ max_active: 3 });
     expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(true);
   } finally {
     sleeper.kill();
@@ -323,13 +326,12 @@ test('an explicit empty state home keeps using the tool root while cutover is de
   expect(existsSync(resolve(destination, 'config.yaml'))).toBe(true);
 });
 
-test('cutover takes the global and admission locks even when the global lock file is absent', async () => {
+test('cutover takes the global lock and waits for an in-flight admission even when the global lock file is absent', async () => {
   const home: string = temp();
   const root: string = toolCopy(home, globalConfig);
-  const locks: string = resolve(root, 'runs/locks');
-  mkdirSync(locks, { recursive: true });
+  // An in-flight admission holds the tool root's admission.lock shared.
   const holder: Bun.Subprocess<'pipe', 'pipe', 'pipe'> = Bun.spawn(
-    ['flock', '-x', resolve(locks, 'akrogon.slice'), 'sh', '-c', 'printf locked; cat >/dev/null'],
+    ['flock', '-s', resolve(root, 'admission.lock'), 'sh', '-c', 'printf locked; cat >/dev/null'],
     { cwd: home, stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
   );
   const reader: ReadableStreamDefaultReader<Uint8Array> = holder.stdout.getReader();
@@ -353,5 +355,35 @@ test('cutover takes the global and admission locks even when the global lock fil
     reader.releaseLock();
     expect(await holder.exited).toBe(0);
     await pending;
+  }
+});
+
+test('an admission waits while the state-home move holds admission.lock', async () => {
+  const home: string = temp();
+  writeFileSync(resolve(home, 'config.yaml'), Bun.YAML.stringify(globalConfig));
+  const previous: string | undefined = process.env.AKROGON_HOME;
+  process.env.AKROGON_HOME = home;
+  const holder: Bun.Subprocess<'pipe', 'pipe', 'pipe'> = Bun.spawn(
+    ['flock', '-x', resolve(home, 'admission.lock'), 'sh', '-c', 'printf locked; cat >/dev/null'],
+    { cwd: home, stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
+  );
+  const reader: ReadableStreamDefaultReader<Uint8Array> = holder.stdout.getReader();
+  try {
+    expect((await reader.read()).done).toBe(false);
+    let admitted: boolean = false;
+    const pending: Promise<void> = withAdmissionLock('akrogon.slice', async (): Promise<void> => {
+      admitted = true;
+    });
+    await Bun.sleep(300);
+    expect(admitted).toBe(false);
+    holder.stdin.end();
+    reader.releaseLock();
+    expect(await holder.exited).toBe(0);
+    await pending;
+    expect(admitted).toBe(true);
+  } finally {
+    if (holder.exitCode === null) holder.kill();
+    if (previous === undefined) delete process.env.AKROGON_HOME;
+    else process.env.AKROGON_HOME = previous;
   }
 });

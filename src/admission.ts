@@ -40,10 +40,15 @@ export type RunRecord = z.infer<typeof recordSchema>;
 const runsDir = (): string => resolve(globalHome(), 'runs');
 const bootId = (): string => readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
 
+// The state-home move takes the home's admission.lock exclusively, so no
+// admission straddles it: each one lands wholly in the old home or the new.
 export async function withAdmissionLock<T>(slice: string, action: () => Promise<T>): Promise<T> {
-  const locks: string = resolve(runsDir(), 'locks');
-  mkdirSync(locks, { recursive: true });
-  return withLock(resolve(locks, slice), action);
+  mkdirSync(resolve(runsDir(), 'locks'), { recursive: true });
+  return withLock(
+    resolve(globalHome(), 'admission.lock'),
+    () => withLock(resolve(runsDir(), 'locks', slice), action),
+    'shared',
+  );
 }
 
 // Field 22 of /proc/<pid>/stat. The command name in field 2 may hold spaces, so split after the last ')'.
