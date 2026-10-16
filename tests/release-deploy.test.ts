@@ -322,6 +322,66 @@ test.serial('an interrupted deploy is shown in status and finished by the next p
   }
 });
 
+test.serial('a first-switch conflict leaves the workspace-pointing command usable', async () => {
+  const d: DeployFixture = await deployFixture();
+  try {
+    const bin: string = resolve(d.home, '.local/bin/akrogon');
+    mkdirSync(dirname(bin), { recursive: true });
+    const workspaceEntry: string = resolve(d.f.root, 'src/akrogon.ts');
+    mkdirSync(dirname(workspaceEntry), { recursive: true });
+    writeFileSync(workspaceEntry, 'workspace\n');
+    symlinkSync(workspaceEntry, bin);
+    mkdirSync(resolve(d.home, '.claude/skills/skill-one'), { recursive: true });
+    const sha: string = await head(d);
+    const failed: Result = await cli(d.f, ['next', '--all'], d.f.root, d.env);
+    expect(failed.code).toBe(0);
+    expect(failed.stdout).toContain('deploy failed');
+    expect(failed.stdout).toContain('links');
+    // No link was created or repointed: the installed command still works.
+    expect(existsSync(resolve(d.home, 'current'))).toBe(false);
+    expect(readlinkSync(bin)).toBe(workspaceEntry);
+    expect(existsSync(bin)).toBe(true);
+    rmSync(resolve(d.home, '.claude/skills/skill-one'), { recursive: true });
+    const retried: Result = await cli(d.f, ['next', '--all'], d.f.root, d.env);
+    expect(retried.code).toBe(0);
+    expect(retried.stdout).toContain(`deployed ${sha.slice(0, 12)}`);
+    expect(realpathSync(bin)).toBe(resolve(releases(d), sha, 'src/akrogon.ts'));
+  } finally {
+    d.f.clean();
+  }
+});
+
+test.serial('a rejected add or remove deploy keeps the active release skill links', async () => {
+  const d: DeployFixture = await deployFixture();
+  try {
+    const first: string = await head(d);
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    await pushSeed(d, () => {
+      mkdirSync(resolve(d.seed, 'skills/skill-two'), { recursive: true });
+      writeFileSync(resolve(d.seed, 'skills/skill-two/SKILL.md'), 'two\n');
+      rmSync(resolve(d.seed, 'skills/skill-one'), { recursive: true, force: true });
+    });
+    mkdirSync(resolve(d.home, '.claude/skills/skill-two'), { recursive: true });
+    const failed: Result = await cli(d.f, ['next', '--all'], d.f.root, d.env);
+    expect(failed.code).toBe(0);
+    expect(failed.stdout).toContain('deploy failed');
+    expect(failed.stdout).toContain('links');
+    expect(realpathSync(resolve(d.home, 'current'))).toBe(resolve(releases(d), first));
+    for (const root of roots) {
+      const kept: string = resolve(d.home, root, 'skill-one');
+      expect(existsSync(kept)).toBe(true);
+      const added: string = resolve(d.home, root, 'skill-two');
+      if (root === '.claude/skills') {
+        expect(lstatSync(added).isDirectory()).toBe(true);
+      } else {
+        expect(lstatSync(added, { throwIfNoEntry: false })).toBe(undefined);
+      }
+    }
+  } finally {
+    d.f.clean();
+  }
+});
+
 test.serial('releases other than current and previous are deleted 24 hours after replacement', async () => {
   const d: DeployFixture = await deployFixture();
   try {
