@@ -246,7 +246,9 @@ test('an already-running command that admits a nested checked run defers cutover
       '--',
       'sh',
       '-c',
-      `${nested}; sleep 6`,
+      // Propagate the nested check's exit: `nested; sleep 6` alone reports the
+      // sleep's success even when the nested run-check fails before admission.
+      `${nested}; rc=$?; sleep 6; exit $rc`,
     ],
     {
       cwd: repo,
@@ -277,6 +279,11 @@ test('an already-running command that admits a nested checked run defers cutover
     const deferred2: SpawnResult = await cli(root, home, ['config']);
     expect(deferred2.stderr).not.toContain('moved state home');
     expect(await outer.exited).toBe(0);
+    // The nested checked run completed inside the outer check: its own
+    // "check run: 0" line was captured in the outer's log.
+    const outerErr: string = await new Response(outer.stderr).text();
+    const outerLog: string = outerErr.trim().split('\n').pop()!.replace(/^.*check run: \d+ /, '');
+    expect(readFileSync(outerLog, 'utf8')).toContain('check run: 0');
   } finally {
     if (outer.exitCode === null) outer.kill();
     sentinel.kill();
