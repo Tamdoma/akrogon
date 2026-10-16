@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
 import { type Repo } from './config';
@@ -205,6 +205,9 @@ export async function withLock<T>(
   action: () => Promise<T>,
   mode: 'exclusive' | 'shared' = 'exclusive',
 ): Promise<T> {
+  // flock creates the lock file but not its parent: a first call against a
+  // state home that nothing has created yet must not ENOENT.
+  mkdirSync(dirname(path), { recursive: true });
   const child: Bun.Subprocess<'pipe', 'pipe', 'pipe'> = Bun.spawn(
     ['flock', mode === 'shared' ? '-s' : '-x', path, 'sh', '-c', 'printf locked; cat >/dev/null'],
     { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
