@@ -89,6 +89,7 @@ On the direct route no leaf files or `state.yaml` are written, `Closed <YYYY-MM-
 The direct route is a second ending for the handoff: the door implements one small settled chart itself in a worktree, B reviews, and the door lands it on the default branch without leaf files. It needs no repo setting: the door offers it at its own discretion whenever the chart is eligible, and the operator can always decline.
 
 Direct is not offered, and the review names the refusal in one line and asks the lifecycle questions as today, when any of these holds:
+
 - the draft needs `inputs`, `grants`, `produces` or `retained`;
 - a done-criterion needs a live run or outside call during implementation (charting proofs do not count);
 - more than one outcome or an unfinished dependency exists (door judgment);
@@ -98,6 +99,7 @@ Direct is not offered, and the review names the refusal in one line and asks the
 When eligible, the review asks one combined route question with the door's recommendation and a reply key: lifecycle debate no, lifecycle debate yes, or direct. The door may recommend lifecycle for a risky small job. Explicit direct authorization already given in the session is the answer. The chosen route is recorded in CHART.md as the `Route:` line. Selecting direct includes the door's push authority; push, source close and broadcast are coordination, not live calls under eligibility.
 
 Protocol, using the shapes in shapes.md:
+
 1. Attempt start: choose a slug, create the worktree with `git worktree add --lock --reason "<chart-folder> direct" <worktree_store>/<slug>` on branch `<slug>` from the destination's default branch, and write the `Direct attempt` section with the slug recorded.
 2. Implement: the door itself runs `implement-issue direct chart=<chart-folder> worktree=<path>`, which writes `<chart>/direct/plan.md` and `<chart>/direct/report.md`.
 3. B review: send the chart's B pane `check-issue direct slot=B chart=<chart-folder> worktree=<path> base=<sha> head=<sha> out=<chart>/slots/review-B-<n>.md`, with `n` = 1 for the initial review and the exact path named. The Fix/Nit bar and verdict rules are check-issue's.
@@ -112,11 +114,12 @@ Protocol, using the shapes in shapes.md:
    7. broadcast-issue as sender when the repo configures broadcast, with the chart brief, pushed SHA and closed sources as context, and a failure does not reopen;
    8. `git worktree unlock <path>` then `git worktree remove <path>` verified by `git worktree list`, then `git branch -D <slug>` verified by empty `git branch --list <slug>`;
    9. `akrogon pack <chart>` when `<chart>/direct` holds a log, then the landed SHA into the `Direct attempt` section, then `Closed <date>`.
-   The root checkout is never reset, and a failed local update is reported.
+      The root checkout is never reset, and a failed local update is reported.
 
 Repair bound: one round is B `fix` (or a blocking landing-check failure), one door repair pass over all Fixes, and B's re-check of the repair diff. The bound is the repo's `fix_rounds` from `akrogon config`, with the count kept in `Direct attempt` so it survives session replacement. A passing last round lands. Exhaustion stops with the open Fixes listed, and the operator chooses one more round, lifecycle handoff, or abandon. Push attempts are not rounds.
 
 Growth stop: stop coding and landing when a locked decision must change, a need eligibility excludes appears, a criterion cannot pass in scope after permitted repairs, or a second outcome appears. The door commits existing work as one partial-labelled commit so the tree is clean, keeps the worktree, updates `Direct attempt` (trigger, done, not done) and opens the trigger as a new fork. Continuations:
+
 - lifecycle handoff: `git worktree unlock <path>` before the handoff because the command's `ensureWorktree` adopts the worktree as-is and leaf rules must be able to remove it later; the leaf slug equals the branch so the command's worktree setup adopts it, the leaf starts at its normal planning phase, the planner decides what to keep, and lifecycle review covers the whole diff;
 - abandon: `git worktree unlock`, then branch and worktree removed, `akrogon pack <chart>` when `<chart>/direct` holds a log, then `Held <date>`.
 

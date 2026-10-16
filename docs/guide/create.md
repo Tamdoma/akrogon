@@ -87,7 +87,7 @@ The seed skill files one GitHub issue with six sections: the observation, locati
 
 To form that hypothesis, the agent reads the files the failure names and follows them one hop, reading only. It stops at a hypothesis or a named evidence gap.
 
-The destination is the repository's configured `issues_repo` or its GitHub origin. When a path the failure names is absent from the current repository but lives under the installed Akrogon checkout, the report routes to that checkout's issue repository instead; if the `akrogon` command cannot be resolved then, the run stops naming the path and reason.
+The destination is the repository's configured `issues_repo` or its GitHub origin. When a path the failure names is absent from the current repository but lives under the installed Akrogon root, the report routes to the registered Akrogon repository's issue destination instead; if the `akrogon` command cannot be resolved then, the run stops naming the path and reason.
 
 It also runs two read-only `gh` searches on the routed repo: the account's reports from the last two days, and a 2-3 word keyword search. Linked reports are listed with a reason each; "none found" or "search failed" is recorded instead. A found report covering the same failure ends the run with its URL and files nothing.
 

@@ -79,7 +79,7 @@ The command directory must be on PATH. The installed paths are:
 ~/.pi/agent/skills/
 ```
 
-The links use this checkout. Landed work deploys itself after a merge landing and on `akrogon next`, `next --all` and `next --resume` runs: the step fetches the default branch of every registered checkout the run covers, replays local commits onto the fetched tip and pushes them when they touch only issue records, then moves the checkout with `git reset --keep`. Installing dependencies and reconciling skill links stay on the Akrogon checkout only. It prints one line per checkout and retries failures at the next trigger.
+The links — command, skills, slice and plugin — point through `~/.akrogon/current`, a link to the running program: this checkout on a fresh install, then each deployed release at `~/.akrogon/releases/<commit>`. A release is the tracked tree built by `git archive` plus `bun install --frozen-lockfile` — not a Git checkout — and `current` flips to it atomically when a build completes. Landed work deploys itself after a merge landing and on `akrogon next`, `next --all` and `next --resume` runs: the step fetches the default branch of every registered checkout the run covers, replays local commits onto the fetched tip and pushes them when they touch only issue records, then moves the checkout with `git reset --keep`, and for the Akrogon repository deploys the merged commit as a new release. The deploy is separate from the workspace checkout move: an uncommitted workspace edit never goes live and never blocks a deploy, and a failed build keeps `current` on the active release and prints in `akrogon status` until a later deploy succeeds. It prints one line per checkout and retries failures at the next trigger.
 
 Follow the reported remedy when the checkout is on another branch or detached, ahead with commits touching more than issue records (`akrogon sync`), or blocked by an overlapping edit (commit or finish the edit). See the [install guide](docs/guide/install.md) for details.
 
@@ -186,7 +186,7 @@ akrogon.yaml
 issues_repo: owner/repo
 ```
 
-A report whose named failure path lives under the installed akrogon checkout routes to that checkout's report destination instead, and reports already covering the failure end the run with their URL. That report destination does not redirect pull.
+A report whose named failure path lives under the installed akrogon root routes to the registered akrogon repository's report destination instead, and reports already covering the failure end the run with their URL. That report destination does not redirect pull.
 
 ## Skills
 

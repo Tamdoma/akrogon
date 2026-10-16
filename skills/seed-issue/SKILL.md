@@ -21,9 +21,9 @@ Only when the file is absent, read this repository's `origin`, accepting GitHub.
 
 Require nonempty GitHub owner and repository names without whitespace, query/fragment suffixes or extra path segments, and stop visibly for missing origin, local paths, non-GitHub or lookalike hosts and malformed paths, without falling back from an invalid file, consulting another remote or asking where to post.
 
-The owner test then applies only to a path the report names as the failure's location that does not exist relative to the consumer root. A named path absent there is akrogon-owned when it exists relative to the akrogon root or resolves under it after `readlink -f`, as installed skill links like `~/.claude/skills/check-issue` do; a report naming several paths routes to akrogon when at least one named path is akrogon-owned, and a named path absent under both roots does not reroute.
+The owner test then applies only to a path the report names as the failure's location that does not exist relative to the consumer root. A named path absent there is akrogon-owned when it exists relative to the akrogon root or akrogon workspace below, or resolves under either or under `~/.akrogon/releases/` after `readlink -f`, as installed skill links like `~/.claude/skills/check-issue` do through `~/.akrogon/current`; a report naming several paths routes to akrogon when at least one named path is akrogon-owned, and a named path absent under the consumer root and every akrogon location does not reroute.
 
-Resolve the akrogon root as the Git root of the resolved `akrogon` command, `git -C "$(dirname "$(readlink -f "$(command -v akrogon)")")" rev-parse --show-toplevel`, and the akrogon repo as that root's `akrogon.yaml` `issues_repo` under the same rules as above, else that root's `origin` under the same rules as above. When the owner test was reached and `command -v akrogon` prints nothing or the root cannot be established, stop visibly with the path and reason before posting, without falling back to the consumer destination.
+Resolve the akrogon root as the directory containing the resolved `akrogon` command's entry point, `dirname(dirname(readlink -f "$(command -v akrogon)"))` — the installed release folder or a development checkout — and the akrogon workspace as the registered repo whose root contains `src/akrogon.ts`: read the `repos:` entries of the state-home config (`~/.akrogon/config.yaml`, or `AKROGON_HOME` when set) and pick the entry with `<path>/src/akrogon.ts` present, falling back to `git -C "$(dirname "$(readlink -f "$(command -v akrogon)")")" rev-parse --show-toplevel` only when no registered root matches, which is the development-checkout case where the akrogon root is that checkout's Git root. The akrogon repo is that workspace's `akrogon.yaml` `issues_repo` under the same rules as above, else that workspace's `origin` under the same rules as above. When the owner test was reached and `command -v akrogon` prints nothing or the akrogon workspace cannot be established, stop visibly with the path and reason before posting, without falling back to the consumer destination.
 
 A report whose named paths all exist relative to the consumer root never reaches the owner test and posts to the consumer destination.
 
@@ -42,21 +42,27 @@ Lesson history: <lesson history path; line present only when a lesson triggered 
 Unverified intake.
 
 ## Observation
+
 <What happened>
 
 ## Location
+
 <Project, surface, command or workflow>
 
 ## Reproduction
+
 <Reported steps and frequency, or Not provided>
 
 ## Expected behavior
+
 <What should happen, or Not provided>
 
 ## Urgency
+
 <Impact and known workaround, or Not provided>
 
 ## Suspected cause
+
 <Supported hypothesis naming the main and contributing conditions or pattern that allowed it, no wider than the evidence shows, or “no supported hypothesis” plus the evidence needed next; a reporter suspicion contradicted by inspected evidence is stated as contradicted with the evidence>
 <Whose view: reporter, agent or both>
 <Files read; installed or vendored copies flagged as not the destination source by inspected provenance, with unverified links to it named>

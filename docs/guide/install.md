@@ -25,7 +25,7 @@ gh auth status
 
 ## The command
 
-From the Akrogon checkout, install dependencies and create the links:
+From the Akrogon workspace checkout, install dependencies and create the links:
 
 ```sh
 bun install
@@ -34,11 +34,13 @@ bun src/akrogon.ts install
 
 Installation links the command, skills and Herdr plugin, links `systemd/akrogon.slice` to `~/.config/systemd/user/akrogon.slice` and runs `systemctl --user daemon-reload`. The slice caps everything akrogon runs: CPUWeight=20, MemoryHigh=64G, MemoryMax=96G and no swap. It also installs the configured harness integrations. If a destination conflicts with an existing file, installation stops and prints removal commands for you to review.
 
-The links point back to this checkout, so this checkout is the program you run. Landed work deploys itself: after a merge lands, and on `akrogon next`, `next --all` and `next --resume` runs, one step updates every registered checkout the run covers. It fetches the default branch and, when every commit not yet on the remote touches only issue records, replays those commits onto the fetched tip in a temporary worktree and pushes them, then moves the checkout with `git reset --keep`, which keeps uncommitted edits. Nothing is staged and nothing is stashed. On the Akrogon checkout it also runs `bun install --frozen-lockfile` and reconciles the skill links and the slice link, then reloads the systemd user manager.
+The links point through `~/.akrogon/current`, the link to the program you run: the workspace checkout on a fresh install, then each deployed release at `~/.akrogon/releases/<commit>`. A release is the tracked tree exported by `git archive` plus `bun install --frozen-lockfile` — it holds `node_modules` and no `.git` — built under a temporary name, renamed into place only when complete and switched live by atomically flipping `current`, followed by skill and slice link reconciliation and a systemd user-manager reload. A release deploy is separate from the workspace checkout move: an uncommitted workspace edit never goes live and never blocks a deploy, and a failed build keeps `current` on the active release while `akrogon status` names the attempted commit, the active commit and the failing step until a later deploy succeeds.
+
+Landed work still updates the registered checkouts: after a merge lands, and on `akrogon next`, `next --all` and `next --resume` runs, one step updates every registered checkout the run covers. It fetches the default branch and, when every commit not yet on the remote touches only issue records, replays those commits onto the fetched tip in a temporary worktree and pushes them, then moves the checkout with `git reset --keep`, which keeps uncommitted edits. Nothing is staged and nothing is stashed. For the Akrogon repository the same run then deploys the merged commit as the new release.
 
 When this containment first ships, close every running leaf tab once. The next `akrogon next` recreates them boxed.
 
-The step prints one line per checkout: `deployed <old>..<new>` when the checkout moved, `pushed <n> record commit(s)` when replayed commits went to the remote, `checkout pending` with the dirty path when an incoming change touches an uncommitted edit, `record conflict: <paths>; run akrogon sync` when a record changed on both sides, `current <sha>` when already up to date, or the failing step, the git or bun error, the lag count and the remedy. `checkout pending` keeps the local commits and the edit; finishing the edit lets the next trigger move. A refused or failed step retries at the next trigger; nothing else changes.
+The step prints one line per checkout: `deployed <old>..<new>` when the checkout moved, `deployed <sha12>` when a new release went live (`; switched from checkout to release` on the first switch), `deploy failed: <step>: <error>` when a release build failed, `pushed <n> record commit(s)` when replayed commits went to the remote, `checkout pending` with the dirty path when an incoming change touches an uncommitted edit, `record conflict: <paths>; run akrogon sync` when a record changed on both sides, `current <sha>` when already up to date, or the failing step, the git or bun error, the lag count and the remedy. `checkout pending` keeps the local commits and the edit; finishing the edit lets the next trigger move. A refused or failed step retries at the next trigger; nothing else changes.
 
 You still act when the line reports the checkout is on another branch or detached, holds a local commit that touches more than the issue records (run `akrogon sync`), or is blocked by an uncommitted edit that overlaps incoming changes (commit or finish that edit). Incoming active coordination lock paths and ignored operator paths colliding with the incoming tree refuse the move with the `akrogon sync` refusal wording.
 
