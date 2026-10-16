@@ -115,6 +115,41 @@ test.serial('a records fetch failure persists the attempted deployment and retri
   }
 });
 
+test.serial('fetch recovery on unchanged main preserves the previous release and its replacement time', async () => {
+  const d: DeployFixture = await deployFixture();
+  try {
+    const previous: string = await head(d);
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    const active: string = await pushSeed(d, () => writeFileSync(resolve(d.seed, 'file'), 'active\n'));
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    const record: ReturnType<typeof deployRecord> = deployRecord(d);
+    const stamps: Record<string, string> = z.record(z.string(), z.string()).parse(record.replaced);
+    const replacedAt: string = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    writeFileSync(
+      resolve(d.home, 'deploy.yaml'),
+      Bun.YAML.stringify({ ...record, replaced: { ...stamps, [previous]: replacedAt } }),
+    );
+    await command(['git', 'remote', 'set-url', 'origin', resolve(d.home, 'missing.git')], d.f.root);
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    expect(deployRecord(d)).toMatchObject({ ok: false, commit: active, previous });
+    await command(['git', 'remote', 'set-url', 'origin', resolve(d.home, 'remote.git')], d.f.root);
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    expect(deployRecord(d)).toMatchObject({
+      ok: true,
+      commit: active,
+      previous,
+      replaced: { [previous]: replacedAt },
+    });
+    expect(readdirSync(releases(d)).sort()).toEqual([previous, active].sort());
+    const next: string = await pushSeed(d, () => writeFileSync(resolve(d.seed, 'file'), 'next\n'));
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    expect(deployRecord(d)).toMatchObject({ ok: true, commit: next, previous: active });
+    expect(readdirSync(releases(d)).sort()).toEqual([active, next].sort());
+  } finally {
+    d.f.clean();
+  }
+});
+
 test.serial('replacement timestamps start at the flip and unchanged main prunes expired releases', async () => {
   const d: DeployFixture = await deployFixture();
   try {
