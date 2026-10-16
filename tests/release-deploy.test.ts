@@ -38,13 +38,18 @@ async function deployFixture(): Promise<DeployFixture> {
   mkdirSync(resolve(seed, 'skills/skill-one'), { recursive: true });
   mkdirSync(resolve(seed, 'systemd'), { recursive: true });
   mkdirSync(resolve(seed, 'plugin'), { recursive: true });
+  mkdirSync(resolve(seed, 'vendor/tiny'), { recursive: true });
+  writeFileSync(resolve(seed, 'vendor/tiny/package.json'), '{"name":"tiny","version":"1.0.0"}\n');
   writeFileSync(resolve(seed, 'src/akrogon.ts'), 'console.log("release");\n');
   writeFileSync(resolve(seed, 'src/config.ts'), 'export const releaseConfig = true;\n');
   writeFileSync(resolve(seed, 'src/lessons.ts'), 'export const lessonsLoaded = true;\n');
   writeFileSync(resolve(seed, 'skills/skill-one/SKILL.md'), 'one\n');
   writeFileSync(resolve(seed, 'systemd/akrogon.slice'), '[Slice]\n');
   writeFileSync(resolve(seed, 'plugin/herdr-plugin.toml'), 'x\n');
-  writeFileSync(resolve(seed, 'package.json'), '{"name":"fixture-release"}\n');
+  writeFileSync(
+    resolve(seed, 'package.json'),
+    '{"name":"fixture-release","dependencies":{"tiny":"file:vendor/tiny"}}\n',
+  );
   await command([process.execPath, 'install'], seed);
   await command(['git', 'add', '-A'], seed);
   await command(['git', 'commit', '-m', 'shape'], seed);
@@ -206,7 +211,9 @@ test.serial('releases other than current and previous are deleted 24 hours after
     const recordPath: string = resolve(d.home, 'deploy.yaml');
     const record = deployRecord(d);
     const replaced: { [key: string]: string } = (record.replaced as { [key: string]: string }) ?? {};
-    replaced[shas[0]] = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    const aged: string = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    replaced[shas[0]] = aged;
+    replaced[shas[1]] = aged;
     writeFileSync(recordPath, Bun.YAML.stringify({ ...record, replaced }));
     shas.push(await pushSeed(d, () => writeFileSync(resolve(d.seed, 'file'), 'c3\n')));
     expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);

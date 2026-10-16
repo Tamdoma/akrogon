@@ -437,7 +437,7 @@ describe('self-update', () => {
         writeFileSync(resolve(f.seed, 'file'), 'changed\n');
       });
       writeFileSync(resolve(f.clone, 'file'), 'dirty\n');
-      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
       expect(logs).toHaveLength(1);
       expect(logs[0]).toContain('checkout pending');
       expect(logs[0]).toContain("Entry 'file'");
@@ -459,7 +459,7 @@ describe('self-update', () => {
         writeFileSync(resolve(f.seed, 'file'), 'changed\n');
       });
       await command(['git', 'checkout', '-b', 'topic'], f.clone);
-      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
       expect(logs).toHaveLength(1);
       expect(logs[0]).toContain('self-update skipped:');
       expect(logs[0]).toContain('topic');
@@ -479,7 +479,7 @@ describe('self-update', () => {
         writeFileSync(resolve(f.seed, 'file'), 'changed\n');
       });
       await command(['git', 'checkout', '--detach', 'HEAD'], f.clone);
-      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
       expect(logs).toHaveLength(1);
       expect(logs[0]).toContain('self-update skipped: detached HEAD');
       expect(logs[0]).toContain('1 behind origin/main');
@@ -499,7 +499,7 @@ describe('self-update', () => {
       await command(['git', 'add', '.'], f.clone);
       await command(['git', 'commit', '-m', 'ahead'], f.clone);
       const head: string = await command(['git', 'rev-parse', 'HEAD'], f.clone);
-      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
       expect(logs).toHaveLength(1);
       expect(logs[0]).toContain('self-update skipped:');
       expect(logs[0]).toContain('akrogon sync');
@@ -520,7 +520,7 @@ describe('self-update', () => {
       const newSha: string = await pushSeed(f, () => {
         writeFileSync(resolve(f.seed, 'file'), 'changed\n');
       });
-      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.clone, f.home));
+      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
       expect(logs).toHaveLength(1);
       expect(logs[0]).toContain('self-update skipped:');
       expect(logs[0]).toContain('diverged');
