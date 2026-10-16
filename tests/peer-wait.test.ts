@@ -556,6 +556,22 @@ test.each<[string, string]>([
   }
 });
 
+test('an unproven harness session change keeps waiting with its original exchange', async (): Promise<void> => {
+  const s: Setup = setup(
+    [{ agent: 'antigravity', agent_status: 'idle', agent_session: { kind: 'id', value: 'session-A' } }],
+    (): WaitEntry[] => [{ status: 'idle' }, { session: 'session-B' }],
+  );
+  try {
+    const result: RunResult = await s.run(pane, s.file, '1');
+    const exchange: Exchange = seed('antigravity', 'session-A');
+    expectOutcome(result, { outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'unproven', exchange });
+    const rerun: RunResult = await s.run(pane, s.file, '1', JSON.stringify(JSON.parse(result.stdout).exchange));
+    expectOutcome(rerun, { outcome: 'budget', pane, file: s.file, status: 'idle', signal: 'unproven', exchange });
+  } finally {
+    s.clean();
+  }
+});
+
 test('a pi session change is ignored while hook authority holds', async (): Promise<void> => {
   const s: Setup = setup([piAuthority], (): WaitEntry[] => [{ status: 'idle' }, { session: '/tmp/s-pi-other.jsonl' }]);
   try {
