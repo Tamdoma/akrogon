@@ -107,7 +107,7 @@ function greenRun(repo: Repo, tree: string, scope: VerifyScope): VerifyRun | und
 const noTestNames: readonly string[] = ['(no test name)', '(log gone)'];
 
 async function baseCoversHead(repo: Repo, head: VerifyRun, base: VerifyRun): Promise<boolean> {
-  if (!completed(base) || !sameCommands(base.commands, head.commands)) return false;
+  if (!completed(head) || !completed(base) || !sameCommands(base.commands, head.commands)) return false;
   for (const [index, item] of head.commands.entries()) {
     if (item.exit === 0) continue;
     const names: string[] = await failedTests(repo, item.log);
