@@ -14,31 +14,40 @@ issues/chart/<chart-slug>/
   slots/<pass>.md                 # peer exchanges, and direct review returns (review-B-<n>.md)
   direct/plan.md, report.md     # only on the direct route
 ```
+
 Charts stay here after handoff. They have no state.yaml or lifecycle phase. Create forks/ even for a fully settled direct item. On resume, CHART.md points to the selected fork and its context rather than requiring a full chart reread.
+
 ```markdown
 # Chart: <destination>
 
 ## Destination
+
 <observable outcome>
 
 Route: <lifecycle (debate no|yes) | direct>
 
 ## Forks taken
+
 - [<fork>](forks/<fork-slug>.md): <settled answer>
 
 ## Open forks
+
 - [<fork>](forks/<fork-slug>.md): <question in one line>, in the order they will be taken
 
 ## Fog
+
 <material work in scope whose question cannot yet be stated precisely>
 
 ## Off route
+
 <excluded work and reasons; a step on main a taken decision needs is never recorded under Off route: the door makes and verifies it during the pass when its precondition exists (config verified through `akrogon config` at the registered root), otherwise it is a Pending steps entry>
 
 ## Pending steps
+
 <none, or each waiting main step: the exact edit, its owner, the prerequisite leaf it waits on and the check that proves it done>
 
 ## Mode record
+
 - mode <time> <door pane> <A session id>: <on | off | changed list | continue autopilot> <detail>
 - mode <time> <door pane> <A session id>: handover <time> <log>: handed <remaining list>; consultants <surviving>
 - mode <time> <door pane> <A session id>: continue autopilot (handover <time>)
@@ -46,6 +55,7 @@ Route: <lifecycle (debate no|yes) | direct>
 Every mode entry's session id is the live `agent_session.value` `herdr agent list` prints for A's pane; a fresh A reads it before appending and never invents one.
 
 ## Autopilot
+
 - breach: <each observed boundary breach, first in the section>
 - switch-on: <INTAKE.md reference carrying the operator's verbatim words>
 - consultant: <each named consultant; each loss with its reason, the charts run without it and ignored late returns>
@@ -60,7 +70,9 @@ Every mode entry's session id is the live `agent_session.value` `herdr agent lis
 - usage: <the linked usage lines>
 
 ## Direct attempt
+
 <only on the direct route, written at attempt start and updated through landing; the route is fixed by the approved handoff review and a later `direct` setting change does not alter it>
+
 - branch: <slug, also the worktree directory name under worktree_store>
 - worktree: <path>
 - base: <sha the attempt started from, then the sha after each rebase>
@@ -73,51 +85,67 @@ Every mode entry's session id is the live `agent_session.value` `herdr agent lis
 - review files: <slots/review-B-<n>.md paths>
 - landed SHA: <sha pushed, after landing>
 ```
+
 Under autopilot the CHART.md carries `## Mode record` — one `- mode` line appended per mode change (on, off, changed list, "continue autopilot") with its time, the door pane and A's session id, the latest entry governing — and `## Autopilot`, written as the pass goes with every line a `- ` list item so no line parses as a chart marker; it records observed states only, never "started" or "merged" without evidence. Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts. The `handover` and `continue autopilot (handover <time>)` entries are appended during an autopilot switch, so a fresh session can resume the same handed list.
+
 ```markdown
 # Intake: <chart-slug>
 
 ## Scope
+
 <destination and proposed grouping, separate from source text>
 
 ## Provenance
+
 - GitHub: owner/repo#12
 - Legacy path: issues/open/older-report.md
 - Operator: <date or message reference>
 
 ## Source: owner/repo#12
+
 <entire mirrored report copied verbatim>
 
 ## Source: issues/open/older-report.md
+
 <entire legacy report copied verbatim>
 
 ## Source: operator <reference>
+
 <operator notes verbatim>
 
 ## Agent findings
+
 <inspected evidence and interpretation, not attributed to the reporter>
 ```
+
 GitHub identity comes from the mirror's `Source: owner/repo#n` line. Compare exact identities against parsed `sources` in all open/closed leaf states and GitHub provenance entries in all chart intakes, including handed-off charts. Compare legacy repo-relative paths against legacy provenance entries, not substrings in report bodies. Deduplicate repeated identities in the current intake too. A local path never enters leaf `sources`. Keep source files unchanged and preserve copied report bytes beneath the source headings. An unsuccessful GitHub refresh supplies no permission to drain a stale mirror.
+
 ```markdown
 # <fork title>
 
 ## Question
+
 <one or more Q blocks, each holding the precise question>
 
 ### Carries
+
 <existing locks, related fork paths and verbatim operator corrections>
 
 ## Findings
+
 <grounded evidence, independent A/B attribution and remaining disagreements>
 
 ## Taken
+
 <operator answer verbatim, reason and foreclosed alternatives; under autopilot, A's own pick with its reason, rejected options and standing consultant dissent, labelled as A's>
 ```
+
 One fork file holds one or more questions that are always presented together on one screen. A fork is taken when every material question in it is taken; partial answers stay under `## Findings` and `## Taken` is written only then. Append each explicit operator correction with its date, preserve earlier answers, and treat the last appended correction as binding only for the answer it changes. Unresolved questions have no invented Taken. A question sharp enough to travel alone gets its own fork file even while blocked. Work whose question is not sharp stays in Fog. Ruling work out records the reason in Off route instead of pretending a fork was taken. Reshape the remaining questions after each answer. A fork file with no operator answer — or, under autopilot, no pick recorded as A's — under `## Taken` is open and appears in CHART.md's Open forks list in the order it will be taken, next first.
 
 ## Handoff tree
 
 One issue uses `issues/open/<issue>/<leaf>/`. Two or more grouped issues use:
+
 ```text
 issues/open/<epic>/
   EPIC.md
@@ -136,25 +164,29 @@ issues/open/<epic>/
       readiness.yaml
       state.yaml
 ```
+
 EPIC.md lists immediate issues, ISSUE.md lists immediate leaves, each one line per child with purpose:
 
 ```markdown
 ---
 slots:
-  a: {harness: claude, model: opus, effort: high}
-  b: {harness: codex, model: gpt-6.1-sol, effort: medium}
+  a: { harness: claude, model: opus, effort: high }
+  b: { harness: codex, model: gpt-6.1-sol, effort: medium }
 ---
+
 # Epic: <epic>
 
 - [<issue>](<issue>/ISSUE.md): <purpose>
 - [<other-issue>](<other-issue>/ISSUE.md): <purpose>
 ```
+
 ```markdown
 ---
 slots:
-  a: {harness: claude, model: opus, effort: high}
-  b: {harness: codex, model: gpt-6.1-sol, effort: medium}
+  a: { harness: claude, model: opus, effort: high }
+  b: { harness: codex, model: gpt-6.1-sol, effort: medium }
 ---
+
 # Issue: <issue>
 
 - [<leaf>](<leaf>/brief.md): <purpose>
@@ -189,12 +221,15 @@ spans:
 # Brief: <leaf>
 
 ## What
+
 <bounded change and observable outcome>
 
 ## Why
+
 <problem this solves>
 
 ## Done-criteria
+
 1. <an observable result in this leaf's ownership, never a test file, assertion or test count; proof may be a command the destination's `checks` already run (never a `merge_checks` command, and never one the leaf adds to `checks`, which holds only repo-wide invariants) or the own-test, end-to-end, real-outside-call and live-run forms standing-design.md allows; no repo-health claim outside leaf ownership>
 ```
 
@@ -202,12 +237,14 @@ spans:
 # Design: <leaf>
 
 ## Binding decisions, verbatim
+
 <each applicable binding decision, retaining heading, answer, reason and
 foreclosed alternatives>
 
 <installed path of standing-design.md, then the current interpretation: how its rules apply to this leaf>
 
 ## Leaf architecture
+
 <owned surfaces, literal interfaces, exclusions with their owners and necessary dependencies; for each state or precondition the change alters, the consumer (file and function) that relies on it and either the decision or an `Open for the plan:` question; existing code is called reusable only when its preconditions were checked against the changed state, otherwise it is an `Open for the plan:` question; functions are named without line numbers>
 ```
 
@@ -295,7 +332,7 @@ proofs:
 
 ```yaml
 slug: sample-change
-phase: plan.synthesis  # plan.positions when debate: 'yes'
+phase: plan.synthesis # plan.positions when debate: 'yes'
 created: '2026-09-11'
 repo: registered-key
 debate: 'no'
