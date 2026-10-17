@@ -14,6 +14,8 @@ const fakePaneSchema = paneSchema.extend({
   screen_detection_skipped: z.boolean().nullable().optional(),
   agent_name: z.string().optional(),
   foreground_process_group_id: z.number().optional(),
+  agent_pid: z.number().optional(),
+  exiting: z.boolean().optional(),
   foreground_processes: z.array(z.looseObject({ pid: z.number(), argv: z.array(z.string()) })).optional(),
   agent_session: z
     .object({
@@ -238,6 +240,7 @@ if (args[0] === 'agent' && args[1] === 'start') {
     failure('agent_name_taken');
   scriptedFailure(db.startScript.shift());
   target.agent = flag('--kind');
+  target.agent_pid = undefined;
   target.agent_status = db.blockOnStart ? 'blocked' : 'idle';
   target.agent_session = { kind: 'id', value: `session-${++db.serial}` };
   db.starts.push(args);
@@ -301,24 +304,51 @@ if (args[0] === 'agent' && args[1] === 'wait') {
   }
   result({ agent: target });
 }
+// A pane seeded with `agent_pid` keeps its agent only while that real process runs; like herdr,
+// the first list after the exit still shows the row without `agent`, holding its name.
+function exited(pid: number): boolean {
+  const stat: string = `/proc/${pid}/stat`;
+  return !existsSync(stat) || readFileSync(stat, 'utf8').split(') ')[1].startsWith('Z');
+}
 if (args[0] === 'agent' && args[1] === 'list') {
+  const exiting: FakePane[] = db.panes.filter(
+    (p) => p.agent_pid !== undefined && exited(p.agent_pid) && p.exiting !== true,
+  );
+  for (const p of db.panes)
+    if (p.exiting === true) {
+      p.agent = null;
+      p.agent_session = null;
+      p.agent_status = 'unknown';
+      p.agent_pid = undefined;
+      p.exiting = undefined;
+    }
+  for (const p of exiting) p.exiting = true;
   result({
-    agents: db.panes.flatMap((p) =>
-      p.agent === null
-        ? []
-        : [
-            {
-              pane_id: p.pane_id,
-              agent: p.agent,
-              agent_status: p.agent_status,
-              ...(p.agent_session ? { agent_session: p.agent_session } : {}),
-              ...(p.agent_name !== undefined ? { name: p.agent_name } : {}),
-              ...(p.screen_detection_skipped !== undefined
-                ? { screen_detection_skipped: p.screen_detection_skipped }
-                : {}),
-            },
-          ],
-    ),
+    agents: [
+      ...exiting.map((p) => ({
+        pane_id: p.pane_id,
+        agent_status: p.agent_status,
+        ...(p.agent_name !== undefined ? { name: p.agent_name } : {}),
+      })),
+      ...db.panes
+        .filter((p) => p.exiting !== true)
+        .flatMap((p) =>
+          p.agent === null
+            ? []
+            : [
+                {
+                  pane_id: p.pane_id,
+                  agent: p.agent,
+                  agent_status: p.agent_status,
+                  ...(p.agent_session ? { agent_session: p.agent_session } : {}),
+                  ...(p.agent_name !== undefined ? { name: p.agent_name } : {}),
+                  ...(p.screen_detection_skipped !== undefined
+                    ? { screen_detection_skipped: p.screen_detection_skipped }
+                    : {}),
+                },
+              ],
+        ),
+    ],
   });
 }
 if (args[0] === 'pane' && args[1] === 'process-info') {
