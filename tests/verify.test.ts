@@ -828,3 +828,22 @@ test('a green on the same revision clears only the earlier main-red incident', a
     f.clean();
   }
 });
+
+test('a failed base setup does not send a main-red test notice', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    config(f, { setup: 'echo dependency-install-failed; exit 9', checks: { test: 'sh check.sh' } });
+    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const { worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    expect((await cli(f, ['verify', '--known-red'], worktree, env)).code).toBe(1);
+    const run: VerifyRun = baseRecord(f, records(f).find((record) => record.sha === head)!);
+    expect(run.setup).toBe(9);
+    expect(run.end).toBeDefined();
+    expect(noticeCalls(f)).toHaveLength(0);
+    expect(run.notice).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
