@@ -1,0 +1,6 @@
+{"t":"2026-10-17T16:37:51.415Z","step":"child","pid":453032,"kind":"pi"}
+{"t":"2026-10-17T16:37:53.422Z","step":"turn-ended","status":"done"}
+{"t":"2026-10-17T16:37:53.727Z","step":"reset-sent","code":0,"err":""}
+{"t":"2026-10-17T16:37:54.230Z","step":"poll","session":"/home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-10-17T16-37-53-728Z_01a14aba-1dc0-7419-87d9-f681296cc948.jsonl","status":"idle","rollouts":0}
+{"t":"2026-10-17T16:37:54.232Z","step":"reset-confirmed","session":"/home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-10-17T16-37-53-728Z_01a14aba-1dc0-7419-87d9-f681296cc948.jsonl"}
+{"t":"2026-10-17T16:37:54.535Z","step":"prompt-sent","code":0,"err":""}

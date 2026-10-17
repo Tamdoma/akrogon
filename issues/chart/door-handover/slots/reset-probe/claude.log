@@ -1,0 +1,6 @@
+{"t":"2026-10-17T16:37:50.344Z","step":"child","pid":452569,"kind":"claude"}
+{"t":"2026-10-17T16:37:52.353Z","step":"turn-ended","status":"done"}
+{"t":"2026-10-17T16:37:52.657Z","step":"reset-sent","code":0,"err":""}
+{"t":"2026-10-17T16:37:53.160Z","step":"poll","session":"8c238f93-fc71-41a4-ae5a-661814d0c999","status":"idle","rollouts":0}
+{"t":"2026-10-17T16:37:53.162Z","step":"reset-confirmed","session":"8c238f93-fc71-41a4-ae5a-661814d0c999"}
+{"t":"2026-10-17T16:37:53.464Z","step":"prompt-sent","code":0,"err":""}

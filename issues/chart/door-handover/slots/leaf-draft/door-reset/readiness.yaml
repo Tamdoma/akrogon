@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr agent prompt <pane> /clear (claude) or /new (codex, pi) on an idle agent, then a start prompt
+    command: herdr agent prompt w8:pSX /clear; herdr agent prompt w8:pSY /new; herdr agent prompt w8:pSZ /new; then herdr agent prompt <pane> "<code word question>"
+    identity: operator's local herdr and harness logins (claude Max, codex, pi), no secret values
+    target: throwaway tab w8:tDH in workspace w8
+    version: herdr 0.9.1, claude 2.1.302, codex-cli 0.163.0, pi 1.3.0
+    date: '2026-10-17'
+    result: all three started a new conversation in the same process (claude pid and argv unchanged) and answered NONE for a code word given before the reset; sent while busy, codex refused and claude ran the queued prompt first, so the reset must follow the turn end
+    cleanup: tab closed, no agent row left for the panes, scratch folder removed
+    limits: short contexts; reset driven from outside the agent; for codex the post-/new prompt that exposed the new session was a short file-write prompt, which stands for the leaf's harmless check prompt
+    record: issues/chart/door-handover/forks/handover.md
+  - operation: self-triggered detached helper that waits for the proven turn end, sends the reset, confirms and sends the start prompt (herdr agent list, agent prompt, Claude transcript, codex rollout, pi hook status)
+    command: each agent ran $CLAUDE_JOB_DIR/tmp/handover/handover.sh <pane> <session> <log> '<start prompt>' (exec bun proto.ts), plus one run with a wrong session id
+    identity: operator's local herdr and harness logins; claude under auto mode with an allow rule for the wrapper path
+    target: throwaway tab w8:tDJ (w8:pS0 claude --model claude-haiku-5-5, w8:pT1 codex -c model_reasoning_effort=low, w8:pT2 pi --thinking low)
+    version: herdr 0.9.1, claude 2.1.302, codex-cli 0.163.0, pi 1.3.0
+    date: '2026-10-17'
+    result: claude and pi reset and answered NONE (new session 0.5 s after the reset); codex accepted /new, herdr kept the old session id until an exchange, and a codex account notice swallowed the first start prompt while herdr agent prompt exited 0; after esc, a resend with --wait --until working answered NONE with a new session; the wrong-session run exited 1, wrote nothing and left the agent untouched
+    cleanup: tab closed, no agent row left; prototype and logs kept in slots/reset-probe/
+    limits: the wrapper path stood in for bun <skill-folder>/scripts/door-reset.ts; the auto-mode allow rule for the installed path and the 3a continuation are proven by done-criterion 1
+    record: issues/chart/door-handover/forks/handover.md

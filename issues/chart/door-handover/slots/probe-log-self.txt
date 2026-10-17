@@ -1,0 +1,7 @@
+helper start 15:38:20.572 pid 1118443 sid 1118443
+{"agent_status":"idle","session":"986f309e-3076-4813-bab1-f3320dfb61c5"}
+[{"pid":1115958,"argv":["/home/ivan/.local/share/mise/installs/claude/latest/claude"]}]
+killing group 1115958 at 15:38:27.083
+shell back after 1 polls: /usr/bin/bash at 15:38:27.587
+{"name":"probe-door-4","agent_status":"idle","session":"4d3203f2-6f26-4074-b1b7-ba63d4c882f7"}
+start exit 0 at 15:38:31.815

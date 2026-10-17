@@ -1,0 +1,7 @@
+helper start 15:27:16.658 pid 1076332 sid 1076332
+{"agent_status":"idle","session":"ac80bdad-a0bc-40b8-a60c-893be6af8c56"}
+[{"pid":1073422,"argv":["/home/ivan/.local/share/mise/installs/claude/latest/claude","--allowedTools","Bash(setsid:*)"]}]
+killing group 1073422 at 15:27:16.664
+shell back after 1 polls: /usr/bin/bash at 15:27:17.167
+{"error":{"code":"agent_name_taken","message":"agent name probe-door is already used; candidates: terminal_id=term_65e0ae84f4c8654 pane_id=w8:pS9 workspace_id=w8 tab_id=w8:tBD cwd=/home/ivan/Work/infra/akrogon status=Idle"},"id":"cli:agent:start"}
+start exit 1 at 15:27:17.170
