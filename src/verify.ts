@@ -132,8 +132,8 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
   if (heads.length === 0) return false;
   const mergeBase: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
   for (const head of heads) {
-    const base: VerifyRun | undefined = runs.find((run) => run.compares === head.run && run.sha === mergeBase);
-    if (base !== undefined && (await baseCoversHead(repo, head, base))) return true;
+    for (const base of runs.filter((run) => run.compares === head.run && run.sha === mergeBase))
+      if (await baseCoversHead(repo, head, base)) return true;
   }
   return false;
 }
