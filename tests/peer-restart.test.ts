@@ -78,18 +78,16 @@ function setup(seats: PaneSeed[], extra: Extra = {}): Setup {
   writeFileSync(
     db,
     JSON.stringify({
-      panes: seats.map(
-        (p: PaneSeed): object => ({
-          pane_id: p.pane_id,
-          tab_id: p.tab_id ?? 'w8:t1',
-          cwd: root,
-          agent: p.agent,
-          agent_status: p.agent === null ? 'unknown' : 'idle',
-          ...(p.agent_name === undefined ? {} : { agent_name: p.agent_name }),
-          ...(p.leader === undefined ? {} : { foreground_process_group_id: p.leader }),
-          ...(p.foreground === undefined ? {} : { foreground_processes: p.foreground }),
-        }),
-      ),
+      panes: seats.map((p: PaneSeed): object => ({
+        pane_id: p.pane_id,
+        tab_id: p.tab_id ?? 'w8:t1',
+        cwd: root,
+        agent: p.agent,
+        agent_status: p.agent === null ? 'unknown' : 'idle',
+        ...(p.agent_name === undefined ? {} : { agent_name: p.agent_name }),
+        ...(p.leader === undefined ? {} : { foreground_process_group_id: p.leader }),
+        ...(p.foreground === undefined ? {} : { foreground_processes: p.foreground }),
+      })),
       tabs: [],
       serial: 100,
       ...(extra.closeScript === undefined ? {} : { closeScript: extra.closeScript }),
@@ -198,8 +196,8 @@ test('refuses a seat without one unique foreground leader', async (): Promise<vo
       { pid: 8001, argv: codexArgv },
     ],
   ]) {
-    const seats: PaneSeed[] = consultants.map(
-      (p: PaneSeed): PaneSeed => (p.pane_id === paneB ? { ...p, foreground } : p),
+    const seats: PaneSeed[] = consultants.map((p: PaneSeed): PaneSeed =>
+      p.pane_id === paneB ? { ...p, foreground } : p,
     );
     const s: Setup = setup(seats);
     try {
@@ -231,8 +229,8 @@ test('refuses argv that restores or forks history', async (): Promise<void> => {
     { agent: 'claude', argv: ['claude', '--session-id', 'z'], token: '--session-id' },
   ];
   for (const { agent, argv, token } of variants) {
-    const seats: PaneSeed[] = consultants.map(
-      (p: PaneSeed): PaneSeed => (p.pane_id === paneB ? { ...p, agent, foreground: [{ pid: 8001, argv }] } : p),
+    const seats: PaneSeed[] = consultants.map((p: PaneSeed): PaneSeed =>
+      p.pane_id === paneB ? { ...p, agent, foreground: [{ pid: 8001, argv }] } : p,
     );
     const s: Setup = setup(seats);
     try {
@@ -250,8 +248,8 @@ test('refuses argv that restores or forks history', async (): Promise<void> => {
 
 // Criterion 2: a seat whose derived agent name is held by a pane outside the restart is refused.
 test('refuses when the derived agent name is held outside the restart', async (): Promise<void> => {
-  const seats: PaneSeed[] = consultants.map(
-    (p: PaneSeed): PaneSeed => (p.pane_id === paneX ? { ...p, agent_name: 'peer-w8-pa-b' } : p),
+  const seats: PaneSeed[] = consultants.map((p: PaneSeed): PaneSeed =>
+    p.pane_id === paneX ? { ...p, agent_name: 'peer-w8-pa-b' } : p,
   );
   const s: Setup = setup(seats);
   try {

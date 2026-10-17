@@ -3,8 +3,17 @@ import { z } from 'zod';
 
 type Seat = { seat: string; pane: string };
 type Launch = { kind: string; argv: string[] };
-type State = { seat: string; old: string; new: string | null; kind: string | null; closed: boolean; restarted: boolean };
-type Herdr = { ok: true; stdout: string } | { ok: false; args: string[]; code: number | null; signal: string | null; stderr: string };
+type State = {
+  seat: string;
+  old: string;
+  new: string | null;
+  kind: string | null;
+  closed: boolean;
+  restarted: boolean;
+};
+type Herdr =
+  | { ok: true; stdout: string }
+  | { ok: false; args: string[]; code: number | null; signal: string | null; stderr: string };
 
 const agentListSchema = z.object({
   result: z.object({
@@ -53,7 +62,7 @@ function run(args: string[]): Herdr {
     ok: false,
     args: ['herdr', ...args],
     code: result.exitCode,
-    signal: result.signalCode,
+    signal: result.signalCode ?? null,
     stderr: result.stderr.toString(),
   };
 }
@@ -102,9 +111,14 @@ async function main(): Promise<void> {
     seat: argv[2 + i * 2],
     pane: argv[3 + i * 2],
   }));
-  const states: State[] = seats.map(
-    (seat: Seat): State => ({ seat: seat.seat, old: seat.pane, new: null, kind: null, closed: false, restarted: false }),
-  );
+  const states: State[] = seats.map((seat: Seat): State => ({
+    seat: seat.seat,
+    old: seat.pane,
+    new: null,
+    kind: null,
+    closed: false,
+    restarted: false,
+  }));
   const stateOf: Map<string, State> = new Map(states.map((state: State): [string, State] => [state.seat, state]));
 
   // Read phase: every kind and launch is collected and every refusal checked before any close.
@@ -114,9 +128,8 @@ async function main(): Promise<void> {
     emit(states);
     process.exit(1);
   }
-  const agents: z.infer<typeof agentListSchema>['result']['agents'] = agentListSchema.parse(
-    JSON.parse(list.stdout),
-  ).result.agents;
+  const agents: z.infer<typeof agentListSchema>['result']['agents'] = agentListSchema.parse(JSON.parse(list.stdout))
+    .result.agents;
   for (const seat of seats) {
     const agent = agents.find((a) => a.pane_id === seat.pane);
     if (agent !== undefined) stateOf.get(seat.seat)!.kind = agent.agent;
@@ -136,9 +149,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     const processes = processInfoSchema.parse(JSON.parse(info.stdout)).result.process_info;
-    const leaders = processes.foreground_processes.filter(
-      (p) => p.pid === processes.foreground_process_group_id,
-    );
+    const leaders = processes.foreground_processes.filter((p) => p.pid === processes.foreground_process_group_id);
     if (leaders.length !== 1) {
       refused = `seat ${seat.seat}: no unique foreground leader on pane ${seat.pane}`;
       break;
