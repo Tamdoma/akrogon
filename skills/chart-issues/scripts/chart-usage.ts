@@ -519,7 +519,7 @@ function piSession(session: string, file: string, wins: Win[], untilMs: number):
 }
 
 function windowsOf(seats: Seats, seatsFile: string, untilMs: number): Win[] {
-  if (seats.spans === undefined) return [{ startMs: Date.parse(seats.opened), endMs: untilMs + 1 }];
+  if (seats.spans === undefined) return [{ startMs: Date.parse(seats.opened), endMs: untilMs }];
   const spans = seats.spans;
   const wins: Win[] = [];
   for (const [i, s] of spans.entries()) {
