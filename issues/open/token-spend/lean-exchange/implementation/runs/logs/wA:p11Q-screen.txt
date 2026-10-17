@@ -1,0 +1,16 @@
+
+ Yes.
+
+
+ yo, are you still there?
+
+
+ Yes.
+
+ Parent — Idle · action:
+ idle · task: yo, are yo ·
+ 3s/0s
+─────────────────────────────
+
+─────────────────────────────
+ PI │ 0.8% │ $0.000 │ muse...

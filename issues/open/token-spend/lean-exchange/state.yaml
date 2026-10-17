@@ -1,0 +1,32 @@
+slug: lean-exchange
+phase: check.review
+created: 2026-10-17
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources: []
+busy_since:
+  A: 2026-10-17T17:59:04.773Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tDN
+worktree: /home/ivan/.akrogon/worktrees/akrogon/lean-exchange
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pT8
+  B: w8:pT9
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+frozen:
+  tests/fake-herdr.ts: 349bf1d1f9a16c7430eeb0ec11a999851d60822c
+  tests/peer-ask.test.ts: 47626be26e02fd3772097c1c2c70da3258563b1b
+  tests/peer-restart.test.ts: 47b71dd42b2ea9341dfadb5ae329a46e17950b64
+  tests/peer-wait.test.ts: 3edbb148265201bacf94ea3e03e82c0a6392cef6
+frozen_cited: []

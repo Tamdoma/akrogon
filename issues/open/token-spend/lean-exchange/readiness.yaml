@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr agent wait <pane> --timeout <ms> chained before a command in one shell call
+    command: herdr agent wait w8:pSB --timeout 10000 && herdr agent wait w8:pS4 --timeout 10000 && echo idle; herdr agent wait w8:pNP --timeout 1500 && echo SHOULD-NOT-RUN
+    identity: operator's local herdr socket from door pane w8:pNP, no secret values
+    target: peer panes w8:pSB (codex), w8:pS4 (pi), door pane w8:pNP (claude, working)
+    version: herdr 0.9.1
+    date: '2026-10-17'
+    result: idle peers passed and the chained command ran in one call; the working pane returned {"error":{"code":"timeout"}} with exit 1 and the chained command did not run
+    cleanup: read-only, none
+    limits: does not prove a missing pane or a stopped herdr beyond a non-zero exit
+    record: issues/chart/token-spend/forks/levers.md
+  - operation: herdr agent list, reading pane_id, agent and agent_session.value per pane
+    command: herdr agent list
+    identity: operator's local herdr socket from door pane w8:pNP, no secret values
+    target: workspace w8 panes w8:pNP, w8:pSB, w8:pS4
+    version: herdr 0.9.1
+    date: '2026-10-17'
+    result: printed codex w8:pSB session 01a14ae6-33dd-7311-8256-23f49c5ca63d after its first exchange and pi w8:pS4 session file path, matching seats.yaml
+    cleanup: read-only, none
+    limits: does not show a codex session before its first exchange (herdr shows it only after one)
+    record: issues/chart/token-spend/forks/levers.md

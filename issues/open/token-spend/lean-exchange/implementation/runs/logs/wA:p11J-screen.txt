@@ -1,0 +1,200 @@
+         +ub name is the identity a reader meets; a
+         +README heading has no literal consumer, so
+         + the check judges the name and line count,
+         + not exact bytes (operator value: function
+         + over form). Rejected: `lx-base` (registry
+         + alias), `scratch` (checkout folder), pros
+         +e sentence (adds nothing).
+       7 +
+       8 +### Route
+       9 +Lifecycle, debate no. Reason: very small i
+         +ssue. Foreclosed: direct route (operator a
+         +nd autopilot).
+      10 +
+      11 +### Scope
+      12 +The leaf touches only `README.md`. Reason:
+         + `issues/` belongs to the chart door; `NOT
+         +ES.md` and `OWNERS` belong to leaves `scra
+         +tch-notes/add-notes` and `scratch-owners/a
+         +dd-owners`. Foreclosed: any change under `
+         +issues/`, to `NOTES.md` or to `OWNERS`.
+      13 +
+      14 +/home/ivan/Work/infra/akrogon/issues/open/
+         +token-spend/lean-exchange/implementation/r
+         +uns/base/skill/skills/chart-issues/assets/
+         +standing-design.md
+      15 +
+      16 +Interpretation: no test is added. A static
+         + one-line file has no behavior to test, so
+         + a test would be a vanity test. The destin
+         +ation's `checks` and `merge_checks` are em
+         +pty, so proof is reading `README.md` for o
+         +ne nonblank line naming `lx-chart-base` an
+         +d `git diff --name-only` against the base
+         +at review. (A,B) No end-to-end, live-run o
+         +r outside-call proof applies. No secrets a
+         +re involved.
+      17 +
+      18 +## Leaf architecture
+      19 +Owned surface: `README.md` at the reposito
+         +ry root, a new file. No interfaces, state
+         +or preconditions change, and no consumer r
+         +eads it. Exclusions: everything under `iss
+         +ues/` (chart door); `NOTES.md` (leaf `scra
+         +tch-notes/add-notes`); `OWNERS` (leaf `scr
+         +atch-owners/add-owners`). No dependencies.
+  ⎿  … 2 more files changed
+
+● Bash(C=issues/chart/scratch-readme; NOW=$(date -u
+      +%Y-%m-%dT%H:%M:%SZ); printf "    to: '%s'\n" $NOW >>
+      $C/seats.yaml
+      python3 - $C/CHART.md $NOW <<'PY'…)
+  ⎿  chart scratch-readme - operator wait 1.8 min, ope
+     rator turns 1; A=7597, B=1800, C=2481 output
+     Handed off 2026-10-17
+  ⎿  Updated issues/chart/scratch-readme/seats.yaml
+     (+1 -0)
+      14      session: /home/ivan/.pi/agent/sessions
+          /--home-ivan-Work-infra-akrogon-issues-ope
+          n-token-spend-lean-exchange-implementation
+          -runs-base-scratch--/2026-10-17T18-38-09-0
+          82Z_01a14b28-36ba-745d-b341-360c419cc40f.j
+          sonl
+      15  spans:
+      16    - from: '2026-10-17T18:38:03Z'
+      17 +    to: '2026-10-17T18:39:59Z'
+  ⎿  Updated issues/chart/scratch-readme/CHART.md (+4
+     -0)
+      20
+      21  ## Mode record
+      22  - mode 2026-10-17T18:38:03Z wA:p11J ef5f46
+          f5-b5a4-4673-b6be-af08117f6570: changed li
+          st, on, handed list [scratch-readme], cons
+          ultants B wA:p11K (codex), C wA:p11M (pi)
+      23 +- mode 2026-10-17T18:39:59Z wA:p11J ef5f46
+         +f5-b5a4-4673-b6be-af08117f6570: off, every
+         + handed chart handed off
+      24
+      25  ## Autopilot
+      26  - switch-on: INTAKE.md `## Source: operato
+          r 2026-10-17 door message`
+      27  - consultant: B wA:p11K (codex), C wA:p11M
+           (pi), both restarted 2026-10-17T18:38Z, b
+          oth returned maps, none dropped; leaf revi
+          ew: B's exact-text objection accepted, C n
+          one
+      28  - route: lifecycle, debate no (very small
+          issue)
+      29 +- handed off: issues/open/scratch-readme/a
+         +dd-readme (plan.synthesis), `akrogon statu
+         +s` valid
+      30  - recorded only: none
+      31 +
+      32 +Handed off 2026-10-17
+  ⎿  Updated issues/chart/scratch-readme/USAGE.md (+28
+     -28)
+      1 -chart scratch-readme - operator wait 0.0 mi
+        -n, operator turns 1; A=1681, B=936, C=1641
+        -output
+      1 +chart scratch-readme - operator wait 1.8 mi
+        +n, operator turns 1; A=7597, B=1800, C=2481
+        + output
+      2
+      3 -window 2026-10-17T18:38:03.000Z to 2026-10-
+        -17T18:39:09.835Z (open)
+      3 +window 2026-10-17T18:38:03.000Z to 2026-10-
+        +17T18:39:59.000Z
+      4
+      5  - window tokens and minutes show that usage
+          and elapsed time changed; they do not show
+          that dollar cost fell.
+      6  - a whole-session dollar figure covers the
+         whole session and can include other charts'
+          work; it is not this chart's cost.
+     ...
+      11    models claude-opus-5-5
+      12    effort high
+      13    turns 1
+      14 -  calls 1
+      15 -  average context per call 126838
+      16 -  working minutes 0.0
+      17 -  first turn in window 2026-10-17T18:37:50
+         -.899Z 0.0 min
+      18 -  input_tokens 2
+      19 -  output_tokens 1681
+      20 -  cache_read_input_tokens 126056
+      21 -  cache_creation_input_tokens 780
+      14 +  calls 3
+      15 +  average context per call 130243
+      16 +  working minutes 1.8
+      17 +  first turn in window 2026-10-17T18:37:50
+         +.899Z 1.8 min
+      18 +  input_tokens 6
+      19 +  output_tokens 7597
+      20 +  cache_read_input_tokens 382589
+      21 +  cache_creation_input_tokens 8133
+      22
+      23  seat B (harness codex, sessions 01a14b28-2
+          bcb-7572-bf56-b7996d900800):
+      24    models gpt-6-astra
+      25    effort high
+      26 -  turns 1
+      27 -  calls 5
+      28 -  average context per call 22726
+      29 -  working minutes 0.5
+      26 +  turns 2
+      27 +  calls 10
+      28 +  average context per call 27088
+      29 +  working minutes 0.9
+      30    first turn in window 2026-10-17T18:38:12
+          .232Z 0.5 min
+     … 36 more lines
+  ⎿  Allowed by auto mode classifier
+
+● The third chart is handed off and autopilot is off.
+  issues/open/scratch-readme/add-readme sits at
+  plan.synthesis, and akrogon status validates all three
+  open leaves with no pause.
+
+  1. Decision: the README names the repo lx-chart-base, its
+     GitHub name, and all three seats agreed. lx-base is
+     only the registry alias and scratch is only the
+     checkout folder. It's recorded in forks/repo-name.md.
+  2. Leaf review correction: B objected to requiring the
+     exact text # lx-chart-base, and I accepted it. Your
+     function-over-form rule keeps strict text for things
+     that read it literally, and a README heading has
+     nothing like that. The criterion is now one nonblank
+     line naming lx-chart-base, with # lx-chart-base as the
+     suggested form. The diff may change only README.md.
+     The changed lines carry the tag (A,B). C found
+     nothing.
+  3. Checks: pull found 0 seeds, preflight passed and the
+     presence check found no gaps. The leaf needs no
+     grants, keys or proofs.
+  4. Usage: operator wait 1.8 min, A=7597, B=1800, C=2481
+     output tokens.
+
+  The same reasoning could apply to the OWNERS leaf, which
+  requires exact text. I left it as is, since that line is
+  just the owner name you gave, with no formatting around
+  it.
+
+  Dispatch still needs
+  AKROGON_HOME=/home/ivan/Work/infra/akrogon/issues/open/to
+  ken-spend/lean-exchange/implementation/runs/base/home.
+
+  Last operation: handed off
+  issues/open/scratch-readme/add-readme (akrogon status
+  valid), added "Handed off 2026-10-17" to its CHART.md,
+  autopilot off
+  Next: none (dispatch belongs to your watcher, running
+  with the AKROGON_HOME above)
+
+✻ Worked for 2m 14s · done 8:40 PM
+
+───────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────
+  CC │ 14% │ $2.48 │ Opus 5.5 │ scratch │ main
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent
