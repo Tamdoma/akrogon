@@ -49,8 +49,12 @@ function setup(seed: PaneSeed, dbExtra: Record<string, unknown> = {}): Setup {
           cwd: '/tmp',
           agent: seed.agent,
           agent_status: seed.agent_status,
-          ...(seed.agent_session === undefined || seed.agent_session === null ? {} : { agent_session: seed.agent_session }),
-          ...(seed.screen_detection_skipped === undefined ? {} : { screen_detection_skipped: seed.screen_detection_skipped }),
+          ...(seed.agent_session === undefined || seed.agent_session === null
+            ? {}
+            : { agent_session: seed.agent_session }),
+          ...(seed.screen_detection_skipped === undefined
+            ? {}
+            : { screen_detection_skipped: seed.screen_detection_skipped }),
         },
       ],
       tabs: [],
@@ -74,7 +78,8 @@ function setup(seed: PaneSeed, dbExtra: Record<string, unknown> = {}): Setup {
     db,
     log,
     calls,
-    promptCalls: (): string[][] => calls().filter((args: string[]): boolean => args[0] === 'agent' && args[1] === 'prompt'),
+    promptCalls: (): string[][] =>
+      calls().filter((args: string[]): boolean => args[0] === 'agent' && args[1] === 'prompt'),
     logLines: (): Record<string, unknown>[] =>
       existsSync(log)
         ? readFileSync(log, 'utf8')
@@ -134,7 +139,11 @@ const START: string = 'start prompt text';
 
 // Criterion 2: unknown kind or mismatched session refuses without sending or logging.
 test.each<[string, PaneSeed, string]>([
-  ['unsupported kind', { agent: 'antigravity', agent_status: 'idle', agent_session: idSession(session, 'herdr:agy') }, session],
+  [
+    'unsupported kind',
+    { agent: 'antigravity', agent_status: 'idle', agent_session: idSession(session, 'herdr:agy') },
+    session,
+  ],
   ['session mismatch', claudePane('sess-other'), session],
   ['pane without agent', { agent: 'pi', agent_status: 'idle' }, session],
 ])('refuses when %s', async (_name: string, seed: PaneSeed, sess: string): Promise<void> => {
@@ -255,7 +264,12 @@ test('claude handover sends reset then start prompt after the new session appear
 // Codex gets the harmless check prompt before the start prompt.
 test('codex handover sends reset, one check prompt, then start prompt', async (): Promise<void> => {
   const s: Setup = setup(
-    { agent: 'codex', agent_status: 'idle', agent_session: idSession(session, 'herdr:codex'), screen_detection_skipped: null },
+    {
+      agent: 'codex',
+      agent_status: 'idle',
+      agent_session: idSession(session, 'herdr:codex'),
+      screen_detection_skipped: null,
+    },
     { promptScript: [{ session: 'sess-new' }] },
   );
   try {
