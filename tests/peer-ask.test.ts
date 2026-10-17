@@ -10,7 +10,14 @@ const paneB: string = 'w8:pB';
 const paneC: string = 'w8:pC';
 
 type RunResult = { code: number; stdout: string; stderr: string };
-type ScriptEntry = { code?: string; append?: string; appendTo?: string; status?: string; sleepMs?: number };
+type ScriptEntry = {
+  code?: string;
+  append?: string;
+  appendTo?: string;
+  status?: string;
+  sleepMs?: number;
+  session?: string | null;
+};
 type PaneSeed = {
   pane_id: string;
   agent: string;

@@ -170,9 +170,16 @@ test('restarts supplied consultants in place with identical kind and argv', asyn
     const result: RunResult = await s.run(paneA, 'B', paneB, 'C', paneC);
     expect(result.code).toBe(0);
     const lines: SeatLine[] = seatLines(result.stdout);
-    expect(lines.map((line: SeatLine): Omit<SeatLine, 'session'> => ({ ...line, session: '' }))).toEqual([
-      { seat: 'B', pane: paneB, kind: 'codex', state: 'restarted', session: '' },
-      { seat: 'C', pane: paneC, kind: 'pi', state: 'restarted', session: '' },
+    expect(
+      lines.map((line: SeatLine): Omit<SeatLine, 'session'> => ({
+        seat: line.seat,
+        pane: line.pane,
+        kind: line.kind,
+        state: line.state,
+      })),
+    ).toEqual([
+      { seat: 'B', pane: paneB, kind: 'codex', state: 'restarted' },
+      { seat: 'C', pane: paneC, kind: 'pi', state: 'restarted' },
     ]);
     expect(lines.every((line: SeatLine): boolean => /^session-\d+$/.test(line.session))).toBe(true);
     expect(s.sleepers.get(paneB)!.signalCode).toBe('SIGTERM');

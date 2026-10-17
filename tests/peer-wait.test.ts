@@ -117,7 +117,15 @@ function writeTranscript(home: string, session: string, closed: boolean): void {
 
 function expectOutcome(
   result: RunResult,
-  expected: { outcome: string; pane: string; file: string; status: string | null; signal: string; exchange: Exchange },
+  expected: {
+    outcome: string;
+    pane: string;
+    file: string;
+    status: string | null;
+    signal: string;
+    session: string | null;
+    exchange: Exchange;
+  },
 ): void {
   expect(result.code).toBe(0);
   expect(result.stdout.split('\n')).toHaveLength(2);
@@ -585,7 +593,7 @@ test('an unproven harness session change keeps waiting with its original exchang
       file: s.file,
       status: 'idle',
       signal: 'unproven',
-      session: 'session-A',
+      session: 'session-B',
       exchange,
     });
     const rerun: RunResult = await s.run(pane, s.file, '1', JSON.stringify(JSON.parse(result.stdout).exchange));
@@ -595,7 +603,7 @@ test('an unproven harness session change keeps waiting with its original exchang
       file: s.file,
       status: 'idle',
       signal: 'unproven',
-      session: 'session-A',
+      session: 'session-B',
       exchange,
     });
   } finally {
@@ -613,7 +621,7 @@ test('a pi session change is ignored while hook authority holds', async (): Prom
       file: s.file,
       status: 'idle',
       signal: 'proven',
-      session: '/tmp/s-pi.jsonl',
+      session: '/tmp/s-pi-other.jsonl',
       exchange: { kind: 'pi', session: '/tmp/s-pi.jsonl', boundary: null, turn: null },
     });
   } finally {
