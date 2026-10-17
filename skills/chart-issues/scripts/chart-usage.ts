@@ -10,8 +10,10 @@ const seatSchema = z.strictObject({
   harness: z.string().min(1),
   session: z.string().min(1),
 });
+const spanEntrySchema = z.strictObject({ from: z.iso.datetime(), to: z.iso.datetime().optional() });
 const seatsSchema = z.object({
   opened: z.iso.datetime(),
+  spans: z.array(spanEntrySchema).optional(),
   seats: z.array(seatSchema),
 });
 const codexOperatorMetadataSchema = z.object({
@@ -25,14 +27,22 @@ type Rec = Record<string, unknown>;
 
 type SeatError = { seat: string; session: string; detail: string };
 type Span = { startMs: number; endMs: number; complete: boolean };
+type Win = { startMs: number; endMs: number };
 type Tokens = Record<string, number>;
+type Counting = {
+  calls: number | null;
+  contextTokens: number;
+  tokens: Tokens;
+  spanOutput: (a: number, b: number) => number;
+};
 type SessionResult = {
   session: string;
   harness: string;
   models: Set<string>;
   efforts: Set<string>;
   turns: Span[];
-  assistantMessages: number | null;
+  calls: number | null;
+  contextTokens: number;
   tokens: Tokens;
   operatorTurns: { startMs: number; replyEndMs: number | null }[];
   spanOutput: (a: number, b: number) => number;
@@ -52,6 +62,14 @@ function mins(a: number, b: number): string {
 
 function iso(ms: number): string {
   return new Date(ms).toISOString();
+}
+
+function inWins(wins: Win[], t: number): boolean {
+  return wins.some((w) => t >= w.startMs && t < w.endMs);
+}
+
+function intersectMs(a: number, b: number, wins: Win[]): number {
+  return wins.reduce((acc, w) => acc + Math.max(0, Math.min(b, w.endMs) - Math.max(a, w.startMs)), 0);
 }
 
 function recordsOf(file: string): Rec[] | string {
@@ -107,6 +125,10 @@ function locate(harness: string, session: string): { file: string } | { detail: 
     if (hits.length === 1) return { file: hits[0] };
     return { detail: `${session}.jsonl: ${hits.length} matches under ${root}` };
   }
+  if (harness === 'pi') {
+    if (existsSync(session)) return { file: resolve(session) };
+    return { detail: `${session}: session file missing` };
+  }
   if (harness === 'codex') {
     const root: string = join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'sessions');
     const suffix: string = `-${session}.jsonl`;
@@ -117,7 +139,7 @@ function locate(harness: string, session: string): { file: string } | { detail: 
   return { detail: `unknown harness ${harness}` };
 }
 
-function claudeSession(session: string, file: string, openMs: number, untilMs: number): SessionResult | string {
+function claudeSession(session: string, file: string, wins: Win[]): SessionResult | string {
   const parsed: Rec[] | string = recordsOf(file);
   if (typeof parsed === 'string') return `${file}: ${parsed}`;
   const recs: Rec[] = parsed;
@@ -128,10 +150,6 @@ function claudeSession(session: string, file: string, openMs: number, untilMs: n
     }
   }
   const timed = (r: Rec): number => Date.parse(r.timestamp as string);
-  const inWin = (r: Rec): boolean => {
-    const t: number = timed(r);
-    return t >= openMs && t <= untilMs;
-  };
   const isOp = (r: Rec): boolean => {
     if (r.type !== 'user' || r.isSidechain === true || r.isMeta === true || r.isCompactSummary === true) return false;
     const content = (r.message as Rec | undefined)?.content;
@@ -139,9 +157,9 @@ function claudeSession(session: string, file: string, openMs: number, untilMs: n
     if (typeof content === 'string') return !content.startsWith('<local-command-stdout>');
     return false;
   };
-  const ops: Rec[] = recs.filter((r) => isOp(r) && inWin(r));
-  const assistants: Rec[] = recs.filter((r) => r.type === 'assistant' && r.isSidechain !== true && inWin(r));
-  for (const r of assistants) {
+  const ops: Rec[] = recs.filter(isOp);
+  const allAssistants: Rec[] = recs.filter((r) => r.type === 'assistant' && r.isSidechain !== true);
+  for (const r of allAssistants) {
     const m = r.message as Rec | undefined;
     if (typeof m?.id !== 'string') return `${file}: field message.id missing`;
     if (typeof m?.model !== 'string') return `${file}: field message.model missing`;
@@ -150,6 +168,7 @@ function claudeSession(session: string, file: string, openMs: number, untilMs: n
       if (num(u?.[k]) === null) return `${file}: field message.usage.${k} missing`;
     if (typeof r.effort !== 'string') return `${file}: field effort missing`;
   }
+  const assistants: Rec[] = allAssistants.filter((r) => inWins(wins, timed(r)));
   const groups = new Map<string, Rec[]>();
   for (const r of assistants) {
     const id: string = (r.message as Rec).id as string;
@@ -163,12 +182,15 @@ function claudeSession(session: string, file: string, openMs: number, untilMs: n
     cache_read_input_tokens: 0,
     cache_creation_input_tokens: 0,
   };
+  let contextTokens: number = 0;
   for (const g of groups.values()) {
     tokens.output_tokens += Math.max(...g.map((r) => ((r.message as Rec).usage as Rec).output_tokens as number));
     const u: Rec = (g[g.length - 1].message as Rec).usage as Rec;
     tokens.input_tokens += u.input_tokens as number;
     tokens.cache_read_input_tokens += u.cache_read_input_tokens as number;
     tokens.cache_creation_input_tokens += u.cache_creation_input_tokens as number;
+    contextTokens +=
+      (u.input_tokens as number) + (u.cache_read_input_tokens as number) + (u.cache_creation_input_tokens as number);
   }
   const spanOutput = (a: number, b: number): number => {
     const prev = new Map<string, number>();
@@ -183,21 +205,25 @@ function claudeSession(session: string, file: string, openMs: number, untilMs: n
     }
     return out;
   };
+  const horizonMs: number = wins.length > 0 ? wins[wins.length - 1].endMs : 0;
   const turns: Span[] = [];
   const operatorTurns: { startMs: number; replyEndMs: number | null }[] = [];
   let splitOpen: boolean = false;
+  let splitFirst: boolean = false;
   for (let i: number = 0; i < ops.length; i += 1) {
     const t0: number = timed(ops[i]);
-    const t1: number = i + 1 < ops.length ? timed(ops[i + 1]) : untilMs;
+    const t1: number = i + 1 < ops.length ? timed(ops[i + 1]) : horizonMs;
     let replyEnd: number | null = null;
     for (const r of assistants) {
       const t: number = timed(r);
       if (t > t0 && t <= t1) replyEnd = t;
     }
     operatorTurns.push({ startMs: t0, replyEndMs: replyEnd });
-    if (replyEnd !== null) {
-      turns.push({ startMs: t0, endMs: replyEnd, complete: true });
-      if (i === 0) splitOpen = recs.some((r) => r.isCompactSummary === true && timed(r) > t0 && timed(r) <= t1);
+    if (replyEnd === null) continue;
+    turns.push({ startMs: t0, endMs: replyEnd, complete: true });
+    if (!splitFirst && intersectMs(t0, replyEnd, wins) > 0) {
+      splitFirst = true;
+      splitOpen = recs.some((r) => r.isCompactSummary === true && timed(r) > t0 && timed(r) <= t1);
     }
   }
   const lastTimed: number | undefined = recs.reduce<number | undefined>(
@@ -209,8 +235,8 @@ function claudeSession(session: string, file: string, openMs: number, untilMs: n
     (r) =>
       r.type === 'cost-state' &&
       (typeof r.timestamp === 'string'
-        ? Date.parse(r.timestamp) >= openMs && Date.parse(r.timestamp) <= untilMs
-        : lastTimed !== undefined && lastTimed >= openMs && lastTimed <= untilMs),
+        ? inWins(wins, Date.parse(r.timestamp))
+        : lastTimed !== undefined && inWins(wins, lastTimed)),
   );
   return {
     session,
@@ -218,7 +244,8 @@ function claudeSession(session: string, file: string, openMs: number, untilMs: n
     models: new Set(assistants.map((r) => (r.message as Rec).model as string)),
     efforts: new Set(assistants.map((r) => r.effort as string)),
     turns,
-    assistantMessages: groups.size,
+    calls: groups.size,
+    contextTokens,
     tokens,
     operatorTurns,
     spanOutput,
@@ -235,48 +262,56 @@ const CODEX_KEYS: string[] = [
   'total_tokens',
 ];
 
-function codexSession(session: string, file: string, openMs: number, untilMs: number): SessionResult | string {
-  const parsed: Rec[] | string = recordsOf(file);
-  if (typeof parsed === 'string') return `${file}: ${parsed}`;
-  const recs: Rec[] = parsed;
+const RESPONSE_KEYS: string[] = ['input_tokens', 'cached_input_tokens', 'output_tokens', 'reasoning_output_tokens'];
+
+function codexCounting(file: string, recs: Rec[], wins: Win[]): Counting | string {
   const timed = (r: Rec): number => {
     if (typeof r.timestamp !== 'string') return NaN;
     return Date.parse(r.timestamp);
   };
-  const counts: { ts: number; u: Rec }[] = [];
-  const started = new Map<string, Rec>();
-  const completed = new Map<string, Rec>();
-  const models = new Set<string>();
-  const efforts = new Set<string>();
-  for (const r of recs) {
-    const t: number = timed(r);
-    if (r.type === 'event_msg' && (r.payload as Rec | undefined)?.type === 'token_count') {
-      const u = ((r.payload as Rec).info as Rec | undefined)?.total_token_usage;
-      if (u === undefined || typeof u !== 'object') return `${file}: field payload.info.total_token_usage missing`;
-      for (const k of CODEX_KEYS)
-        if (num((u as Rec)[k]) === null) return `${file}: field payload.info.total_token_usage.${k} missing`;
-      counts.push({ ts: t, u: u as Rec });
-    } else if (r.type === 'event_msg' && (r.payload as Rec | undefined)?.type === 'task_started') {
-      const id: unknown = (r.payload as Rec).turn_id;
-      if (typeof id !== 'string') return `${file}: field payload.turn_id missing`;
-      started.set(id, r);
-    } else if (r.type === 'event_msg' && (r.payload as Rec | undefined)?.type === 'task_complete') {
-      const id: unknown = (r.payload as Rec).turn_id;
-      if (typeof id !== 'string') return `${file}: field payload.turn_id missing`;
-      completed.set(id, r);
-    } else if (r.type === 'turn_context') {
-      const p = r.payload as Rec;
-      if (t >= openMs && t <= untilMs) {
-        if (typeof p.model !== 'string') return `${file}: field payload.model missing`;
-        if (typeof p.effort !== 'string') return `${file}: field payload.effort missing`;
-        models.add(p.model);
-        efforts.add(p.effort);
-      }
+  const perResponse: Rec[] = recs.filter((r) => r.type === 'token_usage_record');
+  if (perResponse.length > 0) {
+    const ids = new Set<string>();
+    const tokens: Tokens = { input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, reasoning_output_tokens: 0 };
+    const placed: { ts: number; u: Rec }[] = [];
+    for (const r of perResponse) {
+      const p = r.payload as Rec | undefined;
+      if (typeof p?.response_id !== 'string') return `${file}: field payload.response_id missing`;
+      const u = p.usage as Rec | undefined;
+      if (u === undefined || typeof u !== 'object') return `${file}: field payload.usage missing`;
+      for (const k of RESPONSE_KEYS) if (num(u[k]) === null) return `${file}: field payload.usage.${k} missing`;
+      const ts: number = timed(r);
+      if (!inWins(wins, ts)) continue;
+      ids.add(p.response_id);
+      tokens.input_tokens += u.input_tokens as number;
+      tokens.cached_input_tokens += u.cached_input_tokens as number;
+      tokens.output_tokens += u.output_tokens as number;
+      tokens.reasoning_output_tokens += u.reasoning_output_tokens as number;
+      placed.push({ ts, u });
     }
+    placed.sort((a, b) => a.ts - b.ts);
+    const spanOutput = (a: number, b: number): number =>
+      placed.reduce((acc, c) => (c.ts > a && c.ts <= b ? acc + (c.u.output_tokens as number) : acc), 0);
+    return {
+      calls: ids.size,
+      contextTokens: tokens.input_tokens,
+      tokens,
+      spanOutput,
+    };
+  }
+  const counts: { ts: number; u: Rec }[] = [];
+  for (const r of recs) {
+    if (r.type !== 'event_msg' || (r.payload as Rec | undefined)?.type !== 'token_count') continue;
+    const u = ((r.payload as Rec).info as Rec | undefined)?.total_token_usage;
+    if (u === undefined || typeof u !== 'object') return `${file}: field payload.info.total_token_usage missing`;
+    for (const k of CODEX_KEYS)
+      if (num((u as Rec)[k]) === null) return `${file}: field payload.info.total_token_usage.${k} missing`;
+    counts.push({ ts: timed(r), u: u as Rec });
   }
   counts.sort((a, b) => a.ts - b.ts);
-  const inWindow: { ts: number; u: Rec }[] = counts.filter((c) => c.ts >= openMs && c.ts <= untilMs);
-  const before: { ts: number; u: Rec }[] = counts.filter((c) => c.ts < openMs);
+  const firstStart: number = wins.length > 0 ? wins[0].startMs : Infinity;
+  const inWindow: { ts: number; u: Rec }[] = counts.filter((c) => inWins(wins, c.ts));
+  const before: { ts: number; u: Rec }[] = counts.filter((c) => c.ts < firstStart);
   const zero: Rec = Object.fromEntries(CODEX_KEYS.map((k) => [k, 0]));
   const base: Rec = before.length > 0 ? before[before.length - 1].u : zero;
   if (
@@ -288,37 +323,71 @@ function codexSession(session: string, file: string, openMs: number, untilMs: nu
   const last: Rec = inWindow.length > 0 ? inWindow[inWindow.length - 1].u : base;
   const tokens: Tokens = {};
   for (const k of CODEX_KEYS) tokens[k] = (last[k] as number) - (base[k] as number);
-  const turns: Span[] = [];
-  let splitOpen: boolean = false;
-  for (const [id, s] of started) {
-    const t0: number = timed(s);
-    if (t0 < openMs || t0 > untilMs) continue;
-    const c: Rec | undefined = completed.get(id);
-    if (c !== undefined && timed(c) <= untilMs) turns.push({ startMs: t0, endMs: timed(c), complete: true });
-    else turns.push({ startMs: t0, endMs: untilMs, complete: false });
-  }
   const spanOutput = (a: number, b: number): number => {
-    const inSpan: { ts: number; u: Rec }[] = counts.filter((c) => c.ts > a && c.ts <= b);
+    const inSpan: { ts: number; u: Rec }[] = counts.filter((c) => c.ts > a && c.ts <= b && inWins(wins, c.ts));
     if (inSpan.length === 0) return 0;
     const beforeSpan: { ts: number; u: Rec }[] = counts.filter((c) => c.ts <= a);
     const baseU: Rec = beforeSpan.length > 0 ? beforeSpan[beforeSpan.length - 1].u : zero;
     return (inSpan[inSpan.length - 1].u.output_tokens as number) - (baseU.output_tokens as number);
   };
+  return { calls: null, contextTokens: 0, tokens, spanOutput };
+}
+
+function codexSession(session: string, file: string, wins: Win[]): SessionResult | string {
+  const parsed: Rec[] | string = recordsOf(file);
+  if (typeof parsed === 'string') return `${file}: ${parsed}`;
+  const recs: Rec[] = parsed;
+  const timed = (r: Rec): number => {
+    if (typeof r.timestamp !== 'string') return NaN;
+    return Date.parse(r.timestamp);
+  };
+  const models = new Set<string>();
+  const efforts = new Set<string>();
+  const started = new Map<string, Rec>();
+  const completed = new Map<string, Rec>();
+  for (const r of recs) {
+    const p = r.payload as Rec | undefined;
+    if (r.type === 'turn_context') {
+      if (!inWins(wins, timed(r))) continue;
+      if (typeof p?.model !== 'string') return `${file}: field payload.model missing`;
+      if (typeof p.effort !== 'string') return `${file}: field payload.effort missing`;
+      models.add(p.model);
+      efforts.add(p.effort);
+    } else if (r.type === 'event_msg' && p?.type === 'task_started') {
+      if (typeof p.turn_id !== 'string') return `${file}: field payload.turn_id missing`;
+      started.set(p.turn_id, r);
+    } else if (r.type === 'event_msg' && p?.type === 'task_complete') {
+      if (typeof p.turn_id !== 'string') return `${file}: field payload.turn_id missing`;
+      completed.set(p.turn_id, r);
+    }
+  }
+  const counting: Counting | string = codexCounting(file, recs, wins);
+  if (typeof counting === 'string') return counting;
+  const horizonMs: number = wins.length > 0 ? wins[wins.length - 1].endMs : 0;
+  const turns: Span[] = [];
+  for (const [id, s] of started) {
+    const t0: number = timed(s);
+    const c: Rec | undefined = completed.get(id);
+    turns.push(
+      c !== undefined && timed(c) <= horizonMs
+        ? { startMs: t0, endMs: timed(c), complete: true }
+        : { startMs: t0, endMs: horizonMs, complete: false },
+    );
+  }
   const userMsgs: Rec[] = recs.filter(
     (r) =>
       r.type === 'response_item' &&
       (r.payload as Rec | undefined)?.type === 'message' &&
       (r.payload as Rec).role === 'user' &&
       (r.metadata as Rec | undefined)?.user_input_order !== undefined &&
-      timed(r) >= openMs &&
-      timed(r) <= untilMs,
+      inWins(wins, timed(r)),
   );
   const operatorTurns: { startMs: number; replyEndMs: number | null }[] = [];
   for (const [i, r] of userMsgs.entries()) {
     const metadata = codexOperatorMetadataSchema.safeParse(r.metadata);
     if (!metadata.success) return `${file}: field metadata.${metadata.error.issues[0].path.join('.')} missing`;
     const completion: Rec | undefined = completed.get(metadata.data.retained_source.id.turn_id);
-    const nextMs: number = i + 1 < userMsgs.length ? timed(userMsgs[i + 1]) : untilMs;
+    const nextMs: number = i + 1 < userMsgs.length ? timed(userMsgs[i + 1]) : horizonMs;
     const replyEndMs: number | null =
       completion !== undefined && timed(completion) <= nextMs ? timed(completion) : null;
     operatorTurns.push({ startMs: timed(r), replyEndMs });
@@ -330,13 +399,147 @@ function codexSession(session: string, file: string, openMs: number, untilMs: nu
     models,
     efforts,
     turns,
-    assistantMessages: null,
+    calls: counting.calls,
+    contextTokens: counting.contextTokens,
+    tokens: counting.tokens,
+    operatorTurns,
+    spanOutput: counting.spanOutput,
+    splitOpen: false,
+    totalCostUSD: null,
+  };
+}
+
+const PI_TOKEN_FIELDS: [string, string][] = [
+  ['input_tokens', 'input'],
+  ['output_tokens', 'output'],
+  ['cache_read_input_tokens', 'cacheRead'],
+  ['cache_creation_input_tokens', 'cacheWrite'],
+  ['reasoning_output_tokens', 'reasoning'],
+];
+
+function piSession(session: string, file: string, wins: Win[]): SessionResult | string {
+  const parsed: Rec[] | string = recordsOf(file);
+  if (typeof parsed === 'string') return `${file}: ${parsed}`;
+  const recs: Rec[] = parsed;
+  const timed = (r: Rec): number => Date.parse(r.timestamp as string);
+  for (const r of recs) {
+    if (r.type !== 'message' && r.type !== 'compaction') continue;
+    const t: number | string = tsOf(r, 'timestamp');
+    if (typeof t === 'string') return `${file}: ${t}`;
+  }
+  const messages: Rec[] = recs.filter((r) => r.type === 'message');
+  const assistants: Rec[] = messages.filter((r) => (r.message as Rec).role === 'assistant');
+  const tokens: Tokens = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_read_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+    reasoning_output_tokens: 0,
+  };
+  const calls: { ts: number; output: number }[] = [];
+  let contextTokens: number = 0;
+  const usageOf = (raw: unknown, name: string): Rec | string => {
+    if (raw === null || typeof raw !== 'object') return `${file}: field ${name} missing`;
+    for (const [, field] of PI_TOKEN_FIELDS)
+      if (num((raw as Rec)[field]) === null) return `${file}: field ${name}.${field} missing`;
+    return raw as Rec;
+  };
+  const addCall = (ts: number, u: Rec): void => {
+    for (const [key, field] of PI_TOKEN_FIELDS) tokens[key] += u[field] as number;
+    contextTokens += (u.input as number) + (u.cacheRead as number) + (u.cacheWrite as number);
+    calls.push({ ts, output: u.output as number });
+  };
+  const models = new Set<string>();
+  const efforts = new Set<string>();
+  for (const r of assistants) {
+    const present: unknown = (r.message as Rec).usage;
+    if (present === null || typeof present !== 'object') return `${file}: field message.usage missing`;
+  }
+  for (const r of assistants) {
+    const ts: number = timed(r);
+    if (!inWins(wins, ts)) continue;
+    const m = r.message as Rec;
+    if (typeof m.model === 'string') models.add(m.model);
+    if (typeof m.thinkingLevel === 'string') efforts.add(m.thinkingLevel);
+    if (m.stopReason === 'error' && num((m.usage as Rec).totalTokens) === 0) continue;
+    const u: Rec | string = usageOf(m.usage, 'message.usage');
+    if (typeof u === 'string') return u;
+    addCall(ts, u);
+  }
+  for (const r of recs) {
+    if (r.type !== 'compaction') continue;
+    const ts: number = timed(r);
+    if (!inWins(wins, ts)) continue;
+    const u: Rec | string = usageOf(r.usage, 'usage');
+    if (typeof u === 'string') return u;
+    addCall(ts, u);
+  }
+  const horizonMs: number = wins.length > 0 ? wins[wins.length - 1].endMs : 0;
+  const turns: Span[] = [];
+  const operatorTurns: { startMs: number; replyEndMs: number | null }[] = [];
+  let splitOpen: boolean = false;
+  let splitFirst: boolean = false;
+  for (let i: number = 0; i < messages.length; i += 1) {
+    if ((messages[i].message as Rec).role !== 'user') continue;
+    const t0: number = timed(messages[i]);
+    const next: Rec | undefined = messages.slice(i + 1).find((r) => (r.message as Rec).role === 'user');
+    const t1: number = next === undefined ? horizonMs : timed(next);
+    let replyEnd: number | null = null;
+    for (const r of assistants) {
+      const t: number = timed(r);
+      if (t > t0 && t <= t1) replyEnd = t;
+    }
+    operatorTurns.push({ startMs: t0, replyEndMs: replyEnd });
+    if (replyEnd === null) continue;
+    turns.push({ startMs: t0, endMs: replyEnd, complete: true });
+    if (!splitFirst && intersectMs(t0, replyEnd, wins) > 0) {
+      splitFirst = true;
+      splitOpen = recs.some((r) => r.type === 'compaction' && timed(r) > t0 && timed(r) <= t1);
+    }
+  }
+  const spanOutput = (a: number, b: number): number =>
+    calls.reduce((acc, c) => (c.ts > a && c.ts <= b ? acc + c.output : acc), 0);
+  return {
+    session,
+    harness: 'pi',
+    models,
+    efforts,
+    turns,
+    calls: calls.length,
+    contextTokens,
     tokens,
     operatorTurns,
     spanOutput,
     splitOpen,
     totalCostUSD: null,
   };
+}
+
+function windowsOf(seats: Seats, seatsFile: string, untilMs: number): Win[] {
+  if (seats.spans === undefined) return [{ startMs: Date.parse(seats.opened), endMs: untilMs + 1 }];
+  const spans = seats.spans;
+  const wins: Win[] = [];
+  for (const [i, s] of spans.entries()) {
+    const from: number = Date.parse(s.from);
+    if (s.to !== undefined && Date.parse(s.to) <= from) die(`${seatsFile}: field spans.${i}.to: to must be after from`);
+    if (s.to === undefined && i + 1 < spans.length)
+      die(`${seatsFile}: field spans.${i}.to: required on every span except the last (only the last span may be open)`);
+    const prevTo: string | undefined = spans[i - 1]?.to;
+    if (prevTo !== undefined && from < Date.parse(prevTo))
+      die(`${seatsFile}: field spans.${i}.from: must be at or after spans.${i - 1}.to`);
+    const endMs: number = Math.min(s.to === undefined ? Infinity : Date.parse(s.to), untilMs);
+    if (from < endMs) wins.push({ startMs: from, endMs });
+  }
+  return wins;
+}
+
+function windowLine(seats: Seats, untilMs: number): string {
+  if (seats.spans === undefined) return `legacy window ${iso(Date.parse(seats.opened))} to ${iso(untilMs)}`;
+  const parts: string[] = seats.spans.map((s) => {
+    const from: string = iso(Date.parse(s.from));
+    return s.to === undefined ? `${from} to ${iso(untilMs)} (open)` : `${from} to ${iso(Date.parse(s.to))}`;
+  });
+  return `window ${parts.join(', ')}`;
 }
 
 function main(): void {
@@ -358,7 +561,8 @@ function main(): void {
     }
     die(`${seatsFile}: ${cause instanceof Error ? cause.message : cause}`);
   }
-  const openMs: number = Date.parse(seats.opened);
+  const windows: Win[] = windowsOf(seats, seatsFile, untilMs);
+  const windowText: string = windowLine(seats, untilMs);
 
   const errors: SeatError[] =
     seats.seats.length === 0
@@ -376,8 +580,10 @@ function main(): void {
       }
       const result: SessionResult | string =
         entry.harness === 'claude'
-          ? claudeSession(entry.session, found.file, openMs, untilMs)
-          : codexSession(entry.session, found.file, openMs, untilMs);
+          ? claudeSession(entry.session, found.file, windows)
+          : entry.harness === 'codex'
+            ? codexSession(entry.session, found.file, windows)
+            : piSession(entry.session, found.file, windows);
       if (typeof result === 'string') errors.push({ seat: letter, session: entry.session, detail: result });
       else sessions.push(result);
     }
@@ -388,17 +594,24 @@ function main(): void {
   const ops: { startMs: number; replyEndMs: number | null }[] = doorSessions
     .flatMap((s) => s.operatorTurns)
     .sort((a, b) => a.startMs - b.startMs);
-  const opRows: { startMs: number; replyEndMs: number | null; endMs: number; outputs: [string, number][] }[] = ops.map(
-    (o, i) => {
+  const opRows: {
+    startMs: number;
+    replyEndMs: number | null;
+    endMs: number;
+    minutesMs: number;
+    outputs: [string, number][];
+  }[] = ops
+    .map((o, i) => {
       const endMs: number = i + 1 < ops.length ? ops[i + 1].startMs : untilMs;
       const outputs: [string, number][] = measured.map((m) => [
         m.seat,
         m.sessions.reduce((acc, s) => acc + s.spanOutput(o.startMs, endMs), 0),
       ]);
-      return { ...o, endMs, outputs };
-    },
-  );
-  const waitMs: number = opRows.reduce((acc, o) => (o.replyEndMs === null ? acc : acc + (o.replyEndMs - o.startMs)), 0);
+      const stopMs: number = o.replyEndMs ?? endMs;
+      return { ...o, endMs, minutesMs: intersectMs(o.startMs, stopMs, windows), outputs };
+    })
+    .filter((o) => o.minutesMs > 0);
+  const waitMs: number = opRows.reduce((acc, o) => (o.replyEndMs === null ? acc : acc + o.minutesMs), 0);
 
   const seatOut = (m: { seat: string; sessions: SessionResult[] }): number =>
     m.sessions.reduce((acc, s) => acc + s.tokens.output_tokens, 0);
@@ -410,7 +623,7 @@ function main(): void {
     `chart ${basename(chart)} - operator wait ${mins(0, waitMs)} min, operator turns ${opRows.length}` +
     (parts.length + unmeasuredParts.length > 0 ? `; ${[...parts, ...unmeasuredParts].join(', ')} output` : '');
 
-  const lines: string[] = [summary, '', `window ${iso(openMs)} to ${iso(untilMs)}`, ''];
+  const lines: string[] = [summary, '', windowText, ''];
   lines.push(
     '- window tokens and minutes show that usage and elapsed time changed; they do not show that dollar cost fell.',
   );
@@ -429,20 +642,33 @@ function main(): void {
     const efforts = new Set(m.sessions.flatMap((s) => [...s.efforts]));
     if (models.size > 0) lines.push(`  models ${[...models].join(', ')}`);
     if (efforts.size > 0) lines.push(`  effort ${[...efforts].join(', ')}`);
-    const complete: Span[] = m.sessions.flatMap((s) => s.turns.filter((t) => t.complete));
-    const incomplete: number = m.sessions.reduce((acc, s) => acc + s.turns.filter((t) => !t.complete).length, 0);
+    const windowTurns: Span[] = m.sessions
+      .flatMap((s) => s.turns)
+      .filter((t) => intersectMs(t.startMs, t.endMs, windows) > 0);
+    const complete: Span[] = windowTurns.filter((t) => t.complete);
+    const incomplete: number = windowTurns.length - complete.length;
     lines.push(`  turns ${complete.length}${incomplete > 0 ? `, ${incomplete} incomplete` : ''}`);
-    const am: number = m.sessions.reduce((acc, s) => acc + (s.assistantMessages ?? 0), 0);
-    if (m.sessions.some((s) => s.assistantMessages !== null)) lines.push(`  assistant messages ${am}`);
-    const workMs: number = complete.reduce((acc, t) => acc + (t.endMs - t.startMs), 0);
+    const errored: boolean = errors.some((e) => e.seat === m.seat);
+    const uncounted: SessionResult[] = m.sessions.filter((s) => s.calls === null);
+    if (errored || uncounted.length > 0) {
+      const cumulativeOnly: boolean = !errored && uncounted.length === m.sessions.length;
+      lines.push(`  calls unavailable${cumulativeOnly ? ' (cumulative-only rollout)' : ''}`);
+    } else {
+      const calls: number = m.sessions.reduce((acc, s) => acc + (s.calls ?? 0), 0);
+      const context: number = m.sessions.reduce((acc, s) => acc + s.contextTokens, 0);
+      lines.push(`  calls ${calls}`);
+      lines.push(`  average context per call ${calls === 0 ? 'n/a' : Math.round(context / calls)}`);
+    }
+    const workMs: number = complete.reduce((acc, t) => acc + intersectMs(t.startMs, t.endMs, windows), 0);
     lines.push(`  working minutes ${mins(0, workMs)}`);
     const first: SessionResult | undefined = m.sessions[0];
-    const firstTurn: Span | undefined = first?.turns.filter((t) => t.complete).sort((a, b) => a.startMs - b.startMs)[0];
+    const firstTurn: Span | undefined = first?.turns
+      .filter((t) => t.complete && intersectMs(t.startMs, t.endMs, windows) > 0)
+      .sort((a, b) => a.startMs - b.startMs)[0];
     if (firstTurn !== undefined) {
       const note: string = first.splitOpen ? ' (opening reply was split across turns; not the whole map cost)' : '';
-      lines.push(
-        `  first turn in window ${iso(firstTurn.startMs)} ${mins(firstTurn.startMs, firstTurn.endMs)} min${note}`,
-      );
+      const firstMs: number = intersectMs(firstTurn.startMs, firstTurn.endMs, windows);
+      lines.push(`  first turn in window ${iso(firstTurn.startMs)} ${mins(0, firstMs)} min${note}`);
     }
     const keys: string[] = [...new Set(m.sessions.flatMap((s) => Object.keys(s.tokens)))];
     for (const k of keys) lines.push(`  ${k} ${m.sessions.reduce((acc, s) => acc + (s.tokens[k] ?? 0), 0)}`);
@@ -462,7 +688,7 @@ function main(): void {
       lines.push(
         `  ${iso(o.startMs)} incomplete (reply not finished before the next operator message or the window end)${outputs ? `, output ${outputs}` : ''}`,
       );
-    else lines.push(`  ${iso(o.startMs)} ${mins(o.startMs, o.replyEndMs)} min${outputs ? `, output ${outputs}` : ''}`);
+    else lines.push(`  ${iso(o.startMs)} ${mins(0, o.minutesMs)} min${outputs ? `, output ${outputs}` : ''}`);
   }
   lines.push(`  total operator wait ${mins(0, waitMs)} min`);
   lines.push('');
