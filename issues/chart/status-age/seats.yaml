@@ -1,0 +1,10 @@
+opened: '2026-10-17T07:49:27Z'
+seats:
+  - seat: A
+    pane: w8:pRK
+    harness: claude
+    session: afc23c53-4b2a-43f1-bdb9-b1c8277e3f0f
+  - seat: B
+    pane: w8:pRM
+    harness: codex
+    session: 01a148dd-26b5-7e63-bd8f-41ccc5cec7e0

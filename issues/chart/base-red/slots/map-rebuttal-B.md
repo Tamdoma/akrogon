@@ -1,0 +1,13 @@
+# B rebuttal
+
+- F1 `map-merged.md:23` and `:38` narrow the shared incident to “one shared record per base” and a base-SHA/generation key while citing B. My Q2/R2 require equivalent command/configuration and incident provenance, not a blanket base verdict. Different failing units or environments at the same SHA must not clear or exempt each other. Keep that identity question open. Evidence: my opening map Q2/R2, `issues/closed/red-base-wait/known-red-leaf/brief.md:12`, `:30`, `:31`.
+
+- F2 `map-merged.md:25` says a base check on the existing watch tick violates the no-timers lock. That does not follow: the supplied lock forbids NEW timers/polling, and an existing tick already runs. My opening Q2 rejected periodic base checks too broadly on that basis. Reject this option for added suite cost and changed watcher scope if warranted, not as a proven lock violation. Evidence: opening brief Existing locks, `skills/watch-issues/SKILL.md:22`, `:24`.
+
+- F3 `map-merged.md:34` attributes to B a rule that expected values must not depend on the run date. I recommended repairing concrete expiring assertions, not that rule. The delivered repair deliberately computes expected bounds from the observed time, which avoids the reported expiration. Keep clock control versus valid time-relative expectations as choices. Evidence: my Q5/F2, `tests/timing-report.test.ts:511`, `:517`, `:535`, `:539`.
+
+- F4 `map-merged.md:37` presents configured commands/timeouts as removing load-induced false attribution. They remove a command-contract mismatch, not the possibility of an incomplete or timed-out configured run. Such evidence must remain unverified rather than proving a shared base defect. Evidence: my R1/R4, `issues/closed/red-base-wait/known-red-leaf/brief.md:7`, `issues/config.yaml:9`.
+
+- F5 `map-merged.md:51` cites B for adding `base` as “the one class with proven payoff.” I did not choose a failure field or establish its payoff. I recommended settling #98 first because it may remove failures from this path. A shared wait at the existing phase and a new failure cause are different contracts, still unresolved here. Evidence: my Q1 O2 and Q6, `src/phase.ts:139`, `:146`, `src/next.ts:777`.
+
+- F6 `map-merged.md:53` turns my conditional legacy-record proposal into a settled notify-only rule. My Q8 asks for an explicit compatibility decision and limits that proposal to records without reliable classification. Existing records with reason text can currently recover under failed-otherwise, so making every record lacking a new field notify-only changes behavior. Evidence: my Q8, `skills/watch-issues/SKILL.md:40`, `:41`, `src/state.ts:12`.

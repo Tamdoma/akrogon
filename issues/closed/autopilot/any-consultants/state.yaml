@@ -1,0 +1,27 @@
+slug: any-consultants
+phase: merged
+created: 2026-10-16
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tD1
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pRH
+  B: w8:pRJ
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-17T08:17:35.247Z
+frozen: {}
+frozen_cited: []
