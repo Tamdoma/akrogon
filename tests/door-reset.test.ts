@@ -25,7 +25,7 @@ type Setup = {
   calls: () => string[][];
   promptCalls: () => string[][];
   logLines: () => Record<string, unknown>[];
-  run: (...args: string[]) => Promise<RunResult>;
+  run: (extraEnv?: Record<string, string>, ...args: string[]) => Promise<RunResult>;
   clean: () => void;
 };
 
