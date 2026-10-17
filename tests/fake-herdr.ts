@@ -12,6 +12,9 @@ const fakePaneSchema = paneSchema.extend({
   rect: rectSchema.optional(),
   focused: z.boolean().optional(),
   screen_detection_skipped: z.boolean().nullable().optional(),
+  agent_name: z.string().optional(),
+  foreground_process_group_id: z.number().optional(),
+  foreground_processes: z.array(z.looseObject({ pid: z.number(), argv: z.array(z.string()) })).optional(),
   agent_session: z
     .object({
       kind: z.enum(['id', 'path']),
@@ -65,6 +68,7 @@ const databaseSchema = z.object({
   startScript: z.array(scriptEntrySchema).default([]),
   promptScript: z.array(scriptEntrySchema).default([]),
   renameScript: z.array(scriptEntrySchema).default([]),
+  closeScript: z.array(scriptEntrySchema).default([]),
   waitScript: z.array(waitEntrySchema).default([]),
 });
 export type Database = z.infer<typeof databaseSchema>;
@@ -308,6 +312,7 @@ if (args[0] === 'agent' && args[1] === 'list') {
               agent: p.agent,
               agent_status: p.agent_status,
               ...(p.agent_session ? { agent_session: p.agent_session } : {}),
+              ...(p.agent_name !== undefined ? { name: p.agent_name } : {}),
               ...(p.screen_detection_skipped !== undefined
                 ? { screen_detection_skipped: p.screen_detection_skipped }
                 : {}),
@@ -324,14 +329,15 @@ if (args[0] === 'pane' && args[1] === 'process-info') {
     process_info: {
       pane_id: target.pane_id,
       shell_pid: pid,
-      foreground_process_group_id: pid,
-      foreground_processes: [],
+      foreground_process_group_id: target.foreground_process_group_id ?? pid,
+      foreground_processes: target.foreground_processes ?? [],
     },
     type: 'pane_process_info',
   });
 }
 if (args[0] === 'pane' && args[1] === 'close') {
   const target: FakePane = pane(args[2]);
+  scriptedFailure(db.closeScript.shift());
   db.panes = db.panes.filter((p) => p.pane_id !== target.pane_id);
   if (!db.panes.some((p) => p.tab_id === target.tab_id)) db.tabs = db.tabs.filter((t) => t.tab_id !== target.tab_id);
   result({});
