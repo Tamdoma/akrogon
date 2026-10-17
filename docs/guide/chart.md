@@ -165,7 +165,7 @@ Read the table with care. The tokens and minutes show that usage and elapsed tim
 
 ## Independent views when you name a peer seat
 
-Charting can run in one slot. If you name a B pane, A and B first map and research independently. C is named only with B and holds the same role, blind to both A's and B's work. The peers return blind notes on the questions, A merges their notes with attribution and writes the operator round alone. Each named peer gets one disagreement-only rebuttal before the round reaches you.
+Charting can run in one slot or with peers. You may name any number of peer panes; the first is B, then C, D and so on in the order you name them. A and each named peer first map and research independently, every peer blind to A's work and to every other peer's work. The peers return blind notes on the questions, A merges their notes with attribution and writes the operator round alone. Each named peer gets one disagreement-only rebuttal before the round reaches you.
 
 This gives you independent views before the interview settles the scope. Naming a charting peer does not automatically enable implementation debate.
 
@@ -174,8 +174,8 @@ This gives you independent views before the interview settles the scope. Naming 
                          |
              +-----------+-----------+
              v           v           v
-        A researches  B researches  optional C researches
-        independently independently independently
+        A researches  B researches  each further peer
+        independently independently researches independently
              |           |           |
              +-----------+-----------+
                          v
