@@ -383,15 +383,14 @@ function codexSession(session: string, file: string, wins: Win[], untilMs: numbe
       r.type === 'response_item' &&
       (r.payload as Rec | undefined)?.type === 'message' &&
       (r.payload as Rec).role === 'user' &&
-      (r.metadata as Rec | undefined)?.user_input_order !== undefined &&
-      inWins(wins, timed(r)),
+      (r.metadata as Rec | undefined)?.user_input_order !== undefined,
   );
   const operatorTurns: { startMs: number; replyEndMs: number | null }[] = [];
   for (const [i, r] of userMsgs.entries()) {
     const metadata = codexOperatorMetadataSchema.safeParse(r.metadata);
     if (!metadata.success) return `${file}: field metadata.${metadata.error.issues[0].path.join('.')} missing`;
     const completion: Rec | undefined = completed.get(metadata.data.retained_source.id.turn_id);
-    const nextMs: number = i + 1 < userMsgs.length ? timed(userMsgs[i + 1]) : untilMs;
+    const nextMs: number = i + 1 < userMsgs.length ? Math.min(timed(userMsgs[i + 1]), untilMs) : untilMs;
     const replyEndMs: number | null =
       completion !== undefined && timed(completion) <= nextMs ? timed(completion) : null;
     operatorTurns.push({ startMs: timed(r), replyEndMs: turnEnd(timed(r), replyEndMs, wins) });
