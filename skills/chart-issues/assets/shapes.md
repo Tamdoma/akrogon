@@ -43,6 +43,8 @@ Route: <lifecycle (debate no|yes) | direct>
 - mode <time> <door pane> <A session id>: handover <time> <log>: handed <remaining list>; consultants <surviving>
 - mode <time> <door pane> <A session id>: continue autopilot (handover <time>)
 
+Every mode entry's session id is the live `agent_session.value` `herdr agent list` prints for A's pane; a fresh A reads it before appending and never invents one.
+
 ## Autopilot
 - breach: <each observed boundary breach, first in the section>
 - switch-on: <INTAKE.md reference carrying the operator's verbatim words>

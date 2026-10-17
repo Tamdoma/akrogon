@@ -439,6 +439,7 @@ test('docs describe the handover entries and footer wording', (): void => {
   }
   expect(skill).toContain('continue autopilot (handover');
   expect(shapes).toContain('continue autopilot (handover');
+  expect(shapes).toContain('agent_session.value');
   expect(skill).toContain('handover queued');
   expect(skill).toContain('/clear');
   expect(skill).toContain('/new');
