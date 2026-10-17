@@ -354,7 +354,7 @@ async function runOnce(
         commands: ran,
         ...(end === undefined ? {} : { end }),
       };
-      if (compares !== undefined) {
+      if (compares !== undefined && completed(runs[index])) {
         send = await newRedUnits(repo, runs[index], runs);
         if (send.length > 0) runs[index] = { ...runs[index], notice: 'pending' };
       }
