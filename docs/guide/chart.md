@@ -169,7 +169,9 @@ Charting can run in one slot or with peers. You may name any number of peer pane
 
 This gives you independent views before the interview settles the scope. Naming a charting peer does not automatically enable implementation debate.
 
-Consultants restart with an empty context when the door enters a chart and again when it re-enters a chart after they worked on another chart, so their sessions do not accumulate finished charts. Supplied consultant panes may be closed and recreated by this one command only, and a dropped consultant is never restarted. A restarted seat keeps its letter in `seats.yaml`; its new entry appears once herdr shows its new session.
+Consultants restart with an empty context using `peer-restart.ts` under the [chart-issues Open rule](../../skills/chart-issues/SKILL.md#open). The door runs it before a chart's first consultant exchange and on re-entry after the consultants worked on another chart. One run before a shared opening map covers the map. A's own work or compaction alone never triggers it, and dropped consultants are never restarted. The caller must collect every prompted exchange first. An idle pane does not prove that collection is complete.
+
+The operator authorizes this command alone to close and recreate named consultant panes, including supplied panes, as the exception to leaving supplied panes in place. Later briefs, waits and seat entries use the printed panes. A restarted seat keeps its letter in `seats.yaml`; append its new entry only when `herdr agent list` shows its new session (pi at start, codex after its first exchange), never with a null session. A failed restart ends an attended turn and reports the printed states. Under autopilot, every seat not `restarted` is dropped like a herdr prompt refusal, with its printed state recorded under `consultant:`.
 
 ```text
                     same intake
