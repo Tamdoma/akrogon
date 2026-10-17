@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
-import { appendFileSync, existsSync, openSync, readFileSync } from 'node:fs';
+import { appendFileSync, openSync, readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { homedir } from 'node:os';
 import { z } from 'zod';
-import { claudeTurnOpen, codexRollout, piAuthority, readPeerAgent, type ListAgent } from './peer-wait';
+import { claudeTurnOpen, codexRollout, isTimeoutError, piAuthority, readPeerAgent, type ListAgent } from './peer-wait';
 
 type Args = { pane: string; session: string; log: string; start: string };
 type Config = { turnBoundMs: number; confirmMs: number };
@@ -72,18 +71,6 @@ function binding(live: ListAgent, session: string): string | null {
   return kinds.includes(live.agent) && live.agent_session?.value === session ? live.agent : null;
 }
 
-// A session this agent still carries a transcript, rollout or session file for is one it really
-// held on the pane; a session with no such file names an agent the pane never had.
-function heldBefore(kind: string, session: string): boolean {
-  if (kind === 'claude')
-    return (
-      Array.from(new Bun.Glob(`*/${session}.jsonl`).scanSync({ cwd: `${homedir()}/.claude/projects`, absolute: true }))
-        .length === 1
-    );
-  if (kind === 'codex') return codexRollout(session) !== null;
-  return existsSync(session);
-}
-
 function herdr(args: string[]): { code: number; stderr: string } {
   const result: Bun.SyncSubprocess<'pipe', 'pipe'> = Bun.spawnSync(['herdr', ...args], {
     stdin: 'ignore',
@@ -140,6 +127,21 @@ async function child(args: Args, config: Config): Promise<number> {
     if (check.code !== 0)
       return stop(args.log, 'send-check-prompt', 'prompt_stalled', { code: check.code, stderr: check.stderr });
     logLine(args.log, 'send-check-prompt', 'sent');
+    const ended: { code: number; stderr: string } = herdr([
+      'agent',
+      'wait',
+      args.pane,
+      '--timeout',
+      String(config.turnBoundMs),
+      '--until',
+      'idle',
+      '--until',
+      'done',
+    ]);
+    if (ended.code !== 0 && isTimeoutError(ended.stderr)) return stop(args.log, 'wait-check-end', 'turn open');
+    if (ended.code !== 0)
+      return stop(args.log, 'wait-check-end', 'wait failed', { code: ended.code, stderr: ended.stderr });
+    logLine(args.log, 'wait-check-end', (await readPeerAgent(args.pane)).agent_status);
   }
   const confirmed: string | null = await waitNewSession(args, config.confirmMs);
   if (confirmed === null) return stop(args.log, 'wait-new-session', 'reset unconfirmed');
@@ -163,12 +165,8 @@ async function main(): Promise<void> {
   const config: Config = { turnBoundMs: env.DOOR_RESET_TURN_BOUND_MS, confirmMs: env.DOOR_RESET_CONFIRM_MS };
   if (process.env.DOOR_RESET_CHILD === '1') process.exit(await child(args, config));
   const live: ListAgent = await readPeerAgent(pane);
-  const kind: string | null = kinds.includes(live.agent) ? live.agent : null;
   const held: string = live.agent_session?.value ?? 'no session';
-  // A pane holding a different session of the same kind still queues the child when the passed
-  // session is one that kind really held here, so the identity change is logged instead of the
-  // call being dropped; any other mismatch names an agent this pane never had.
-  if (kind === null || live.agent_session === undefined || (held !== session && !heldBefore(kind, session))) {
+  if (!kinds.includes(live.agent) || live.agent_session?.value !== session) {
     process.stderr.write(`refused: pane ${pane} holds ${live.agent} ${held}, expected ${kinds.join('|')} ${session}\n`);
     process.exit(1);
   }
