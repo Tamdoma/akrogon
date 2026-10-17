@@ -7,8 +7,7 @@ type State = {
   seat: string;
   pane: string;
   kind: string | null;
-  // pre-restart session during the read phase, the session herdr shows after the start once the
-  // post phase resolves it, null when herdr shows none or the old value
+  // The pre-restart session is kept only for comparison with the final roster.
   session: string | null;
   stopped: boolean;
   restarted: boolean;
@@ -93,17 +92,34 @@ function historyToken(kind: string, argv: string[]): string | undefined {
     );
 }
 
-function emit(states: State[]): void {
+function emit(states: State[], agents: AgentRow[]): void {
   for (const state of states) {
+    const session: string | null =
+      agents.find((agent: AgentRow): boolean => agent.pane_id === state.pane)?.agent_session?.value ?? null;
     const line = {
       seat: state.seat,
       pane: state.pane,
       kind: state.kind,
       state: state.restarted ? 'restarted' : state.stopped ? 'stopped' : 'untouched',
-      session: state.restarted ? (state.session ?? 'none') : 'none',
+      session: state.restarted && session !== state.session ? (session ?? 'none') : 'none',
     };
     process.stdout.write(`${JSON.stringify(line)}\n`);
   }
+}
+
+function finish(states: State[]): 0 | 1 {
+  if (!states.some((state: State): boolean => state.restarted)) {
+    emit(states, []);
+    return 0;
+  }
+  const after: Herdr = run(['agent', 'list']);
+  if (!after.ok) {
+    process.stderr.write(failureText(after));
+    emit(states, []);
+    return 1;
+  }
+  emit(states, agentListSchema.parse(JSON.parse(after.stdout)).result.agents);
+  return 0;
 }
 
 function paneListed(pane: string): Extract<Herdr, { ok: false }> | boolean {
@@ -137,7 +153,7 @@ async function main(): Promise<void> {
   const list: Herdr = run(['agent', 'list']);
   if (!list.ok) {
     process.stderr.write(failureText(list));
-    emit(states);
+    finish(states);
     process.exit(1);
   }
   const rows: AgentRow[] = agentListSchema.parse(JSON.parse(list.stdout)).result.agents;
@@ -161,7 +177,7 @@ async function main(): Promise<void> {
     const info: Herdr = run(['pane', 'process-info', '--pane', seat.pane]);
     if (!info.ok) {
       process.stderr.write(failureText(info));
-      emit(states);
+      finish(states);
       process.exit(1);
     }
     const processes = processInfoSchema.parse(JSON.parse(info.stdout)).result.process_info;
@@ -185,7 +201,7 @@ async function main(): Promise<void> {
   }
   if (refused !== null) {
     process.stderr.write(`refusing restart, ${refused}\n`);
-    emit(states);
+    finish(states);
     process.exit(1);
   }
 
@@ -205,7 +221,7 @@ async function main(): Promise<void> {
       process.stderr.write(
         `kill -TERM -- -${launch.group} failed (exit ${kill.exitCode ?? `signal ${kill.signalCode}`}): ${kill.stderr.toString()}`,
       );
-      emit(states);
+      finish(states);
       process.exit(1);
     }
     state.stopped = true;
@@ -221,7 +237,7 @@ async function main(): Promise<void> {
           ? `seat ${seat.seat}: herdr still lists an agent on pane ${seat.pane} ${STOP_TIMEOUT_MS} ms after SIGTERM to process group ${launch.group}\n`
           : failureText(present),
       );
-      emit(states);
+      finish(states);
       process.exit(1);
     }
     const start: Herdr = run([
@@ -237,29 +253,13 @@ async function main(): Promise<void> {
     ]);
     if (!start.ok) {
       process.stderr.write(failureText(start));
-      emit(states);
+      finish(states);
       process.exit(1);
     }
     state.restarted = true;
   }
 
-  // One read after the mutate phase resolves every restarted seat's session: only a session herdr
-  // shows now and that differs from the pre-restart one is the fresh seat's own session.
-  const after: Herdr = run(['agent', 'list']);
-  if (!after.ok) {
-    process.stderr.write(failureText(after));
-    emit(states);
-    process.exit(1);
-  }
-  const rowsAfter: AgentRow[] = agentListSchema.parse(JSON.parse(after.stdout)).result.agents;
-  for (const state of states) {
-    if (!state.restarted) continue;
-    const value: string | null =
-      rowsAfter.find((a: AgentRow): boolean => a.pane_id === state.pane)?.agent_session?.value ?? null;
-    state.session = value !== null && value !== state.session ? value : null;
-  }
-  emit(states);
-  process.exit(0);
+  process.exit(finish(states));
 }
 
 if (import.meta.main) {
