@@ -72,6 +72,17 @@ function intersectMs(a: number, b: number, wins: Win[]): number {
   return wins.reduce((acc, w) => acc + Math.max(0, Math.min(b, w.endMs) - Math.max(a, w.startMs)), 0);
 }
 
+// a completed turn or operator wait ends where its reply ends inside a span; a reply landing in a
+// gap or past the last overlapped span ends the wait at the last span edge the interval crosses
+function turnEnd(startMs: number, replyEndMs: number | null, wins: Win[]): number | null {
+  if (replyEndMs === null) return null;
+  const overlapped: number[] = wins
+    .filter((w) => startMs < w.endMs && w.startMs < replyEndMs)
+    .map((w) => w.endMs);
+  if (overlapped.length === 0) return null;
+  return Math.min(replyEndMs, Math.max(...overlapped));
+}
+
 function recordsOf(file: string): Rec[] | string {
   const out: Rec[] = [];
   const lines: string[] = readFileSync(file, 'utf8').split('\n');
@@ -139,7 +150,7 @@ function locate(harness: string, session: string): { file: string } | { detail: 
   return { detail: `unknown harness ${harness}` };
 }
 
-function claudeSession(session: string, file: string, wins: Win[]): SessionResult | string {
+function claudeSession(session: string, file: string, wins: Win[], untilMs: number): SessionResult | string {
   const parsed: Rec[] | string = recordsOf(file);
   if (typeof parsed === 'string') return `${file}: ${parsed}`;
   const recs: Rec[] = parsed;
@@ -168,7 +179,8 @@ function claudeSession(session: string, file: string, wins: Win[]): SessionResul
       if (num(u?.[k]) === null) return `${file}: field message.usage.${k} missing`;
     if (typeof r.effort !== 'string') return `${file}: field effort missing`;
   }
-  const assistants: Rec[] = allAssistants.filter((r) => inWins(wins, timed(r)));
+  const assistants: Rec[] = allAssistants;
+  // groups form over the whole session; a group counts only when its final record lands inside a span
   const groups = new Map<string, Rec[]>();
   for (const r of assistants) {
     const id: string = (r.message as Rec).id as string;
@@ -176,6 +188,7 @@ function claudeSession(session: string, file: string, wins: Win[]): SessionResul
     if (g) g.push(r);
     else groups.set(id, [r]);
   }
+  const counted: Rec[][] = [...groups.values()].filter((g) => inWins(wins, timed(g[g.length - 1])));
   const tokens: Tokens = {
     input_tokens: 0,
     output_tokens: 0,
@@ -183,7 +196,7 @@ function claudeSession(session: string, file: string, wins: Win[]): SessionResul
     cache_creation_input_tokens: 0,
   };
   let contextTokens: number = 0;
-  for (const g of groups.values()) {
+  for (const g of counted) {
     tokens.output_tokens += Math.max(...g.map((r) => ((r.message as Rec).usage as Rec).output_tokens as number));
     const u: Rec = (g[g.length - 1].message as Rec).usage as Rec;
     tokens.input_tokens += u.input_tokens as number;
@@ -197,6 +210,7 @@ function claudeSession(session: string, file: string, wins: Win[]): SessionResul
     let out: number = 0;
     for (const r of assistants) {
       const t: number = timed(r);
+      if (!inWins(wins, t)) continue;
       const id: string = (r.message as Rec).id as string;
       const v: number = ((r.message as Rec).usage as Rec).output_tokens as number;
       const delta: number = prev.has(id) ? v - (prev.get(id) as number) : v;
@@ -205,23 +219,23 @@ function claudeSession(session: string, file: string, wins: Win[]): SessionResul
     }
     return out;
   };
-  const horizonMs: number = wins.length > 0 ? wins[wins.length - 1].endMs : 0;
   const turns: Span[] = [];
   const operatorTurns: { startMs: number; replyEndMs: number | null }[] = [];
   let splitOpen: boolean = false;
   let splitFirst: boolean = false;
   for (let i: number = 0; i < ops.length; i += 1) {
     const t0: number = timed(ops[i]);
-    const t1: number = i + 1 < ops.length ? timed(ops[i + 1]) : horizonMs;
+    const t1: number = i + 1 < ops.length ? timed(ops[i + 1]) : untilMs;
     let replyEnd: number | null = null;
     for (const r of assistants) {
       const t: number = timed(r);
       if (t > t0 && t <= t1) replyEnd = t;
     }
-    operatorTurns.push({ startMs: t0, replyEndMs: replyEnd });
-    if (replyEnd === null) continue;
-    turns.push({ startMs: t0, endMs: replyEnd, complete: true });
-    if (!splitFirst && intersectMs(t0, replyEnd, wins) > 0) {
+    const clippedEnd: number | null = turnEnd(t0, replyEnd, wins);
+    operatorTurns.push({ startMs: t0, replyEndMs: clippedEnd });
+    if (clippedEnd === null || replyEnd === null) continue;
+    turns.push({ startMs: t0, endMs: clippedEnd, complete: true });
+    if (!splitFirst && intersectMs(t0, clippedEnd, wins) > 0) {
       splitFirst = true;
       splitOpen = recs.some((r) => r.isCompactSummary === true && timed(r) > t0 && timed(r) <= t1);
     }
@@ -241,10 +255,10 @@ function claudeSession(session: string, file: string, wins: Win[]): SessionResul
   return {
     session,
     harness: 'claude',
-    models: new Set(assistants.map((r) => (r.message as Rec).model as string)),
-    efforts: new Set(assistants.map((r) => r.effort as string)),
+    models: new Set(assistants.filter((r) => inWins(wins, timed(r))).map((r) => (r.message as Rec).model as string)),
+    efforts: new Set(assistants.filter((r) => inWins(wins, timed(r))).map((r) => r.effort as string)),
     turns,
-    calls: groups.size,
+    calls: counted.length,
     contextTokens,
     tokens,
     operatorTurns,
@@ -333,7 +347,7 @@ function codexCounting(file: string, recs: Rec[], wins: Win[]): Counting | strin
   return { calls: null, contextTokens: 0, tokens, spanOutput };
 }
 
-function codexSession(session: string, file: string, wins: Win[]): SessionResult | string {
+function codexSession(session: string, file: string, wins: Win[], untilMs: number): SessionResult | string {
   const parsed: Rec[] | string = recordsOf(file);
   if (typeof parsed === 'string') return `${file}: ${parsed}`;
   const recs: Rec[] = parsed;
@@ -363,15 +377,14 @@ function codexSession(session: string, file: string, wins: Win[]): SessionResult
   }
   const counting: Counting | string = codexCounting(file, recs, wins);
   if (typeof counting === 'string') return counting;
-  const horizonMs: number = wins.length > 0 ? wins[wins.length - 1].endMs : 0;
   const turns: Span[] = [];
   for (const [id, s] of started) {
     const t0: number = timed(s);
     const c: Rec | undefined = completed.get(id);
     turns.push(
-      c !== undefined && timed(c) <= horizonMs
+      c !== undefined && timed(c) <= untilMs
         ? { startMs: t0, endMs: timed(c), complete: true }
-        : { startMs: t0, endMs: horizonMs, complete: false },
+        : { startMs: t0, endMs: untilMs, complete: false },
     );
   }
   const userMsgs: Rec[] = recs.filter(
@@ -387,10 +400,10 @@ function codexSession(session: string, file: string, wins: Win[]): SessionResult
     const metadata = codexOperatorMetadataSchema.safeParse(r.metadata);
     if (!metadata.success) return `${file}: field metadata.${metadata.error.issues[0].path.join('.')} missing`;
     const completion: Rec | undefined = completed.get(metadata.data.retained_source.id.turn_id);
-    const nextMs: number = i + 1 < userMsgs.length ? timed(userMsgs[i + 1]) : horizonMs;
+    const nextMs: number = i + 1 < userMsgs.length ? timed(userMsgs[i + 1]) : untilMs;
     const replyEndMs: number | null =
       completion !== undefined && timed(completion) <= nextMs ? timed(completion) : null;
-    operatorTurns.push({ startMs: timed(r), replyEndMs });
+    operatorTurns.push({ startMs: timed(r), replyEndMs: turnEnd(timed(r), replyEndMs, wins) });
   }
   operatorTurns.sort((x, y) => x.startMs - y.startMs);
   return {
@@ -417,7 +430,7 @@ const PI_TOKEN_FIELDS: [string, string][] = [
   ['reasoning_output_tokens', 'reasoning'],
 ];
 
-function piSession(session: string, file: string, wins: Win[]): SessionResult | string {
+function piSession(session: string, file: string, wins: Win[], untilMs: number): SessionResult | string {
   const parsed: Rec[] | string = recordsOf(file);
   if (typeof parsed === 'string') return `${file}: ${parsed}`;
   const recs: Rec[] = parsed;
@@ -474,7 +487,6 @@ function piSession(session: string, file: string, wins: Win[]): SessionResult | 
     if (typeof u === 'string') return u;
     addCall(ts, u);
   }
-  const horizonMs: number = wins.length > 0 ? wins[wins.length - 1].endMs : 0;
   const turns: Span[] = [];
   const operatorTurns: { startMs: number; replyEndMs: number | null }[] = [];
   let splitOpen: boolean = false;
@@ -483,16 +495,17 @@ function piSession(session: string, file: string, wins: Win[]): SessionResult | 
     if ((messages[i].message as Rec).role !== 'user') continue;
     const t0: number = timed(messages[i]);
     const next: Rec | undefined = messages.slice(i + 1).find((r) => (r.message as Rec).role === 'user');
-    const t1: number = next === undefined ? horizonMs : timed(next);
+    const t1: number = next === undefined ? untilMs : timed(next);
     let replyEnd: number | null = null;
     for (const r of assistants) {
       const t: number = timed(r);
       if (t > t0 && t <= t1) replyEnd = t;
     }
-    operatorTurns.push({ startMs: t0, replyEndMs: replyEnd });
-    if (replyEnd === null) continue;
-    turns.push({ startMs: t0, endMs: replyEnd, complete: true });
-    if (!splitFirst && intersectMs(t0, replyEnd, wins) > 0) {
+    const clippedEnd: number | null = turnEnd(t0, replyEnd, wins);
+    operatorTurns.push({ startMs: t0, replyEndMs: clippedEnd });
+    if (clippedEnd === null || replyEnd === null) continue;
+    turns.push({ startMs: t0, endMs: clippedEnd, complete: true });
+    if (!splitFirst && intersectMs(t0, clippedEnd, wins) > 0) {
       splitFirst = true;
       splitOpen = recs.some((r) => r.type === 'compaction' && timed(r) > t0 && timed(r) <= t1);
     }
@@ -580,10 +593,10 @@ function main(): void {
       }
       const result: SessionResult | string =
         entry.harness === 'claude'
-          ? claudeSession(entry.session, found.file, windows)
+          ? claudeSession(entry.session, found.file, windows, untilMs)
           : entry.harness === 'codex'
-            ? codexSession(entry.session, found.file, windows)
-            : piSession(entry.session, found.file, windows);
+            ? codexSession(entry.session, found.file, windows, untilMs)
+            : piSession(entry.session, found.file, windows, untilMs);
       if (typeof result === 'string') errors.push({ seat: letter, session: entry.session, detail: result });
       else sessions.push(result);
     }
