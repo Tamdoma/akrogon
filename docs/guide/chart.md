@@ -159,7 +159,7 @@ issues/chart/export-csv/
 
 Intake keeps the original report separate from agent findings. Fork files keep evidence and your recorded answers. The chart points to what remains open. CHART.md lists open forks in the order they will be taken.
 
-`seats.yaml` records when the door began charting and each seat's session id. `USAGE.md` is the usage table the door generates from those transcripts before handoff and after the chart closes, covering the tokens and minutes each seat used since the chart opened. Its `first turn in window` rows and `operator turns` section break the time down further. A transcript that cannot be measured is marked `usage unmeasured`.
+`seats.yaml` records when the door began charting and each seat's session id; a restarted seat's new entry is appended once herdr shows its new session. `USAGE.md` is the usage table the door generates from those transcripts before handoff and after the chart closes, covering the tokens and minutes each seat used since the chart opened. Its `first turn in window` rows and `operator turns` section break the time down further. A transcript that cannot be measured is marked `usage unmeasured`.
 
 Read the table with care. The tokens and minutes show that usage and elapsed time changed in the window, not that dollar cost fell; a whole-session dollar total can include other charts and is not this chart's cost, and subagent usage is not counted. A turn is one seat's work between two of your messages or a `task_started`→`task_complete` pair, and your waiting time is the sum of the minutes from each of your messages until that seat's reply ended.
 
@@ -168,6 +168,8 @@ Read the table with care. The tokens and minutes show that usage and elapsed tim
 Charting can run in one slot or with peers. You may name any number of peer panes; the first is B, then C, D and so on in the order you name them. A and each named peer first map and research independently, every peer blind to A's work and to every other peer's work. The peers return blind notes on the questions, A merges their notes with attribution and writes the operator round alone. Each named peer gets one disagreement-only rebuttal before the round reaches you.
 
 This gives you independent views before the interview settles the scope. Naming a charting peer does not automatically enable implementation debate.
+
+Consultants restart with an empty context when the door enters a chart and again when it re-enters a chart after they worked on another chart, so their sessions do not accumulate finished charts. Supplied consultant panes may be closed and recreated by this one command only, and a dropped consultant is never restarted. A restarted seat keeps its letter in `seats.yaml`; its new entry appears once herdr shows its new session.
 
 ```text
                     same intake
