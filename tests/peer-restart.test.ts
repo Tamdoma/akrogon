@@ -341,6 +341,27 @@ test('a failed agent start reports the stopped seat and herdr error', async (): 
   }
 });
 
+test.each([false, true])(
+  'a later start failure resolves the restarted seat session (stale=%s)',
+  async (staleSession: boolean): Promise<void> => {
+    const seats: PaneSeed[] = consultants.map((p: PaneSeed): PaneSeed =>
+      p.pane_id === paneB ? { ...p, staleSession, agent_session: { kind: 'id', value: 'session-before' } } : p,
+    );
+    const s: Setup = setup(seats, { startScript: [{}, { code: 'agent_blocked' }] });
+    try {
+      const result: RunResult = await s.run(paneA, 'B', paneB, 'C', paneC);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('agent_blocked');
+      expect(seatLines(result.stdout)).toEqual([
+        { seat: 'B', pane: paneB, kind: 'codex', state: 'restarted', session: staleSession ? 'none' : 'session-101' },
+        { seat: 'C', pane: paneC, kind: 'pi', state: 'stopped', session: 'none' },
+      ]);
+    } finally {
+      s.clean();
+    }
+  },
+);
+
 // lean-exchange criterion: a restarted seat's line carries the session `herdr agent list` shows
 // after the start, or `none` when it shows none or the pre-restart session.
 test('a restart leaving the pre-restart session prints none', async (): Promise<void> => {
