@@ -44,11 +44,13 @@ type PaneSeed = {
   leader?: number;
   foreground?: Fg[];
   live?: boolean;
+  staleSession?: boolean;
+  agent_session?: { kind: 'id' | 'path'; value: string };
 };
 type ScriptEntry = { code?: string; message?: string; stderr?: string };
 type Extra = { startScript?: ScriptEntry[] };
 type RunResult = { code: number; stdout: string; stderr: string };
-type SeatLine = { seat: string; pane: string; kind: string | null; state: string };
+type SeatLine = { seat: string; pane: string; kind: string | null; state: string; session: string | 'none' };
 type DbShape = { panes: { pane_id: string; agent: string | null }[] };
 type Setup = {
   dir: string;
@@ -108,6 +110,8 @@ function setup(seeds: PaneSeed[], extra: Extra = {}): Setup {
         agent: p.agent,
         agent_status: p.agent === null ? 'unknown' : 'idle',
         ...(p.agent_name === undefined ? {} : { agent_name: p.agent_name }),
+        ...(p.staleSession === undefined ? {} : { staleSession: p.staleSession }),
+        ...(p.agent_session === undefined ? {} : { agent_session: p.agent_session }),
         ...(p.leader === undefined ? {} : { foreground_process_group_id: p.leader }),
         ...(p.live === true && p.leader !== undefined ? { agent_pid: p.leader } : {}),
         ...(p.foreground === undefined ? {} : { foreground_processes: p.foreground }),
@@ -165,10 +169,12 @@ test('restarts supplied consultants in place with identical kind and argv', asyn
   try {
     const result: RunResult = await s.run(paneA, 'B', paneB, 'C', paneC);
     expect(result.code).toBe(0);
-    expect(seatLines(result.stdout)).toEqual([
-      { seat: 'B', pane: paneB, kind: 'codex', state: 'restarted' },
-      { seat: 'C', pane: paneC, kind: 'pi', state: 'restarted' },
+    const lines: SeatLine[] = seatLines(result.stdout);
+    expect(lines.map((line: SeatLine): Omit<SeatLine, 'session'> => ({ ...line, session: '' }))).toEqual([
+      { seat: 'B', pane: paneB, kind: 'codex', state: 'restarted', session: '' },
+      { seat: 'C', pane: paneC, kind: 'pi', state: 'restarted', session: '' },
     ]);
+    expect(lines.every((line: SeatLine): boolean => /^session-\d+$/.test(line.session))).toBe(true);
     expect(s.sleepers.get(paneB)!.signalCode).toBe('SIGTERM');
     expect(s.sleepers.get(paneC)!.signalCode).toBe('SIGTERM');
     const calls: string[][] = s.calls();
@@ -193,7 +199,9 @@ test('a single surviving consultant keeps its letter and pane', async (): Promis
   try {
     const result: RunResult = await s.run(paneA, 'C', paneC);
     expect(result.code).toBe(0);
-    expect(seatLines(result.stdout)).toEqual([{ seat: 'C', pane: paneC, kind: 'pi', state: 'restarted' }]);
+    expect(seatLines(result.stdout)).toEqual([
+      { seat: 'C', pane: paneC, kind: 'pi', state: 'restarted', session: expect.stringMatching(/^session-\d+$/) },
+    ]);
     expect(command(s.calls(), 'agent', 'start')).toEqual([
       ['agent', 'start', 'peer-w8-pa-c', '--kind', 'pi', '--pane', paneC, '--', ...piArgv.slice(1)],
     ]);
@@ -223,8 +231,8 @@ test('refuses a seat without one unique foreground leader', async (): Promise<vo
       expect(result.stderr).toContain('B');
       expect(result.stderr).toContain('unique foreground leader');
       expect(seatLines(result.stdout)).toEqual([
-        { seat: 'B', pane: paneB, kind: 'codex', state: 'untouched' },
-        { seat: 'C', pane: paneC, kind: 'pi', state: 'untouched' },
+        { seat: 'B', pane: paneB, kind: 'codex', state: 'untouched', session: 'none' },
+        { seat: 'C', pane: paneC, kind: 'pi', state: 'untouched', session: 'none' },
       ]);
       expect(s.calls().some((args: string[]): boolean => args[1] === 'process-info')).toBe(true);
       expect(alive(s, paneB) && alive(s, paneC)).toBe(true);
@@ -255,6 +263,7 @@ test('refuses argv that restores or forks history', async (): Promise<void> => {
       expect(result.stderr).toContain('B');
       expect(result.stderr).toContain(token);
       expect(seatLines(result.stdout).every((line: SeatLine): boolean => line.state === 'untouched')).toBe(true);
+      expect(seatLines(result.stdout).every((line: SeatLine): boolean => line.session === 'none')).toBe(true);
       expect(alive(s, paneB) && alive(s, paneC)).toBe(true);
     } finally {
       s.clean();
@@ -274,6 +283,7 @@ test('refuses when the derived agent name is held outside the restart', async ()
     expect(result.stderr).toContain('B');
     expect(result.stderr).toContain('peer-w8-pa-b');
     expect(seatLines(result.stdout).every((line: SeatLine): boolean => line.state === 'untouched')).toBe(true);
+    expect(seatLines(result.stdout).every((line: SeatLine): boolean => line.session === 'none')).toBe(true);
     expect(alive(s, paneB) && alive(s, paneC)).toBe(true);
   } finally {
     s.clean();
@@ -293,8 +303,8 @@ test('a failed stop ends the restart before any start', async (): Promise<void> 
     expect(result.code).toBe(1);
     expect(result.stderr).toContain(`kill -TERM -- -${gone}`);
     expect(seatLines(result.stdout)).toEqual([
-      { seat: 'B', pane: paneB, kind: 'codex', state: 'untouched' },
-      { seat: 'C', pane: paneC, kind: 'pi', state: 'untouched' },
+      { seat: 'B', pane: paneB, kind: 'codex', state: 'untouched', session: 'none' },
+      { seat: 'C', pane: paneC, kind: 'pi', state: 'untouched', session: 'none' },
     ]);
     expect(command(s.calls(), 'agent', 'start')).toEqual([]);
     expect(alive(s, paneC)).toBe(true);
@@ -313,12 +323,50 @@ test('a failed agent start reports the stopped seat and herdr error', async (): 
     expect(result.stderr).toContain('herdr agent start peer-w8-pa-b');
     expect(result.stderr).toContain('agent_blocked');
     expect(seatLines(result.stdout)).toEqual([
-      { seat: 'B', pane: paneB, kind: 'codex', state: 'stopped' },
-      { seat: 'C', pane: paneC, kind: 'pi', state: 'untouched' },
+      { seat: 'B', pane: paneB, kind: 'codex', state: 'stopped', session: 'none' },
+      { seat: 'C', pane: paneC, kind: 'pi', state: 'untouched', session: 'none' },
     ]);
     expect(command(s.calls(), 'agent', 'start').length).toBe(1);
     expect(s.dbJson().panes.find((p) => p.pane_id === paneB)?.agent).toBe(null);
     expect(alive(s, paneC)).toBe(true);
+  } finally {
+    s.clean();
+  }
+});
+
+// lean-exchange criterion: a restarted seat's line carries the session `herdr agent list` shows
+// after the start, or `none` when it shows none or the pre-restart session.
+test('a restart leaving the pre-restart session prints none', async (): Promise<void> => {
+  const seats: PaneSeed[] = consultants.map((p: PaneSeed): PaneSeed =>
+    p.pane_id === paneB ? { ...p, staleSession: true, agent_session: { kind: 'id', value: 'sess-before' } } : p,
+  );
+  const s: Setup = setup(seats);
+  try {
+    const result: RunResult = await s.run(paneA, 'B', paneB, 'C', paneC);
+    expect(result.code).toBe(0);
+    const lines: SeatLine[] = seatLines(result.stdout);
+    expect(lines[0]).toEqual({ seat: 'B', pane: paneB, kind: 'codex', state: 'restarted', session: 'none' });
+    expect(lines[1].session).not.toBe('none');
+  } finally {
+    s.clean();
+  }
+});
+
+test('a restart with no session shown prints none', async (): Promise<void> => {
+  const seats: PaneSeed[] = consultants.map((p: PaneSeed): PaneSeed =>
+    p.pane_id === paneB ? { ...p, staleSession: true } : p,
+  );
+  const s: Setup = setup(seats);
+  try {
+    const result: RunResult = await s.run(paneA, 'B', paneB, 'C', paneC);
+    expect(result.code).toBe(0);
+    expect(seatLines(result.stdout)[0]).toEqual({
+      seat: 'B',
+      pane: paneB,
+      kind: 'codex',
+      state: 'restarted',
+      session: 'none',
+    });
   } finally {
     s.clean();
   }

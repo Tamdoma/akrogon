@@ -109,6 +109,7 @@ test('prompts, then waits for the answer in the same call', async (): Promise<vo
       file: s.fileB,
       status: null,
       signal: 'proven',
+      session: null,
       exchange: { kind: 'fake', session: null, boundary: null, turn: null },
     });
     const order: string[] = verbs(s.calls());
@@ -150,9 +151,30 @@ test('seeds the codex boundary before prompting', async (): Promise<void> => {
     expect(line.outcome).toBe('failure');
     expect(line.signal).toBe('proven');
     expect(line.exchange).toEqual({ kind: 'codex', session, boundary: 0, turn: 'turn-A' });
+    expect(line.session).toBe(session);
     const order: string[] = verbs(s.calls());
     expect(order[0]).toBe('agent list');
     expect(order[1]).toBe(`agent prompt ${paneB}`);
+  } finally {
+    s.clean();
+  }
+});
+
+// lean-exchange criterion: the outcome line's `session` is what `herdr agent list` shows after
+// the exchange, including a session that only appeared during the wait.
+test('outcome line carries the session that appeared during the wait', async (): Promise<void> => {
+  const s: Setup = setup(
+    (): ScriptEntry[] => [{}],
+    (fileB: string): ScriptEntry[] => [{ session: 'sess-late' }, { append: fileB }],
+    [{ pane_id: paneB, agent: 'fake', agent_status: 'idle' }],
+  );
+  try {
+    const result: RunResult = await s.run('10', paneB, s.fileB, 'read the brief');
+    expect(result.code).toBe(0);
+    const line = JSON.parse(result.stdout);
+    expect(line.outcome).toBe('done');
+    expect(line.session).toBe('sess-late');
+    expect(line.exchange).toEqual({ kind: 'fake', session: 'sess-late', boundary: null, turn: null });
   } finally {
     s.clean();
   }
@@ -174,6 +196,7 @@ test('a failed prompt skips that wait, still waits on the others and exits non-z
       file: s.fileB,
       status: null,
       signal: 'proven',
+      session: null,
       exchange: { kind: 'fake', session: null, boundary: null, turn: null },
     });
     expect(verbs(s.calls())).not.toContain(`agent wait ${paneC}`);

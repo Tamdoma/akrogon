@@ -16,6 +16,7 @@ const fakePaneSchema = paneSchema.extend({
   foreground_process_group_id: z.number().optional(),
   agent_pid: z.number().optional(),
   exiting: z.boolean().optional(),
+  staleSession: z.boolean().optional(),
   foreground_processes: z.array(z.looseObject({ pid: z.number(), argv: z.array(z.string()) })).optional(),
   agent_session: z
     .object({
@@ -246,7 +247,10 @@ if (args[0] === 'agent' && args[1] === 'start') {
   target.agent = flag('--kind');
   target.agent_pid = undefined;
   target.agent_status = db.blockOnStart ? 'blocked' : 'idle';
-  target.agent_session = { kind: 'id', value: `session-${++db.serial}` };
+  if (target.staleSession !== true) {
+    target.agent_session = { kind: 'id', value: `session-${++db.serial}` };
+  }
+  target.staleSession = undefined;
   db.starts.push(args);
   const cgroupPath: string = resolve(procDir(procRoot(), shellPid(target.pane_id)), 'cgroup');
   db.startCgroups.push({
