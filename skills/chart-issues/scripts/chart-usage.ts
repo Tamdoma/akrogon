@@ -321,27 +321,20 @@ function codexCounting(file: string, recs: Rec[], wins: Win[]): Counting | strin
     counts.push({ ts: timed(r), u: u as Rec });
   }
   counts.sort((a, b) => a.ts - b.ts);
-  const firstStart: number = wins.length > 0 ? wins[0].startMs : Infinity;
-  const inWindow: { ts: number; u: Rec }[] = counts.filter((c) => inWins(wins, c.ts));
-  const before: { ts: number; u: Rec }[] = counts.filter((c) => c.ts < firstStart);
   const zero: Rec = Object.fromEntries(CODEX_KEYS.map((k) => [k, 0]));
-  const base: Rec = before.length > 0 ? before[before.length - 1].u : zero;
-  if (
-    inWindow.some((c, i) =>
-      CODEX_KEYS.some((k) => (c.u[k] as number) < ((i === 0 ? base : inWindow[i - 1].u)[k] as number)),
-    )
-  )
+  const deltas: { ts: number; u: Tokens }[] = counts
+    .map((c, i) => ({
+      ts: c.ts,
+      u: Object.fromEntries(
+        CODEX_KEYS.map((k) => [k, (c.u[k] as number) - ((i === 0 ? zero : counts[i - 1].u)[k] as number)]),
+      ),
+    }))
+    .filter((c) => inWins(wins, c.ts));
+  if (deltas.some((c) => CODEX_KEYS.some((k) => c.u[k] < 0)))
     return `${basename(file)}: token_count cumulative counters decreased (counter reset)`;
-  const last: Rec = inWindow.length > 0 ? inWindow[inWindow.length - 1].u : base;
-  const tokens: Tokens = {};
-  for (const k of CODEX_KEYS) tokens[k] = (last[k] as number) - (base[k] as number);
-  const spanOutput = (a: number, b: number): number => {
-    const inSpan: { ts: number; u: Rec }[] = counts.filter((c) => c.ts > a && c.ts <= b && inWins(wins, c.ts));
-    if (inSpan.length === 0) return 0;
-    const beforeSpan: { ts: number; u: Rec }[] = counts.filter((c) => c.ts <= a);
-    const baseU: Rec = beforeSpan.length > 0 ? beforeSpan[beforeSpan.length - 1].u : zero;
-    return (inSpan[inSpan.length - 1].u.output_tokens as number) - (baseU.output_tokens as number);
-  };
+  const tokens: Tokens = Object.fromEntries(CODEX_KEYS.map((k) => [k, deltas.reduce((acc, c) => acc + c.u[k], 0)]));
+  const spanOutput = (a: number, b: number): number =>
+    deltas.reduce((acc, c) => (c.ts > a && c.ts <= b ? acc + c.u.output_tokens : acc), 0);
   return { calls: null, contextTokens: 0, tokens, spanOutput };
 }
 
