@@ -76,9 +76,7 @@ function intersectMs(a: number, b: number, wins: Win[]): number {
 // gap or past the last overlapped span ends the wait at the last span edge the interval crosses
 function turnEnd(startMs: number, replyEndMs: number | null, wins: Win[]): number | null {
   if (replyEndMs === null) return null;
-  const overlapped: number[] = wins
-    .filter((w) => startMs < w.endMs && w.startMs < replyEndMs)
-    .map((w) => w.endMs);
+  const overlapped: number[] = wins.filter((w) => startMs < w.endMs && w.startMs < replyEndMs).map((w) => w.endMs);
   if (overlapped.length === 0) return null;
   return Math.min(replyEndMs, Math.max(...overlapped));
 }
