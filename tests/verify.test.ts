@@ -416,6 +416,33 @@ test('verify --known-red reruns the failing command on a fresh checkout of the e
   }
 });
 
+test('known-red accepts a later qualifying base comparison after an earlier comparison fails', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const marker: string = resolve(f.home, 'base-seen');
+    writeFileSync(
+      resolve(f.root, 'check.sh'),
+      `if test ! -f head-only && test ! -f '${marker}'; then touch '${marker}'; echo runner-unavailable; exit 8; fi\necho '(fail) alpha'; exit 7\n`,
+    );
+    await command(['git', 'add', 'check.sh'], f.root);
+    await command(['git', 'commit', '-m', 'add base check'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    config(f, { checks: { test: 'sh check.sh' } });
+    const { leafPath, worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'head-only');
+    expect((await verify(f, ['--known-red'], worktree)).code).toBe(1);
+    expect((await verify(f, ['--known-red'], worktree)).code).toBe(0);
+    const runs: VerifyRun[] = records(f);
+    expect(runs).toHaveLength(3);
+    expect(runs.slice(1).map((run) => run.compares)).toEqual([runs[0].run, runs[0].run]);
+    const moved: Result = await cli(f, ['phase', 'caller', 'check.review', '--slot', 'A'], worktree);
+    expect(moved.code).toBe(0);
+    expect(readState(leafPath).phase).toBe('check.review');
+  } finally {
+    f.clean();
+  }
+});
+
 test('verify --known-red refuses a head failure absent on the base', async () => {
   const f: Fixture = await fixture();
   try {
