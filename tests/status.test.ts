@@ -148,7 +148,7 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     expect(noteText).toContain('B:nits');
     expect(noteText).not.toContain('w1:t9');
     expect(cell(result.stdout, row, 'BLOCKED BY')).toBe('missing');
-    expect(cell(result.stdout, row, 'TIME')).toBe('0h23m');
+    expect(cell(result.stdout, row, 'TIME')).toBe('0h 23m');
     const epic: number = rows.findIndex((line) => line.trim() === 'epic');
     const job: number = rows.findIndex((line) => line.trim() === 'job');
     const broken: number = rows.indexOf(row);
@@ -190,7 +190,7 @@ test('time runs from the first delivered prompt to now for a running leaf and is
     }
     timings(f, [prompt('timed', 40, 'failed'), prompt('timed', 12), prompt('timed', 5)]);
     const aged: string = (await cli(f, ['status'])).stdout;
-    expect(cell(aged, leafRow(aged, 'timed'), 'TIME')).toBe('0h12m');
+    expect(cell(aged, leafRow(aged, 'timed'), 'TIME')).toBe('0h 12m');
   } finally {
     f.clean();
   }
@@ -221,8 +221,8 @@ test('time for a merged or failed leaf stops at its move into that phase and doe
     write(60);
     const later: string = (await cli(f, ['status'])).stdout;
     for (const output of [now, later]) {
-      expect(cell(output, leafRow(output, 'landed'), 'TIME')).toBe('17h28m');
-      expect(cell(output, leafRow(output, 'broke'), 'TIME')).toBe('0h29m');
+      expect(cell(output, leafRow(output, 'landed'), 'TIME')).toBe('17h 28m');
+      expect(cell(output, leafRow(output, 'broke'), 'TIME')).toBe('0h 29m');
       expect(cell(output, leafRow(output, 'unmoved'), 'TIME')).toBe('-');
       expect(cell(output, leafRow(output, 'reversed'), 'TIME')).toBe('-');
     }
@@ -550,10 +550,10 @@ test('busy durations appear in NOTE for every recorded seat without writes or he
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const result: Result = await cli(f, ['status'], f.home, env);
     expect(result.code).toBe(0);
-    expect(cell(result.stdout, leafRow(result.stdout, 'long'), 'NOTE')).toContain('busy A 1h02m');
-    expect(cell(result.stdout, leafRow(result.stdout, 'long'), 'NOTE')).toContain('busy B 25h03m');
-    expect(cell(result.stdout, leafRow(result.stdout, 'short'), 'NOTE')).toContain('busy A 0h02m');
-    expect(cell(result.stdout, leafRow(result.stdout, 'short'), 'NOTE')).toContain('busy B 0h00m');
+    expect(cell(result.stdout, leafRow(result.stdout, 'long'), 'NOTE')).toContain('busy A 1h 02m');
+    expect(cell(result.stdout, leafRow(result.stdout, 'long'), 'NOTE')).toContain('busy B 25h 03m');
+    expect(cell(result.stdout, leafRow(result.stdout, 'short'), 'NOTE')).toContain('busy A 0h 02m');
+    expect(cell(result.stdout, leafRow(result.stdout, 'short'), 'NOTE')).toContain('busy B 0h 00m');
     expect(cell(result.stdout, leafRow(result.stdout, 'empty'), 'NOTE')).not.toContain('busy');
     expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
     expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
@@ -769,7 +769,7 @@ test('failed leaves show cause and reason in NOTE and terminal phases suppress b
     expect(cell(result.stdout, leafRow(result.stdout, 'with-cause'), 'NOTE')).not.toContain('busy');
     expect(cell(result.stdout, leafRow(result.stdout, 'legacy-failed'), 'NOTE')).not.toContain('busy');
     expect(cell(result.stdout, leafRow(result.stdout, 'done-leaf'), 'NOTE')).not.toContain('busy');
-    expect(cell(result.stdout, leafRow(result.stdout, 'active-leaf'), 'NOTE')).toContain('busy A 1h02m');
+    expect(cell(result.stdout, leafRow(result.stdout, 'active-leaf'), 'NOTE')).toContain('busy A 1h 02m');
   } finally {
     f.clean();
   }

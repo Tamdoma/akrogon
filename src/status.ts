@@ -115,7 +115,7 @@ const header: string[] = ['LEAF', 'PHASE', 'TIME', 'BLOCKED BY', 'NOTE', 'TURN']
 
 function clock(ms: number): string {
   const minutes: number = Math.max(0, Math.floor(ms / 60000));
-  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`;
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
 }
 
 // Each slug's first delivered seat prompt, when work on the leaf began.
