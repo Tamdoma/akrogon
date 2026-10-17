@@ -1,0 +1,29 @@
+slug: door-reset
+phase: merged
+created: 2026-10-17
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#101"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 3
+verdict: {}
+tab: w8:tDK
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pT3
+  B: w8:pT4
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-17T19:51:47.018Z
+frozen:
+  tests/door-reset.test.ts: b8334db80e7ad7b731a5aed8c156593cd9e570c5
+frozen_cited: []

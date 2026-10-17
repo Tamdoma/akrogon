@@ -1,0 +1,9 @@
+opened: '2026-10-17T19:43:26Z'
+seats:
+  - seat: A
+    pane: w8:pTG
+    harness: claude
+    session: c815573f-911c-497e-ad72-7401eb570177
+spans:
+  - from: '2026-10-17T19:43:26Z'
+    to: '2026-10-17T19:44:14Z'

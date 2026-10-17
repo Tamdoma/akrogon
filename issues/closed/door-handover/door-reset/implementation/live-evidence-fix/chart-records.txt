@@ -1,0 +1,89 @@
+=== claude/app-hello-world
+- mode 2026-10-17T20:20+02:00 w8:pTA 4f82223b-30b9-44c8-b9db-f14c904507e9: on autopilot (operator: chart item 1 now; handover at item 2 switch)
+- mode 2026-10-17T20:23+02:00 w8:pTA 4f82223b-30b9-44c8-b9db-f14c904507e9: handover 2026-10-17T20:23+02:00 /tmp/claude-1000/-var-tmp-akr-1000-5d20-80cf0603-door-reset-live2/4f82223b-30b9-44c8-b9db-f14c904507e9/scratchpad/handover.log: handed readme-scratch-pad; consultants none
+- mode 2026-10-17T20:26+02:00 w8:pTA 4f82223b-30b9-44c8-b9db-f14c904507e9: continue autopilot (handover 2026-10-17T20:23+02:00)
+--- seats.yaml
+open_time: 2026-10-17T20:20+02:00
+door_started: 2026-10-17T20:20+02:00
+seats:
+  - seat: A
+    pane: w8:pTA
+    kind: claude
+    session: 4f82223b-30b9-44c8-b9db-f14c904507e9
+=== claude/readme-scratch-pad
+- mode 2026-10-17T20:23+02:00 w8:pTA 4f82223b-30b9-44c8-b9db-f14c904507e9: on autopilot (operator: chart item 2 via handover from app-hello-world)
+- mode 2026-10-17T20:23+02:00 w8:pTA 4f82223b-30b9-44c8-b9db-f14c904507e9: handover 2026-10-17T20:23+02:00 /tmp/claude-1000/-var-tmp-akr-1000-5d20-80cf0603-door-reset-live2/4f82223b-30b9-44c8-b9db-f14c904507e9/scratchpad/handover.log: handed app-hello-world (waiting on origin); consultants none
+- mode 2026-10-17T20:26+02:00 w8:pTA 4f82223b-30b9-44c8-b9db-f14c904507e9: continue autopilot (handover 2026-10-17T20:23+02:00)
+--- seats.yaml
+open_time: 2026-10-17T20:23+02:00
+door_started: 2026-10-17T20:23+02:00
+seats:
+  - seat: A
+    pane: w8:pTA
+    kind: claude
+    session: 4f82223b-30b9-44c8-b9db-f14c904507e9
+=== codex/hello-world
+- mode 2026-10-17T18:04:56Z w8:pTB 01a14b09-c440-74a1-991e-8585a15e792f: on autopilot; handed item 1 hello-world, item 2 readme-title; consultants none
+- mode 2026-10-17T18:07:54Z w8:pTB 01a14b09-c440-74a1-991e-8585a15e792f: handover 2026-10-17T18:07:54Z /var/tmp/akr-1000/5d20/80cf0603/door-reset-live2/repo-codex/issues/chart/hello-world/slots/handover-to-readme-title.jsonl: handed item 1 hello-world (waiting on origin), item 2 readme-title (next runnable); consultants none
+- mode 2026-10-17T18:09:18Z w8:pTB 01a14b0c-9d5c-7db3-904e-74af8c1b2c07: continue autopilot (handover 2026-10-17T18:07:54Z)
+--- seats.yaml
+opened: '2026-10-17T18:04:56Z'
+seats:
+  - seat: A
+    pane: w8:pTB
+    harness: codex
+    session: 01a14b09-c440-74a1-991e-8585a15e792f
+spans:
+  - from: '2026-10-17T18:04:56Z'
+    to: '2026-10-17T18:07:54Z'
+=== codex/readme-title
+- mode 2026-10-17T18:04:56Z w8:pTB 01a14b09-c440-74a1-991e-8585a15e792f: on autopilot; handed item 1 hello-world, item 2 readme-title; consultants none
+- mode 2026-10-17T18:07:54Z w8:pTB 01a14b09-c440-74a1-991e-8585a15e792f: handover 2026-10-17T18:07:54Z /var/tmp/akr-1000/5d20/80cf0603/door-reset-live2/repo-codex/issues/chart/hello-world/slots/handover-to-readme-title.jsonl: handed item 1 hello-world (waiting on origin), item 2 readme-title (next runnable); consultants none
+- mode 2026-10-17T18:09:18Z w8:pTB 01a14b0c-9d5c-7db3-904e-74af8c1b2c07: continue autopilot (handover 2026-10-17T18:07:54Z)
+--- seats.yaml
+opened: '2026-10-17T18:07:54Z'
+seats:
+  - seat: A
+    pane: w8:pTB
+    harness: codex
+    session: 01a14b09-c440-74a1-991e-8585a15e792f
+  - seat: A
+    pane: w8:pTB
+    harness: codex
+    session: 01a14b0c-9d5c-7db3-904e-74af8c1b2c07
+spans:
+  - from: '2026-10-17T18:09:18Z'
+    to: '2026-10-17T18:10:06Z'
+=== pi/hello-world-output
+- mode 2026-10-17T18:05:32Z w8:pTC /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-live2--/2026-10-17T18-04-55-939Z_01a14b09-cd03-72e8-824c-a1595456a55a.jsonl: on handed item 1, then item 2; consultants none
+- mode 2026-10-17T18:06:24Z w8:pTC /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-live2--/2026-10-17T18-04-55-939Z_01a14b09-cd03-72e8-824c-a1595456a55a.jsonl: handover 2026-10-17T18:06:24Z /var/tmp/akr-1000/5d20/80cf0603/door-reset-live2/repo-pi/issues/chart/readme-title/slots/door-reset.log: handed item 2; consultants none
+--- seats.yaml
+opened: '2026-10-17T18:05:32Z'
+seats:
+  - seat: A
+    pane: w8:pTC
+    harness: pi
+    session: /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-live2--/2026-10-17T18-04-55-939Z_01a14b09-cd03-72e8-824c-a1595456a55a.jsonl
+spans:
+  - from: '2026-10-17T18:05:32Z'
+    to: '2026-10-17T18:06:24Z'
+=== pi/readme-title
+- mode 2026-10-17T18:05:32Z w8:pTC /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-live2--/2026-10-17T18-04-55-939Z_01a14b09-cd03-72e8-824c-a1595456a55a.jsonl: on handed item 1, then item 2; consultants none
+- mode 2026-10-17T18:06:24Z w8:pTC /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-live2--/2026-10-17T18-04-55-939Z_01a14b09-cd03-72e8-824c-a1595456a55a.jsonl: handover 2026-10-17T18:06:24Z /var/tmp/akr-1000/5d20/80cf0603/door-reset-live2/repo-pi/issues/chart/readme-title/slots/door-reset.log: handed item 2; consultants none
+- mode 2026-10-17T18:07:08Z w8:pTC /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-live2--/2026-10-17T18-06-46-008Z_01a14b0b-7af8-72e8-824c-a15af4165069.jsonl: continue autopilot (handover 2026-10-17T18:06:24Z)
+--- seats.yaml
+opened: '2026-10-17T18:06:24Z'
+seats:
+  - seat: A
+    pane: w8:pTC
+    harness: pi
+    session: /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-live2--/2026-10-17T18-04-55-939Z_01a14b09-cd03-72e8-824c-a1595456a55a.jsonl
+  - seat: A
+    pane: w8:pTC
+    harness: pi
+    session: /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-live2--/2026-10-17T18-06-46-008Z_01a14b0b-7af8-72e8-824c-a15af4165069.jsonl
+spans:
+  - from: '2026-10-17T18:06:24Z'
+    to: '2026-10-17T18:06:25Z'
+  - from: '2026-10-17T18:07:08Z'
+    to: '2026-10-17T18:07:39Z'

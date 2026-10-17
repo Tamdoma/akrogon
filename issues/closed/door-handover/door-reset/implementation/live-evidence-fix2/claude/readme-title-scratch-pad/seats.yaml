@@ -1,0 +1,13 @@
+opened: '2026-10-17T19:15:02Z'
+seats:
+  - seat: A
+    pane: w8:pTF
+    harness: claude
+    session: 7b890562-ee7f-4025-a145-1cb45210786b
+  - seat: A
+    pane: w8:pTF
+    harness: claude
+    session: 3499bf6c-0bd3-4a34-8b54-10c85fa98cd8
+spans:
+  - from: '2026-10-17T19:16:08Z'
+    to: '2026-10-17T19:17:00Z'

@@ -1,0 +1,6 @@
+{"t":"2026-10-17T17:28:27.427Z","step":"wait-turn-end","result":"turn ended"}
+{"t":"2026-10-17T17:28:27.428Z","step":"recheck","result":"identity held"}
+{"t":"2026-10-17T17:28:27.731Z","step":"send-reset","result":"sent","reset":"/new"}
+{"t":"2026-10-17T17:28:28.034Z","step":"send-check-prompt","result":"sent"}
+{"t":"2026-10-17T17:28:29.543Z","step":"wait-new-session","result":"confirmed","session":"01a14ae8-6959-7663-882e-c01e0f3b6a48"}
+{"t":"2026-10-17T17:28:29.847Z","step":"send-start-prompt","result":"sent"}

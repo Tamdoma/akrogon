@@ -1,0 +1,25 @@
+
+● Mode: Attended, single slot (no peers named).
+
+  To begin the open sequence I need one of: operator notes describing the work to chart, or confirmation to import from
+  seeds and open issues with no note supplied.
+
+✻ Crunched for 25s · done 9:21 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  CC │ 23% │ $0.15 │ Sonnet 4.6 │ door-reset-live3
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent

@@ -1,0 +1,2 @@
+base A=wA:p13G B=wA:p13H C=wA:p13J
+branch A=wA:p13K B=wA:p13M C=wA:p13N

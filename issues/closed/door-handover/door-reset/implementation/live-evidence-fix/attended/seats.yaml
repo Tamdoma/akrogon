@@ -1,0 +1,9 @@
+opened: '2026-10-17T18:37:29Z'
+seats:
+  - seat: A
+    pane: w8:pTE
+    harness: pi
+    session: /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-att--/2026-10-17T18-36-53-871Z_01a14b27-10ef-732b-94bf-aea4dc738015.jsonl
+spans:
+  - from: '2026-10-17T18:37:29Z'
+    to: '2026-10-17T18:37:48Z'

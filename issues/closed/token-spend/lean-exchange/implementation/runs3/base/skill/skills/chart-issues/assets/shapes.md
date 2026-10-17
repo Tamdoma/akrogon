@@ -1,0 +1,316 @@
+# Chart and handoff shapes
+
+Read before creating a chart or handing off. Paths below are relative to the authoritative registered root from `akrogon config` (`repo` identifies the key in `repos`), not an issues copy in a worktree. When effective config reports `repo: none` (the literal string `none` from `effectiveConfig`), chart locally and stop before leaf handoff until a registered destination is available.
+
+## Chart records
+
+```text
+issues/chart/<chart-slug>/
+  CHART.md
+  INTAKE.md
+  seats.yaml                    # open time and seat session ids, per the door
+  USAGE.md                      # last measured usage table; a rerun replaces it
+  forks/<fork-slug>.md
+  slots/<pass>.md                 # peer exchanges, and direct review returns (review-B-<n>.md)
+  direct/plan.md, report.md     # only on the direct route
+```
+Charts stay here after handoff. They have no state.yaml or lifecycle phase. Create forks/ even for a fully settled direct item. On resume, CHART.md points to the selected fork and its context rather than requiring a full chart reread.
+```markdown
+# Chart: <destination>
+
+## Destination
+<observable outcome>
+
+Route: <lifecycle (debate no|yes) | direct>
+
+## Forks taken
+- [<fork>](forks/<fork-slug>.md): <settled answer>
+
+## Open forks
+- [<fork>](forks/<fork-slug>.md): <question in one line>, in the order they will be taken
+
+## Fog
+<material work in scope whose question cannot yet be stated precisely>
+
+## Off route
+<excluded work and reasons; a step on main a taken decision needs is never recorded under Off route: the door makes and verifies it during the pass when its precondition exists (config verified through `akrogon config` at the registered root), otherwise it is a Pending steps entry>
+
+## Pending steps
+<none, or each waiting main step: the exact edit, its owner, the prerequisite leaf it waits on and the check that proves it done>
+
+## Mode record
+- mode <time> <door pane> <A session id>: <on | off | changed list | continue autopilot> <detail>
+
+## Autopilot
+- breach: <each observed boundary breach, first in the section>
+- switch-on: <INTAKE.md reference carrying the operator's verbatim words>
+- consultant: <each named consultant; each loss with its reason, the charts run without it and ignored late returns>
+- route: <lifecycle with its debate choice>
+- handed off: <each leaf handed off>
+- main step: <each completed step on main or lesson write for handed work>
+- wait: <the exact missing need, approval or prerequisite> — next: <next step>
+- pending step: after <leaf> lands, open a chart door to finish <step>
+- pick against recommendation: <the round, the pick and its reason>
+- recorded only: <each seed match, close offer, flaky test or failed leaf outside the handed list>
+- friction: <observed friction>
+- usage: <the linked usage lines>
+
+## Direct attempt
+<only on the direct route, written at attempt start and updated through landing; the route is fixed by the approved handoff review and a later `direct` setting change does not alter it>
+- branch: <slug, also the worktree directory name under worktree_store>
+- worktree: <path>
+- base: <sha the attempt started from, then the sha after each rebase>
+- head: <sha of the latest committed head>
+- rounds used / fix_rounds: <n / limit>
+- push attempts: <n / 2>
+- done: <criteria passing>
+- not done: <criteria open, or none>
+- trigger: <growth stop trigger, or none>
+- review files: <slots/review-B-<n>.md paths>
+- landed SHA: <sha pushed, after landing>
+```
+Under autopilot the CHART.md carries `## Mode record` — one `- mode` line appended per mode change (on, off, changed list, "continue autopilot") with its time, the door pane and A's session id, the latest entry governing — and `## Autopilot`, written as the pass goes with every line a `- ` list item so no line parses as a chart marker; it records observed states only, never "started" or "merged" without evidence. Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts.
+```markdown
+# Intake: <chart-slug>
+
+## Scope
+<destination and proposed grouping, separate from source text>
+
+## Provenance
+- GitHub: owner/repo#12
+- Legacy path: issues/open/older-report.md
+- Operator: <date or message reference>
+
+## Source: owner/repo#12
+<entire mirrored report copied verbatim>
+
+## Source: issues/open/older-report.md
+<entire legacy report copied verbatim>
+
+## Source: operator <reference>
+<operator notes verbatim>
+
+## Agent findings
+<inspected evidence and interpretation, not attributed to the reporter>
+```
+GitHub identity comes from the mirror's `Source: owner/repo#n` line. Compare exact identities against parsed `sources` in all open/closed leaf states and GitHub provenance entries in all chart intakes, including handed-off charts. Compare legacy repo-relative paths against legacy provenance entries, not substrings in report bodies. Deduplicate repeated identities in the current intake too. A local path never enters leaf `sources`. Keep source files unchanged and preserve copied report bytes beneath the source headings. An unsuccessful GitHub refresh supplies no permission to drain a stale mirror.
+```markdown
+# <fork title>
+
+## Question
+<one or more Q blocks, each holding the precise question>
+
+### Carries
+<existing locks, related fork paths and verbatim operator corrections>
+
+## Findings
+<grounded evidence, independent A/B attribution and remaining disagreements>
+
+## Taken
+<operator answer verbatim, reason and foreclosed alternatives; under autopilot, A's own pick with its reason, rejected options and standing consultant dissent, labelled as A's>
+```
+One fork file holds one or more questions that are always presented together on one screen. A fork is taken when every material question in it is taken; partial answers stay under `## Findings` and `## Taken` is written only then. Append each explicit operator correction with its date, preserve earlier answers, and treat the last appended correction as binding only for the answer it changes. Unresolved questions have no invented Taken. A question sharp enough to travel alone gets its own fork file even while blocked. Work whose question is not sharp stays in Fog. Ruling work out records the reason in Off route instead of pretending a fork was taken. Reshape the remaining questions after each answer. A fork file with no operator answer — or, under autopilot, no pick recorded as A's — under `## Taken` is open and appears in CHART.md's Open forks list in the order it will be taken, next first.
+
+## Handoff tree
+
+One issue uses `issues/open/<issue>/<leaf>/`. Two or more grouped issues use:
+```text
+issues/open/<epic>/
+  EPIC.md
+  <issue>/
+    ISSUE.md
+    <leaf>/
+      brief.md
+      design.md
+      readiness.yaml
+      state.yaml
+  <other-issue>/
+    ISSUE.md
+    <other-leaf>/
+      brief.md
+      design.md
+      readiness.yaml
+      state.yaml
+```
+EPIC.md lists immediate issues, ISSUE.md lists immediate leaves, each one line per child with purpose:
+
+```markdown
+---
+slots:
+  a: {harness: claude, model: opus, effort: high}
+  b: {harness: codex, model: gpt-6.1-sol, effort: medium}
+---
+# Epic: <epic>
+
+- [<issue>](<issue>/ISSUE.md): <purpose>
+- [<other-issue>](<other-issue>/ISSUE.md): <purpose>
+```
+```markdown
+---
+slots:
+  a: {harness: claude, model: opus, effort: high}
+  b: {harness: codex, model: gpt-6.1-sol, effort: medium}
+---
+# Issue: <issue>
+
+- [<leaf>](<leaf>/brief.md): <purpose>
+```
+
+Container indexes hold no lifecycle state or global order; their optional `slots:` front matter is seat configuration. An index may open with a front matter block holding `slots:` and no other key. Detection is literal: the file's first line must be `---` and a later `---` must close the block, so the door places it at the very top. `slots:` accepts only keys `a` and `b`, each optional, and each present seat is exactly `{harness, model, effort}`. Every value must be nonblank after trim and its decoded value must contain no `'` or `"` character, so YAML delimiters are fine: `model: 'opus'` decodes to `opus`. The `harness` value names a template in the machine `config.yaml` `harnesses:` map. The nearest set seat wins per seat: `ISSUE.md`, then `EPIC.md`, then repo `issues/config.yaml`, then machine `config.yaml`. An issue inside an epic may carry its own block for its leaves. The door writes the block into the chosen owner's index before any leaf `state.yaml` is written, and `state.yaml` carries no seat field. Slugs are lowercase hyphenated words without ordering markers. Leaf slugs are unique across the proposed handoff and existing open/closed leaves in the destination repo. Independently checkable outcomes can run in parallel, even when files overlap; only actual prerequisites enter blocked-by.
+
+### seats.yaml
+
+The door writes one `seats.yaml` per chart holding the open time and one entry per seat session:
+
+```yaml
+opened: '2026-10-06T16:34:47Z'
+seats:
+  - seat: A
+    pane: w8:pCT
+    harness: claude
+    session: 1ce71920-4c64-414b-ac1c-af56890a1c4b
+spans:
+  - from: '2026-10-06T16:34:47Z'
+    to: '2026-10-06T17:20:05Z'
+  - from: '2026-10-07T09:02:11Z'
+```
+
+`opened` is the time the door began its first pass on the chart and is never reset by folder creation or session replacement. `pane`, `harness` and `session` are the `pane_id`, `agent` and `agent_session.value` values `herdr agent list` prints; for pi, `session` is the session file path. A replaced session is a second entry with the same seat letter. Outside herdr `seats` is empty.
+
+`spans` is an optional list of `{from: ISO, to?: ISO}` entries, each a half-open window `[from, to)` in which the door worked the chart; only the last entry may omit `to`, and a record without `spans` reads as a legacy window from `opened`. The door opens a span when it begins work on a chart and closes it on handoff, close or hold, when the chart waits on an approval, need or prerequisite, or before switching to another chart, keeping it open while it waits on this chart's consultants.
+
+## Leaf files
+
+```markdown
+# Brief: <leaf>
+
+## What
+<bounded change and observable outcome>
+
+## Why
+<problem this solves>
+
+## Done-criteria
+1. <an observable result in this leaf's ownership, never a test file, assertion or test count; proof may be a command the destination's `checks` already run (never a `merge_checks` command, and never one the leaf adds to `checks`, which holds only repo-wide invariants) or the own-test, end-to-end, real-outside-call and live-run forms standing-design.md allows; no repo-health claim outside leaf ownership>
+```
+
+```markdown
+# Design: <leaf>
+
+## Binding decisions, verbatim
+<each applicable binding decision, retaining heading, answer, reason and
+foreclosed alternatives>
+
+<installed path of standing-design.md, then the current interpretation: how its rules apply to this leaf>
+
+## Leaf architecture
+<owned surfaces, literal interfaces, exclusions with their owners and necessary dependencies; for each state or precondition the change alters, the consumer (file and function) that relies on it and either the decision or an `Open for the plan:` question; existing code is called reusable only when its preconditions were checked against the changed state, otherwise it is an `Open for the plan:` question; functions are named without line numbers>
+```
+
+Each design is self-contained. Copy every binding decision into each affected leaf, with explicit exclusions for binding decisions that do not belong there. Cross-leaf claims name an owner whose own brief/design accepts that responsibility. Known human-only prerequisites have a named owner and recorded completion before handoff.
+
+### readiness.yaml
+
+The door writes one `<leaf>/readiness.yaml` per leaf with all five sections, leaving unused arrays empty:
+
+```yaml
+inputs:
+  - kind: env
+    name: EXAMPLE_API_TOKEN
+    holder: repo
+    purpose: <what this input unlocks>
+    consumers: [dependent-leaf-slug]
+    steps: <how the operator supplies it>
+    source: <where the value lives>
+    done: <observable presence check>
+  - kind: file
+    name: ca-chain.pem
+    holder: repo
+    purpose: <what this input unlocks>
+    consumers: [dependent-leaf-slug]
+    steps: <how the operator supplies it>
+    source: <where the file lives>
+    done: <observable presence check>
+produces:
+  - name: <artifact the leaf emits>
+    holder: repo
+    consumers: [dependent-leaf-slug]
+    save:
+      entry: <store entry>
+      revision: <revision tag>
+      args: [<selection arg>]
+      value_source: <where the saved value is read>
+grants:
+  - approved:
+      by: <approver>
+      date: <YYYY-MM-DD>
+      answer: <recorded operator answer>
+    principal: <agent identity>
+    account: <service account>
+    credential:
+      name: <credential name>
+      holder: repo
+    targets: [<external system>]
+    fixtures:
+      - account: <service account>
+        purpose: <why the fixture exists>
+        marker: <fixture marker>
+        naming: <name pattern>
+        count: 1
+        cleanup:
+          - step: <removal step>
+            identity: <who removes it>
+        absence_check: <how absence is confirmed>
+    operations: [<allowed operation>]
+    effects: <what the operations touch>
+    bounds: <limits on use>
+    stop_line: <never-cross condition>
+retained:
+  - resources: [<kept resource>]
+    purpose: <why it is kept>
+    owner: <responsible party>
+    remove_by: <YYYY-MM-DD>
+    cost: <ongoing cost>
+    exposure: <who can reach it>
+    cleanup:
+      identity: <who removes it>
+      route: <how removal runs>
+    reason: <why removal waits>
+proofs:
+  - operation: <external operation>
+    command: <command executed>
+    identity: <identity used>
+    target: <system exercised>
+    version: <version under proof>
+    date: <YYYY-MM-DD>
+    result: <observed outcome>
+    cleanup: <post-proof cleanup>
+    limits: <what the proof does not cover>
+    record: issues/chart/<chart>/forks/<fork>.md
+```
+
+```yaml
+slug: sample-change
+phase: plan.synthesis  # plan.positions when debate: 'yes'
+created: '2026-09-11'
+repo: registered-key
+debate: 'no'
+blocked-by: []
+sources: []
+```
+
+Replace sample values with the chosen slug, creation date and registered repo key. `debate: 'no'` starts at `plan.synthesis`; `debate: 'yes'` starts at `plan.positions`. Debate is one door election, default no, with very small issues using no without a question. A direct-route chart writes no leaf files or state.yaml. Every leaf gets `sources`, empty when unsourced. Attempts, done, fix_rounds, frozen, frozen_cited, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
+
+A GitHub report has exactly one completion owner, an issue or an epic: every leaf beneath that owner carries its exact identity in sources. For an epic owner, that includes leaves of every child issue. Do not distribute one identity across unrelated completion owners. Legacy source paths stay in intake provenance, not sources. One stated exception: a report whose close depends on a step on main that can only follow a leaf's merge is withheld from `sources` of every leaf whose completion could close it; the identity stays open, mirrored by `akrogon pull`, and the door makes and verifies the edit, then runs `akrogon close <id> --by <text>` naming what delivered it.
+
+Each identity compared during intake resolves to one outcome. A confirmed full match with no existing owner copies verbatim into INTAKE.md under its own `Source` heading with a GitHub provenance line, and its identity goes into `sources` of every leaf under the delivering completion owner so existing completion closes it. A partial match stays open and is shown with its uncovered part. An identity already in any open or closed leaf `sources` or another chart intake is shown to the operator as a conflict and is never silently reassigned. A failed or non-GitHub destination pull holds the handoff to that destination only and is reported; checking a destination never imports unrelated seeds.
+
+## Preflight and validation
+
+Prepare the complete contracts and attended handoff review before writing. Check all proposed destination folders and index files for occupancy, including partial leaf folders without state.yaml, and refuse the handoff on any collision. Before any handoff write, also refuse an existing `issues/closed/<top-level-owner-folder-name>` and name that conflicting destination, even if empty or missing state and indexes. The completion owner is the standalone issue or the epic, not a nested child issue. Never overwrite a sentinel brief or reuse an occupied leaf destination. Refuse a leaf whose What, done-criteria or owned surfaces touch any path under `issues/`, since a leaf branch carries code only and `akrogon phase` rejects `issues/` diffs; such work is a step on main, not a leaf: the door makes and verifies it during the pass when its precondition exists, otherwise it is a Pending steps record, never an Off-route entry. Check slug uniqueness across open/closed and the proposal. Resolve every blocked-by slug to an existing leaf folder with valid state or a proposed prerequisite, and refuse missing targets and circular prerequisites before writes. Emit prerequisite leaves before dependents so no written state names a not-yet-created prerequisite. Refuse the handoff while any fork file lacks an operator answer — under autopilot, an answer recorded as A's per `SKILL.md` `## Autopilot` counts — or `## Fog` is not empty. An A answer under autopilot never covers an approval; grant approval, fixture retention and secret-save approval stay operator-only. Refuse the handoff when a brief names an external operation with no recorded proof under the Take operation-proof rule. Refuse a handoff to a destination whose check right before the handoff review did not succeed, and name that destination. Run `akrogon preflight` at the registered root before any handoff write and refuse the handoff on non-zero exit, handing the printed remediation to the operator.
+
+Read the briefs as an implementer: each criterion can be fulfilled within ownership and dependencies, cross-leaf promises have a matching owner, all binding decisions have a home or explicit exclusion, and known human prerequisites are complete. A done-criterion states an observable result in the leaf's ownership, never a test file, assertion or test count; proof may come from a command in the destination's blocking `checks` or the own-test, end-to-end, real-outside-call and live-run forms standing-design.md allows; the audit refuses a criterion naming a test file, assertion or test count, citing a `merge_checks` command or claiming repo health outside leaf ownership, refuses a live-run done-criterion that runs sessions one after another without naming the shared resource that forces serial order, and refuses a live-run done-criterion that names a session count, which belongs in the handoff review line, and allows a repo-wide `checks` command only when the chart names the property no smaller test proves. A cost criterion names the structural work removed, such as one browser launch per run, or less than a baseline measured on the same host with before and after recorded, and the audit refuses a guessed wall-second or CPU-second cap. The audit refuses a product leaf whose done-criterion depends on machinery that does not exist on the destination's default branch, unless a prerequisite leaf in the same handoff delivers it and the product leaf lists that leaf in `blocked-by`, so the machinery exists at the product leaf's `AKROGON_BASE`. The audit also refuses a leaf that owns the complete stop (removal, loud refusal or running guard, per the lesson rule's Retire clause) for a lesson its `sources` trace to (a `sources` seed whose body names a `learnings/history` path) without a retirement done-criterion naming that history path; a leaf that only touches the lesson is not required to retire it. For every `blocked-by` entry the door writes into the dependent's brief, under What or Why, the output it consumes; when that output is a part the producer could merge with its own proof, the door proposes that part as a prerequisite leaf, with no count, size or duration trigger and no recorded reason for a kept bundle. Missing machinery that can be proven alone is proposed as that prerequisite leaf, with one known-good case passing and one deliberate break failing as its done-criterion; otherwise the door narrows the criterion with the operator at the handoff review. Obtain the operator's go-ahead for this concrete tree and contracts, honoring session authorization already given. The audit checks that operation-proof refusal.
+
+A chart with a chain names the spine command and a stage table; each stage-owning leaf gets a done-criterion putting its stage in the spine and deleting obsolete stand-ins (blocked-by where it needs the spine first); the chart names the rule owner when writer and checker sit in different leaves; a slow-run leaf's brief states its repair scope and final-proof rule; and the audit refuses a stage-owning leaf without the spine criterion (rules live in standing-design.md, not restated here).
+
+Write the leaf files and immediate-child indexes directly at the registered root. Write brief.md, design.md and readiness.yaml before state.yaml, and a prerequisite leaf's files before its dependents', because dispatch picks up any folder holding a state.yaml. Then run `akrogon status` there and inspect the actual result. It parses states with the command's schema, parses each leaf's readiness.yaml and checks repo/slug consistency; a readiness.yaml that does not parse fails validation. It does not prove source ownership, dependency existence or prose quality, which require the preceding audit. A failed validation is an unfinished handoff requiring repair, not permission to mark the chart handed off. A successful handoff retains the chart and original inputs, appends the handoff date and runs no dispatch; the door then moves to the next chart as SKILL.md's Drain states.

@@ -1,0 +1,13 @@
+opened: '2026-10-17T17:28:20Z'
+seats:
+  - seat: A
+    pane: w8:pT7
+    harness: pi
+    session: /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-live--/2026-10-17T17-26-33-452Z_01a14ae6-aaec-75c2-ae0e-a5042dcf92dd.jsonl
+  - seat: A
+    pane: w8:pT7
+    harness: pi
+    session: /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-80cf0603-door-reset-live--/2026-10-17T17-28-31-702Z_01a14ae8-78d6-75c2-ae0e-a5079d074c93.jsonl
+spans:
+  - from: '2026-10-17T17:28:54Z'
+    to: '2026-10-17T17:28:54Z'
