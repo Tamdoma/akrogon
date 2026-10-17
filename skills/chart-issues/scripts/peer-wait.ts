@@ -240,8 +240,6 @@ async function finish(
 ): Promise<never> {
   const agent: ListAgent = await readPeerAgent(pane);
   const session: string | null = agent.agent_session?.value ?? null;
-  // the last read also adopts a session that first appeared during the wait, as every grace check does
-  if (exchange.session === null) exchange.session = session;
   const line: string = JSON.stringify({ outcome, pane, file, status, signal, exchange, session });
   process.stdout.write(`${line}\n`);
   process.exit(0);
