@@ -1,0 +1,29 @@
+slug: peer-restart
+phase: merged
+created: 2026-10-17
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#99"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tD6
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pS5
+  B: w8:pS6
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-17T10:44:49.177Z
+frozen:
+  tests/peer-restart.test.ts: bdd3069cafb84156114b1593f8fa099b75c07d89
+frozen_cited: []

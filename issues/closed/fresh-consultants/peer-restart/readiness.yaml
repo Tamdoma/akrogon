@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr pane close + pane split + agent start for consultant panes
+    command: herdr pane close <pane>; herdr pane split <A pane> --direction right --ratio 0.65 --cwd <root> --no-focus; herdr pane split <B pane> --direction down --ratio 0.5 --cwd <root> --no-focus; herdr agent start slot-b --kind codex --pane <id>; herdr agent start slot-c --kind pi --pane <id>
+    identity: local operator account (no credential)
+    target: consultant panes w8:pNQ, w8:pPY in tab w8:tBD
+    version: herdr 0.9.1
+    date: '2026-10-17'
+    result: new panes w8:pRX (codex, session none until first turn, adopted by peer-wait) and w8:pRY (pi, new session file at start); one peer-ask exchange each ended done, signal proven
+    cleanup: none needed, the new panes are the live consultants
+    limits: no-argument launches only
+    record: issues/chart/fresh-consultants/forks/restart-rule.md
+  - operation: herdr pane process-info argv pass-through on restart
+    command: herdr pane process-info --pane <id>; herdr agent start probe-g --kind codex --pane <new id> -- -c model_reasoning_effort=high; herdr agent start probe-h --kind pi --pane <id> -- --append-system-prompt probe
+    identity: local operator account (no credential)
+    target: throwaway panes split from w8:pNP
+    version: herdr 0.9.1
+    date: '2026-10-17'
+    result: codex argv identical after close + split + start (w8:pR0 to w8:pS1); pi argument passed through
+    cleanup: probe panes closed, absent from herdr agent list
+    limits: argv passed as an array; settings changed inside a running agent are not in argv and are not preserved
+    record: issues/chart/fresh-consultants/forks/restart-rule.md

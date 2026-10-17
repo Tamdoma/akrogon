@@ -1,0 +1,35 @@
+slug: usage-spans
+phase: merged
+created: 2026-10-17
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#100"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tD7
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pS7
+  B: w8:pS8
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-17T11:32:23.392Z
+frozen:
+  tests/chart-usage.test.ts: 8a63b370e91d4a43951b18837535abc77c195af7
+  tests/fixtures/chart-usage/README.md: e9e83105f63c04ef4c321364e69607e9b0a6d384
+  tests/fixtures/chart-usage/claude/claude-spans.jsonl: c65962c0f4106c96614f5a67c025be8bfa671aa1
+  tests/fixtures/chart-usage/codex/rollout-tur.jsonl: 93cd72993acf29c3a94fdaa61aad50c347a9486f
+  tests/fixtures/chart-usage/pi/pi-A.jsonl: 63a7bf21fb85a11573a6971dc0aa8baa9b521b55
+  tests/fixtures/chart-usage/pi/pi-nousage.jsonl: 00efb358ef4bf2dc320f04a59eabd198010868ce
+  tests/fixtures/chart-usage/pi/pi-zero.jsonl: 10f29f8dc4f184202f6ae1a1ffb78739767f4eb0
+frozen_cited: []
