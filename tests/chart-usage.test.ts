@@ -13,12 +13,13 @@ const until: string = '2026-10-06T20:16:00Z';
 type RunResult = { code: number; stdout: string; stderr: string };
 
 type Seat = { seat: string; harness: string; session: string };
+type SpanEntry = { from: string; to?: string };
 
 type World = {
   chart: string;
   parent: string;
   chartDir: (name: string) => string;
-  putSeats: (chart: string, seats: Seat[], openedAt?: string) => void;
+  putSeats: (chart: string, seats: Seat[], openedAt?: string, spans?: SpanEntry[]) => void;
   putTranscript: (harness: string, session: string, file: string, extraDir?: string) => void;
   run: (...args: string[]) => Promise<RunResult>;
   clean: () => void;
@@ -41,7 +42,7 @@ function setup(): World {
       mkdirSync(d, { recursive: true });
       return d;
     },
-    putSeats: (c: string, seats: Seat[], openedAt: string = opened): void => {
+    putSeats: (c: string, seats: Seat[], openedAt: string = opened, spans?: SpanEntry[]): void => {
       const lines: string[] = [`opened: '${openedAt}'`];
       if (seats.length === 0) lines.push('seats: []');
       else lines.push('seats:');
@@ -52,6 +53,13 @@ function setup(): World {
           `    harness: ${s.harness}`,
           `    session: ${s.session}`,
         );
+      if (spans !== undefined) {
+        lines.push('spans:');
+        for (const sp of spans) {
+          lines.push(`  - from: '${sp.from}'`);
+          if (sp.to !== undefined) lines.push(`    to: '${sp.to}'`);
+        }
+      }
       writeFileSync(resolve(c, 'seats.yaml'), lines.join('\n') + '\n');
     },
     putTranscript: (harness: string, session: string, file: string, extraDir?: string): void => {
@@ -103,13 +111,13 @@ test('writes USAGE.md, counts transcripts exactly, prints summary and outcome do
     expect(md).toContain('claude-fable-5-1');
     expect(md).toContain('effort high');
     expect(md).toContain('turns 19');
-    expect(md).toContain('assistant messages 152');
+    expect(md).toContain('calls 152');
     expect(md).toContain('working minutes 99.4');
     expect(md).toContain('output_tokens 270787');
     expect(md).toContain('input_tokens 326');
     expect(md).toContain('cache_read_input_tokens 19768778');
     expect(md).toContain('cache_creation_input_tokens 638581');
-    expect(md).not.toContain('assistant messages 346');
+    expect(md).not.toContain('calls 346');
     // seat B: codex counters read as differences, never summed
     expect(md).toContain('seat B');
     expect(md).toContain('harness codex');
@@ -235,7 +243,7 @@ test('two sessions of one seat are added and an ended session shows whole-sessio
     const r: RunResult = await w.run(w.chart, until);
     expect(r.code).toBe(0);
     const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
-    expect(md).toContain('assistant messages 153');
+    expect(md).toContain('calls 153');
     expect(md).toContain('output_tokens 270977');
     expect(md).toContain('input_tokens 341');
     expect(md).toContain('totalCostUSD 1.2345');
@@ -295,7 +303,7 @@ test('a codex counter reset marks the seat usage unmeasured and partial', async 
     expect(row).toContain('usage unmeasured');
     expect(row).toMatch(/reset|decreas|counter/i);
     // seat A still measured
-    expect(md).toContain('assistant messages 152');
+    expect(md).toContain('calls 152');
   } finally {
     w.clean();
   }
@@ -343,7 +351,7 @@ test('unmeasured seats name the file or field; other seats still measure', async
     expect(unmeasured.find((l: string) => l.includes('seat F'))).toMatch(/watson/);
     expect(unmeasured.find((l: string) => l.includes('seat G'))).toMatch(/claude-broken\.jsonl/);
     expect(unmeasured.find((l: string) => l.includes('seat G'))).toMatch(/message\.usage/);
-    expect(md).toContain('assistant messages 152');
+    expect(md).toContain('calls 152');
   } finally {
     w.clean();
   }
@@ -359,7 +367,7 @@ test('non-operator user records start no turn and an unfinished turn is incomple
     const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
     expect(md).toContain('operator turns 3');
     expect(md).toContain('operator wait 10.0 min');
-    expect(md).toContain('assistant messages 3');
+    expect(md).toContain('calls 3');
     expect(md).toContain('turns 2');
     expect(md).toContain('working minutes 10.0');
     expect(md).toContain('output_tokens 810');
@@ -398,6 +406,279 @@ test('missing chart folder or bad seats.yaml exit non-zero with no USAGE.md', as
     expect(r4.code).toBe(1);
     expect(r4.stderr).toMatch(/seats/);
     expect(readdirSync(w.chart)).toEqual(['seats.yaml']);
+  } finally {
+    w.clean();
+  }
+});
+
+test('spans filter records, calls and minutes into their half-open windows', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    // t1=10:00 t2=10:20 t3=10:30; last span open, until 12:00
+    w.putSeats(
+      w.chart,
+      [{ seat: 'A', harness: 'claude', session: 'claude-spans' }],
+      '2026-10-06T09:30:00Z',
+      [{ from: '2026-10-06T10:00:00Z', to: '2026-10-06T10:20:00Z' }, { from: '2026-10-06T10:30:00Z' }],
+    );
+    w.putTranscript('claude', 'claude-spans', 'claude/claude-spans.jsonl');
+    const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
+    expect(r.code).toBe(0);
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    expect(md).toContain(
+      'window 2026-10-06T10:00:00.000Z to 2026-10-06T10:20:00.000Z, 2026-10-06T10:30:00.000Z to 2026-10-06T12:00:00.000Z (open)',
+    );
+    expect(md).not.toContain('legacy window');
+    // groups g1, g2, g4 placed by final record: 3 calls; g3 (last record in gap), g6 (after spans) excluded
+    expect(md).toContain('calls 3');
+    expect(md).toContain('average context per call 5133');
+    expect(md).toContain('output_tokens 850');
+    expect(md).toContain('input_tokens 1400');
+    expect(md).toContain('cache_read_input_tokens 11000');
+    expect(md).toContain('cache_creation_input_tokens 1500');
+    // gap and edge records never leak: none of the 9000-token sentinels appear
+    expect(md).not.toContain('9000');
+    // turn 1 10:00-10:19 = 19 min; turn 2 10:35-10:45 clipped to the open span = 5 min
+    expect(md).toContain('turns 2');
+    expect(md).toContain('working minutes 24.0');
+    expect(md).toContain('first turn in window 2026-10-06T10:00:00.000Z 19.0 min');
+    expect(md).toContain('operator wait 24.0 min');
+    expect(md).toContain('operator turns 2');
+    const opRows: string[] = md.split('\n').filter((l: string) => /^  2026-10-06T10:/.test(l));
+    expect(opRows).toHaveLength(2);
+    expect(opRows[0]).toContain('2026-10-06T10:00:00.000Z 19.0 min');
+    expect(opRows[1]).toContain('2026-10-06T10:35:00.000Z 5.0 min');
+    expect(r.stdout).not.toContain('USAGE_LEAK_MARKER');
+    expect(md).not.toContain('USAGE_LEAK_MARKER');
+
+    // a closed span ending after until is clipped at until
+    w.putSeats(
+      w.chart,
+      [{ seat: 'A', harness: 'claude', session: 'claude-spans' }],
+      '2026-10-06T09:30:00Z',
+      [{ from: '2026-10-06T10:00:00Z', to: '2026-10-06T12:30:00Z' }],
+    );
+    const r2: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
+    expect(r2.code).toBe(0);
+    const md2: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    expect(md2).toContain('calls 5');
+    expect(md2).toContain('working minutes 40.0');
+
+    // a span starting at or after until counts nothing
+    w.putSeats(
+      w.chart,
+      [{ seat: 'A', harness: 'claude', session: 'claude-spans' }],
+      '2026-10-06T09:30:00Z',
+      [{ from: '2026-10-06T13:00:00Z', to: '2026-10-06T14:00:00Z' }],
+    );
+    const r3: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
+    expect(r3.code).toBe(0);
+    const md3: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    expect(md3).toContain('calls 0');
+    expect(md3).toContain('average context per call n/a');
+    expect(md3).toContain('output_tokens 0');
+    expect(md3).toContain('working minutes 0.0');
+    expect(md3).not.toContain('operator turns 1');
+    expect(md3).not.toContain('first turn in window');
+  } finally {
+    w.clean();
+  }
+});
+
+test('invalid spans exit non-zero, name the field and write no USAGE.md', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    w.putTranscript('claude', 'claude-spans', 'claude/claude-spans.jsonl');
+    const seats: Seat[] = [{ seat: 'A', harness: 'claude', session: 'claude-spans' }];
+    const cases: { name: string; spans: SpanEntry[]; field: RegExp }[] = [
+      {
+        name: 'to not after from',
+        spans: [{ from: '2026-10-06T10:00:00Z', to: '2026-10-06T10:00:00Z' }],
+        field: /spans.*to|to.*from/i,
+      },
+      {
+        name: 'out of order',
+        spans: [
+          { from: '2026-10-06T10:30:00Z', to: '2026-10-06T10:40:00Z' },
+          { from: '2026-10-06T10:00:00Z', to: '2026-10-06T10:10:00Z' },
+        ],
+        field: /spans/i,
+      },
+      {
+        name: 'overlapping',
+        spans: [
+          { from: '2026-10-06T10:00:00Z', to: '2026-10-06T10:35:00Z' },
+          { from: '2026-10-06T10:30:00Z', to: '2026-10-06T10:40:00Z' },
+        ],
+        field: /spans/i,
+      },
+      {
+        name: 'non-last span open',
+        spans: [{ from: '2026-10-06T10:00:00Z' }, { from: '2026-10-06T10:30:00Z', to: '2026-10-06T10:40:00Z' }],
+        field: /spans.*to|to.*required|open/i,
+      },
+    ];
+    for (const c of cases) {
+      w.putSeats(w.chart, seats, '2026-10-06T09:30:00Z', c.spans);
+      const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
+      expect(r.code).not.toBe(0);
+      expect(r.stderr).toMatch(/spans/);
+      expect(r.stderr).toMatch(c.field);
+      expect(readdirSync(w.chart)).toEqual(['seats.yaml']);
+    }
+  } finally {
+    w.clean();
+  }
+});
+
+test('claude calls and average context per call', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    // no spans: legacy window, window line named, records at exactly until excluded
+    w.putSeats(w.chart, [{ seat: 'A', harness: 'claude', session: 'claude-spans' }], '2026-10-06T10:00:00Z');
+    w.putTranscript('claude', 'claude-spans', 'claude/claude-spans.jsonl');
+    const r: RunResult = await w.run(w.chart, '2026-10-06T10:45:00Z');
+    expect(r.code).toBe(0);
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    expect(md).toContain('legacy window 2026-10-06T10:00:00.000Z to 2026-10-06T10:45:00.000Z');
+    // g1..g6 all inside -> calls 4 counted + g3 and g6 = 6 groups? g1,g2,g3,g4,g5,g6 -> 6 distinct message.ids
+    expect(md).toContain('calls 6');
+    // context: g1 200+2000+300, g2 300+3000+400, g3 9000+9000+9000, g4 600+5000+600, g5 700+6000+700, g6 9000+9000+9000
+    // = 2500 + 3700 + 27000 + 6200 + 7400 + 27000 = 73800 / 6 = 12300
+    expect(md).toContain('average context per call 12300');
+    expect(md).toContain('output_tokens 19385');
+  } finally {
+    w.clean();
+  }
+});
+
+test('codex token_usage_record calls skip compacted copies', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    w.putSeats(
+      w.chart,
+      [{ seat: 'A', harness: 'codex', session: 'codex-tur' }],
+      '2026-10-06T09:30:00Z',
+      [{ from: '2026-10-06T10:00:00Z', to: '2026-10-06T10:20:00Z' }, { from: '2026-10-06T10:30:00Z' }],
+    );
+    w.putTranscript('codex', 'codex-tur', 'codex/rollout-tur.jsonl');
+    const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
+    expect(r.code).toBe(0);
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    // resp-1, resp-2, resp-4 count; resp-3 sits in the gap; the embedded copy inside compacted is never counted
+    expect(md).toContain('calls 3');
+    // context = input_tokens only (cached never added): 100+200+300 = 600 / 3 = 200
+    expect(md).toContain('average context per call 200');
+    expect(md).toContain('input_tokens 600');
+    expect(md).toContain('cached_input_tokens 330');
+    expect(md).toContain('output_tokens 180');
+    expect(md).toContain('reasoning_output_tokens 60');
+    // token_count cumulative line is ignored in this mode: none of its 9000 values leak
+    expect(md).not.toContain('9000');
+    expect(md).toContain('fixture-codex');
+    expect(md).toContain('turns 2');
+    expect(md).toContain('operator turns 1');
+  } finally {
+    w.clean();
+  }
+});
+
+test('cumulative-only rollout prints calls unavailable', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    w.putSeats(w.chart, [{ seat: 'B', harness: 'codex', session: 'codex-diff' }], '2026-10-06T10:30:00Z');
+    w.putTranscript('codex', 'codex-diff', 'codex/codex-diff.jsonl');
+    const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
+    expect(r.code).toBe(0);
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    // cumulative counters still measured; no per-response records exist
+    expect(md).toContain('calls unavailable (cumulative-only rollout)');
+    expect(md).toContain('input_tokens 660');
+    expect(md).toContain('output_tokens 130');
+    expect(md).not.toContain('average context per call');
+    expect(md).toContain('legacy window');
+  } finally {
+    w.clean();
+  }
+});
+
+test('pi calls, compaction and error entries', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    const session: string = resolve(fixtures, 'pi/pi-A.jsonl');
+    w.putSeats(
+      w.chart,
+      [{ seat: 'C', harness: 'pi', session }],
+      '2026-10-06T09:30:00Z',
+      [{ from: '2026-10-06T10:00:00Z', to: '2026-10-06T10:20:00Z' }, { from: '2026-10-06T10:30:00Z' }],
+    );
+    const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
+    expect(r.code).toBe(0);
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    // calls: 3 stop/toolUse assistants + compaction with usage + nonzero-usage... zero-usage error skipped;
+    // gap record 10:25 and post-span 10:45 excluded -> a1, compaction, a3, a5 = 4 + error-zero skipped
+    expect(md).toContain('calls 4');
+    // context: 1300 + 3700 + 2500 + 4900 = 12400? hand-computed below:
+    // a1 100+1000+200=1300, comp 300+3000+400=3700, a3 200+2000+300=2500, a5 400+4000+500=4900 -> 12400/4 = 3100
+    expect(md).toContain('average context per call 3100');
+    expect(md).toContain('input_tokens 1000');
+    expect(md).toContain('cache_read_input_tokens 10000');
+    expect(md).toContain('cache_creation_input_tokens 1400');
+    expect(md).toContain('output_tokens 260');
+    // usage.reasoning maps to reasoning_output_tokens, kept out of context and output: 2+2+1+2=7
+    expect(md).toContain('reasoning_output_tokens 7');
+    expect(md).not.toContain('9000');
+    expect(md).toContain('harness pi');
+    expect(md).toContain('fixture-pi-1');
+    expect(md).toContain('effort high');
+    // turns mirror claude: user at 10:00 -> last assistant before 10:35 is 10:19 = 19 min;
+    // user at 10:35 -> 10:38 clipped by span end 10:40? end is replyEnd 10:38 = 3 min... hand-computed 19+3=22
+    expect(md).toContain('operator turns 2');
+    expect(md).toContain('turns 2');
+    expect(md).not.toContain('USAGE_LEAK_MARKER');
+  } finally {
+    w.clean();
+  }
+});
+
+test('mixed sessions print calls unavailable; zero calls print n/a; missing pi path is unmeasured', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    const piA: string = resolve(fixtures, 'pi/pi-A.jsonl');
+    // seat B: one measurable pi session + one cumulative-only codex rollout -> calls unavailable, tokens still print
+    w.putSeats(
+      w.chart,
+      [
+        { seat: 'B', harness: 'pi', session: piA },
+        { seat: 'B', harness: 'codex', session: 'codex-diff' },
+        { seat: 'D', harness: 'pi', session: resolve(fixtures, 'pi/pi-nousage.jsonl') },
+        { seat: 'E', harness: 'pi', session: resolve(fixtures, 'pi/pi-zero.jsonl') },
+        { seat: 'F', harness: 'pi', session: resolve(w.parent, 'pi-does-not-exist.jsonl') },
+      ],
+      '2026-10-06T09:30:00Z',
+      [{ from: '2026-10-06T10:00:00Z', to: '2026-10-06T12:30:00Z' }],
+    );
+    w.putTranscript('codex', 'codex-diff', 'codex/codex-diff.jsonl');
+    const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
+    expect(r.code).toBe(0);
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    const bSection: string = md.split('\n\n').find((s: string) => s.startsWith('seat B'))!;
+    expect(bSection).toContain('calls unavailable');
+    expect(bSection).toContain('input_tokens');
+    expect(bSection).not.toContain('average context per call');
+    // pi assistant without usage -> unmeasured naming the field
+    const dRow: string = md.split('\n').find((l: string) => l.includes('seat D'))!;
+    expect(dRow).toContain('usage unmeasured');
+    expect(dRow).toMatch(/usage/);
+    // pi session with only a zero-usage error -> measured, zero calls, n/a average
+    const eSection: string = md.split('\n\n').find((s: string) => s.startsWith('seat E'))!;
+    expect(eSection).toContain('calls 0');
+    expect(eSection).toContain('average context per call n/a');
+    // missing pi path -> unmeasured naming the path
+    const fRow: string = md.split('\n').find((l: string) => l.includes('seat F'))!;
+    expect(fRow).toContain('usage unmeasured');
+    expect(fRow).toContain('pi-does-not-exist.jsonl');
+    expect(r.stdout.trimEnd().split('\n').at(-1)).toBe('outcome partial');
   } finally {
     w.clean();
   }

@@ -1,0 +1,3 @@
+{"type": "session", "version": 3, "id": "pi-nousage", "timestamp": "2026-10-06T11:59:00.000Z", "cwd": "/x"}
+{"type": "message", "id": "m-12:00:00.000Z", "parentId": "p", "timestamp": "2026-10-06T12:00:00.000Z", "message": {"role": "user", "content": "USAGE_LEAK_MARKER"}}
+{"type": "message", "id": "m-12:10:00.000Z", "parentId": "p", "timestamp": "2026-10-06T12:10:00.000Z", "message": {"role": "assistant", "content": "USAGE_LEAK_MARKER", "model": "fixture-pi-1", "thinkingLevel": "high", "stopReason": "stop"}}
