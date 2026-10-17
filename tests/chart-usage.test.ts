@@ -486,11 +486,11 @@ test('spans filter records, calls and minutes into their half-open windows', asy
     const r4: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
     const md4: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
     expect(md4).toContain('calls 0');
-    // ...while the legacy window keeps its inclusive until boundary and counts g7 at 12:00
+    // ...and the legacy window is the same half-open [opened, until): g7 at 12:00 is excluded
     w.putSeats(w.chart, [{ seat: 'A', harness: 'claude', session: 'claude-spans' }], '2026-10-06T11:00:00Z');
     const r5: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
     const md5: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
-    expect(md5).toContain('calls 1');
+    expect(md5).toContain('calls 0');
     expect(md5).toContain('legacy window');
   } finally {
     w.clean();
@@ -605,13 +605,13 @@ test('claude calls and average context per call', async (): Promise<void> => {
     expect(r.code).toBe(0);
     const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
     expect(md).toContain('legacy window 2026-10-06T10:00:00.000Z to 2026-10-06T10:45:00.000Z');
-    // g1..g6 all inside -> calls 4 counted + g3 and g6 = 6 groups? g1,g2,g3,g4,g5,g6 -> 6 distinct message.ids
-    expect(md).toContain('calls 6');
-    // context: g1 200+2000+300, g2 300+3000+400, g3 9000+9000+9000, g4 600+5000+600, g5 700+6000+700, g6 9000+9000+9000
-    // = 2500 + 3700 + 27000 + 6200 + 7400 + 27000 = 73800 / 6 = 12300
-    expect(md).toContain('average context per call 12300');
-    // output is max per group: 100 + 150 + 9000 + 600 + 180 + 9000 = 19030
-    expect(md).toContain('output_tokens 19030');
+    // g1..g5 inside; g6 lands exactly at until and the legacy [opened, until) window excludes it -> 5 calls
+    expect(md).toContain('calls 5');
+    // context: g1 200+2000+300, g2 300+3000+400, g3 9000+9000+9000, g4 600+5000+600, g5 700+6000+700
+    // = 2500 + 3700 + 27000 + 6200 + 7400 = 46800 / 5 = 9360
+    expect(md).toContain('average context per call 9360');
+    // output is max per group: 100 + 150 + 9000 + 600 + 180 = 10030
+    expect(md).toContain('output_tokens 10030');
   } finally {
     w.clean();
   }
@@ -676,18 +676,18 @@ test('pi calls, compaction and error entries', async (): Promise<void> => {
     const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
     expect(r.code).toBe(0);
     const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
-    // calls: 3 stop/toolUse assistants + compaction with usage; the zero-usage error is skipped;
-    // gap record 10:25 and post-span 10:45 excluded -> a1, compaction, a3, a5 = 4
-    expect(md).toContain('calls 4');
+    // calls: 3 stop/toolUse assistants + the nonzero-usage error at 10:15 + compaction with usage;
+    // the zero-usage error is skipped; gap record 10:25 and post-span 10:45 excluded -> 5
+    expect(md).toContain('calls 5');
     expect(md).toContain('seat A (harness pi');
-    // context: a1 100+1000+200=1300, comp 300+3000+400=3700, a3 200+2000+300=2500, a5 400+4000+500=4900 -> 12400/4 = 3100
-    expect(md).toContain('average context per call 3100');
-    expect(md).toContain('input_tokens 1000');
-    expect(md).toContain('cache_read_input_tokens 10000');
-    expect(md).toContain('cache_creation_input_tokens 1400');
-    expect(md).toContain('output_tokens 260');
-    // usage.reasoning maps to reasoning_output_tokens, kept out of context and output: 2+2+1+2=7
-    expect(md).toContain('reasoning_output_tokens 7');
+    // context: a1 1300, comp 3700, err-nonzero 610, a3 2500, a5 4900 -> 13010/5 = 2602
+    expect(md).toContain('average context per call 2602');
+    expect(md).toContain('input_tokens 1050');
+    expect(md).toContain('cache_read_input_tokens 10500');
+    expect(md).toContain('cache_creation_input_tokens 1460');
+    expect(md).toContain('output_tokens 290');
+    // usage.reasoning maps to reasoning_output_tokens, kept out of context and output: 2+2+3+1+2=10
+    expect(md).toContain('reasoning_output_tokens 10');
     expect(md).not.toContain('9000');
     expect(md).toContain('harness pi');
     expect(md).toContain('fixture-pi-1');
