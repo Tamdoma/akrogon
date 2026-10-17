@@ -5,7 +5,7 @@ import { readState, saveState, type State } from '../src/state';
 import type { Result } from '../src/shell';
 import type { Database } from './fake-herdr';
 
-const columns: string[] = ['LEAF', 'PHASE', 'AGE', 'BLOCKED BY', 'NOTE', 'TURN'];
+const columns: string[] = ['LEAF', 'PHASE', 'TIME', 'BLOCKED BY', 'NOTE', 'TURN'];
 function cell(output: string, row: string, name: string): string {
   const lines: string[] = output.split('\n');
   const header: string = lines

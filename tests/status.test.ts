@@ -16,7 +16,7 @@ import { command, type Result } from '../src/shell';
 import { z } from 'zod';
 import { readState, saveState, stateSchema, type State } from '../src/state';
 
-const columns: string[] = ['LEAF', 'PHASE', 'AGE', 'BLOCKED BY', 'NOTE', 'TURN'];
+const columns: string[] = ['LEAF', 'PHASE', 'TIME', 'BLOCKED BY', 'NOTE', 'TURN'];
 function cell(output: string, row: string, name: string): string {
   const lines: string[] = output.split('\n');
   const header: string = lines
@@ -70,6 +70,22 @@ function mergeRecord(slug: string, minutes: number): string {
 function log(f: Fixture, lines: string[]): void {
   writeFileSync(resolve(f.root, 'issues/log.jsonl'), lines.join('\n') + '\n');
 }
+function prompt(slug: string, minutes: number, outcome: 'delivered' | 'failed' = 'delivered'): string {
+  return JSON.stringify({
+    kind: 'prompt',
+    slug,
+    slot: 'A',
+    phase: 'plan.synthesis',
+    visit: 0,
+    session: null,
+    outcome,
+    ts: new Date(Date.now() - minutes * 60000).toISOString(),
+    repo: 'repo',
+  });
+}
+function timings(f: Fixture, lines: string[]): void {
+  writeFileSync(resolve(f.root, 'issues/timings.jsonl'), lines.join('\n') + '\n');
+}
 function snapshot(path: string): Record<string, string> {
   return Object.fromEntries(
     readdirSync(path, { recursive: true, withFileTypes: true }).map((item) => {
@@ -113,6 +129,7 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
       event('broken', 'failed', 7),
       event('ordinary', 'failed', 0),
     ]);
+    timings(f, [prompt('broken', 30)]);
     const env: NodeJS.ProcessEnv = fakeHerdr(f).env;
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const otherBefore: Record<string, string> = snapshot(resolve(g.root, 'issues'));
@@ -131,7 +148,7 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     expect(noteText).toContain('B:nits');
     expect(noteText).not.toContain('w1:t9');
     expect(cell(result.stdout, row, 'BLOCKED BY')).toBe('missing');
-    expect(cell(result.stdout, row, 'AGE')).toBe('7m');
+    expect(cell(result.stdout, row, 'TIME')).toBe('0h23m');
     const epic: number = rows.findIndex((line) => line.trim() === 'epic');
     const job: number = rows.findIndex((line) => line.trim() === 'job');
     const broken: number = rows.indexOf(row);
@@ -148,7 +165,7 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     expect(cell(result.stdout, ordinary, 'PHASE')).toBe('implement');
     expect(cell(result.stdout, ordinary, 'NOTE')).toBe('');
     expect(cell(result.stdout, ordinary, 'BLOCKED BY')).toBe('');
-    expect(cell(result.stdout, ordinary, 'AGE')).toBe('-');
+    expect(cell(result.stdout, ordinary, 'TIME')).toBe('-');
     expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
     expect(snapshot(resolve(g.root, 'issues'))).toEqual(otherBefore);
     expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
@@ -158,26 +175,57 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
   }
 });
 
-test('age is unavailable for missing, empty, unrelated and future history and uses file order', async () => {
+test('time runs from the first delivered prompt to now for a running leaf and is unavailable without one', async () => {
   const f: Fixture = await fixture();
   try {
     leaf(f, 'timed', 'implement');
     const first: string = (await cli(f, ['status'])).stdout;
-    expect(cell(first, leafRow(first, 'timed'), 'AGE')).toBe('-');
-    for (const lines of [
-      [],
-      [event('other', 'implement', 1)],
-      [event('timed', 'merge', 1)],
-      [event('timed', 'implement', -10)],
-    ]) {
-      log(f, lines);
+    expect(first).not.toContain('AGE');
+    expect(cell(first, leafRow(first, 'timed'), 'TIME')).toBe('-');
+    for (const lines of [[], [prompt('timed', 30, 'failed')], [prompt('other', 30)]]) {
+      timings(f, lines);
       const result: Result = await cli(f, ['status']);
       expect(result.code).toBe(0);
-      expect(cell(result.stdout, leafRow(result.stdout, 'timed'), 'AGE')).toBe('-');
+      expect(cell(result.stdout, leafRow(result.stdout, 'timed'), 'TIME')).toBe('-');
     }
-    log(f, [event('timed', 'implement', 1), event('timed', 'implement', 12)]);
+    timings(f, [prompt('timed', 40, 'failed'), prompt('timed', 12), prompt('timed', 5)]);
     const aged: string = (await cli(f, ['status'])).stdout;
-    expect(cell(aged, leafRow(aged, 'timed'), 'AGE')).toBe('12m');
+    expect(cell(aged, leafRow(aged, 'timed'), 'TIME')).toBe('0h12m');
+  } finally {
+    f.clean();
+  }
+});
+
+test('time for a merged or failed leaf stops at its move into that phase and does not grow', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'landed', 'merged');
+    leaf(f, 'broke', 'failed');
+    leaf(f, 'unmoved', 'merged');
+    leaf(f, 'reversed', 'failed');
+    const write = (shift: number): void => {
+      timings(f, [
+        prompt('landed', 1100 + shift),
+        prompt('broke', 40 + shift),
+        prompt('unmoved', 20 + shift),
+        prompt('reversed', 10 + shift),
+      ]);
+      log(f, [
+        event('landed', 'merged', 52 + shift),
+        event('broke', 'failed', 11 + shift),
+        event('reversed', 'failed', 15 + shift),
+      ]);
+    };
+    write(0);
+    const now: string = (await cli(f, ['status'])).stdout;
+    write(60);
+    const later: string = (await cli(f, ['status'])).stdout;
+    for (const output of [now, later]) {
+      expect(cell(output, leafRow(output, 'landed'), 'TIME')).toBe('17h28m');
+      expect(cell(output, leafRow(output, 'broke'), 'TIME')).toBe('0h29m');
+      expect(cell(output, leafRow(output, 'unmoved'), 'TIME')).toBe('-');
+      expect(cell(output, leafRow(output, 'reversed'), 'TIME')).toBe('-');
+    }
   } finally {
     f.clean();
   }
