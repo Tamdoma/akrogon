@@ -1,0 +1,32 @@
+slug: known-red-pass
+phase: merged
+created: 2026-10-17
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#98"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tD3
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pRQ
+  B: w8:pRR
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-17T09:35:21.115Z
+frozen:
+  tests/docs-links.test.ts: 9d85c70f0159c722a8701316ea338bdc103b42ce
+  tests/helpers.ts: 2110eecb26eb636d22befaae7c29f4790f615b74
+  tests/receipt-gates.test.ts: 989c678afe6d1fe01f31b7ca36799319cd4c43bb
+  tests/verify.test.ts: c4dbef77fd995127158831ba8e247d522d990487
+frozen_cited: []

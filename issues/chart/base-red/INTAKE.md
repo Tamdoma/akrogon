@@ -6,6 +6,7 @@ When main turns red with no commit (clock, environment), one detection and one r
 ## Provenance
 - GitHub: Tamdoma/akrogon#98
 - Operator: 2026-10-17 chart-issues invocation
+- Operator: 2026-10-17 autopilot switch-on (2026-10-17T08:36:16Z)
 
 ## Source: Tamdoma/akrogon#98
 # Base turns red without a commit and every leaf rediscovers it: seat skills assume main stays green because each commit once passed verify
@@ -77,6 +78,9 @@ Related reports, from a search of Tamdoma/akrogon in all states ("base red verif
 
 ## Source: operator 2026-10-17
 I've pulled the new issues in. Please let's chart them out. You can only use slot B which is active in the pane next to you.
+
+## Source: operator 2026-10-17 autopilot switch-on
+run autopilot on base-red (#98), loop-counts (#97) and failed-cause (#96), consultants B and C (active in this pane)
 
 ## Agent findings
 See slots/map-merged.md (A,B with rebuttal corrections). Key points:

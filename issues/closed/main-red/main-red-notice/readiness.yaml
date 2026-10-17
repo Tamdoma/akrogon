@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr notification for a new main-red incident
+    command: 'herdr notification show "akrogon charting proof: base-red" --body "Test of the main-red notice call. No action needed." --sound none'
+    identity: operator's local herdr session (no credential)
+    target: herdr workspace w8 desktop notification
+    version: herdr 0.9.1
+    date: '2026-10-17'
+    result: 'exit 0, stdout {"id":"cli:notification:show","result":{"reason":"shown","shown":true,"type":"notification_show"}}'
+    cleanup: none, a notification with no stored state
+    limits: does not prove delivery outside herdr, that the operator saw it, or behavior when herdr is absent
+    record: issues/chart/base-red/forks/red-notice.md

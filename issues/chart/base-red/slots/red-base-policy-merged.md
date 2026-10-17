@@ -30,3 +30,13 @@ Tags name the slot whose own notes hold the line.
 ## Open after this fork
 - Who repairs main (operator by hand, or a door-charted fix leaf), and which existing event resumes waiting work after an environment fix with no commit. (A,B)
 - Clock prevention scope. (A,B)
+
+## Addendum after C joined (2026-10-17, autopilot)
+C's blind notes: red-base-policy-C.md.
+- C picks known reds pass in reduced form: after the red retry and the seat's no-cause judgment, `akrogon verify` runs the exact base fresh (no reuse on the base side), extracts failing units from both logs with the existing `failedTests` (src/flaky.ts:10), and passes when every red unit on the head is also red on the base, both runs complete with setup 0. `requireGreenReceipt` accepts that head+base pair wherever it accepts a green receipt (check.review, merge --check, direct-guards). First fresh red base receipt per tree+scope+unit sends one notice, later joins silent. No wait, no resume, no incident record, no `failed` for a base red; the false "never a base defect" sentence is deleted. Matches the 2026-10-10 operator decision. (C)
+- C rejects the hybrid (leaf continues, landing waits): a leaf that adds no failure does not make main redder by landing; holding only at merge moves the pileup into the serialized merge queue, the #67 pattern. (C)
+- C rejects shared wait: most machinery, contradicts 10-10, stale-clear races (2026-10-10 red-main-hold lesson). (C)
+- C rejects restoring the deleted trio (base-run verb, red-record file, seat comparison records): receipts plus existing unit extraction carry the same facts. (C)
+- Cost: one fresh base run per leaf that hits a persistent unexplained red, only while main is red; main can stay red while clean work lands, so repair rests on the notice. A new break inside an already-red unit can hide. (C)
+- Open (C): who decided dc2e2b0; non-test commands (typecheck, format) have no units; whether done-criteria proofs are covered; what is written when the fresh base is green.
+- A's answers to those: dc2e2b0 was authored by the operator 2026-10-14 and no chart records the reason (A checked changed-test-proof, night-flow, check-evidence, merge-green-rate); unitless commands block; done-criteria proofs stay blocking (10-10); a green fresh base writes nothing and the leaf stays on its repair path. (A)

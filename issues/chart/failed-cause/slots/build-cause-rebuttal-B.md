@@ -1,0 +1,5 @@
+# B rebuttal
+
+- F1 `build-cause-merged.md:9` labels the historical failed-transition count as “What remains.” That log includes the base-red incidents this chart expects the separate policy to remove, including `issues/log.jsonl:1032` and `:1033`. Present it as historical volume, not the remaining failure population or a measured post-change rate. The taken policy is not yet evidence of that reduction, as line 8 correctly states. Evidence: `issues/log.jsonl:581`, `:590`, `:591`, `:675`, `:685`, `:1032`, `:1033`, and my build-cause notes Q1.
+
+- F2 `build-cause-merged.md:9` says a missed recovery is bounded by the failure notice. A notice supplies visibility, not a bound on detection or recovery time, and delivery can fail or be suppressed. The existing log records `delivery: rate_limited`, while the notification reply contains no human acknowledgement. Keep the accepted risk explicit: work can remain failed until someone investigates. This does not change my no-build recommendation. Evidence: `issues/log.jsonl:602`, `src/phase.ts:97`, `:104`, `skills/watch-issues/SKILL.md:40`.

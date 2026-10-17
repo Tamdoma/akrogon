@@ -8,3 +8,7 @@ seats:
     pane: w8:pNQ
     harness: codex
     session: 01a148d2-b706-7d93-acd8-744c86365e07
+  - seat: C
+    pane: w8:pPY
+    harness: pi
+    session: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-10-15T19-43-57-606Z_01a14117-bea6-728a-9455-0db743e0cf11.jsonl

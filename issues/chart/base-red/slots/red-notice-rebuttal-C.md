@@ -1,0 +1,5 @@
+# C rebuttal: red-notice
+
+D1. Tag cites C against C's own open question. Q1 bullet: "A failed send never fails verify: record reason or `error`, print it, retry at the next relevant verify. No timer, no side effect in status. (A,B,C)". I wrote the never-fails and retry parts (red-notice-C.md Pick and P2). I did not write "no side effect in status": my Q-a asks whether a derived `akrogon status` line should be in scope, which the merged notes themselves record two bullets later as "(C asks, A defers)". Retag the status clause to its actual slot.
+
+D2. Tag cites C for an acceptance C did not state. Q1 bullet: "Decide the sender under the verify-runs lock; accept an occasional duplicate after an uncertain delivery. (A,B,C)". The lock decision is mine (P1). The duplicate acceptance is not in my notes: my retry rule keys on the recorded delivery, and I did not address the crash-after-send-before-record case. Retag that clause, or record it as an open consequence of the retry rule for the leaf to settle.

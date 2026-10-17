@@ -1,0 +1,30 @@
+slug: main-red-notice
+phase: merged
+created: 2026-10-17
+repo: akrogon
+debate: "no"
+blocked-by:
+  - known-red-pass
+sources:
+  - "Tamdoma/akrogon#98"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tD5
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pRV
+  B: w8:pRW
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-17T10:00:15.193Z
+frozen:
+  tests/verify.test.ts: dbccafc0b967737238380ab62fb2137d45ff9a32
+frozen_cited: []
