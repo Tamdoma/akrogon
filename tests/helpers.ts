@@ -251,7 +251,9 @@ export function greenReceipt(
 ): void {
   seedRun(f, {
     sha,
-    tree: Bun.spawnSync(['git', 'rev-parse', `${sha}^{tree}`], { cwd: f.root }).stdout.toString().trim(),
+    tree: Bun.spawnSync(['git', 'rev-parse', `${sha}^{tree}`], { cwd: f.root })
+      .stdout.toString()
+      .trim(),
     scope,
     commands: commands.map((item) => ({ ...item, exit: 0, log: resolve(f.home, 'verified.log') })),
   });

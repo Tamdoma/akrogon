@@ -1,17 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  cli,
-  fakeAkrogon,
-  fixture,
-  greenReceipt,
-  leaf,
-  seedRun,
-  storeDir,
-  yaml,
-  type Fixture,
-} from './helpers';
+import { cli, fakeAkrogon, fixture, greenReceipt, leaf, seedRun, storeDir, yaml, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
 import { readRepo, type Repo } from '../src/config';
 import { readState } from '../src/state';
@@ -371,11 +361,7 @@ test('verify removes each command TMPDIR on success and failure', async () => {
 
 // The failing script's `(fail)` lines name a tracked file's content, so the
 // same configured command fails differently on the head and base trees.
-async function failureScript(
-  f: Fixture,
-  name: string,
-  extra: Record<string, string> = {},
-): Promise<void> {
+async function failureScript(f: Fixture, name: string, extra: Record<string, string> = {}): Promise<void> {
   writeFileSync(
     resolve(f.root, 'check.sh'),
     `name=$(cat failure); echo "(fail) $name"; for p in ${Object.keys(extra).join(' ')}; do echo "(fail) $p"; done; exit 7\n`,
