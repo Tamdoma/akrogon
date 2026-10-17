@@ -804,3 +804,27 @@ test('a pending notice left by a dead process does not block the next send', asy
     f.clean();
   }
 });
+
+test('a green on the same revision clears only the earlier main-red incident', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'one.ts');
+    expect((await cli(f, ['verify', '--known-red'], worktree, env)).code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(1);
+
+    const base: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+    greenReceipt(f, base, 'leaf');
+    await commitIn(worktree, 'two.ts');
+    expect((await cli(f, ['verify', '--known-red'], worktree, env)).code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(2);
+
+    await commitIn(worktree, 'three.ts');
+    expect((await cli(f, ['verify', '--known-red'], worktree, env)).code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(2);
+  } finally {
+    f.clean();
+  }
+});
