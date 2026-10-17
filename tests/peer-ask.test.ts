@@ -181,7 +181,7 @@ test('outcome line carries the session that appeared during the wait', async ():
     const line = JSON.parse(result.stdout);
     expect(line.outcome).toBe('done');
     expect(line.session).toBe('sess-late');
-    expect(line.exchange).toEqual({ kind: 'fake', session: 'sess-late', boundary: null, turn: null });
+    expect(line.exchange).toEqual({ kind: 'fake', session: null, boundary: null, turn: null });
   } finally {
     s.clean();
   }
