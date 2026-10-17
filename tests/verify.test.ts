@@ -400,7 +400,8 @@ test('verify --known-red reruns the failing command on a fresh checkout of the e
     expect(result.stdout).toContain(`verify known-red ${head}: pass`);
     const runs: VerifyRun[] = records(f);
     const headRun: VerifyRun | undefined = runs.find((run) => run.sha === head);
-    const baseRun: VerifyRun | undefined = runs.find((run) => run.sha === base);
+    const baseRun: VerifyRun | undefined = runs.find((run) => run.compares === headRun?.run);
+    expect(baseRun?.sha).toBe(base);
     expect(headRun?.commands.map((item) => item.exit)).toEqual([7]);
     expect(baseRun?.compares).toBe(headRun?.run);
     expect(baseRun?.commands.map((item) => item.exit)).toEqual([7]);
