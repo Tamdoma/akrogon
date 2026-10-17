@@ -29,7 +29,7 @@ const contracts: Record<string, string> = {
   flaky: '',
   log: '<path>',
   'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
-  verify: '[--sha <rev>] [--attempt <id>] [--holder <dir>]',
+  verify: '[--sha <rev>] [--attempt <id>] [--holder <dir>] [--known-red]',
   'stop-run': '[<run-id>]',
   pack: '<folder>...',
   guard: '<ancestors|own-modules>',
