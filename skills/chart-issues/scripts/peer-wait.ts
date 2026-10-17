@@ -51,8 +51,8 @@ const exchangeSchema = z.object({
   turn: z.string().nullable(),
 });
 
-type Exchange = z.infer<typeof exchangeSchema>;
-type ListAgent = z.infer<typeof agentListSchema>['result']['agents'][number];
+export type Exchange = z.infer<typeof exchangeSchema>;
+export type ListAgent = z.infer<typeof agentListSchema>['result']['agents'][number];
 
 type RunResult = { code: number; stdout: string; stderr: string };
 type Outcome = 'done' | 'blocked' | 'failure' | 'budget';
@@ -113,7 +113,7 @@ async function runWait(pane: string, timeoutMs: number, until: string[]): Promis
   }
 }
 
-async function readPeerAgent(pane: string): Promise<ListAgent> {
+export async function readPeerAgent(pane: string): Promise<ListAgent> {
   const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(['herdr', 'agent', 'list'], {
     stdin: 'ignore',
     stdout: 'pipe',
@@ -132,7 +132,7 @@ async function readPeerAgent(pane: string): Promise<ListAgent> {
   return agent;
 }
 
-function piAuthority(live: ListAgent): boolean {
+export function piAuthority(live: ListAgent): boolean {
   return live.agent === 'pi' && live.agent_session?.source === 'herdr:pi' && live.screen_detection_skipped === true;
 }
 
@@ -156,7 +156,7 @@ function checkIdentity(pane: string, live: ListAgent, exchange: Exchange): void 
 
 // herdr shows a Claude pane idle during long silent thinking, so for Claude the session
 // transcript decides: the turn is open until a turn_duration entry follows the last prompt.
-function claudeTurnOpen(session: string): boolean {
+export function claudeTurnOpen(session: string): boolean {
   const matches: string[] = Array.from(
     new Bun.Glob(`*/${session}.jsonl`).scanSync({ cwd: `${homedir()}/.claude/projects`, absolute: true }),
   );
@@ -175,7 +175,7 @@ function claudeTurnOpen(session: string): boolean {
 
 // Codex proves its turn through the rollout: bind the first task_started written after the
 // pre-prompt boundary, then end only on that turn's task_complete or turn_aborted.
-function codexRollout(session: string): string | null {
+export function codexRollout(session: string): string | null {
   const root: string = `${homedir()}/.codex/sessions`;
   if (!existsSync(root)) return null;
   const matches: string[] = Array.from(
@@ -184,7 +184,7 @@ function codexRollout(session: string): string | null {
   return matches.length === 1 ? matches[0] : null;
 }
 
-function codexEnded(exchange: Exchange): Verdict {
+export function codexEnded(exchange: Exchange): Verdict {
   if (exchange.session === null || exchange.boundary === null) return 'unproven';
   const rollout: string | null = codexRollout(exchange.session);
   if (rollout === null) return 'unproven';

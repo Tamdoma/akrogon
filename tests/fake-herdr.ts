@@ -40,6 +40,9 @@ const scriptEntrySchema = z.object({
   append: z.string().optional(),
   appendTo: z.string().optional(),
 });
+const promptEntrySchema = scriptEntrySchema.extend({
+  session: z.string().optional(),
+});
 const waitEntrySchema = scriptEntrySchema.extend({
   status: paneSchema.shape.agent_status.optional(),
   sleepMs: z.number().optional(),
@@ -68,7 +71,7 @@ const databaseSchema = z.object({
   starts: z.array(z.array(z.string())).default([]),
   startCgroups: z.array(z.object({ pane: z.string(), cgroup: z.string() })).default([]),
   startScript: z.array(scriptEntrySchema).default([]),
-  promptScript: z.array(scriptEntrySchema).default([]),
+  promptScript: z.array(promptEntrySchema).default([]),
   renameScript: z.array(scriptEntrySchema).default([]),
   closeScript: z.array(scriptEntrySchema).default([]),
   waitScript: z.array(waitEntrySchema).default([]),
@@ -253,10 +256,16 @@ if (args[0] === 'agent' && args[1] === 'start') {
 }
 if (args[0] === 'agent' && args[1] === 'prompt') {
   const target: FakePane = pane(args[2]);
-  if (!['idle', 'done'].includes(target.agent_status)) throw new Error('Prompt sent to non-idle fixture');
-  if (flag('--until') !== 'working' || !args.includes('--wait') || flag('--timeout') !== '5000')
+  if (!['idle', 'done', 'working'].includes(target.agent_status)) throw new Error('Prompt sent to non-idle fixture');
+  if (args.includes('--wait') && (flag('--until') !== 'working' || flag('--timeout') !== '5000'))
     throw new Error('Wrong prompt wait contract');
   const scripted = db.promptScript.shift();
+  if (scripted?.session !== undefined)
+    target.agent_session = {
+      kind: target.agent_session?.kind ?? 'id',
+      value: scripted.session,
+      source: target.agent_session?.source,
+    };
   if (scripted?.append !== undefined) {
     const target_path: string | undefined =
       scripted.appendTo ?? (target.agent_session?.kind === 'path' ? target.agent_session.value : undefined);
