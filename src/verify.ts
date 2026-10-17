@@ -205,6 +205,7 @@ async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[]): Promis
       const resolved: boolean = await (async () => {
         for (const green of runs) {
           if (!completed(green)) continue;
+          if (green.end! <= run.end!) continue;
           const hit = matching(green, unit);
           if (hit === undefined || hit.exit !== 0) continue;
           if (!(await onMain(green.sha))) continue;
