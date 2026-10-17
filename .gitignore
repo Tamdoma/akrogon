@@ -17,3 +17,4 @@ releases/
 issues/open/**/*.log
 issues/parked/**/*.log
 issues/chart/*/direct/**/*.log
+issues/**/scratch/
