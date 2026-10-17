@@ -146,6 +146,8 @@ CHART.md records the mode record and the `## Autopilot` section per shapes.md, w
 
 Handover happens only when switching to the next runnable handed chart, after the outgoing chart's records are written and its span closed: old A creates the next chart's folder when absent (INTAKE.md plus CHART.md with its mode record), appends `handover <time> <log>: handed <remaining list>; consultants <surviving>` to the mode record of every handed chart still open, runs `bun <skill-folder>/scripts/door-reset.ts <A pane> <A session> <log> <start prompt>` and ends its turn. The start prompt names A's pane, the handover time, the next handed item, its absolute chart folder and the absolute path to this skill. The fresh session continues only when that prompt names its pane and next item and matches the latest handover entry and time in that chart's mode record; it appends `continue autopilot (handover <time>)` and continues the same handed list. Without that start prompt or when it does not match, a new session starts attended. Handover is supported for claude (`/clear`), codex and pi (`/new`); every other kind keeps same-session behavior.
 
+For a next chart whose folder old A creates for this handover, defer `seats.yaml` creation to fresh A, overriding Open's folder-creation rule. Fresh A creates that record on entry with `opened` and its first span's `from` set to its entry time, and its first A seat uses its live `agent_session.value`. Existing charts keep their original `opened` time and append the new session as usual.
+
 ## Printed footer
 
 End each door pass with the actual result and reason no automatic pass follows, printed rather than saved:
