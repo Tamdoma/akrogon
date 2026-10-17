@@ -1,0 +1,479 @@
+10/16/26, 5:04 PM                                         Building an AI Software Factory
+
+
+
+
+    Building an AI Software Factory
+    https://gemini.google.com/app/73df5ea086bc2d67
+
+    User prompt: Subject: https://youtu.be/GQatuTWSRqY?si=GyktakHxUgnJmIeV For: an agentic beginner
+    trying to understand where the human in the loop is still necessary, while automating as much as possible
+    Research the {{Subject}} thoroughly before explaining (for software libraries, use Context7; otherwise
+    search the web and prefer primary sources. Avoid SEO-heavy articles like listicles and obivious content
+    made for search engines only. Prioritize recent research for more recent topics). Then teach it to me in two
+    parts. Part 1, the foundations. Explain from first principles what this is, why it exists, and what problem it
+    solves. Start from zero and build in numbered steps, where each step relies only on the steps before it.
+    Define every term the first time it appears, use one concrete analogy per new idea, and follow any code,
+    formula, or jargon-heavy example with a plain-English translation. Part 2, the architecture. Once the parts
+    are built, zoom out and teach me to see it as a whole system: the major parts and what each is responsible
+    for, how they connect and what flows between them, where the boundaries are, and what depends on
+    what. For each key design decision, explain what problem it solves and what it costs. Show where the
+    system tends to break or get misused, and give me the questions I should ask myself whenever I work with
+    it, so I can reason through new situations on my own instead of memorizing rules. End with one realistic
+    walk-through that uses everything together with a real life example fit for {{Audience}}, then what it means
+    for me given who I am and what I want to do with it.
+
+    Response: In My AI Dark Factory Dream Is Dead (Here's What Actually Works), AI engineer Cole Medin
+    shares the post-mortem of his multi-month experiment building a fully autonomous coding system—and
+    why he abandoned pure autonomy in favor of a structured AI Software Factory [00:18].
+
+    His core thesis is reinforced by recent industry research, including Dan Shapiro’s taxonomy of AI coding
+    autonomy, StrongDM’s lights-out engineering experiments, and HumanLayer CEO Dex Horthy’s research
+    on Why Software Factories Fail: even if AI models achieved perfect coding intelligence, 100% hands-
+    off software generation would still fail because of the human intent bottleneck and silent codebase
+    decay [00:47].
+
+    Part 1: The Foundations (From First Principles)
+    To understand where a human must remain in the loop—and what can be safely automated—we need to
+    build the concepts from the ground up in seven sequential steps.
+
+    1. Coding Agents vs. "Vibe Coding"
+            Definition: A Large Language Model (LLM) is an AI system trained to predict and generate text or
+            code. A Coding Agent is an LLM given tools to interact with your computer—it can read files, run
+            terminal commands, execute tests, and write code autonomously. Vibe Coding is the practice of
+            casually prompting an AI in a chat window ("build me a login page") and hoping the output works
+            without a strict engineering process [02:04].
+
+            Analogy: Vibe coding is like shouting recipe ideas at an talented chef from across the restaurant and
+            hoping the dish tastes right.
+
+            The Problem It Solves: Coding agents eliminate the manual typing of boilerplate code, but without
+            structure, they produce unpredictable, fragile results.
+
+    2. The Agentic Harness
+            Definition: A Harness is the deterministic software scaffolding—scripts, rules, workflows, tool
+            permissions, and test runners—that wraps around a coding agent and forces it to follow a strict step-
+            by-step engineering procedure [02:10].
+
+
+https://gemini.google.com/app/73df5ea086bc2d67                                                                       1/8
+10/16/26, 5:04 PM                                             Building an AI Software Factory
+
+
+            Analogy: If the AI model is a powerful wild horse, the harness is the bridle, reins, and fenced track
+            that force its raw energy to pull a carriage along a specific road.
+
+            Jargon Example & Translation:
+
+                    Jargon: "We don't rely on zero-shot prompt adherence at runtime; we enforce deterministic
+                    state transitions in the harness."
+
+                    Plain English: Instead of politely asking the AI to remember to test its code, we write a wrapper
+                    script that physically blocks the AI from finishing its task until the automated test suite passes.
+
+    3. The 5 Levels of Autonomy and "The Dark Factory"
+            Definition: Popularized by Dan Shapiro (modeled after self-driving car levels), the 5 Levels of AI
+            Coding Autonomy measure how much of the engineering loop the AI owns [02:47]:
+
+                    Level 1–2 (Intern / Pair Programmer): You write code alongside the AI and read every line as
+                    it is written.
+
+                    Level 3 (Developer as Manager): The AI writes the code; you review every Pull Request (PR)
+                    —a formal bundle of proposed code changes waiting to be merged into the main project.
+
+                    Level 4 (Product Engineer): You write detailed specifications (specs), let agents build for
+                    hours, and check the final outcomes.
+
+                    Level 5 (The Dark Factory): Named after FANUC’s "lights-out" robotics factories in Japan
+                    where robots build robots in total darkness because no humans are on the floor. In a Software
+                    Dark Factory, you feed in a high-level document for an entire application, and agents split the
+                    work, write the code, test it, and deploy it straight to live users (production) with zero human
+                    intervention [00:00].
+
+            Analogy: A Level 5 Dark Factory is a self-driving car with no steering wheel and no brake pedals—
+            you type in the destination city and go to sleep in the back seat [03:04].
+
+    4. Why the Dark Factory Fails: The Intent Gap & Codebase Sprawl
+    Why did both Cole Medin and Dex Horthy dial back from Level 5? Because of two fundamental failure
+    modes that better AI models cannot fix:
+
+        1. The Intent Bottleneck: As models get smarter at writing code, they do not become psychic [03:35].
+           Humans cannot write a single prompt that anticipates every product nuance, edge case, or user
+           feeling. When a Dark Factory encounters an unstated requirement, it guesses—compounding small
+           misunderstandings into software you didn't actually want [06:24].
+
+        2. Codebase Sprawl (Silent Maintainability Decay): Coding agents are trained via reinforcement
+           learning to make tests pass as fast as possible. As Dex Horthy demonstrated in Why Software
+           Factories Fail, agents left alone over weeks will duplicate logic, bypass existing architectural patterns,
+           and create "spaghetti code" (sprawl) [04:32]. Every individual change passes its tests, but the overall
+           system becomes impossible to maintain.
+
+            Analogy: Imagine hiring 50 contractors to build a mansion from a one-page sketch with no architect
+            on site. Whenever two hallways don't line up, a contractor just builds a crooked staircase to connect
+            them. Technically you can walk from room to room, but the house is structurally absurd.
+
+    5. From Dark Factory to "AI Software Factory" (Scoping via Epics)
+
+
+https://gemini.google.com/app/73df5ea086bc2d67                                                                            2/8
+10/16/26, 5:04 PM                                              Building an AI Software Factory
+
+
+            Definition: An AI Software Factory preserves autonomous code execution in the middle of the
+            workflow, but wraps the beginning (planning/scoping) and the end (staging verification) in strict
+            Human-in-the-Loop (HITL) checkpoints [05:48]. Instead of feeding the factory a whole application,
+            you feed it a single bounded Release or Epic (a medium-sized body of work that splits into roughly
+            10 to 20 bite-sized Tickets or Issues, which are individual work orders) [10:20].
+
+            Analogy: Instead of telling an autonomous cruise ship to "sail around the world," you plot the exact
+            coordinates from Port A to Port B, let the autopilot sail that single leg, and inspect the ship at Port B
+            before plotting Port C.
+
+    6. Holdout Scenarios (Preventing "Psychic" Test Gaming)
+            Definition: Borrowing a concept from machine learning and Level 5 adversarial verification (such as
+            StrongDM's scenario testing), a Holdout Scenario is an end-to-end user test defined upfront during
+            planning that is kept secret from the coding agent building the feature [10:53].
+
+            Analogy: If a teacher gives a student the exact 10 questions on tomorrow's exam, the student will
+            memorize those 10 answers without learning the subject (overfitting). A holdout scenario is the
+            sealed exam envelope opened only by an independent proctor after the student finishes studying.
+
+            Jargon Example & Translation:
+
+                    Jargon: "Isolating holdout evaluation scenarios from the implementation agent's context window
+                    prevents reward hacking and test overfitting." [11:12]
+
+                    Plain English: If the coding AI can see the exact test script you use to grade it, it will take lazy
+                    shortcuts just to make that test turn green. Hiding the final test forces the AI to build the feature
+                    properly.
+
+    7. Immutable Context & The Manager Agent
+            Definition:
+
+                    Immutable Context (mission.md / engineering.md): Read-only files containing global
+                    architectural rules and explicit out-of-scope boundaries (what the agent must never build or
+                    touch) [16:40]. The harness blocks agents from editing these files so an agent cannot rewrite
+                    the rules to make its job easier [16:55].
+
+                    Manager Agent: A supervisory AI process that wakes up on a timer (e.g., every 2–3 hours) to
+                    inspect all parallel worker agents, resolve dependency deadlocks, unstick failing tasks, or page
+                    a human when a worker hits its retry limit [15:34].
+
+            Analogy: The immutable context is the factory's safety code bolted to the wall behind locked glass;
+            the Manager Agent is the night-shift floor supervisor walking the catwalk to check for jammed
+            conveyor belts.
+
+    Part 2: The Architecture (Seeing the Whole System)
+    Zooming out, the AI Software Factory operates as a three-stage pipeline (Upfront Planning → The
+    Autonomous Core Loop → Staging Batch Review) supported by two cross-cutting oversight layers (The
+    Manager Agent and Immutable Context).
+
+    [ STAGE 1: HUMAN + FRONTIER AI (Planning & Scoping) ]
+       Human writes Epic PRD + In/Out Scope + Secret Holdout Scenarios
+             │
+
+
+https://gemini.google.com/app/73df5ea086bc2d67                                                                              3/8
+10/16/26, 5:04 PM                                              Building an AI Software Factory
+
+
+
+             ▼
+       Splitter Agent breaks Epic into 10–20 GitHub Issues + Dependency Labels
+       (Optional HITL Toggle: Human approves ticket split)
+             │
+             ▼
+    [ STAGE 2: AUTONOMOUS CORE LOOP ("Running Laps" in Parallel) ]
+       ┌───────────────────────────────────────────────────────────────┐
+       │ 1. Claim Issue (Apply GitHub claim label)                     │
+       │ 2. Complexity Router (Lightweight model: Simple vs. Complex) │
+       │ 3. Builder Agent (Writes code; CANNOT see Holdout Scenarios) │
+       │ 4. Dual Gate:                                                 │
+       │    ├─ App Validation (Browser clickthrough + Holdout Tests)   │
+       │    └─ AI Code Review (Checks simplicity, sprawl, mission.md) │
+       │    (If either fails ──► Loop back to Builder, up to Max Retry)│
+       │ 5. Green CI ──► Auto-Merge Pull Request into STAGING Branch   │
+       └───────────────────────────────────────────────────────────────┘
+             ▲
+             │ (Monitors every 2–3 hrs, unblocks dependencies, or alerts Human)
+       [ MANAGER AGENT ]
+             │
+             ▼
+    [ STAGE 3: HUMAN BATCH VERIFICATION (Staging → Production) ]
+       Human tests compiled Epic in Staging Environment
+       ├─ Bugs/Intent Drift found? ──► Human opens 3–5 fix Issues (back to Stage 2)
+       └─ Intent verified?         ──► Human promotes Staging to PRODUCTION
+
+    Major Components, Connections, and Boundaries
+
+      Component              Responsibility                  Input → Output Flow                 Hard Boundary
+
+                             Defines product intent,         Customer problem →                  Intentionally sits outside
+      1. Human
+                             architectural boundaries,       PRD / Epic Doc +                    the automated harness;
+      Architect
+                             and what is explicitly out of   Holdout Scenarios                   never delegated to the
+      (Stage 1)
+                             scope [10:39].                  [09:36].                            factory [09:22].
+
+                             Breaks the Epic into 10–20      Epic Doc → GitHub
+      2. Splitter &                                                                              Cannot invent product
+                             atomic tickets and maps         Issues tagged with
+      Dependency                                                                                 features outside the Epic's
+                             which tickets depend on         order/dependency labels
+      Mapper                                                                                     scope.
+                             others [11:46].                 [12:00].
+
+                             Evaluates each ticket
+                                                             Claimed GitHub Issue →              Prevents wasting 30
+      3. Complexity          upfront using a fast, cheap
+                                                             Execution path selection            minutes of deep reasoning
+      Router                 model to pick a lightweight
+                                                             (Simple vs. Complex).               on a 5-line fix [14:01].
+                             or deep workflow [14:05].
+
+                                                                                                 Blindfolded boundary:
+                                                             GitHub Issue +                      Cannot read Holdout
+      4. Builder             Implements the ticket                                               Scenarios or modify
+                                                             engineering.md →
+      Agent                  inside an isolated branch.
+                                                             Draft Code / PR.                    mission.md /
+                                                                                                 engineering.md [11:05].
+
+
+https://gemini.google.com/app/73df5ea086bc2d67                                                                                 4/8
+10/16/26, 5:04 PM                                             Building an AI Software Factory
+
+
+
+      Component              Responsibility                Input → Output Flow                  Hard Boundary
+
+                             Validator uses browser/UI
+                                                           Draft PR + Holdout
+                             tools to click buttons and
+      5. Validator &                                       Scenarios → Pass                     Capped by Max Retries
+                             run Holdout Scenarios
+      Reviewer                                             (Merge to Staging) or                [15:15]; cannot loop
+                             [14:31]. Reviewer checks
+      Agents                                               Fail (Send feedback to               forever burning API tokens.
+                             code maintainability and
+                                                           Builder) [15:03].
+                             simplicity [14:47].
+
+                             Wakes up every 2–3 hours
+                                                           Global Repo / Issue State            Escalates to the human
+                             to survey all active laps,
+      6. Manager                                           → Realigned labels,                  rather than guessing when
+                             adjust shifting
+      Agent                                                rescued workflows, or                architectural deadlocks
+                             dependencies, or rescue
+                                                           Human Alert [16:09].                 occur.
+                             stuck PRs [15:34].
+
+                             Holds all merged PRs from     10–20 Merged PRs →
+      7. Staging                                                                                Agents can auto-merge to
+                             the Epic so the human can     Human Batch Feedback
+      Environment                                                                               Staging, but never straight
+                             test the complete release     Issues or Production
+      (Stage 3)                                                                                 to Production [18:23].
+                             in one batch [17:48].         Release [18:14].
+
+
+    Key Design Decisions: What They Solve vs. What They Cost
+        1. Scoping by 10–20 Ticket Epics Instead of Whole Apps
+
+                    Solves: Prevents intent drift. If an agent misunderstands a requirement, the blast radius is
+                    contained to a small release rather than corrupting a massive system [06:37].
+
+                    Costs: Requires consistent upfront human planning energy before every release cycle [09:36].
+
+        2. Separating "App Validation" from "Code Review"
+
+                    Solves: Passing unit tests doesn't mean the UI works, and a working UI doesn't mean the code
+                    is clean. Running an interactive browser validator plus an architectural code-review agent
+                    catches both broken buttons and codebase sprawl [14:31].
+
+                    Costs: Higher token consumption and longer lap execution times per ticket.
+
+        3. Multi-Model Routing Across Nodes
+
+                    Solves: Running a frontier reasoning model on every micro-step drains rate limits and budget.
+                    Using frontier models (e.g., Claude Opus / GPT-level reasoning) strictly for upfront planning and
+                    complex architecture, while routing task triage and simple bug fixes to smaller/faster models,
+                    allows hundreds of laps per week without hitting rate limits [17:05].
+
+                    Costs: Orchestration complexity—you must configure and maintain API credentials and prompts
+                    across multiple model providers.
+
+        4. Batch Human Verification in Staging (Instead of Reviewing Every PR)
+
+                    Solves: Reviewing 20 individual pull requests creates a severe human bottleneck (Level 3
+                    fatigue). Letting the factory auto-merge all 20 tickets into a staging branch lets the human test
+                    the entire feature experience at once and file 3–4 follow-up issues if something feels off [18:09].
+
+                    Costs: Delayed error detection—if Ticket #2 had a subtle UX flaw, you only spot it after Tickets
+                    #3 through #15 have built on top of it in staging.
+
+
+https://gemini.google.com/app/73df5ea086bc2d67                                                                                5/8
+10/16/26, 5:04 PM                                         Building an AI Software Factory
+
+
+
+    Where the System Breaks or Gets Misused
+            Failure Mode 1: The "Vague Epic" Trap. If you feed the Splitter Agent a lazy, two-paragraph prompt
+            instead of a rigorous PRD with explicit Out-of-Scope rules, you have secretly reverted to a Dark
+            Factory. The agents will invent features you didn't ask for [10:44].
+
+            Failure Mode 2: Holdout Contamination. If your Holdout Scenarios accidentally live in a standard
+            /tests folder that the Builder Agent has read-access to, the Builder will read them and hardcode
+            workarounds to pass them [11:25].
+
+            Failure Mode 3: Rule Self-Modification. If you forget to lock permissions on mission.md or
+            engineering.md (or your linter config), a frustrated Builder Agent stuck on Retry #3 will simply
+            delete the linting rule or rewrite engineering.md so its sloppy code passes review [16:55].
+
+            Failure Mode 4: Parallel Merge Collisions. If the Dependency Mapper fails to recognize that Ticket
+            #4 and Ticket #7 both edit the same core database schema, running those laps in parallel will cause
+            severe merge conflicts that require the Manager Agent (or human) to untangle [15:46].
+
+    The 5 Diagnostic Questions to Ask Yourself
+    Whenever you design or troubleshoot an agentic workflow, ask yourself these five questions instead of
+    memorizing rigid rules:
+
+        1. The Intent Question: "If the agent builds something that passes every automated test, could I still
+           hate the result?" If yes, you haven't defined your Out-of-Scope boundaries and Holdout Scenarios
+           tightly enough—or a human needs to approve the spec before code is written.
+
+        2. The Contagion Question: "Can the agent that writes the code see the exact criteria used to grade
+           it?" If yes, expect the agent to game the test. Move the final validation into a separate step with
+           withheld test cases.
+
+        3. The Blast-Radius Question: "What is the worst thing that happens if this step runs 'lights-out' and
+           fails?" If the answer is "corrupts production data or breaks regulatory compliance," turn ON the
+           human-in-the-loop toggle for ticket-split and PR review [12:32]. If the answer is "a staging branch
+           looks weird," turn the toggle OFF [12:45].
+
+        4. The Sprawl Question: "If an agent repeats this implementation pattern 50 times over the next
+           month, will the codebase still be readable?" If no, add that constraint explicitly to your immutable
+           engineering.md and enforce it in the Code Review node.
+
+        5. The Token-ROI Question: "Does this specific node require deep architectural synthesis, or is it
+           following a checklist?" Use frontier models for synthesis; downgrade checklist nodes to fast,
+           lightweight models.
+
+    Realistic Walk-Through: Building an Automated Lead-Routing &
+    Analytics Module
+    Imagine you are an agentic beginner who wants to automate as much software delivery as possible for a
+    web platform, without waking up to a broken production site. You want to add a Client Performance &
+    Lead-Routing Dashboard to an existing web application.
+
+    Step 1: Upfront Human Planning (Human ON)
+
+
+
+https://gemini.google.com/app/73df5ea086bc2d67                                                                    6/8
+10/16/26, 5:04 PM                                         Building an AI Software Factory
+
+
+    Instead of telling an agent "Build me a client lead dashboard and deploy it," you spend 45 minutes working
+    with a high-reasoning model to write epic-lead-dashboard.md:
+
+            In Scope: Webhook endpoint to ingest form submissions, database table for lead attribution, and a
+            filterable UI table showing conversion status.
+
+            Out of Scope (Never Build): Do not build automated email replies, do not alter existing
+            authentication middleware, and do not install new CSS component libraries.
+
+            Secret Holdout Scenarios (Saved outside the Builder's reach):
+
+                1. Send a malformed webhook payload missing the email field → verify the API returns HTTP
+                   400 cleanly without crashing the dashboard UI.
+
+                2. Simulate 2 rapid duplicate submissions with the same lead_id → verify idempotency (only 1
+                   record created).
+
+    Step 2: Splitting & Dependency Mapping (Human Toggle: Quick Check)
+
+    You hand epic-lead-dashboard.md to the Factory's Splitter. It generates 12 GitHub Issues:
+
+            Issue #101: Create database migration for leads table (Label: wave-1, blocking).
+
+            Issue #102: Build webhook ingestion endpoint (Label: wave-2, depends-on-101).
+
+            Issue #103: Build UI filter bar component (Label: wave-2, parallel-safe).
+
+            ...through Issue #112. You spend 3 minutes glancing at the issue titles on GitHub. They look solid,
+            so you trigger the factory loop.
+
+    Step 3: The Autonomous Core Loop (Human OFF — Lights-Out Execution)
+    You walk away from your desk. Over the next two hours:
+
+            Lap 1 claims Issue #101. The Complexity Router flags it as Simple (standard schema migration),
+            routes it to a fast coding model, validates the migration, passes AI code review against
+            engineering.md, and merges the PR into staging.
+
+            Laps 2 and 3 now trigger in parallel (Issue #102 and Issue #103).
+
+            On Issue #102, the Builder writes the webhook endpoint. Then the Validator Agent runs the secret
+            Holdout Scenarios. Holdout #2 fails! The Builder forgot to handle duplicate lead_id payloads. The
+            Validator rejects the PR and sends the error log back to the Builder. On Retry #2, the Builder adds a
+            unique constraint check, passes both the Holdout Scenario and the AI Code Review, and merges to
+            staging.
+
+            Meanwhile, the Manager Agent wakes up at the 2-hour mark, sees all 12 issues have cleanly
+            merged into staging, and sends you a notification: "Epic #4 Ready in Staging."
+
+    Step 4: Batch Staging Review (Human ON)
+
+    You open the staging URL. The database, webhook, and table work—and you didn't write or review a
+    single line of code across 12 pull requests. However, as a human clicking through the UI, you notice the
+    date picker defaults to UTC instead of local time, and the mobile layout feels cramped.
+
+https://gemini.google.com/app/73df5ea086bc2d67                                                                      7/8
+10/16/26, 5:04 PM                                        Building an AI Software Factory
+
+
+            Instead of opening your code editor, you create 2 new GitHub Issues describing those exact visual
+            tweaks.
+
+            The factory automatically claims both issues, runs two quick laps, and merges the fixes to staging
+            in 10 minutes [18:03].
+
+            You refresh staging, confirm the intent matches your vision, and click Deploy to Production
+            [18:23].
+
+    What This Means for You and Your Workflow
+    If your goal is to build productized web infrastructure, automated marketing/SEO systems, or full-stack
+    client deliverables using terminal-based coding agents while keeping overhead minimal, this architecture
+    changes where you spend your leverage:
+
+        1. Stop Being a Line-by-Line PR Reviewer (Escape Level 3): If you use CLI coding agents to
+           generate components, API routes, or schema markups, reading every diff manually is a bottleneck.
+           By investing upfront in an immutable engineering.md (locking in your exact stack conventions—
+           such as Astro/Svelte patterns, Tailwind tokens, and strict file structures) and automated browser/end-
+           to-end validation, you can safely stop reviewing individual ticket PRs and instead review compiled
+           Epics in a staging preview URL.
+
+        2. Productize Your Harness Across Projects: Because the Planning phase is decoupled from the
+           Core Execution Loop, the Core Loop (Splitter → Router → Builder → Holdout Validator → Code
+           Reviewer → Manager) becomes a reusable Engine-as-a-Service. You can drop the exact same
+           factory harness onto any repository, swapping out only the project-specific mission.md and
+           engineering.md.
+
+        3. Shift Your Daily Craft to "Spec & Holdout Engineering": Your highest-value human contribution is
+           no longer typing syntax or babysitting agent terminal loops. It is writing crystal-clear 10–20 ticket
+           Epic specs, defining strict Out-of-Scope guardrails so agents don't bloat client codebases, and
+           designing clever Holdout Scenarios that prove the software actually works in the real world before
+           you ever look at the staging link.
+
+    Interactive Architecture Explorer: Dark Factory vs. AI Software Factory
+    Use the interactive diagram below to toggle between the Level 5 Dark Factory and Cole Medin's AI
+    Software Factory, and click any stage node to inspect what flows through it, where it breaks, and how the
+    Human-in-the-Loop toggles operate.
+
+
+
+
+https://gemini.google.com/app/73df5ea086bc2d67                                                                      8/8
+

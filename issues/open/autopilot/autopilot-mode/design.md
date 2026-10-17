@@ -1,0 +1,68 @@
+# Design: autopilot-mode
+
+## Binding decisions, verbatim
+
+### Intake (issues/chart/autopilot/INTAKE.md)
+Operator 2026-10-16: "when I'm saying the autopilot mode, I'm only talking about the charting phase itself and making sure you pick the best solutions. So I don't hae to be at the computer and choose always the recommended answer because most of the time it's probably correct or sometimes it's not."
+"The default mode is still me being in front of the computer and doing the decisions."
+"even in the autopilot mode, the tab that is doing the autopilot mode still goes through the same process... you should actually go through all the steps and then anser them... except there is no human in the loop for the autopilot system, but you are actually answering the questions yourself."
+"I can use multiple charting processes at the same time... some processes will use autopilot mode while others will not."
+
+### Boundary (issues/chart/autopilot/forks/boundary.md)
+Operator 2026-10-16, verbatim in INTAKE.md "Boundary answer": "if this is gonna be autopilot, then it's gonna be autopilot... I don't want the middle ground." Taken: inside autopilot A answers every question, with the consultants named for that session (none, one or several), judged by the operator's universals (simplicity, function over form, removing over adding, systems thinking, speed, price). Purpose: incoming, non-original work such as bug fixes.
+Binding from the checks: existing checks still stop a handoff and A repairs (K1). A alone has no direct route (K2).
+Operator follow-up "1a, 2a, 3a":
+- Autopilot charts only the work handed at switch-on and pulls in nothing new during the run. Where new incoming work enters is not assigned here: charting is the first part and separate.
+- Approvals for live outside-account changes (grant approval, fixture retention, secret-save approval) wait for the operator. That chart waits and the door moves on (`SKILL.md` Drain).
+- Right after the operator starts /chart-issues in autopilot, once the handed work is read (`SKILL.md` Open import), A shows a best-guess list of things to supply (logins, API keys, files), each with purpose and destination. Approvals are not on it and stay with the operator. The later needs sheet and presence check (`SKILL.md` Take) still run. A missing need found later makes that chart wait.
+- Autopilot never changes its own switch or limits. Only the operator does.
+Foreclosed: a middle ground that holds intent or technical questions for the operator; an earlier per-kind hold list (round questions 1-7 collapsed into the answer).
+
+### Picking (issues/chart/autopilot/forks/picking.md)
+Settled by the Boundary answer: A decides a disagreement that stands after rebuttal and records the dissent. There is no minimum consultant count. A alone runs with no peer steps and no direct route.
+Operator "1a": when a named consultant's exchange ends in failure or blocked, or herdr refuses the prompt, A keeps going with the consultants still working, or alone, and stops using that consultant for the rest of the session. A never re-prompts it. Completed returns are kept. The morning record names the lost consultant, when, and which charts ran without it. If B is lost, the direct route is gone. Foreclosed: B and C's fixed roster at switch-on.
+
+### Switch (issues/chart/autopilot/forks/switch.md)
+Agreed without a question: on in plain words at start (autopilot, handed work, consultants or none), echoed back, with the best-guess needs list after reading the work. The operator's words are copied verbatim into each handed chart's INTAKE.md, plus one mode line in CHART.md with the time and door pane. The handed list is fixed at opening. Switch-on mid-chart is allowed when the words name the chart. The door works only its handed list: Drain is limited to it, with no oldest-chart or seed steps. Overlapping hand-outs hold the overlap. The mode ends when the handed work is all handed off, and a chart waiting on a need stays in autopilot.
+Operator "1a | 2a | 3a":
+- Off early only by the operator saying so in words ("stop", "autopilot off"). Supplying a key or changing the work list keeps it on, and a changed list is recorded as the operator's updated instruction. Once off, A makes no further choice and the next question goes to the operator. An open peer turn is collected first.
+- Compaction is the same session and continues. A replacement session starts attended, and the operator's words "continue autopilot" resume the same handed list. Lost consultants stay lost.
+- Consultants are not shared between autopilot tabs. A named consultant whose pane is recorded in another tab's open chart is skipped, like a lost consultant.
+Foreclosed: any operator message turns it off; a replacement session continues autopilot on its own.
+
+### Watcher seam (issues/chart/autopilot/forks/watcher-seam.md)
+Agreed by A, B and C: the door runs no `akrogon next`. Handed-off leaves are eligible for existing dispatch, and the operator's watcher normally picks them up. There is no review wait, and the lifecycle's checks are the gate. Stated cost: a wrong pick can merge to main, and for akrogon deploy, before the morning record is read. The handoff footer says "handed off", not "started", and names a pause when status shows one. At switch-on the first reply says handed-off work waits for the operator's watcher and that the door cannot check whether it runs. No change to either skill at this seam beyond that line.
+Operator "1a": a failed autopilot leaf that the operator hands to an autopilot door is charted like any other handed work.
+Foreclosed: the door runs `akrogon next`; leaves wait for the operator's review.
+
+### Morning record (issues/chart/autopilot/forks/morning-record.md)
+Agreed by A, B and C:
+- Picks stay in fork Taken as A's, with reason and dissent.
+- There is one short Autopilot section per handed chart in CHART.md, written as the pass goes. It covers the switch-on reference, the consultants and their losses with the affected charts, the route, leaves handed off and verified direct landings, holds with the exact missing need or approval and the next step, picks against the round's recommendation, friction, and the linked usage lines. It records observed states only, never "started" or "merged" without evidence.
+- The pass ends with one line per chart in the door pane.
+- Boundary breaches are shown at the top and never averaged into anything.
+- A correction is recorded verbatim in its fork within its stated scope. Merged work gets fixed as new handed work. Reusable mechanisms become lessons by the existing rule.
+- Autopilot's authority changes only by the operator.
+Operator "1a | 2a": the first autopilot run happens once with the operator around, answering nothing and able to say stop. It is not staging: handed-off work still merges. Overnight use after that is the operator's call. No score: the record shows breaches first, then A's picks, and the operator decides.
+Foreclosed: an attended trial in staging; an acceptance score or threshold.
+
+### Loopholes (issues/chart/autopilot/forks/loopholes.md)
+Operator 2026-10-17 "1a": no direct route under autopilot. Every handed chart goes the lifecycle route to builders and the operator's watcher. Reason: autopilot is charting only. Removes the direct continuations (extra repair rounds, abandon) from autopilot. Foreclosed: 1b direct with no extra rounds or deletion. Where an earlier decision above mentions the direct route under autopilot (Boundary K2, Picking "If B is lost", Morning record "verified direct landings"), this answer governs: no direct route runs under autopilot.
+Operator "2a": after a `budget` outcome with status idle or done and `signal: unproven`, the door waits one more full budget, then drops that consultant for the session like a lost consultant. A return file arriving later is ignored and recorded as ignored. Ordinary working-status budgets are still rerun at once. Cost accepted: a slow but healthy consultant can be dropped. Foreclosed: 2b wait until a clear outcome.
+Operator "3a": a handed job whose step on main waits on its merge is handed off. The step is a Pending steps entry, and the Autopilot record and the pass-end line say "after <leaf> lands, open a chart door to finish <step>", as in attended mode. Foreclosed: 3b hold the whole job.
+Corrections following from recorded answers (slots/loopholes-merged.md, rebuttals): the fork shape and preflight accept an A answer under autopilot, with approvals still operator-only (B); the mode record holds every operator mode change and the latest entry governs (B); the mode ends on `Handed off` or `Closed` markers, and a waiting chart is not terminal (B, C); a waiting chart keeps the mode on across a pass end, and the next operator message in that door resumes it (C); waits cover approvals, mutating proofs before grant approval, missing needs and human-only prerequisites (A, B, C); a full seed match for handed work is A's to confirm, while other seed matches, close offers, flaky tests and failed leaves outside the list are recorded only (A, B, C); overlap is held on the same chart folder, GitHub identity or legacy path, or when A sees the same outcome open in another door, and a simultaneous start is a stated limit (B, C); only another door's open chart causes a consultant skip (C); the skill names the operator's values itself (C); a main step or lesson that would change autopilot's own rules waits for the operator (C); stop counts only in the door's own pane (B); autopilot needs herdr (C); answers given before a mid-chart switch-on stay the operator's (A); "limits" includes existing bounds in the skill (C).
+
+### Split (issues/chart/autopilot/INTAKE.md, "split answer")
+Operator 2026-10-16: "1a", "2a". This leaf and any-consultants are parallel leaves of one issue. The roster count (any number of consultants, in both modes) belongs to any-consultants. This leaf says "the consultants named for the session" and does not restate the roster rule.
+
+/home/ivan/.claude/skills/chart-issues/assets/standing-design.md: this leaf has no auth, secrets, outside accounts or live calls, and its brief names no new external operation. The herdr and akrogon commands it mentions (`herdr agent list`, `akrogon status`) are already in the skill. A reviewer proves the skill and guide text against the binding decisions above. No test asserts skill prose wording, which keeps the proof about function, not exact words. Existing checks still guard what this leaf touches: `tests/chart-shapes.test.ts` parses the `shapes.md` readiness.yaml example, so the shapes.md edit keeps that block intact, and `tests/docs-links.test.ts` covers any link the guide edit adds.
+
+## Leaf architecture
+- Owned: `skills/chart-issues/SKILL.md`, which gets one `## Autopilot` section holding the mode's rules. Elsewhere it changes only where a sentence would contradict autopilot: "This is an attended door" becomes attended by default, and the Open first-reply rule, the Direct route offer and the Handoff review point to the section. The front matter's "Operator-invoked only" stays true, since only the operator switches it on. Also owned: `skills/chart-issues/assets/questions.md` (the exception to "Recommendations and silence cannot supply an operator answer", and the autopilot handling of peer outcomes that today end A's turn, both pointing to the Autopilot section), `skills/chart-issues/assets/shapes.md` (the CHART.md shape gets the mode record and the `## Autopilot` section; the fork shape's Taken and the preflight's "lacks an operator answer" refusal accept an A answer recorded under autopilot) and `docs/guide/chart.md` (one autopilot section).
+- Consumer: `src/status.ts` `lastStage` reads CHART.md lines matching `^(Handed off|Closed|Held)\b` as chart markers, and the last one wins. Every mode record line and Autopilot section line is a list item starting with `- `, so the record cannot end or reopen a chart.
+- Consumer: `skills/chart-issues/scripts/chart-usage.ts` reads `seats.yaml` and is unchanged. The mode record's session id is A's `agent_session.value` from `herdr agent list`, the same value the seat record holds.
+- Session match: a door compares its own A session id with the latest mode record entry. While that entry says on, the same id (compaction) continues. A different id is a replacement and runs attended until the operator says "continue autopilot", and the door then adds a new entry.
+- Other doors: "another door's open chart" is a chart under the registered root's `issues/chart/` whose last marker is not `Handed off`, `Closed` or `Held` and whose latest A seat in `seats.yaml` is on a different pane from this door's A pane. Overlap with it is the same chart folder, a GitHub identity or legacy path in its INTAKE.md provenance (the `SKILL.md` Open dedupe rule), or the same outcome A sees in its Destination. This is detection, not a lock.
+- Peer outcomes: `skills/chart-issues/scripts/peer-ask.ts` and `peer-wait.ts` are unchanged. The autopilot rules read their existing outcome lines (`failure`, `blocked`, `budget` with status and signal, non-zero exit).
+- Excluded: the roster count and pane creation (leaf any-consultants), the direct route's own rules (unchanged, only not offered under autopilot), the watch-issues skill and watcher (operator-run, off route), lifecycle dispatch, `src/`, `tests/`, `issues/`, autopilot for other doors such as learn-issues.
+- Shared lines: leaf any-consultants also edits `SKILL.md` Open and `questions.md`. The leaves run in parallel, and whichever merges second rebases onto the other's text and keeps both outcomes.

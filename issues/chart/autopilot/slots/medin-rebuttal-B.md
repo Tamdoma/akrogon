@@ -1,0 +1,11 @@
+# Medin rebuttal B
+
+**F1. Item 7 reverses B's holdout position.** `medin-B.md:25` explicitly rejects equating blind peer notes with hidden evaluation. Blindness to A's initial answer does not isolate acceptance cases or establish an independent measure of the operator's preferences. **Fix:** remove B from “already give the independent grader property.” Describe blind consultants as independent initial reasoning, and keep outcome-based trial evaluation separate. Medin's cited holdout template also warns that its helper does not enforce privacy.
+
+**F2. Item 5 and D-c misstate B as accepting retrospective review of unresolved intent.** `medin-B.md:5,36` says draft only and hold the affected handoff until the undelegated product assumption is accepted. Line 28 describes retrospective review of work already authorized; it does not authorize shipping guesses. **Fix:** replace the two-way split with the actual distinction: B holds before emitting actionable contracts for unresolved intent, without adding a post-build lifecycle gate or staging. Record separately whether authorized choices receive morning review.
+
+**F3. Item 2's “No toggle machinery (A,B,C)” is not B's position.** `medin-B.md:29` rejects a repo-global switch and copying Medin's configuration, while recommending explicit per-door delegation. It does not settle whether implementing that switch requires machinery. **Fix:** attribute only the per-door authority boundary to B. Leave storage, switch operation and concurrent-door enforcement to Switch.
+
+**F4. An acceptance-rate threshold is not established by StrongDM's satisfaction metric.** The cited factory article measures likely user satisfaction across observed scenario trajectories. Counting accepted chart choices measures something different: many harmless choices can outweigh one severe scope violation, and an operator may change intent after seeing results. **Fix:** present any threshold as C's proposal requiring justification, not a transferred practitioner rule. In Morning record, distinguish wrong intent, violated authority, ordinary preference changes and implementation defects, with consequences. Use that evidence for the operator's continuation decision rather than automatically enabling or ending the mode from one aggregate percentage.
+
+END medin-rebuttal-B

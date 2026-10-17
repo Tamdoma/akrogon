@@ -1,0 +1,4 @@
+# Brief: Morning record fork, slot B
+Fork: /home/ivan/Work/infra/akrogon/issues/chart/autopilot/forks/morning-record.md (Question Q1-Q4 and Carries). Related Taken: forks/boundary.md, picking.md, switch.md, watcher-seam.md. Intake verbatim: INTAKE.md. Last night's notes: /home/ivan/Work/infra/akrogon/issues/chart/sources/autopilot-night-2026-10-16.md. Locks: skills/chart-issues/SKILL.md at f7baddc, CHART.md Off route. Operator values: simplicity, function over form, delete over add, speed, price; operator said "if this is gonna be autopilot, then it's gonna be autopilot".
+Write blind notes per the note definition in /home/ivan/.claude/skills/chart-issues/assets/questions.md "Blind peer exchange". Under 500 words. Do not read slots/morning-record-A.md or the other peer's file.
+Return path: /home/ivan/Work/infra/akrogon/issues/chart/autopilot/slots/morning-record-B.md, ending with "END morning-record-B".

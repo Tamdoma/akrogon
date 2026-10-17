@@ -1,0 +1,30 @@
+slug: autopilot-mode
+phase: implement
+created: 2026-10-16
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources: []
+busy_since:
+  A: 2026-10-17T07:47:17.361Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tC0
+worktree: /home/ivan/.akrogon/worktrees/akrogon/autopilot-mode
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pRF
+  B: w8:pRG
+prompted:
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-autopilot-mode--/2026-10-17T07-42-32-322Z_01a148cf-fb81-7700-8e90-257c0b8df216.jsonl
+prompted_at:
+  A: 2026-10-17T07:47:17.362Z
+delivery_error: {}
+frozen: {}
+frozen_cited: []

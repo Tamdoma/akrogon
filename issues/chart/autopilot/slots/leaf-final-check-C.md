@@ -1,0 +1,9 @@
+# Leaf final check, slot C (disagreements only)
+
+- F1 **Completed main steps and lesson writes have no done-criterion.** Loopholes correction 11 (`forks/loopholes.md` Findings, from `slots/loopholes-merged.md` item 11) says main steps and lesson writes run as today for handed work and are named in the Autopilot section, and one that changes autopilot's own rules waits. The corrected brief covers only pending main steps (`autopilot-mode/brief.md:17`, the "after <leaf> lands" line, operator 3a) and its waits list (`brief.md:12`) does not name the own-rules wait for a main step or lesson either. `design.md:53` recites the correction, but `design.md:61` never assigns it to the Autopilot section's text. An implementer can satisfy every criterion while leaving both surfaces silent, which is the gap the correction was meant to close. Fix: add to criterion 3 that a main step or lesson changing autopilot's own switch or limits waits, and to criterion 8 that completed main steps and lesson writes for handed work are named in the Autopilot section.
+
+- F2 **The Autopilot section dropped the route.** Morning record binding (`design.md:41`) lists the route among the section's contents. The loopholes answer (`design.md:50`) overrides only direct-specific mentions: no direct route, no verified direct landings. The lifecycle debate choice still exists at every handoff review and is one of A's picks (`brief.md:4` names debate among the points A answers). Criterion 8 (`brief.md:17`) lists the section's contents in order and omits route entirely, so the debate pick would appear only in CHART.md's existing `Route:` line, outside the record the operator reads breaches-and-picks-first. Fix: restore route (lifecycle, debate no or yes) to criterion 8's ordered list, after consultants. Only the direct-specific items stay out.
+
+No disagreement on any-consultants as corrected, or on the rest of autopilot-mode.
+
+END leaf-final-check-C
