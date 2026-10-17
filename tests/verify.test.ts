@@ -838,7 +838,10 @@ test('a failed base setup does not send a main-red test notice', async () => {
     const { worktree } = await callerWorktree(f);
     const head: string = await commitIn(worktree, 'code.ts');
     expect((await cli(f, ['verify', '--known-red'], worktree, env)).code).toBe(1);
-    const run: VerifyRun = baseRecord(f, records(f).find((record) => record.sha === head)!);
+    const run: VerifyRun = baseRecord(
+      f,
+      records(f).find((record) => record.sha === head)!,
+    );
     expect(run.setup).toBe(9);
     expect(run.end).toBeDefined();
     expect(noticeCalls(f)).toHaveLength(0);
