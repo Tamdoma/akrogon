@@ -508,11 +508,13 @@ test('flow report: parked-carried and open-carried issues stay carried while ope
         args: listingArgs('acme/project'),
       },
     ]);
+    const before: number = Date.now();
     const result: { code: number; stdout: string; stderr: string } = await timing(
       f,
       ['--flow', '--since', '2026-10-10'],
       gh.env,
     );
+    const after: number = Date.now();
     expect(result.code).toBe(0);
     const lines: string[] = result.stdout.split('\n');
     expect(lines).toHaveLength(8);
@@ -529,11 +531,15 @@ test('flow report: parked-carried and open-carried issues stay carried while ope
     expect(lines[5]).toBe('summary since: 1 merged 0 wait - total -');
     const backlog: RegExpMatchArray | null = /^summary backlog: 2 median (\d+\.\d)d oldest (\d+)d$/.exec(lines[6]);
     expect(backlog).not.toBeNull();
-    const oldest: number = Number(backlog![2]);
-    expect(oldest).toBeGreaterThanOrEqual(3);
-    expect(oldest).toBeLessThanOrEqual(5);
-    expect(Number(backlog![1])).toBeGreaterThanOrEqual(1);
-    expect(Number(backlog![1])).toBeLessThanOrEqual(oldest);
+    const day: number = 24 * 60 * 60000;
+    const median: (at: number) => number = (at: number): number =>
+      (2 * at - Date.parse('2026-10-11T00:00:00Z') - Date.parse('2026-10-13T00:00:00Z')) / 2 / day;
+    const oldest: (at: number) => number = (at: number): number =>
+      Math.floor((at - Date.parse('2026-10-11T00:00:00Z')) / day);
+    expect(Number(backlog![1])).toBeGreaterThanOrEqual(median(before) - 0.05);
+    expect(Number(backlog![1])).toBeLessThanOrEqual(median(after) + 0.05);
+    expect(Number(backlog![2])).toBeGreaterThanOrEqual(oldest(before));
+    expect(Number(backlog![2])).toBeLessThanOrEqual(oldest(after));
     expect(lines[7]).toBe('summary uncarried closed: 1');
   } finally {
     f.clean();
