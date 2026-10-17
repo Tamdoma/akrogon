@@ -26,6 +26,7 @@ import {
   type State,
 } from './state';
 import { readLog, type LogRecord } from './log';
+import { readTimings, type TimingEvent } from './timing';
 import { mergeQueue, type QueueEntry } from './turn';
 import { issueFolders } from './park';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
@@ -36,7 +37,15 @@ import { currentReleaseCommit, readDeployRecord } from './release';
 
 type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
 type Scan =
-  | { ok: true; repo: Repo; leaves: ScannedLeaf[]; parked: string[]; log: LogRecord[]; queue: QueueEntry[] }
+  | {
+      ok: true;
+      repo: Repo;
+      leaves: ScannedLeaf[];
+      parked: string[];
+      log: LogRecord[];
+      timings: TimingEvent[];
+      queue: QueueEntry[];
+    }
   | { ok: false; repo: string; path: string; error: string };
 
 class ReadinessError extends Error {}
@@ -84,7 +93,8 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     path = resolve(repo.root, 'issues/log.jsonl');
     const log: LogRecord[] = readLog(repo.root);
     const queue: QueueEntry[] = mergeQueue(global, [...leaves, ...closed], () => log);
-    return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log, queue };
+    const timings: TimingEvent[] = readTimings(repo.root);
+    return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log, timings, queue };
   } catch (error) {
     if (error instanceof SeatIndexError) path = error.file;
     if (
@@ -101,7 +111,23 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
   }
 }
 
-const header: string[] = ['LEAF', 'PHASE', 'AGE', 'BLOCKED BY', 'NOTE', 'TURN'];
+const header: string[] = ['LEAF', 'PHASE', 'TIME', 'BLOCKED BY', 'NOTE', 'TURN'];
+
+function clock(ms: number): string {
+  const minutes: number = Math.max(0, Math.floor(ms / 60000));
+  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`;
+}
+
+// Each slug's first delivered seat prompt, when work on the leaf began.
+function starts(timings: TimingEvent[]): Map<string, number> {
+  return timings.reduce(
+    (map, event) =>
+      event.kind === 'prompt' && event.outcome === 'delivered'
+        ? map.set(event.slug, Math.min(map.get(event.slug) ?? Infinity, Date.parse(event.ts)))
+        : map,
+    new Map<string, number>(),
+  );
+}
 
 function note(state: State, now: number, seatSources: { a: string; b: string }): string {
   const busy: string[] =
@@ -109,9 +135,7 @@ function note(state: State, now: number, seatSources: { a: string; b: string }):
       ? []
       : (['A', 'B'] as const).flatMap((seat) => {
           const since: string | undefined = state.busy_since[seat];
-          if (since === undefined) return [];
-          const minutes: number = Math.max(0, Math.floor((now - Date.parse(since)) / 60000));
-          return [`busy ${seat} ${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`];
+          return since === undefined ? [] : [`busy ${seat} ${clock(now - Date.parse(since))}`];
         });
   const attempts: string[] =
     state.attempts.A + state.attempts.B > 0 ? [`A:${state.attempts.A} B:${state.attempts.B}`] : [];
@@ -146,6 +170,7 @@ function note(state: State, now: number, seatSources: { a: string; b: string }):
 function cells(
   leaf: ScannedLeaf,
   log: LogRecord[],
+  start: number | undefined,
   now: number,
   indent: string,
   queue: Map<string, QueueEntry>,
@@ -155,8 +180,13 @@ function cells(
   const last: LogRecord | undefined = log.findLast(
     ({ record }) => record.slug === state.slug && record.to === state.phase,
   );
-  const elapsed: number | undefined = last === undefined ? undefined : now - Date.parse(last.record.ts);
-  const age: string = elapsed === undefined || elapsed < 0 ? '-' : `${Math.floor(elapsed / 60000)}m`;
+  const end: number | undefined =
+    state.phase !== 'merged' && state.phase !== 'failed'
+      ? now
+      : last === undefined
+        ? undefined
+        : Date.parse(last.record.ts);
+  const time: string = start === undefined || end === undefined || end < start ? '-' : clock(end - start);
   const entry: QueueEntry | undefined = queue.get(state.slug);
   const detail: string = note(state, now, leaf.seatSources);
   const turn: string =
@@ -166,7 +196,7 @@ function cells(
   return [
     `${indent}${state.slug}`,
     state.phase,
-    age,
+    time,
     state['blocked-by'].join(' '),
     stopped ? (detail === '' ? 'stopped' : `stopped; ${detail}`) : detail,
     turn,
@@ -175,6 +205,7 @@ function cells(
 
 function rows(scan: Scan & { ok: true }, now: number, stopped: Set<string>): string[][] {
   const queue: Map<string, QueueEntry> = new Map(scan.queue.map((entry) => [entry.leaf.state.slug, entry]));
+  const started: Map<string, number> = starts(scan.timings);
   let previous: string[] = [];
   return scan.leaves.flatMap((leaf) => {
     const groups: string[] = relative(resolve(scan.repo.root, 'issues/open'), leaf.path).split(sep).slice(0, -1);
@@ -185,7 +216,15 @@ function rows(scan: Scan & { ok: true }, now: number, stopped: Set<string>): str
     return [
       ...separator,
       ...groups.slice(shared).map((group, offset) => [`${indent(shared + offset)}${group}`, '', '', '', '', '']),
-      cells(leaf, scan.log, now, indent(groups.length), queue, stopped.has(`${scan.repo.name}/${leaf.state.slug}`)),
+      cells(
+        leaf,
+        scan.log,
+        started.get(leaf.state.slug),
+        now,
+        indent(groups.length),
+        queue,
+        stopped.has(`${scan.repo.name}/${leaf.state.slug}`),
+      ),
     ];
   });
 }
