@@ -50,7 +50,7 @@ Check these choices:
 
 - **default_branch** is where reviewed work lands.
 - **remote** selects the Git remote used for integration.
-- **checks** lists the commands that must pass before merge. `akrogon verify` runs them on a fresh checkout of a commit and records a receipt; the `check.review` move, the `check.repair` move into `merge`, and the merge and direct routes require a green one for the exact commit and command set.
+- **checks** lists the commands that must pass before merge. `akrogon verify` runs them on a fresh checkout of a commit and records a receipt; the `check.review` move, the `check.repair` move into `merge`, and the merge and direct routes accept a green receipt or a qualifying linked head/base pair for the tested tree and current command set. `akrogon verify --known-red` runs the exact merge-base fresh and links it to the red head run. Both runs must complete with setup 0, and every nonzero head command must name failing tests also failing in that command on the base.
 - **merge_checks** lists slow commands that run only at merge, on the rebased leaf before push, except a `check.fix` pass after a red merge ending reruns the reproducing command of the rejected run. A cheap check never runs only at merge, even when a merge command also runs it — a check cheap enough for the leaf's own check belongs in `checks`, and a merge command may rerun it on the integrated candidate but is never its only home.
 - **merge_covers** lists `checks` names skipped at merge because `merge_checks` covers them. Empty by default.
 - **grounding** points agents to the project's reference index, or disables that lookup.
