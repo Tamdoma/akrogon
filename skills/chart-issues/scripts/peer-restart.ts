@@ -7,6 +7,9 @@ type State = {
   seat: string;
   pane: string;
   kind: string | null;
+  // pre-restart session during the read phase, the session herdr shows after the start once the
+  // post phase resolves it, null when herdr shows none or the old value
+  session: string | null;
   stopped: boolean;
   restarted: boolean;
 };
@@ -21,6 +24,7 @@ const agentListSchema = z.object({
         pane_id: z.string(),
         agent: z.string().nullish(),
         name: z.string().optional(),
+        agent_session: z.object({ value: z.string() }).optional(),
       }),
     ),
   }),
@@ -96,6 +100,7 @@ function emit(states: State[]): void {
       pane: state.pane,
       kind: state.kind,
       state: state.restarted ? 'restarted' : state.stopped ? 'stopped' : 'untouched',
+      session: state.restarted ? (state.session ?? 'none') : 'none',
     };
     process.stdout.write(`${JSON.stringify(line)}\n`);
   }
@@ -122,6 +127,7 @@ async function main(): Promise<void> {
     seat: seat.seat,
     pane: seat.pane,
     kind: null,
+    session: null,
     stopped: false,
     restarted: false,
   }));
@@ -138,7 +144,11 @@ async function main(): Promise<void> {
   const agents: Agent[] = rows.filter((a: AgentRow): a is Agent => a.agent !== null && a.agent !== undefined);
   for (const seat of seats) {
     const agent = agents.find((a) => a.pane_id === seat.pane);
-    if (agent !== undefined) stateOf.get(seat.seat)!.kind = agent.agent;
+    if (agent !== undefined) {
+      const state: State = stateOf.get(seat.seat)!;
+      state.kind = agent.agent;
+      state.session = agent.agent_session?.value ?? null;
+    }
   }
   const launches: Map<string, Launch> = new Map();
   let refused: string | null = null;
@@ -231,6 +241,22 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     state.restarted = true;
+  }
+
+  // One read after the mutate phase resolves every restarted seat's session: only a session herdr
+  // shows now and that differs from the pre-restart one is the fresh seat's own session.
+  const after: Herdr = run(['agent', 'list']);
+  if (!after.ok) {
+    process.stderr.write(failureText(after));
+    emit(states);
+    process.exit(1);
+  }
+  const rowsAfter: AgentRow[] = agentListSchema.parse(JSON.parse(after.stdout)).result.agents;
+  for (const state of states) {
+    if (!state.restarted) continue;
+    const value: string | null =
+      rowsAfter.find((a: AgentRow): boolean => a.pane_id === state.pane)?.agent_session?.value ?? null;
+    state.session = value !== null && value !== state.session ? value : null;
   }
   emit(states);
   process.exit(0);

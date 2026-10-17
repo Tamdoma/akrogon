@@ -228,15 +228,21 @@ function turnVerdict(live: ListAgent, exchange: Exchange): { verdict: Verdict; p
   }
 }
 
-function finish(
+// The outcome line carries the session herdr shows once the wait is over, so the caller needs no
+// separate agent list read; a session that appeared during the wait is the post-exchange value.
+async function finish(
   outcome: Outcome,
   pane: string,
   file: string,
   status: string | null,
   signal: 'proven' | 'unproven',
   exchange: Exchange,
-): never {
-  const line: string = JSON.stringify({ outcome, pane, file, status, signal, exchange });
+): Promise<never> {
+  const agent: ListAgent = await readPeerAgent(pane);
+  const session: string | null = agent.agent_session?.value ?? null;
+  // the last read also adopts a session that first appeared during the wait, as every grace check does
+  if (exchange.session === null) exchange.session = session;
+  const line: string = JSON.stringify({ outcome, pane, file, status, signal, exchange, session });
   process.stdout.write(`${line}\n`);
   process.exit(0);
 }
