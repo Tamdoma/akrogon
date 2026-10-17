@@ -271,6 +271,23 @@ test('a failed setup with no configured checks exits red and its receipt is refu
   }
 });
 
+test('known-red refuses a failed head setup when the base setup passes and no checks are configured', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { setup: 'test ! -f head-only', checks: {} });
+    const { worktree } = await callerWorktree(f);
+    const sha: string = await commitIn(worktree, 'head-only');
+    const result: Result = await verify(f, ['--known-red'], worktree);
+    expect(records(f)[0]).toMatchObject({ setup: 1, commands: [] });
+    expect(result.code).toBe(1);
+    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).rejects.toThrow(
+      'No green leaf verify receipt',
+    );
+  } finally {
+    f.clean();
+  }
+});
+
 test('a green receipt covers another commit with the same tree and command set without a second run', async () => {
   const f: Fixture = await fixture();
   try {
