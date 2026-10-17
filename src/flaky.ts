@@ -7,7 +7,7 @@ type Line = { name: string; test: string; count: number; last: string };
 type Red = { name: string; command: string; log: string };
 
 // A closed leaf's logs move with its records between issues/<state> owner dirs and packed archives.
-async function failedTests(repo: Repo, recorded: string): Promise<string[]> {
+export async function failedTests(repo: Repo, recorded: string): Promise<string[]> {
   let bytes: Uint8Array;
   try {
     bytes = await readLog(repo, recorded, repo.root);

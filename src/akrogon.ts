@@ -35,7 +35,12 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
             : verb === 'run-check'
               ? { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } }
               : verb === 'verify'
-                ? { sha: { type: 'string' }, attempt: { type: 'string' }, holder: { type: 'string' } }
+                ? {
+                    sha: { type: 'string' },
+                    attempt: { type: 'string' },
+                    holder: { type: 'string' },
+                    'known-red': { type: 'boolean' },
+                  }
                 : verb === 'status'
                   ? { charts: { type: 'boolean' } }
                   : verb === 'timing'
@@ -216,7 +221,13 @@ switch (verb) {
     const optional: z.ZodOptional<z.ZodString> = z.string().trim().min(1).optional();
     process.exitCode = await (
       await import('./verify')
-    ).verify(process.cwd(), optional.parse(values.sha), optional.parse(values.attempt), optional.parse(values.holder));
+    ).verify(
+      process.cwd(),
+      optional.parse(values.sha),
+      optional.parse(values.attempt),
+      optional.parse(values.holder),
+      values['known-red'] === true,
+    );
     break;
   }
   case 'guard':
