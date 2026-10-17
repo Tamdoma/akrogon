@@ -244,4 +244,20 @@ If you choose it, A implements in a branch worktree and B reviews. The door then
 
 If the work grows or repairs run out, the door stops and saves the work in a `Direct attempt` record. You then hand it to the lifecycle or abandon it.
 
+## Autopilot
+
+For incoming, non-original work you can hand a chart door a fixed list and let it answer its own rounds. In the door's own pane, say so in plain words — name autopilot, the work you are handing it, and the consultants or none:
+
+```text
+/chart-issues run autopilot on these two bug reports, consultants B
+```
+
+The door echoes the mode, the handed work and the consultants, and after reading the work it shows a best-guess list of things to supply, such as logins, API keys or files, each with purpose and destination. It still runs every step, but where it would ask you it answers itself by your standing values — simplicity, function over form, removing over adding, systems thinking, speed and price — and records each pick as its own, never as your words. Every handed chart takes the lifecycle route to builders and your watcher; the direct route is not offered.
+
+Some things still wait for you, while the door moves on within the handed list: every approval (live-account grants, fixture retention, secret saves), a mutating proof call, a missing need such as a key, and anything only a person can do. The mode ends on its own when every handed chart is handed off or closed, and resumes when you next write in that door. Only your words in the door pane turn it off early; handing over a key or changing the handed list keeps it on.
+
+The record lives in each chart's `## Autopilot` section in CHART.md: boundary breaches first, then the switch-on reference, consultants and losses, the route, handed-off leaves, waits and picks against the recommendation. The door also prints one line per chart at the end of each pass. The [chart-issues](../../skills/chart-issues/SKILL.md#autopilot) skill holds the full mode rules.
+
+The cost: a wrong pick can merge to main — and for akrogon, deploy — before you read the record, so check it before trusting a run overnight. Do not hand the same work to two doors; the door holds work another door's open chart already covers, but two doors started on the same work at the same moment are a stated limit. The first run happens once with you around, answering nothing and able to say stop; overnight use after that is your call.
+
 Previous: [Create](create.md) · Next: [Next](next.md) · [Home](../../README.md)
