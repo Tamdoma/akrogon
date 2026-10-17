@@ -8,8 +8,9 @@ import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { trackingRef } from './preflight';
 import { checkedRun, leafFields, leafTarget, refuse, type LeafTarget } from './run-check';
-import { command } from './shell';
+import { command, herdr } from './shell';
 import { allLeaves, withLock, type Leaf } from './state';
+import { isAncestor } from './batch';
 
 const verifyScopeSchema = z.enum(['leaf', 'merge']);
 
@@ -23,6 +24,7 @@ export const verifyRunSchema = z.strictObject({
   tree: z.string(),
   scope: verifyScopeSchema,
   compares: z.string().optional(),
+  notice: z.string().optional(),
   path: z.string(),
   pid: z.number().int(),
   boot_id: z.string(),
@@ -138,6 +140,119 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
   return false;
 }
 
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+function bootId(): string {
+  return existsSync('/proc/sys/kernel/random/boot_id')
+    ? readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
+    : '';
+}
+
+// A reservation covers only while its process lives on this boot; `error` never covers.
+function noticeCovers(run: VerifyRun, boot: string): boolean {
+  if (run.notice === undefined || run.notice === 'error') return false;
+  return run.notice !== 'pending' || (run.boot_id === boot && pidAlive(run.pid));
+}
+
+// Identity is scope + command name and string + failing test name; sha is evidence, not identity.
+type Unit = { scope: VerifyScope; name: string; command: string; test: string };
+
+function matching(run: VerifyRun, unit: Unit): VerifyRun['commands'][number] | undefined {
+  return run.scope === unit.scope
+    ? run.commands.find((item) => item.name === unit.name && item.command === unit.command)
+    : undefined;
+}
+
+// A green observation is a completed record with the unit's command green whose sha sits on landed
+// main; a red observation R resolves when a green observation lands at or after R's sha.
+async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[]): Promise<string[]> {
+  const boot: string = bootId();
+  const tip: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
+  const landed: Map<string, boolean> = new Map();
+  const onMain = async (sha: string): Promise<boolean> => {
+    if (!landed.has(sha)) landed.set(sha, await isAncestor(repo.root, sha, tip));
+    return landed.get(sha)!;
+  };
+  const covers: Map<string, boolean> = new Map();
+  const redOrGreen = async (red: string, green: string): Promise<boolean> => {
+    const key: string = `${red}\0${green}`;
+    if (!covers.has(key)) covers.set(key, await isAncestor(repo.root, red, green));
+    return covers.get(key)!;
+  };
+  const units: Unit[] = [];
+  for (const item of me.commands) {
+    if (item.exit === 0) continue;
+    for (const test of await failedTests(repo, item.log))
+      units.push({ scope: me.scope, name: item.name, command: item.command, test });
+  }
+  const fresh: string[] = [];
+  for (const unit of units) {
+    let covered: boolean = false;
+    for (const run of runs) {
+      if (run.run === me.run || !completed(run)) continue;
+      const item = matching(run, unit);
+      if (item === undefined) continue;
+      if (item.exit === 0) continue;
+      if (run.compares === undefined) continue;
+      if (!(await failedTests(repo, item.log)).includes(unit.test)) continue;
+      const resolved: boolean = await (async () => {
+        for (const green of runs) {
+          if (!completed(green)) continue;
+          const hit = matching(green, unit);
+          if (hit === undefined || hit.exit !== 0) continue;
+          if (!(await onMain(green.sha))) continue;
+          if (await redOrGreen(run.sha, green.sha)) return true;
+        }
+        return false;
+      })();
+      if (!resolved && noticeCovers(run, boot)) {
+        covered = true;
+        break;
+      }
+    }
+    if (!covered) fresh.push(unit.test);
+  }
+  return [...new Set(fresh)];
+}
+
+const noticeSchema = z.object({ shown: z.boolean(), reason: z.string() });
+
+// The reply reason or `error` replaces the pending reservation; a failed send only prints.
+async function sendMainRedNotice(repo: Repo, runId: string, lock: string, names: string[]): Promise<void> {
+  const args: string[] = [
+    'notification',
+    'show',
+    `${repo.name} main red`,
+    '--body',
+    `${names.length} new red on main: ${names.slice(0, 3).join(', ')}; receipt ${runId}; chart a repair`,
+    '--sound',
+    'none',
+  ];
+  let delivery: string = 'error';
+  try {
+    delivery = (await herdr(args, noticeSchema)).reason;
+  } catch (error) {
+    process.stderr.write(`notice: ${error instanceof Error ? error.message : String(error)}\n`);
+  }
+  await withLock(lock, async () => {
+    const file: string = recordsPath(repo);
+    const runs: VerifyRun[] = readVerifyRuns(repo);
+    const index: number = runs.findIndex((run) => run.run === runId);
+    if (index === -1) return;
+    runs[index] = { ...runs[index], notice: delivery };
+    const temporary: string = `${file}.${process.pid}.tmp`;
+    writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
+    renameSync(temporary, file);
+  });
+}
+
 export async function requireGreenReceipt(repo: Repo, sha: string, scope: VerifyScope): Promise<void> {
   const green: VerifyRun | undefined = greenRun(repo, await treeOf(repo, sha), scope);
   if (green === undefined && !(await knownRedReceipt(repo, sha, scope)))
@@ -203,6 +318,7 @@ async function runOnce(
   const ran: VerifyRun['commands'] = [];
   let setupExit: number | undefined;
   let end: string | undefined;
+  let send: string[] = [];
   try {
     await createSparseWorktree(repo, target, sha, { detach: true });
     await emitEnvFile(repo, target, repo.config.env);
@@ -237,10 +353,15 @@ async function runOnce(
         commands: ran,
         ...(end === undefined ? {} : { end }),
       };
+      if (compares !== undefined) {
+        send = await newRedUnits(repo, runs[index], runs);
+        if (send.length > 0) runs[index] = { ...runs[index], notice: 'pending' };
+      }
       const temporary: string = `${file}.${process.pid}.tmp`;
       writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
       renameSync(temporary, file);
     });
+    if (send.length > 0) await sendMainRedNotice(repo, id, lock, send);
     if (existsSync(target)) await command(['git', 'worktree', 'remove', '--force', target], repo.root);
   }
   return {
