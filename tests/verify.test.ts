@@ -1,7 +1,21 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fakeAkrogon, fixture, greenReceipt, leaf, seedRun, storeDir, yaml, type Fixture } from './helpers';
+import {
+  cli,
+  entry,
+  fakeAkrogon,
+  fakeHerdr,
+  fixture,
+  greenReceipt,
+  leaf,
+  seedRun,
+  storeDir,
+  unitBin,
+  yaml,
+  type Fixture,
+} from './helpers';
+import type { Database } from './fake-herdr';
 import { command, type Result } from '../src/shell';
 import { readRepo, type Repo } from '../src/config';
 import { readState } from '../src/state';
@@ -563,6 +577,229 @@ test('plain verify on a red head writes only its own run', async () => {
     const runs: VerifyRun[] = records(f);
     expect(runs).toHaveLength(1);
     expect(runs[0].compares).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
+function noticeEnv(f: Fixture): NodeJS.ProcessEnv {
+  const herdr: { env: NodeJS.ProcessEnv } = fakeHerdr(f);
+  return { ...herdr.env, PATH: `${resolve(f.home, 'bin')}:${unitBin(f)}:${process.env.PATH}` };
+}
+
+function noticeCalls(f: Fixture): string[][] {
+  const file: string = resolve(f.home, 'herdr.json.calls');
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line) as string[])
+    .filter((args) => args[0] === 'notification');
+}
+
+function herdrDb(f: Fixture): Database {
+  return JSON.parse(readFileSync(resolve(f.home, 'herdr.json'), 'utf8')) as Database;
+}
+
+function baseRecord(f: Fixture, head: VerifyRun): VerifyRun {
+  const found: VerifyRun | undefined = records(f).find((run) => run.compares === head.run);
+  if (found === undefined) throw new Error(`no base run for ${head.run}`);
+  return found;
+}
+
+test('a fresh red base run sends one main-red notice and records the reason', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    const result: Result = await cli(f, ['verify', '--known-red'], worktree, noticeEnv(f));
+    expect(result.code).toBe(0);
+    const runs: VerifyRun[] = records(f);
+    const head: VerifyRun = runs.find((run) => run.compares === undefined)!;
+    const baseRun: VerifyRun = baseRecord(f, head);
+    expect(noticeCalls(f)).toEqual([
+      [
+        'notification',
+        'show',
+        'repo main red',
+        '--body',
+        `1 new red on main: alpha; receipt ${baseRun.run}; chart a repair`,
+        '--sound',
+        'none',
+      ],
+    ]);
+    expect(baseRun.notice).toBe('shown');
+    expect(head.notice).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
+test('a later base run red on the same unresolved unit sends nothing', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const { worktree: first } = await callerWorktree(f, 'one');
+    const { worktree: second } = await callerWorktree(f, 'two');
+    await commitIn(first, 'a.ts');
+    await commitIn(second, 'b.ts');
+    expect((await cli(f, ['verify', '--known-red'], first, env)).code).toBe(0);
+    expect((await cli(f, ['verify', '--known-red'], second, env)).code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(1);
+    const bases: VerifyRun[] = records(f).filter((run) => run.compares !== undefined);
+    expect(bases).toHaveLength(2);
+    expect(bases.filter((run) => run.notice !== undefined).map((run) => run.notice)).toEqual(['shown']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('the incident resolves only on green evidence at or after the red on landed main', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const { worktree: w1 } = await callerWorktree(f, 'one');
+    await commitIn(w1, 'a.ts');
+    expect((await cli(f, ['verify', '--known-red'], w1, env)).code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(1);
+
+    // A green leaf-head run does not resolve: the unit stays covered by the first notice.
+    const { worktree: wOk } = await callerWorktree(f, 'fixer');
+    writeFileSync(resolve(wOk, 'check.sh'), 'echo ok; exit 0\n');
+    await command(['git', 'add', 'check.sh'], wOk);
+    await command(['git', 'commit', '-m', 'fix the check'], wOk);
+    expect((await cli(f, ['verify'], wOk, env)).code).toBe(0);
+    await commitIn(w1, 'more.ts');
+    expect((await cli(f, ['verify', '--known-red'], w1, env)).code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(1);
+
+    // Once that green head is main it resolves the incident; a new red re-notifies.
+    await command(['git', 'push', 'origin', 'HEAD:main'], wOk);
+    await command(['git', 'merge', '--ff-only', 'origin/main'], f.root);
+    writeFileSync(resolve(f.root, 'check.sh'), 'name=$(cat failure); echo "(fail) $name"; exit 7\n');
+    await command(['git', 'add', 'check.sh'], f.root);
+    await command(['git', 'commit', '-m', 'break alpha again'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const { worktree: w3 } = await callerWorktree(f, 'after');
+    const head3: string = await commitIn(w3, 'new.ts');
+    expect((await cli(f, ['verify', '--known-red'], w3, env)).code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(2);
+    const second: VerifyRun | undefined = records(f).find((run) => run.sha === head3);
+    expect(baseRecord(f, second!).notice).toBe('shown');
+
+    // A green on an older revision finishing later never clears the newer red.
+    const s1: string = await command(['git', 'rev-parse', 'origin/main~1'], f.root);
+    greenReceipt(f, s1, 'leaf');
+    const { worktree: w4 } = await callerWorktree(f, 'later');
+    await commitIn(w4, 'yet.ts');
+    expect((await cli(f, ['verify', '--known-red'], w4, env)).code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(2);
+    expect(records(f).filter((run) => run.notice === 'shown')).toHaveLength(2);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a failed herdr call is recorded and retried by the next base run', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    writeFileSync(resolve(f.home, 'herdr.json'), JSON.stringify({ ...herdrDb(f), failNotification: true }));
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    const first: Result = await cli(f, ['verify', '--known-red'], worktree, env);
+    expect(first.code).toBe(0);
+    expect(first.stderr).toContain('notice: ');
+    const base1: VerifyRun | undefined = records(f).find((run) => run.compares !== undefined);
+    expect(base1?.notice).toBe('error');
+    writeFileSync(resolve(f.home, 'herdr.json'), JSON.stringify({ ...herdrDb(f), failNotification: false }));
+    await commitIn(worktree, 'more.ts');
+    const second: Result = await cli(f, ['verify', '--known-red'], worktree, env);
+    expect(second.code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(2);
+    const bases: VerifyRun[] = records(f).filter((run) => run.compares !== undefined);
+    expect(bases.map((run) => run.notice)).toEqual(['error', 'shown']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('an absent herdr binary is recorded as error and verify keeps its result', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const bin: string = resolve(f.home, 'noherdr');
+    mkdirSync(bin);
+    symlinkSync(process.execPath, resolve(bin, 'bun'));
+    symlinkSync(entry, resolve(bin, 'akrogon'));
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    const result: Result = await cli(f, ['verify', '--known-red'], worktree, {
+      PATH: `${bin}:${unitBin(f)}:/usr/bin:/bin`,
+    });
+    expect(result.code).toBe(0);
+    expect(result.stderr).toContain('notice: ');
+    expect(records(f).find((run) => run.compares !== undefined)?.notice).toBe('error');
+  } finally {
+    f.clean();
+  }
+});
+
+test('two simultaneous base runs produce one notification', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const { worktree: w1 } = await callerWorktree(f, 'one');
+    const { worktree: w2 } = await callerWorktree(f, 'two');
+    await commitIn(w1, 'a.ts');
+    await commitIn(w2, 'b.ts');
+    const [first, second]: Result[] = await Promise.all([
+      cli(f, ['verify', '--known-red'], w1, env),
+      cli(f, ['verify', '--known-red'], w2, env),
+    ]);
+    expect([first.code, second.code]).toEqual([0, 0]);
+    expect(noticeCalls(f)).toHaveLength(1);
+    const bases: VerifyRun[] = records(f).filter((run) => run.compares !== undefined);
+    expect(bases).toHaveLength(2);
+    expect(bases.filter((run) => run.notice === 'shown')).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a pending notice left by a dead process does not block the next send', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const { leafPath, worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    const baseTree: string = await command(['git', 'rev-parse', `${base}^{tree}`], f.root);
+    const log: string = resolve(leafPath, 'red.log');
+    writeFileSync(log, '(fail) alpha\n');
+    const repo: Repo = readRepo('repo', f.root);
+    const seeded: VerifyRun = seedRun(f, {
+      sha: base,
+      tree: baseTree,
+      scope: 'leaf',
+      compares: 'dead-head',
+      notice: 'pending',
+      pid: 2 ** 22 + 12345,
+      boot_id: 'older-boot',
+      commands: verifyCommands(repo.config, 'leaf').map((item) => ({ ...item, exit: 7, log })),
+    });
+    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const result: Result = await cli(f, ['verify', '--known-red'], worktree, env);
+    expect(result.code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(1);
+    const runs: VerifyRun[] = records(f);
+    expect(runs.find((run) => run.run === seeded.run)?.notice).toBe('pending');
+    expect(runs.find((run) => run.compares !== undefined && run.notice === 'shown')).toBeDefined();
   } finally {
     f.clean();
   }
