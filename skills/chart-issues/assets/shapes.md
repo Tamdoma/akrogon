@@ -169,9 +169,15 @@ seats:
     pane: w8:pCT
     harness: claude
     session: 1ce71920-4c64-414b-ac1c-af56890a1c4b
+spans:
+  - from: '2026-10-06T16:34:47Z'
+    to: '2026-10-06T17:20:05Z'
+  - from: '2026-10-07T09:02:11Z'
 ```
 
-`opened` is the time the door began its first pass on the chart and is never reset by folder creation or session replacement. `pane`, `harness` and `session` are the `pane_id`, `agent` and `agent_session.value` values `herdr agent list` prints. A replaced session is a second entry with the same seat letter. Outside herdr `seats` is empty.
+`opened` is the time the door began its first pass on the chart and is never reset by folder creation or session replacement. `pane`, `harness` and `session` are the `pane_id`, `agent` and `agent_session.value` values `herdr agent list` prints; for pi, `session` is the session file path. A replaced session is a second entry with the same seat letter. Outside herdr `seats` is empty.
+
+`spans` is an optional list of `{from: ISO, to?: ISO}` entries, each a half-open window `[from, to)` in which the door worked the chart; only the last entry may omit `to`, and a record without `spans` reads as a legacy window from `opened`. The door opens a span when it begins work on a chart and closes it on handoff, close or hold, when the chart waits on an approval, need or prerequisite, or before switching to another chart, keeping it open while it waits on this chart's consultants.
 
 ## Leaf files
 
