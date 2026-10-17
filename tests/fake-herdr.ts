@@ -42,6 +42,7 @@ const scriptEntrySchema = z.object({
 });
 const promptEntrySchema = scriptEntrySchema.extend({
   session: z.string().optional(),
+  status: paneSchema.shape.agent_status.optional(),
 });
 const waitEntrySchema = scriptEntrySchema.extend({
   status: paneSchema.shape.agent_status.optional(),
@@ -256,7 +257,7 @@ if (args[0] === 'agent' && args[1] === 'start') {
 }
 if (args[0] === 'agent' && args[1] === 'prompt') {
   const target: FakePane = pane(args[2]);
-  if (!['idle', 'done', 'working'].includes(target.agent_status)) throw new Error('Prompt sent to non-idle fixture');
+  if (!['idle', 'done'].includes(target.agent_status)) throw new Error('Prompt sent to non-idle fixture');
   if (args.includes('--wait') && (flag('--until') !== 'working' || flag('--timeout') !== '5000'))
     throw new Error('Wrong prompt wait contract');
   const scripted = db.promptScript.shift();
@@ -275,6 +276,7 @@ if (args[0] === 'agent' && args[1] === 'prompt') {
   db.prompts.push({ pane: target.pane_id, text: args[3] });
   if (db.failPrompts) failure('agent_prompt_stalled');
   target.agent_status = 'working';
+  if (scripted?.status !== undefined) target.agent_status = scripted.status;
   result({ agent: target });
 }
 if (args[0] === 'agent' && args[1] === 'wait') {

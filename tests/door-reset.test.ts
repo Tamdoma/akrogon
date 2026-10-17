@@ -88,7 +88,7 @@ function setup(seed: PaneSeed, dbExtra: Record<string, unknown> = {}): Setup {
             .filter(Boolean)
             .map((line: string) => JSON.parse(line) as Record<string, unknown>)
         : [],
-    run: async (...args: string[]): Promise<RunResult> => {
+    run: async (extraEnv: Record<string, string> = {}, ...args: string[]): Promise<RunResult> => {
       const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, ...args], {
         env: {
           ...process.env,
@@ -98,6 +98,7 @@ function setup(seed: PaneSeed, dbExtra: Record<string, unknown> = {}): Setup {
           DOOR_RESET_INLINE: '1',
           DOOR_RESET_TURN_BOUND_MS: '500',
           DOOR_RESET_CONFIRM_MS: '400',
+          ...extraEnv,
         },
       });
       return { code, stdout, stderr };
@@ -149,7 +150,21 @@ test.each<[string, PaneSeed, string]>([
 ])('refuses when %s', async (_name: string, seed: PaneSeed, sess: string): Promise<void> => {
   const s: Setup = setup(seed);
   try {
-    const result: RunResult = await s.run(pane, sess, s.log, START);
+    const result: RunResult = await s.run({}, pane, sess, s.log, START);
+    expect(result.code).toBe(1);
+    expect(result.stderr).not.toBe('');
+    expect(existsSync(s.log)).toBe(false);
+    expect(s.promptCalls()).toHaveLength(0);
+  } finally {
+    s.clean();
+  }
+});
+
+test('refuses a session mismatch even when the passed session has a transcript', async (): Promise<void> => {
+  const s: Setup = setup(claudePane('sess-other'));
+  try {
+    writeTranscript(s.home, session, true);
+    const result: RunResult = await s.run({}, pane, session, s.log, START);
     expect(result.code).toBe(1);
     expect(result.stderr).not.toBe('');
     expect(existsSync(s.log)).toBe(false);
@@ -163,7 +178,7 @@ test.each<[string, PaneSeed, string]>([
 test('pi turn still open at the bound is logged and nothing is sent', async (): Promise<void> => {
   const s: Setup = setup({ ...piAuthority, agent_status: 'working' });
   try {
-    const result: RunResult = await s.run(pane, piSession, s.log, START);
+    const result: RunResult = await s.run({}, pane, piSession, s.log, START);
     expect(result.code).toBe(1);
     const lines: Record<string, unknown>[] = s.logLines();
     expect(lines.length).toBeGreaterThan(0);
@@ -178,7 +193,7 @@ test('claude turn still open at the bound is logged and nothing is sent', async 
   const s: Setup = setup(claudePane());
   try {
     writeTranscript(s.home, session, false);
-    const result: RunResult = await s.run(pane, session, s.log, START);
+    const result: RunResult = await s.run({}, pane, session, s.log, START);
     expect(result.code).toBe(1);
     expect(s.logLines().some((l) => l.step === 'wait-turn-end' && l.result === 'turn open')).toBe(true);
     expect(s.promptCalls()).toHaveLength(0);
@@ -187,16 +202,23 @@ test('claude turn still open at the bound is logged and nothing is sent', async 
   }
 });
 
-// Criterion 3: session changed before the reset means nothing is sent.
-test('a session change before the reset sends nothing', async (): Promise<void> => {
-  const s: Setup = setup(claudePane('sess-later'), {
-    promptScript: [{ session: 'sess-later' }],
-  });
+// Criterion 3: a session change observed during the turn wait is logged and nothing is sent.
+test('a session change during the turn wait is logged and nothing is sent', async (): Promise<void> => {
+  const s: Setup = setup(claudePane());
   try {
     writeTranscript(s.home, session, false);
-    const result: RunResult = await s.run(pane, session, s.log, START);
+    const pending: Promise<RunResult> = s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, session, s.log, START);
+    await Bun.sleep(700);
+    writeFileSync(
+      s.db,
+      readFileSync(s.db, 'utf8').replaceAll(
+        JSON.stringify(idSession(session, 'herdr:claude')),
+        JSON.stringify(idSession('sess-later', 'herdr:claude')),
+      ),
+    );
+    const result: RunResult = await pending;
     expect(result.code).toBe(1);
-    expect(s.logLines().some((l) => l.result === 'identity changed')).toBe(true);
+    expect(s.logLines().some((l) => l.step === 'wait-turn-end' && l.result === 'identity changed')).toBe(true);
     expect(s.promptCalls()).toHaveLength(0);
   } finally {
     s.clean();
@@ -207,7 +229,7 @@ test('a session change before the reset sends nothing', async (): Promise<void> 
 test('unconfirmed reset is logged and no start prompt is sent', async (): Promise<void> => {
   const s: Setup = setup(piAuthority);
   try {
-    const result: RunResult = await s.run(pane, piSession, s.log, START);
+    const result: RunResult = await s.run({}, pane, piSession, s.log, START);
     expect(result.code).toBe(1);
     const lines: Record<string, unknown>[] = s.logLines();
     expect(lines.some((l) => l.step === 'wait-new-session' && l.result === 'reset unconfirmed')).toBe(true);
@@ -222,11 +244,11 @@ test('unconfirmed reset is logged and no start prompt is sent', async (): Promis
 // Criterion 5: a stalled start prompt is logged as failure, with no retry.
 test('a stalled start prompt is logged as failure and not retried', async (): Promise<void> => {
   const s: Setup = setup(claudePane(), {
-    promptScript: [{ session: 'sess-new' }, { code: 'agent_prompt_stalled' }],
+    promptScript: [{ session: 'sess-new', status: 'idle' }, { code: 'agent_prompt_stalled' }],
   });
   try {
     writeTranscript(s.home, session, true);
-    const result: RunResult = await s.run(pane, session, s.log, START);
+    const result: RunResult = await s.run({}, pane, session, s.log, START);
     expect(result.code).toBe(1);
     const lines: Record<string, unknown>[] = s.logLines();
     expect(lines.some((l) => l.step === 'send-start-prompt' && l.result === 'prompt_stalled')).toBe(true);
@@ -239,11 +261,11 @@ test('a stalled start prompt is logged as failure and not retried', async (): Pr
 // Criterion 3+4+5 happy path: claude — turn end, reset, new session, start prompt, all logged.
 test('claude handover sends reset then start prompt after the new session appears', async (): Promise<void> => {
   const s: Setup = setup(claudePane(), {
-    promptScript: [{ session: 'sess-new' }],
+    promptScript: [{ session: 'sess-new', status: 'idle' }],
   });
   try {
     writeTranscript(s.home, session, true);
-    const result: RunResult = await s.run(pane, session, s.log, START);
+    const result: RunResult = await s.run({}, pane, session, s.log, START);
     expect(result.code).toBe(0);
     const lines: Record<string, unknown>[] = s.logLines();
     for (const step of ['wait-turn-end', 'send-reset', 'wait-new-session', 'send-start-prompt']) {
@@ -270,7 +292,10 @@ test('codex handover sends reset, one check prompt, then start prompt', async ()
       agent_session: idSession(session, 'herdr:codex'),
       screen_detection_skipped: null,
     },
-    { promptScript: [{ session: 'sess-new' }] },
+    {
+      promptScript: [{ status: 'idle' }],
+      waitScript: [{ status: 'done', session: 'sess-new' }],
+    },
   );
   try {
     writeRollout(
@@ -278,7 +303,7 @@ test('codex handover sends reset, one check prompt, then start prompt', async ()
       session,
       `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't1' } })}\n`,
     );
-    const result: RunResult = await s.run(pane, session, s.log, START);
+    const result: RunResult = await s.run({}, pane, session, s.log, START);
     expect(result.code).toBe(0);
     const prompts: string[][] = s.promptCalls();
     expect(prompts).toHaveLength(3);
@@ -286,6 +311,98 @@ test('codex handover sends reset, one check prompt, then start prompt', async ()
     expect(prompts[1][3]).not.toBe(START);
     expect(prompts[1]).toContain('--wait');
     expect(prompts[2][3]).toBe(START);
+    expect(s.calls().some((args) => args[0] === 'agent' && args[1] === 'wait')).toBe(true);
+  } finally {
+    s.clean();
+  }
+});
+
+// Criterion 3: codex logs and stops when its last task is still open at the bound.
+test.each<[string, string]>([
+  [
+    'a single open task',
+    `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n`,
+  ],
+  [
+    'an older completed task before the open one',
+    `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't0' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't0' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n`,
+  ],
+])(
+  'codex turn still open at the bound with %s is logged and nothing is sent',
+  async (_name: string, rollout: string): Promise<void> => {
+    const s: Setup = setup({
+      agent: 'codex',
+      agent_status: 'idle',
+      agent_session: idSession(session, 'herdr:codex'),
+      screen_detection_skipped: null,
+    });
+    try {
+      writeRollout(s.home, session, rollout);
+      const result: RunResult = await s.run({}, pane, session, s.log, START);
+      expect(result.code).toBe(1);
+      expect(s.logLines().some((l) => l.step === 'wait-turn-end' && l.result === 'turn open')).toBe(true);
+      expect(s.promptCalls()).toHaveLength(0);
+    } finally {
+      s.clean();
+    }
+  },
+);
+
+// Criterion 5: a stalled codex check prompt is logged as failure, with no retry.
+test('a stalled codex check prompt is logged as failure and not retried', async (): Promise<void> => {
+  const s: Setup = setup(
+    {
+      agent: 'codex',
+      agent_status: 'idle',
+      agent_session: idSession(session, 'herdr:codex'),
+      screen_detection_skipped: null,
+    },
+    {
+      promptScript: [{ status: 'idle' }, { code: 'agent_prompt_stalled' }],
+      waitScript: [],
+    },
+  );
+  try {
+    writeRollout(
+      s.home,
+      session,
+      `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't1' } })}\n`,
+    );
+    const result: RunResult = await s.run({}, pane, session, s.log, START);
+    expect(result.code).toBe(1);
+    const lines: Record<string, unknown>[] = s.logLines();
+    expect(lines.some((l) => l.step === 'send-check-prompt' && l.result === 'prompt_stalled')).toBe(true);
+    expect(s.promptCalls()).toHaveLength(2);
+  } finally {
+    s.clean();
+  }
+});
+
+// The check turn still working at the bound is logged, and no start prompt is sent.
+test('a codex check turn still working at the bound sends no start prompt', async (): Promise<void> => {
+  const s: Setup = setup(
+    {
+      agent: 'codex',
+      agent_status: 'idle',
+      agent_session: idSession(session, 'herdr:codex'),
+      screen_detection_skipped: null,
+    },
+    {
+      promptScript: [{ status: 'idle' }],
+      waitScript: [{}],
+    },
+  );
+  try {
+    writeRollout(
+      s.home,
+      session,
+      `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't1' } })}\n`,
+    );
+    const result: RunResult = await s.run({}, pane, session, s.log, START);
+    expect(result.code).toBe(1);
+    const lines: Record<string, unknown>[] = s.logLines();
+    expect(lines.some((l) => l.step === 'wait-check-end' && l.result === 'turn open')).toBe(true);
+    expect(s.promptCalls().filter((args) => args[3] === START)).toHaveLength(0);
   } finally {
     s.clean();
   }
@@ -294,10 +411,10 @@ test('codex handover sends reset, one check prompt, then start prompt', async ()
 // Pi happy path through hook authority.
 test('pi handover sends reset then start prompt', async (): Promise<void> => {
   const s: Setup = setup(piAuthority, {
-    promptScript: [{ session: '/tmp/pi-new.jsonl' }],
+    promptScript: [{ session: '/tmp/pi-new.jsonl', status: 'idle' }],
   });
   try {
-    const result: RunResult = await s.run(pane, piSession, s.log, START);
+    const result: RunResult = await s.run({}, pane, piSession, s.log, START);
     expect(result.code).toBe(0);
     const prompts: string[][] = s.promptCalls();
     expect(prompts).toHaveLength(2);
