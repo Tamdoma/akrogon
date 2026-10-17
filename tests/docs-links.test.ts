@@ -135,6 +135,29 @@ test('missing anchors with and without a path part are reported', () => {
   expect(valid).toEqual([]);
 });
 
+test('seat skills name the known-red step and no longer claim base defects impossible', (): void => {
+  const root: string = resolve(import.meta.dir, '..');
+  const retired: string = 'Every commit on the default branch passed';
+  for (const site of ['implement-issue', 'check-issue', 'merge-issue']) {
+    const content: string = readFileSync(join(root, 'skills', site, 'SKILL.md'), 'utf8');
+    expect(content).toContain('--known-red');
+    expect(content).not.toContain(retired);
+  }
+  for (const site of ['implement-issue', 'check-issue']) {
+    const content: string = readFileSync(join(root, 'skills', site, 'SKILL.md'), 'utf8');
+    expect(content).toContain('akrogon verify --known-red');
+  }
+  expect(readFileSync(join(root, 'skills/merge-issue/SKILL.md'), 'utf8')).toContain(
+    'akrogon verify --attempt <id> --known-red',
+  );
+});
+
+test('chart-issues direct landing routes a no-cause red through --known-red', (): void => {
+  const content: string = readFileSync(resolve(import.meta.dir, '../skills/chart-issues/SKILL.md'), 'utf8');
+  expect(content).toContain('verify --holder <chart>/direct --known-red');
+  expect(content).toContain('failing known-red');
+});
+
 test('chart-issues skill names akrogon pack at every end-marker site', (): void => {
   const content: string = readFileSync(resolve(import.meta.dir, '../skills/chart-issues/SKILL.md'), 'utf8');
   const markers: string[] = ['Handed off', 'Closed', 'Held'];

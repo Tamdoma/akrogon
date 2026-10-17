@@ -1,10 +1,21 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fakeAkrogon, fixture, leaf, storeDir, yaml, type Fixture } from './helpers';
+import {
+  cli,
+  fakeAkrogon,
+  fixture,
+  greenReceipt,
+  leaf,
+  seedRun,
+  storeDir,
+  yaml,
+  type Fixture,
+} from './helpers';
 import { command, type Result } from '../src/shell';
-import { readRepo } from '../src/config';
-import { requireGreenReceipt, verifyRunSchema, type VerifyRun } from '../src/verify';
+import { readRepo, type Repo } from '../src/config';
+import { readState } from '../src/state';
+import { requireGreenReceipt, verifyCommands, verifyRunSchema, type VerifyRun } from '../src/verify';
 
 function records(f: Fixture): VerifyRun[] {
   const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
@@ -353,6 +364,174 @@ test('verify removes each command TMPDIR on success and failure', async () => {
     const { worktree } = await callerWorktree(f);
     expect((await verify(f, [], worktree)).code).toBe(1);
     for (const item of records(f)[0].commands) expect(existsSync(readFileSync(item.log, 'utf8'))).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+// The failing script's `(fail)` lines name a tracked file's content, so the
+// same configured command fails differently on the head and base trees.
+async function failureScript(
+  f: Fixture,
+  name: string,
+  extra: Record<string, string> = {},
+): Promise<void> {
+  writeFileSync(
+    resolve(f.root, 'check.sh'),
+    `name=$(cat failure); echo "(fail) $name"; for p in ${Object.keys(extra).join(' ')}; do echo "(fail) $p"; done; exit 7\n`,
+  );
+  writeFileSync(resolve(f.root, 'failure'), `${name}\n`);
+  yaml(resolve(f.root, 'issues/config.yaml'), { checks: { test: 'sh check.sh' }, grounding: 'none' });
+  await command(['git', 'add', '.'], f.root);
+  await command(['git', 'commit', '-m', 'add failing check'], f.root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+}
+
+test('verify --known-red reruns the failing command on a fresh checkout of the exact base and records the linked pair', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const { leafPath, worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    greenReceipt(f, base, 'leaf');
+    const result: Result = await verify(f, ['--known-red'], worktree);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain(`verify known-red ${head}: pass`);
+    const runs: VerifyRun[] = records(f);
+    const headRun: VerifyRun | undefined = runs.find((run) => run.sha === head);
+    const baseRun: VerifyRun | undefined = runs.find((run) => run.sha === base);
+    expect(headRun?.commands.map((item) => item.exit)).toEqual([7]);
+    expect(baseRun?.compares).toBe(headRun?.run);
+    expect(baseRun?.commands.map((item) => item.exit)).toEqual([7]);
+    for (const run of runs) expect(run.compares === undefined || run.run === baseRun?.run).toBe(true);
+    expect((await cli(f, ['phase', 'caller', 'check.review', '--slot', 'A'], worktree)).code).toBe(0);
+    expect(readState(leafPath).phase).toBe('check.review');
+  } finally {
+    f.clean();
+  }
+});
+
+test('verify --known-red refuses a head failure absent on the base', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const { leafPath, worktree } = await callerWorktree(f);
+    writeFileSync(resolve(worktree, 'failure'), 'beta\n');
+    await command(['git', 'add', 'failure'], worktree);
+    await command(['git', 'commit', '-m', 'different failing test'], worktree);
+    const result: Result = await verify(f, ['--known-red'], worktree);
+    expect(result.code).not.toBe(0);
+    expect(result.stdout).toContain('verify known-red');
+    const refused: Result = await cli(f, ['phase', 'caller', 'check.review', '--slot', 'A'], worktree);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('No green leaf verify receipt');
+    expect(readState(leafPath).phase).toBe('implement');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a linked pair fails to satisfy requireGreenReceipt with unnamed or unlinked failing work', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { leafPath, worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], worktree);
+    const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    const baseTree: string = await command(['git', 'rev-parse', `${base}^{tree}`], f.root);
+    const repo: Repo = readRepo('repo', f.root);
+    const cmds: { name: string; command: string }[] = verifyCommands(repo.config, 'leaf');
+    const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
+    const log = (name: string, content: string): string => {
+      const path: string = resolve(leafPath, name);
+      writeFileSync(path, content);
+      return path;
+    };
+    const redAlpha: string = log('red.log', '(fail) alpha\n');
+    const noNames: string = log('plain.log', 'boom\n');
+    const gone: string = resolve(leafPath, 'gone.log');
+    const headRun = (overrides: Partial<VerifyRun> = {}): VerifyRun =>
+      seedRun(f, {
+        sha: head,
+        tree,
+        scope: 'leaf',
+        commands: cmds.map((item) => ({ ...item, exit: 7, log: redAlpha })),
+        ...overrides,
+      });
+    const baseRun = (headRunId: string, overrides: Partial<VerifyRun> = {}): VerifyRun =>
+      seedRun(f, {
+        sha: base,
+        tree: baseTree,
+        scope: 'leaf',
+        compares: headRunId,
+        commands: cmds.map((item) => ({ ...item, exit: 7, log: redAlpha })),
+        ...overrides,
+      });
+    const reset = (): void => writeFileSync(file, '');
+    const refuse = async (): Promise<void> => {
+      await expect(requireGreenReceipt(repo, head, 'leaf')).rejects.toThrow(`No green leaf verify receipt for ${head}`);
+    };
+
+    reset();
+    headRun({ commands: cmds.map((item) => ({ ...item, exit: 7, log: noNames })) });
+    baseRun(records(f).at(-1)!.run);
+    await refuse();
+
+    reset();
+    headRun({ commands: cmds.map((item) => ({ ...item, exit: 7, log: gone })) });
+    baseRun(records(f).at(-1)!.run);
+    await refuse();
+
+    reset();
+    headRun();
+    baseRun(records(f).at(-1)!.run, {
+      commands: cmds.map((item) => ({ name: item.name, command: `${item.command} --old`, exit: 7, log: redAlpha })),
+    });
+    await refuse();
+
+    reset();
+    headRun();
+    baseRun(records(f).at(-1)!.run, { end: undefined });
+    await refuse();
+
+    reset();
+    const unended: VerifyRun = headRun({ end: undefined });
+    baseRun(unended.run);
+    await refuse();
+
+    reset();
+    headRun();
+    baseRun(records(f).at(-1)!.run, { setup: 3 });
+    await refuse();
+
+    reset();
+    headRun();
+    baseRun(records(f).at(-1)!.run, {
+      commands: cmds.map((item) => ({ ...item, exit: 0, log: noNames })),
+    });
+    await refuse();
+
+    reset();
+    headRun();
+    baseRun(records(f).at(-1)!.run);
+    await requireGreenReceipt(repo, head, 'leaf');
+  } finally {
+    f.clean();
+  }
+});
+
+test('plain verify on a red head writes only its own run', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    const result: Result = await verify(f, [], worktree);
+    expect(result.code).toBe(1);
+    const runs: VerifyRun[] = records(f);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].compares).toBeUndefined();
   } finally {
     f.clean();
   }

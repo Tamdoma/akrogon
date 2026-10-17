@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 import { readRepo } from '../src/config';
-import { verifyCommands, type VerifyScope } from '../src/verify';
+import { verifyCommands, verifyRunSchema, type VerifyRun, type VerifyScope } from '../src/verify';
 import { findLeaf, readState, type Batch } from '../src/state';
 import { descendantsOf } from './isolation';
 
@@ -221,31 +221,40 @@ export function printedChecks(f: Fixture): (printed: string, cwd: string, env?: 
   };
 }
 
+export function seedRun(f: Fixture, run: Partial<VerifyRun>): VerifyRun {
+  const at: string = new Date().toISOString();
+  const record: VerifyRun = verifyRunSchema.parse({
+    run: randomUUID(),
+    repo: 'repo',
+    leaf: 'seeded',
+    sha: 'x',
+    tree: 'x',
+    scope: 'leaf',
+    path: resolve(f.home, 'verified'),
+    pid: process.pid,
+    boot_id: '',
+    setup: 0,
+    commands: [],
+    start: at,
+    end: at,
+    ...run,
+  });
+  appendFileSync(resolve(f.root, 'issues/verify-runs.jsonl'), JSON.stringify(record) + '\n');
+  return record;
+}
+
 export function greenReceipt(
   f: Fixture,
   sha: string,
   scope: VerifyScope,
   commands: { name: string; command: string }[] = verifyCommands(readRepo('repo', f.root).config, scope),
 ): void {
-  const at: string = new Date().toISOString();
-  const record = {
-    run: randomUUID(),
-    repo: 'repo',
-    leaf: 'seeded',
+  seedRun(f, {
     sha,
-    tree: Bun.spawnSync(['git', 'rev-parse', `${sha}^{tree}`], { cwd: f.root })
-      .stdout.toString()
-      .trim(),
+    tree: Bun.spawnSync(['git', 'rev-parse', `${sha}^{tree}`], { cwd: f.root }).stdout.toString().trim(),
     scope,
-    path: resolve(f.home, 'verified'),
-    pid: process.pid,
-    boot_id: '',
-    setup: 0,
     commands: commands.map((item) => ({ ...item, exit: 0, log: resolve(f.home, 'verified.log') })),
-    start: at,
-    end: at,
-  };
-  appendFileSync(resolve(f.root, 'issues/verify-runs.jsonl'), JSON.stringify(record) + '\n');
+  });
 }
 
 export async function verified(f: Fixture, slug: string, scope: VerifyScope): Promise<void> {

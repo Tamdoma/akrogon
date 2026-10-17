@@ -1,9 +1,11 @@
 import { test, expect } from 'bun:test';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fakeHerdr, fixture, greenReceipt, leaf, type Fixture } from './helpers';
+import { cli, fakeHerdr, fixture, greenReceipt, leaf, seedRun, type Fixture } from './helpers';
+import { readRepo } from '../src/config';
 import { readState, saveState, type Batch } from '../src/state';
 import { command, spawnCaptured, type Result } from '../src/shell';
+import { verifyCommands, type VerifyRun } from '../src/verify';
 
 const stale: { name: string; command: string }[] = [{ name: 'test', command: 'bun test --old' }];
 
@@ -82,6 +84,73 @@ test('merged --check stamps tested_top only with a green merge receipt for HEAD 
     greenReceipt(f, head, 'merge');
     expect((await cli(f, check, f.root, herdr.env)).code).toBe(0);
     expect(readState(path).batch?.tested_top).toBe(head);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a qualifying linked pair satisfies the merge gates and a non-qualifying pair refuses them', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree, head } = await branch(f, 'landing');
+    const builtOn: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+    const path: string = leaf(f, 'landing', 'merge', { worktree, merge_stamp: '2026-10-05T00:00:00.000Z' });
+    const record: Batch = {
+      attempt: 'a1',
+      built_on: builtOn,
+      holder: { base: builtOn, head },
+      applied: true,
+      members: [],
+    };
+    saveState(path, { ...readState(path), batch: record });
+    const herdr: { env: NodeJS.ProcessEnv } = fakeHerdr(f);
+    const check: string[] = ['phase', 'landing', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'];
+    const tree: string = await command(['git', 'rev-parse', `${head}^{tree}`], f.root);
+    const baseTree: string = await command(['git', 'rev-parse', `${builtOn}^{tree}`], f.root);
+    const cmds: { name: string; command: string }[] = verifyCommands(readRepo('repo', f.root).config, 'merge');
+    mkdirSync(resolve(path, 'implementation'), { recursive: true });
+    const pair = (baseLog: string): void => {
+      const headLog: string = resolve(path, 'implementation/check-test-head.log');
+      writeFileSync(headLog, '(fail) alpha\n');
+      const headRun: VerifyRun = seedRun(f, {
+        sha: head,
+        tree,
+        scope: 'merge',
+        commands: cmds.map((item) => ({ ...item, exit: 1, log: headLog })),
+      });
+      seedRun(f, {
+        sha: builtOn,
+        tree: baseTree,
+        scope: 'merge',
+        compares: headRun.run,
+        commands: cmds.map((item) => ({ ...item, exit: 1, log: baseLog })),
+      });
+    };
+    const guards = async (): Promise<Result> =>
+      spawnCaptured(
+        [
+          process.execPath,
+          resolve(import.meta.dir, '../skills/chart-issues/scripts/direct-guards.ts'),
+          worktree,
+          'repo',
+          resolve(f.home, 'chart'),
+        ],
+        { env: { ...process.env, AKROGON_HOME: f.home } },
+      );
+    const headOnly: string = resolve(path, 'implementation/check-test-base.log');
+    writeFileSync(headOnly, '(fail) beta\n');
+    pair(headOnly);
+    expect((await cli(f, check, f.root, herdr.env)).stderr).toContain(`No green merge verify receipt for ${head}`);
+    expect(readState(path).batch?.tested_top).toBeUndefined();
+    expect((await guards()).code).not.toBe(0);
+    const same: string = resolve(path, 'implementation/check-test-base-same.log');
+    writeFileSync(same, '(fail) alpha\n');
+    pair(same);
+    expect((await cli(f, check, f.root, herdr.env)).code).toBe(0);
+    expect(readState(path).batch?.tested_top).toBe(head);
+    const passed: Result = await guards();
+    expect(passed.stderr).toBe('');
+    expect(passed.code).toBe(0);
   } finally {
     f.clean();
   }
