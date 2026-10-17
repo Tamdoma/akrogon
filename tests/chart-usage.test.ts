@@ -530,6 +530,25 @@ test('cumulative codex spans exclude gap increments from totals and operator out
   }
 });
 
+test('codex operator turns crossing a span start count only in-span minutes', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    w.putSeats(w.chart, [{ seat: 'A', harness: 'codex', session: 'codex-tur' }], '2026-10-06T09:30:00Z', [
+      { from: '2026-10-06T10:04:00Z', to: '2026-10-06T10:20:00Z' },
+    ]);
+    w.putTranscript('codex', 'codex-tur', 'codex/rollout-tur.jsonl');
+    const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
+    expect(r.code).toBe(0);
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    expect(md).toContain('operator turns 1');
+    expect(md).toContain('operator wait 15.0 min');
+    expect(md).toContain('  2026-10-06T10:00:03.000Z 15.0 min');
+    expect(md).toContain('working minutes 15.0');
+  } finally {
+    w.clean();
+  }
+});
+
 test('invalid spans exit non-zero, name the field and write no USAGE.md', async (): Promise<void> => {
   const w: World = setup();
   try {
