@@ -497,6 +497,39 @@ test('spans filter records, calls and minutes into their half-open windows', asy
   }
 });
 
+test('cumulative codex spans exclude gap increments from totals and operator output', async (): Promise<void> => {
+  const w: World = setup();
+  try {
+    w.putSeats(
+      w.chart,
+      [
+        { seat: 'A', harness: 'claude', session: 'claude-spans' },
+        { seat: 'B', harness: 'codex', session: 'codex-diff' },
+      ],
+      '2026-10-06T09:30:00Z',
+      [
+        { from: '2026-10-06T10:00:00Z', to: '2026-10-06T10:03:00Z' },
+        { from: '2026-10-06T11:30:00Z', to: '2026-10-06T11:40:00Z' },
+      ],
+    );
+    w.putTranscript('claude', 'claude-spans', 'claude/claude-spans.jsonl');
+    w.putTranscript('codex', 'codex-diff', 'codex/codex-diff.jsonl');
+    const r: RunResult = await w.run(w.chart, '2026-10-06T12:00:00Z');
+    expect(r.code).toBe(0);
+    const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
+    const section: string = md.split('\n\n').find((s: string) => s.startsWith('seat B'))!;
+    expect(section).toContain('input_tokens 600');
+    expect(section).toContain('cached_input_tokens 240');
+    expect(section).toContain('output_tokens 80');
+    expect(section).toContain('reasoning_output_tokens 20');
+    expect(section).toContain('total_tokens 610');
+    const row: string = md.split('\n').find((l: string) => l.startsWith('  2026-10-06T10:35:00.000Z'))!;
+    expect(row).toContain('B=70');
+  } finally {
+    w.clean();
+  }
+});
+
 test('invalid spans exit non-zero, name the field and write no USAGE.md', async (): Promise<void> => {
   const w: World = setup();
   try {
