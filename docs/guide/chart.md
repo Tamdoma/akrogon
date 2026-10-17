@@ -262,6 +262,8 @@ Some things still wait for you, while the door moves on within the handed list: 
 
 The record lives in each chart's `## Autopilot` section in CHART.md: boundary breaches first, then the switch-on reference, consultants and losses, the route, handed-off leaves, waits and picks against the recommendation. The door also prints one line per chart at the end of each pass. The [chart-issues](../../skills/chart-issues/SKILL.md#autopilot) skill holds the full mode rules.
 
+After the first handed chart, the door can hand itself to a fresh conversation in the same pane, a self-handover, so its context stays small over a long run. This works for claude, codex and pi; any other agent keeps today's behavior and stays in the same conversation.
+
 The cost: a wrong pick can merge to main — and for akrogon, deploy — before you read the record, so check it before trusting a run overnight. Do not hand the same work to two doors; the door holds work another door's open chart already covers, but two doors started on the same work at the same moment are a stated limit. The first run happens once with you around, answering nothing and able to say stop; overnight use after that is your call.
 
 Previous: [Create](create.md) · Next: [Next](next.md) · [Home](../../README.md)

@@ -144,6 +144,8 @@ The mode ends when every handed chart's last marker is `Handed off` or `Closed`.
 
 CHART.md records the mode record and the `## Autopilot` section per shapes.md, written as the pass goes. The pass ends with one line per chart in the door pane. The handoff footer says "handed off", not "started", and names a pause when `akrogon status` shows one. Nothing computes a score.
 
+Handover happens only when switching to the next runnable handed chart, after the outgoing chart's records are written and its span closed: old A creates the next chart's folder when absent (INTAKE.md plus CHART.md with its mode record), appends `handover <time> <log>: handed <remaining list>; consultants <surviving>` to the mode record of every handed chart still open, runs `bun <skill-folder>/scripts/door-reset.ts <A pane> <A session> <log> <start prompt>` and ends its turn. The fresh session whose latest mode entry is that handover appends `continue autopilot (handover <time>)` and continues the same handed list; any other new session in that pane starts attended. Handover is supported for claude (`/clear`), codex and pi (`/new`); every other kind keeps same-session behavior.
+
 ## Printed footer
 
 End each door pass with the actual result and reason no automatic pass follows, printed rather than saved:
@@ -152,5 +154,7 @@ End each door pass with the actual result and reason no automatic pass follows, 
 Last operation: <what this pass wrote or observed>
 Next: none <awaiting operator answer, dispatch, or named blocker>
 ```
+
+The pass that queued a handover prints `Next: none handover queued to a fresh A in <pane>`.
 
 The footer is printed only when the turn ends, and never while a prompted peer's turn is open.

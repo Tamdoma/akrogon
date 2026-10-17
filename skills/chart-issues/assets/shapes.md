@@ -40,6 +40,8 @@ Route: <lifecycle (debate no|yes) | direct>
 
 ## Mode record
 - mode <time> <door pane> <A session id>: <on | off | changed list | continue autopilot> <detail>
+- mode <time> <door pane> <A session id>: handover <time> <log>: handed <remaining list>; consultants <surviving>
+- mode <time> <door pane> <A session id>: continue autopilot (handover <time>)
 
 ## Autopilot
 - breach: <each observed boundary breach, first in the section>
@@ -69,7 +71,7 @@ Route: <lifecycle (debate no|yes) | direct>
 - review files: <slots/review-B-<n>.md paths>
 - landed SHA: <sha pushed, after landing>
 ```
-Under autopilot the CHART.md carries `## Mode record` — one `- mode` line appended per mode change (on, off, changed list, "continue autopilot") with its time, the door pane and A's session id, the latest entry governing — and `## Autopilot`, written as the pass goes with every line a `- ` list item so no line parses as a chart marker; it records observed states only, never "started" or "merged" without evidence. Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts.
+Under autopilot the CHART.md carries `## Mode record` — one `- mode` line appended per mode change (on, off, changed list, "continue autopilot") with its time, the door pane and A's session id, the latest entry governing — and `## Autopilot`, written as the pass goes with every line a `- ` list item so no line parses as a chart marker; it records observed states only, never "started" or "merged" without evidence. Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts. The `handover` and `continue autopilot (handover <time>)` entries are appended during an autopilot switch, so a fresh session can resume the same handed list.
 ```markdown
 # Intake: <chart-slug>
 
