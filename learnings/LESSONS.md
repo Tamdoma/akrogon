@@ -4,6 +4,8 @@ These lessons record what happened, not what is true.
 
 One line per lesson: mechanism, date, history file. A line leaves when the leaf that stops its mechanism retires it, when `/learn-issues` removes a stopped line, or when an operator-approved transfer moves a judgment lesson into its review step.
 
+- Review of red-merge repairs must distinguish the recorded aggregate from its permitted narrow reproducer; requiring an aggregate rerun when the implementation skill allows failing test suites adds a false gate. 2026-10-18. history/2026-10-18-aggregate-vs-reproducer-review.md
+
 - check-issue review: slot A missed three reproducible defects on the command leaf by reading only, slot B found them by running the code in a temp repo. 2026-09-10. history/2026-09-10-review-by-reading.md
 - implement-issue report: core-skills deleted consult-issue and explain-issue and left dangling links in seed-issue and init-issues unreported; grep for the old path and name out-of-scope hits under known limitations. 2026-09-10. history/2026-09-10-core-skills.md
 - process boundary: `retryable` in `src/next.ts` parses herdr stderr as JSON unguarded, so a non-JSON stderr surfaces as SyntaxError and the real body is lost; parse external stderr behind a guard and propagate the raw text. 2026-09-10. history/2026-09-10-stderr-json-parse.md
