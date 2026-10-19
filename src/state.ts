@@ -118,7 +118,8 @@ export function readState(path: string): State {
   try {
     return stateSchema.parse(input);
   } catch (error) {
-    if (error instanceof z.ZodError) throw new Error(`Invalid state ${file}: ${error.message}`, { cause: error });
+    if (error instanceof z.ZodError)
+      throw new z.ZodError([{ code: 'custom', path: [], message: `Invalid state ${file}`, input }, ...error.issues]);
     throw error;
   }
 }
