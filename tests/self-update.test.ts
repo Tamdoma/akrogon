@@ -1,10 +1,12 @@
 import { test, expect } from 'bun:test';
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -397,6 +399,65 @@ test.serial('an incoming tracked path colliding with an ignored file refuses a b
     expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(head);
     expect(await remoteHead(f)).not.toBe(remoteBefore);
     expect(readFileSync(resolve(f.clone, 'collision'), 'utf8')).toBe('operator ignored bytes\n');
+    expect(await worktreeCount(f)).toBe(1);
+  } finally {
+    f.clean();
+  }
+});
+
+test.serial('a behind-only move adopts identical ignored entries from the incoming tree', async () => {
+  const f: SelfUpdateFixture = await selfUpdateFixture();
+  try {
+    mkdirSync(resolve(f.seed, 'collide')); 
+    writeFileSync(resolve(f.seed, 'collide/file'), 'shared\n');
+    writeFileSync(resolve(f.seed, 'collide/tool'), '#!/bin/sh\nexit 0\n');
+    chmodSync(resolve(f.seed, 'collide/tool'), 0o755);
+    symlinkSync('file', resolve(f.seed, 'collide/link'));
+    await command(['git', 'add', '--', 'collide'], f.seed);
+    await command(['git', 'commit', '-m', 'track collisions'], f.seed);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.seed);
+    const incoming: string = await remoteHead(f);
+    writeFileSync(resolve(f.clone, '.gitignore'), 'node_modules/\ncollide/\n');
+    mkdirSync(resolve(f.clone, 'collide'));
+    writeFileSync(resolve(f.clone, 'collide/file'), 'shared\n');
+    writeFileSync(resolve(f.clone, 'collide/tool'), '#!/bin/sh\nexit 0\n');
+    symlinkSync('file', resolve(f.clone, 'collide/link'));
+    chmodSync(resolve(f.clone, 'collide/tool'), 0o755);
+    const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toContain('deployed');
+    expect(logs[0]).not.toContain('ignored operator path');
+    expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(incoming);
+    const staged: Map<string, string> = new Map(
+      (await command(['git', 'ls-files', '--stage', '-z'], f.clone))
+        .split('\0')
+        .filter((line: string) => line !== '')
+        .map((line: string) => [line.split('\t')[1], line.split(' ')[0] + ' ' + line.split(' ')[1]]),
+    );
+    for (const [path, mode] of [
+      ['collide/file', '100644'],
+      ['collide/tool', '100755'],
+      ['collide/link', '120000'],
+    ]) {
+      expect(staged.has(path), `${path} tracked`).toBe(true);
+      expect(staged.get(path)?.split(' ')[0]).toBe(mode);
+    }
+    const tree: Map<string, string> = new Map(
+      (await command(['git', 'ls-tree', '-r', '-z', incoming], f.clone))
+        .split('\0')
+        .filter((line: string) => line !== '')
+        .map((line: string) => {
+          const [meta, path] = line.split('\t');
+          return [path, meta.split(' ')[2]];
+        }),
+    );
+    for (const path of ['collide/file', 'collide/tool', 'collide/link'])
+      expect(staged.get(path)?.split(' ')[1]).toBe(tree.get(path));
+    expect(readFileSync(resolve(f.clone, 'collide/file'), 'utf8')).toBe('shared\n');
+    expect(readFileSync(resolve(f.clone, 'collide/tool'), 'utf8')).toBe('#!/bin/sh\nexit 0\n');
+    expect(lstatSync(resolve(f.clone, 'collide/tool')).mode & 0o111).not.toBe(0);
+    expect(readlinkSync(resolve(f.clone, 'collide/link'))).toBe('file');
+    expect((await run(['git', 'status', '--porcelain'], f.clone)).stdout).toBe(' M .gitignore');
     expect(await worktreeCount(f)).toBe(1);
   } finally {
     f.clean();

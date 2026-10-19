@@ -1,6 +1,17 @@
 import { test, expect } from 'bun:test';
 import { dirname, resolve } from 'node:path';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
 import { command, run, type Result } from '../src/shell';
 
@@ -404,6 +415,233 @@ for (const source of ['incoming', 'replay']) {
     });
   }
 }
+
+test('sync adopts identical ignored entries from the incoming tree', async () => {
+  const f: Fixture = await remoteFixture();
+  try {
+    put(f, '.gitignore', 'collision*\n');
+    await command(['git', 'add', '.gitignore'], f.root);
+    await command(['git', 'commit', '-m', 'ignore operator files'], f.root);
+    await command(['git', 'push'], f.root);
+    const other: string = resolve(f.home, 'other');
+    await command(['git', 'clone', resolve(f.home, 'remote.git'), other]);
+    await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
+    await command(['git', 'config', 'user.name', 'Test'], other);
+    put({ ...f, root: other }, 'collision', 'shared bytes\n');
+    put({ ...f, root: other }, 'collision-diff', 'shared different\n');
+    put({ ...f, root: other }, 'collision [1]* \n', 'odd bytes\n');
+    put({ ...f, root: other }, 'collision-tool', '#!/bin/sh\nexit 0\n');
+    chmodSync(resolve(other, 'collision-tool'), 0o755);
+    put({ ...f, root: other }, 'collision-target', 'link bytes\n');
+    symlinkSync('collision-target', resolve(other, 'collision-link'));
+    await command(
+      [
+        'git',
+        '--literal-pathspecs',
+        'add',
+        '-f',
+        '--',
+        'collision',
+        'collision-diff',
+        'collision [1]* \n',
+        'collision-tool',
+        'collision-link',
+      ],
+      other,
+    );
+    await command(['git', 'commit', '-m', 'track collisions'], other);
+    await command(['git', 'push'], other);
+    const incoming: string = await command(['git', 'rev-parse', 'HEAD'], resolve(f.home, 'remote.git'));
+    put(f, 'collision', 'shared bytes\n');
+    put(f, 'collision-diff', 'shared different\n');
+    put(f, 'collision [1]* \n', 'odd bytes\n');
+    put(f, 'collision-tool', '#!/bin/sh\nexit 0\n');
+    chmodSync(resolve(f.root, 'collision-tool'), 0o755);
+    symlinkSync('collision-target', resolve(f.root, 'collision-link'));
+    put(f, 'issues/record', 'eligible issue\n');
+    const result: Result = await cli(f, ['sync']);
+    expect(result.code, result.stderr).toBe(0);
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
+    expect(await command(['git', 'merge-base', '--is-ancestor', incoming, head], f.root)).toBe('');
+    expect(await command(['git', 'rev-parse', 'main'], resolve(f.home, 'remote.git'))).toBe(head);
+    const staged: Map<string, string> = new Map(
+      (await command(['git', 'ls-files', '--stage', '-z'], f.root))
+        .split('\0')
+        .filter((line: string) => line !== '')
+        .map((line: string) => [line.split('\t')[1], line.split(' ')[0] + ' ' + line.split(' ')[1]]),
+    );
+    for (const [path, modeId] of [
+      ['collision', '100644'],
+      ['collision-diff', '100644'],
+      ['collision [1]* \n', '100644'],
+      ['collision-tool', '100755'],
+      ['collision-link', '120000'],
+      ['issues/record', '100644'],
+    ]) {
+      expect(staged.has(path), `${path} tracked`).toBe(true);
+      expect(staged.get(path)?.split(' ')[0]).toBe(modeId);
+    }
+    const tree: Map<string, string> = new Map(
+      (await command(['git', 'ls-tree', '-r', '-z', incoming], f.root))
+        .split('\0')
+        .filter((line: string) => line !== '')
+        .map((line: string) => {
+          const [meta, path] = line.split('\t');
+          return [path, meta.split(' ')[2]];
+        }),
+    );
+    for (const path of ['collision', 'collision-diff', 'collision [1]* \n', 'collision-tool', 'collision-link'])
+      expect(staged.get(path)?.split(' ')[1]).toBe(tree.get(path));
+    expect(readFileSync(resolve(f.root, 'collision'), 'utf8')).toBe('shared bytes\n');
+    expect(readFileSync(resolve(f.root, 'collision-diff'), 'utf8')).toBe('shared different\n');
+    expect(readFileSync(resolve(f.root, 'collision [1]* \n'), 'utf8')).toBe('odd bytes\n');
+    expect(readFileSync(resolve(f.root, 'collision-tool'), 'utf8')).toBe('#!/bin/sh\nexit 0\n');
+    expect(lstatSync(resolve(f.root, 'collision-tool')).mode & 0o111).not.toBe(0);
+    expect(readlinkSync(resolve(f.root, 'collision-link'))).toBe('collision-target');
+    expect(await command(['git', 'status', '--porcelain'], f.root)).toBe('');
+    expect(await command(['git', 'ls-files', '--others', '--ignored', '--exclude-standard', '-z'], f.root)).toBe('');
+    await locksFree(f);
+  } finally {
+    f.clean();
+  }
+});
+
+for (const variant of [
+  'line endings',
+  'executable bit local',
+  'executable bit incoming',
+  'local file incoming symlink',
+  'local symlink incoming file',
+]) {
+  test(`sync refuses an ignored entry differing only in ${variant}`, async () => {
+    const f: Fixture = await remoteFixture();
+    try {
+      put(f, '.gitignore', 'collision*\n');
+      await command(['git', 'add', '.gitignore'], f.root);
+      await command(['git', 'commit', '-m', 'ignore operator files'], f.root);
+      await command(['git', 'push'], f.root);
+      const other: string = resolve(f.home, 'other');
+      await command(['git', 'clone', resolve(f.home, 'remote.git'), other]);
+      await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
+      await command(['git', 'config', 'user.name', 'Test'], other);
+      if (variant === 'line endings') {
+        put({ ...f, root: other }, '.gitattributes', 'collision text\n');
+        await command(['git', 'add', '.gitattributes'], other);
+      }
+      const localLink: boolean = variant === 'local symlink incoming file';
+      const incomingLink: boolean = variant === 'local file incoming symlink';
+      if (incomingLink) symlinkSync('collision', resolve(other, 'collision'));
+      else put({ ...f, root: other }, 'collision', 'shared\n');
+      if (variant === 'executable bit incoming') chmodSync(resolve(other, 'collision'), 0o755);
+      await command(['git', '--literal-pathspecs', 'add', '-f', '--', 'collision'], other);
+      await command(['git', 'commit', '-m', 'track collision'], other);
+      await command(['git', 'push'], other);
+      if (localLink) symlinkSync('collision', resolve(f.root, 'collision'));
+      else put(f, 'collision', variant === 'line endings' ? 'shared\r\n' : 'shared\n');
+      if (variant === 'executable bit local') chmodSync(resolve(f.root, 'collision'), 0o755);
+      const before: string[] = await snapshot(f);
+      const result: Result = await cli(f, ['sync']);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('ignored operator paths');
+      expect(result.stderr).toContain('collision');
+      expect(await snapshot(f)).toEqual(before);
+      const local: string = resolve(f.root, 'collision');
+      if (localLink) expect(readlinkSync(local)).toBe('collision');
+      else {
+        expect(readFileSync(local, 'utf8')).toBe(variant === 'line endings' ? 'shared\r\n' : 'shared\n');
+        expect(lstatSync(local).isFile()).toBe(true);
+        if (variant === 'executable bit local') expect(lstatSync(local).mode & 0o111).not.toBe(0);
+      }
+      await locksFree(f);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+for (const [ignoredPath, replayedPath] of [
+  ['collision', 'collision'],
+  ['collision', 'collision/file'],
+  ['collision/file', 'collision'],
+]) {
+  test(`sync refuses an identical ignored ${JSON.stringify(ignoredPath)} replayed ${JSON.stringify(replayedPath)}`, async () => {
+    const f: Fixture = await remoteFixture();
+    try {
+      put(f, '.gitignore', 'collision*\n');
+      await command(['git', 'add', '.gitignore'], f.root);
+      await command(['git', 'commit', '-m', 'ignore operator files'], f.root);
+      await command(['git', 'push'], f.root);
+      put(f, replayedPath, 'replay bytes\n');
+      await command(['git', '--literal-pathspecs', 'add', '-f', '--', replayedPath], f.root);
+      await command(['git', 'commit', '-m', 'add replay'], f.root);
+      await command(['git', '--literal-pathspecs', 'rm', '-q', '-r', '--', replayedPath], f.root);
+      await command(['git', 'commit', '-m', 'remove replay'], f.root);
+      const other: string = resolve(f.home, 'other');
+      await command(['git', 'clone', resolve(f.home, 'remote.git'), other]);
+      await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
+      await command(['git', 'config', 'user.name', 'Test'], other);
+      if (ignoredPath === 'collision') put({ ...f, root: other }, 'collision', 'shared\n');
+      else {
+        mkdirSync(resolve(other, 'collision'), { recursive: true });
+        put({ ...f, root: other }, 'collision/file', 'shared\n');
+      }
+      await command(
+        ['git', '--literal-pathspecs', 'add', '-f', '--', ignoredPath === 'collision' ? 'collision' : 'collision/file'],
+        other,
+      );
+      await command(['git', 'commit', '-m', 'track collision'], other);
+      await command(['git', 'push'], other);
+      put(f, ignoredPath, 'shared\n');
+      put(f, 'issues/record', 'eligible issue\n');
+      const before: string[] = await snapshot(f);
+      const result: Result = await cli(f, ['sync']);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('ignored operator paths');
+      expect(result.stderr).toContain(ignoredPath === 'collision' ? 'collision' : 'collision/file');
+      expect(readFileSync(resolve(f.root, ignoredPath), 'utf8')).toBe('shared\n');
+      expect(readFileSync(resolve(f.root, 'issues/record'), 'utf8')).toBe('eligible issue\n');
+      expect(await snapshot(f)).toEqual(before);
+      await locksFree(f);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+test('sync refusing a mixed ignored batch names only the differing path', async () => {
+  const f: Fixture = await remoteFixture();
+  try {
+    put(f, '.gitignore', 'collision*\n');
+    await command(['git', 'add', '.gitignore'], f.root);
+    await command(['git', 'commit', '-m', 'ignore operator files'], f.root);
+    await command(['git', 'push'], f.root);
+    const other: string = resolve(f.home, 'other');
+    await command(['git', 'clone', resolve(f.home, 'remote.git'), other]);
+    await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
+    await command(['git', 'config', 'user.name', 'Test'], other);
+    put({ ...f, root: other }, 'collision', 'shared\n');
+    put({ ...f, root: other }, 'collision-diff', 'shared\n');
+    await command(['git', '--literal-pathspecs', 'add', '-f', '--', 'collision', 'collision-diff'], other);
+    await command(['git', 'commit', '-m', 'track collisions'], other);
+    await command(['git', 'push'], other);
+    put(f, 'collision', 'shared\n');
+    put(f, 'collision-diff', 'operator bytes\n');
+    put(f, 'issues/record', 'eligible issue\n');
+    const before: string[] = await snapshot(f);
+    const result: Result = await cli(f, ['sync']);
+    expect(result.code).not.toBe(0);
+    const lines: string[] = result.stderr.split('\n');
+    expect(lines).toContain('collision-diff');
+    expect(lines).not.toContain('collision');
+    expect(readFileSync(resolve(f.root, 'collision'), 'utf8')).toBe('shared\n');
+    expect(readFileSync(resolve(f.root, 'collision-diff'), 'utf8')).toBe('operator bytes\n');
+    expect(readFileSync(resolve(f.root, 'issues/record'), 'utf8')).toBe('eligible issue\n');
+    expect(await snapshot(f)).toEqual(before);
+    await locksFree(f);
+  } finally {
+    f.clean();
+  }
+});
 
 test('sync permits harmless ignored paths while preserving tracked autostash edits', async () => {
   const f: Fixture = await remoteFixture();
