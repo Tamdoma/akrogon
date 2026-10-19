@@ -941,6 +941,7 @@ async function reconcileBatch(
       (fresh.state.phase === 'merge' && !(batch.applied === true && batch.candidate !== undefined))
     )
       return;
+    if (batch.owner === 'command' && (await landAlive(batch.attempt))) return;
     const end: PressureSnapshot | undefined =
       batch.pressure_start === undefined ? undefined : readPressure(pressureDir);
     const landed: boolean =
@@ -989,10 +990,13 @@ async function mergeTurn(
   if (holder === undefined) return;
   if (isStopped(repo.name, holder.state.slug)) return;
   const recorded: Batch | undefined = holder.state.batch;
+  if (recorded?.owner === 'command' && (await landAlive(recorded.attempt))) {
+    recordWait(repo, holder.state.slug, 'merge_turn');
+    return;
+  }
   if (recorded !== undefined && recorded.applied === true) {
     if (recorded.top === undefined || recorded.owner !== 'command')
       await dispatchMergeLeaf(global, repo, holder, invocation, mergeContext(recorded), isAutomatic, recorded.attempt);
-    else if (await landAlive(recorded.attempt)) recordWait(repo, holder.state.slug, 'merge_turn');
     else
       await withLock(resolve(globalHome(), '.lock'), async () => {
         const batch: Batch | undefined = readState(holder.path).batch;
@@ -1025,6 +1029,7 @@ async function mergeTurn(
       fresh.state.batch?.applied === true
     )
       return;
+    if (fresh.state.batch?.owner === 'command' && (await landAlive(fresh.state.batch.attempt))) return;
     if (mergeQueue(global, leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== holder.state.slug) return;
     const start: PressureSnapshot | undefined = readPressure(pressureDir);
     const builtOn: string = await localBase(repo);
