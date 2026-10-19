@@ -291,3 +291,16 @@ test('owner completion retains duplicate and foreign leaf failures while an inde
     }
   }
 }, 30000);
+
+test('status for a missing leaf does not report a bad sibling', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const bad: string = makeBad(f, 'bad', 'slug: [');
+    const result: Result = await cli(f, ['status', 'missing-leaf']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('missing-leaf');
+    expect(result.stderr).not.toContain(resolve(bad, 'state.yaml'));
+  } finally {
+    f.clean();
+  }
+});
