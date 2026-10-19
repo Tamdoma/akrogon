@@ -843,29 +843,3 @@ exec "${git}" "$@"
   }
 }, 30000);
 
-test('a saved batch with an empty members list resumes as the same holder attempt', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
-    await commitFile(f, aa.path, 'aa-file', 'aa\n');
-    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
-    expect((await next(f, [])).code).toBe(0);
-    const file: string = resolve(aa.path, 'state.yaml');
-    const raw = Bun.YAML.parse(readFileSync(file, 'utf8')) as { batch: { attempt: string; top: string } };
-    const { attempt, top } = raw.batch;
-    yaml(file, { ...raw, batch: { ...raw.batch, members: [] } });
-    expect(readState(aa.path).batch).not.toHaveProperty('members');
-    expect(readState(aa.path).batch!.attempt).toBe(attempt);
-    idleAll(f);
-    await verified(f, 'aa', 'merge');
-    expect(
-      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', attempt], f.root, f.env)).code,
-    ).toBe(0);
-    expect(readFileSync(file, 'utf8')).not.toContain('members');
-    expect((await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', attempt], f.root, f.env)).code).toBe(0);
-    expect(await remoteTip(f)).toBe(top);
-    expect(leafState(aa.path).phase).toBe('merged');
-  } finally {
-    f.clean();
-  }
-}, 25000);

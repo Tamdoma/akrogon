@@ -227,12 +227,12 @@ test('a bad leaf is never dispatched or queued but stays owned: reconcile keeps 
     expect(solo.stdout).toContain('issue complete calm');
     expect(existsSync(resolve(f.root, 'issues/closed/calm/solo/state.yaml'))).toBe(true);
 
-    // Reconcile keeps the bad leaf's worktree and tab.
-    const tabsBefore: number = database(f).tabs.length;
+    // Reconcile keeps the bad leaf's worktree and tab. Other leaves' tabs may
+    // close normally now that the pass runs — before this change the walk
+    // threw and reconcile never reached them.
     const pass: Result = await next(f, ['--all']);
     expect(pass.code).toBe(1);
     expect(existsSync(badWorktree)).toBe(true);
-    expect(database(f).tabs).toHaveLength(tabsBefore);
     expect(database(f).tabs.some((tab) => tab.tab_id === badTab)).toBe(true);
     const keptReport: { kept: { path: string; reason: string }[] } = JSON.parse(
       readFileSync(resolve(f.home, 'reconcile', 'repo.json'), 'utf8'),
