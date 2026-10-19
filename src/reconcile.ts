@@ -171,6 +171,18 @@ async function sliceHasProcess(slice: string): Promise<boolean> {
   return subtreeHasProcess(join(cgroupRoot(), group));
 }
 
+function broadcastInProgress(state: State, live: Pane[] | null): boolean {
+  return (
+    broadcastPending(state) ||
+    (state.phase === 'merged' &&
+      state.broadcast !== undefined &&
+      (live === null ||
+        live.some(
+          (pane) => pane.pane_id === state.pane.B && pane.agent_status !== 'idle' && pane.agent_status !== 'done',
+        )))
+  );
+}
+
 // Why a leaf-matched slice survives this pass, or null when it may stop.
 function sliceKeepReason(
   slice: string,
@@ -181,7 +193,7 @@ function sliceKeepReason(
 ): string | null {
   if (own.has(slice)) return 'own slice';
   if (runs.has(slice)) return 'live run record';
-  if (broadcastPending(leaf.state)) return 'broadcast pending';
+  if (broadcastInProgress(leaf.state, live)) return 'broadcast in progress';
   if (leaf.state.tab === undefined && !finished(leaf)) return 'unfinished leaf';
   if (leaf.state.tab !== undefined) {
     if (live === null) return 'pane list unavailable';
@@ -359,7 +371,7 @@ export function processesInside(paths: string[]): Set<string> {
 }
 
 export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null): Promise<boolean> {
-  if (leaf.state.tab === undefined || live === null || broadcastPending(leaf.state)) return false;
+  if (leaf.state.tab === undefined || live === null || broadcastInProgress(leaf.state, live)) return false;
   const tab: string = leaf.state.tab;
   if (!live.some((pane) => pane.tab_id === tab)) return false;
   await command(['herdr', 'tab', 'close', tab]);
@@ -707,7 +719,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       if (
         state.phase === 'merged' &&
         state.batch === undefined &&
-        !broadcastPending(state) &&
+        !broadcastInProgress(state, live) &&
         live !== null &&
         tabLive(panes, state.tab) &&
         !(within(leaf.path, openRoot) && ownerCompletes(repo, leaf))
@@ -741,8 +753,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       keep(worktree, 'state.batch', 'removed once the leaf releases its merge batch');
       continue;
     }
-    if (broadcastPending(state)) {
-      keep(worktree, 'broadcast pending', 'removed once the broadcast seat is prompted');
+    if (broadcastInProgress(state, live)) {
+      keep(worktree, 'broadcast in progress', 'removed once the broadcast seat finishes');
       continue;
     }
     if (state.phase === 'merged') {
@@ -1056,8 +1068,8 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
           // finished leaves report what stays; a finished leaf's temp also
           // stays while its slice still holds a running unit (D2).
           const done: boolean = finished(leaf);
-          if (broadcastPending(leaf.state))
-            keep(dir, 'broadcast pending', 'removed once the broadcast seat is prompted');
+          if (broadcastInProgress(leaf.state, live))
+            keep(dir, 'broadcast in progress', 'removed once the broadcast seat finishes');
           else if (live === null) {
             if (done) keep(dir, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
           } else if (tabLive(live, leaf.state.tab) || livePaneInside(live, dir)) {
