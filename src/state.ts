@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, type Dirent
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
-import { type Repo } from './config';
+import { within, type Repo } from './config';
 import { writeYaml } from './shell';
 import { issueFolders } from './park';
 
@@ -231,6 +231,15 @@ export function inventoryFailures(inv: Inventory): { ownedNames: Set<string>; in
   return {
     ownedNames: new Set(inv.unreadable.map((failure) => basename(failure.path))),
     incomplete: inv.unknown.length > 0,
+  };
+}
+
+export function inventoryUnder(inv: Inventory, path: string): Inventory {
+  return {
+    leaves: inv.leaves.filter((leaf) => within(leaf.path, path)),
+    unreadable: inv.unreadable.filter((failure) => within(failure.path, path)),
+    unknown: inv.unknown.filter((failure) => within(failure.path, path) || within(path, failure.path)),
+    foreign: inv.foreign.filter((leaf) => within(leaf.path, path)),
   };
 }
 

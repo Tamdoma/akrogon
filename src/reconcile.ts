@@ -29,7 +29,7 @@ import {
 import { readVerifyRuns, type VerifyRun } from './verify';
 import {
   broadcastPending,
-  readInventory,
+  inventoryUnder,
   readState,
   repoInventory,
   saveState,
@@ -262,13 +262,10 @@ function tabLive(live: Pane[], tab: string | undefined): boolean {
 function ownerCompletes(repo: Repo, leaf: Leaf): boolean {
   const open: string = resolve(repo.root, 'issues/open');
   const issue: string = dirname(leaf.path);
-  const issueInv: Inventory = readInventory(issue, open);
   const parent: string = dirname(issue);
   const owner: string = basename(parent) === 'open' ? issue : parent;
-  const ownerInv: Inventory = owner === issue ? issueInv : readInventory(owner, open);
-  const failures = (inv: Inventory): number => inv.unreadable.length + inv.unknown.length + inv.foreign.length;
-  if (failures(issueInv) + (owner === issue ? 0 : failures(ownerInv)) > 0) return false;
-  if (!issueInv.leaves.every((item) => item.state.phase === 'merged')) return false;
+  const ownerInv: Inventory = inventoryUnder(repoInventory(repo), owner);
+  if (ownerInv.unreadable.length + ownerInv.unknown.length + ownerInv.foreign.length > 0) return false;
   return ownerInv.leaves.every((item) => item.state.phase === 'merged');
 }
 
