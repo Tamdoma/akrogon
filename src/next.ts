@@ -75,7 +75,7 @@ import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
 import { isStopped } from './stop';
 import { selfUpdate } from './self-update';
-import { blockDetail, dependentCounts, mergeQueue, type DepDetail, type QueueEntry } from './turn';
+import { blockDetail, dependentCounts, mergeQueue, twinConflict, type DepDetail, type QueueEntry } from './turn';
 import { appendTiming, currentVisit, readTimings, recordWait, type WaitReason } from './timing';
 import { closeMergedTab, reconcile, reconcileHost, reconcileNeedsPanes } from './reconcile';
 import { adoptShell, inOwnScope, leafSlice, type ScopePlace } from './scope';
@@ -735,6 +735,17 @@ async function dispatchLeaf(
     report(invocation, repo.name, identity.path, new Error(`Missing or unreadable leaf: ${slug}`), slug);
     return 'skipped';
   }
+  const twin: { open: string; conflict: string } | null = twinConflict(repo, leaf.path);
+  if (twin !== null) {
+    report(
+      invocation,
+      repo.name,
+      twin.open,
+      new Error(`Twin owner folder: ${twin.open} conflicts with ${twin.conflict}`),
+      slug,
+    );
+    return 'skipped';
+  }
   if (isAutomatic && isPaused(repo.name)) return end('none');
   if (isStopped(repo.name, slug)) {
     if (!picked || isAutomatic) return end('none');
@@ -807,7 +818,7 @@ async function dispatchLeaf(
       return 'waiting';
     }
     const turn: QueueEntry | undefined =
-      state.phase === 'merge' ? mergeQueue(global, inventory.leaves, () => readLog(repo.root))[0] : undefined;
+      state.phase === 'merge' ? mergeQueue(global, repo, inventory.leaves, () => readLog(repo.root))[0] : undefined;
     if (state.phase === 'merge' && (turn?.leaf.state.slug !== slug || mergeContext === undefined))
       return end('merge_turn', turn === undefined || turn.leaf.state.slug === slug ? undefined : turn.leaf.state.slug);
     seats(global, repo, leaf.path);
@@ -985,8 +996,9 @@ async function mergeTurn(
       report(invocation, repo.name, leaf.path, error, leaf.state.slug);
     }
   }
-  const holder: Leaf | undefined = mergeQueue(global, discover(repo, invocation).leaves, () => readLog(repo.root))[0]
-    ?.leaf;
+  const holder: Leaf | undefined = mergeQueue(global, repo, discover(repo, invocation).leaves, () =>
+    readLog(repo.root),
+  )[0]?.leaf;
   if (holder === undefined) return;
   if (isStopped(repo.name, holder.state.slug)) return;
   const recorded: Batch | undefined = holder.state.batch;
@@ -1030,7 +1042,7 @@ async function mergeTurn(
     )
       return;
     if (fresh.state.batch?.owner === 'command' && (await landAlive(fresh.state.batch.attempt))) return;
-    if (mergeQueue(global, leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== holder.state.slug) return;
+    if (mergeQueue(global, repo, leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== holder.state.slug) return;
     const start: PressureSnapshot | undefined = readPressure(pressureDir);
     const builtOn: string = await localBase(repo);
     const holderHead: string = (await branchSha(repo, holder.state.slug)) ?? builtOn;
@@ -1157,8 +1169,9 @@ export async function mergePass(
 ): Promise<void> {
   for (;;) {
     if (isAutomatic && isPaused(repo.name)) return;
-    const holder: Leaf | undefined = mergeQueue(global, discover(repo, invocation).leaves, () => readLog(repo.root))[0]
-      ?.leaf;
+    const holder: Leaf | undefined = mergeQueue(global, repo, discover(repo, invocation).leaves, () =>
+      readLog(repo.root),
+    )[0]?.leaf;
     await mergeTurn(global, repo, invocation, isAutomatic, pressureDir);
     if (
       holder === undefined ||
