@@ -643,6 +643,37 @@ test('sync refusing a mixed ignored batch names only the differing path', async 
   }
 });
 
+test('sync refuses a differing ignored path containing a tab', async () => {
+  const f: Fixture = await remoteFixture();
+  try {
+    const path: string = 'collision\tfile';
+    put(f, '.gitignore', 'collision*\n');
+    await command(['git', 'add', '.gitignore'], f.root);
+    await command(['git', 'commit', '-m', 'ignore operator files'], f.root);
+    await command(['git', 'push'], f.root);
+    const other: string = resolve(f.home, 'other');
+    await command(['git', 'clone', resolve(f.home, 'remote.git'), other]);
+    await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
+    await command(['git', 'config', 'user.name', 'Test'], other);
+    put({ ...f, root: other }, path, 'incoming bytes\n');
+    await command(['git', '--literal-pathspecs', 'add', '-f', '--', path], other);
+    await command(['git', 'commit', '-m', 'track collision'], other);
+    await command(['git', 'push'], other);
+    put(f, path, 'operator bytes\n');
+    put(f, 'issues/record', 'eligible issue\n');
+    const before: string[] = await snapshot(f);
+    const result: Result = await cli(f, ['sync']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr.split('\n')).toContain(path);
+    expect(readFileSync(resolve(f.root, path), 'utf8')).toBe('operator bytes\n');
+    expect(readFileSync(resolve(f.root, 'issues/record'), 'utf8')).toBe('eligible issue\n');
+    expect(await snapshot(f)).toEqual(before);
+    await locksFree(f);
+  } finally {
+    f.clean();
+  }
+});
+
 test('sync permits harmless ignored paths while preserving tracked autostash edits', async () => {
   const f: Fixture = await remoteFixture();
   try {
