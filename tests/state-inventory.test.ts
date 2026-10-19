@@ -258,3 +258,36 @@ test('no module outside src/state.ts walks issue areas for state.yaml or parses 
   }
   expect(offenders).toEqual([]);
 });
+
+test('owner completion retains duplicate and foreign leaf failures while an independent owner completes', async () => {
+  for (const failure of ['foreign', 'duplicate']) {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      const healthy: string = leaf(
+        f,
+        'healthy',
+        'merge',
+        { ...holding(f), merge_stamp: '2026-10-19T00:00:00Z' },
+        'epic/one',
+      );
+      if (failure === 'foreign') leaf(f, 'bad', 'merged', { repo: 'other' }, 'epic/two');
+      else {
+        leaf(f, 'bad', 'merged', {}, 'epic/one');
+        leaf(f, 'bad', 'merged', {}, 'epic/two');
+      }
+      leaf(f, 'independent', 'merge', { ...holding(f), merge_stamp: '2026-10-19T00:00:01Z' }, 'calm');
+
+      const merged: Result = await cli(f, ['phase', 'healthy', 'merged'], f.root, f.env);
+      expect(merged.code, merged.stderr).toBe(0);
+      expect(existsSync(resolve(f.root, 'issues/open/epic'))).toBe(true);
+      expect(existsSync(resolve(f.root, 'issues/closed/epic'))).toBe(false);
+      expect(readState(healthy).phase).toBe('merged');
+
+      const independent: Result = await cli(f, ['phase', 'independent', 'merged'], f.root, f.env);
+      expect(independent.code, independent.stderr).toBe(0);
+      expect(existsSync(resolve(f.root, 'issues/closed/calm/independent/state.yaml'))).toBe(true);
+    } finally {
+      f.clean();
+    }
+  }
+}, 30000);
