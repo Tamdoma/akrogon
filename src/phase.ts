@@ -186,17 +186,57 @@ export async function commitMove(
   return announced;
 }
 
-export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): Promise<void> {
-  if (within(leaf.path, resolve(repo.root, 'issues/closed'))) return;
+export type CompletedOwner = { kind: 'issue' | 'epic'; name: string; destination: string; sources: string[] };
+
+type OwnerScope = { issue: string; issueLeaves: Leaf[]; owner: string; ownerLeaves: Leaf[] };
+
+function ownerScope(repo: Repo, leaf: Leaf, after: State): OwnerScope {
+  const open: string = resolve(repo.root, 'issues/open');
+  const current = (leaves: Leaf[]): Leaf[] =>
+    leaves.map((item): Leaf => (item.path === leaf.path ? { path: item.path, state: after } : item));
   const issue: string = dirname(leaf.path);
-  const issueLeaves: Leaf[] = leavesUnder(issue, resolve(repo.root, 'issues/open'));
-  if (!issueLeaves.every((item) => item.state.phase === 'merged')) return;
+  const issueLeaves: Leaf[] = current(leavesUnder(issue, open));
   const parent: string = dirname(issue);
   const owner: string = basename(parent) === 'open' ? issue : parent;
-  const ownerLeaves: Leaf[] = owner === issue ? issueLeaves : leavesUnder(owner, resolve(repo.root, 'issues/open'));
-  const complete: boolean = ownerLeaves.every((item) => item.state.phase === 'merged');
-  const destination: string = resolve(repo.root, 'issues/closed', basename(owner));
-  if (complete && existsSync(destination)) throw new Error(`Completion destination exists: ${destination}`);
+  return { issue, issueLeaves, owner, ownerLeaves: owner === issue ? issueLeaves : current(leavesUnder(owner, open)) };
+}
+
+function completion(repo: Repo, scope: OwnerScope): CompletedOwner | null {
+  if (!scope.ownerLeaves.every((item) => item.state.phase === 'merged')) return null;
+  return {
+    kind: scope.owner === scope.issue ? 'issue' : 'epic',
+    name: basename(scope.owner),
+    destination: resolve(repo.root, 'issues/closed', basename(scope.owner)),
+    sources: [...new Set(scope.ownerLeaves.flatMap((item) => item.state.sources ?? []))],
+  };
+}
+
+// The owner that completes once the leaf holds `after`, read before the move is saved.
+export function ownerCompletion(repo: Repo, leaf: Leaf, after: State): CompletedOwner | null {
+  if (within(leaf.path, resolve(repo.root, 'issues/closed'))) return null;
+  return completion(repo, ownerScope(repo, leaf, after));
+}
+
+// A command-run merge: no seat moves the leaf, and a completing owner leaves its broadcast handoff in the same save.
+export async function commandMerged(repo: Repo, holder: Leaf, pushed: string): Promise<void> {
+  const completed: CompletedOwner | null = ownerCompletion(repo, holder, { ...holder.state, phase: 'merged' });
+  await commitMove(
+    repo,
+    holder,
+    completed === null ? holder.state : { ...holder.state, broadcast: { ...completed, pushed } },
+    'merged',
+    null,
+  );
+}
+
+export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean): Promise<CompletedOwner | null> {
+  if (within(leaf.path, resolve(repo.root, 'issues/closed'))) return null;
+  const scope: OwnerScope = ownerScope(repo, leaf, readState(leaf.path));
+  const { issue, issueLeaves, owner, ownerLeaves } = scope;
+  if (!issueLeaves.every((item) => item.state.phase === 'merged')) return null;
+  const completed: CompletedOwner | null = completion(repo, scope);
+  if (completed !== null && existsSync(completed.destination))
+    throw new Error(`Completion destination exists: ${completed.destination}`);
   const issueSources: Set<string> = new Set(issueLeaves.flatMap((item) => item.state.sources ?? []));
   const siblingSources: Set<string> = new Set(
     ownerLeaves.filter((item) => dirname(item.path) !== issue).flatMap((item) => item.state.sources ?? []),
@@ -211,19 +251,31 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
           ),
         );
   await closeSources(repo, privateSources, leaf);
-  if (complete && owner !== issue) {
+  if (completed !== null && owner !== issue) {
     const remaining: Set<string> = new Set(
       ownerLeaves.flatMap((item) => item.state.sources ?? []).filter((source) => !privateSources.has(source)),
     );
     await closeSources(repo, remaining, leaf);
   }
-  if (!complete) return;
-  if (justMerged) console.log(`${owner === issue ? 'issue' : 'epic'} complete ${basename(owner)}`);
+  if (completed === null) return null;
+  if (justMerged) console.log(`${completed.kind} complete ${completed.name}`);
   writeFileSync(resolve(owner, '.closing'), '');
   await packFolder(repo, owner, leaf.path);
   mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
-  renameSync(owner, destination);
-  rmSync(resolve(destination, '.closing'));
+  renameSync(owner, completed.destination);
+  rmSync(resolve(completed.destination, '.closing'));
+  return completed;
+}
+
+export async function moveGuards(repo: Repo, leaf: Leaf, state: State, requested: Phase, from?: string): Promise<void> {
+  if (state.worktree !== undefined && !(state.phase === 'failed' && state.failure?.cause === 'blocked'))
+    await requireClean(state.worktree);
+  if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path, from);
+  // Recovery back into work skips the citation gates: the seat's own move out of that work runs them on the same diff.
+  const cites: boolean = state.phase !== 'failed' || requested === 'check.review' || requested === 'merge';
+  if (state.worktree !== undefined && cites) await requireTestChangeCitations(repo, state.worktree, from);
+  if (state.worktree !== undefined && state.frozen !== undefined && cites)
+    await requireFrozenCitations(repo, state.worktree, state.frozen, state.frozen_cited, from);
 }
 
 export async function transition(
@@ -278,14 +330,7 @@ export async function transition(
     );
     return;
   }
-  if (state.worktree !== undefined && !(state.phase === 'failed' && state.failure?.cause === 'blocked'))
-    await requireClean(state.worktree);
-  if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path, from);
-  // Recovery back into work skips the citation gates: the seat's own move out of that work runs them on the same diff.
-  const cites: boolean = state.phase !== 'failed' || requested === 'check.review' || requested === 'merge';
-  if (state.worktree !== undefined && cites) await requireTestChangeCitations(repo, state.worktree, from);
-  if (state.worktree !== undefined && state.frozen !== undefined && cites)
-    await requireFrozenCitations(repo, state.worktree, state.frozen, state.frozen_cited, from);
+  await moveGuards(repo, leaf, state, requested, from);
   if (requested === 'check.review' && state.worktree !== undefined) {
     await requireNonEmpty(repo, state.worktree);
     await requireGreenReceipt(repo, await command(['git', 'rev-parse', 'HEAD'], state.worktree), 'leaf');
@@ -515,15 +560,7 @@ async function requireBatchTop(worktree: string, record: Batch, head: string): P
     throw new Error(`HEAD must descend from the recorded batch top ${record.top}, found ${head}`);
 }
 
-async function batchCheck(
-  repo: Repo,
-  leaf: Leaf,
-  requested: Phase,
-  slot: Slot | undefined,
-  verdict: Verdict | undefined,
-  reason: string | undefined,
-  record: Batch,
-): Promise<void> {
+async function batchGuards(repo: Repo, leaf: Leaf, record: Batch): Promise<string> {
   const state: State = readState(leaf.path);
   const worktree: string = state.worktree ?? repo.root;
   const head: string = await mergeHead(repo, state, record);
@@ -541,7 +578,10 @@ async function batchCheck(
         retired.join(', ') +
         '. Remove the learnings/LESSONS.md line(s) and commit before pushing.',
     );
-  await transition(repo, leaf, requested, slot, verdict, reason, true);
+  return head;
+}
+
+async function recordTested(repo: Repo, leaf: Leaf, record: Batch, head: string): Promise<void> {
   await requireGreenReceipt(repo, head, 'merge');
   saveState(leaf.path, {
     ...readState(leaf.path),
@@ -553,12 +593,7 @@ async function batchCheck(
   });
 }
 
-type BatchPending =
-  | { kind: 'none' }
-  | { kind: 'refused'; record: Batch; candidate: string; end: PressureSnapshot | undefined }
-  | { kind: 'error'; record: Batch; candidate: string; result: Result; end: PressureSnapshot | undefined };
-
-async function batchPush(
+async function batchCheck(
   repo: Repo,
   leaf: Leaf,
   requested: Phase,
@@ -566,16 +601,52 @@ async function batchPush(
   verdict: Verdict | undefined,
   reason: string | undefined,
   record: Batch,
-  onCommitted: () => void,
+): Promise<void> {
+  const head: string = await batchGuards(repo, leaf, record);
+  await transition(repo, leaf, requested, slot, verdict, reason, true);
+  await recordTested(repo, leaf, record, head);
+}
+
+// The land run's gates: everything a seat's `merged --check` and its move would refuse. A throw is the refusal.
+export async function landGates(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
+  const head: string = await batchGuards(repo, leaf, record);
+  await moveGuards(repo, leaf, readState(leaf.path), 'merged', record.built_on);
+  await recordTested(repo, leaf, record, head);
+}
+
+export class StaleLandError extends Error {}
+
+// A land run acts only while the leaf is still in merge on its attempt and the command owns it.
+export function landClaim(repo: Repo, slug: string, attempt: string): Leaf {
+  const leaf: Leaf = findLeaf(repo, slug);
+  if (leaf.state.phase !== 'merge' || leaf.state.batch?.attempt !== attempt || leaf.state.batch.owner !== 'command')
+    throw new StaleLandError(
+      `Stale land run ${slug} attempt ${attempt}: phase ${leaf.state.phase}, attempt ${leaf.state.batch?.attempt ?? 'none'}, owner ${leaf.state.batch?.owner ?? 'seat'}`,
+    );
+  return leaf;
+}
+
+type BatchPending =
+  | { kind: 'none' }
+  | { kind: 'refused'; record: Batch; candidate: string; stderr: string; end: PressureSnapshot | undefined }
+  | { kind: 'error'; record: Batch; candidate: string; result: Result; end: PressureSnapshot | undefined };
+
+type Move = (holderNow: Leaf, pushed: string, builtOn: string) => Promise<void>;
+
+async function batchPush(
+  repo: Repo,
+  leaf: Leaf,
+  record: Batch,
+  tested: boolean,
+  move: Move,
   end: PressureSnapshot | undefined,
-  pressureDir: string = '/proc/pressure',
 ): Promise<BatchPending> {
   const state: State = readState(leaf.path);
   const worktree: string = state.worktree ?? repo.root;
   const head: string = await mergeHead(repo, state, record);
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
   if (record.top !== undefined) await requireBatchTop(worktree, record, head);
-  if (slot !== undefined && head !== record.tested_top)
+  if (tested && head !== record.tested_top)
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);
   await requireGreenReceipt(repo, head, 'merge');
   await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
@@ -587,8 +658,7 @@ async function batchPush(
   if (pushed.code === 0) {
     appendAttempt(repo, leaf.state.slug, record, 'merged', end);
     saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head, recorded: true } });
-    const holderNow: Leaf = findLeaf(repo, leaf.state.slug);
-    await transition(repo, holderNow, requested, slot, verdict, reason, false, onCommitted, record.built_on);
+    await move(findLeaf(repo, leaf.state.slug), head, record.built_on);
     return { kind: 'none' };
   }
   if (pushed.stderr.includes('non-fast-forward') || pushed.stderr.includes('[rejected]')) {
@@ -603,13 +673,15 @@ async function batchPush(
         decision: undefined,
       },
     });
-    return { kind: 'refused', record, candidate: head, end };
+    return { kind: 'refused', record, candidate: head, stderr: pushed.stderr, end };
   }
   saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: undefined } });
   return { kind: 'error', record, candidate: head, result: pushed, end };
 }
 
-async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
+type Restacked = { kind: 'restacked'; top: string } | { kind: 'rebase' };
+
+async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<Restacked> {
   const builtOn: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
   const holderHead: string = await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root);
   const staged: Awaited<ReturnType<typeof buildStack>> = await buildStack(
@@ -646,19 +718,17 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
       ? `rerun rebase ${leaf.state.slug} onto ${builtOn}`
       : `rerun tested=${record.tested_top ?? 'none'} pushed=${top}`,
   );
+  return top === undefined ? { kind: 'rebase' } : { kind: 'restacked', top };
 }
+
+type Finished = { kind: 'landed' } | Restacked | { kind: 'error'; result: Result };
 
 async function finishPush(
   repo: Repo,
   slug: string,
   pending: Exclude<BatchPending, { kind: 'none' }>,
-  requested: Phase,
-  slot: Slot | undefined,
-  verdict: Verdict | undefined,
-  reason: string | undefined,
-  onCommitted: () => void,
-  pressureDir: string = '/proc/pressure',
-): Promise<void> {
+  move: Move,
+): Promise<Finished> {
   const fetched: Result = await run(['git', 'fetch', repo.config.remote], repo.root);
   if (fetched.code !== 0) {
     if (pending.kind === 'error')
@@ -677,14 +747,45 @@ async function finishPush(
         ...leaf.state,
         batch: { ...batch, applied: true, top: pending.candidate, candidate: pending.candidate, recorded: true },
       });
-      const holderNow: Leaf = findLeaf(repo, slug);
-      await transition(repo, holderNow, requested, slot, verdict, reason, false, onCommitted, batch.built_on);
+      await move(findLeaf(repo, slug), pending.candidate, batch.built_on);
     });
-    return;
+    return { kind: 'landed' };
   }
-  if (pending.kind === 'error')
-    throw new Error(`Push failed: git push exited ${pending.result.code}: ${pending.result.stderr}`);
-  await restack(repo, findLeaf(repo, slug), pending.record);
+  if (pending.kind === 'error') return { kind: 'error', result: pending.result };
+  return restack(repo, findLeaf(repo, slug), pending.record);
+}
+
+export type LandPush =
+  | { kind: 'landed' }
+  | { kind: 'restacked'; top: string; stderr: string }
+  | { kind: 'rebase' }
+  | { kind: 'error'; stderr: string };
+
+// The land run's push: the claim and the push hold the global lock, the refusal follow-up takes it itself.
+export async function landPush(
+  repo: Repo,
+  slug: string,
+  record: Batch,
+  end: PressureSnapshot | undefined,
+): Promise<LandPush> {
+  const pending: BatchPending = await withLock(resolve(globalHome(), '.lock'), async () =>
+    batchPush(
+      repo,
+      landClaim(repo, slug, record.attempt),
+      record,
+      true,
+      (holderNow, pushed) => commandMerged(repo, holderNow, pushed),
+      end,
+    ),
+  );
+  if (pending.kind === 'none') return { kind: 'landed' };
+  const finished: Finished = await finishPush(repo, slug, pending, (holderNow, pushed) =>
+    commandMerged(repo, holderNow, pushed),
+  );
+  if (finished.kind === 'error') return { kind: 'error', stderr: finished.result.stderr };
+  if (finished.kind === 'restacked')
+    return { kind: 'restacked', top: finished.top, stderr: pending.kind === 'refused' ? pending.stderr : '' };
+  return finished;
 }
 
 export async function phaseCommand(
@@ -712,6 +813,8 @@ export async function phaseCommand(
     committedTo = requested;
     committed = true;
   };
+  const seatMove: Move = (holderNow, _pushed, builtOn) =>
+    transition(repo, holderNow, requested, slot, verdict, reason, false, onCommitted, builtOn);
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
     if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
@@ -736,19 +839,7 @@ export async function phaseCommand(
       else {
         const end: PressureSnapshot | undefined =
           record.pressure_start === undefined ? undefined : readPressure(pressureDir);
-        if (requested === 'merged')
-          pending = await batchPush(
-            repo,
-            leaf,
-            requested,
-            slot,
-            verdict,
-            reason,
-            record,
-            onCommitted,
-            end,
-            pressureDir,
-          );
+        if (requested === 'merged') pending = await batchPush(repo, leaf, record, slot !== undefined, seatMove, end);
         else
           await transition(repo, leaf, requested, slot, verdict, reason, check, () => {
             appendAttempt(repo, leaf.state.slug, record, 'red', end);
@@ -759,7 +850,10 @@ export async function phaseCommand(
       await transition(repo, leaf, requested, slot, verdict, reason, check, onCommitted);
     }
   });
-  if (pending.kind !== 'none')
-    await finishPush(repo, slug, pending, requested, slot, verdict, reason, onCommitted, pressureDir);
+  if (pending.kind !== 'none') {
+    const finished: Finished = await finishPush(repo, slug, pending, seatMove);
+    if (finished.kind === 'error')
+      throw new Error(`Push failed: git push exited ${finished.result.code}: ${finished.result.stderr}`);
+  }
   return { repo, committed, to: committedTo };
 }

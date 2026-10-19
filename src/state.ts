@@ -59,9 +59,24 @@ export const batchSchema = z.strictObject({
   candidate: z.string().optional(),
   notified: z.boolean().optional(),
   applied: z.boolean(),
+  // Absent means seat: records written before command-run merges are B's.
+  owner: z.enum(['command', 'seat']).optional(),
+  wake: z.enum(['red', 'gate', 'push']).optional(),
+  red: z.string().optional(),
+  refusal: z.string().optional(),
 });
 
 export type Batch = z.infer<typeof batchSchema>;
+
+export const broadcastSchema = z.strictObject({
+  kind: z.enum(['issue', 'epic']),
+  name: text,
+  destination: text,
+  pushed: text,
+  sources: z.array(z.string()),
+});
+
+export type Broadcast = z.infer<typeof broadcastSchema>;
 
 export const stateSchema = z
   .strictObject({
@@ -89,12 +104,18 @@ export const stateSchema = z
     failure: failureSchema.optional(),
     merge_stamp: z.string().optional(),
     batch: batchSchema.optional(),
+    broadcast: broadcastSchema.optional(),
     frozen: z.record(z.string(), z.string().nullable()).optional(),
     frozen_cited: z.array(z.string()).optional(),
   })
   .refine((state) => new Set(state.done).size === state.done.length, 'Duplicate done slot');
 
 export type State = z.infer<typeof stateSchema>;
+
+// commitMove clears `prompted`, so on a merged leaf only the broadcast dispatch sets prompted.B.
+export function broadcastPending(state: State): boolean {
+  return state.phase === 'merged' && state.broadcast !== undefined && state.prompted.B === undefined;
+}
 
 export type Leaf = { path: string; state: State };
 
