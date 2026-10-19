@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, fakeHerdr, leaf, editOnSecondStatus, yaml, type Fixture, verified } from './helpers';
+import { fixture, cli, fakeHerdr, leaf, editOnSecondStatus, yaml, type Fixture, verified, seatOwned } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { Database } from './fake-herdr';
@@ -132,6 +132,9 @@ test('the holder gets a batch record rebased onto the remote and only the holder
     await pushMain(f, 'main-advance');
     saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, [])).code).toBe(0);
+    expect(database(f).prompts).toEqual([]);
+    seatOwned(aa.path);
+    expect((await next(f, [])).code).toBe(0);
     const state: State = readState(aa.path);
     expect(state.batch?.applied).toBe(true);
     expect(state.batch?.attempt).toBeTruthy();
@@ -169,6 +172,8 @@ test('an interrupted build is discarded and rebuilt under a new attempt', async 
     });
     saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, ['--all'])).code).toBe(0);
+    seatOwned(aa.path);
+    expect((await next(f, ['--all'])).code).toBe(0);
     const state: State = readState(aa.path);
     expect(state.batch?.applied).toBe(true);
     expect(state.batch?.attempt).not.toBe('interrupted-attempt');
@@ -205,12 +210,11 @@ test('a failed holder with a landed candidate is told to move back, then reconci
     expect(readState(aa.path).phase).toBe('failed');
     expect(readState(aa.path).batch?.candidate).toBe(top);
     idleAll(f);
-    const promptsBefore: number = database(f).prompts.length;
-    const promptCallsBefore: number = calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt').length;
+    const promptsBefore: number = mergePrompts(f).length;
     expect((await cli(f, ['phase', 'aa', 'merge'], f.root, f.env)).code).toBe(0);
     expect(leafState(aa.path).phase).toBe('merged');
-    expect(database(f).prompts).toHaveLength(promptsBefore);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(promptCallsBefore);
+    expect(mergePrompts(f)).toHaveLength(promptsBefore);
+    expect(database(f).prompts.filter((prompt) => prompt.text.startsWith('broadcast-issue aa'))).toHaveLength(1);
   } finally {
     f.clean();
   }
@@ -233,7 +237,8 @@ test('a landed candidate moves the holder once, clears the record, and the next 
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(leafState(holder.path).phase).toBe('merged');
     expect(leafState(holder.path).batch).toBeUndefined();
-    expect(database(f).prompts).toEqual([]);
+    expect(database(f).prompts.map((prompt) => prompt.text.split(' ')[0])).toEqual(['broadcast-issue']);
+    saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(database(f).prompts).toEqual([
       { pane: readState(dependent).pane.A!, text: `plan-issue dep slot=A phase=plan.synthesis leaf=${dependent}` },
@@ -492,6 +497,8 @@ test('empty untracked folders are removed before an applied merge prompt', async
     toMerge(holder.path, '2026-09-11T00:00:00.000Z');
     saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, ['--all'])).code).toBe(0);
+    seatOwned(holder.path);
+    expect((await next(f, ['--all'])).code).toBe(0);
     expect(database(f).prompts).toEqual([expectedPrompt(holder.path, holder.b)]);
     expect(existsSync(resolve(worktree, 'e1'))).toBe(false);
     expect(existsSync(resolve(worktree, 'td/e2'))).toBe(false);
@@ -555,6 +562,8 @@ test('unreadable ignored folders do not stop empty-folder cleanup before merge',
       saveDatabase(f, { ...database(f), prompts: [] });
       expect((await command(['git', 'status', '--porcelain'], worktree)).trim()).toBe('');
       expect((await next(f, ['--all'])).code).toBe(0);
+      seatOwned(holder.path);
+      expect((await next(f, ['--all'])).code).toBe(0);
       expect(mergePrompts(f)).toEqual([expectedPrompt(holder.path, holder.b)]);
       expect(existsSync(resolve(worktree, 'empty'))).toBe(false);
       expect(existsSync(resolve(worktree, 'up/empty-child'))).toBe(false);
@@ -579,6 +588,8 @@ test('a failed removal stops the merge prompt', async () => {
     chmodSync(locked, 0o555);
     try {
       toMerge(holder.path, '2026-09-11T00:00:00.000Z');
+      expect((await next(f, ['--all'])).code).toBe(0);
+      seatOwned(holder.path);
       const result: Result = await next(f, ['--all']);
       expect(result.code).toBe(1);
       expect(result.stderr).toContain(resolve(locked, 'child'));
@@ -604,6 +615,8 @@ test('a waiting leaf stays out of the holder turn and lands in its own turn', as
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     saveDatabase(f, { ...database(f), prompts: [] });
+    expect((await next(f, [])).code).toBe(0);
+    seatOwned(aa.path);
     expect((await next(f, [])).code).toBe(0);
     const record = readState(aa.path).batch!;
     expect(record).not.toHaveProperty('members');
@@ -633,6 +646,8 @@ test('a waiting leaf stays out of the holder turn and lands in its own turn', as
     expect(attempts[0]).not.toHaveProperty('members');
     // bb takes its own turn on the base aa landed.
     idleAll(f);
+    expect((await next(f, [])).code).toBe(0);
+    seatOwned(bb.path);
     expect((await next(f, [])).code).toBe(0);
     const own = readState(bb.path).batch!;
     expect(own.attempt).not.toBe(attempt);
@@ -716,6 +731,8 @@ test('a red verify with another leaf waiting moves the holder to check.fix', asy
     expect(attempts[0]).not.toHaveProperty('members');
     expect(readState(bb.path).phase).toBe('merge');
     idleAll(f);
+    expect((await next(f, [])).code).toBe(0);
+    seatOwned(bb.path);
     expect((await next(f, [])).code).toBe(0);
     expect(readState(bb.path).batch!.attempt).not.toBe(record.attempt);
     expect(mergePrompts(f)).toContainEqual(expectedPrompt(bb.path, bb.b));

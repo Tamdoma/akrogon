@@ -32,6 +32,7 @@ import {
   type Fixture,
   verified,
   holding,
+  seatOwned,
 } from './helpers';
 import { readState, saveState, type Batch, type State } from '../src/state';
 import { parseEnv } from 'node:util';
@@ -843,6 +844,8 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     const promptsBefore: number = database(f).prompts.length;
     const prompted: Result = await next(f, ['landed']);
     expect(prompted.code).toBe(0);
+    seatOwned(path);
+    expect((await next(f, ['landed'])).code).toBe(0);
     expect(readState(path).phase).toBe('merge');
     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)).toMatchObject({
@@ -1856,6 +1859,8 @@ test('merge, check.fix, check.repair and post-repair review dispatch to their sw
     const db0: Database = database(f);
     saveDatabase(f, { ...db0, panes: db0.panes.map((p) => ({ ...p, agent: 'fake', agent_status: 'idle' })) });
     expect((await next(f, ['post-repair'])).code).toBe(0);
+    seatOwned(path);
+    expect((await next(f, ['post-repair'])).code).toBe(0);
     expect(database(f).prompts.at(-1)).toEqual({
       pane: state.pane.B!,
       text: mergeText(path),
@@ -2788,6 +2793,8 @@ test('merge leaf with landed branch re-prompts its idle seat instead of auto-rec
       })),
     });
     const promptsBefore: number = database(f).prompts.length;
+    expect((await next(f, ['landed-merge'])).code).toBe(0);
+    seatOwned(path);
     expect((await next(f, ['landed-merge'])).code).toBe(0);
     expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)).toMatchObject({
@@ -4896,6 +4903,8 @@ test('only the earlier-stamped merge leaf is prompted while the waiting leaf kee
     const before: State = toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     saveDatabase(f, { ...database(f), prompts: [] });
     expect((await next(f, [])).code).toBe(0);
+    seatOwned(aa.path);
+    expect((await next(f, [])).code).toBe(0);
     expect(database(f).prompts).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
     expect(readState(bb.path)).toEqual(before);
     expect(database(f).tabs.map((tab) => tab.label)).toEqual(['aa', 'bb']);
@@ -4919,6 +4928,8 @@ test('an ineligible merge leaf never holds the turn (blocked-by)', async () => {
       prompts: [],
       panes: database(f).panes.map((pane) => ({ ...pane, agent_status: 'idle' })),
     });
+    expect((await next(f, ['--all'])).code).toBe(1);
+    seatOwned(aa.path);
     expect((await next(f, ['--all'])).code).toBe(1);
     expect(mergePrompts(f)).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
     expect(database(f).prompts).toHaveLength(1);
@@ -4949,6 +4960,8 @@ for (const exit of [
         promptScript: exit === 'prompt delivery fault' ? [stalled, stalled, stalled] : [],
       });
       if (exit === 'prompt delivery fault') {
+        expect((await next(f, ['--all'])).code).toBe(0);
+        seatOwned(aa.path);
         for (let pass = 0; pass < 3; pass++) expect((await next(f, ['--all'])).code).toBe(0);
         expect(readState(aa.path).phase).toBe('merge');
         expect(readState(aa.path).attempts.B).toBe(3);
@@ -4974,8 +4987,13 @@ for (const exit of [
               ? 'merge'
               : 'failed',
       );
-      if (exit === 'prompt delivery fault') expect(mergePrompts(f)).toEqual([]);
-      else expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
+      expect(mergePrompts(f)).toEqual([]);
+      if (exit !== 'prompt delivery fault') {
+        expect(readState(bb.path).batch?.owner).toBe('command');
+        seatOwned(bb.path);
+        expect((await next(f, ['--all'])).code).toBe(exit === 'seat failed' ? 1 : 0);
+        expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
+      }
       expect((await next(f, ['--all'])).code).toBe(exit === 'seat failed' ? 1 : 0);
       if (exit === 'prompt delivery fault') expect(mergePrompts(f)).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
       else expect(mergePrompts(f).filter((prompt) => prompt.pane === bb.b)).toHaveLength(1);
@@ -5002,7 +5020,8 @@ test('a committed merge whose log append fails still wakes the next leaf', async
     expect(result.stderr).toContain('log append failed');
     chmodSync(log, 0o644);
     expect(readState(aa.path).phase).toBe('merged');
-    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
+    expect(readState(bb.path).batch?.owner).toBe('command');
+    expect(mergePrompts(f)).toEqual([]);
   } finally {
     f.clean();
   }
@@ -5023,8 +5042,12 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
       panes: database(f).panes.map((pane) => ({ ...pane, agent_status: 'idle' })),
     });
     expect((await next(f, ['--all'])).code).toBe(0);
+    seatOwned(aa.path);
+    expect((await next(f, ['--all'])).code).toBe(0);
     expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b]);
     expect((await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop', '--slot', 'B'], f.root, f.env)).code).toBe(0);
+    seatOwned(bb.path);
+    expect((await next(f, ['bb'])).code).toBe(0);
     expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b]);
     expect((await cli(f, ['phase', 'aa', 'merge'], f.root, f.env)).code).toBe(0);
     expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b]);
@@ -5041,6 +5064,8 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
     expect((await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--attempt', bbAttempt], f.root, f.env)).code).toBe(
       0,
     );
+    seatOwned(cc.path);
+    expect((await next(f, ['cc'])).code).toBe(0);
     expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, cc.b]);
     const ccAttempt: string = z.string().parse(readState(cc.path).batch?.attempt);
     await verified(f, 'cc', 'merge');
@@ -5050,6 +5075,8 @@ test('a leaf re-entering merge queues behind the two leaves stamped earlier', as
     expect((await cli(f, ['phase', 'cc', 'merged', '--slot', 'B', '--attempt', ccAttempt], f.root, f.env)).code).toBe(
       0,
     );
+    seatOwned(aa.path);
+    expect((await next(f, ['aa'])).code).toBe(0);
     expect(mergePrompts(f).map((prompt) => prompt.pane)).toEqual([aa.b, bb.b, cc.b, aa.b]);
     const aaAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
     await verified(f, 'aa', 'merge');
@@ -5072,6 +5099,8 @@ test('a merge seat consumes one delivery attempt per pass and retries instead of
     const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
     toMerge(holder.path, '2026-09-11T00:00:00.000Z');
     const stalled: { code: string; message: string } = { code: 'agent_prompt_stalled', message: 'stalled' };
+    expect((await next(f, ['--all'])).code).toBe(0);
+    seatOwned(holder.path);
     saveDatabase(f, { ...database(f), prompts: [], promptScript: [stalled, stalled, stalled] });
     for (const attempts of [1, 2, 3]) {
       expect((await next(f, ['--all'])).code).toBe(0);
@@ -5115,6 +5144,8 @@ test('an idle hook retries a faulted merge holder before its waiter', async () =
       }),
     };
     expect((await next(f, [], env)).code).toBe(0);
+    seatOwned(holder.path);
+    expect((await next(f, [], env)).code).toBe(0);
     expect(readState(holder.path).phase).toBe('merge');
     expect(readState(holder.path).attempts.B).toBe(3);
     expect(readState(holder.path).delivery_error.B?.code).toBe('agent_prompt_stalled');
@@ -5142,7 +5173,8 @@ test('a saved holder failure wakes the stamped queue when the log is a directory
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('log append failed');
     expect(readState(aa.path).phase).toBe('failed');
-    expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
+    expect(readState(bb.path).batch?.owner).toBe('command');
+    expect(mergePrompts(f)).toEqual([]);
   } finally {
     f.clean();
   }
@@ -5177,6 +5209,8 @@ test('unstamped merge dispatch uses log order and refuses unreadable history', a
       }),
     );
     writeFileSync(log, records.join('\n') + '\n');
+    expect((await next(f, ['--all'])).code).toBe(0);
+    seatOwned(bb.path);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(mergePrompts(f)).toEqual([{ pane: bb.b, text: mergeText(bb.path) }]);
   } finally {
@@ -5521,7 +5555,8 @@ test('blocked-report no line for merge turn waits', async () => {
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
-    expect(mergePrompts(f)).toEqual([{ pane: aa.b, text: mergeText(aa.path) }]);
+    expect(readState(aa.path).batch?.owner).toBe('command');
+    expect(mergePrompts(f)).toEqual([]);
   } finally {
     f.clean();
   }

@@ -456,17 +456,17 @@ function cliEnv(f: DispatchFixture, extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv
 test('race A: pause recorded before the locked merge section suppresses the launch', async () => {
   const control: DispatchFixture = await dispatchFixture();
   try {
-    leaf(control, 'holder', 'merge', { solo: true });
+    const controlPath: string = leaf(control, 'holder', 'merge', { solo: true });
     const run: Result = await next(control, ['--resume']);
     expect(run.code).toBe(0);
-    expect(database(control).prompts.length).toBeGreaterThan(0);
+    expect(readState(controlPath).batch?.owner).toBe('command');
   } finally {
     control.clean();
   }
   const f: DispatchFixture = await dispatchFixture();
   const child: { current?: Bun.Subprocess } = {};
   try {
-    leaf(f, 'holder', 'merge', { solo: true });
+    const holderPath: string = leaf(f, 'holder', 'merge', { solo: true });
     const barrier: string = resolve(f.home, 'barrier');
     mkdirSync(barrier);
     const realGit: string = await command(['sh', '-c', 'command -v git']);
@@ -494,6 +494,7 @@ test('race A: pause recorded before the locked merge section suppresses the laun
     expect({ stdout, stderr, code }).toMatchObject({ code: 0 });
     expect(mutating(f)).toEqual([]);
     expect(database(f).prompts).toEqual([]);
+    expect(readState(holderPath).batch?.owner).toBeUndefined();
   } finally {
     if (child.current !== undefined) killTree(child.current);
     f.clean();

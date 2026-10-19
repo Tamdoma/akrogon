@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 import { readRepo } from '../src/config';
 import { verifyCommands, verifyRunSchema, type VerifyRun, type VerifyScope } from '../src/verify';
-import { findLeaf, readState, type Batch } from '../src/state';
+import { findLeaf, readState, saveState, type Batch } from '../src/state';
 import { descendantsOf } from './isolation';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
@@ -275,4 +275,10 @@ export function holding(f: Fixture): { batch: Batch } {
   return {
     batch: { attempt: 'a1', built_on: main, holder: { base: main, head: main }, applied: true, top: main },
   };
+}
+
+// The command claims every applied top. Cases about B's merge prompt hand the attempt to the seat, as a land run's handoff does.
+export function seatOwned(path: string): void {
+  const state = readState(path);
+  saveState(path, { ...state, batch: { ...state.batch!, owner: 'seat' } });
 }

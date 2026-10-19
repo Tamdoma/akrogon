@@ -85,8 +85,8 @@ test.serial('a nonempty legacy held.yaml is inert for status, pause, unpause and
     expect(unpause.code).toBe(0);
     expect(unpause.stdout).not.toContain('held');
     const db: Database = database(herdr.db);
-    expect(db.prompts.some((prompt) => prompt.text.includes('merge-issue hold slot=B'))).toBe(true);
-    expect(readState(holderPath).batch).toBeDefined();
+    expect(db.prompts.some((prompt) => prompt.text.includes('merge-issue hold slot=B'))).toBe(false);
+    expect(readState(holderPath).batch?.owner).toBe('command');
     expect(readFileSync(file, 'utf8')).toBe(before);
   } finally {
     f.clean();

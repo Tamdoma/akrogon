@@ -13,6 +13,7 @@ const contracts: Record<string, string> = {
   config: '',
   preflight: '',
   phase: '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>]',
+  land: '<slug> --attempt <id>',
   next: '[<slug>|<path>|--all|--resume]',
   pull: '[--all]',
   close: '<owner/repo#n> --by <text>',

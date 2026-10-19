@@ -15,6 +15,7 @@ import {
   type HerdrFixture,
   registerTemp,
   verified,
+  unitBin,
 } from './helpers';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State, type Tool } from '../src/state';
@@ -235,6 +236,7 @@ async function spawn(
       HOME: f.home,
       AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
       ...env,
+      PATH: `${unitBin(f)}:${env.PATH ?? process.env.PATH}`,
     },
   });
   return { code, stdout: stdout.trim(), stderr: stderr.trim() };
@@ -292,7 +294,7 @@ test.serial('a green batch appends one merged attempt line and log.jsonl keeps i
 test.serial('a landed candidate reconciles to exactly one merged attempt line', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f);
+    const { holder, record, herdr } = await batchFixture(f, true);
     await command(['git', 'push', 'origin', 'refs/heads/hold:main'], f.root);
     saveState(holder.path, {
       ...readState(holder.path),
@@ -602,7 +604,7 @@ test.serial('legacy held, split and ejected lines still parse beside a recorded 
 test.serial('a reconciled merged line carries PSI stall deltas from batch creation', async () => {
   const f: Fixture = await fixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f);
+    const { holder, record, herdr } = await batchFixture(f, true);
     await command(['git', 'push', 'origin', 'refs/heads/hold:main'], f.root);
     saveBatch(holder.path, withStart({ ...record, candidate: record.top }, { cpu: 11, memory: 13, io: 17 }));
     const dir: string = pressureDir(f, { cpu: '21', memory: '23', io: '47' });
