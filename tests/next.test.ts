@@ -5760,21 +5760,100 @@ test('ambiguous name refuses an owner and an unrelated leaf', async () => {
   }
 });
 
-test('closed owner name does not block an open same-name owner', async () => {
+test('closed owner twin refuses next <slug> without dispatch', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    configure(f, { max_active: 8 });
+    leaf(f, 'c1', 'plan.synthesis', {}, 'old');
+    mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
+    renameSync(resolve(f.root, 'issues/open/old'), resolve(f.root, 'issues/closed/old'));
+    const o1: string = leaf(f, 'o1', 'plan.synthesis', {}, 'old');
+    const before: string[] = stateSnapshot([o1]);
+    const result: Result = await next(f, ['o1']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('issues/open/old');
+    expect(result.stderr).toContain('issues/closed/old');
+    expect(result.stderr).not.toContain('Missing leaf');
+    expectNoLaunch(f, [o1], before);
+  } finally {
+    f.clean();
+  }
+});
+
+test('the twin refusal prints once per owner and other owners dispatch under --all', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    configure(f, { max_active: 16 });
     leaf(f, 'c1', 'plan.synthesis', {}, 'old');
     mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
     renameSync(resolve(f.root, 'issues/open/old'), resolve(f.root, 'issues/closed/old'));
     leaf(f, 'o1', 'plan.synthesis', {}, 'old');
-    const byName: Result = await next(f, ['old']);
-    expect(byName.code).toBe(0);
-    expect(dispatchedSlugs(f)).toEqual(['o1']);
+    leaf(f, 'o2', 'plan.synthesis', {}, 'old/inner');
+    leaf(f, 'm1', 'merged', {}, 'old');
+    leaf(f, 'dep1', 'plan.synthesis', { 'blocked-by': ['m1'] }, 'other');
+    leaf(f, 'ok1', 'plan.synthesis', {}, 'other');
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    const lines: string[] = result.stderr.split('\n').filter((line) => line !== '');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('issues/open/old');
+    expect(lines[0]).toContain('issues/closed/old');
+    expect(dispatchedSlugs(f)).toEqual(['dep1', 'ok1']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a twin merge leaf never heads the merge queue', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'c1', 'plan.synthesis', {}, 'old');
+    mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
+    renameSync(resolve(f.root, 'issues/open/old'), resolve(f.root, 'issues/closed/old'));
+    leaf(f, 'm1', 'merge', holding(f), 'old');
+    const { batch }: { batch: Batch } = holding(f);
+    leaf(f, 'm2', 'merge', { batch }, 'other');
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('issues/open/old');
+    expect(dispatchedSlugs(f)).toEqual(['m2']);
+    expect(database(f).prompts[0].text).toContain(`merge-issue m2 slot=B phase=merge leaf=`);
+    expect(database(f).prompts[0].text).toContain(`attempt=${batch.attempt} top=${batch.top}`);
+  } finally {
+    f.clean();
+  }
+});
+
+for (const conflict of ['parked leaf', 'empty parked', 'empty closed'] as const) {
+  test(`a ${conflict} owner folder twin refuses next <slug>`, async () => {
+    const f: DispatchFixture = await dispatchFixture();
+    try {
+      if (conflict === 'parked leaf') mkdirSync(resolve(f.root, 'issues/parked/old/p1'), { recursive: true });
+      else mkdirSync(resolve(f.root, `issues/${conflict === 'empty parked' ? 'parked' : 'closed'}/old`), { recursive: true });
+      const o1: string = leaf(f, 'o1', 'plan.synthesis', {}, 'old');
+      const before: string[] = stateSnapshot([o1]);
+      const result: Result = await next(f, ['o1']);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('issues/open/old');
+      expect(result.stderr).toContain(`issues/${conflict === 'empty closed' ? 'closed' : 'parked'}/old`);
+      expect(result.stderr).not.toContain('Missing leaf');
+      expectNoLaunch(f, [o1], before);
+    } finally {
+      f.clean();
+    }
+  });
+}
+
+test('a closed leaf dispatches by path while its open twin exists', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'c1', 'plan.synthesis', {}, 'old');
+    mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
+    renameSync(resolve(f.root, 'issues/open/old'), resolve(f.root, 'issues/closed/old'));
+    leaf(f, 'o1', 'plan.synthesis', {}, 'old');
     const promptsBefore: number = database(f).prompts.length;
-    const byPath: Result = await next(f, ['issues/closed/old']);
-    expect(byPath.code).toBe(0);
-    expect(database(f).prompts.length).toBe(promptsBefore + 1);
+    const result: Result = await next(f, ['issues/closed/old']);
+    expect(result.code).toBe(0);
+    expect(database(f).prompts).toHaveLength(promptsBefore + 1);
     expect(database(f).prompts.at(-1)!.text.split(' ')[1]).toBe('c1');
   } finally {
     f.clean();
