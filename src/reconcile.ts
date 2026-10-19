@@ -27,7 +27,16 @@ import {
   type Repo,
 } from './config';
 import { readVerifyRuns, type VerifyRun } from './verify';
-import { allLeaves, broadcastPending, leavesUnder, readState, saveState, type Leaf, type State } from './state';
+import {
+  broadcastPending,
+  readInventory,
+  readState,
+  repoInventory,
+  saveState,
+  type Inventory,
+  type Leaf,
+  type State,
+} from './state';
 import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
 import { liveRuns, liveStartTime, withAdmissionLock } from './admission';
 import { command, herdrError, run, spawnCaptured, type Pane, type Result } from './shell';
@@ -247,15 +256,21 @@ function tabLive(live: Pane[], tab: string | undefined): boolean {
   return tab !== undefined && live.some((pane) => pane.tab_id === tab);
 }
 
-// Mirrors completeOwner: would the leaf's owner move to issues/closed this pass?
+// Mirrors completeOwner: would the leaf's owner move to issues/closed this
+// pass? Any inventory failure inside the owner's subtree blocks it — an
+// unproven owner never completes.
 function ownerCompletes(repo: Repo, leaf: Leaf): boolean {
   const open: string = resolve(repo.root, 'issues/open');
   const issue: string = dirname(leaf.path);
-  const issueLeaves: Leaf[] = leavesUnder(issue, open);
-  if (!issueLeaves.every((item) => item.state.phase === 'merged')) return false;
+  const issueInv: Inventory = readInventory(issue, open);
   const parent: string = dirname(issue);
   const owner: string = basename(parent) === 'open' ? issue : parent;
-  return (owner === issue ? issueLeaves : leavesUnder(owner, open)).every((item) => item.state.phase === 'merged');
+  const ownerInv: Inventory = owner === issue ? issueInv : readInventory(owner, open);
+  const failures = (inv: Inventory): number =>
+    inv.unreadable.length + inv.unknown.length + inv.foreign.length;
+  if (failures(issueInv) + (owner === issue ? 0 : failures(ownerInv)) > 0) return false;
+  if (!issueInv.leaves.every((item) => item.state.phase === 'merged')) return false;
+  return ownerInv.leaves.every((item) => item.state.phase === 'merged');
 }
 
 const ownerSchema = z.object({
@@ -441,7 +456,12 @@ export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<b
   return candidates.some((leaf) => loaded.has(leafSlice(repo, leaf.state.slug)));
 }
 
-export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null): Promise<Reconciled> {
+export async function reconcile(
+  repo: Repo,
+  leaves: Leaf[],
+  live: Pane[] | null,
+  failures?: { ownedNames: ReadonlySet<string>; incomplete: boolean },
+): Promise<Reconciled> {
   const removed: string[] = [];
   const removedWorktrees: RemovedRecord[] = [];
   const kept: KeptEntry[] = [];
@@ -482,29 +502,10 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
   const underRoot = (path: string): boolean => roots.some((root) => path !== root && within(path, root));
   const openRoot: string = resolve(repo.root, 'issues/open');
 
-  const knownSlugs: Set<string> = new Set();
-  const collectSlugs = (path: string): void => {
-    let entries: Dirent[];
-    try {
-      entries = readdirSync(path, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    if (entries.some((entry) => entry.name === 'state.yaml')) {
-      try {
-        knownSlugs.add(readState(path).slug);
-      } catch {
-        // unreadable state.yaml protects nothing
-      }
-      return;
-    }
-    for (const entry of entries.filter((entry) => entry.isDirectory())) collectSlugs(resolve(path, entry.name));
-  };
-  for (const area of ['open', 'closed']) {
-    const areaRoot: string = resolve(repo.root, 'issues', area);
-    if (existsSync(areaRoot)) collectSlugs(areaRoot);
-  }
+  // A leaf folder that will not parse still owns its names: the folder
+  // basename joins the slugs its worktree, tab and slice answer to.
   const leafSlugs: Set<string> = new Set(leaves.map((leaf) => leaf.state.slug));
+  const knownSlugs: Set<string> = new Set([...leafSlugs, ...(failures?.ownedNames ?? [])]);
 
   const verifyRuns: VerifyRun[] = readVerifyRuns(repo);
   const leafBySlug: Map<string, Leaf> = new Map(leaves.map((leaf) => [leaf.state.slug, leaf]));
@@ -1012,7 +1013,15 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       if (!pidAlive(Number(tempMatch[1]))) dropChecked(path);
       continue;
     }
-    await dropUnowned(path);
+    // The repo inventory is unprovable: an unclaimed entry may belong to a
+    // leaf record the walk could not reach, so it is kept, never dropped.
+    if (failures?.incomplete === true)
+      keep(
+        path,
+        `leaf inventory unavailable: ${repo.name}`,
+        'restore readable repository leaf records and retry cleanup',
+      );
+    else await dropUnowned(path);
   }
 
   const scratchRoot: string = dirname(leafTemp(repo, 'x'));
@@ -1162,14 +1171,23 @@ export async function reconcileHost(
   const failedRuns: Set<string> | null = await loadedUnits('akrogon-run-*', '--failed');
   if (loaded !== null) {
     const leafOf: Map<string, { repo: Repo; leaf: Leaf }> = new Map();
+    // An unreadable leaf's folder basename is the only name its slice still
+    // answers to; matching slices are kept, not stopped.
+    const badSlices: Set<string> = new Set();
     const inventoryErrors: string[] = [];
-    for (const repo of repos)
-      try {
-        for (const leaf of allLeaves(repo)) leafOf.set(leafSlice(repo, leaf.state.slug), { repo, leaf });
-      } catch (error) {
-        if (!(error instanceof Error)) throw error;
-        inventoryErrors.push(`${repo.name}: ${error.message}`);
+    for (const repo of repos) {
+      const inventory: Inventory = repoInventory(repo);
+      for (const leaf of inventory.leaves) leafOf.set(leafSlice(repo, leaf.state.slug), { repo, leaf });
+      for (const failure of inventory.unreadable) {
+        badSlices.add(leafSlice(repo, basename(failure.path)));
+        inventoryErrors.push(`${failure.path}: ${failure.error}`);
       }
+      for (const failure of inventory.unknown) inventoryErrors.push(`${failure.path}: ${failure.error}`);
+      for (const leaf of inventory.foreign)
+        inventoryErrors.push(
+          `${leaf.path}: leaf repo mismatch, stored key "${leaf.stored}", registered key "${repo.name}"`,
+        );
+    }
     const own: Set<string> = ownSlices();
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
     for (const slice of [...loaded].sort()) {
@@ -1183,6 +1201,10 @@ export async function reconcileHost(
         }
         const error: string | null = await stopSlice(slice);
         if (error !== null) keep(slice, error, 'resolve the systemd stop error and retry cleanup');
+        continue;
+      }
+      if (badSlices.has(slice)) {
+        keep(slice, 'unreadable leaf state', 'restore the leaf state file and retry cleanup');
         continue;
       }
       if (own.has(slice)) {
