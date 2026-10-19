@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { z } from 'zod';
 import { globalHome, readGlobal, requireRepo, type Repo } from './config';
 import { leafSlice } from './scope';
 import { command, CommandError, writeYaml } from './shell';
-import { findLeaf, leavesUnder, withLock, type Leaf } from './state';
+import { findLeaf, repoInventory, withLock, type Inventory, type Leaf, type LeafFailure } from './state';
 
 const stopSchema = z.record(z.string().min(1), z.literal(true));
 
@@ -55,15 +55,30 @@ async function stopSlice(repo: Repo, slug: string): Promise<void> {
 
 export async function stopCommand(target: string | undefined, all: boolean, cwd: string): Promise<void> {
   const repo: Repo = await requireRepo(readGlobal(), cwd);
-  const open: string = resolve(repo.root, 'issues/open');
-  const slugs: string[] = all
-    ? leavesUnder(open, open)
-        .filter(
-          (leaf: Leaf) =>
-            (leaf.state.tab !== undefined || leaf.state.batch?.owner === 'command') && leaf.state.phase !== 'merged',
-        )
-        .map((leaf: Leaf) => leaf.state.slug)
-    : [findLeaf(repo, z.string().parse(target)).state.slug];
+  const inv: Inventory | null = all ? repoInventory(repo, ['open']) : null;
+  if (inv !== null) {
+    const failures: LeafFailure[] = [
+      ...inv.unreadable,
+      ...inv.unknown,
+      ...inv.foreign.map((foreign) => ({
+        path: foreign.path,
+        error: `Leaf repo mismatch at ${foreign.path}: stored key "${foreign.stored}", registered key "${repo.name}"`,
+      })),
+    ];
+    for (const failure of failures) {
+      console.error(`failed: ${repo.name}/${basename(failure.path)} ${failure.error}`);
+      process.exitCode = 1;
+    }
+  }
+  const slugs: string[] =
+    inv !== null
+      ? inv.leaves
+          .filter(
+            (leaf: Leaf) =>
+              (leaf.state.tab !== undefined || leaf.state.batch?.owner === 'command') && leaf.state.phase !== 'merged',
+          )
+          .map((leaf: Leaf) => leaf.state.slug)
+      : [findLeaf(repo, z.string().parse(target)).state.slug];
   await withLock(resolve(globalHome(), '.lock'), async () => {
     writeStopped(new Set<string>([...readStopped(), ...slugs.map((slug: string) => `${repo.name}/${slug}`)]));
   });

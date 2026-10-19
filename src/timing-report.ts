@@ -7,7 +7,7 @@ import { readLog, type LogRecord } from './log';
 import { originSource } from './pull';
 import { requiredSlots, type Phase, type Slot } from './routing';
 import { retryCommand } from './shell';
-import { allLeaves, leavesUnder, sourcePattern, type Leaf } from './state';
+import { repoInventory, sourcePattern, type ForeignLeaf, type Inventory, type Leaf, type LeafFailure } from './state';
 import { readTimings, type TimingEvent, type WaitReason } from './timing';
 
 // Gate bounds fixed by issues/chart/leaf-speed/forks/measure-and-revisit.md (operator 2026-10-12).
@@ -435,8 +435,15 @@ function flowBucket(label: string, rows: FlowRow[]): string {
 
 async function flowReport(repo: Repo, since: string): Promise<void> {
   const log: LogRecord[] = readLog(repo.root);
-  const parked: string = resolve(repo.root, 'issues/parked');
-  const leaves: Leaf[] = [...allLeaves(repo), ...leavesUnder(parked, parked)];
+  const inv: Inventory = repoInventory(repo, ['open', 'closed', 'parked']);
+  const bad: LeafFailure | undefined = [...inv.unreadable, ...inv.unknown][0];
+  if (bad !== undefined) throw new Error(`Invalid state ${resolve(bad.path, 'state.yaml')}: ${bad.error}`);
+  const foreign: ForeignLeaf | undefined = inv.foreign[0];
+  if (foreign !== undefined)
+    throw new Error(
+      `Invalid state ${resolve(foreign.path, 'state.yaml')}: stored key "${foreign.stored}", registered key "${repo.name}"`,
+    );
+  const leaves: Leaf[] = inv.leaves;
   const carriers = new Map<string, Carrier[]>();
   for (const leaf of leaves)
     for (const source of leaf.state.sources ?? []) {
