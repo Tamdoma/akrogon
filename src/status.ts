@@ -15,6 +15,7 @@ import {
   type SlotConfig,
 } from './config';
 import {
+  broadcastPending,
   findLeaf,
   leavesUnder,
   readState,
@@ -34,6 +35,7 @@ import { readPaused } from './pause';
 import { readStopped } from './stop';
 import { readHostKept, readKept } from './reconcile';
 import { currentReleaseCommit, readDeployRecord } from './release';
+import { landAlive, landUnit } from './land';
 
 type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
 type Scan =
@@ -155,8 +157,12 @@ function note(state: State, now: number, seatSources: { a: string; b: string }):
     .map((file) => basename(file))
     .filter((name) => name === 'ISSUE.md' || name === 'EPIC.md')
     .filter((name, index, all) => all.indexOf(name) === index);
+  const land: string[] = state.phase === 'merge' && state.batch?.owner === 'command' ? ['land'] : [];
+  const broadcast: string[] = broadcastPending(state) ? ['broadcast pending'] : [];
   return [
     ...failed,
+    ...land,
+    ...broadcast,
     ...done,
     ...prompt,
     ...attempts,
@@ -434,6 +440,11 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     console.log(Bun.YAML.stringify(leaf.state, null, 2).trimEnd());
     if (paused.has(repo.name)) console.log(`paused: ${repo.name}`);
     if (stopped.has(`${repo.name}/${slug}`)) console.log(`stopped: ${repo.name}/${slug}`);
+    if (leaf.state.phase === 'merge' && leaf.state.batch?.owner === 'command')
+      console.log(
+        `land ${(await landAlive(leaf.state.batch.attempt)) ? 'alive' : 'dead'}: ${landUnit(leaf.state.batch.attempt)}`,
+      );
+    if (broadcastPending(leaf.state)) console.log(`broadcast pending: ${repo.name}/${slug}`);
     for (const entry of readKept(repo)) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     for (const entry of readHostKept()) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     for (const gap of missing)

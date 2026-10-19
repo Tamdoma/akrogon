@@ -27,7 +27,7 @@ import {
   type Repo,
 } from './config';
 import { readVerifyRuns, type VerifyRun } from './verify';
-import { allLeaves, leavesUnder, readState, saveState, type Leaf, type State } from './state';
+import { allLeaves, broadcastPending, leavesUnder, readState, saveState, type Leaf, type State } from './state';
 import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
 import { liveRuns, liveStartTime, withAdmissionLock } from './admission';
 import { command, herdrError, run, spawnCaptured, type Pane, type Result } from './shell';
@@ -181,6 +181,7 @@ function sliceKeepReason(
 ): string | null {
   if (own.has(slice)) return 'own slice';
   if (runs.has(slice)) return 'live run record';
+  if (broadcastPending(leaf.state)) return 'broadcast pending';
   if (leaf.state.tab === undefined && !finished(leaf)) return 'unfinished leaf';
   if (leaf.state.tab !== undefined) {
     if (live === null) return 'pane list unavailable';
@@ -358,7 +359,7 @@ export function processesInside(paths: string[]): Set<string> {
 }
 
 export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null): Promise<boolean> {
-  if (leaf.state.tab === undefined || live === null) return false;
+  if (leaf.state.tab === undefined || live === null || broadcastPending(leaf.state)) return false;
   const tab: string = leaf.state.tab;
   if (!live.some((pane) => pane.tab_id === tab)) return false;
   await command(['herdr', 'tab', 'close', tab]);
@@ -706,6 +707,7 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
       if (
         state.phase === 'merged' &&
         state.batch === undefined &&
+        !broadcastPending(state) &&
         live !== null &&
         tabLive(panes, state.tab) &&
         !(within(leaf.path, openRoot) && ownerCompletes(repo, leaf))
@@ -737,6 +739,10 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
     }
     if (state.batch !== undefined) {
       keep(worktree, 'state.batch', 'removed once the leaf releases its merge batch');
+      continue;
+    }
+    if (broadcastPending(state)) {
+      keep(worktree, 'broadcast pending', 'removed once the broadcast seat is prompted');
       continue;
     }
     if (state.phase === 'merged') {
@@ -1050,7 +1056,9 @@ export async function reconcile(repo: Repo, leaves: Leaf[], live: Pane[] | null)
           // finished leaves report what stays; a finished leaf's temp also
           // stays while its slice still holds a running unit (D2).
           const done: boolean = finished(leaf);
-          if (live === null) {
+          if (broadcastPending(leaf.state))
+            keep(dir, 'broadcast pending', 'removed once the broadcast seat is prompted');
+          else if (live === null) {
             if (done) keep(dir, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
           } else if (tabLive(live, leaf.state.tab) || livePaneInside(live, dir)) {
             if (done) keep(dir, 'live pane inside', 'removed once the pane closes or leaves this path');

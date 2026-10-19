@@ -32,6 +32,7 @@ type Visit = {
   end: number | null;
   failed: boolean;
   rounds: number;
+  seatless: boolean;
 };
 
 function ms(ts: string): number {
@@ -68,6 +69,8 @@ function visitsOf(slug: string, timings: TimingEvent[], log: LogRecord[]): Visit
         end: close === undefined ? null : ms(close.ts),
         failed: close !== undefined && close.to === 'failed',
         rounds: entry?.fix_rounds ?? 0,
+        // A command-run merge closes with no slot: no seat was prompted.
+        seatless: close !== undefined && close.to === 'merged' && close.slot === null,
       };
     });
 }
@@ -170,7 +173,7 @@ function checkPairs(
 function visitGaps(events: TimingEvent[], slug: string, visit: Visit): string[] {
   if (visit.end === null || visit.failed) return [];
   const missing: string[] = [];
-  const slots: readonly Slot[] = requiredSlots(visit.phase, visit.rounds);
+  const slots: readonly Slot[] = visit.seatless ? [] : requiredSlots(visit.phase, visit.rounds);
   const present: Slot[] = slots.filter((slot) => delivered(events, slug, visit, slot));
   if (slots.length > 0 && present.length === 0) missing.push('prompt');
   else for (const slot of slots.filter((slot) => !present.includes(slot))) missing.push(`prompt:${slot}`);

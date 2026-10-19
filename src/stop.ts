@@ -58,7 +58,10 @@ export async function stopCommand(target: string | undefined, all: boolean, cwd:
   const open: string = resolve(repo.root, 'issues/open');
   const slugs: string[] = all
     ? leavesUnder(open, open)
-        .filter((leaf: Leaf) => leaf.state.tab !== undefined && leaf.state.phase !== 'merged')
+        .filter(
+          (leaf: Leaf) =>
+            (leaf.state.tab !== undefined || leaf.state.batch?.owner === 'command') && leaf.state.phase !== 'merged',
+        )
         .map((leaf: Leaf) => leaf.state.slug)
     : [findLeaf(repo, z.string().parse(target)).state.slug];
   await withLock(resolve(globalHome(), '.lock'), async () => {
