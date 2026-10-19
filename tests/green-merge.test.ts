@@ -513,3 +513,20 @@ test('next preserves a live command attempt while its refused push restacks', as
     f.clean();
   }
 }, 60000);
+
+test('the land service keeps the named Herdr socket without a seat identity', async () => {
+  const f: GreenFixture = await greenFixture({ ok: 'true' });
+  try {
+    const socket: string = resolve(f.home, 'sessions/infra/herdr.sock');
+    f.env = { ...f.env, HERDR_SOCKET_PATH: socket };
+    const path: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(path, 'aa-file', 'aa\n');
+    toMerge(path);
+    await claimed(f, path);
+    expect(landLaunches(f)).toHaveLength(1);
+    expect(landLaunches(f)[0]).toContain(`--setenv=HERDR_SOCKET_PATH=${socket}`);
+    expect(landLaunches(f)[0]).not.toContain('HERDR_PANE_ID');
+  } finally {
+    f.clean();
+  }
+}, 60000);
