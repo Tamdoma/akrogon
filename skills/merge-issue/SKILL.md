@@ -7,7 +7,7 @@ At every phase prompt, re-read this file, its references and the leaf's `brief.m
 
 # Merge issue
 
-The prompt is `merge-issue <slug> slot=B phase=merge leaf=<folder> attempt=<id> top=<sha>` for a rebase the command already applied, or `... attempt=<id> solo` when B rebases its own leaf; B works in the existing leaf worktree and never runs `git push`.
+The prompt is `merge-issue <slug> slot=B phase=merge leaf=<folder> attempt=<id> top=<sha>` for a rebase the command already applied, optionally followed by `wake=red red=<run>`, `wake=gate` or `wake=push` when the command's own land run handed the attempt over, or `... attempt=<id> solo` when B rebases its own leaf; B works in the existing leaf worktree and never runs `git push`.
 
 ## Shared context
 
@@ -34,13 +34,15 @@ The merge seat reuses `grants[]` for the operations they cover, within their bou
 
 ## merge
 
-Each registered repo holds one merge turn, and each leaf in `merge` takes its own turn in merge-queue order; a waiting leaf is never touched by another leaf's turn. At the turn's start the command records a batch on the holder, rebases the holder's branch onto the fetched `<remote>/<default_branch>` in disposable state, removes resurrected retired lesson lines as a fixup commit on the top, moves the holder's live branch to the top, and prompts the holder's B. A holder that cannot be rebased mechanically (a conflict or a dirty worktree) takes a solo turn. A `merged`, `merged --check` or `check.fix` call on a leaf whose turn is not held is refused (naming the current holder when one holds it), ending that pass; `failed` is never refused.
+Each registered repo holds one merge turn, and each leaf in `merge` takes its own turn in merge-queue order; a waiting leaf is never touched by another leaf's turn. At the turn's start the command records a batch on the holder, rebases the holder's branch onto the fetched `<remote>/<default_branch>` in disposable state, removes resurrected retired lesson lines as a fixup commit on the top, moves the holder's live branch to the top, and lands a green top itself: it launches `akrogon land <slug> --attempt <id>` as the user unit `akrogon-land-<id>`, which runs `akrogon verify --attempt <id>`, the `merged --check` gates and the push, and moves the holder with no seat. B gets the merge prompt only when that run hands the attempt over: a red verify, a gate refusal, a push it cannot finish, or a rebase. A holder that cannot be rebased mechanically (a conflict or a dirty worktree) takes a solo turn. A `merged`, `merged --check` or `check.fix` call on a leaf whose turn is not held is refused (naming the current holder when one holds it), ending that pass; `failed` is never refused.
 
 The prompt ends `attempt=<id> top=<sha>` for an applied rebase, or `attempt=<id> solo` when the branch cannot be rebased mechanically (a conflict or a dirty worktree) and B rebases it by hand. Every `merged`, `merged --check` and `check.fix` call carries `--attempt <id>`; a stale or missing id is refused and changes nothing, ending the pass.
 
 ### attempt top: the worktree is the rebased top
 
-B does not fetch or rebase, and commits nothing except the repair below. B runs `akrogon verify --attempt <id>` in the worktree, which checks `HEAD` out fresh, runs every `checks` command not named in `merge_covers`, then every `merge_checks` command, and writes the receipt `merged --check` requires, then records its output in `review-B.md` under the `leaf=` folder with advisory failures as Nits; verify keeps its own logs under the Shared context exemption.
+B does not fetch or rebase, and commits nothing except the repair below.
+
+A `wake=` suffix names where the command's land run stopped; the batch record in the leaf's `state.yaml` holds its text. `wake=red red=<run>`: the command's verify of this top is red; B reads that run's logs with `akrogon log <path>` and judges it under Shared endings before any repair, rerunning `akrogon verify --attempt <id>` as below. `wake=gate`: `merged --check` refused, with the message in `batch.refusal`; B fixes it as a trailer refusal is fixed below and reruns `merged --check`. `wake=push`: the push failed or was refused twice, with git's stderr in `batch.refusal`; B reruns `akrogon verify --attempt <id>`, `--check` and `merged`, and reports any other push error rather than retrying. B runs `akrogon verify --attempt <id>` in the worktree, which checks `HEAD` out fresh, runs every `checks` command not named in `merge_covers`, then every `merge_checks` command, and writes the receipt `merged --check` requires, then records its output in `review-B.md` under the `leaf=` folder with advisory failures as Nits; verify keeps its own logs under the Shared context exemption.
 
 On a green verify run `akrogon phase <slug> merged --slot B --check --attempt <id>`, which requires a green merge receipt for HEAD under the current config, HEAD to descend from the recorded top, checks the `Test-Change:` trailers over the pushed range, and records the tested top. A refusal names each uncited file, fixed as the solo form fixes it; red runs take the endings under Shared endings.
 
@@ -78,7 +80,7 @@ On a red verify, judge the cause. A red run with no cause in the leaf's diff get
 
 A local default branch is unnecessary; the command's fast-forward push serializes competing merges. An unchanged successful check run is reused only when neither code nor integration changed.
 
-Each `issue complete` or `epic complete` line the `merged` call prints gets one broadcast-issue run by the merge seat itself in this session with that context and repo worktree — one run per completed standalone issue or whole epic — sent by the merge slot, never by a subagent or another agent, because the tab closes as soon as this pane goes idle after `merged`.
+When the command's land run merges the leaf, B makes no merge call; the command later prompts B with `broadcast-issue` for the completed owner. Each `issue complete` or `epic complete` line B's own `merged` call prints gets one broadcast-issue run by the merge seat itself in this session with that context and repo worktree — one run per completed standalone issue or whole epic — sent by the merge slot, never by a subagent or another agent, because the tab closes as soon as this pane goes idle after `merged`.
 
 A failed broadcast is visible but leaves the merge complete, while GitHub closure and completed-folder moves belong to the command.
 

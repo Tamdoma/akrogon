@@ -7,7 +7,7 @@ At every phase prompt, re-read this file, its references and the leaf's `brief.m
 
 # Broadcast issue
 
-This is the merge slot's own terminal task after `issue complete` or `epic complete`, or the chart door's after a chart-issues direct landing, never delegated, not another leaf phase; one completed standalone issue, one completed epic or one direct landing produces one message delivered to its configured targets.
+This is the merge slot's own terminal task after `issue complete` or `epic complete`, or the chart door's after a chart-issues direct landing, never delegated, not another leaf phase. After a merge the command ran itself, the command prompts the merged leaf's B with `broadcast-issue <slug> slot=B owner=<issue|epic>:<name> closed=<folder> sha=<pushed> sources=<list|none> leaf=<path>`: B reads the owner's briefs from the `closed=` folder, sends this one broadcast and runs no phase command; one completed standalone issue, one completed epic or one direct landing produces one message delivered to its configured targets.
 
 ## Context and message
 
@@ -40,7 +40,7 @@ Only the sender reads webhook values from `~/.config/akrogon/env`; missing file 
 
 Each target gets one delivery attempt and one immediate retry on failure with a warning, then the final failure is exposed with secret values redacted; successful targets are not resent because another target failed, no outcome is recorded, and a broadcast failure does not reopen the issue.
 
-The sender (the merge slot, or the chart door after a direct landing) does not repeat the sender after its built-in retry or run a phase command because completion already happened.
+The sender (the merge slot, the broadcast-only B seat after a command-run merge, or the chart door after a direct landing) does not repeat the sender after its built-in retry or run a phase command because completion already happened.
 
 ## Printed footer
 
