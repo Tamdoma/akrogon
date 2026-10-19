@@ -1094,7 +1094,7 @@ test('next awaits sourced completion after a failed rename before removing the w
     const path: string = leaf(f, 'rename', 'plan.synthesis');
     expect((await next(f, ['rename'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
-    saveState(path, { ...readState(path), phase: 'merge', ...holding(f), sources: ['team/project#9'] });
+    saveState(path, { ...readState(path), phase: 'merged', sources: ['team/project#9'] });
     const closed: string = resolve(f.root, 'issues/closed/issue');
     mkdirSync(closed, { recursive: true });
     const gh: GhFixture = fakeGh(f);
@@ -2760,7 +2760,7 @@ for (const owner of ['issue', 'epic/issue']) {
         );
       }
       expect(calls(f)).toEqual([]);
-      leaf(f, 'resting', 'plan.synthesis');
+      leaf(f, 'resting', 'plan.synthesis', {}, 'active-issue');
       expect((await next(f, ['resting'])).code).toBe(0);
       expect(database(f).prompts).toHaveLength(1);
       renameSync(resolve(f.root, 'issues/open'), resolve(f.root, 'issues/closed'));
@@ -5252,8 +5252,8 @@ test('blocked-report dep detail labels parked, missing, unreadable and skips mer
     leaf(f, 'phased', 'implement', {}, 'deps');
     leaf(f, 'merged-open', 'merged', {}, 'deps');
     const closedSrc: string = leaf(f, 'merged-closed', 'merged', {}, 'tmpmove');
-    mkdirSync(resolve(f.root, 'issues/closed/issue'), { recursive: true });
-    renameSync(closedSrc, resolve(f.root, 'issues/closed/issue/merged-closed'));
+    mkdirSync(resolve(f.root, 'issues/closed/tmpmove'), { recursive: true });
+    renameSync(closedSrc, resolve(f.root, 'issues/closed/tmpmove/merged-closed'));
     const parkedDir: string = resolve(f.root, 'issues/parked/myepic/parked-dep');
     mkdirSync(parkedDir, { recursive: true });
     yaml(resolve(parkedDir, 'state.yaml'), {

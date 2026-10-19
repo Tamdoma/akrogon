@@ -171,7 +171,8 @@ test('the reconcile report records removed worktrees and still reads pre-change 
     expect(rows).toContainEqual({ path: worktree, branch: 'report-leaf', head, rule: 'merged leaf' });
     expect(rows).toContainEqual({ path: ended, head: endedHead, rule: 'ended verify' });
     // A pass that removes no registered worktree writes an empty list.
-    await dispatchLeaf(f, 'calm-leaf');
+    leaf(f, 'calm-leaf', 'plan.synthesis', {}, 'calm-issue');
+    expect((await next(f, ['calm-leaf'])).code).toBe(0);
     const calmRows: unknown[] = report(f).removed;
     expect(calmRows).toEqual([]);
     // A report written before `removed` existed still reads its kept entries.

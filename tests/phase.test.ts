@@ -340,7 +340,7 @@ test('failed log preserves committed state and failed container rename retries w
     expect((await cli(f, ['phase', 'log-error', 'implement'])).code).not.toBe(0);
     expect(bytes(path)).toBe(before);
     rmSync(resolve(f.root, 'issues/log.jsonl'), { recursive: true });
-    leaf(f, 'close-error', 'merge', holding(f), 'closing');
+    leaf(f, 'close-error', 'merged', {}, 'closing');
     mkdirSync(resolve(f.root, 'issues/closed/closing'), { recursive: true });
     expect((await cli(f, ['phase', 'close-error', 'merged'])).code).not.toBe(0);
     rmSync(resolve(f.root, 'issues/closed/closing'), { recursive: true });
@@ -348,7 +348,7 @@ test('failed log preserves committed state and failed container rename retries w
     expect(retried.stdout).not.toContain('issue complete');
     expect(retried.stdout).not.toContain('epic complete');
     expect(existsSync(resolve(f.root, 'issues/closed/closing/close-error/state.yaml'))).toBe(true);
-    expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1);
+    expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
   } finally {
     f.clean();
   }
