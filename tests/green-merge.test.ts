@@ -452,3 +452,29 @@ test('stop --all stops a tabless command merge', async () => {
     f.clean();
   }
 });
+
+test('next keeps a working broadcast seat until it finishes', async () => {
+  const f: GreenFixture = await greenFixture({ ok: 'true' });
+  try {
+    const path: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(path, 'aa-file', 'aa\n');
+    toMerge(path);
+    const { attempt } = await claimed(f, path);
+    expect((await land(f, 'aa', attempt)).code).toBe(0);
+    const closed: string = moved(path);
+    const state: State = readState(closed);
+    expect(database(f).panes.find((pane) => pane.pane_id === state.pane.B)?.agent_status).toBe('working');
+    expect((await next(f)).code).toBe(0);
+    expect((await next(f)).code).toBe(0);
+    expect(database(f).panes.some((pane) => pane.pane_id === state.pane.B)).toBe(true);
+    expect(existsSync(z.string().parse(state.worktree))).toBe(true);
+    expect(prompts(f, 'broadcast-issue')).toHaveLength(1);
+    idleAll(f);
+    expect((await next(f)).code).toBe(0);
+    expect((await next(f)).code).toBe(0);
+    expect(database(f).panes.some((pane) => pane.pane_id === state.pane.B)).toBe(false);
+    expect(prompts(f, 'broadcast-issue')).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+}, 60000);
