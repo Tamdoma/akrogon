@@ -229,7 +229,7 @@ export function repoInventory(
 
 export function inventoryFailures(inv: Inventory): { ownedNames: Set<string>; incomplete: boolean } {
   return {
-    ownedNames: new Set(inv.unreadable.map((failure) => basename(failure.path))),
+    ownedNames: new Set([...inv.unreadable, ...inv.foreign].map((failure) => basename(failure.path))),
     incomplete: inv.unknown.length > 0,
   };
 }

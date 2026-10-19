@@ -1179,10 +1179,12 @@ export async function reconcileHost(
         inventoryErrors.push(`${failure.path}: ${failure.error}`);
       }
       for (const failure of inventory.unknown) inventoryErrors.push(`${failure.path}: ${failure.error}`);
-      for (const leaf of inventory.foreign)
+      for (const leaf of inventory.foreign) {
+        badSlices.add(leafSlice(repo, basename(leaf.path)));
         inventoryErrors.push(
           `${leaf.path}: leaf repo mismatch, stored key "${leaf.stored}", registered key "${repo.name}"`,
         );
+      }
     }
     const own: Set<string> = ownSlices();
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
