@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, readdirSync, readFileSync, statSync, type Dirent } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import {
@@ -17,13 +17,14 @@ import {
 import {
   broadcastPending,
   findLeaf,
-  leavesUnder,
-  readState,
-  stateSchema,
+  hasLeafFolder,
+  readInventory,
+  repoInventory,
   RepoMismatchError,
-  validateLeafDepth,
   type DeliveryError,
+  type Inventory,
   type Leaf,
+  type LeafFailure,
   type State,
 } from './state';
 import { readLog, type LogRecord } from './log';
@@ -47,6 +48,7 @@ type Scan =
       log: LogRecord[];
       timings: TimingEvent[];
       queue: QueueEntry[];
+      failures: LeafFailure[];
     }
   | { ok: false; repo: string; path: string; error: string };
 
@@ -67,36 +69,30 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     readdirSync(path);
     path = resolve(path, 'issues/config.yaml');
     const repo: Repo = readRepo(name, registeredPath);
-    const slugs: Set<string> = new Set();
-    function walk(folder: string): ScannedLeaf[] {
-      path = folder;
-      const entries: Dirent[] = readdirSync(folder, { withFileTypes: true });
-      if (entries.some((entry) => entry.name === 'state.yaml')) {
-        path = resolve(folder, 'state.yaml');
-        validateLeafDepth(open, folder);
-        const state: State = readState(folder);
-        if (state.repo !== repo.name) throw new RepoMismatchError(folder, state.repo, repo.name);
-        stateSchema.shape.slug.refine((slug) => !slugs.has(slug), 'Duplicate leaf slug').parse(state.slug);
-        slugs.add(state.slug);
-        path = resolve(folder, 'readiness.yaml');
-        const missing: Gap[] = leafGaps(global, { path: folder, state });
-        return [{ path: folder, state, missing, seatSources: seats(global, repo, folder).source }];
-      }
-      return entries
-        .filter((entry) => entry.isDirectory())
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .flatMap((entry) => walk(resolve(folder, entry.name)));
-    }
     const open: string = resolve(repo.root, 'issues/open');
-    const leaves: ScannedLeaf[] = existsSync(open) ? walk(open) : [];
-    const closedRoot: string = resolve(repo.root, 'issues/closed');
-    path = closedRoot;
-    const closed: Leaf[] = existsSync(closedRoot) ? leavesUnder(closedRoot, closedRoot) : [];
+    const inventory: Inventory = repoInventory(repo);
+    const leaves: ScannedLeaf[] = inventory.leaves
+      .filter((leaf) => leaf.path.startsWith(open + sep))
+      .map((leaf) => {
+        path = resolve(leaf.path, 'readiness.yaml');
+        return { ...leaf, missing: leafGaps(global, leaf), seatSources: seats(global, repo, leaf.path).source };
+      });
+    const failures: LeafFailure[] = [
+      ...inventory.unreadable.map((failure) => ({
+        path: resolve(failure.path, 'state.yaml'),
+        error: failure.error,
+      })),
+      ...inventory.foreign.map((leaf) => ({
+        path: resolve(leaf.path, 'state.yaml'),
+        error: new RepoMismatchError(leaf.path, leaf.stored, repo.name).message,
+      })),
+      ...inventory.unknown,
+    ];
     path = resolve(repo.root, 'issues/log.jsonl');
     const log: LogRecord[] = readLog(repo.root);
-    const queue: QueueEntry[] = mergeQueue(global, repo, [...leaves, ...closed], () => log);
+    const queue: QueueEntry[] = mergeQueue(global, repo, inventory.leaves, () => log);
     const timings: TimingEvent[] = readTimings(repo.root);
-    return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log, timings, queue };
+    return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log, timings, queue, failures };
   } catch (error) {
     if (error instanceof SeatIndexError) path = error.file;
     if (
@@ -378,10 +374,12 @@ function unpackedLines(root: string): string[] {
     if ((ended && hasLog(resolve(folder, 'direct'))) || closing(folder)) lines.push(packLine(folder));
   }
   const open: string = resolve(root, 'issues/open');
-  for (const owner of issueFolders(root, 'issues/open')) {
+  const owners: string[] =
+    statSync(open, { throwIfNoEntry: false })?.isDirectory() === true ? issueFolders(root, 'issues/open') : [];
+  for (const owner of owners) {
     const folder: string = resolve(open, owner);
     if (!closing(folder)) continue;
-    const leaves: Leaf[] = leavesUnder(folder, open);
+    const leaves: Leaf[] = readInventory(folder, open).leaves;
     const slug: string | undefined =
       leaves.find((leaf) => leaf.state.phase === 'merged')?.state.slug ?? leaves[0]?.state.slug;
     if (slug !== undefined) lines.push(`Unpacked: ${relative(root, folder)}: run akrogon next ${slug}`);
@@ -432,7 +430,19 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   const stopped: Set<string> = readStopped();
   if (slug !== undefined) {
     const repo: Repo = await requireRepo(global, process.cwd());
-    const leaf: Leaf = findLeaf(repo, slug);
+    const inventory: Inventory = repoInventory(repo);
+    let leaf: Leaf;
+    if (hasLeafFolder(repo, slug)) {
+      leaf = findLeaf(repo, slug);
+      const flagged: LeafFailure | undefined = inventory.unreadable.find((failure) => failure.path === leaf.path);
+      if (flagged !== undefined) throw new Error(flagged.error);
+    } else if (inventory.unreadable.length > 0) {
+      const failure: LeafFailure =
+        inventory.unreadable.find((entry) => basename(entry.path) === slug) ?? inventory.unreadable[0];
+      throw new Error(failure.error);
+    } else {
+      leaf = findLeaf(repo, slug);
+    }
     const log: LogRecord[] = readLog(repo.root)
       .filter(({ record }) => record.slug === slug)
       .slice(-10);
@@ -471,6 +481,9 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     .map(([name, path]) => scanRepo(name, path, global));
   for (const scan of scans) {
     if (!scan.ok) console.log(JSON.stringify({ unreadable: scan.repo, path: scan.path, error: scan.error }));
+    else
+      for (const failure of scan.failures)
+        console.log(JSON.stringify({ unreadable: scan.repo.name, path: failure.path, error: failure.error }));
   }
   const deploy: ReturnType<typeof readDeployRecord> = readDeployRecord();
   const active: string | null = currentReleaseCommit();
@@ -512,7 +525,7 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     const separator: string[][] = scan.leaves.length > 0 && parked.length > 0 ? [['', '', '', '', '', '']] : [];
     const lines: string[][] = [...rows(scan, now, stopped), ...separator, ...parked];
     if (lines.length > 0) console.log(render(header, [['  LEAF', ...header.slice(1)], ...lines]).join('\n'));
-    else console.log('  no open leaves');
+    else if (scan.failures.length === 0) console.log('  no open leaves');
   }
-  if (scans.some((scan) => !scan.ok)) process.exitCode = 1;
+  if (scans.some((scan) => !scan.ok || scan.failures.length > 0)) process.exitCode = 1;
 }
