@@ -1094,13 +1094,17 @@ function mergeContext(record: Batch): string {
 
 // A command-run merge leaves the completing owner's broadcast to a broadcast-only B seat; prompted.B is its ack.
 async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<void> {
-  for (const pending of allLeaves(repo).filter((leaf) => broadcastPending(leaf.state))) {
+  for (const pending of discover(repo, invocation).leaves.filter((leaf) => broadcastPending(leaf.state))) {
     try {
       await withLock(resolve(globalHome(), '.lock'), async () => {
-        const fresh: Leaf | undefined = allLeaves(repo).find((leaf) => leaf.state.slug === pending.state.slug);
+        const fresh: Leaf | undefined = discover(repo, invocation).leaves.find(
+          (leaf) => leaf.state.slug === pending.state.slug,
+        );
         if (fresh === undefined || fresh.state.broadcast === undefined || !broadcastPending(fresh.state)) return;
         const handoff: Broadcast = fresh.state.broadcast;
-        const allocated: State | null = await allocate(global, repo, fresh, invocation);
+        const allocated: State | null = (await panes()).some((pane) => pane.pane_id === fresh.state.pane.B)
+          ? fresh.state
+          : await allocate(global, repo, fresh, invocation);
         if (allocated === null) return;
         const sources: string = handoff.sources.length === 0 ? 'none' : handoff.sources.join(',');
         await dispatchSlot(
