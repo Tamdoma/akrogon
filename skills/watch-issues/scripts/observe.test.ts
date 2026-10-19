@@ -231,12 +231,7 @@ test('failed attempts with missing delivery prints dash', async (): Promise<void
 test('legacy failed without failure record prints unknown', async (): Promise<void> => {
   const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
   try {
-    writeLeaf(root, 'owner', 'fail-legacy', {
-      ...baseState('fail-legacy', 'failed'),
-      priority: 1,
-      slot: 'A',
-      failed_notified: '2026-09-10',
-    });
+    writeLeaf(root, 'owner', 'fail-legacy', baseState('fail-legacy', 'failed'));
     const akrogon: string = akrogonOk(root);
     const herdr: string = herdrOk(root, []);
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });

@@ -456,7 +456,7 @@ function cliEnv(f: DispatchFixture, extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv
 test('race A: pause recorded before the locked merge section suppresses the launch', async () => {
   const control: DispatchFixture = await dispatchFixture();
   try {
-    const controlPath: string = leaf(control, 'holder', 'merge', { solo: true });
+    const controlPath: string = leaf(control, 'holder', 'merge');
     const run: Result = await next(control, ['--resume']);
     expect(run.code).toBe(0);
     expect(readState(controlPath).batch?.owner).toBe('command');
@@ -466,7 +466,7 @@ test('race A: pause recorded before the locked merge section suppresses the laun
   const f: DispatchFixture = await dispatchFixture();
   const child: { current?: Bun.Subprocess } = {};
   try {
-    const holderPath: string = leaf(f, 'holder', 'merge', { solo: true });
+    const holderPath: string = leaf(f, 'holder', 'merge');
     const barrier: string = resolve(f.home, 'barrier');
     mkdirSync(barrier);
     const realGit: string = await command(['sh', '-c', 'command -v git']);

@@ -34,18 +34,6 @@ test.serial('stateSchema accepts a state with a batch record', () => {
   expect(minimal.batch?.applied).toBe(false);
 });
 
-test.serial('readState drops a legacy solo key left in state.yaml', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const path: string = leaf(f, 'legacy', 'merge', { solo: true });
-    const state: State = readState(path);
-    expect(state.slug).toBe('legacy');
-    expect(state).not.toHaveProperty('solo');
-  } finally {
-    f.clean();
-  }
-});
-
 test.serial('stateSchema rejects unknown or missing-required batch fields', () => {
   expect(() => stateSchema.parse({ ...baseState, batch: { ...record, extra: 1 } })).toThrow();
   expect(() => stateSchema.parse({ ...baseState, batch: { built_on: 'x', applied: true } })).toThrow();

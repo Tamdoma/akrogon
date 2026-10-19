@@ -105,8 +105,6 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
       'broken',
       'failed',
       {
-        priority: 'n',
-        slot: 'B',
         done: ['A'],
         attempts: { A: 2, B: 3 },
         fix_rounds: 2,
@@ -485,7 +483,7 @@ test('overview rejects repo mismatches and duplicate slugs within an open repo',
 test('detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes', async () => {
   const f: Fixture = await fixture();
   try {
-    const path: string = leaf(f, 'selected', 'merged', { priority: 'n', slot: 'B' });
+    const path: string = leaf(f, 'selected', 'merged');
     mkdirSync(resolve(f.root, 'issues/closed'));
     renameSync(resolve(path, '..'), resolve(f.root, 'issues/closed/issue'));
     const authoritative: string = resolve(f.root, 'issues/closed/issue/selected');
