@@ -199,7 +199,6 @@ type OwnerScope = {
 };
 
 function ownerScope(repo: Repo, leaf: Leaf, after: State): OwnerScope {
-  const open: string = resolve(repo.root, 'issues/open');
   const current = (leaves: Leaf[]): Leaf[] =>
     leaves.map((item): Leaf => (item.path === leaf.path ? { path: item.path, state: after } : item));
   const issue: string = dirname(leaf.path);

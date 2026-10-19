@@ -260,7 +260,6 @@ function tabLive(live: Pane[], tab: string | undefined): boolean {
 // pass? Any inventory failure inside the owner's subtree blocks it — an
 // unproven owner never completes.
 function ownerCompletes(repo: Repo, leaf: Leaf): boolean {
-  const open: string = resolve(repo.root, 'issues/open');
   const issue: string = dirname(leaf.path);
   const parent: string = dirname(issue);
   const owner: string = basename(parent) === 'open' ? issue : parent;
