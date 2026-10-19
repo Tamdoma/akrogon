@@ -429,10 +429,13 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   const stopped: Set<string> = readStopped();
   if (slug !== undefined) {
     const repo: Repo = await requireRepo(global, process.cwd());
-    const leaf: Leaf = findLeaf(repo, slug);
-    const flagged: LeafFailure | undefined = repoInventory(repo).unreadable.find(
-      (failure) => failure.path === leaf.path,
+    const inventory: Inventory = repoInventory(repo);
+    const invalidRoot: LeafFailure | undefined = inventory.unreadable.find((failure) =>
+      ['open', 'closed'].some((area) => failure.path === resolve(repo.root, 'issues', area)),
     );
+    if (invalidRoot !== undefined) throw new Error(invalidRoot.error);
+    const leaf: Leaf = findLeaf(repo, slug);
+    const flagged: LeafFailure | undefined = inventory.unreadable.find((failure) => failure.path === leaf.path);
     if (flagged !== undefined) throw new Error(flagged.error);
     const log: LogRecord[] = readLog(repo.root)
       .filter(({ record }) => record.slug === slug)
