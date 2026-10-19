@@ -17,7 +17,6 @@ import {
 import {
   broadcastPending,
   findLeaf,
-  hasLeafFolder,
   readInventory,
   repoInventory,
   RepoMismatchError,
@@ -430,19 +429,11 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   const stopped: Set<string> = readStopped();
   if (slug !== undefined) {
     const repo: Repo = await requireRepo(global, process.cwd());
-    const inventory: Inventory = repoInventory(repo);
-    let leaf: Leaf;
-    if (hasLeafFolder(repo, slug)) {
-      leaf = findLeaf(repo, slug);
-      const flagged: LeafFailure | undefined = inventory.unreadable.find((failure) => failure.path === leaf.path);
-      if (flagged !== undefined) throw new Error(flagged.error);
-    } else if (inventory.unreadable.length > 0) {
-      const failure: LeafFailure =
-        inventory.unreadable.find((entry) => basename(entry.path) === slug) ?? inventory.unreadable[0];
-      throw new Error(failure.error);
-    } else {
-      leaf = findLeaf(repo, slug);
-    }
+    const leaf: Leaf = findLeaf(repo, slug);
+    const flagged: LeafFailure | undefined = repoInventory(repo).unreadable.find(
+      (failure) => failure.path === leaf.path,
+    );
+    if (flagged !== undefined) throw new Error(flagged.error);
     const log: LogRecord[] = readLog(repo.root)
       .filter(({ record }) => record.slug === slug)
       .slice(-10);
