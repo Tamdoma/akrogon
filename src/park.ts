@@ -54,9 +54,7 @@ function stranded(root: string, verb: ParkVerb, moving: string[]): string[] {
     verb === 'unpark' ? moving.map((issue) => readInventory(resolve(root, from, issue), resolve(root, from))) : [];
   const closed: Inventory = readInventory(closedRoot, closedRoot);
   const open: Leaf[] = [...staying, ...arriving].flatMap((inv) => inv.leaves);
-  const known: Set<string> = new Set(
-    [...open, ...closed.leaves].map((leaf) => leaf.state.slug),
-  );
+  const known: Set<string> = new Set([...open, ...closed.leaves].map((leaf) => leaf.state.slug));
   // A bad leaf's folder basename is the only name it still answers to: a
   // dependency on it stays unmet but is not reported dangling.
   for (const inv of [...staying, ...arriving, closed])
@@ -74,8 +72,7 @@ export async function parkCommand(verb: ParkVerb, names: string[], all: boolean,
     for (const name of names) if (!present.includes(name)) throw new Error(`No issue ${name} under ${from}`);
     const bad: string[] = present.filter((name) => failures(repo, resolve(repo.root, from, name), inv).length > 0);
     if (!all)
-      for (const name of names)
-        if (bad.includes(name)) throw refusal(repo, resolve(repo.root, from, name), inv);
+      for (const name of names) if (bad.includes(name)) throw refusal(repo, resolve(repo.root, from, name), inv);
     const busy: string[] =
       verb === 'park' ? present.filter((name) => !bad.includes(name) && running(repo.root, name)) : [];
     const candidates: string[] = all

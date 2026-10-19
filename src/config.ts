@@ -366,9 +366,13 @@ export async function effectiveConfig(cwd: string): Promise<string> {
         realpathSync(item.state.worktree) === realTop,
     );
     if (leaf === undefined && top !== repo.root) {
-      const failure = [...inv.unreadable, ...inv.foreign.map((f) => ({ path: f.path, error: new RepoMismatchError(f.path, f.stored, repo.name).message }))].find(
-        (f) => basename(f.path) === basename(realTop),
-      );
+      const failure = [
+        ...inv.unreadable,
+        ...inv.foreign.map((f) => ({
+          path: f.path,
+          error: new RepoMismatchError(f.path, f.stored, repo.name).message,
+        })),
+      ].find((f) => basename(f.path) === basename(realTop));
       if (failure !== undefined)
         throw new Error(`Invalid state ${resolve(failure.path, 'state.yaml')}: ${failure.error}`);
     }

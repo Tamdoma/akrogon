@@ -1,23 +1,8 @@
 import { test, expect } from 'bun:test';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import {
-  fixture,
-  cli,
-  leaf,
-  yaml,
-  fakeHerdr,
-  storeDir,
-  holding,
-  type Fixture,
-} from './helpers';
+import { fixture, cli, leaf, yaml, fakeHerdr, storeDir, holding, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
 import { readState } from '../src/state';
 import type { Database } from './fake-herdr';
@@ -96,10 +81,15 @@ test('one bad leaf stops only itself: next, phase, config, run-check and status 
     expect(config.code).toBe(0);
     expect(Bun.YAML.parse(config.stdout)).toMatchObject({ repo: 'repo' });
 
-    const check: Result = await cli(f, ['run-check', '--name', 'probe', '--', 'sh', '-c', 'printf probe-ok'], worktree, {
-      ...f.env,
-      HOME: f.home,
-    });
+    const check: Result = await cli(
+      f,
+      ['run-check', '--name', 'probe', '--', 'sh', '-c', 'printf probe-ok'],
+      worktree,
+      {
+        ...f.env,
+        HOME: f.home,
+      },
+    );
     expect(check.code).toBe(0);
     expect(check.stdout).toContain('probe-ok');
 

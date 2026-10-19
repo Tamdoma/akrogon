@@ -266,8 +266,7 @@ function ownerCompletes(repo: Repo, leaf: Leaf): boolean {
   const parent: string = dirname(issue);
   const owner: string = basename(parent) === 'open' ? issue : parent;
   const ownerInv: Inventory = owner === issue ? issueInv : readInventory(owner, open);
-  const failures = (inv: Inventory): number =>
-    inv.unreadable.length + inv.unknown.length + inv.foreign.length;
+  const failures = (inv: Inventory): number => inv.unreadable.length + inv.unknown.length + inv.foreign.length;
   if (failures(issueInv) + (owner === issue ? 0 : failures(ownerInv)) > 0) return false;
   if (!issueInv.leaves.every((item) => item.state.phase === 'merged')) return false;
   return ownerInv.leaves.every((item) => item.state.phase === 'merged');

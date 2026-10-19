@@ -128,11 +128,11 @@ export async function leafTarget(
         target: resolve(owner.path, 'implementation'),
       };
   }
-  const failure = [...inv.unreadable, ...inv.foreign.map((f) => ({ path: f.path, error: new RepoMismatchError(f.path, f.stored, repo.name).message }))].find(
-    (f) => basename(f.path) === basename(top),
-  );
-  if (failure !== undefined)
-    throw new Error(`Invalid state ${resolve(failure.path, 'state.yaml')}: ${failure.error}`);
+  const failure = [
+    ...inv.unreadable,
+    ...inv.foreign.map((f) => ({ path: f.path, error: new RepoMismatchError(f.path, f.stored, repo.name).message })),
+  ].find((f) => basename(f.path) === basename(top));
+  if (failure !== undefined) throw new Error(`Invalid state ${resolve(failure.path, 'state.yaml')}: ${failure.error}`);
   if (holder === undefined) throw new Error('No leaf worktree matches cwd; pass --leaf or --holder');
   return { slug: 'checkout', target: resolve(cwd, holder), scope: 'leaf' };
 }
