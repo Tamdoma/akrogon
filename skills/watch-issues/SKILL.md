@@ -21,7 +21,7 @@ Job identity is the exact prompt `/watch-issues tick <root>`. The watch never se
 
 A check begins by running `akrogon status` at `<root>`. When it reports the repo paused (`<repo> (paused)` list mark or `paused: <name>` slug line), that check observes nothing and acts on nothing: run no observe script, `next`, `phase` or herdr command, and report paused.
 
-Run `bun <skill-folder>/scripts/observe.ts <root>` under a Bash timeout; it prints one line per leaf sorted by slug, nothing when the open tree is empty.
+Run `bun <skill-folder>/scripts/observe.ts <root>` under a Bash timeout. It prints readable leaf lines sorted by slug, followed by `unreadable=<path> error=<message>` lines sorted by path for unreadable states, foreign-repo leaves and unreadable directories. It prints nothing when there are no readable leaves or failures.
 
 `OBSERVE_HERDR` and `OBSERVE_AKROGON` override the herdr and akrogon binaries for tests only.
 
