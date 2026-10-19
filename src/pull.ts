@@ -183,15 +183,10 @@ async function closeSource(repo: Repo, source: string, comment: string): Promise
 
 export async function closeSources(repo: Repo, sources: ReadonlySet<string>, leaf: Leaf): Promise<void> {
   if (sources.size === 0) return;
-  if (leaf.state.worktree === undefined)
-    throw new Error(
-      JSON.stringify({ error: 'Sourced completion requires a worktree', slug: leaf.state.slug, sources: [...sources] }),
-    );
-  const commit: string = await command(['git', 'rev-parse', 'HEAD'], leaf.state.worktree);
   const failures: { source: string; error: Error }[] = [];
   for (const source of sources) {
     try {
-      await closeSource(repo, source, `merged ${commit}`);
+      await closeSource(repo, source, `delivered by ${leaf.state.slug}`);
     } catch (error) {
       if (!(error instanceof CommandError) && !(error instanceof SourceError)) throw error;
       failures.push({ source, error });
