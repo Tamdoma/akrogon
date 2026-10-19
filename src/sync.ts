@@ -109,7 +109,9 @@ export async function integrate(
           .split('\0')
           .filter((line: string) => line !== '')
           .map((line: string) => {
-            const [meta, path]: string[] = line.split('\t');
+            const tab: number = line.indexOf('\t');
+            const meta: string = line.slice(0, tab);
+            const path: string = line.slice(tab + 1);
             const [mode, , id]: string[] = meta.split(' ');
             return [resolve(repo.root, path), { mode, id }];
           }),
