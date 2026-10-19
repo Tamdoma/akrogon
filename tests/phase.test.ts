@@ -423,7 +423,7 @@ test('asymmetric and empty leaf sources defer until epic completion under open l
     saveState(second, {
       ...readState(second),
       phase: 'merge',
-      batch: { attempt: 'a1', built_on: main, holder: { base: main, head }, applied: true, members: [] },
+      batch: { attempt: 'a1', built_on: main, holder: { base: main, head }, applied: true },
     });
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/epic'),
@@ -1993,7 +1993,6 @@ test('merged --check refuses an applied stack whose top still contains a retired
       built_on: builtOn,
       holder: { base: builtOn, head: top },
       applied: true,
-      members: [],
       top,
     };
     saveState(path, { ...readState(path), batch: record });
@@ -2047,7 +2046,6 @@ test('a solo merge push keeps citations valid when the remote ref advanced', asy
       built_on: builtOn,
       holder: { base: builtOn, head },
       applied: true,
-      members: [],
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: HerdrFixture = fakeHerdr(f);
@@ -2096,7 +2094,6 @@ test('merged --check refuses a solo record whose rebased head contains a retired
       built_on: builtOn,
       holder: { base: builtOn, head: builtOn },
       applied: true,
-      members: [],
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: HerdrFixture = fakeHerdr(f);

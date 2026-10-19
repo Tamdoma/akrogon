@@ -364,7 +364,7 @@ for (const refusal of ['dirty', 'mid-rebase', 'live tab', 'live cwd', 'batch'] a
         refusal === 'batch'
           ? {
               worktree: old,
-              batch: { attempt: 'a1', built_on: 'x', holder: { base: 'x', head: 'x' }, applied: false, members: [] },
+              batch: { attempt: 'a1', built_on: 'x', holder: { base: 'x', head: 'x' }, applied: false },
             }
           : { worktree: old };
       const slug: string = `stay-${refusal.replace(' ', '-')}`;

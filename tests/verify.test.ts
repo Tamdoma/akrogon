@@ -169,7 +169,7 @@ test('a merge caller runs checks outside merge_covers, then merge_checks', async
     });
     const head: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
     const leafPath: string = leaf(f, 'holder', 'merge', {
-      batch: { attempt: 'att-123', built_on: head, holder: { base: head, head }, applied: true, members: [] },
+      batch: { attempt: 'att-123', built_on: head, holder: { base: head, head }, applied: true },
     });
     const result: Result = await verify(f, ['--attempt', 'att-123'], f.root);
     expect(result.code).toBe(0);
@@ -191,7 +191,7 @@ test('--attempt from the repo root verifies the merge leaf worktree HEAD', async
     const head: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
     leaf(f, 'holder', 'merge', {
       worktree,
-      batch: { attempt: 'att-1', built_on: head, holder: { base: head, head: sha }, applied: true, members: [] },
+      batch: { attempt: 'att-1', built_on: head, holder: { base: head, head: sha }, applied: true },
     });
     expect((await verify(f, ['--attempt', 'att-1'], f.root)).code).toBe(0);
     expect(records(f)[0]).toMatchObject({ leaf: 'holder', scope: 'merge', sha });

@@ -93,7 +93,6 @@ async function batchFixture(f: Fixture, inStore: boolean = false): Promise<Batch
     built_on: builtOn,
     holder: { base: builtOn, head: branch.head },
     applied: true,
-    members: [],
     top: built.top,
   };
   const holderState: State = { ...readState(holderPath), batch: record };
@@ -119,7 +118,6 @@ async function soloFixture(f: Fixture): Promise<BatchFixture> {
     built_on: builtOn,
     holder: { base: builtOn, head: branch.head },
     applied: true,
-    members: [],
   };
   saveState(holderPath, { ...readState(holderPath), batch: record });
   return {

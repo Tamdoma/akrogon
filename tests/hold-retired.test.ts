@@ -103,7 +103,6 @@ test('a held outcome already in merge-attempts.jsonl still parses and status sti
         attempt: 'a1',
         repo: 'repo',
         holder: 'hold',
-        members: [],
         built_on: 'a'.repeat(40),
         outcome: 'held',
         end: '2026-10-10T00:00:00.000Z',

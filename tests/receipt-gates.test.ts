@@ -69,7 +69,6 @@ test('merged --check stamps tested_top only with a green merge receipt for HEAD 
       built_on: builtOn,
       holder: { base: builtOn, head },
       applied: true,
-      members: [],
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: { env: NodeJS.ProcessEnv } = fakeHerdr(f);
@@ -100,7 +99,6 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
       built_on: builtOn,
       holder: { base: builtOn, head },
       applied: true,
-      members: [],
     };
     saveState(path, { ...readState(path), batch: record });
     const herdr: { env: NodeJS.ProcessEnv } = fakeHerdr(f);

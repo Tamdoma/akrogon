@@ -4850,12 +4850,8 @@ function mergeText(path: string): string {
   const state: State = readState(path);
   const batch = state.batch;
   expect(batch).toBeDefined();
-  const members: string =
-    batch!.members.length === 0 ? '' : ` members=${batch!.members.map((member) => member.slug).join(',')}`;
   const context: string =
-    batch!.top === undefined
-      ? `attempt=${batch!.attempt} solo`
-      : `attempt=${batch!.attempt} top=${batch!.top}${members}`;
+    batch!.top === undefined ? `attempt=${batch!.attempt} solo` : `attempt=${batch!.attempt} top=${batch!.top}`;
   return `merge-issue ${state.slug} slot=B phase=merge leaf=${path} ${context}`;
 }
 

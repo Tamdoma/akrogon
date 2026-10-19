@@ -165,7 +165,6 @@ test('an interrupted build is discarded and rebuilt under a new attempt', async 
         built_on: builtOn,
         holder: { base: builtOn, head: aaHead },
         applied: false,
-        members: [],
       },
     });
     saveDatabase(f, { ...database(f), prompts: [] });

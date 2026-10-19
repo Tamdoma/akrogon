@@ -63,7 +63,6 @@ test.serial('restack preserves a holder retirement the union merge resurrects', 
       built_on: builtOn,
       holder: { base: guardBase, head: held.head },
       applied: true,
-      members: [],
       top: built.top,
     };
     saveState(holderPath, { ...readState(holderPath), batch: record });
@@ -153,7 +152,6 @@ async function batchFixture(f: Fixture, top: boolean = true): Promise<BatchFixtu
     built_on: builtOn,
     holder: { base: builtOn, head: branch.head },
     applied: true,
-    members: [],
     ...(top ? { top: built.top } : {}),
   };
   saveState(holderPath, { ...readState(holderPath), batch: record });

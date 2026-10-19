@@ -194,7 +194,6 @@ test('check events carry the merge attempt id inside a merge attempt', async () 
         built_on: head,
         holder: { base: head, head },
         applied: true,
-        members: [],
       },
     });
     const run: Result = await cli(f, ['run-check', '--name', 'm', '--', 'true'], worktree, f.env);

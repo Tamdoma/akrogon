@@ -61,7 +61,6 @@ test('TURN keeps the batch record holder first ahead of a leaf with more depende
           head: '0123456789abcdef0123456789abcdef01234567',
         },
         applied: true,
-        members: [],
       },
     });
     const result: Result = await cli(f, ['status']);

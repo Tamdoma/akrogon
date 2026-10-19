@@ -273,6 +273,6 @@ export function holding(f: Fixture): { batch: Batch } {
   const main: string = Bun.spawnSync(['git', 'rev-parse', 'origin/main'], { cwd: f.root }).stdout.toString().trim();
   greenReceipt(f, main, 'merge');
   return {
-    batch: { attempt: 'a1', built_on: main, holder: { base: main, head: main }, applied: true, top: main, members: [] },
+    batch: { attempt: 'a1', built_on: main, holder: { base: main, head: main }, applied: true, top: main },
   };
 }
