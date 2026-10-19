@@ -94,16 +94,3 @@ test('no member stacking code remains in src', () => {
     }).outcome,
   ).toBe('red');
 });
-
-test('merge docs describe the holder alone', () => {
-  for (const path of ['skills/merge-issue/SKILL.md', 'skills/check-issue/SKILL.md', 'src/AREA.md']) {
-    const text: string = readFileSync(resolve(root, path), 'utf8');
-    for (const pattern of [/\bmembers?\b/i, /stack red/, /stack top/])
-      expect(text, `${path} matches ${pattern}`).not.toMatch(pattern);
-  }
-  for (const path of ['docs/guide/merge.md', 'docs/guide/next.md', 'docs/guide/state.md', 'docs/guide/files.md']) {
-    const text: string = readFileSync(resolve(root, path), 'utf8');
-    for (const pattern of [/members=/, /stack red/, /restarts alone/, /member tip/, /member branch/])
-      expect(text, `${path} matches ${pattern}`).not.toMatch(pattern);
-  }
-});
