@@ -1,8 +1,15 @@
 #!/usr/bin/env bun
-import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { existsSync, readdirSync, type Dirent } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { stateSchema, type Leaf, type State } from '../../../src/state';
+import {
+  repoInventory,
+  RepoMismatchError,
+  type Inventory,
+  type Leaf,
+  type LeafFailure,
+  type State,
+} from '../../../src/state';
 
 const agentStatusSchema = z.enum(['idle', 'done', 'working', 'blocked', 'unknown']);
 
@@ -73,53 +80,6 @@ async function resolveRepoKey(root: string, bin: string): Promise<string> {
     throw new Error('akrogon config has no usable repo: missing or invalid repo field');
   }
   return repo;
-}
-
-function validateLeafDepth(areaRoot: string, leafPath: string): void {
-  const depth: number = relative(areaRoot, leafPath).split(sep).filter(Boolean).length;
-  if (depth !== 2 && depth !== 3) {
-    throw new Error(`Invalid leaf depth: ${resolve(leafPath, 'state.yaml')}`);
-  }
-}
-
-function readState(leafPath: string): State {
-  const file: string = resolve(leafPath, 'state.yaml');
-  let text: string;
-  try {
-    text = readFileSync(file, 'utf8');
-  } catch (error) {
-    throw new Error(`Cannot read state at ${file}: ${messageOf(error)}`);
-  }
-  let parsed: unknown;
-  try {
-    parsed = Bun.YAML.parse(text);
-  } catch (error) {
-    throw new Error(`Invalid YAML at ${file}: ${messageOf(error)}`);
-  }
-  const stripped: unknown =
-    parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? Object.fromEntries(
-          Object.entries(parsed as Record<string, unknown>).filter(
-            ([key]) => key !== 'priority' && key !== 'slot' && key !== 'failed_notified',
-          ),
-        )
-      : parsed;
-  try {
-    return stateSchema.parse(stripped);
-  } catch (error) {
-    throw new Error(`Invalid state at ${file}: ${messageOf(error)}`);
-  }
-}
-
-function leavesUnder(path: string, areaRoot: string): Leaf[] {
-  if (!existsSync(path)) return [];
-  if (existsSync(resolve(path, 'state.yaml'))) {
-    validateLeafDepth(areaRoot, path);
-    return [{ path, state: readState(path) }];
-  }
-  return readdirSync(path, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .flatMap((entry) => leavesUnder(resolve(path, entry.name), areaRoot));
 }
 
 async function agentStatuses(root: string, bin: string): Promise<Map<string, AgentEntry>> {
@@ -260,16 +220,29 @@ async function main(): Promise<void> {
   const herdrBin: string = process.env.OBSERVE_HERDR ?? 'herdr';
   const home: string = process.env.HOME ?? '';
   const repoKey: string = await resolveRepoKey(root, akrogonBin);
-  const openRoot: string = resolve(root, 'issues/open');
-  const leaves: Leaf[] = leavesUnder(openRoot, openRoot);
-  const slugs: Set<string> = new Set();
-  for (const leaf of leaves) {
-    if (slugs.has(leaf.state.slug)) throw new Error(`Duplicate leaf slug: ${leaf.state.slug}`);
-    if (leaf.state.repo !== repoKey)
-      throw new Error(`Leaf repo mismatch at ${leaf.path}: stored key "${leaf.state.repo}", registered key "${repoKey}"`);
-    slugs.add(leaf.state.slug);
+  const inv: Inventory = repoInventory({ name: repoKey, root }, ['open']);
+  const leaves: Leaf[] = inv.leaves;
+  const failures: LeafFailure[] = [
+    ...inv.unreadable.map(
+      (f): LeafFailure => ({ path: resolve(f.path, 'state.yaml'), error: f.error.replaceAll('\n', ' ') }),
+    ),
+    ...inv.foreign.map(
+      (f): LeafFailure => ({
+        path: resolve(f.path, 'state.yaml'),
+        error: new RepoMismatchError(f.path, f.stored, repoKey).message,
+      }),
+    ),
+    ...inv.unknown.map(
+      (f): LeafFailure => ({ path: f.path, error: f.error.replaceAll('\n', ' ') }),
+    ),
+  ].sort((a, b) => a.path.localeCompare(b.path));
+  const reportFailures = (): void => {
+    for (const failure of failures) console.log(`unreadable=${failure.path} error=${failure.error}`);
+  };
+  if (leaves.length === 0) {
+    reportFailures();
+    return;
   }
-  if (leaves.length === 0) return;
   const entries: Map<string, AgentEntry> = await agentStatuses(root, herdrBin);
   const now: number = Date.now();
   const panes: Set<string> = new Set();
@@ -287,6 +260,7 @@ async function main(): Promise<void> {
   for (const leaf of sorted) {
     console.log(formatLeaf(leaf, entries, logs, now));
   }
+  reportFailures();
 }
 
 if (import.meta.main) {

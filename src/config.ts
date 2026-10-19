@@ -1,5 +1,5 @@
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -356,14 +356,23 @@ export async function effectiveConfig(cwd: string): Promise<string> {
   const repoConfig: RepoConfig = repo === null ? repoSchema.parse({ grounding: 'none' }) : repo.config;
   let leafPath: string | undefined;
   if (repo !== null && top !== null) {
-    const { allLeaves } = await import('./state');
+    const { repoInventory, RepoMismatchError } = await import('./state');
     const realTop: string = realpathSync(top);
-    leafPath = allLeaves(repo).find(
-      (leaf) =>
-        leaf.state.worktree !== undefined &&
-        existsSync(leaf.state.worktree) &&
-        realpathSync(leaf.state.worktree) === realTop,
-    )?.path;
+    const inv: import('./state').Inventory = repoInventory(repo);
+    const leaf = inv.leaves.find(
+      (item) =>
+        item.state.worktree !== undefined &&
+        existsSync(item.state.worktree) &&
+        realpathSync(item.state.worktree) === realTop,
+    );
+    if (leaf === undefined && top !== repo.root) {
+      const failure = [...inv.unreadable, ...inv.foreign.map((f) => ({ path: f.path, error: new RepoMismatchError(f.path, f.stored, repo.name).message }))].find(
+        (f) => basename(f.path) === basename(realTop),
+      );
+      if (failure !== undefined)
+        throw new Error(`Invalid state ${resolve(failure.path, 'state.yaml')}: ${failure.error}`);
+    }
+    leafPath = leaf?.path;
   }
   const resolved: { a: SlotConfig; b: SlotConfig; source: { a: string; b: string } } | null =
     repo === null ? null : seats(global, repo, leafPath);

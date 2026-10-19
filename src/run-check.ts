@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { base, ensureLeafTemp, readGlobal, requireRepo, type Repo } from './config';
-import { allLeaves, readState, type Leaf, type State } from './state';
+import { repoInventory, RepoMismatchError, readState, type Inventory, type Leaf, type State } from './state';
 import { command, spawnCaptured, type Result } from './shell';
 import { appendTiming } from './timing';
 import { callerScope, withAdmission } from './admission';
@@ -111,14 +111,15 @@ export async function leafTarget(
     return { ...leafFields(state, 'leaf'), target: resolve(cwd, leafOverride, 'implementation') };
   }
   const top: string = realpathSync(await command(['git', 'rev-parse', '--show-toplevel'], cwd));
-  const leaf: Leaf | undefined = allLeaves(repo).find(
+  const inv: Inventory = repoInventory(repo);
+  const leaf: Leaf | undefined = inv.leaves.find(
     (item) =>
       item.state.worktree !== undefined && existsSync(item.state.worktree) && realpathSync(item.state.worktree) === top,
   );
   if (leaf !== undefined) return { ...leafFields(leaf.state, 'leaf'), target: resolve(leaf.path, 'implementation') };
   const worker: RegExpMatchArray | null = basename(top).match(/-u(\d+)$/);
   if (worker !== null) {
-    const owner: Leaf | undefined = allLeaves(repo).find(
+    const owner: Leaf | undefined = inv.leaves.find(
       (item) => item.state.slug === basename(top).slice(0, -worker[0].length),
     );
     if (owner !== undefined)
@@ -127,6 +128,11 @@ export async function leafTarget(
         target: resolve(owner.path, 'implementation'),
       };
   }
+  const failure = [...inv.unreadable, ...inv.foreign.map((f) => ({ path: f.path, error: new RepoMismatchError(f.path, f.stored, repo.name).message }))].find(
+    (f) => basename(f.path) === basename(top),
+  );
+  if (failure !== undefined)
+    throw new Error(`Invalid state ${resolve(failure.path, 'state.yaml')}: ${failure.error}`);
   if (holder === undefined) throw new Error('No leaf worktree matches cwd; pass --leaf or --holder');
   return { slug: 'checkout', target: resolve(cwd, holder), scope: 'leaf' };
 }
