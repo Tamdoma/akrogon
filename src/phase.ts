@@ -7,13 +7,15 @@ import {
   readState,
   saveState,
   findLeaf,
-  leavesUnder,
+  readInventory,
   withLock,
   failureSchema,
   type Batch,
   type Failure,
   type State,
   type Leaf,
+  type LeafFailure,
+  type Inventory,
 } from './state';
 import {
   phaseSchema,
@@ -188,20 +190,39 @@ export async function commitMove(
 
 export type CompletedOwner = { kind: 'issue' | 'epic'; name: string; destination: string; sources: string[] };
 
-type OwnerScope = { issue: string; issueLeaves: Leaf[]; owner: string; ownerLeaves: Leaf[] };
+type OwnerScope = {
+  issue: string;
+  issueLeaves: Leaf[];
+  owner: string;
+  ownerLeaves: Leaf[];
+  failures: LeafFailure[];
+};
 
 function ownerScope(repo: Repo, leaf: Leaf, after: State): OwnerScope {
   const open: string = resolve(repo.root, 'issues/open');
   const current = (leaves: Leaf[]): Leaf[] =>
     leaves.map((item): Leaf => (item.path === leaf.path ? { path: item.path, state: after } : item));
   const issue: string = dirname(leaf.path);
-  const issueLeaves: Leaf[] = current(leavesUnder(issue, open));
+  const issueInv: Inventory = readInventory(issue, open);
+  const issueLeaves: Leaf[] = current(issueInv.leaves);
   const parent: string = dirname(issue);
   const owner: string = basename(parent) === 'open' ? issue : parent;
-  return { issue, issueLeaves, owner, ownerLeaves: owner === issue ? issueLeaves : current(leavesUnder(owner, open)) };
+  const ownerInv: Inventory = owner === issue ? issueInv : readInventory(owner, open);
+  return {
+    issue,
+    issueLeaves,
+    owner,
+    ownerLeaves: owner === issue ? issueLeaves : current(ownerInv.leaves),
+    failures: [
+      ...issueInv.unreadable,
+      ...issueInv.unknown,
+      ...(owner === issue ? [] : [...ownerInv.unreadable, ...ownerInv.unknown]),
+    ],
+  };
 }
 
 function completion(repo: Repo, scope: OwnerScope): CompletedOwner | null {
+  if (scope.failures.length > 0) return null;
   if (!scope.ownerLeaves.every((item) => item.state.phase === 'merged')) return null;
   return {
     kind: scope.owner === scope.issue ? 'issue' : 'epic',
@@ -233,6 +254,7 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   if (within(leaf.path, resolve(repo.root, 'issues/closed'))) return null;
   const scope: OwnerScope = ownerScope(repo, leaf, readState(leaf.path));
   const { issue, issueLeaves, owner, ownerLeaves } = scope;
+  if (scope.failures.length > 0) return null;
   if (!issueLeaves.every((item) => item.state.phase === 'merged')) return null;
   const completed: CompletedOwner | null = completion(repo, scope);
   if (completed !== null && existsSync(completed.destination))
