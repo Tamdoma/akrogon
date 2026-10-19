@@ -304,3 +304,23 @@ test('status for a missing leaf does not report a bad sibling', async () => {
     f.clean();
   }
 });
+
+test('reconcile preserves unregistered store entries owned by a foreign leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'foreign-leaf', 'implement', { repo: 'other' });
+    const entries: string[] = ['foreign-leaf', 'foreign-leaf-old'].map((name) => resolve(storeDir(f), name));
+    for (const entry of entries) {
+      mkdirSync(entry, { recursive: true });
+      writeFileSync(resolve(entry, 'work'), 'unsaved work');
+    }
+    const result: Result = await next(f, ['--all']);
+    expect(result.code).toBe(1);
+    for (const entry of entries) {
+      expect(existsSync(entry)).toBe(true);
+      expect(readFileSync(resolve(entry, 'work'), 'utf8')).toBe('unsaved work');
+    }
+  } finally {
+    f.clean();
+  }
+});
