@@ -58,6 +58,13 @@ if (verb === 'show') {
   process.exit(0);
 }
 
+if (verb === 'is-active') {
+  const unit: string = z.string().parse(args.at(-1));
+  const found = db.units.find((item) => item.unit === unit || item.unit === `${unit}.service`);
+  console.log(found === undefined ? 'inactive' : 'active');
+  process.exit(found === undefined ? 3 : 0);
+}
+
 if (verb === 'stop' || verb === 'reset-failed') {
   const names: string[] = args.filter((arg) => arg.includes('.') && !arg.startsWith('-'));
   const missing: string[] = names.filter((name) => !db.units.some((unit) => unit.unit === name));
