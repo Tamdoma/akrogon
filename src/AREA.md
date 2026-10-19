@@ -12,10 +12,8 @@
 
 - `src/akrogon.ts` validates CLI arguments and dispatches commands.
 - `src/state-home.ts` moves the state home out of the tool root to `~/.akrogon` (or `AKROGON_HOME`) on the first command after deploy, gated on live run records and foreign processes and committed last via the rewritten `config.yaml`.
-- `src/release.ts` owns the deploy filesystem: it builds a release (`git archive`, `tar`, `bun install`) into `releases/<sha>`, flips the `current` symlink atomically, and writes the deploy record, hold and prune state; `src/rollback.ts` runs `akrogon rollback` — flip to the recorded previous release, hold the rolled-away commit and restore links through `install()`, under the same install lock deployStage takes.
-- `src/self-update.ts` pushes record commits and fast-forwards the workspace checkout, then deploys the remote tip for the akrogon repo: deploy builds releases behind `current`, re-links through it and records failures in `deploy.yaml`, all under the install lock.
-- `src/preflight.ts` verifies the configured base remote branch and local tracking ref; `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`).
-- `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file; `src/readiness.ts` owns the readiness contract schema and gap computation.
+- `src/release.ts` owns the deploy filesystem: it builds a release (`git archive`, `tar`, `bun install`) into `releases/<sha>`, flips the `current` symlink atomically, and writes the deploy record, hold and prune state; `src/rollback.ts` runs `akrogon rollback` — flip to the recorded previous release, hold the rolled-away commit and restore links through `install()`, under the same install lock deployStage takes. `src/self-update.ts` pushes record commits and fast-forwards the workspace checkout, then deploys the remote tip for the akrogon repo: deploy builds releases behind `current`, re-links through it and records failures in `deploy.yaml`, all under the install lock.
+- `src/preflight.ts` verifies the configured base remote branch and local tracking ref; `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`). `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file; `src/readiness.ts` owns the readiness contract schema and gap computation.
 - `src/phase.ts` and `src/shell.ts` aggregate slot completion and enforce handoff guards; shell wraps subprocesses, retries, YAML writes and Herdr responses.
 - `src/timing.ts` defines the timing-event schema and appends to `issues/timings.jsonl` (`readTimings` and `visitOf` feed the readout); `src/timing-report.ts` implements `akrogon timing`: per-visit time decomposition from `timings.jsonl` and `log.jsonl`, plus the 20-leaf cohort gate from `merge-attempts.jsonl` and the `--flow` leaf-carried issue report from per-repository GitHub `state=all` listings.
 - `src/verify.ts` checks a commit out detached, runs every command for the caller's scope, logs each into the leaf or holder and records one receipt in `issues/verify-runs.jsonl`; `--known-red` reruns the head when no completed red head run exists, then runs the base fresh at the head's merge-base with the tracked default branch and links that base run from the head's receipt through `compares`; a completed base run holding a failing test no unresolved incident covers sends one `main red` herdr notification under the receipt lock, stores the reply reason or `error` in `notice` on the base record and retries on the next base run for an undelivered or cleared incident; `requireGreenReceipt` is the one gate the `check.review` move, the `check.repair` move into `merge`, `merged --check` stamping and direct-guards call, accepting a green receipt or a pair whose red head command logged a test name that also fails on the linked base.
@@ -28,8 +26,7 @@
 ## Non-obvious patterns
 
 - Repository identity comes from registration and the shared Git directory.
-- A phase move can be committed even when later log collection fails.
-- Phase moves reject a dirty worktree and branch changes under `issues/`; a stop into `failed` skips both, a `cause: blocked` restart skips only the dirty check, and the empty-branch refusal applies only at review handoff.
+- A phase move can be committed even when later log collection fails. Phase moves reject a dirty worktree and branch changes under `issues/`; a stop into `failed` skips both, a `cause: blocked` restart skips only the dirty check, and the empty-branch refusal applies only at review handoff.
 - External command retries warn once, then preserve the last failure context.
 - Foreign leaves are summarized once per repo and excluded from capacity and dispatch; prompt delivery is one attempt per pass per seat, with a timeout settling against the seat session file on the next pass.
 - `verify` appends its receipt before checkout, then rewrites `verify-runs.jsonl` under the same lock with its setup exit, each command's exit and log and its end — a `compares` record with an uncovered red unit gains `notice: pending` in the same locked write as its send reservation, replaced by the herdr reason or `error` in a second locked write — before removing the checkout; `end` is set only after every command ran, a base record names the head run it was made for in `compares`, and a receipt matches any commit with its tree under the exact current command set, so `verify` on such a commit prints `reuse receipt <run> tree=<tree>` and runs nothing.
@@ -40,5 +37,4 @@
 
 ## See also
 
-- `docs/reference-index.md` links the other repository areas.
-- `tests/helpers.ts` builds isolated registered repositories for command tests.
+- `docs/reference-index.md` links the other repository areas, and `tests/helpers.ts` builds isolated registered repositories for command tests.
