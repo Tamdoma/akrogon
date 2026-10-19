@@ -408,7 +408,7 @@ test.serial('an incoming tracked path colliding with an ignored file refuses a b
 test.serial('a behind-only move adopts identical ignored entries from the incoming tree', async () => {
   const f: SelfUpdateFixture = await selfUpdateFixture();
   try {
-    mkdirSync(resolve(f.seed, 'collide')); 
+    mkdirSync(resolve(f.seed, 'collide'));
     writeFileSync(resolve(f.seed, 'collide/file'), 'shared\n');
     writeFileSync(resolve(f.seed, 'collide/tool'), '#!/bin/sh\nexit 0\n');
     chmodSync(resolve(f.seed, 'collide/tool'), 0o755);

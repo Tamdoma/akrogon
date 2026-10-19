@@ -1,3 +1,4 @@
+import { lstatSync, readlinkSync } from 'node:fs';
 import { basename, dirname, relative, resolve } from 'node:path';
 import { globalHome, readGlobal, requireRepo, within, worktreeStore, type GlobalConfig, type Repo } from './config';
 import { CommandError, command, run, type Result } from './shell';
@@ -12,6 +13,12 @@ export function eligibleRecord(root: string, worktree: string, path: string): bo
     !basename(path).endsWith('.tar.zst.tmp') &&
     !(within(worktree, root) && within(resolve(root, path), worktree))
   );
+}
+
+async function localId(stat: { isSymbolicLink: () => boolean }, path: string, cwd: string): Promise<string> {
+  return stat.isSymbolicLink()
+    ? await command(['git', 'hash-object', '--stdin'], cwd, readlinkSync(path))
+    : await command(['git', 'hash-object', '--no-filters', '--', path], cwd);
 }
 
 export async function integrate(
@@ -97,28 +104,54 @@ export async function integrate(
       .split('\0')
       .filter((path: string) => path !== '');
     if (ignored.length > 0) {
-      const incomingPaths: string = await command(['git', 'ls-tree', '-r', '--name-only', '-z', incoming], repo.root);
-      const replayedPaths: string = await command(
-        ['git', 'log', '--format=', '--name-only', '--no-renames', '-z', `${incoming}..HEAD`],
-        repo.root,
+      const incomingEntries: Map<string, { mode: string; id: string }> = new Map(
+        (await command(['git', 'ls-tree', '-r', '-z', incoming], repo.root))
+          .split('\0')
+          .filter((line: string) => line !== '')
+          .map((line: string) => {
+            const [meta, path]: string[] = line.split('\t');
+            const [mode, , id]: string[] = meta.split(' ');
+            return [resolve(repo.root, path), { mode, id }];
+          }),
       );
-      const integrated: Set<string> = new Set(
-        (incomingPaths + replayedPaths)
+      const replayed: Set<string> = new Set(
+        (
+          await command(
+            ['git', 'log', '--format=', '--name-only', '--no-renames', '-z', `${incoming}..HEAD`],
+            repo.root,
+          )
+        )
           .split('\0')
           .filter((path: string) => path !== '')
           .map((path: string) => resolve(repo.root, path)),
       );
       const directories: Set<string> = new Set();
-      for (const path of integrated)
+      for (const path of [...incomingEntries.keys(), ...replayed])
         for (let parent: string = dirname(path); parent !== repo.root; parent = dirname(parent))
           directories.add(parent);
-      const collisions: string[] = ignored.filter((path: string) => {
-        const absolute: string = resolve(repo.root, path);
-        if (directories.has(absolute)) return true;
-        for (let ancestor: string = absolute; ancestor !== repo.root; ancestor = dirname(ancestor))
-          if (integrated.has(ancestor)) return true;
-        return false;
-      });
+      const collisions: string[] = (
+        await Promise.all(
+          ignored.map(async (path: string): Promise<string | null> => {
+            const absolute: string = resolve(repo.root, path);
+            if (directories.has(absolute) || replayed.has(absolute)) return path;
+            const entry: { mode: string; id: string } | undefined = incomingEntries.get(absolute);
+            for (let ancestor: string = dirname(absolute); ancestor !== repo.root; ancestor = dirname(ancestor))
+              if (replayed.has(ancestor) || incomingEntries.has(ancestor)) return path;
+            if (entry === undefined) return null;
+            const stat = lstatSync(absolute);
+            const localMode: string = stat.isSymbolicLink()
+              ? '120000'
+              : stat.isFile()
+                ? (stat.mode & 0o100) !== 0
+                  ? '100755'
+                  : '100644'
+                : '';
+            if (localMode !== entry.mode) return path;
+            if ((await localId(stat, absolute, repo.root)) !== entry.id) return path;
+            return null;
+          }),
+        )
+      ).filter((path: string | null): path is string => path !== null);
       if (collisions.length > 0) throw new Error(`Cannot sync over ignored operator paths:\n${collisions.join('\n')}`);
     }
 
