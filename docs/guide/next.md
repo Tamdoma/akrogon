@@ -170,7 +170,9 @@ Each dispatch pass makes at most one delivery attempt per pending seat. A failed
 
 A typed pass reports every picked leaf it cannot start. Picked means the `next <target>` selection, the typed bare `next` selection without event JSON, and the `next --all` sweep inside one repo or across every repo outside one. Each picked leaf gets at most one line naming the leaf and why, and ready siblings still start.
 
-Reasons come in order. A failed leaf needs phase recovery first. Otherwise every unmerged dependency is named with its phase, or `parked`, `missing`, or `unreadable`. Otherwise every missing input is named by kind, name, and holder, never values. Dependencies win over inputs.
+Reasons come in order. First, an open owner whose top-level folder name also exists under `issues/closed` or `issues/parked` blocks every leaf beneath it in every phase. An empty conflicting folder also counts. The error names both folders once per owner per pass, while other owners keep dispatching.
+
+Otherwise a failed leaf needs phase recovery. Otherwise every unmerged dependency is named with its phase, or `parked`, `missing`, or `unreadable`. Otherwise every missing input is named by kind, name, and holder, never values. Dependencies win over inputs.
 
 A leaf whose dependencies are all open leaves still in progress is waiting normally: it prints a plain `waiting: <slug> on <dependency> (<phase>)` line on stdout and does not change the exit code. Every other reason, including a `failed`, `parked`, `missing` or `unreadable` dependency, is an error line on stderr and sets exit 1.
 
