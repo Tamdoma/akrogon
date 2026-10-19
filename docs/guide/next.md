@@ -134,7 +134,7 @@ akrogon stop --all
 
 It prints one result line per leaf. One failure does not stop the others, and the command exits non-zero if any leaf failed.
 
-While a leaf is stopped, automatic passes skip it quietly. A typed `akrogon next <slug>`, bare `akrogon next` or `akrogon next --all` reports the leaf with an error naming `akrogon start <slug>` and exits non-zero. The merge turn builds no stack and prompts no merge seat for it. A stopped leaf that already holds the merge turn keeps it, so the repository's other merge leaves wait until it is started. `akrogon status` shows stopped in the NOTE column, and `akrogon status <slug>` prints a `stopped:` line.
+While a leaf is stopped, automatic passes skip it quietly. A typed `akrogon next <slug>`, bare `akrogon next` or `akrogon next --all` reports the leaf with an error naming `akrogon start <slug>` and exits non-zero. The merge turn prompts no merge seat for it. A stopped leaf that already holds the merge turn keeps it, so the repository's other merge leaves wait until it is started. `akrogon status` shows stopped in the NOTE column, and `akrogon status <slug>` prints a `stopped:` line.
 
 Start removes the stopped record and runs the targeted next pass for that leaf by its folder path:
 
@@ -154,7 +154,7 @@ A leaf must have valid state and satisfied dependencies. Failed leaves are skipp
 
 The global max_active setting limits new leaf allocations across repositories. Existing tabs can keep progressing at the limit. Each leaf normally has two seats, so this is not a count of agent processes.
 
-Leaves in `merge` take their repository's single merge turn: the merge pass writes a batch record on the holder snapshotting the other unstopped eligible `merge` leaves as members, rebases the holder's branch onto the remote base and each member onto the tip outside the global lock, moves only the holder's branch under the lock, keeping member branches at their original heads until the push lands — a member whose rebase conflicts is skipped and stays in `merge` — and prompts only the holder's B while the rest wait. Every committed `phase` move and the end of each pass re-sweep `merge` leaves, so the next holder is prompted as soon as the turn frees.
+Leaves in `merge` take their repository's single merge turn one at a time in merge-queue order: the merge pass writes a batch record on the holder, rebases the holder's branch onto the remote base outside the global lock, moves the holder's branch under the lock, and prompts only the holder's B while the rest wait untouched. Every committed `phase` move and the end of each pass re-sweep `merge` leaves, so the next holder is prompted as soon as the turn frees.
 
 Each leaf pane shell runs in its own systemd scope under a per-leaf slice under `akrogon.slice` before a seat starts in it. A recorded pane found outside its scope, as after a Herdr restore, is closed and recreated before any prompt. A pane whose cgroup cannot be read is left open, and the leaf is skipped that pass with the error. A failed boxing also skips the leaf. Panes you split by hand in a leaf tab are not boxed.
 

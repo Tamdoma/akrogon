@@ -61,7 +61,7 @@ Each line carries:
 - `attempt` is the merge attempt id.
 - `repo` is the registered repo name.
 - `holder` is the holder leaf slug.
-- `members` lists carried member slugs as object entries `{slug, head}`; string-slug entries appear only on lines written before this change returned.
+- `members` appears only on old lines, written before solo turns.
 - `built_on` is the remote tip the holder was rebased onto.
 - `tested_top` is the head the checks ran against; it is absent when the attempt ended with no checked top.
 - `outcome` is `merged` or `red`; `held`, `split`, `reuse` and `ejected` appear only on older lines and still parse.
