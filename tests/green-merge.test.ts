@@ -478,3 +478,38 @@ test('next keeps a working broadcast seat until it finishes', async () => {
     f.clean();
   }
 }, 60000);
+
+test('next preserves a live command attempt while its refused push restacks', async () => {
+  const f: GreenFixture = await greenFixture({ ok: 'true' });
+  try {
+    const systemctl: SystemctlFixture = fakeSystemctl(f);
+    f.env = { ...f.env, ...systemctl.env };
+    const path: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(path, 'aa-file', 'aa\n');
+    toMerge(path);
+    const { attempt, top } = await claimed(f, path);
+    writeFileSync(
+      systemctl.db,
+      JSON.stringify({ units: [{ unit: `akrogon-land-${attempt}.service`, sub: 'running' }] }),
+    );
+    const state: State = readState(path);
+    saveState(path, {
+      ...state,
+      batch: {
+        ...state.batch!,
+        candidate: top,
+        applied: false,
+        tested_top: undefined,
+        tested_main: undefined,
+        decision: undefined,
+      },
+    });
+    expect((await next(f)).code).toBe(0);
+    expect(readState(path).batch?.attempt).toBe(attempt);
+    expect(landLaunches(f)).toHaveLength(1);
+    expect(prompts(f, 'merge-issue')).toEqual([]);
+    expect(verifyRuns(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+}, 60000);
