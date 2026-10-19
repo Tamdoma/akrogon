@@ -38,7 +38,9 @@ import {
   missingLeafMessage,
   findLeaf,
   withLock,
+  broadcastPending,
   type Batch,
+  type Broadcast,
   type Tool,
   type Leaf,
   type State,
@@ -65,7 +67,8 @@ import {
 import { checkBase, localBase, trackingRef } from './preflight';
 import { checkLocation } from './guard';
 import { attemptId, applyTop, branchSha, buildStack, isAncestor, memberBase, removeEmptyUntrackedDirs } from './batch';
-import { commitMove, completeOwner } from './phase';
+import { commandMerged, completeOwner } from './phase';
+import { landAlive, launchLand } from './land';
 import { appendAttempt, readPressure, resolveTools, type PressureSnapshot } from './attempts';
 import { sessionFile, deliveredAfter } from './session-file';
 import { readLog } from './log';
@@ -561,7 +564,7 @@ async function dispatchSlot(
   repo: Repo,
   leaf: Leaf,
   slot: Slot,
-  mergeContext?: string,
+  prompt: string,
   attempt?: string,
 ): Promise<void> {
   async function recordDelivery(): Promise<void> {
@@ -634,9 +637,6 @@ async function dispatchSlot(
     Date.now() - Date.parse(state.prompted_at[slot] ?? '') < PROMPT_GRACE_MS
   )
     return;
-  const prompt: string =
-    `${routing[state.phase].skill} ${state.slug} slot=${slot} phase=${state.phase} leaf=${leaf.path}` +
-    (mergeContext === undefined ? '' : ` ${mergeContext}`);
   const pendingOffset: number | undefined = state.delivery_error[slot]?.offset;
   if (
     pendingOffset !== undefined &&
@@ -677,7 +677,7 @@ async function dispatchSlot(
   const ready: Pane = await currentPane(pane.pane_id);
   await observeBusy(leaf.path, readState(leaf.path), slot, ready, Date.now());
   if (!idle(ready)) return;
-  if (mergeContext !== undefined && state.worktree !== undefined && existsSync(state.worktree))
+  if (state.phase === 'merge' && state.worktree !== undefined && existsSync(state.worktree))
     await removeEmptyUntrackedDirs(state.worktree);
   let file: string | undefined;
   let offset: number | undefined;
@@ -820,7 +820,10 @@ async function dispatchLeaf(
       const delivery: string = `${repo.name}/${slug}/${allocated.phase}/${slot}`;
       if (invocation.dispatched.has(delivery)) continue;
       invocation.dispatched.add(delivery);
-      await dispatchSlot(global, repo, { path: leaf.path, state: allocated }, slot, mergeContext, attempt);
+      const prompt: string =
+        `${routing[allocated.phase].skill} ${slug} slot=${slot} phase=${allocated.phase} leaf=${leaf.path}` +
+        (mergeContext === undefined ? '' : ` ${mergeContext}`);
+      await dispatchSlot(global, repo, { path: leaf.path, state: allocated }, slot, prompt, attempt);
     }
     return end('none');
   } catch (error) {
@@ -953,7 +956,7 @@ async function reconcileBatch(
     const holderNow: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
     if (holderNow === undefined) return;
     if (holderNow.state.phase === 'merge') {
-      await commitMove(repo, holderNow, holderNow.state, 'merged', null);
+      await commandMerged(repo, holderNow, z.string().parse(batch.candidate));
       const remaining: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
       if (remaining !== undefined) saveState(remaining.path, { ...remaining.state, batch: undefined });
     } else if (holderNow.state.phase === 'failed') {
@@ -971,6 +974,7 @@ async function mergeTurn(
   pressureDir: string = '/proc/pressure',
 ): Promise<void> {
   if (isAutomatic && isPaused(repo.name)) return;
+  await broadcastPass(global, repo, invocation);
   const inventory: Inventory = discover(repo, invocation);
   for (const leaf of inventory.leaves.filter((item) => item.state.batch !== undefined)) {
     try {
@@ -986,7 +990,16 @@ async function mergeTurn(
   if (isStopped(repo.name, holder.state.slug)) return;
   const recorded: Batch | undefined = holder.state.batch;
   if (recorded !== undefined && recorded.applied === true) {
-    await dispatchMergeLeaf(global, repo, holder, invocation, mergeContext(recorded), isAutomatic, recorded.attempt);
+    if (recorded.top === undefined || recorded.owner !== 'command')
+      await dispatchMergeLeaf(global, repo, holder, invocation, mergeContext(recorded), isAutomatic, recorded.attempt);
+    else if (await landAlive(recorded.attempt)) recordWait(repo, holder.state.slug, 'merge_turn');
+    else
+      await withLock(resolve(globalHome(), '.lock'), async () => {
+        const batch: Batch | undefined = readState(holder.path).batch;
+        if (batch?.attempt !== recorded.attempt || batch.owner !== 'command' || (await landAlive(batch.attempt)))
+          return;
+        await launchLand(repo, holder.state.slug, batch.attempt);
+      });
     return;
   }
   const fetched: Result = await run(['git', 'fetch', repo.config.remote], repo.root);
@@ -1052,13 +1065,14 @@ async function mergeTurn(
       }
       const applied: Batch =
         staged.ok && (await applyTop(repo, fresh, staged.top, current.holder.head))
-          ? { ...fresh.state.batch, applied: true, top: staged.top }
+          ? { ...fresh.state.batch, applied: true, top: staged.top, owner: 'command' }
           : { ...fresh.state.batch, applied: true };
       saveState(fresh.path, { ...readState(fresh.path), batch: applied });
+      if (applied.owner === 'command') await launchLand(repo, holder.state.slug, applied.attempt);
       return applied;
     },
   );
-  if (outcome !== undefined)
+  if (outcome !== undefined && outcome.owner !== 'command')
     await dispatchMergeLeaf(
       global,
       repo,
@@ -1071,7 +1085,37 @@ async function mergeTurn(
 }
 
 function mergeContext(record: Batch): string {
-  return record.top === undefined ? `attempt=${record.attempt} solo` : `attempt=${record.attempt} top=${record.top}`;
+  return record.top === undefined
+    ? `attempt=${record.attempt} solo`
+    : `attempt=${record.attempt} top=${record.top}` +
+        (record.wake === undefined ? '' : ` wake=${record.wake}`) +
+        (record.red === undefined ? '' : ` red=${record.red}`);
+}
+
+// A command-run merge leaves the completing owner's broadcast to a broadcast-only B seat; prompted.B is its ack.
+async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<void> {
+  for (const pending of allLeaves(repo).filter((leaf) => broadcastPending(leaf.state))) {
+    try {
+      await withLock(resolve(globalHome(), '.lock'), async () => {
+        const fresh: Leaf | undefined = allLeaves(repo).find((leaf) => leaf.state.slug === pending.state.slug);
+        if (fresh === undefined || fresh.state.broadcast === undefined || !broadcastPending(fresh.state)) return;
+        const handoff: Broadcast = fresh.state.broadcast;
+        const allocated: State | null = await allocate(global, repo, fresh, invocation);
+        if (allocated === null) return;
+        const sources: string = handoff.sources.length === 0 ? 'none' : handoff.sources.join(',');
+        await dispatchSlot(
+          global,
+          repo,
+          { path: fresh.path, state: allocated },
+          'B',
+          `broadcast-issue ${fresh.state.slug} slot=B owner=${handoff.kind}:${handoff.name} closed=${handoff.destination} sha=${handoff.pushed} sources=${sources} leaf=${fresh.path}`,
+        );
+      });
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      report(invocation, repo.name, pending.path, error, pending.state.slug);
+    }
+  }
 }
 
 async function dispatchMergeLeaf(
@@ -1132,6 +1176,20 @@ export async function mergeWake(
   } catch (error) {
     if (!(error instanceof Error)) throw error;
     report(invocation, repo.name, repo.root, error);
+  }
+}
+
+// The land run's wake after its push: the next merge turn, the merged leaf's dependents, and its tab when no broadcast waits.
+export async function landedWake(global: GlobalConfig, repo: Repo, slug: string): Promise<void> {
+  await mergeWake(global, repo, 'merged');
+  const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
+  try {
+    await dispatchDependents(global, repo, slug, invocation, true);
+    const merged: Leaf | undefined = discover(repo, invocation).leaves.find((leaf) => leaf.state.slug === slug);
+    if (merged !== undefined && merged.state.broadcast === undefined) await closeMergedTab(repo, merged, await panes());
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    report(invocation, repo.name, repo.root, error, slug);
   }
 }
 
@@ -1417,6 +1475,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
           if (
             rediscovered !== undefined &&
             rediscovered.state.phase === 'merged' &&
+            !broadcastPending(rediscovered.state) &&
             hookPane === rediscovered.state.pane.B &&
             (event === undefined ||
               event.event !== 'pane_agent_status_changed' ||

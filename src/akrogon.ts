@@ -26,26 +26,28 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
           check: { type: 'boolean' },
           attempt: { type: 'string' },
         }
-      : verb === 'next'
-        ? { all: { type: 'boolean' }, resume: { type: 'boolean' } }
-        : verb === 'pull' || verb === 'park' || verb === 'unpark' || verb === 'stop'
-          ? { all: { type: 'boolean' } }
-          : verb === 'close'
-            ? { by: { type: 'string' } }
-            : verb === 'run-check'
-              ? { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } }
-              : verb === 'verify'
-                ? {
-                    sha: { type: 'string' },
-                    attempt: { type: 'string' },
-                    holder: { type: 'string' },
-                    'known-red': { type: 'boolean' },
-                  }
-                : verb === 'status'
-                  ? { charts: { type: 'boolean' } }
-                  : verb === 'timing'
-                    ? { cohort: { type: 'boolean' }, flow: { type: 'boolean' }, since: { type: 'string' } }
-                    : {};
+      : verb === 'land'
+        ? { attempt: { type: 'string' } }
+        : verb === 'next'
+          ? { all: { type: 'boolean' }, resume: { type: 'boolean' } }
+          : verb === 'pull' || verb === 'park' || verb === 'unpark' || verb === 'stop'
+            ? { all: { type: 'boolean' } }
+            : verb === 'close'
+              ? { by: { type: 'string' } }
+              : verb === 'run-check'
+                ? { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } }
+                : verb === 'verify'
+                  ? {
+                      sha: { type: 'string' },
+                      attempt: { type: 'string' },
+                      holder: { type: 'string' },
+                      'known-red': { type: 'boolean' },
+                    }
+                  : verb === 'status'
+                    ? { charts: { type: 'boolean' } }
+                    : verb === 'timing'
+                      ? { cohort: { type: 'boolean' }, flow: { type: 'boolean' }, since: { type: 'string' } }
+                      : {};
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(3),
@@ -93,6 +95,11 @@ switch (verb) {
     } finally {
       if (committed !== undefined) await mergeWake(readGlobal(), committed.repo, committed.to);
     }
+    break;
+  }
+  case 'land': {
+    const [slug]: [string] = z.tuple([z.string()]).parse(positionals);
+    await (await import('./land')).landCommand(slug, z.string().trim().min(1).parse(values.attempt));
     break;
   }
   case 'next':
@@ -239,6 +246,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|rollback>',
+      'Usage: akrogon <install|init|config|preflight|phase|land|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|rollback>',
     );
 }

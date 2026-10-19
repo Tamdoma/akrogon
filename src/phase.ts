@@ -617,13 +617,14 @@ export async function landGates(repo: Repo, leaf: Leaf, record: Batch): Promise<
 export class StaleLandError extends Error {}
 
 // A land run acts only while the leaf is still in merge on its attempt and the command owns it.
-export function landClaim(repo: Repo, slug: string, attempt: string): Leaf {
+export function landClaim(repo: Repo, slug: string, attempt: string): { leaf: Leaf; record: Batch } {
   const leaf: Leaf = findLeaf(repo, slug);
-  if (leaf.state.phase !== 'merge' || leaf.state.batch?.attempt !== attempt || leaf.state.batch.owner !== 'command')
+  const record: Batch | undefined = leaf.state.batch;
+  if (leaf.state.phase !== 'merge' || record === undefined || record.attempt !== attempt || record.owner !== 'command')
     throw new StaleLandError(
-      `Stale land run ${slug} attempt ${attempt}: phase ${leaf.state.phase}, attempt ${leaf.state.batch?.attempt ?? 'none'}, owner ${leaf.state.batch?.owner ?? 'seat'}`,
+      `Stale land run ${slug} attempt ${attempt}: phase ${leaf.state.phase}, attempt ${record?.attempt ?? 'none'}, owner ${record?.owner ?? 'seat'}`,
     );
-  return leaf;
+  return { leaf, record };
 }
 
 type BatchPending =
@@ -762,26 +763,16 @@ export type LandPush =
   | { kind: 'error'; stderr: string };
 
 // The land run's push: the claim and the push hold the global lock, the refusal follow-up takes it itself.
-export async function landPush(
-  repo: Repo,
-  slug: string,
-  record: Batch,
-  end: PressureSnapshot | undefined,
-): Promise<LandPush> {
-  const pending: BatchPending = await withLock(resolve(globalHome(), '.lock'), async () =>
-    batchPush(
-      repo,
-      landClaim(repo, slug, record.attempt),
-      record,
-      true,
-      (holderNow, pushed) => commandMerged(repo, holderNow, pushed),
-      end,
-    ),
-  );
+export async function landPush(repo: Repo, slug: string, attempt: string): Promise<LandPush> {
+  const move: Move = (holderNow, pushed) => commandMerged(repo, holderNow, pushed);
+  const pending: BatchPending = await withLock(resolve(globalHome(), '.lock'), async () => {
+    const { leaf, record } = landClaim(repo, slug, attempt);
+    const end: PressureSnapshot | undefined =
+      record.pressure_start === undefined ? undefined : readPressure('/proc/pressure');
+    return batchPush(repo, leaf, record, true, move, end);
+  });
   if (pending.kind === 'none') return { kind: 'landed' };
-  const finished: Finished = await finishPush(repo, slug, pending, (holderNow, pushed) =>
-    commandMerged(repo, holderNow, pushed),
-  );
+  const finished: Finished = await finishPush(repo, slug, pending, move);
   if (finished.kind === 'error') return { kind: 'error', stderr: finished.result.stderr };
   if (finished.kind === 'restacked')
     return { kind: 'restacked', top: finished.top, stderr: pending.kind === 'refused' ? pending.stderr : '' };
