@@ -1,14 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  realpathSync,
-  renameSync,
-  statSync,
-  writeFileSync,
-  type Dirent,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseEnv } from 'node:util';
@@ -34,7 +24,8 @@ import {
   readState,
   saveState,
   allLeaves,
-  validateLeafDepth,
+  repoInventory,
+  inventoryFailures,
   missingLeafMessage,
   findLeaf,
   withLock,
@@ -44,6 +35,7 @@ import {
   type Tool,
   type Leaf,
   type State,
+  type Inventory,
 } from './state';
 import { requiredSlots, routing, type Phase, type Slot } from './routing';
 import {
@@ -106,7 +98,6 @@ const hookEventSchema = z.discriminatedUnion('event', [
 type HookEvent = z.infer<typeof hookEventSchema>;
 
 type Invocation = { skipped: Set<string>; dispatched: Set<string> };
-type Inventory = { leaves: Leaf[]; unreadable: number; unknown: boolean; foreign: { path: string; stored: string }[] };
 type DispatchOutcome = 'completed' | 'waiting' | 'skipped';
 
 function herdrDetail(error: unknown): string {
@@ -127,52 +118,9 @@ function report(invocation: Invocation, repo: string, path: string, error: Error
 }
 
 function discover(repo: Repo, invocation: Invocation): Inventory {
-  const result: Inventory = { leaves: [], unreadable: 0, unknown: false, foreign: [] };
-  function visit(path: string, areaRoot: string): void {
-    let entries: Dirent[];
-    try {
-      entries = readdirSync(path, { withFileTypes: true });
-    } catch (error) {
-      if (!(error instanceof Error)) throw error;
-      report(invocation, repo.name, path, error);
-      result.unknown = true;
-      return;
-    }
-    if (entries.some((entry) => entry.name === 'state.yaml')) {
-      try {
-        validateLeafDepth(areaRoot, path);
-        const state: State = readState(path);
-        if (state.repo !== repo.name) result.foreign.push({ path, stored: state.repo });
-        else result.leaves.push({ path, state });
-      } catch (error) {
-        if (!(error instanceof Error)) throw error;
-        report(invocation, repo.name, path, error);
-        result.unreadable += 1;
-      }
-      return;
-    }
-    for (const entry of entries.filter((entry) => entry.isDirectory())) visit(resolve(path, entry.name), areaRoot);
-  }
-  for (const area of ['open', 'closed']) {
-    const path: string = resolve(repo.root, 'issues', area);
-    try {
-      if (statSync(path, { throwIfNoEntry: false }) !== undefined) visit(path, path);
-    } catch (error) {
-      if (!(error instanceof Error)) throw error;
-      report(invocation, repo.name, path, error);
-      result.unknown = true;
-    }
-  }
-  const slugs: Set<string> = new Set();
-  const duplicates: Set<string> = new Set();
-  for (const leaf of result.leaves) {
-    if (slugs.has(leaf.state.slug)) duplicates.add(leaf.state.slug);
-    slugs.add(leaf.state.slug);
-  }
-  for (const leaf of result.leaves.filter((leaf) => duplicates.has(leaf.state.slug))) {
-    report(invocation, repo.name, leaf.path, new Error(`Duplicate leaf slug: ${leaf.state.slug}`));
-    result.unreadable += 1;
-  }
+  const result: Inventory = repoInventory(repo);
+  for (const entry of result.unreadable) report(invocation, repo.name, entry.path, new Error(entry.error));
+  for (const entry of result.unknown) report(invocation, repo.name, entry.path, new Error(entry.error));
   if (result.foreign.length > 0 && !invocation.skipped.has(repo.name)) {
     invocation.skipped.add(repo.name);
     for (const entry of result.foreign) invocation.skipped.add(`${repo.name}/${entry.path}`);
@@ -186,7 +134,7 @@ function discover(repo: Repo, invocation: Invocation): Inventory {
       }),
     );
   }
-  return { ...result, leaves: result.leaves.filter((leaf) => !duplicates.has(leaf.state.slug)) };
+  return result;
 }
 
 function registeredRepos(global: GlobalConfig, invocation: Invocation): { repos: Repo[]; unknown: boolean } {
@@ -412,7 +360,10 @@ async function activeCount(global: GlobalConfig, invocation: Invocation): Promis
     live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf));
   for (const repo of registered.repos) {
     const inventory: Inventory = discover(repo, invocation);
-    total += inventory.unknown ? global.max_active : inventory.leaves.filter(active).length + inventory.unreadable;
+    total +=
+      inventory.unknown.length > 0
+        ? global.max_active
+        : inventory.leaves.filter(active).length + inventory.unreadable.length;
   }
   return total;
 }
@@ -1310,7 +1261,7 @@ async function selectLeaves(
           (leaf) => within(leaf.path, folder) || within(folder, leaf.path) || inWorktree(folder, leaf),
         );
   if (selected.length === 0) {
-    if (inventory.unreadable > 0 || inventory.unknown || inventory.foreign.length > 0)
+    if (inventory.unreadable.length > 0 || inventory.unknown.length > 0 || inventory.foreign.length > 0)
       return { repo, leaves: selected };
     if (input !== undefined && !existsSync(folder)) throw new Error(missingLeafMessage(repo, input));
     throw new Error(`No leaves match: ${input ?? cwd}`);
@@ -1326,9 +1277,14 @@ async function reconcileRepos(
 ): Promise<void> {
   for (const repo of repos) {
     if (isAutomatic && isPaused(repo.name)) continue;
-    const leaves: Leaf[] = discover(repo, invocation).leaves;
+    const inventory: Inventory = discover(repo, invocation);
     try {
-      await reconcile(repo, leaves, (await reconcileNeedsPanes(repo, leaves)) ? await panesOnce() : []);
+      await reconcile(
+        repo,
+        inventory.leaves,
+        (await reconcileNeedsPanes(repo, inventory.leaves)) ? await panesOnce() : [],
+        inventoryFailures(inventory),
+      );
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       report(invocation, repo.name, repo.root, error);
@@ -1452,11 +1408,12 @@ export async function nextCommand(input: string | undefined, pressureDir: string
         if (isPaused(owners[0].repo.name)) return;
         const completedSlug: string = owners[0].leaf.state.slug;
         try {
-          const leaves: Leaf[] = discover(owners[0].repo, invocation).leaves;
+          const inventory: Inventory = discover(owners[0].repo, invocation);
           await reconcile(
             owners[0].repo,
-            leaves,
-            (await reconcileNeedsPanes(owners[0].repo, leaves)) ? await panesOnce() : [],
+            inventory.leaves,
+            (await reconcileNeedsPanes(owners[0].repo, inventory.leaves)) ? await panesOnce() : [],
+            inventoryFailures(inventory),
           );
           await reconcileHost(registeredRepos(global, invocation).repos, live, panesOnce);
         } catch (error) {
