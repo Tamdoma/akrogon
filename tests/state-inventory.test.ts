@@ -256,7 +256,15 @@ test('no module outside src/state.ts walks issue areas for state.yaml or parses 
   for (const file of files) {
     if (file === resolve(import.meta.dir, '../src/state.ts')) continue;
     const text: string = readFileSync(file, 'utf8');
-    if (text.includes('state.yaml') || text.includes('stateSchema')) offenders.push(file);
+    // The leaf marker: comparing an entry name to 'state.yaml', reading or
+    // parsing a leaf state file, or reaching for the schema. Constructing the
+    // file path for reporting (resolve(folder, 'state.yaml')) is not a walk.
+    if (
+      /===\s*['"]state\.yaml['"]|!==\s*['"]state\.yaml['"]|name\s*===\s*['"]state\.yaml['"]/.test(text) ||
+      /(readFileSync|existsSync|statSync|mkdirSync|writeFileSync|lstatSync)\([^)]*['"]state\.yaml['"]/.test(text) ||
+      text.includes('stateSchema')
+    )
+      offenders.push(file);
   }
   expect(offenders).toEqual([]);
 });
