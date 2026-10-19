@@ -277,50 +277,62 @@ test('recorded pane absent from agent list prints dash status', async (): Promis
   }
 });
 
-test('unreadable state.yaml exits non-zero naming the cause', async (): Promise<void> => {
+test('unreadable state.yaml is reported beside a healthy leaf and names its file', async (): Promise<void> => {
   const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
   try {
+    writeLeaf(root, 'owner', 'healthy', baseState('healthy', 'implement'));
     const dir: string = resolve(root, 'issues/open/owner/bad-leaf');
     mkdirSync(dir, { recursive: true });
     mkdirSync(resolve(dir, 'state.yaml'));
     const akrogon: string = akrogonOk(root);
     const herdr: string = herdrOk(root, []);
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
-    expect(r.code).not.toBe(0);
-    expect(r.stdout.trim()).toBe('');
-    expect(r.stderr).toContain('state.yaml');
+    expect(r.code, r.stderr).toBe(0);
+    const output: string[] = lines(r.stdout);
+    expect(output).toHaveLength(2);
+    expect(output[0]).toBe('slug=healthy phase=implement attempts=A0,B0 blocked= A=-/- B=-/- notified=');
+    expect(output[1]).toContain('unreadable=');
+    expect(output[1]).toContain(resolve(dir, 'state.yaml'));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('schema-invalid state.yaml exits non-zero naming the cause', async (): Promise<void> => {
+test('schema-invalid state.yaml is reported beside a healthy leaf', async (): Promise<void> => {
   const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
   try {
-    writeLeaf(root, 'owner', 'bad-schema', { phase: 'implement', repo: 'testrepo' });
+    writeLeaf(root, 'owner', 'healthy', baseState('healthy', 'implement'));
+    const dir: string = writeLeaf(root, 'owner', 'bad-schema', { phase: 'implement', repo: 'testrepo' });
     const akrogon: string = akrogonOk(root);
     const herdr: string = herdrOk(root, []);
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
-    expect(r.code).not.toBe(0);
-    expect(r.stdout.trim()).toBe('');
-    expect(r.stderr).toContain('state.yaml');
+    expect(r.code, r.stderr).toBe(0);
+    const output: string[] = lines(r.stdout);
+    expect(output).toHaveLength(2);
+    expect(output[0]).toContain('slug=healthy');
+    expect(output[1]).toContain('unreadable=');
+    expect(output[1]).toContain(resolve(dir, 'state.yaml'));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('wrong-repo state exits non-zero naming stored and registered keys', async (): Promise<void> => {
+test('wrong-repo state is reported beside a healthy leaf naming stored and registered keys', async (): Promise<void> => {
   const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
   try {
+    writeLeaf(root, 'owner', 'healthy', baseState('healthy', 'implement'));
     const dir: string = writeLeaf(root, 'owner', 'foreign-leaf', baseState('foreign-leaf', 'implement', { repo: 'other' }));
     const akrogon: string = akrogonOk(root, 'testrepo');
     const herdr: string = herdrOk(root, []);
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
-    expect(r.code).not.toBe(0);
-    expect(r.stdout.trim()).toBe('');
-    expect(r.stderr).toContain(dir);
-    expect(r.stderr).toContain('other');
-    expect(r.stderr).toContain('testrepo');
+    expect(r.code, r.stderr).toBe(0);
+    const output: string[] = lines(r.stdout);
+    expect(output).toHaveLength(2);
+    expect(output[0]).toContain('slug=healthy');
+    expect(output[1]).toContain('unreadable=');
+    expect(output[1]).toContain(resolve(dir, 'state.yaml'));
+    expect(output[1]).toContain('other');
+    expect(output[1]).toContain('testrepo');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -405,36 +417,45 @@ test('missing issues/open exits 0 printing nothing', async (): Promise<void> => 
   }
 });
 
-test('invalid leaf depth exits non-zero naming the cause', async (): Promise<void> => {
+test('invalid leaf depth is reported beside a healthy leaf', async (): Promise<void> => {
   const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
   try {
+    writeLeaf(root, 'owner', 'healthy', baseState('healthy', 'implement'));
     const dir: string = resolve(root, 'issues/open/shallow-leaf');
     mkdirSync(dir, { recursive: true });
     writeFileSync(resolve(dir, 'state.yaml'), Bun.YAML.stringify(baseState('shallow-leaf', 'implement')));
     const akrogon: string = akrogonOk(root);
     const herdr: string = herdrOk(root, []);
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
-    expect(r.code).not.toBe(0);
-    expect(r.stdout.trim()).toBe('');
-    expect(r.stderr).toContain('Invalid leaf depth');
-    expect(r.stderr).toContain('state.yaml');
+    expect(r.code, r.stderr).toBe(0);
+    const output: string[] = lines(r.stdout);
+    expect(output).toHaveLength(2);
+    expect(output[0]).toContain('slug=healthy');
+    expect(output[1]).toContain('unreadable=');
+    expect(output[1]).toContain(resolve(dir, 'state.yaml'));
+    expect(output[1]).toContain('Invalid leaf depth');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('duplicate slug exits non-zero naming it', async (): Promise<void> => {
+test('duplicate slugs are reported once each beside a healthy leaf', async (): Promise<void> => {
   const root: string = mkdtempSync(join(tmpdir(), 'akrogon-observe-'));
   try {
+    writeLeaf(root, 'owner', 'healthy', baseState('healthy', 'implement'));
     writeLeaf(root, 'owner-a', 'dup-leaf', baseState('dup-leaf', 'implement'));
     writeLeaf(root, 'owner-b', 'dup-leaf', baseState('dup-leaf', 'implement'));
     const akrogon: string = akrogonOk(root);
     const herdr: string = herdrOk(root, []);
     const r: RunResult = await runObserve(root, { OBSERVE_AKROGON: akrogon, OBSERVE_HERDR: herdr });
-    expect(r.code).not.toBe(0);
-    expect(r.stdout.trim()).toBe('');
-    expect(r.stderr).toContain('Duplicate leaf slug');
-    expect(r.stderr).toContain('dup-leaf');
+    expect(r.code, r.stderr).toBe(0);
+    const output: string[] = lines(r.stdout);
+    expect(output).toHaveLength(3);
+    expect(output[0]).toContain('slug=healthy');
+    const reports: string[] = output.slice(1).filter((line) => line.startsWith('unreadable='));
+    expect(reports).toHaveLength(2);
+    expect(reports.join('\n')).toContain('Duplicate leaf slug');
+    expect(reports.join('\n')).toContain('dup-leaf');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

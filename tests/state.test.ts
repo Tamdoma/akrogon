@@ -3,7 +3,16 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { repoSchema, type Repo } from '../src/config';
-import { allLeaves, findLeaf, leavesUnder, readState, saveState, stateSchema, type State } from '../src/state';
+import {
+  allLeaves,
+  findLeaf,
+  leavesUnder,
+  readState,
+  repoInventory,
+  saveState,
+  stateSchema,
+  type State,
+} from '../src/state';
 import { fixture, leaf, yaml, type Fixture } from './helpers';
 
 const canonical: z.input<typeof stateSchema> = {
@@ -43,8 +52,10 @@ for (const area of ['open', 'closed', 'parked']) {
     { slot: ['invalid'] },
     { priority: { old: true }, slot: 42 },
     { failed_notified: true },
+    { solo: true },
+    { batch: { attempt: 'a1', built_on: 'main', holder: { base: 'main', head: 'main' }, applied: false, members: [] } },
   ]) {
-    test(`${area} lazily migrates ${Object.keys(legacy).join(', ')} regardless of legacy value type`, async () => {
+    test(`${area} reports retired keys ${Object.keys(legacy).join(', ')} as the leaf's own error`, async () => {
       const f: Fixture = await fixture();
       try {
         const created: string = leaf(f, 'example', 'implement');
@@ -53,36 +64,12 @@ for (const area of ['open', 'closed', 'parked']) {
           mkdirSync(resolve(path, '..'), { recursive: true });
           renameSync(created, path);
         }
-        const supported: State = {
-          ...stateSchema.parse(canonical),
-          sources: ['team/project#1'],
-          busy_since: { A: '2026-09-10T10:00:00Z' },
-          busy_notified: { A: '2026-09-10T10:00:00Z' },
-          attempts: { A: 1, B: 2 },
-          done: ['A'],
-          fix_rounds: 1,
-          verdict: { A: 'fix', B: 'nits' },
-          tab: 'tab',
-          worktree: '/worktree',
-          env_names: [],
-          env_generation: 0,
-          pane: { A: 'pane-a', B: 'pane-b' },
-          prompted: { B: 'session-b' },
-          prompted_at: { B: '2026-09-10T10:00:00Z' },
-          delivery_error: {},
-        };
         const file: string = resolve(path, 'state.yaml');
-        yaml(file, { ...supported, ...legacy });
+        yaml(file, { ...stateSchema.parse(canonical), ...legacy });
         const before: string = readFileSync(file, 'utf8');
-        const state: State = readState(path);
-        expect(state).toEqual(supported);
+        expect(() => readState(path)).toThrow(z.ZodError);
+        expect(() => readState(path)).toThrow(file);
         expect(readFileSync(file, 'utf8')).toBe(before);
-        saveState(path, state);
-        const saved: string = readFileSync(file, 'utf8');
-        expect(saved).not.toMatch(/^(priority|slot):/m);
-        expect(readState(path)).toEqual(supported);
-        saveState(path, readState(path));
-        expect(readFileSync(file, 'utf8')).toBe(saved);
       } finally {
         f.clean();
       }
@@ -114,7 +101,7 @@ test('migration retains strict validation of unknown keys, required fields, know
 
 for (const area of ['open', 'closed']) {
   for (const depth of [0, 1, 2, 3, 4]) {
-    test(`allLeaves validates ${area} depth ${depth} before reading state`, async () => {
+    test(`the inventory reports ${area} depth ${depth} as a per-leaf failure`, async () => {
       const f: Fixture = await fixture();
       try {
         const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({ grounding: 'none' }) };
@@ -123,12 +110,15 @@ for (const area of ['open', 'closed']) {
         mkdirSync(path, { recursive: true });
         renameSync(resolve(original, 'state.yaml'), resolve(path, 'state.yaml'));
         if (depth === 2 || depth === 3) {
-          expect(allLeaves(repo).map((item) => item.path)).toEqual([path]);
+          expect(repoInventory(repo).leaves.map((item) => item.path)).toEqual([path]);
           expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area)).map((item) => item.path)).toEqual([path]);
         } else {
           writeFileSync(resolve(path, 'state.yaml'), 'invalid: [');
-          expect(() => allLeaves(repo)).toThrow(z.ZodError);
-          expect(() => allLeaves(repo)).toThrow(resolve(path, 'state.yaml'));
+          expect(repoInventory(repo).leaves).toEqual([]);
+          expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area))).toEqual([]);
+          const failures = repoInventory(repo).unreadable;
+          expect(failures).toHaveLength(1);
+          expect(failures[0].error).toContain(resolve(path, 'state.yaml'));
         }
       } finally {
         f.clean();
