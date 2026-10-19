@@ -56,17 +56,6 @@ export function readAttempts(repo: Repo): AttemptRecord[] {
     .map((line) => attemptRecordSchema.parse(JSON.parse(line)));
 }
 
-// Member heads already proven red on this base; stacking them again would repeat the same failure.
-export function redMemberHeads(repo: Repo, builtOn: string): Set<string> {
-  return new Set(
-    readAttempts(repo).flatMap((record) =>
-      record.outcome === 'red' && record.built_on === builtOn
-        ? (record.members ?? []).flatMap((member) => (typeof member === 'string' ? [] : [member.head]))
-        : [],
-    ),
-  );
-}
-
 export async function resolveTools(repo: Repo): Promise<Tool[]> {
   return Promise.all(
     repo.config.tools.map(async (name): Promise<Tool> => {
@@ -94,10 +83,6 @@ export function appendAttempt(
     built_on: batch.built_on,
     tested_top: batch.tested_top,
     outcome,
-    members:
-      batch.members.length === 0
-        ? undefined
-        : batch.members.map((member) => ({ slug: member.slug, head: member.head })),
     start: batch.started,
     end: new Date().toISOString(),
     tools: batch.tools,

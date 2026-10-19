@@ -37,15 +37,6 @@ export const toolSchema = z.strictObject({ name: text, path: text, version: text
 
 export type Tool = z.infer<typeof toolSchema>;
 
-export const batchMemberSchema = z.strictObject({
-  slug: z.string(),
-  base: z.string(),
-  head: z.string(),
-  tip: z.string(),
-});
-
-export type BatchMember = z.infer<typeof batchMemberSchema>;
-
 export const batchSchema = z.strictObject({
   attempt: z.string().min(1),
   started: z.iso.datetime().optional(),
@@ -60,7 +51,6 @@ export const batchSchema = z.strictObject({
   recorded: z.boolean().optional(),
   built_on: z.string(),
   holder: z.strictObject({ base: z.string(), head: z.string() }),
-  members: z.array(batchMemberSchema).default([]),
   tools: z.array(toolSchema).optional(),
   top: z.string().optional(),
   tested_top: z.string().optional(),
@@ -115,17 +105,33 @@ export class RepoMismatchError extends Error {
 }
 
 export function readState(path: string): State {
-  const parsed: ReturnType<typeof Bun.YAML.parse> = Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8'));
-  const state: State = stateSchema.parse(
+  const file: string = resolve(path, 'state.yaml');
+  const parsed: ReturnType<typeof Bun.YAML.parse> = Bun.YAML.parse(readFileSync(file, 'utf8'));
+  const input: ReturnType<typeof Bun.YAML.parse> =
     parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
       ? Object.fromEntries(
-          Object.entries(parsed).filter(
-            ([key]) => key !== 'priority' && key !== 'slot' && key !== 'failed_notified' && key !== 'solo',
-          ),
+          Object.entries(parsed)
+            .filter(([key]) => key !== 'priority' && key !== 'slot' && key !== 'failed_notified' && key !== 'solo')
+            .map(([key, value]) => [key, key === 'batch' ? withoutEmptyMembers(value) : value]),
         )
-      : parsed,
-  );
-  return state;
+      : parsed;
+  try {
+    return stateSchema.parse(input);
+  } catch (error) {
+    if (error instanceof z.ZodError) throw new Error(`Invalid state ${file}: ${error.message}`, { cause: error });
+    throw error;
+  }
+}
+
+// Records saved before solo turns carry `members: []`; that alone parses as absent.
+function withoutEmptyMembers(batch: ReturnType<typeof Bun.YAML.parse>): ReturnType<typeof Bun.YAML.parse> {
+  return batch !== null && typeof batch === 'object' && !Array.isArray(batch)
+    ? Object.fromEntries(
+        Object.entries(batch).filter(
+          ([key, value]) => !(key === 'members' && Array.isArray(value) && value.length === 0),
+        ),
+      )
+    : batch;
 }
 
 export function saveState(path: string, state: State): void {

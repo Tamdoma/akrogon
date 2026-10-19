@@ -1,15 +1,12 @@
 import { existsSync, mkdirSync, readdirSync, rmdirSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
-import { worktreeStore, type GlobalConfig, type Repo } from './config';
+import { worktreeStore, type Repo } from './config';
 import { checkLocation } from './guard';
-import { type BatchMember, type Leaf } from './state';
+import { type Leaf } from './state';
 import { command, run, CommandError, type Result } from './shell';
 import { removeRetiredLessons } from './lessons';
 import { createSparseWorktree } from './next';
-import { mergeQueue } from './turn';
-import { readLog } from './log';
-import { redMemberHeads } from './attempts';
 import { writeOwner } from './reconcile';
 
 export async function removeEmptyUntrackedDirs(worktree: string): Promise<void> {
@@ -81,37 +78,12 @@ export async function branchSha(repo: Repo, slug: string): Promise<string | unde
   throw new CommandError(['git', 'rev-parse', `refs/heads/${slug}^{commit}`], repo.root, result);
 }
 
-// The waiting leaves behind the holder, minus heads already red on this base.
-export async function pickMembers(
-  repo: Repo,
-  global: GlobalConfig,
-  leaves: Leaf[],
-  builtOn: string,
-): Promise<BatchMember[]> {
-  const red: Set<string> = redMemberHeads(repo, builtOn);
-  const members: BatchMember[] = [];
-  for (const candidate of mergeQueue(global, leaves, () => readLog(repo.root)).slice(1)) {
-    const slug: string = candidate.leaf.state.slug;
-    const sha: string | undefined = await branchSha(repo, slug);
-    const head: string = sha ?? builtOn;
-    if (red.has(head)) continue;
-    members.push({
-      slug,
-      base: sha === undefined || head === builtOn ? head : await memberBase(repo, builtOn, head),
-      head,
-      tip: head,
-    });
-  }
-  return members;
-}
-
-export type StackResult = { ok: true; top: string; tips: Map<string, string> } | { ok: false };
+export type StackResult = { ok: true; top: string } | { ok: false };
 
 export async function buildStack(
   repo: Repo,
   builtOn: string,
   holderHead: string,
-  members: { slug: string; base: string; head: string }[] = [],
   retirementHead: string = holderHead,
 ): Promise<StackResult> {
   const dir: string = resolve(worktreeStore(repo), 'batch-' + attemptId());
@@ -130,25 +102,7 @@ export async function buildStack(
       }
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
     }
-    const tips: Map<string, string> = new Map();
-    const stacked: { slug: string; base: string; head: string }[] = [];
-    for (const member of members) {
-      if (await isAncestor(dir, member.head, tip)) {
-        tips.set(member.slug, tip);
-        stacked.push(member);
-        continue;
-      }
-      const rebased: Result = await run(['git', 'rebase', '--onto', tip, member.base, member.head], dir);
-      if (rebased.code !== 0) {
-        await run(['git', 'rebase', '--abort'], dir);
-        continue;
-      }
-      tip = await command(['git', 'rev-parse', 'HEAD'], dir);
-      tips.set(member.slug, tip);
-      stacked.push(member);
-    }
     const removed: string[] = await removeRetiredLessons(dir, builtOn, 'HEAD', [
-      ...stacked.map((member) => ({ base: member.base, head: member.head })),
       { base: await memberBase(repo, builtOn, retirementHead), head: retirementHead },
     ]);
     if (removed.length > 0) {
@@ -156,7 +110,7 @@ export async function buildStack(
       await command(['git', 'commit', '-m', 'lessons: retire applied lines'], dir);
       tip = await command(['git', 'rev-parse', 'HEAD'], dir);
     }
-    return { ok: true, top: tip, tips };
+    return { ok: true, top: tip };
   } finally {
     await command(['git', 'worktree', 'remove', '--force', dir], repo.root);
     rmSync(owner, { force: true });
