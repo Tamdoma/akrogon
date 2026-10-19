@@ -100,7 +100,7 @@ async function advancer(f: Fixture, name: string, content: string): Promise<stri
   return [
     `cd ${clone}`,
     'git pull -q origin main',
-    `printf '%s\\n' ${content} > ${name}`,
+    `printf '%s\\n' ${content}-$(date +%s%N) > ${name}`,
     `git add ${name}`,
     `git -c user.email=t@example.invalid -c user.name=T commit -qm adv-$(date +%s%N)`,
     'git push -q origin HEAD:main',
