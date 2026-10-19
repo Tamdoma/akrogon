@@ -1201,7 +1201,11 @@ export async function reconcileHost(
         continue;
       }
       if (badSlices.has(slice)) {
-        keep(slice, 'unreadable leaf state', 'restore the leaf state file and retry cleanup');
+        keep(
+          slice,
+          `unreadable leaf state: ${inventoryErrors.join('; ')}`,
+          'restore the leaf state file and retry cleanup',
+        );
         continue;
       }
       if (own.has(slice)) {
