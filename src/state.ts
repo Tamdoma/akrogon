@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, relative, resolve, sep } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, type Dirent } from 'node:fs';
+import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { phaseSchema, slotSchema, verdictSchema } from './routing';
 import { type Repo } from './config';
@@ -127,33 +127,27 @@ export class RepoMismatchError extends Error {
 
 export function readState(path: string): State {
   const file: string = resolve(path, 'state.yaml');
-  const parsed: ReturnType<typeof Bun.YAML.parse> = Bun.YAML.parse(readFileSync(file, 'utf8'));
-  const input: ReturnType<typeof Bun.YAML.parse> =
-    parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? Object.fromEntries(
-          Object.entries(parsed)
-            .filter(([key]) => key !== 'priority' && key !== 'slot' && key !== 'failed_notified' && key !== 'solo')
-            .map(([key, value]) => [key, key === 'batch' ? withoutEmptyMembers(value) : value]),
-        )
-      : parsed;
+  let input: string;
   try {
-    return stateSchema.parse(input);
+    input = readFileSync(file, 'utf8');
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    throw new Error(`Cannot read state at ${file}: ${error.message}`, { cause: error });
+  }
+  let parsed: ReturnType<typeof Bun.YAML.parse>;
+  try {
+    parsed = Bun.YAML.parse(input);
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    throw new Error(`Invalid state ${file}: ${error.message}`, { cause: error });
+  }
+  try {
+    return stateSchema.parse(parsed);
   } catch (error) {
     if (error instanceof z.ZodError)
       throw new z.ZodRealError([{ code: 'custom', path: [], message: `Invalid state ${file}` }, ...error.issues]);
     throw error;
   }
-}
-
-// Records saved before solo turns carry `members: []`; that alone parses as absent.
-function withoutEmptyMembers(batch: ReturnType<typeof Bun.YAML.parse>): ReturnType<typeof Bun.YAML.parse> {
-  return batch !== null && typeof batch === 'object' && !Array.isArray(batch)
-    ? Object.fromEntries(
-        Object.entries(batch).filter(
-          ([key, value]) => !(key === 'members' && Array.isArray(value) && value.length === 0),
-        ),
-      )
-    : batch;
 }
 
 export function saveState(path: string, state: State): void {
@@ -167,29 +161,85 @@ export function validateLeafDepth(areaRoot: string, leafPath: string): void {
     .parse(depth);
 }
 
-export function leavesUnder(path: string, areaRoot: string): Leaf[] {
-  if (!existsSync(path)) return [];
-  if (existsSync(resolve(path, 'state.yaml'))) {
-    validateLeafDepth(areaRoot, path);
-    return [{ path, state: readState(path) }];
+export type LeafFailure = { path: string; error: string };
+export type ForeignLeaf = { path: string; stored: string };
+export type Inventory = {
+  leaves: Leaf[];
+  unreadable: LeafFailure[];
+  unknown: LeafFailure[];
+  foreign: ForeignLeaf[];
+};
+
+export function readInventory(path: string, areaRoot: string): Inventory {
+  const inv: Inventory = { leaves: [], unreadable: [], unknown: [], foreign: [] };
+  function visit(dir: string): void {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      inv.unknown.push({ path: dir, error: error.message });
+      return;
+    }
+    if (entries.some((entry) => entry.name === 'state.yaml')) {
+      try {
+        validateLeafDepth(areaRoot, dir);
+        inv.leaves.push({ path: dir, state: readState(dir) });
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        inv.unreadable.push({ path: dir, error: error.message });
+      }
+      return;
+    }
+    for (const entry of entries.filter((entry) => entry.isDirectory())) visit(resolve(dir, entry.name));
   }
-  return readdirSync(path, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .flatMap((entry) => leavesUnder(resolve(path, entry.name), areaRoot));
+  try {
+    if (statSync(path, { throwIfNoEntry: false }) !== undefined) visit(path);
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    inv.unknown.push({ path, error: error.message });
+  }
+  return inv;
+}
+
+export function repoInventory(
+  repo: Pick<Repo, 'name' | 'root'>,
+  areas: readonly string[] = ['open', 'closed'],
+): Inventory {
+  const inv: Inventory = { leaves: [], unreadable: [], unknown: [], foreign: [] };
+  for (const area of areas) {
+    const areaRoot: string = resolve(repo.root, 'issues', area);
+    const part: Inventory = readInventory(areaRoot, areaRoot);
+    inv.unreadable.push(...part.unreadable);
+    inv.unknown.push(...part.unknown);
+    for (const leaf of part.leaves)
+      if (leaf.state.repo === repo.name) inv.leaves.push(leaf);
+      else inv.foreign.push({ path: leaf.path, stored: leaf.state.repo });
+  }
+  const slugs: Set<string> = new Set();
+  const duplicates: Set<string> = new Set();
+  for (const leaf of inv.leaves) {
+    if (slugs.has(leaf.state.slug)) duplicates.add(leaf.state.slug);
+    slugs.add(leaf.state.slug);
+  }
+  for (const leaf of inv.leaves.filter((leaf) => duplicates.has(leaf.state.slug)))
+    inv.unreadable.push({ path: leaf.path, error: `Duplicate leaf slug: ${leaf.state.slug}` });
+  return { ...inv, leaves: inv.leaves.filter((leaf) => !duplicates.has(leaf.state.slug)) };
+}
+
+export function inventoryFailures(inv: Inventory): { ownedNames: Set<string>; incomplete: boolean } {
+  return {
+    ownedNames: new Set(inv.unreadable.map((failure) => basename(failure.path))),
+    incomplete: inv.unknown.length > 0,
+  };
+}
+
+export function leavesUnder(path: string, areaRoot: string): Leaf[] {
+  return readInventory(path, areaRoot).leaves;
 }
 
 export function allLeaves(repo: Repo): Leaf[] {
-  const leaves: Leaf[] = ['open', 'closed'].flatMap((area) => {
-    const areaRoot: string = resolve(repo.root, 'issues', area);
-    return leavesUnder(areaRoot, areaRoot);
-  });
-  const slugs: Set<string> = new Set();
-  for (const leaf of leaves) {
-    if (slugs.has(leaf.state.slug)) throw new Error(`Duplicate leaf slug: ${leaf.state.slug}`);
-    if (leaf.state.repo !== repo.name) throw new RepoMismatchError(leaf.path, leaf.state.repo, repo.name);
-    slugs.add(leaf.state.slug);
-  }
-  return leaves;
+  return repoInventory(repo).leaves;
 }
 
 export function isParked(repo: Repo, slug: string): boolean {
@@ -206,16 +256,28 @@ export function isParked(repo: Repo, slug: string): boolean {
   });
 }
 
-function hasSlugFolder(path: string, slug: string): boolean {
-  if (!existsSync(path)) return false;
-  if (existsSync(resolve(path, 'state.yaml'))) return path.split(sep).pop() === slug;
-  return readdirSync(path, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .some((entry) => hasSlugFolder(resolve(path, entry.name), slug));
+function slugFolders(repo: Pick<Repo, 'root'>, slug: string): string[] {
+  const found: string[] = [];
+  function visit(path: string): void {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(path, { withFileTypes: true });
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      return;
+    }
+    if (entries.some((entry) => entry.name === 'state.yaml')) {
+      if (basename(path) === slug) found.push(path);
+      return;
+    }
+    for (const entry of entries.filter((entry) => entry.isDirectory())) visit(resolve(path, entry.name));
+  }
+  for (const area of ['open', 'closed']) visit(resolve(repo.root, 'issues', area));
+  return found;
 }
 
 export function hasLeafFolder(repo: Repo, slug: string): boolean {
-  return ['open', 'closed'].some((area) => hasSlugFolder(resolve(repo.root, 'issues', area), slug));
+  return slugFolders(repo, slug).length > 0;
 }
 
 export function missingLeafMessage(repo: Repo, slug: string): string {
@@ -223,9 +285,15 @@ export function missingLeafMessage(repo: Repo, slug: string): string {
 }
 
 export function findLeaf(repo: Repo, slug: string): Leaf {
-  const leaf: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === slug);
-  if (leaf === undefined) throw new Error(missingLeafMessage(repo, slug));
-  return leaf;
+  const folders: string[] = slugFolders(repo, slug);
+  if (folders.length === 0) throw new Error(missingLeafMessage(repo, slug));
+  if (folders.length > 1) throw new Error(`Duplicate leaf slug: ${slug}`);
+  const path: string = folders[0];
+  const state: State = readState(path);
+  if (state.repo !== repo.name) throw new RepoMismatchError(path, state.repo, repo.name);
+  if (state.slug !== slug)
+    throw new Error(`Leaf slug mismatch at ${path}: folder "${basename(path)}", state slug "${state.slug}"`);
+  return { path, state };
 }
 
 export async function withLock<T>(
