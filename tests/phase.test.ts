@@ -461,7 +461,9 @@ test('asymmetric and empty leaf sources defer until epic completion under open l
         .filter((call) => call.args[1] === 'close')
         .map((call) => call.args)
         .sort(),
-    ).toEqual([1, 2, 3].map((n) => ['issue', 'close', '-R', 'team/project', String(n), '--comment', `merged ${head}`]));
+    ).toEqual(
+      [1, 2, 3].map((n) => ['issue', 'close', '-R', 'team/project', String(n), '--comment', 'delivered by two']),
+    );
     expect(
       calls
         .filter((call) => call.args[1] === 'view')
@@ -502,9 +504,8 @@ test('source retries recheck state, skip CLOSED, and continue after final failur
       code,
       stderr: code ? 'view failure' : '',
     });
-    const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     const close = (n: number, code: number = 0): GhStep => ({
-      args: ['issue', 'close', '-R', 'team/project', String(n), '--comment', `merged ${head}`],
+      args: ['issue', 'close', '-R', 'team/project', String(n), '--comment', 'delivered by source'],
       stdout: '',
       code,
       stderr: code ? 'close failure' : '',
@@ -516,7 +517,7 @@ test('source retries recheck state, skip CLOSED, and continue after final failur
         view(2),
         close(2, 1),
         view(2),
-        { stdout: JSON.stringify([[{ body: `merged ${head} extra` }]]) },
+        { stdout: JSON.stringify([[{ body: 'delivered by source extra' }]]) },
         close(2),
         view(3),
         close(3, 1),
@@ -563,27 +564,36 @@ test('source retries recheck state, skip CLOSED, and continue after final failur
   }
 });
 
-test('sourced completion without worktree context fails before rename without a fabricated commit', async () => {
+test('sourced completion without a recorded worktree closes the source with the leaf slug', async () => {
   const f: Fixture = await fixture();
   try {
     const gh: GhFixture = fakeGh(f);
     leaf(f, 'missing', 'merge', { ...holding(f), sources: ['team/project#1'] });
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'] },
+        {
+          stdout: '',
+          args: ['issue', 'close', '-R', 'team/project', '1', '--comment', 'delivered by missing'],
+        },
+      ]),
+    );
     const result: Result = await cli(f, ['phase', 'missing', 'merged'], f.root, gh.env);
-    expect(result.code).not.toBe(0);
-    expect(result.stderr).toContain('worktree');
-    expect(readState(resolve(f.root, 'issues/open/issue/missing')).phase).toBe('merged');
-    expect(existsSync(gh.db + '.calls')).toBe(false);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('issue complete issue');
+    expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+    expect(readState(resolve(f.root, 'issues/closed/issue/missing')).phase).toBe('merged');
   } finally {
     f.clean();
   }
 });
 
-test('partial commented close success retries without duplicating a merged comment on a later page', async () => {
+test('partial commented close success retries without duplicating a delivered-by comment on a later page', async () => {
   const f: Fixture = await fixture();
   try {
     const gh: GhFixture = fakeGh(f);
     const worktree: string = await sourceWorktree(f, 'partial');
-    const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     leaf(f, 'partial', 'merge', { ...holding(f), worktree, sources: ['team/project#1'] });
     const comments: string[] = Array.from({ length: 100 }, (_, i) => `earlier ${i}`);
     writeFileSync(gh.db + '.state', JSON.stringify({ state: 'OPEN', comments, attempts: 0 }));
@@ -601,7 +611,7 @@ test('partial commented close success retries without duplicating a merged comme
     expect(result.code).toBe(0);
     expect(JSON.parse(readFileSync(gh.db + '.state', 'utf8'))).toEqual({
       state: 'CLOSED',
-      comments: [...comments, `merged ${head}`],
+      comments: [...comments, 'delivered by partial'],
       attempts: 2,
     });
     expect(JSON.parse(result.stderr)).toMatchObject({ warning: expect.any(String), source: 'team/project#1', code: 1 });
@@ -613,7 +623,7 @@ test('partial commented close success retries without duplicating a merged comme
       .map((line) => z.object({ args: z.array(z.string()) }).parse(JSON.parse(line)).args);
     expect(calls).toEqual([
       ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'],
-      ['issue', 'close', '-R', 'team/project', '1', '--comment', `merged ${head}`],
+      ['issue', 'close', '-R', 'team/project', '1', '--comment', 'delivered by partial'],
       ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'],
       ['api', '--hostname', 'github.com', 'repos/team/project/issues/1/comments?per_page=100', '--paginate', '--slurp'],
       ['issue', 'close', '-R', 'team/project', '1'],
@@ -627,13 +637,12 @@ test('failed or malformed retry comment listing prevents another close and conti
   for (const listing of [
     { stdout: '[[', stderr: 'comment page failed', code: 2 },
     { stdout: '{malformed-json', code: 0 },
-    { stdout: '[[{"body":"merged PLACEHOLDER"}],[{"body":42}]]', code: 0 },
+    { stdout: '[[{"body":"delivered by other"}],[{"body":42}]]', code: 0 },
   ]) {
     const f: Fixture = await fixture();
     try {
       const gh: GhFixture = fakeGh(f);
       const worktree: string = await sourceWorktree(f, 'listing');
-      const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
       leaf(f, 'listing', 'merge', { ...holding(f), worktree, sources: ['team/project#1', 'team/project#2'] });
       const args: string[] = [
         'api',
@@ -643,16 +652,19 @@ test('failed or malformed retry comment listing prevents another close and conti
         '--paginate',
         '--slurp',
       ];
-      const response: string = listing.stdout.replace('PLACEHOLDER', head);
       writeFileSync(
         gh.db,
         JSON.stringify([
           { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'] },
-          { stdout: '', code: 1, args: ['issue', 'close', '-R', 'team/project', '1', '--comment', `merged ${head}`] },
+          {
+            stdout: '',
+            code: 1,
+            args: ['issue', 'close', '-R', 'team/project', '1', '--comment', 'delivered by listing'],
+          },
           { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'] },
-          { ...listing, stdout: response, args },
+          { ...listing, args },
           { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '2', '--json', 'state'] },
-          { stdout: '', args: ['issue', 'close', '-R', 'team/project', '2', '--comment', `merged ${head}`] },
+          { stdout: '', args: ['issue', 'close', '-R', 'team/project', '2', '--comment', 'delivered by listing'] },
         ]),
       );
       const result: Result = await cli(f, ['phase', 'listing', 'merged'], f.root, gh.env);
@@ -674,7 +686,9 @@ test('failed or malformed retry comment listing prevents another close and conti
       expect(JSON.parse(failure.error)).toMatchObject({
         command: ['gh', ...args],
         cwd: f.root,
-        ...(listing.code === 0 ? { response } : { code: 2, stdout: response, stderr: 'comment page failed' }),
+        ...(listing.code === 0
+          ? { response: listing.stdout }
+          : { code: 2, stdout: listing.stdout, stderr: 'comment page failed' }),
       });
       expect(readState(resolve(f.root, 'issues/open/issue/listing')).phase).toBe('merged');
     } finally {
@@ -689,7 +703,6 @@ test('each completed issue closes only its all-leaf private sources before the f
     const gh: GhFixture = fakeGh(f);
     const first: string = await sourceWorktree(f, 'first');
     const last: string = await sourceWorktree(f, 'last');
-    const firstHead: string = await command(['git', 'rev-parse', 'HEAD'], first);
     let lastHead: string = await command(['git', 'rev-parse', 'HEAD'], last);
     for (const [name, worktree, privateSource] of [
       ['first', first, '2'],
@@ -720,7 +733,7 @@ test('each completed issue closes only its all-leaf private sources before the f
         },
         {
           stdout: '',
-          args: ['issue', 'close', '-R', 'team/project', '2', '--comment', `merged ${firstHead}`],
+          args: ['issue', 'close', '-R', 'team/project', '2', '--comment', 'delivered by first'],
           probe: firstProbe,
         },
       ]),
@@ -744,7 +757,7 @@ test('each completed issue closes only its all-leaf private sources before the f
         },
         {
           stdout: '',
-          args: ['issue', 'close', '-R', 'team/project', '3', '--comment', `merged ${lastHead}`],
+          args: ['issue', 'close', '-R', 'team/project', '3', '--comment', 'delivered by last'],
           probe: lastProbe,
         },
         {
@@ -754,7 +767,7 @@ test('each completed issue closes only its all-leaf private sources before the f
         },
         {
           stdout: '',
-          args: ['issue', 'close', '-R', 'team/project', '1', '--comment', `merged ${lastHead}`],
+          args: ['issue', 'close', '-R', 'team/project', '1', '--comment', 'delivered by last'],
           probe: lastProbe,
         },
         {
@@ -790,7 +803,6 @@ for (const scope of ['standalone', 'epic'] as const) {
         { ...holding(f), worktree, sources: ['team/project#2', 'team/project#1'] },
         container,
       );
-      const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
       if (scope === 'epic') leaf(f, 'earlier', 'merged', { sources: ['team/project#1'] }, 'epic/earlier');
       const chart: string = resolve(f.root, 'issues/chart', owner);
       mkdirSync(chart, { recursive: true });
@@ -806,7 +818,7 @@ for (const scope of ['standalone', 'epic'] as const) {
         gh.db,
         JSON.stringify([
           { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '2', '--json', 'state'], probe },
-          { stdout: '', args: ['issue', 'close', '-R', 'team/project', '2', '--comment', `merged ${head}`], probe },
+          { stdout: '', args: ['issue', 'close', '-R', 'team/project', '2', '--comment', 'delivered by retry'], probe },
           { stdout: '', code: 1, stderr: 'offline', probe },
           { stdout: '', code: 1, stderr: 'offline', probe },
         ]),
@@ -829,7 +841,7 @@ for (const scope of ['standalone', 'epic'] as const) {
             probe,
           },
           { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'], probe },
-          { stdout: '', args: ['issue', 'close', '-R', 'team/project', '1', '--comment', `merged ${head}`], probe },
+          { stdout: '', args: ['issue', 'close', '-R', 'team/project', '1', '--comment', 'delivered by retry'], probe },
         ]),
       );
       const retried: Result = await cli(f, ['next', 'retry'], f.root, gh.env);

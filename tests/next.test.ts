@@ -817,7 +817,6 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     await command(['git', 'commit', '-m', 'landed change'], worktree);
     await command(['git', 'push', 'upstream', 'HEAD:trunk'], worktree);
     const gh: GhFixture = fakeGh(f);
-    const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/landing'),
       closed: resolve(f.root, 'issues/closed/landing'),
@@ -831,7 +830,7 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
         {
           stdout: '',
           delayMs: 100,
-          args: ['issue', 'close', '-R', 'team/project', '8', '--comment', `merged ${head}`],
+          args: ['issue', 'close', '-R', 'team/project', '8', '--comment', 'delivered by landed'],
           probe,
         },
       ]),
@@ -1101,7 +1100,6 @@ test('next awaits sourced completion after a failed rename before removing the w
     expect(readState(path).phase).toBe('merged');
     expect(existsSync(gh.db + '.calls')).toBe(false);
     rmSync(closed, { recursive: true });
-    const head: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     const probe: NonNullable<GhStep['probe']> = {
       open: resolve(f.root, 'issues/open/issue'),
       closed,
@@ -1115,7 +1113,7 @@ test('next awaits sourced completion after a failed rename before removing the w
         {
           stdout: '',
           delayMs: 100,
-          args: ['issue', 'close', '-R', 'team/project', '9', '--comment', `merged ${head}`],
+          args: ['issue', 'close', '-R', 'team/project', '9', '--comment', 'delivered by rename'],
           probe,
         },
       ]),
@@ -1140,6 +1138,40 @@ test('next awaits sourced completion after a failed rename before removing the w
     f.clean();
   }
 }, 15000);
+
+test('a merged sourced leaf with no recorded worktree completes on next', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'stuck', 'merged', { sources: ['team/project#1'] });
+    const gh: GhFixture = fakeGh(f);
+    const env: NodeJS.ProcessEnv = { ...f.env, ...gh.env, PATH: `${resolve(f.home, 'gh-bin')}:${f.env.PATH}` };
+    const probe: NonNullable<GhStep['probe']> = {
+      open: resolve(f.root, 'issues/open/issue'),
+      closed: resolve(f.root, 'issues/closed/issue'),
+      lock: resolve(f.home, '.lock'),
+      worktree: f.root,
+    };
+    writeFileSync(
+      gh.db,
+      JSON.stringify([
+        { stdout: '{"state":"OPEN"}', probe },
+        {
+          stdout: '',
+          args: ['issue', 'close', '-R', 'team/project', '1', '--comment', 'delivered by stuck'],
+          probe,
+        },
+      ]),
+    );
+    const retried: Result = await cli(f, ['next', 'stuck'], f.root, env);
+    expect(retried.stderr).not.toContain('worktree');
+    expect(retried.code).toBe(0);
+    expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
+    expect(existsSync(resolve(f.root, 'issues/open/issue'))).toBe(false);
+    expect(readState(resolve(f.root, 'issues/closed/issue/stuck')).phase).toBe('merged');
+  } finally {
+    f.clean();
+  }
+});
 
 const skipSchema = z.object({
   repo: z.string(),
