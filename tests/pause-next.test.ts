@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { command, finishCaptured, spawnFiles, type Captured, type Result } from '../src/shell';
 import { readState, saveState, type State } from '../src/state';
@@ -373,6 +373,21 @@ test('unpause starts tab-less leaves only through the dependent cascade', async 
     const d: State = readState(resolve(f.root, 'issues/open/issue/d'));
     expect(d.tab).toBe(undefined);
     expect(d.worktree).toBe(undefined);
+  } finally {
+    f.clean();
+  }
+});
+
+test('unpause starts an open dependent of an already closed leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'm', 'merged', {}, 'm-owner');
+    mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
+    renameSync(resolve(f.root, 'issues/open/m-owner'), resolve(f.root, 'issues/closed/m-owner'));
+    leaf(f, 'c', 'plan.synthesis', { 'blocked-by': ['m'] });
+    expect((await cli(f, ['pause'])).code).toBe(0);
+    expect((await cli(f, ['unpause'], f.root, f.env)).code).toBe(0);
+    expect(readState(resolve(f.root, 'issues/open/issue/c')).tab).not.toBe(undefined);
   } finally {
     f.clean();
   }

@@ -1,0 +1,31 @@
+slug: slug-witness
+phase: merged
+created: 2026-10-19
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#103"
+  - "Tamdoma/akrogon#108"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tD0
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pTX
+  B: w8:pTY
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-19T15:57:05.984Z
+frozen:
+  tests/next.test.ts: 1590a37b67913bb9b287d0868bf9a39440c767c4
+  tests/phase.test.ts: 87722226dfa73a71c8c5192367b214ebe6d222bc
+frozen_cited: []

@@ -1,0 +1,31 @@
+slug: shared-inventory
+phase: merged
+created: 2026-10-19
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#102"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tE1
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pTZ
+  B: w8:pT0
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-19T18:20:34.291Z
+frozen:
+  skills/watch-issues/scripts/observe.test.ts: 41489dd79085e30fed043dfbc7ebfe0de0550add
+  tests/state-inventory.test.ts: 3b242ebcc60a1f61da285176ed41cb330ffe760f
+  tests/state.test.ts: 61ecee7c44aaeb18d96134931695bc7cecd04d6e
+frozen_cited: []

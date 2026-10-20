@@ -1,0 +1,30 @@
+slug: twin-guard
+phase: merged
+created: 2026-10-19
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#103"
+  - "Tamdoma/akrogon#108"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tDZ
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pTV
+  B: w8:pTW
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-19T16:09:59.221Z
+frozen:
+  tests/next.test.ts: e41ef6b07e6ef9e0956962903c5283a979218170
+frozen_cited: []

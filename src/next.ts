@@ -819,7 +819,23 @@ async function sweep(
 ): Promise<void> {
   if (isAutomatic && isPaused(repo.name)) return;
   const counts: Map<string, number> = dependentCounts(discover(repo, invocation).leaves);
-  const ordered: Leaf[] = [...leaves].sort(
+  const closedRoot: string = resolve(repo.root, 'issues/closed');
+  const closedSlugs: Set<string> = new Set(
+    leaves.filter((leaf) => within(leaf.path, closedRoot)).map((leaf) => leaf.state.slug),
+  );
+  if (closedSlugs.size > 0)
+    await sweep(
+      global,
+      repo,
+      discover(repo, invocation).leaves.filter(
+        (leaf) =>
+          !within(leaf.path, closedRoot) && leaf.state['blocked-by'].some((slug: string) => closedSlugs.has(slug)),
+      ),
+      invocation,
+      false,
+      isAutomatic,
+    );
+  const ordered: Leaf[] = leaves.filter((leaf) => !within(leaf.path, closedRoot)).sort(
     (a, b) =>
       Number(b.state.phase === 'merged') - Number(a.state.phase === 'merged') ||
       (counts.get(b.state.slug) ?? 0) - (counts.get(a.state.slug) ?? 0),

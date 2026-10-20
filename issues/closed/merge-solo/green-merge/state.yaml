@@ -1,0 +1,31 @@
+slug: green-merge
+phase: merged
+created: 2026-10-19
+repo: akrogon
+debate: "no"
+blocked-by:
+  - solo-turns
+sources:
+  - "Tamdoma/akrogon#104"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tDY
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pTS
+  B: w8:pTT
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-19T16:06:34.962Z
+frozen:
+  tests/fake-systemctl.ts: 0cedaf279beea4107f5420a6f32614498e920de9
+  tests/green-merge.test.ts: f29b32de70abb4a41106ab861a68a452c4ef7651
+frozen_cited: []

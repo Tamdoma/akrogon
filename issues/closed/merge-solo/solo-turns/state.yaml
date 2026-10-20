@@ -1,0 +1,30 @@
+slug: solo-turns
+phase: merged
+created: 2026-10-19
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#104"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tDX
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pTQ
+  B: w8:pTR
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-19T15:18:31.711Z
+frozen:
+  tests/batch-dispatch.test.ts: 15f07108404411af4b7b49ad9a4cf8782729dd82
+  tests/solo-turns.test.ts: 3f88882fc32d26993ac3d1fa39c6a12613a623e4
+frozen_cited: []

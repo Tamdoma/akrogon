@@ -1556,6 +1556,35 @@ test('merged foreign leaves survive cleanup with worktree branch and tab intact'
   }
 }, 15000);
 
+test('a sweep leaves closed merged leaves untouched', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const open: string = leaf(f, 'archived', 'merged');
+    mkdirSync(resolve(f.root, 'issues/closed/issue'), { recursive: true });
+    renameSync(open, resolve(f.root, 'issues/closed/issue/archived'));
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const timings: string = resolve(f.root, 'issues/timings.jsonl');
+    const events: string = existsSync(timings) ? readFileSync(timings, 'utf8') : '';
+    expect(events).not.toContain('"slug":"archived"');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
+test('next --resume starts an open dependent of an already closed leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'done', 'merged', {}, 'done-owner');
+    mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
+    renameSync(resolve(f.root, 'issues/open/done-owner'), resolve(f.root, 'issues/closed/done-owner'));
+    const child: string = leaf(f, 'child', 'plan.synthesis', { 'blocked-by': ['done'] }, 'child-owner');
+    expect((await next(f, ['--resume'], {}, f.home)).code).toBe(0);
+    expect(readState(child).tab).toBeDefined();
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('two repos summarize once per repo on every invocation', async () => {
   const f: DispatchFixture = await dispatchFixture();
   const g: Fixture = await fixture();

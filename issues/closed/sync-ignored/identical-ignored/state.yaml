@@ -1,0 +1,40 @@
+slug: identical-ignored
+phase: merged
+created: 2026-10-19
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#106"
+busy_since:
+  B: 2026-10-19T17:50:39.158Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tE3
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pV3
+  B: w8:pV4
+prompted:
+  B: 01a15544-1eaf-79c0-8744-819e08a2dcb0
+prompted_at:
+  B: 2026-10-19T17:50:39.158Z
+delivery_error: {}
+merge_stamp: 2026-10-19T17:50:31.687Z
+broadcast:
+  kind: issue
+  name: sync-ignored
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/sync-ignored
+  pushed: dbb51e195255da7fdfd2b7d345c11c1c395a9461
+  sources:
+    - "Tamdoma/akrogon#106"
+frozen:
+  tests/self-update.test.ts: d20721600ea2b6ab11e00cbc6bc51d96a3e0d4c9
+  tests/sync.test.ts: ee34b74d1b48f23e5f1606a79fefd75644d95fee
+frozen_cited: []

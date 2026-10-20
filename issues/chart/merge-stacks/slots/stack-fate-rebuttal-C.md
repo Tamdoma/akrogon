@@ -1,0 +1,6 @@
+# stack-fate rebuttal, slot C
+
+- External evidence tags cite two claims C did not write. Merged line 36, "bors-ng: batch all ready PRs, split on red" tagged (B,C): C's bors line (stack-fate-C.md line 66, bors.tech getting started and homepage, read 2026-10-19) claims only staging batching, fast-forward on green, and a later max batch size; C read no bors source for split-on-red. Merged line 38's "dynamic batch of at most 2 helped bursts but not daily volume" tagged (B,C): C cited only Mergify's batch docs (stack-fate-C.md line 65), not Danjou or Maurin. Drop C from those two clauses; no disagreement with B's substance, which C has not read.
+- "Where slots differ" line 58 misstates C's in-flight position as unconditional strip-and-continue. C wrote (stack-fate-C.md line 72): discard members on parse and "the holder must continue solo or have its record cleared, never throw". The merged line drops the record-cleared branch, and strip-and-continue is wrong for an already-applied batch whose holder branch sits at a top carrying member commits: current code restores the holder to `batch.holder.head` on that path (src/next.ts line 960). C's position stands only in its conditional form: continue solo solely with the holder branch restored and no remote candidate, otherwise clear the record and rebuild the holder alone.
+
+Nothing else to rebut.

@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: GitHub issue close with comment through akrogon closeSource (gh issue view, gh issue close --comment)
+    command: akrogon close Tamdoma/tamdoma-framework#282 --by pool-parity; akrogon close Tamdoma/tamdoma-framework#285 --by pool-parity
+    identity: operator's gh login on github.com (GH_HOST=github.com set by closeSource)
+    target: Tamdoma/tamdoma-framework issues #282 and #285
+    version: akrogon release e522c186
+    date: '2026-10-19'
+    result: both printed "closed ... with delivered by pool-parity"; gh issue view read back CLOSED with last comment "delivered by pool-parity"
+    cleanup: none; both closes were the intended stuck-repair 2a step
+    limits: does not exercise the retry branch where the comment already exists; the leaf's tests use the repo's fake gh for that
+    record: issues/chart/owner-completion/forks/close-witness.md
