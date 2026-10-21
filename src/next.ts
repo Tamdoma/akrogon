@@ -835,11 +835,13 @@ async function sweep(
       false,
       isAutomatic,
     );
-  const ordered: Leaf[] = leaves.filter((leaf) => !within(leaf.path, closedRoot)).sort(
-    (a, b) =>
-      Number(b.state.phase === 'merged') - Number(a.state.phase === 'merged') ||
-      (counts.get(b.state.slug) ?? 0) - (counts.get(a.state.slug) ?? 0),
-  );
+  const ordered: Leaf[] = leaves
+    .filter((leaf) => !within(leaf.path, closedRoot))
+    .sort(
+      (a, b) =>
+        Number(b.state.phase === 'merged') - Number(a.state.phase === 'merged') ||
+        (counts.get(b.state.slug) ?? 0) - (counts.get(a.state.slug) ?? 0),
+    );
   for (const leaf of ordered) {
     const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, picked, invocation, undefined, isAutomatic);
     if (outcome === 'completed') await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
