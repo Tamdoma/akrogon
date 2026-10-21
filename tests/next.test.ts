@@ -5767,10 +5767,54 @@ test('ambiguous name refuses an epic and its same-name issue', async () => {
   }
 });
 
-test('ambiguous name refuses an issue and its same-name leaf', async () => {
+test('same-work name starts an issue and its only same-name leaf once', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'exp', 'plan.synthesis', {}, 'exp');
+    const result: Result = await next(f, ['exp']);
+    expect(result.code).toBe(0);
+    expect(dispatchedSlugs(f)).toEqual(['exp']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('same-work name starts an epic and its only same-name issue once', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    configure(f, { max_active: 8 });
+    leaf(f, 'l1', 'plan.synthesis', {}, 'same/same');
+    leaf(f, 'l2', 'plan.synthesis', {}, 'same/same');
+    const result: Result = await next(f, ['same']);
+    expect(result.code).toBe(0);
+    expect(dispatchedSlugs(f)).toEqual(['l1', 'l2']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('ambiguous name refuses an issue whose same-name leaf has a sibling', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const a: string = leaf(f, 'exp', 'plan.synthesis', {}, 'exp');
+    const b: string = leaf(f, 'sib', 'plan.synthesis', {}, 'exp');
+    const before: string[] = stateSnapshot([a, b]);
+    const result: Result = await next(f, ['exp']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('issue issues/open/exp');
+    expect(result.stderr).toContain('leaf issues/open/exp/exp');
+    expectNoLaunch(f, [a, b], before);
+  } finally {
+    f.clean();
+  }
+});
+
+test('ambiguous name refuses a same-name pair when the issue holds an unreadable leaf', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const a: string = leaf(f, 'exp', 'plan.synthesis', {}, 'exp');
+    const broken: string = leaf(f, 'broken', 'plan.synthesis', {}, 'exp');
+    writeFileSync(resolve(broken, 'state.yaml'), 'slug: [');
     const before: string[] = stateSnapshot([a]);
     const result: Result = await next(f, ['exp']);
     expect(result.code).toBe(1);
