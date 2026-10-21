@@ -32,7 +32,7 @@ An issue contains leaves. Even an issue with one leaf needs both folders:
           state.yaml
 ```
 
-The two folders may share a name. The inner folder is the leaf. Its name is the slug used by commands. When an issue and its leaf share a name, the bare name matches both, so select by folder path:
+The two folders may share a name. The inner folder is the leaf. Its name is the slug used by commands. When an issue and its leaf share a name and the leaf is the issue's only leaf, both readings start the same work, so `akrogon next export-csv` starts it. Once the issue gains a second leaf, or holds a leaf Akrogon cannot read, the bare name is ambiguous and `next` refuses, so select by folder path:
 
 ```sh
 akrogon next issues/open/export-csv/export-csv

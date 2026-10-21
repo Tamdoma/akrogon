@@ -1235,7 +1235,17 @@ function resolveName(repo: Repo, inventory: Inventory, input: string): Leaf[] | 
     })),
     ...leaves.map((leaf) => ({ kind: 'leaf', path: leaf.path, leaves: [leaf] })),
   ];
-  if (matches.length === 1) return matches[0].leaves;
+  const key = (match: { leaves: Leaf[] }): string =>
+    match.leaves
+      .map((leaf) => leaf.path)
+      .sort()
+      .join('\n');
+  // Readings that start the same leaves are one target, unless an unreadable leaf under an owner leaves that unproven.
+  const hidden: boolean = [...inventory.unreadable, ...inventory.unknown].some((entry) =>
+    owners.some((owner) => within(entry.path, owner.path)),
+  );
+  if (matches.length > 0 && !hidden && matches.every((match) => key(match) === key(matches[0])))
+    return matches[0].leaves;
   if (matches.length > 1) {
     const lines: string[] = matches
       .map((match) => ({ kind: match.kind, rel: relative(repo.root, match.path) }))
