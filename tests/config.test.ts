@@ -264,6 +264,7 @@ test('config prints worktree_store matching the leaf path for every root shape a
     check(atSibling, sibling);
     const linked: string = resolve(f.home, 'linked-store');
     await command(['git', 'worktree', 'add', '-b', 'linked-store', linked], f.root);
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: absolute });
     const atLinked = Bun.YAML.parse((await cli(f, ['config'], linked)).stdout) as StoreParsed;
     expect(atLinked.worktree_root).toBe(absolute);
     check(atLinked, absolute);

@@ -46,13 +46,11 @@ test('sync commits local changes, rebases on the remote and pushes', async () =>
   }
 });
 
-async function remoteFixture(
-  worktreeRoot: string | null = 'issues/worktrees',
-  branch: string = 'main',
-): Promise<Fixture> {
+async function remoteFixture(worktreeRoot?: string | null, branch: string = 'main'): Promise<Fixture> {
   const f: Fixture = await fixture();
+  const store: string | null = worktreeRoot === undefined ? resolve(f.home, 'store') : worktreeRoot;
   yaml(resolve(f.root, 'issues/config.yaml'), {
-    ...(worktreeRoot !== null ? { worktree_root: worktreeRoot } : {}),
+    ...(store !== null ? { worktree_root: store } : {}),
     default_branch: branch,
     grounding: 'none',
   });
