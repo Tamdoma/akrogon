@@ -443,7 +443,11 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
             z.object({ pane: paneSchema }),
           )
         ).pane);
-  // Boxed before any save records it, so a later throw never leaves an unboxed recorded pane.
+  // A recorded pane may be unboxed only until the entry sweep or the box step runs; dispatch follows successful boxing.
+  saveState(leaf.path, {
+    ...tabState,
+    pane: { A: first.pane_id, ...(repairB === undefined ? {} : { B: repairB.pane_id }) },
+  });
   async function box(pane: Pane): Promise<void> {
     const place: ScopePlace = await inOwnScope(slice, pane.pane_id);
     if (place.place === 'unreadable')
@@ -464,7 +468,6 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   }
   await box(first);
   if (repairB !== undefined) {
-    saveState(leaf.path, { ...tabState, pane: { A: first.pane_id, B: repairB.pane_id } });
     const prev: string | undefined = (await tabs()).find((tab) => tab.focused === true)?.tab_id;
     async function restoreFocus(): Promise<void> {
       if (prev !== undefined && prev !== tab.tab_id) await herdr(['tab', 'focus', prev], z.object({}));
@@ -504,9 +507,9 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
         z.object({ pane: paneSchema }),
       )
     ).pane;
-  await box(second);
   const allocated: State = { ...tabState, pane: { A: first.pane_id, B: second.pane_id } };
   saveState(leaf.path, allocated);
+  await box(second);
   return allocated;
 }
 
@@ -1088,9 +1091,7 @@ async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invoc
         );
         if (fresh === undefined || fresh.state.broadcast === undefined || !broadcastPending(fresh.state)) return;
         const handoff: Broadcast = fresh.state.broadcast;
-        const allocated: State | null = (await panes()).some((pane) => pane.pane_id === fresh.state.pane.B)
-          ? fresh.state
-          : await allocate(global, repo, fresh, invocation);
+        const allocated: State | null = await allocate(global, repo, fresh, invocation);
         if (allocated === null) return;
         const sources: string = handoff.sources.length === 0 ? 'none' : handoff.sources.join(',');
         await dispatchSlot(

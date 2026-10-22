@@ -212,9 +212,7 @@ test('a B pane whose boxing fails is recorded and replaced before the next promp
     rmSync(resolve(f.home, 'busctl.fail'));
     expect((await next(f, ['build'])).code).toBe(0);
     const after = readState(path);
-    expect(calls(f).filter((args) => args[0] === 'pane' && args[1] === 'close')).toEqual([
-      ['pane', 'close', orphan],
-    ]);
+    expect(calls(f).filter((args) => args[0] === 'pane' && args[1] === 'close')).toEqual([['pane', 'close', orphan]]);
     expect(database(f).panes.some((pane) => pane.pane_id === orphan)).toBe(false);
     expect(after.pane.A).toBe(setup.pane.A);
     const newB: string = z.string().parse(after.pane.B);
@@ -260,9 +258,7 @@ test('boxing a replacement A fails while B lives keeps B recorded', async () => 
     rmSync(resolve(f.home, 'busctl.fail'));
     expect((await next(f, ['build'])).code).toBe(0);
     const after = readState(path);
-    expect(calls(f).filter((args) => args[0] === 'pane' && args[1] === 'close')).toEqual([
-      ['pane', 'close', orphanA],
-    ]);
+    expect(calls(f).filter((args) => args[0] === 'pane' && args[1] === 'close')).toEqual([['pane', 'close', orphanA]]);
     expect(database(f).panes.some((pane) => pane.pane_id === orphanA)).toBe(false);
     const newA: string = z.string().parse(after.pane.A);
     expect(newA).not.toBe(orphanA);
