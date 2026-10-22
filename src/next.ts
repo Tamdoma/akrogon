@@ -446,7 +446,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   // A recorded pane may be unboxed only until the entry sweep or the box step runs; dispatch follows successful boxing.
   saveState(leaf.path, {
     ...tabState,
-    pane: { A: first.pane_id, ...(repairB === undefined ? {} : { B: repairB.pane_id }) },
+    pane: { A: first.pane_id, ...(recordedB === undefined ? {} : { B: recordedB.pane_id }) },
   });
   async function box(pane: Pane): Promise<void> {
     const place: ScopePlace = await inOwnScope(slice, pane.pane_id);
