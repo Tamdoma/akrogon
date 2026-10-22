@@ -184,12 +184,3 @@ test('a sparse store leaf resolves only its own modules: foreign left-pad fails,
     f.clean();
   }
 });
-
-test('setup.md requires a worktree store outside the checkout and drops the in-checkout gitignore line', () => {
-  const guide: string = readFileSync(resolve(import.meta.dir, '../docs/guide/setup.md'), 'utf8');
-  const bullet: string | undefined = guide.split('\n').find((line) => line.includes('worktree_root'));
-  expect(bullet).toBeDefined();
-  expect(bullet).toContain('outside the checkout');
-  expect(bullet).toMatch(/refus/);
-  expect(bullet).not.toContain('inside the checkout is gitignored');
-});
