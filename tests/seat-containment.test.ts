@@ -1,9 +1,10 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { fixture, cli, leaf, fakeHerdr, procRoot, type Fixture } from './helpers';
-import { readState } from '../src/state';
+import { readState, stateSchema, type State } from '../src/state';
+import { quote } from '../src/shell';
 import type { Result } from '../src/shell';
 import type { Database } from './fake-herdr';
 import type { BusctlCall } from './fake-busctl';
@@ -180,6 +181,44 @@ test('an outside pane is closed and recreated boxed before any prompt', async ()
     expect(fresh[0].cgroup.endsWith(`/${slice}/${expectedScope(slice, after.pane.A!)}`)).toBe(true);
     expect(db.prompts.length).toBe(promptsBefore + 1);
     expect(db.prompts.at(-1)!.pane).toBe(after.pane.A!);
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
+test('a repeated allocation keeps live B recorded during every scope lookup', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'build', 'check.review');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const before: State = readState(path);
+    const snapshots: string = resolve(f.home, 'snapshots');
+    const observerBin: string = resolve(f.home, 'observer-bin');
+    mkdirSync(snapshots);
+    mkdirSync(observerBin);
+    const wrapper: string = resolve(observerBin, 'herdr');
+    writeFileSync(
+      wrapper,
+      `#!/bin/sh
+set -eu
+if [ "$1" = pane ] && [ "$2" = process-info ]; then
+  cp ${quote(resolve(path, 'state.yaml'))} ${quote(snapshots)}/"$$"
+fi
+exec ${quote(resolve(f.home, 'bin/herdr'))} "$@"
+`,
+    );
+    chmodSync(wrapper, 0o755);
+    const result: Result = await cli(f, ['next', 'build'], f.root, {
+      ...f.env,
+      PATH: `${observerBin}:${f.env.PATH}`,
+    });
+    expect(result.code).toBe(0);
+    const observed: State[] = readdirSync(snapshots).map((name) =>
+      stateSchema.parse(Bun.YAML.parse(readFileSync(resolve(snapshots, name), 'utf8'))),
+    );
+    expect(observed.length).toBeGreaterThan(0);
+    for (const state of observed) expect(state.pane).toEqual(before.pane);
+    expect(readState(path).pane).toEqual(before.pane);
   } finally {
     f.clean();
   }
