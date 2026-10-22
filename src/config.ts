@@ -264,10 +264,23 @@ export async function requireRepo(global: GlobalConfig, cwd: string): Promise<Re
   return repo;
 }
 
+// Realpath of the deepest existing ancestor joined with the remaining suffix,
+// so paths that do not exist yet still resolve symlinked ancestors.
+function canonicalPath(path: string): string {
+  if (existsSync(path)) return realpathSync(path);
+  const parent: string = dirname(path);
+  return parent === path ? path : resolve(canonicalPath(parent), basename(path));
+}
+
 export function worktreeStore(repo: Repo): string {
-  return repo.config.worktree_root === undefined
-    ? resolve(homedir(), '.akrogon/worktrees', repo.name)
-    : expandPath(repo.config.worktree_root, repo.root);
+  if (repo.config.worktree_root === undefined) return resolve(homedir(), '.akrogon/worktrees', repo.name);
+  const store: string = canonicalPath(expandPath(repo.config.worktree_root, repo.root));
+  const root: string = canonicalPath(repo.root);
+  if (within(store, root))
+    throw new Error(
+      `worktree_root in issues/config.yaml resolves inside the registered checkout: store ${store} is inside ${root}; remove the key (default ~/.akrogon/worktrees/${repo.name}) or point it outside the checkout`,
+    );
+  return store;
 }
 
 // Short on purpose: Chrome puts its SingletonSocket under TMPDIR and aborts past the 107-byte socket path limit.
