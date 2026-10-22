@@ -7,7 +7,7 @@ import { readState } from '../src/state';
 import type { Result } from '../src/shell';
 import type { Database } from './fake-herdr';
 import type { BusctlCall } from './fake-busctl';
-import { OUTSIDE_CGROUP, expectedScope, expectedSlice, procDir, shellPid } from './fake-proc';
+import { OUTSIDE_CGROUP, expectedScope, expectedSlice, procDir, seedShell, shellPid } from './fake-proc';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 async function dispatchFixture(): Promise<DispatchFixture> {
@@ -46,6 +46,26 @@ function skipped(result: Result): { slug?: string; error: string }[] {
     .split('\n')
     .filter((line) => line.startsWith('{'))
     .map((line) => z.object({ slug: z.string().optional(), error: z.string() }).parse(JSON.parse(line)));
+}
+function saveDatabase(f: DispatchFixture, db: Database): void {
+  writeFileSync(f.db, JSON.stringify(db));
+}
+// An operator pane split by hand in the leaf tab: live, unrecorded and outside the leaf's scope.
+function manualPane(f: DispatchFixture, tabId: string, id: string = 'w1:p900'): string {
+  const db: Database = database(f);
+  db.panes.push({ pane_id: id, tab_id: tabId, cwd: null, agent: null, agent_status: 'unknown' });
+  saveDatabase(f, db);
+  seedShell(procRoot(f), id, OUTSIDE_CGROUP);
+  return id;
+}
+function removePane(f: DispatchFixture, id: string): void {
+  const db: Database = database(f);
+  saveDatabase(f, { ...db, panes: db.panes.filter((pane) => pane.pane_id !== id) });
+}
+function manualUntouched(f: DispatchFixture, id: string): void {
+  expect(database(f).panes.some((pane) => pane.pane_id === id)).toBe(true);
+  expect(readFileSync(cgroupPath(f, id), 'utf8').trim()).toBe(OUTSIDE_CGROUP);
+  expect(busctlCalls(f).every((call) => call.pid !== shellPid(id))).toBe(true);
 }
 
 test('next boxes every pane shell in its own scope under the leaf slice before the seat starts', async () => {
@@ -160,6 +180,103 @@ test('an outside pane is closed and recreated boxed before any prompt', async ()
     expect(fresh[0].cgroup.endsWith(`/${slice}/${expectedScope(slice, after.pane.A!)}`)).toBe(true);
     expect(db.prompts.length).toBe(promptsBefore + 1);
     expect(db.prompts.at(-1)!.pane).toBe(after.pane.A!);
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
+test('a B pane whose boxing fails is recorded and replaced before the next prompt', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'build', 'check.review');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const setup = readState(path);
+    const manual: string = manualPane(f, z.string().parse(setup.tab));
+    const deadB: string = z.string().parse(setup.pane.B);
+    removePane(f, deadB);
+    const promptsBefore: number = database(f).prompts.length;
+    writeFileSync(resolve(f.home, 'busctl.fail'), '');
+    const failed: Result = await next(f, ['build']);
+    expect(failed.code).toBe(1);
+    const errors = skipped(failed).filter((entry) => entry.slug === 'build');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].error).toContain('fixture refused');
+    expect(database(f).prompts).toHaveLength(promptsBefore);
+    const mid = readState(path);
+    const orphan: string = z.string().parse(mid.pane.B);
+    expect(orphan).not.toBe(deadB);
+    expect(orphan).not.toBe(manual);
+    expect(database(f).panes.some((pane) => pane.pane_id === orphan)).toBe(true);
+    expect(mid.pane.A).toBe(setup.pane.A);
+    manualUntouched(f, manual);
+    rmSync(resolve(f.home, 'busctl.fail'));
+    expect((await next(f, ['build'])).code).toBe(0);
+    const after = readState(path);
+    expect(calls(f).filter((args) => args[0] === 'pane' && args[1] === 'close')).toEqual([
+      ['pane', 'close', orphan],
+    ]);
+    expect(database(f).panes.some((pane) => pane.pane_id === orphan)).toBe(false);
+    expect(after.pane.A).toBe(setup.pane.A);
+    const newB: string = z.string().parse(after.pane.B);
+    expect(newB).not.toBe(orphan);
+    const slice: string = expectedSlice('repo', 'build');
+    const groups: Database['startCgroups'] = database(f).startCgroups;
+    for (const id of [z.string().parse(after.pane.A), newB])
+      expect(
+        groups.some((start) => start.pane === id && start.cgroup.endsWith(`/${slice}/${expectedScope(slice, id)}`)),
+      ).toBe(true);
+    const sent: Database['prompts'] = database(f).prompts;
+    expect(sent).toHaveLength(promptsBefore + 1);
+    expect(sent.at(-1)!.pane).toBe(newB);
+    manualUntouched(f, manual);
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
+test('boxing a replacement A fails while B lives keeps B recorded', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'build', 'check.review');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const setup = readState(path);
+    const manual: string = manualPane(f, z.string().parse(setup.tab));
+    const deadA: string = z.string().parse(setup.pane.A);
+    const liveB: string = z.string().parse(setup.pane.B);
+    removePane(f, deadA);
+    const promptsBefore: number = database(f).prompts.length;
+    writeFileSync(resolve(f.home, 'busctl.fail'), '');
+    const failed: Result = await next(f, ['build']);
+    expect(failed.code).toBe(1);
+    expect(skipped(failed).filter((entry) => entry.slug === 'build')).toHaveLength(1);
+    expect(database(f).prompts).toHaveLength(promptsBefore);
+    const mid = readState(path);
+    const orphanA: string = z.string().parse(mid.pane.A);
+    expect(orphanA).not.toBe(deadA);
+    expect(mid.pane.B).toBe(liveB);
+    expect(database(f).panes.some((pane) => pane.pane_id === orphanA)).toBe(true);
+    expect(database(f).panes.some((pane) => pane.pane_id === liveB)).toBe(true);
+    manualUntouched(f, manual);
+    rmSync(resolve(f.home, 'busctl.fail'));
+    expect((await next(f, ['build'])).code).toBe(0);
+    const after = readState(path);
+    expect(calls(f).filter((args) => args[0] === 'pane' && args[1] === 'close')).toEqual([
+      ['pane', 'close', orphanA],
+    ]);
+    expect(database(f).panes.some((pane) => pane.pane_id === orphanA)).toBe(false);
+    const newA: string = z.string().parse(after.pane.A);
+    expect(newA).not.toBe(orphanA);
+    expect(after.pane.B).toBe(liveB);
+    const slice: string = expectedSlice('repo', 'build');
+    const groups: Database['startCgroups'] = database(f).startCgroups;
+    expect(
+      groups.some((start) => start.pane === newA && start.cgroup.endsWith(`/${slice}/${expectedScope(slice, newA)}`)),
+    ).toBe(true);
+    expect(groups.some((start) => start.pane === liveB)).toBe(true);
+    const sent: Database['prompts'] = database(f).prompts.slice(promptsBefore);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].pane).toBe(newA);
+    manualUntouched(f, manual);
   } finally {
     f.clean();
   }

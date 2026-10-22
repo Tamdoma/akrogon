@@ -2,7 +2,18 @@ import { test, expect } from 'bun:test';
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { cli, fakeHerdr, fakeSystemctl, fixture, leaf, yaml, type Fixture, type SystemctlFixture } from './helpers';
+import {
+  cli,
+  fakeHerdr,
+  fakeSystemctl,
+  fixture,
+  leaf,
+  procRoot,
+  yaml,
+  type Fixture,
+  type SystemctlFixture,
+} from './helpers';
+import { OUTSIDE_CGROUP, expectedScope, expectedSlice, procDir, shellPid } from './fake-proc';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
@@ -452,6 +463,38 @@ test('stop --all stops a tabless command merge', async () => {
     f.clean();
   }
 });
+
+test('a pending broadcast recreates a live recorded B outside its scope before prompting it', async () => {
+  const f: GreenFixture = await greenFixture({ ok: 'true' });
+  try {
+    const path: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(path, 'aa-file', 'aa\n');
+    toMerge(path);
+    const { attempt } = await claimed(f, path);
+    const before: State = readState(path);
+    const oldB: string = z.string().parse(before.pane.B);
+    writeFileSync(resolve(procDir(procRoot(f), shellPid(oldB)), 'cgroup'), OUTSIDE_CGROUP + '\n');
+    expect((await land(f, 'aa', attempt)).code).toBe(0);
+    const closed: string = moved(path);
+    const state: State = readState(closed);
+    const sent: Database['prompts'] = prompts(f, 'broadcast-issue');
+    expect(sent).toHaveLength(1);
+    const newB: string = z.string().parse(state.pane.B);
+    expect(newB).not.toBe(oldB);
+    expect(sent[0].pane).toBe(newB);
+    expect(sent[0].text).toContain('owner=issue:issue-aa');
+    const db: Database = database(f);
+    expect(db.panes.some((pane) => pane.pane_id === oldB)).toBe(false);
+    expect(db.panes.some((pane) => pane.pane_id === newB)).toBe(true);
+    expect(state.pane.A).toBe(before.pane.A);
+    const slice: string = expectedSlice('repo', 'aa');
+    const fresh = db.startCgroups.filter((start) => start.pane === newB);
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0].cgroup.endsWith(`/${slice}/${expectedScope(slice, newB)}`)).toBe(true);
+  } finally {
+    f.clean();
+  }
+}, 60000);
 
 test('next keeps a working broadcast seat until it finishes', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
