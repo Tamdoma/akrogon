@@ -60,6 +60,7 @@ export function constructedEnv(repo: Repo, runRoot: string): Record<string, stri
     if (value !== undefined) env[key] = value;
   }
   env.TMPDIR = runRoot;
+  env.LANG = 'C.UTF-8';
   for (const key of [...repo.config.env, ...repo.config.pass_env]) {
     const value: string | undefined = process.env[key];
     if (value !== undefined) env[key] = value;
