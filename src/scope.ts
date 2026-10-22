@@ -46,6 +46,7 @@ export function runUnitArgv(slice: string, run: string, argv: string[], cutBus: 
     '--user',
     '--scope',
     '--quiet',
+    '--expand-environment=no',
     `--unit=${runUnitBase(run)}`,
     `--slice=${slice}`,
     '-p',
