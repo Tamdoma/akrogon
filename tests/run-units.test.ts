@@ -495,6 +495,41 @@ test.serial(
 );
 
 test.serial(
+  'a run-check passes $-arguments byte for byte through the real run unit and a nested run-check',
+  async () => {
+    const { f, slice } = await realFixture();
+    const out: string = outDir(f);
+    const worktree: string = await leafWorktree(f, 'literal-argv');
+    const args: string[] = ['a ${base} b', '${file.key}', '$HOME', '$${x}'];
+    const recorder = (file: string): string =>
+      `sh -c 'printf "%s\\n" "$1" "$2" "$3" "$4" > "${file}"; cat /proc/self/cgroup > "${file}.cg"' sh ${args
+        .map((arg) => `'${arg}'`)
+        .join(' ')}`;
+    const script: string = [
+      recorder(resolve(out, 'outer')),
+      `akrogon run-check --name inner -- ${recorder(resolve(out, 'inner'))}`,
+    ].join('; ');
+    const result: SpawnResult = await spawnReal(
+      f,
+      ['run-check', '--name', 'outer', '--', 'sh', '-c', script],
+      worktree,
+      { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
+    ).result;
+    expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
+    const expected: string = `${args.join('\n')}\n`;
+    expect(readFileSync(resolve(out, 'outer'), 'utf8')).toBe(expected);
+    expect(readFileSync(resolve(out, 'inner'), 'utf8')).toBe(expected);
+    const outerCg: string = readFileSync(resolve(out, 'outer.cg'), 'utf8');
+    const scope: string | undefined = outerCg.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];
+    expect(scope).toBeDefined();
+    expect(outerCg).toContain(`/${slice}/${scope}`);
+    expect(readFileSync(resolve(out, 'inner.cg'), 'utf8')).toBe(outerCg);
+    expect(await fixtureUnits(slice)).toEqual([]);
+  },
+  45000,
+);
+
+test.serial(
   'a nested run-check inside a live run adds no record and no reservation',
   async () => {
     const { f, slice } = await realFixture();

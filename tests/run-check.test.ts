@@ -64,6 +64,7 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
       'AKROGON_RUN',
       'AKROGON_HOME',
       'DBUS_SESSION_BUS_ADDRESS',
+      'LANG',
       'CHECK_TOKEN',
       'PWD',
       'SHLVL',
@@ -91,6 +92,31 @@ test('run-check cuts the session bus even when the caller has one', async () => 
     );
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('bus=unix:path=/nonexistent');
+  } finally {
+    f.clean();
+  }
+});
+
+test('run-check gives the command LANG=C.UTF-8 unless the repo declares LANG in env or pass_env', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree } = await leafWorktree(f, 'lang-default');
+    const probe = 'printf "lang=%s\\n" "$LANG"; printf "Č" | wc -m';
+    const plain: Result = await cli(f, ['run-check', '--', ...sh(probe)], worktree, baseEnv(f, { LANG: 'undeclared' }));
+    expect(plain.code).toBe(0);
+    expect(plain.stdout).toBe('lang=C.UTF-8\n1');
+    const config: string = resolve(f.root, 'issues/config.yaml');
+    const before: string = readFileSync(config, 'utf8');
+    yaml(config, { ...(Bun.YAML.parse(before) as object), pass_env: ['LANG'] });
+    const declared: Result = await cli(
+      f,
+      ['run-check', '--', ...sh(probe)],
+      worktree,
+      baseEnv(f, { LANG: 'akrogon-test-lang' }),
+    );
+    writeFileSync(config, before);
+    expect(declared.code).toBe(0);
+    expect(declared.stdout).toBe('lang=akrogon-test-lang\n2');
   } finally {
     f.clean();
   }
