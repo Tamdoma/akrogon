@@ -11,7 +11,7 @@ You need:
 - The harness CLIs named in your machine configuration.
 - The flock command for locking.
 - An authenticated GitHub CLI for GitHub intake and issue closure.
-- A systemd user manager (`systemctl --user`).
+- A systemd user manager (`systemctl --user`), systemd 254 or later.
 
 Check that the commands are available:
 
