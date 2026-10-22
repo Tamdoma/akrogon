@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, relative, resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import {
   type RepoConfig,
@@ -8,7 +8,6 @@ import {
   readGlobal,
   repoSchema,
   seats,
-  within,
   worktreeStore,
 } from './config';
 import { command, writeYaml } from './shell';
@@ -59,6 +58,7 @@ export async function initialize(
     throw new Error(`Repo name already registered: ${repoName}`);
   seats(global, { name: repoName, root, config });
   checkGrounding(root, config);
+  worktreeStore({ name: repoName, root, config });
   writeRepoConfig(root, config);
   mkdirSync(resolve(root, 'issues/open'), { recursive: true });
   mkdirSync(resolve(root, 'learnings'), { recursive: true });
@@ -66,9 +66,7 @@ export async function initialize(
   if (!existsSync(lessons)) writeFileSync(lessons, '# Lessons\n');
   const ignore: string = resolve(root, '.gitignore');
   const prior: string = existsSync(ignore) ? readFileSync(ignore, 'utf8') : '';
-  const worktreeRoot: string = worktreeStore({ name: repoName, root, config });
   const additions: string[] = [
-    ...(worktreeRoot !== root && within(worktreeRoot, root) ? [`${relative(root, worktreeRoot)}/`] : []),
     'issues/seeds/',
     '.lock',
     'issues/open/**/*.log',
