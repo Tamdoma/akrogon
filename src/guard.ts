@@ -35,7 +35,9 @@ export async function guard(cwd: string, positionals: string[]): Promise<number>
   }
   const own: string = join(top, 'node_modules');
   if (existsSync(join(top, 'package.json')) && !existsSync(own)) {
-    console.error(`missing own node_modules: ${own}; set setup in issues/config.yaml to install dependencies in each fresh checkout`);
+    console.error(
+      `missing own node_modules: ${own}; set setup in issues/config.yaml to install dependencies in each fresh checkout`,
+    );
     return 1;
   }
   return 0;

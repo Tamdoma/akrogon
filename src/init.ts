@@ -1,15 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import {
-  type RepoConfig,
-  type GlobalConfig,
-  globalHome,
-  readGlobal,
-  repoSchema,
-  seats,
-  worktreeStore,
-} from './config';
+import { type RepoConfig, type GlobalConfig, globalHome, readGlobal, repoSchema, seats, worktreeStore } from './config';
 import { command, writeYaml } from './shell';
 
 export function writeRepoConfig(root: string, config: RepoConfig): void {
