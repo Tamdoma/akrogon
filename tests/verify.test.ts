@@ -61,6 +61,36 @@ async function verify(f: Fixture, args: string[], cwd: string, timeout?: number)
   return cli(f, ['verify', ...args], cwd, env, timeout);
 }
 
+const refusedVerifyStores: [string, (f: Fixture) => string, (f: Fixture) => string][] = [
+  ['relative inside the checkout', () => 'issues/worktrees', (f) => `${realpathSync(f.root)}/issues/worktrees`],
+  ['absolute inside the checkout', (f) => resolve(f.root, 'worktrees'), (f) => `${realpathSync(f.root)}/worktrees`],
+  ['a symlinked alias of the checkout', () => '~/alias/trees', (f) => `${realpathSync(f.root)}/trees`],
+];
+
+test.each(refusedVerifyStores)(
+  'verify refuses a worktree store %s and creates no checkout',
+  async (_shape, worktreeRoot, resolvedStore) => {
+    const f: Fixture = await fixture();
+    try {
+      symlinkSync(f.root, resolve(f.home, 'alias'));
+      config(f, { worktree_root: worktreeRoot(f) });
+      const { worktree } = await callerWorktree(f);
+      await commitIn(worktree, 'code.ts');
+      const worktrees: string = await command(['git', 'worktree', 'list', '--porcelain'], f.root);
+      const result: Result = await verify(f, [], worktree);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('worktree_root');
+      expect(result.stderr).toContain('issues/config.yaml');
+      expect(result.stderr).toContain(resolvedStore(f));
+      expect(result.stderr).toContain(realpathSync(f.root));
+      expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).toBe(worktrees);
+      expect(records(f)).toEqual([]);
+    } finally {
+      f.clean();
+    }
+  },
+);
+
 test('verify runs every leaf check on a fresh checkout of HEAD, keeps logs and writes one receipt', async () => {
   const f: Fixture = await fixture();
   try {

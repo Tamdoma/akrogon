@@ -43,6 +43,8 @@ test('guard own-modules refuses naming the missing node_modules and accepts it o
     const missing: Result = await cli(f, ['guard', 'own-modules']);
     expect(missing.code).toBe(1);
     expect(missing.stderr).toContain(resolve(realpathSync(f.root), 'node_modules'));
+    expect(missing.stderr).toContain('setup');
+    expect(missing.stderr).toContain('issues/config.yaml');
     mkdirSync(resolve(f.root, 'node_modules'));
     const present: Result = await cli(f, ['guard', 'own-modules']);
     expect(present.code).toBe(0);
@@ -130,6 +132,8 @@ test('printed check refuses naming missing own node_modules and never runs the c
     const result: Result = await check(printed, worktree);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(resolve(realpathSync(worktree), 'node_modules'));
+    expect(result.stderr).toContain('setup');
+    expect(result.stderr).toContain('issues/config.yaml');
     expect(existsSync(marker)).toBe(false);
   } finally {
     f.clean();

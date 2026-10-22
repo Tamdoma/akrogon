@@ -1617,7 +1617,7 @@ for (const moved of ['worktree root', 'repo root'] as const) {
       await command(['git', 'worktree', 'add', '-b', 'relocated', recorded], f.root);
       leaf(f, 'relocated', 'plan.synthesis', { worktree: recorded });
       const root: string = moved === 'repo root' ? resolve(f.home, 'moved-repo') : f.root;
-      const worktreeRoot: string = moved === 'worktree root' ? 'issues/new-worktrees' : storeDir(f);
+      const worktreeRoot: string = moved === 'worktree root' ? resolve(f.home, 'new-store') : storeDir(f);
       if (moved === 'repo root') renameSync(f.root, root);
       else yaml(resolve(root, 'issues/config.yaml'), { worktree_root: worktreeRoot, grounding: 'none' });
       configure(f, { repos: { repo: root } });

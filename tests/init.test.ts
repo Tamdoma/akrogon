@@ -2,7 +2,16 @@ import { test, expect } from 'bun:test';
 import { resolve } from 'node:path';
 
 const LOG_IGNORES: string = 'issues/open/**/*.log\nissues/parked/**/*.log\nissues/chart/*/direct/**/*.log\n';
-import { appendFileSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, readdirSync } from 'node:fs';
+import {
+  appendFileSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+  existsSync,
+  rmSync,
+  mkdirSync,
+  readdirSync,
+} from 'node:fs';
 import { fixture, cli, yaml, type Fixture } from './helpers';
 import { command, run, type Result } from '../src/shell';
 
@@ -47,49 +56,42 @@ test('init writes proposal, registration and toolkit and preserves repeated user
   }
 });
 
-test('init ignores the custom worktree root and preserves user rules on repeated init', async () => {
+test('init writes no worktree store line to .gitignore and preserves user rules on repeated init', async () => {
   const f: Fixture = await fixture();
   try {
     const proposal: string = resolve(f.home, 'proposal.yaml');
-    yaml(proposal, { worktree_root: 'work/trees', grounding: 'none' });
+    yaml(proposal, { worktree_root: '~/work/trees', grounding: 'none' });
     const ignore: string = resolve(f.root, '.gitignore');
     writeFileSync(ignore, '# User rules\nlocal/\nissues/seeds/\n.lock');
     expect((await cli(f, ['init', '--from', proposal])).code).toBe(0);
     const before: string = readFileSync(ignore, 'utf8');
-    expect(before).toBe('# User rules\nlocal/\nissues/seeds/\n.lock\nwork/trees/\n' + LOG_IGNORES);
-    mkdirSync(resolve(f.root, 'work/trees/leaf'), { recursive: true });
-    writeFileSync(resolve(f.root, 'work/trees/leaf/file'), 'worktree content\n');
-    expect(await command(['git', 'check-ignore', 'work/trees/leaf/file'], f.root)).toBe('work/trees/leaf/file');
+    expect(before).toBe('# User rules\nlocal/\nissues/seeds/\n.lock\n' + LOG_IGNORES);
+    expect(before).not.toContain('trees');
     expect((await cli(f, ['init'])).code).toBe(0);
     expect(readFileSync(ignore, 'utf8')).toBe(before);
     expect(Bun.YAML.parse(readFileSync(resolve(f.root, 'issues/config.yaml'), 'utf8'))).toMatchObject({
-      worktree_root: 'work/trees',
+      worktree_root: '~/work/trees',
     });
   } finally {
     f.clean();
   }
 });
 
-const rootCases: [string, (f: Fixture) => string, string][] = [
-  ['relative external', () => '../trees', ''],
-  ['absolute external', (f: Fixture) => resolve(f.home, 'trees'), ''],
-  ['tilde external', () => '~/trees', ''],
-  ['repo-prefix sibling', (f: Fixture) => `${f.root}-trees`, ''],
-  ['normalized relative internal', () => './work/temporary/../trees/', 'work/trees/\n'],
-  ['absolute internal', (f: Fixture) => resolve(f.root, 'work/trees'), 'work/trees/\n'],
-  ['relative repo-equal', () => '.', ''],
-  ['absolute repo-equal', (f: Fixture) => f.root, ''],
+const acceptedCases: [string, (f: Fixture) => string][] = [
+  ['relative external', () => '../trees'],
+  ['absolute external', (f: Fixture) => resolve(f.home, 'trees')],
+  ['tilde external', () => '~/trees'],
+  ['repo-prefix sibling', (f: Fixture) => `${f.root}-trees`],
+  ['repo2 sibling', (f: Fixture) => `${f.root}2/trees`],
 ];
 
-test.each(rootCases)('init resolves %s worktree root from nested cwd', async (_, worktreeRoot, expected) => {
+test.each(acceptedCases)('init resolves %s worktree root from nested cwd', async (_shape, worktreeRoot) => {
   const f: Fixture = await fixture();
   try {
     const proposal: string = resolve(f.home, 'proposal.yaml');
     yaml(proposal, { worktree_root: worktreeRoot(f), grounding: 'none' });
     expect((await cli(f, ['init', '--from', proposal], resolve(f.root, 'issues/open'))).code).toBe(0);
-    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe(
-      `.env\n${expected}issues/seeds/\n.lock\n` + LOG_IGNORES,
-    );
+    expect(readFileSync(resolve(f.root, '.gitignore'), 'utf8')).toBe('.env\nissues/seeds/\n.lock\n' + LOG_IGNORES);
   } finally {
     f.clean();
   }
@@ -101,6 +103,7 @@ type InitSnapshot = {
   open: string[];
   learnings: boolean;
   ignore: string | null;
+  attributes: string | null;
 };
 function snapshotInit(f: Fixture): InitSnapshot {
   return {
@@ -109,6 +112,9 @@ function snapshotInit(f: Fixture): InitSnapshot {
     open: readdirSync(resolve(f.root, 'issues/open')),
     learnings: existsSync(resolve(f.root, 'learnings')),
     ignore: existsSync(resolve(f.root, '.gitignore')) ? readFileSync(resolve(f.root, '.gitignore'), 'utf8') : null,
+    attributes: existsSync(resolve(f.root, '.gitattributes'))
+      ? readFileSync(resolve(f.root, '.gitattributes'), 'utf8')
+      : null,
   };
 }
 function expectInitUnchanged(f: Fixture, before: InitSnapshot): void {
@@ -119,7 +125,46 @@ function expectInitUnchanged(f: Fixture, before: InitSnapshot): void {
   expect(existsSync(resolve(f.root, '.gitignore')) ? readFileSync(resolve(f.root, '.gitignore'), 'utf8') : null).toBe(
     before.ignore,
   );
+  expect(
+    existsSync(resolve(f.root, '.gitattributes')) ? readFileSync(resolve(f.root, '.gitattributes'), 'utf8') : null,
+  ).toBe(before.attributes);
 }
+
+const refusedCases: [string, (f: Fixture) => string, (f: Fixture) => string][] = [
+  [
+    'normalized relative internal',
+    () => './work/temporary/../trees/',
+    (f: Fixture) => `${realpathSync(f.root)}/work/trees`,
+  ],
+  [
+    'absolute internal',
+    (f: Fixture) => resolve(f.root, 'work/trees'),
+    (f: Fixture) => `${realpathSync(f.root)}/work/trees`,
+  ],
+  ['relative repo-equal', () => '.', (f: Fixture) => realpathSync(f.root)],
+  ['absolute repo-equal', (f: Fixture) => f.root, (f: Fixture) => realpathSync(f.root)],
+];
+
+test.each(refusedCases)(
+  'init refuses %s worktree root naming the key, store and checkout without writing files',
+  async (_shape, worktreeRoot, resolvedStore) => {
+    const f: Fixture = await fixture();
+    try {
+      const proposal: string = resolve(f.home, 'proposal.yaml');
+      yaml(proposal, { worktree_root: worktreeRoot(f), grounding: 'none' });
+      const before: InitSnapshot = snapshotInit(f);
+      const result: Result = await cli(f, ['init', '--from', proposal]);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('worktree_root');
+      expect(result.stderr).toContain('issues/config.yaml');
+      expect(result.stderr).toContain(resolvedStore(f));
+      expect(result.stderr).toContain(realpathSync(f.root));
+      expectInitUnchanged(f, before);
+    } finally {
+      f.clean();
+    }
+  },
+);
 
 test('init refuses missing grounding index without changing files', async () => {
   const f: Fixture = await fixture();

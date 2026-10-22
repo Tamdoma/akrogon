@@ -244,10 +244,10 @@ test('config prints worktree_store matching the leaf path for every root shape a
     const unset = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
     expect(unset.worktree_root ?? null).toBeNull();
     check(unset, resolve(f.home, '.akrogon/worktrees/repo'));
-    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: 'custom/trees' });
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: '~/custom/trees' });
     const custom = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
-    expect(custom.worktree_root).toBe('custom/trees');
-    check(custom, resolve(root, 'custom/trees'));
+    expect(custom.worktree_root).toBe('~/custom/trees');
+    check(custom, resolve(f.home, 'custom/trees'));
     yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: '~/x' });
     const tilde = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
     expect(tilde.worktree_root).toBe('~/x');
@@ -257,6 +257,11 @@ test('config prints worktree_store matching the leaf path for every root shape a
     const atRoot = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
     expect(atRoot.worktree_root).toBe(absolute);
     check(atRoot, absolute);
+    const sibling: string = `${root}2/trees`;
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: sibling });
+    const atSibling = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
+    expect(atSibling.worktree_root).toBe(sibling);
+    check(atSibling, sibling);
     const linked: string = resolve(f.home, 'linked-store');
     await command(['git', 'worktree', 'add', '-b', 'linked-store', linked], f.root);
     const atLinked = Bun.YAML.parse((await cli(f, ['config'], linked)).stdout) as StoreParsed;
@@ -270,6 +275,31 @@ test('config prints worktree_store matching the leaf path for every root shape a
     f.clean();
   }
 });
+
+const refusedStores: [string, (f: Fixture) => string, (f: Fixture) => string][] = [
+  ['relative inside the checkout', () => 'issues/worktrees', (f) => resolve(realpathSync(f.root), 'issues/worktrees')],
+  ['absolute inside the checkout', (f) => resolve(f.root, 'worktrees'), (f) => `${realpathSync(f.root)}/worktrees`],
+  ['a symlinked alias of the checkout', () => '~/alias/trees', (f) => `${realpathSync(f.root)}/trees`],
+];
+
+test.each(refusedStores)(
+  'config refuses a worktree store %s naming the key, store and checkout',
+  async (_shape, worktreeRoot, resolvedStore) => {
+    const f: Fixture = await fixture();
+    try {
+      symlinkSync(f.root, resolve(f.home, 'alias'));
+      yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: worktreeRoot(f) });
+      const result: Result = await cli(f, ['config']);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('worktree_root');
+      expect(result.stderr).toContain('issues/config.yaml');
+      expect(result.stderr).toContain(resolvedStore(f));
+      expect(result.stderr).toContain(realpathSync(f.root));
+    } finally {
+      f.clean();
+    }
+  },
+);
 
 test('config prints per-repo merged slots with two overrides', async () => {
   const f: Fixture = await fixture();

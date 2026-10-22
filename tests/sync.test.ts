@@ -8,6 +8,7 @@ import {
   mkdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -132,15 +133,14 @@ test('sync scopes eligible issue records with the default home worktree store', 
   }
 });
 
-test('sync stages eligible records beside ignored seeds and worktree paths', async () => {
+test('sync stages eligible records beside ignored seeds', async () => {
   const f: Fixture = await remoteFixture();
   try {
-    put(f, '.gitignore', '.env\nissues/seeds/\nissues/worktrees/\n');
+    put(f, '.gitignore', '.env\nissues/seeds/\n');
     await command(['git', 'add', '.gitignore'], f.root);
     await command(['git', 'commit', '-m', 'ignore'], f.root);
     await command(['git', 'push'], f.root);
     put(f, 'issues/seeds/note');
-    put(f, 'issues/worktrees/branch/file');
     put(f, 'issues/log.jsonl');
     const result: Result = await cli(f, ['sync']);
     expect(result.code, result.stderr).toBe(0);
@@ -175,7 +175,7 @@ test('autostash restoration conflict refuses push and preserves recovery stash',
 
 for (const branch of ['side', 'detached HEAD']) {
   test(`sync refuses ${branch} without touching HEAD or index`, async () => {
-    const f: Fixture = await remoteFixture('issues/worktrees', 'trunk');
+    const f: Fixture = await remoteFixture(undefined, 'trunk');
     try {
       await command(branch === 'side' ? ['git', 'checkout', '-b', branch] : ['git', 'checkout', '--detach'], f.root);
       put(f, 'issues/log.jsonl');
@@ -193,13 +193,7 @@ for (const branch of ['side', 'detached HEAD']) {
   });
 }
 
-for (const path of [
-  'outside file \n',
-  'issues/seeds/note',
-  'issues/nested/.lock',
-  'issues/worktrees/branch/file',
-  'rename',
-]) {
+for (const path of ['outside file \n', 'issues/seeds/note', 'issues/nested/.lock', 'rename']) {
   test(`sync refuses staged exclusion ${JSON.stringify(path)}`, async () => {
     const f: Fixture = await remoteFixture();
     try {
@@ -221,12 +215,11 @@ for (const path of [
   });
 }
 
-for (const worktreeRoot of ['issues/worktrees', 'issues/custom trees', 'issues/tree[1]*', '../external', '.']) {
+for (const worktreeRoot of ['../external', '../repo2/trees']) {
   test(`sync scopes tracked changes and new files with worktree root ${worktreeRoot}`, async () => {
     const f: Fixture = await remoteFixture(worktreeRoot);
     try {
       const excluded: string[] = ['issues/seeds/note', '.lock', 'issues/record/.lock', 'issues/nested/.lock'];
-      if (worktreeRoot !== '.' && !worktreeRoot.startsWith('../')) excluded.push(`${worktreeRoot}/file`);
       const removed: string[] = excluded.map((path: string) => `${dirname(path)}/deleted`);
       // Lock exclusions apply to the basename, so use nested lock files for deleted locks.
       const deleted: string[] = removed.map((path: string, i: number) =>
@@ -236,22 +229,17 @@ for (const worktreeRoot of ['issues/worktrees', 'issues/custom trees', 'issues/t
       await command(['git', 'add', '-A'], f.root);
       await command(['git', 'commit', '-m', 'tracked fixtures'], f.root);
       await command(['git', 'push'], f.root);
-      const before: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
       for (const path of excluded) put(f, path, 'operator edits\n');
       for (const path of [...deleted, 'issues/eligible-delete']) rmSync(resolve(f.root, path));
       for (const path of ['issues/seeds/new', 'issues/another/.lock', `${worktreeRoot}/new`]) put(f, path);
       put(f, 'issues/eligible-new');
-      if (worktreeRoot === 'issues/tree[1]*') put(f, 'issues/tree1-match/eligible');
       const result: Result = await cli(f, ['sync']);
       expect(result.code, result.stderr).toBe(0);
       expect(await command(['git', 'diff', '--cached', '--name-only'], f.root)).toBe('');
-      if (worktreeRoot === '.') expect(await command(['git', 'rev-parse', 'HEAD'], f.root)).toBe(before);
-      else
-        expect((await command(['git', 'show', '--format=', '--name-status', 'HEAD'], f.root)).split('\n')).toEqual([
-          'D\tissues/eligible-delete',
-          'A\tissues/eligible-new',
-          ...(worktreeRoot === 'issues/tree[1]*' ? ['A\tissues/tree1-match/eligible'] : []),
-        ]);
+      expect((await command(['git', 'show', '--format=', '--name-status', 'HEAD'], f.root)).split('\n')).toEqual([
+        'D\tissues/eligible-delete',
+        'A\tissues/eligible-new',
+      ]);
       for (const path of excluded) expect(readFileSync(resolve(f.root, path), 'utf8')).toBe('operator edits\n');
       for (const path of deleted) expect(existsSync(resolve(f.root, path))).toBe(false);
     } finally {
@@ -259,6 +247,24 @@ for (const worktreeRoot of ['issues/worktrees', 'issues/custom trees', 'issues/t
     }
   });
 }
+
+test('sync refuses a worktree store inside the checkout naming the key without committing', async () => {
+  const f: Fixture = await remoteFixture('issues/worktrees');
+  try {
+    put(f, 'issues/log.jsonl');
+    const remoteHead: string = await command(['git', 'rev-parse', 'HEAD'], resolve(f.home, 'remote.git'));
+    const result: Result = await cli(f, ['sync']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('worktree_root');
+    expect(result.stderr).toContain('issues/config.yaml');
+    expect(result.stderr).toContain(`${realpathSync(f.root)}/issues/worktrees`);
+    expect(result.stderr).toContain(realpathSync(f.root));
+    expect(await command(['git', 'rev-parse', 'HEAD'], resolve(f.home, 'remote.git'))).toBe(remoteHead);
+    await locksFree(f);
+  } finally {
+    f.clean();
+  }
+});
 
 async function waitFor(path: string): Promise<void> {
   const deadline: number = Date.now() + 3000;
