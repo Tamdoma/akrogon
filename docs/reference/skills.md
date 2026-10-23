@@ -41,8 +41,8 @@ Chart consultants are different from seats A and B. A consultant is a peer pane 
 
 ## merge-issue
 
-- **Result:** the leaf rebased onto the default branch and its checks run. The command then pushes and moves the leaf. Seat B never pushes itself.
-- **When to use:** a leaf is in `merge`.
+- **Result:** a merge attempt the command could not finish alone, checked or repaired by seat B: the applied rebase checked, a red check or refused push looked into, or a solo leaf rebased by hand. The command then pushes and moves the leaf. Seat B never pushes itself.
+- **When to use:** a leaf is in `merge` and the command hands the attempt over. An attempt that passes the command's own land run lands with no seat at all.
 - **Who starts it:** the command, dispatching seat B.
 - **Source:** [`skills/merge-issue/SKILL.md`](../../skills/merge-issue/SKILL.md)
 
