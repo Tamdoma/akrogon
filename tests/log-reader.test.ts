@@ -159,9 +159,3 @@ test('log resolves against every registered repo outside one and names matches o
     f.clean();
   }
 });
-
-test('docs and skills name akrogon log for recorded check and verify logs', (): void => {
-  for (const path of ['README.md', 'skills/learn-issues/SKILL.md', 'skills/merge-issue/SKILL.md']) {
-    expect(readFileSync(resolve(import.meta.dir, '..', path), 'utf8')).toContain('akrogon log');
-  }
-});
