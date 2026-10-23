@@ -10,7 +10,7 @@
 - `tests/helpers.ts` supplies temporary repos, CLI invocations and leaf fixtures; `tests/deploy-fixture.ts` builds the deployed-release fixture (seed repo, release stub, `deployedPair`).
 - `tests/isolation.ts` is the `bunfig.toml` `[test]` preload: per-worker scratch HOME and leaf-temp, a subreaper plus descendant sweep so the suite never reaches real HOME or `/var/tmp/akr-<uid>` and leaves no process.
 - `tests/phase.test.ts` checks real transitions, races and handoff refusal.
-- `tests/command-reference.test.ts` checks README command argument contracts against the dispatched verbs; `tests/docs-links.test.ts` checks relative links and heading anchors in README and the guide.
+- `tests/command-reference.test.ts` checks the command table in `docs/reference/commands.md` against the dispatched verbs and their argument contracts; `tests/docs-links.test.ts` checks relative links, heading anchors and image references in README, every Markdown page under `docs/` and the skills.
 - `tests/watch-issues-scripts.test.ts` is the `skills/watch-issues` gate, running its scripts tests and typecheck.
 - `tests/guard.test.ts` checks the `akrogon guard` ancestor and own-modules refusals.
 - `tests/run-permit.test.ts` checks runs start at once: concurrent runs, nested `run-check`/`verify`, `status` showing no waiter lines, missing `memory.stat` ignored and unmatched `AKROGON_RUN` tokens. `tests/run-units.test.ts` checks run-unit boxing, `stop-run` authority, wrapper-death reaping, verify units, immediate admission, the stale sweep and the skills' `stop-run` wording, with real units under `akrogon-test-*.slice`.
