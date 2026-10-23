@@ -83,7 +83,7 @@ test.serial('the hold blocks redeploy of the rolled-back commit until main moves
   }
 });
 
-test.serial('the README manual steps roll a broken release back using the real previous release', async () => {
+test.serial('the roll-back page manual steps roll a broken release back using the real previous release', async () => {
   const d: DeployFixture = await deployFixture();
   try {
     // The real predecessor: the newest commit before the rollback work,
@@ -126,10 +126,11 @@ test.serial('the README manual steps roll a broken release back using the real p
       { env: homeEnv },
     );
     expect(cannotStart.code).not.toBe(0);
-    // The README's manual steps, verbatim against the fixture's state home.
-    const readme: string = readFileSync(resolve(import.meta.dir, '../README.md'), 'utf8');
-    expect(readme).toContain('release-hold.yaml');
-    expect(readme).toContain('writeDeploySuccess');
+    // The roll-back page's manual steps, verbatim against the fixture's state home.
+    const page: string = readFileSync(resolve(import.meta.dir, '../docs/use/roll-back-a-release.md'), 'utf8');
+    expect(page).toContain('mv -T .next-current current');
+    expect(page).toContain('release-hold.yaml');
+    expect(page).toContain('writeDeploySuccess');
     await command(['ln', '-s', resolve(releases(d), base), '.next-current'], d.home);
     await command(['mv', '-T', '.next-current', 'current'], d.home);
     writeFileSync(resolve(d.home, 'release-hold.yaml'), `commit: ${bad}\n`);
