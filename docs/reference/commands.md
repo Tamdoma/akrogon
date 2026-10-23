@@ -38,7 +38,7 @@ Every `akrogon` command, one line each. Run commands from the registered reposit
 | --- | --- |
 | `akrogon status [<slug>\|--charts]` | Show the board, one leaf's state and history, or the charts. Outside a repository, the board covers every registered repository. |
 | `akrogon leftovers` | List kept paths and units that need a person, grouped by reason. Outside a repository, it covers every registered repository. |
-| `akrogon timing [<slug>\|--cohort --since <iso>\|--flow --since <YYYY-MM-DD>]` | Report time spent per leaf, the cohort since a moment, or issue flow since a date. |
+| `akrogon timing <slug> \| --cohort --since <iso> \| --flow --since <YYYY-MM-DD>` | Report time spent per leaf, the cohort since a moment, or issue flow since a date. |
 | `akrogon flaky` | List checks and tests that went red then green on the same tree, newest first. |
 
 ## Checks and logs
