@@ -20,7 +20,7 @@ The command then records the reason in the leaf's `failure` field, shows a deskt
 
    The failed line shows the reason. It often points to a file in the leaf folder with more detail, such as `plan.md` or `implementation/report.md`. For a missing credential, the `Missing:` lines name the variable to add.
 
-2. Fix the cause. A missing value needs you to add it, for example to the worktree's `.env`. Broken code needs a repair. Retrying without changing anything brings back the same stop.
+2. Fix the cause. A missing value needs you to add it to the `.env` file in the repo the `Missing:` line names after `in`, never in the leaf worktree. Broken code needs a repair. Retrying without changing anything brings back the same stop.
 
 3. Move the leaf back to the active phase that fits the remaining work, with no `--slot`:
 
