@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 676" role="img">
+  <title>Project folders: the checkout's issues folder and the separate worktree store</title>
+  <rect x="0" y="0" width="640" height="676" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+  <style>
+    text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .node { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+    .root { fill: #ffffff; stroke: #0969da; stroke-width: 2; }
+    .head { fill: #1f2328; font-size: 17px; font-weight: 600; }
+    .name { fill: #1f2328; font-size: 15px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 14px; }
+  </style>
+
+  <!-- Root 1: the registered checkout's issues folder -->
+  <rect class="root" x="24" y="24" width="592" height="440" rx="10"/>
+  <text class="head" x="40" y="54">Registered checkout: &lt;repo&gt;/issues/</text>
+
+  <rect class="node" x="40" y="72" width="272" height="56" rx="8"/>
+  <text class="name" x="56" y="96">seeds/</text>
+  <text class="note" x="56" y="116">imported seeds, not committed</text>
+  <rect class="node" x="328" y="72" width="272" height="56" rx="8"/>
+  <text class="name" x="344" y="96">chart/</text>
+  <text class="note" x="344" y="116">charts of open forks</text>
+
+  <rect class="node" x="40" y="140" width="272" height="56" rx="8"/>
+  <text class="name" x="56" y="164">open/</text>
+  <text class="note" x="56" y="184">active issues and leaves</text>
+  <rect class="node" x="328" y="140" width="272" height="56" rx="8"/>
+  <text class="name" x="344" y="164">parked/</text>
+  <text class="note" x="344" y="184">issues set aside</text>
+
+  <rect class="node" x="40" y="208" width="272" height="56" rx="8"/>
+  <text class="name" x="56" y="232">closed/</text>
+  <text class="note" x="56" y="252">completed issues</text>
+
+  <!-- Records files -->
+  <text class="note" x="40" y="296">Records, one JSON line per event</text>
+  <rect class="node" x="40" y="312" width="272" height="56" rx="8"/>
+  <text class="name" x="56" y="336">log.jsonl</text>
+  <text class="note" x="56" y="356">lifecycle moves</text>
+  <rect class="node" x="328" y="312" width="272" height="56" rx="8"/>
+  <text class="name" x="344" y="336">timings.jsonl</text>
+  <text class="note" x="344" y="356">when each stage happens</text>
+
+  <rect class="node" x="40" y="380" width="272" height="56" rx="8"/>
+  <text class="name" x="56" y="404">merge-attempts.jsonl</text>
+  <text class="note" x="56" y="424">each merge attempt</text>
+  <rect class="node" x="328" y="380" width="272" height="56" rx="8"/>
+  <text class="name" x="344" y="404">verify-runs.jsonl</text>
+  <text class="note" x="344" y="424">each verify run's receipt</text>
+
+  <!-- Root 2: the worktree store, outside the checkout -->
+  <rect class="root" x="24" y="496" width="592" height="156" rx="10"/>
+  <text class="head" x="40" y="526">Worktree store, outside the checkout</text>
+  <text class="note" x="40" y="550">default ~/.akrogon/worktrees/&lt;repo&gt;</text>
+
+  <rect class="node" x="40" y="572" width="272" height="56" rx="8"/>
+  <text class="name" x="56" y="596">&lt;leaf-slug&gt;/</text>
+  <text class="note" x="56" y="616">one leaf's worktree</text>
+  <rect class="node" x="328" y="572" width="272" height="56" rx="8"/>
+  <text class="name" x="344" y="596">&lt;leaf-slug&gt;/</text>
+  <text class="note" x="344" y="616">one leaf's worktree</text>
+</svg>

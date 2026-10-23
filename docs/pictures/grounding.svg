@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 500" role="img">
+  <title>Grounding: from the reference index to an AREA file to source code</title>
+  <rect x="0" y="0" width="640" height="500" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+  <style>
+    text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .node { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+    .agent { fill: #ffffff; stroke: #0969da; stroke-width: 2; }
+    .name { fill: #1f2328; font-size: 16px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 14px; }
+    .edge { stroke: #0969da; stroke-width: 2; fill: none; }
+    .side { stroke: #8250df; stroke-width: 2; stroke-dasharray: 6 4; fill: none; }
+    .label { fill: #0969da; font-size: 14px; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0969da"/>
+    </marker>
+  </defs>
+
+  <!-- The chain -->
+  <rect class="node" x="24" y="24" width="320" height="104" rx="8"/>
+  <text class="name" x="40" y="54">grounding.index</text>
+  <text class="note" x="40" y="78">set in issues/config.yaml</text>
+  <text class="note" x="40" y="100">for example</text>
+  <text class="note" x="40" y="118">docs/reference-index.md</text>
+
+  <path class="edge" d="M184,128 L184,194" marker-end="url(#arrow)"/>
+  <text class="label" x="196" y="166">links to</text>
+
+  <rect class="node" x="24" y="196" width="320" height="104" rx="8"/>
+  <text class="name" x="40" y="226">AREA.md</text>
+  <text class="note" x="40" y="250">for example src/AREA.md</text>
+  <text class="note" x="40" y="272">commands, key files and</text>
+  <text class="note" x="40" y="290">local constraints</text>
+
+  <path class="edge" d="M184,300 L184,366" marker-end="url(#arrow)"/>
+  <text class="label" x="196" y="338">points to</text>
+
+  <rect class="node" x="24" y="368" width="320" height="104" rx="8"/>
+  <text class="name" x="40" y="398">Source file</text>
+  <text class="note" x="40" y="422">for example src/scope.ts</text>
+  <text class="note" x="40" y="444">real code and tests</text>
+
+  <!-- The agents that read along it -->
+  <rect class="agent" x="392" y="24" width="224" height="104" rx="8"/>
+  <text class="name" x="408" y="54">Plan agent</text>
+  <text class="note" x="408" y="78">reads the index, the</text>
+  <text class="note" x="408" y="98">relevant areas and</text>
+  <text class="note" x="408" y="118">their files</text>
+  <path class="edge" d="M392,76 L346,76" marker-end="url(#arrow)"/>
+  <text class="label" x="369" y="66" text-anchor="middle">reads</text>
+
+  <path class="edge" d="M504,128 L504,194" marker-end="url(#arrow)"/>
+  <text class="label" x="512" y="166">read-first list</text>
+
+  <rect class="agent" x="392" y="196" width="224" height="104" rx="8"/>
+  <text class="name" x="408" y="226">Implement agent</text>
+  <text class="note" x="408" y="250">works from the plan's</text>
+  <text class="note" x="408" y="270">read-first list, opens</text>
+  <text class="note" x="408" y="290">the index only on a gap</text>
+  <path class="side" d="M392,280 L368,280 L368,112 L346,112"/>
+</svg>

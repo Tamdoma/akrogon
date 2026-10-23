@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 620" role="img">
+  <title>Machine parts: the akrogon command, its config, and the leaf slice with Herdr panes</title>
+  <rect x="0" y="0" width="640" height="620" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+  <style>
+    text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .node { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+    .box { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+    .name { fill: #1f2328; font-size: 16px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 14px; }
+    .edge { stroke: #0969da; stroke-width: 2; fill: none; }
+    .label { fill: #0969da; font-size: 14px; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0969da"/>
+    </marker>
+  </defs>
+
+  <!-- Inputs the command reads -->
+  <rect class="node" x="24" y="24" width="280" height="88" rx="8"/>
+  <text class="name" x="164" y="52" text-anchor="middle">Machine config.yaml</text>
+  <text class="note" x="164" y="76" text-anchor="middle">repos, slots, harnesses</text>
+  <text class="note" x="164" y="98" text-anchor="middle">in ~/.akrogon</text>
+
+  <rect class="node" x="336" y="24" width="280" height="88" rx="8"/>
+  <text class="name" x="476" y="52" text-anchor="middle">Registered repos</text>
+  <text class="note" x="476" y="76" text-anchor="middle">listed under repos:</text>
+  <text class="note" x="476" y="98" text-anchor="middle">each has issues/config.yaml</text>
+
+  <!-- The command -->
+  <rect class="node" x="200" y="172" width="240" height="56" rx="8"/>
+  <text class="name" x="320" y="206" text-anchor="middle">akrogon command</text>
+
+  <path class="edge" d="M164,112 L250,170" marker-end="url(#arrow)"/>
+  <text class="label" x="170" y="150">reads</text>
+  <path class="edge" d="M476,112 L390,170" marker-end="url(#arrow)"/>
+  <text class="label" x="470" y="150" text-anchor="end">reads</text>
+
+  <!-- One slice per leaf -->
+  <path class="edge" d="M320,228 L320,286" marker-end="url(#arrow)"/>
+  <text class="label" x="332" y="262">starts seats</text>
+
+  <rect class="box" x="24" y="288" width="592" height="308" rx="10"/>
+  <text class="name" x="320" y="316" text-anchor="middle">akrogon-l&lt;hash&gt;.slice</text>
+  <text class="note" x="320" y="338" text-anchor="middle">one systemd user slice per leaf, under akrogon.slice</text>
+
+  <!-- Seat A pane -->
+  <rect class="node" x="44" y="356" width="268" height="220" rx="8"/>
+  <text class="name" x="178" y="384" text-anchor="middle">Herdr pane: seat A</text>
+  <path class="edge" d="M178,394 L178,418" marker-end="url(#arrow)"/>
+  <text class="label" x="188" y="412">runs</text>
+  <rect class="box" x="64" y="420" width="228" height="136" rx="8"/>
+  <text class="name" x="178" y="452" text-anchor="middle">Agent CLI</text>
+  <text class="note" x="178" y="480" text-anchor="middle">started from the</text>
+  <text class="note" x="178" y="500" text-anchor="middle">seat's harness template</text>
+  <text class="note" x="178" y="520" text-anchor="middle">in config.yaml</text>
+
+  <!-- Seat B pane -->
+  <rect class="node" x="328" y="356" width="268" height="220" rx="8"/>
+  <text class="name" x="462" y="384" text-anchor="middle">Herdr pane: seat B</text>
+  <path class="edge" d="M462,394 L462,418" marker-end="url(#arrow)"/>
+  <text class="label" x="472" y="412">runs</text>
+  <rect class="box" x="348" y="420" width="228" height="136" rx="8"/>
+  <text class="name" x="462" y="452" text-anchor="middle">Agent CLI</text>
+  <text class="note" x="462" y="480" text-anchor="middle">started from the</text>
+  <text class="note" x="462" y="500" text-anchor="middle">seat's harness template</text>
+  <text class="note" x="462" y="520" text-anchor="middle">in config.yaml</text>
+</svg>
