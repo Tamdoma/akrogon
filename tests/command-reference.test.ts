@@ -26,7 +26,7 @@ const contracts: Record<string, string> = {
   start: '<slug>',
   status: '[<slug>|--charts]',
   leftovers: '',
-  timing: '[<slug>|--cohort --since <iso>|--flow --since <YYYY-MM-DD>]',
+  timing: '<slug>|--cohort --since <iso>|--flow --since <YYYY-MM-DD>',
   flaky: '',
   log: '<path>',
   'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
