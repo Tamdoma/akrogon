@@ -6,11 +6,11 @@ The [chart-issues](../../skills/chart-issues/SKILL.md) skill holds the full proc
 
 ## Pick a way to run it
 
-![Four ways to run a chart: attended or autopilot charting, ending in the direct route or a lifecycle handoff, with an optional watch beside the leaves.](../pictures/ways-to-run.svg)
+![Ways to run a chart: an attended chart ends in the direct route when small and eligible or in a lifecycle handoff, an autopilot chart ends only in a lifecycle handoff, and an optional watch runs beside the handed-off leaves.](../pictures/ways-to-run.svg)
 
 - Attended chart: you answer each question. This page covers it.
-- Direct route: for a small, settled, code-only job. See [Quick fix](quick-fix.md).
-- Autopilot: the door answers its own questions for a fixed list of work. See [Autopilot](autopilot.md).
+- Direct route: for a small, settled, code-only job. It skips the leaf handoff and `akrogon next`, and keeps the charted decisions and B's review. See [Quick fix](quick-fix.md).
+- Autopilot: the door answers its own questions for a fixed list of work. It charts and hands off, and starts no execution. See [Autopilot](autopilot.md).
 - Write the files yourself: when nothing is left to decide. See [Write issues by hand](write-issues-by-hand.md).
 
 ## Open a chart
