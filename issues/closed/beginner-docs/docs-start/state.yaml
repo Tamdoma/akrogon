@@ -1,5 +1,5 @@
 slug: docs-start
-phase: plan.synthesis
+phase: merged
 created: 2026-10-23
 repo: akrogon
 debate: "no"
@@ -13,7 +13,7 @@ blocked-by:
   - docs-examples
 sources: []
 busy_since:
-  A: 2026-10-23T15:32:09.562Z
+  B: 2026-10-23T15:48:45.060Z
 busy_notified: {}
 attempts:
   A: 0
@@ -22,14 +22,22 @@ done: []
 fix_rounds: 0
 verdict: {}
 tab: w8:tEH
-worktree: /home/ivan/.akrogon/worktrees/akrogon/docs-start
 env_names: []
 env_generation: 0
 pane:
   A: w8:pW1
   B: w8:pW2
 prompted:
-  A: 59228099-8472-4a59-8bb1-45b56dcb8da6
+  B: 01a16971-6e5a-7433-8281-e8f0f40cfa3d
 prompted_at:
-  A: 2026-10-23T15:32:09.562Z
+  B: 2026-10-23T15:48:45.060Z
 delivery_error: {}
+merge_stamp: 2026-10-23T15:48:39.302Z
+broadcast:
+  kind: issue
+  name: beginner-docs
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/beginner-docs
+  pushed: 942e2020e78ca0fc8eb9305cf8f0d5b4f86ef190
+  sources: []
+frozen: {}
+frozen_cited: []

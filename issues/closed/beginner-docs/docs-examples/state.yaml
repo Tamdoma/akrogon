@@ -20,7 +20,6 @@ done: []
 fix_rounds: 0
 verdict: {}
 tab: w8:tEG
-worktree: /home/ivan/.akrogon/worktrees/akrogon/docs-examples
 env_names: []
 env_generation: 0
 pane:
