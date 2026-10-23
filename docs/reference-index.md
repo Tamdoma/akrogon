@@ -4,6 +4,6 @@
 - [Tests](../tests/AREA.md): command scenarios and isolated fixtures.
 - [Skills](../skills/AREA.md): the ten agent workflows and their supporting resources.
 - [Integration](../plugin/): Herdr lifecycle hooks.
-- [Documentation](guide/): the markdown operator guide.
+- [Documentation](README.md): the human docs home. [reference/where-things-go.md](reference/where-things-go.md) names where each fact lives.
 - [Issue records](../issues/): configuration, charts and lifecycle records.
 - [Learnings](../learnings/): active lessons and preserved history.
