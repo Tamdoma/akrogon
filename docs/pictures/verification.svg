@@ -21,9 +21,11 @@ text { font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans
 <rect class="n" x="60" y="152" width="440" height="50" rx="8" style="stroke: #0969da;"/>
 <text x="280" y="183">akrogon verify on a fresh checkout</text>
 <line class="e" x1="153" y1="202" x2="153" y2="238" style="stroke: #1a7f37;" marker-end="url(#g)"/>
+<text class="m" x="165" y="226" style="text-anchor: start;">green</text>
 <rect x="20" y="240" width="266" height="76" rx="8" fill="#f6f8fa" stroke="#1a7f37" stroke-width="2"/>
 <text x="153" y="272">receipt in<tspan x="153" dy="24">issues/verify-runs.jsonl</tspan></text>
 <line class="e" x1="420" y1="202" x2="420" y2="238" style="stroke: #cf222e;" marker-end="url(#r)"/>
+<text class="m" x="432" y="226" style="text-anchor: start;">red</text>
 <rect x="300" y="240" width="240" height="96" rx="8" fill="#f6f8fa" stroke="#cf222e" stroke-width="2"/>
 <text x="420" y="270">known-red: compare<tspan x="420" dy="24">failing tests with</tspan><tspan x="420" dy="24">the base</tspan></text>
 <line class="e" x1="420" y1="336" x2="420" y2="364" style="stroke: #cf222e;" marker-end="url(#r)"/>

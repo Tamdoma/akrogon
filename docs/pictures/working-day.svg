@@ -28,7 +28,7 @@
   </defs>
 
   <rect class="n" x="40" y="20" width="485" height="70" rx="8"/>
-  <text class="t" x="290" y="49" text-anchor="middle">a local note, or a GitHub issue<tspan x="290" dy="24">or seed brought in by akrogon pull</tspan></text>
+  <text class="t" x="290" y="49" text-anchor="middle">intake: a local note, a GitHub issue,<tspan x="290" dy="24">or a seed brought in by akrogon pull</tspan></text>
 
   <rect class="n" x="40" y="120" width="250" height="50" rx="8"/>
   <text class="t" x="175" y="151" text-anchor="middle">/chart-issues</text>
