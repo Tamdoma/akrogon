@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname, join, relative } from 'node:path';
 
 type FileResolver = (absolutePath: string) => string | null;
 
@@ -34,6 +34,8 @@ function linkTargets(markdown: string): string[] {
     if (token === '') continue;
     targets.push(token);
   }
+  const images: IterableIterator<RegExpMatchArray> = markdown.matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["']/g);
+  for (const match of images) targets.push(match[1].trim());
   return targets;
 }
 
@@ -66,25 +68,30 @@ function brokenLinks(sourcePath: string, markdown: string, resolveFile: FileReso
   return broken;
 }
 
+const repoRoot: string = resolve(import.meta.dir, '..');
+
+// Leaf worktrees are sparse checkouts without issues/, so a path missing on disk is looked up in the committed tree.
 function diskResolver(absolutePath: string): string | null {
-  if (!existsSync(absolutePath)) return null;
-  if (statSync(absolutePath).isDirectory()) return '';
-  return readFileSync(absolutePath, 'utf8');
+  if (existsSync(absolutePath)) return statSync(absolutePath).isDirectory() ? '' : readFileSync(absolutePath, 'utf8');
+  const committed: Bun.SyncSubprocess<'pipe', 'pipe'> = Bun.spawnSync(
+    ['git', 'cat-file', '-p', 'HEAD:' + relative(repoRoot, absolutePath)],
+    { cwd: repoRoot },
+  );
+  return committed.exitCode === 0 ? committed.stdout.toString() : null;
 }
 
-test('README and guide links resolve to files and anchors', () => {
-  const root: string = resolve(import.meta.dir, '..');
-  const guideDir: string = join(root, 'docs/guide');
-  const guideFiles: string[] = readdirSync(guideDir)
-    .filter((name: string) => name.endsWith('.md'))
-    .sort()
-    .map((name: string) => join(guideDir, name));
+test('README, docs and skill links resolve to files and anchors', () => {
+  const root: string = repoRoot;
+  const docFiles: string[] = readdirSync(join(root, 'docs'), { recursive: true })
+    .map((entry) => join(root, 'docs', String(entry)))
+    .filter((file: string) => file.endsWith('.md'))
+    .sort();
   const skillsDir: string = join(root, 'skills');
   const skillFiles: string[] = readdirSync(skillsDir)
     .map((name: string) => join(skillsDir, name, 'SKILL.md'))
     .filter((path: string) => existsSync(path))
     .sort();
-  const files: string[] = [join(root, 'README.md'), ...guideFiles, ...skillFiles];
+  const files: string[] = [join(root, 'README.md'), ...docFiles, ...skillFiles];
   const broken: string[] = [];
   for (const file of files) {
     const content: string = readFileSync(file, 'utf8');
@@ -115,6 +122,20 @@ test('broken relative link is reported', () => {
   const broken: string[] = brokenLinks('/docs/a.md', '[dead](missing.md)', resolveFile);
   expect(broken.length).toBe(1);
   expect(broken[0]).toContain('missing.md');
+});
+
+test('missing images in a nested page are reported in Markdown and img forms', () => {
+  const files: Record<string, string> = { '/docs/pictures/real.svg': '<svg/>' };
+  const resolveFile: FileResolver = (path: string): string | null => (Object.hasOwn(files, path) ? files[path] : null);
+  const broken: string[] = brokenLinks(
+    '/docs/reference/a.md',
+    '![gone](../pictures/gone.svg)\n<img alt="lost" src="../pictures/lost.svg">\n![ok](../pictures/real.svg) <img src="../pictures/real.svg">',
+    resolveFile,
+  );
+  expect(broken).toEqual([
+    '/docs/reference/a.md: missing file ../pictures/gone.svg',
+    '/docs/reference/a.md: missing file ../pictures/lost.svg',
+  ]);
 });
 
 test('missing anchors with and without a path part are reported', () => {

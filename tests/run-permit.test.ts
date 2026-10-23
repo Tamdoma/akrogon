@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   cli,
   entry,
@@ -345,7 +345,14 @@ test('no run.lock lanes, run-holder files or name exemptions remain in src, and 
       expect({ file, hit: text.match(pattern)?.[0] }).toEqual({ file, hit: undefined });
     }
   }
-  for (const doc of ['README.md', 'docs/guide/setup.md', 'docs/guide/files.md', 'src/AREA.md']) {
+  const docs: string[] = [
+    'README.md',
+    ...readdirSync(resolve(root, 'docs'), { recursive: true })
+      .map((entry) => join('docs', String(entry)))
+      .filter((file: string) => file.endsWith('.md')),
+    'src/AREA.md',
+  ];
+  for (const doc of docs) {
     const text: string = readFileSync(resolve(root, doc), 'utf8');
     expect({ doc, hit: text.match(/run permit/i)?.[0] }).toEqual({ doc, hit: undefined });
   }

@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 type CommandRow = { verb: string; arguments: string; effect: string };
 type ArgumentGroup = { optional: boolean; alternatives: string[] };
 
-const readme: string = readFileSync(resolve(import.meta.dir, '../README.md'), 'utf8');
+const page: string = readFileSync(resolve(import.meta.dir, '../docs/reference/commands.md'), 'utf8');
 const source: string = readFileSync(resolve(import.meta.dir, '../src/akrogon.ts'), 'utf8');
 const contracts: Record<string, string> = {
   install: '',
@@ -38,9 +38,7 @@ const contracts: Record<string, string> = {
 };
 
 function commandRows(markdown: string): CommandRow[] {
-  const section: RegExpExecArray | null = /^## Command\s*\n([\s\S]*?)(?=^## |$(?![\s\S]))/m.exec(markdown);
-  if (section === null) throw new Error('Missing command reference');
-  return section[1]
+  return markdown
     .split('\n')
     .filter((line: string) => /^\|\s*`/.test(line))
     .map((line: string): CommandRow => {
@@ -86,20 +84,8 @@ function reference(invocations: Record<string, string> = contracts): string {
     .join('\n')}\n`;
 }
 
-test('README covers every dispatched command and its argument contract', () => {
-  checkReference(readme, source);
-});
-
-test('the files guide describes the flow report', () => {
-  const guide: string = readFileSync(resolve(import.meta.dir, '../docs/guide/files.md'), 'utf8');
-  expect(guide).toContain('akrogon timing --flow --since <YYYY-MM-DD>');
-});
-
-test('the next guide describes stop and start', () => {
-  const guide: string = readFileSync(resolve(import.meta.dir, '../docs/guide/next.md'), 'utf8');
-  expect(guide).toContain('akrogon stop <slug>');
-  expect(guide).toContain('akrogon stop --all');
-  expect(guide).toContain('akrogon start <slug>');
+test('the commands reference covers every dispatched command and its argument contract', () => {
+  checkReference(page, source);
 });
 
 test('coverage rejects missing, extra and duplicate rows and newly dispatched verbs', () => {
