@@ -4,7 +4,7 @@ Optional: the [watch-issues](../../skills/watch-issues/SKILL.md) skill checks ev
 
 ## Start the watch
 
-Optional: open Claude Code in the registered repository and run:
+Open Claude Code in the registered repository and run:
 
 ```text
 /watch-issues
@@ -31,7 +31,7 @@ The watch never kills an agent, closes a pane, answers a seat, or edits `state.y
 
 ## Stop the watch
 
-Optional: stop it with:
+Stop it with:
 
 ```text
 /watch-issues stop
