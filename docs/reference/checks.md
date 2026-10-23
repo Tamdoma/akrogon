@@ -80,7 +80,7 @@ When a seat should retry a red command, and when it should run known-red, is a s
 
 Phase moves protect tests. A file counts as a test file by the path rule in [src/test-files.ts](../../src/test-files.ts): a folder in its path named `test`, `tests`, `__tests__`, `fixture`, `fixtures`, `__fixtures__`, `__snapshots__`, `e2e`, `spec`, `specs`, `testdata`, `golden` or `goldens`, a name ending in `.snap`, or a name like `*.test.*`, `*.spec.*`, `*.e2e.*` or `*_test.*`.
 
-Two checks run on each phase move from a leaf worktree, and again on the merge attempt. A recovery from `failed` back into work skips them, because the seat's next move runs them on the same diff.
+Two checks run on each phase move from a leaf worktree, and again on the merge attempt. A recovery from `failed` back into work skips them, because the seat's next move runs them on the same diff. A recovery straight into `check.review` or `merge` still runs them.
 
 1. Old test files. A test file that existed on the base and was changed or deleted on the branch is refused.
 2. Drift from the plan. At the `plan.synthesis` to `implement` move, akrogon records every path changed on the branch and its content. Later, a recorded path that changed or vanished is refused, and so is a new test file that is not in the record.
