@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 580" width="560" height="580" role="img">
+  <title>How one change flows from plan to merged</title>
+  <rect x="1" y="1" width="558" height="578" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .t { fill: #1f2328; font-size: 18px; }
+    .m { fill: #59636e; font-size: 17px; }
+    .n { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+    .e { fill: none; stroke: #59636e; stroke-width: 1.5; }
+    .marker { animation: flow 8s ease-in-out 1 forwards; animation-iteration-count: 1; animation-fill-mode: forwards; }
+    @keyframes flow {
+      0%, 8% { transform: translate(0px, -470px); }
+      18%, 28% { transform: translate(0px, -390px); }
+      38%, 52% { transform: translate(0px, -310px); }
+      70%, 80% { transform: translate(0px, -80px); }
+      92%, 100% { transform: translate(0px, 0px); }
+    }
+    @media (prefers-reduced-motion: reduce) { .marker { animation: none; } }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#59636e"/>
+    </marker>
+  </defs>
+
+  <rect class="n" x="40" y="30" width="220" height="50" rx="8"/>
+  <text class="t" x="160" y="61" text-anchor="middle">plan</text>
+  <rect class="n" x="40" y="110" width="220" height="50" rx="8"/>
+  <text class="t" x="160" y="141" text-anchor="middle">build</text>
+  <rect class="n" x="40" y="190" width="220" height="50" rx="8"/>
+  <text class="t" x="160" y="221" text-anchor="middle">review</text>
+  <rect class="n" x="40" y="420" width="220" height="50" rx="8"/>
+  <text class="t" x="160" y="451" text-anchor="middle">the command lands</text>
+  <rect class="n" x="40" y="500" width="220" height="50" rx="8" style="stroke: #1a7f37"/>
+  <text class="t" x="160" y="531" text-anchor="middle">merged</text>
+
+  <rect class="n" x="310" y="110" width="215" height="50" rx="8" style="stroke: #cf222e"/>
+  <text class="t" x="417" y="141" text-anchor="middle">finding</text>
+  <rect class="n" x="310" y="190" width="215" height="70" rx="8"/>
+  <text class="t" x="417" y="220" text-anchor="middle">repair: B fixes most,<tspan x="417" dy="24">A fixes the rest</tspan></text>
+  <rect class="n" x="310" y="300" width="160" height="50" rx="8" style="stroke: #9a6700"/>
+  <text class="t" x="390" y="331" text-anchor="middle">re-check</text>
+
+  <line class="e" x1="160" y1="80" x2="160" y2="108" marker-end="url(#arrow)"/>
+  <line class="e" x1="160" y1="160" x2="160" y2="188" marker-end="url(#arrow)"/>
+  <line class="e" x1="160" y1="240" x2="160" y2="418" marker-end="url(#arrow)"/>
+  <text class="m" x="170" y="335">no finding</text>
+  <line class="e" x1="160" y1="470" x2="160" y2="498" marker-end="url(#arrow)"/>
+
+  <path class="e" d="M260,205 H290 V135 H308" marker-end="url(#arrow)"/>
+  <line class="e" x1="417" y1="160" x2="417" y2="188" marker-end="url(#arrow)"/>
+  <line class="e" x1="390" y1="260" x2="390" y2="298" marker-end="url(#arrow)"/>
+  <text class="m" x="400" y="286">A's fixes</text>
+  <path class="e" d="M310,325 H280 V230 H262" marker-end="url(#arrow)"/>
+  <path class="e" d="M525,225 H542 V445 H262" marker-end="url(#arrow)"/>
+  <text class="m" x="532" y="436" text-anchor="end">B fixed it all</text>
+
+  <circle class="marker" cx="58" cy="525" r="8" fill="#0969da"/>
+</svg>
