@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 540" width="560" height="540" role="img">
+<title>How a release is deployed and rolled back</title>
+<style>
+text { font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 18px; fill: #1f2328; text-anchor: middle; }
+.m { font-size: 17px; fill: #59636e; }
+.n { fill: #f6f8fa; stroke: #8c959f; stroke-width: 2; }
+.e { fill: none; stroke: #59636e; stroke-width: 2; }
+</style>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#59636e"/></marker>
+<marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9a6700"/></marker>
+</defs>
+<rect x="1" y="1" width="558" height="538" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+<rect class="n" x="60" y="24" width="440" height="72" rx="8"/>
+<text x="280" y="54">source: merged default branch,<tspan x="280" dy="24">fetched</tspan></text>
+<line class="e" x1="280" y1="96" x2="280" y2="128" marker-end="url(#a)"/>
+<rect class="n" x="60" y="130" width="440" height="50" rx="8"/>
+<text x="280" y="161">release folder</text>
+<line class="e" x1="145" y1="180" x2="145" y2="222" marker-end="url(#a)"/>
+<rect class="n" x="30" y="224" width="230" height="70" rx="8" style="stroke: #0969da;"/>
+<text x="145" y="265">active (current)</text>
+<rect class="n" x="300" y="224" width="230" height="70" rx="8"/>
+<text x="415" y="253">previous release<tspan x="415" dy="24">kept</tspan></text>
+<path class="e" d="M145 294 C145 350 415 350 415 297" marker-end="url(#a)"/>
+<text x="280" y="368">akrogon rollback</text>
+<text class="m" x="280" y="390">previous becomes active</text>
+<line class="e" x1="280" y1="400" x2="280" y2="438" style="stroke: #9a6700;" marker-end="url(#h)"/>
+<rect x="60" y="440" width="440" height="72" rx="8" fill="#f6f8fa" stroke="#9a6700" stroke-width="2"/>
+<text x="280" y="470" style="fill: #9a6700;">hold on the rolled-back commit<tspan x="280" dy="24">(cleared by the next good deploy)</tspan></text>
+</svg>

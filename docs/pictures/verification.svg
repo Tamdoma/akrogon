@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 660" width="560" height="660" role="img">
+<title>How akrogon verify checks a change</title>
+<style>
+text { font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 18px; fill: #1f2328; text-anchor: middle; }
+.m { font-size: 17px; fill: #59636e; }
+.n { fill: #f6f8fa; stroke: #8c959f; stroke-width: 2; }
+.e { fill: none; stroke: #59636e; stroke-width: 2; }
+</style>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#59636e"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1a7f37"/></marker>
+<marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#cf222e"/></marker>
+</defs>
+<rect x="1" y="1" width="558" height="658" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+<rect class="n" x="30" y="24" width="240" height="96" rx="8"/>
+<text x="150" y="78">leaf checks: checks</text>
+<rect class="n" x="290" y="24" width="240" height="96" rx="8"/>
+<text x="410" y="54">merge checks: checks<tspan x="410" dy="24">minus merge_covers,</tspan><tspan x="410" dy="24">plus merge_checks</tspan></text>
+<line class="e" x1="150" y1="120" x2="150" y2="150" marker-end="url(#a)"/>
+<line class="e" x1="410" y1="120" x2="410" y2="150" marker-end="url(#a)"/>
+<rect class="n" x="60" y="152" width="440" height="50" rx="8" style="stroke: #0969da;"/>
+<text x="280" y="183">akrogon verify on a fresh checkout</text>
+<line class="e" x1="153" y1="202" x2="153" y2="238" style="stroke: #1a7f37;" marker-end="url(#g)"/>
+<rect x="20" y="240" width="266" height="76" rx="8" fill="#f6f8fa" stroke="#1a7f37" stroke-width="2"/>
+<text x="153" y="272">receipt in<tspan x="153" dy="24">issues/verify-runs.jsonl</tspan></text>
+<line class="e" x1="420" y1="202" x2="420" y2="238" style="stroke: #cf222e;" marker-end="url(#r)"/>
+<rect x="300" y="240" width="240" height="96" rx="8" fill="#f6f8fa" stroke="#cf222e" stroke-width="2"/>
+<text x="420" y="270">known-red: compare<tspan x="420" dy="24">failing tests with</tspan><tspan x="420" dy="24">the base</tspan></text>
+<line class="e" x1="420" y1="336" x2="420" y2="364" style="stroke: #cf222e;" marker-end="url(#r)"/>
+<rect x="300" y="366" width="240" height="76" rx="8" fill="#f6f8fa" stroke="#cf222e" stroke-width="2"/>
+<text x="420" y="398">passes only if the<tspan x="420" dy="24">same tests fail there</tspan></text>
+<line x1="30" y1="462" x2="530" y2="462" stroke="#d0d7de" stroke-width="2"/>
+<rect x="60" y="480" width="440" height="76" rx="8" fill="#f6f8fa" stroke="#cf222e" stroke-width="2"/>
+<text x="280" y="512">changed test file without<tspan x="280" dy="24">a trailer: refused</tspan></text>
+<line class="e" x1="280" y1="556" x2="280" y2="582" marker-end="url(#a)"/>
+<rect class="n" x="60" y="584" width="440" height="50" rx="8"/>
+<text x="280" y="615">remedy: add a Test-Change trailer</text>
+</svg>
