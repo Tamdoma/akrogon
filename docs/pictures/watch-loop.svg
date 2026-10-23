@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 510" width="560" height="510" role="img">
+  <title>The watch loop</title>
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 18px; fill: #1f2328; text-anchor: middle; }
+    .muted { fill: #59636e; font-size: 17px; }
+    .node { fill: #f6f8fa; stroke: #8c959f; stroke-width: 2; }
+    .edge { stroke: #59636e; stroke-width: 2; fill: none; }
+    .back { stroke: #0969da; stroke-width: 2; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#59636e"/>
+    </marker>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0969da"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="558" height="508" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+
+  <rect class="node" x="160" y="24" width="240" height="56" rx="8" style="stroke: #0969da;"/>
+  <text x="280" y="59">cron every 20 min</text>
+  <line class="edge" x1="280" y1="80" x2="280" y2="106" marker-end="url(#arrow)"/>
+
+  <rect class="node" x="80" y="110" width="400" height="76" rx="8"/>
+  <text x="280" y="142">read status</text>
+  <text x="280" y="166">(stop if the repo is paused)</text>
+
+  <line class="edge" x1="200" y1="186" x2="170" y2="226" marker-end="url(#arrow)"/>
+  <line class="edge" x1="400" y1="186" x2="430" y2="226" marker-end="url(#arrow)"/>
+
+  <rect class="node" x="20" y="230" width="300" height="156" rx="8"/>
+  <text x="170" y="262">act within allowed steps:</text>
+  <text x="170" y="288">start waiting leaves,</text>
+  <text x="170" y="314">retry a failed leaf</text>
+  <text x="170" y="340">at its phase,</text>
+  <text x="170" y="366">nudge a looping seat</text>
+
+  <text class="muted" x="340" y="264">or</text>
+
+  <rect class="node" x="360" y="230" width="140" height="56" rx="8"/>
+  <text x="430" y="265">report</text>
+
+  <line class="edge" x1="170" y1="386" x2="220" y2="426" marker-end="url(#arrow)"/>
+  <line class="edge" x1="430" y1="286" x2="380" y2="426" marker-end="url(#arrow)"/>
+
+  <rect class="node" x="140" y="430" width="280" height="56" rx="8"/>
+  <text x="280" y="465">you (notification)</text>
+
+  <path class="back" d="M420 458 H530 V52 H404" marker-end="url(#arrow-accent)"/>
+</svg>

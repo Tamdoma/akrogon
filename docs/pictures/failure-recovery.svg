@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 584" width="560" height="584" role="img">
+  <title>How a failed leaf is recovered</title>
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 18px; fill: #1f2328; text-anchor: middle; }
+    .node { fill: #f6f8fa; stroke: #8c959f; stroke-width: 2; }
+    .edge { stroke: #59636e; stroke-width: 2; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#59636e"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="558" height="582" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+
+  <rect class="node" x="180" y="24" width="200" height="56" rx="8"/>
+  <text x="280" y="59">attempt</text>
+  <line class="edge" x1="280" y1="80" x2="280" y2="106" marker-end="url(#arrow)"/>
+
+  <rect class="node" x="80" y="110" width="400" height="76" rx="8" style="stroke: #cf222e;"/>
+  <text x="280" y="142" style="fill: #cf222e;">failed, with a recorded</text>
+  <text x="280" y="166" style="fill: #cf222e;">reason</text>
+  <line class="edge" x1="280" y1="186" x2="280" y2="212" marker-end="url(#arrow)"/>
+
+  <rect class="node" x="80" y="216" width="400" height="76" rx="8"/>
+  <text x="280" y="248">work kept on the leaf branch</text>
+  <text x="280" y="272">(plan, reviews, code)</text>
+  <line class="edge" x1="280" y1="292" x2="280" y2="318" marker-end="url(#arrow)"/>
+
+  <rect class="node" x="80" y="322" width="400" height="76" rx="8" style="stroke: #0969da;"/>
+  <text x="280" y="354">akrogon phase &lt;slug&gt; &lt;phase&gt;,</text>
+  <text x="280" y="378">then akrogon next</text>
+
+  <line class="edge" x1="200" y1="398" x2="150" y2="452" marker-end="url(#arrow)"/>
+  <line class="edge" x1="360" y1="398" x2="410" y2="452" marker-end="url(#arrow)"/>
+
+  <rect class="node" x="20" y="456" width="250" height="104" rx="8"/>
+  <text x="145" y="488">carried forward</text>
+  <text x="145" y="512">from the step that</text>
+  <text x="145" y="536">still needs work</text>
+
+  <rect class="node" x="290" y="456" width="250" height="104" rx="8"/>
+  <text x="415" y="514">that step retried</text>
+</svg>
