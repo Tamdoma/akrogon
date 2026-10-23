@@ -22,8 +22,8 @@
   <line class="edge" x1="280" y1="186" x2="280" y2="212" marker-end="url(#arrow)"/>
 
   <rect class="node" x="80" y="216" width="400" height="76" rx="8"/>
-  <text x="280" y="248">work kept on the leaf branch</text>
-  <text x="280" y="272">(plan, reviews, code)</text>
+  <text x="280" y="248">work kept: code on the leaf branch</text>
+  <text x="280" y="272">plan and reviews in issues/</text>
   <line class="edge" x1="280" y1="292" x2="280" y2="318" marker-end="url(#arrow)"/>
 
   <rect class="node" x="80" y="322" width="400" height="76" rx="8" style="stroke: #0969da;"/>
