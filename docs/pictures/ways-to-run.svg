@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 440" role="img">
+  <title>Ways to run a chart</title>
+  <rect x="0" y="0" width="640" height="440" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+  <style>
+    text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; fill: #1f2328; }
+    .head { font-size: 20px; font-weight: 600; }
+    .name { font-size: 15px; font-weight: 600; }
+    .muted { fill: #57606a; }
+    .side-text { fill: #8250df; }
+    .node { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+    .door { fill: #f6f8fa; stroke: #0969da; stroke-width: 2; }
+    .side { fill: #f6f8fa; stroke: #8250df; stroke-width: 1.5; stroke-dasharray: 6 4; }
+    .edge { stroke: #57606a; stroke-width: 1.5; fill: none; }
+    .edge-side { stroke: #8250df; stroke-width: 1.5; stroke-dasharray: 6 4; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <!-- Heading -->
+  <text class="head" x="40" y="40">Ways to run a chart</text>
+
+  <!-- Chart doors -->
+  <rect class="door" x="40" y="84" width="240" height="60" rx="8"/>
+  <text class="name" x="160" y="109" text-anchor="middle">Attended chart</text>
+  <text class="muted" x="160" y="130" text-anchor="middle">operator answers</text>
+  <rect class="door" x="360" y="84" width="240" height="60" rx="8"/>
+  <text class="name" x="480" y="109" text-anchor="middle">Autopilot chart</text>
+  <text class="muted" x="480" y="130" text-anchor="middle">door answers itself</text>
+
+  <!-- Routes -->
+  <rect class="side" x="40" y="234" width="240" height="60" rx="8"/>
+  <text class="name" x="160" y="259" text-anchor="middle">Direct route</text>
+  <text class="muted" x="160" y="280" text-anchor="middle">door builds, B reviews</text>
+  <rect class="node" x="360" y="234" width="240" height="60" rx="8"/>
+  <text class="name" x="480" y="259" text-anchor="middle">Lifecycle handoff</text>
+  <text class="muted" x="480" y="280" text-anchor="middle">leaves run plan to merge</text>
+
+  <!-- Watch, beside lifecycle execution only -->
+  <rect class="side" x="360" y="354" width="240" height="60" rx="8"/>
+  <text class="name" x="480" y="379" text-anchor="middle">Watch (optional)</text>
+  <text class="muted" x="480" y="400" text-anchor="middle">checks leaves every 20 min</text>
+
+  <!-- Edges -->
+  <line class="edge-side" x1="160" y1="144" x2="160" y2="234" marker-end="url(#arrow)"/>
+  <text class="side-text" x="172" y="194">small, eligible</text>
+  <line class="edge" x1="240" y1="144" x2="420" y2="234" marker-end="url(#arrow)"/>
+  <line class="edge" x1="480" y1="144" x2="480" y2="234" marker-end="url(#arrow)"/>
+  <text class="muted" x="492" y="194">lifecycle only</text>
+  <line class="edge-side" x1="480" y1="294" x2="480" y2="354"/>
+  <text class="side-text" x="492" y="329">runs beside</text>
+
+  <!-- Note -->
+  <text class="muted" x="40" y="380">Autopilot never takes</text>
+  <text class="muted" x="40" y="400">the direct route.</text>
+</svg>

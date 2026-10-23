@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 780" role="img">
+  <title>Leaf phases</title>
+  <rect x="0" y="0" width="640" height="780" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+  <style>
+    text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; fill: #1f2328; }
+    .head { font-size: 20px; font-weight: 600; }
+    .name { font-size: 15px; font-weight: 600; }
+    .muted { fill: #57606a; }
+    .accent { fill: #0969da; }
+    .stop { fill: #cf222e; }
+    .node { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+    .start { fill: #f6f8fa; stroke: #0969da; stroke-width: 2.5; }
+    .fail { fill: #ffebe9; stroke: #cf222e; stroke-width: 2; }
+    .zone { fill: none; stroke: #cf222e; stroke-width: 2; }
+    .edge { stroke: #57606a; stroke-width: 1.5; fill: none; }
+    .edge-stop { stroke: #cf222e; stroke-width: 2; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <!-- Heading -->
+  <text class="head" x="24" y="40">Leaf phases</text>
+
+  <!-- Working phases: the red box is where failed can be reached -->
+  <rect class="zone" x="24" y="64" width="600" height="600" rx="10"/>
+
+  <!-- Plan -->
+  <rect class="node" x="70" y="80" width="200" height="48" rx="8"/>
+  <text class="name" x="170" y="109" text-anchor="middle">plan.positions</text>
+  <rect class="node" x="370" y="80" width="200" height="48" rx="8"/>
+  <text class="name" x="470" y="109" text-anchor="middle">plan.rebuttal</text>
+  <rect class="start" x="70" y="180" width="200" height="60" rx="8"/>
+  <text class="name" x="170" y="205" text-anchor="middle">plan.synthesis</text>
+  <text class="accent" x="170" y="226" text-anchor="middle">debate off starts here</text>
+
+  <!-- Build and check -->
+  <rect class="node" x="70" y="290" width="200" height="48" rx="8"/>
+  <text class="name" x="170" y="319" text-anchor="middle">implement</text>
+  <rect class="node" x="70" y="390" width="200" height="48" rx="8"/>
+  <text class="name" x="170" y="419" text-anchor="middle">check.review</text>
+  <rect class="node" x="370" y="390" width="200" height="48" rx="8"/>
+  <text class="name" x="470" y="419" text-anchor="middle">check.fix</text>
+  <rect class="node" x="370" y="500" width="200" height="48" rx="8"/>
+  <text class="name" x="470" y="529" text-anchor="middle">check.repair</text>
+  <rect class="node" x="70" y="600" width="200" height="48" rx="8"/>
+  <text class="name" x="170" y="629" text-anchor="middle">merge</text>
+
+  <!-- Ends -->
+  <rect class="node" x="70" y="690" width="200" height="48" rx="8"/>
+  <text class="name" x="170" y="719" text-anchor="middle">merged</text>
+  <rect class="fail" x="330" y="690" width="280" height="60" rx="8"/>
+  <text class="name stop" x="470" y="715" text-anchor="middle">failed</text>
+  <text class="stop" x="470" y="736" text-anchor="middle">any boxed phase can stop here</text>
+
+  <!-- Edges -->
+  <line class="edge" x1="270" y1="104" x2="370" y2="104" marker-end="url(#arrow)"/>
+  <text class="muted" x="320" y="96" text-anchor="middle">rebuttal on</text>
+  <line class="edge" x1="170" y1="128" x2="170" y2="180" marker-end="url(#arrow)"/>
+  <text class="muted" x="180" y="160">rebuttal off</text>
+  <line class="edge" x1="470" y1="128" x2="270" y2="210" marker-end="url(#arrow)"/>
+  <line class="edge" x1="170" y1="240" x2="170" y2="290" marker-end="url(#arrow)"/>
+  <line class="edge" x1="170" y1="338" x2="170" y2="390" marker-end="url(#arrow)"/>
+  <line class="edge" x1="170" y1="438" x2="170" y2="600" marker-end="url(#arrow)"/>
+  <text class="muted" x="160" y="525" text-anchor="end">no fix verdict</text>
+  <line class="edge" x1="250" y1="438" x2="450" y2="500" marker-end="url(#arrow)"/>
+  <text class="muted" x="360" y="455">a fix verdict</text>
+  <line class="edge" x1="370" y1="530" x2="250" y2="600" marker-end="url(#arrow)"/>
+  <line class="edge" x1="470" y1="500" x2="470" y2="438" marker-end="url(#arrow)"/>
+  <line class="edge" x1="370" y1="414" x2="270" y2="414" marker-end="url(#arrow)"/>
+  <path class="edge" d="M270,624 H604 V414 H570" marker-end="url(#arrow)"/>
+  <line class="edge" x1="170" y1="648" x2="170" y2="690" marker-end="url(#arrow)"/>
+  <line class="edge-stop" x1="470" y1="664" x2="470" y2="690" marker-end="url(#arrow)"/>
+</svg>

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 620" role="img">
+  <title>Where each seat comes from</title>
+  <rect x="0" y="0" width="640" height="620" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+  <style>
+    text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; fill: #1f2328; }
+    .head { font-size: 20px; font-weight: 600; }
+    .seat { font-size: 16px; font-weight: 600; fill: #0969da; }
+    .name { font-size: 15px; font-weight: 600; }
+    .muted { fill: #57606a; }
+    .node { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+    .optional { fill: #f6f8fa; stroke: #8250df; stroke-width: 1.5; stroke-dasharray: 6 4; }
+    .edge { stroke: #57606a; stroke-width: 1.5; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <!-- Heading -->
+  <text class="head" x="40" y="40">Where each seat comes from</text>
+  <text class="muted" x="40" y="66">Nearest file first. If a file has no seat, look one step down.</text>
+
+  <!-- Seat a column -->
+  <text class="seat" x="170" y="108" text-anchor="middle">Seat a</text>
+  <rect class="node" x="40" y="124" width="260" height="60" rx="8"/>
+  <text class="name" x="170" y="150" text-anchor="middle">ISSUE.md</text>
+  <text class="muted" x="170" y="171" text-anchor="middle">slots: a</text>
+  <rect class="optional" x="40" y="214" width="260" height="60" rx="8"/>
+  <text class="name" x="170" y="240" text-anchor="middle">EPIC.md</text>
+  <text class="muted" x="170" y="261" text-anchor="middle">only when under an epic</text>
+  <rect class="node" x="40" y="304" width="260" height="60" rx="8"/>
+  <text class="name" x="170" y="330" text-anchor="middle">issues/config.yaml</text>
+  <text class="muted" x="170" y="351" text-anchor="middle">repo, slots: a</text>
+  <rect class="node" x="40" y="394" width="260" height="60" rx="8"/>
+  <text class="name" x="170" y="420" text-anchor="middle">machine config.yaml</text>
+  <text class="muted" x="170" y="441" text-anchor="middle">slots: a</text>
+  <line class="edge" x1="170" y1="184" x2="170" y2="214" marker-end="url(#arrow)"/>
+  <line class="edge" x1="170" y1="274" x2="170" y2="304" marker-end="url(#arrow)"/>
+  <line class="edge" x1="170" y1="364" x2="170" y2="394" marker-end="url(#arrow)"/>
+
+  <!-- Seat b column -->
+  <text class="seat" x="470" y="108" text-anchor="middle">Seat b</text>
+  <rect class="node" x="340" y="124" width="260" height="60" rx="8"/>
+  <text class="name" x="470" y="150" text-anchor="middle">ISSUE.md</text>
+  <text class="muted" x="470" y="171" text-anchor="middle">slots: b</text>
+  <rect class="optional" x="340" y="214" width="260" height="60" rx="8"/>
+  <text class="name" x="470" y="240" text-anchor="middle">EPIC.md</text>
+  <text class="muted" x="470" y="261" text-anchor="middle">only when under an epic</text>
+  <rect class="node" x="340" y="304" width="260" height="60" rx="8"/>
+  <text class="name" x="470" y="330" text-anchor="middle">issues/config.yaml</text>
+  <text class="muted" x="470" y="351" text-anchor="middle">repo, slots: b</text>
+  <rect class="node" x="340" y="394" width="260" height="60" rx="8"/>
+  <text class="name" x="470" y="420" text-anchor="middle">machine config.yaml</text>
+  <text class="muted" x="470" y="441" text-anchor="middle">slots: b</text>
+  <line class="edge" x1="470" y1="184" x2="470" y2="214" marker-end="url(#arrow)"/>
+  <line class="edge" x1="470" y1="274" x2="470" y2="304" marker-end="url(#arrow)"/>
+  <line class="edge" x1="470" y1="364" x2="470" y2="394" marker-end="url(#arrow)"/>
+
+  <!-- Notes -->
+  <rect class="node" x="40" y="484" width="560" height="50" rx="8"/>
+  <text x="320" y="514" text-anchor="middle">First file with the seat wins. A seat is harness + model + effort.</text>
+  <rect class="node" x="40" y="550" width="560" height="50" rx="8"/>
+  <text x="320" y="580" text-anchor="middle">All other repo settings come from issues/config.yaml alone.</text>
+</svg>
