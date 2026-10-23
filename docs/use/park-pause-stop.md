@@ -18,7 +18,7 @@ akrogon park <issue>
 
 Park is refused in two cases:
 
-- A leaf of the issue has a tab or a worktree. That work is running, so stop or finish it first.
+- A leaf of the issue has a tab or a worktree. Stopping the leaf keeps those records, so parking is still refused. Use stop or pause to hold work that has already started.
 - An open leaf lists a leaf of the issue in `blocked-by`. Parking it would leave that open leaf waiting on something it cannot reach.
 
 To park every issue that can be parked:
