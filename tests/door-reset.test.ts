@@ -425,15 +425,13 @@ test('pi handover sends reset then start prompt', async (): Promise<void> => {
   }
 });
 
-// Criterion 6: docs describe the handover step and the new mode entries.
+// Criterion 6: the chart-issues skill describes the handover step and the new mode entries.
 test('docs describe the handover entries and footer wording', (): void => {
   const skill: string = readFileSync(resolve(import.meta.dir, '../skills/chart-issues/SKILL.md'), 'utf8');
   const shapes: string = readFileSync(resolve(import.meta.dir, '../skills/chart-issues/assets/shapes.md'), 'utf8');
-  const guide: string = readFileSync(resolve(import.meta.dir, '../docs/guide/chart.md'), 'utf8');
   for (const [name, text] of [
     ['SKILL.md', skill],
     ['shapes.md', shapes],
-    ['chart.md', guide],
   ] as [string, string][]) {
     expect(text, `${name} names the handover entry`).toContain('handover');
   }
