@@ -1,0 +1,10 @@
+# A notes — doc-architecture
+
+Q1 pick (a): purpose folders start/ use/ reference/ examples/. Reason: "the right info at the right place" needs a page's purpose to be visible from its path, so a future feature lands in exactly one obvious place (a new mode = one use/ page + reference rows). start/ is the only ordered path: what the factory is → why it works (two seats, durable files, independent review) → install → set up a project → first finished change. Cost: every guide page moves; current pages split (parts.md words → reference/glossary; state.md, files.md → reference; phases.md → start concept + reference; chart.md → use/chart, use/autopilot, use/direct; next.md → use/run; problems.md → use/recover; gacp.md → reference or use/save-records).
+Rejected (b): the flat book forces linear reading; State is page 3 today; new features keep getting appended to long pages (chart.md 269 lines, autopilot at the end). Rejected (c): four Diátaxis folders for ~25 pages adds an "explanation" bucket readers don't know to look in; Procida himself says apply it as a check, not as empty structure (diataxis.fr how-to-use).
+Evidence: README.md "Guide" list; docs/guide headings; diataxis.fr start-here and how-to-use (practitioner, 2026-10-23).
+Pitfalls: concept explanations scattered → "why" sections live in start/ and the concept page each use/ page links back to. Folder sprawl → four folders, no subfolders. Docs/guide/ path disappears → old inbound links (README, reference-index) updated in the move.
+Q2 pick (a): short front door. Reason: README is the GitHub landing page; it must answer what / for whom / what you need / where to start in one screen plus the overview SVG. Command table, install, rollback move to their one home. Cost: README readers click once more for detail.
+Rejected (b): collapsed sections still duplicate facts the guide also holds → drift (F2, F3 in the map).
+Pitfall: README bullet lists of features rot → README links to use/ pages, never lists counts.
+Extra question: should the A/B names be kept for both charting consultants and execution seats? A thinks docs must name them apart (consultants vs seats) — design rule, not a fork.

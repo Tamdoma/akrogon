@@ -1,0 +1,4 @@
+# Page map re-check — slot B
+Your review: /home/ivan/Work/infra/akrogon/issues/chart/beginner-docs/slots/page-map-B.md. Revised map: /home/ivan/Work/infra/akrogon/issues/chart/beginner-docs/PAGE-MAP.md. Private provenance moved to issues/chart/beginner-docs/scratch/provenance.md (gitignored, verify with git check-ignore) and chart files scrubbed to P1/P2.
+Sizing change: five leaves became eight by subject bundle (pictures-concepts, pictures-operations, reference-commands, reference-records, use-plan, use-finish, examples, start), as split-and-checks Taken Q1 allows at the door.
+Check once: is each of your F1–F12 resolved; any new defect introduced; anything private left in non-scratch chart files (grep). Disagreements only, or "none". Return to /home/ivan/Work/infra/akrogon/issues/chart/beginner-docs/slots/page-map-recheck-B.md, then end your turn.

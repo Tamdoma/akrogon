@@ -1,0 +1,34 @@
+slug: docs-examples
+phase: merged
+created: 2026-10-23
+repo: akrogon
+debate: "no"
+blocked-by:
+  - docs-pictures-concepts
+  - docs-pictures-operations
+  - docs-reference-commands
+  - docs-reference-records
+  - docs-use-plan
+  - docs-use-finish
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tEG
+worktree: /home/ivan/.akrogon/worktrees/akrogon/docs-examples
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pVZ
+  B: w8:pV0
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-23T15:32:00.320Z
+frozen: {}
+frozen_cited: []

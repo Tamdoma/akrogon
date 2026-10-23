@@ -1,0 +1,31 @@
+slug: docs-use-finish
+phase: merged
+created: 2026-10-23
+repo: akrogon
+debate: "no"
+blocked-by:
+  - docs-pictures-operations
+  - docs-reference-commands
+  - docs-reference-records
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tEE
+env_names: []
+env_generation: 1
+pane:
+  A: w8:pVV
+  B: w8:pVW
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-23T15:10:22.609Z
+frozen:
+  tests/rollback.test.ts: d7088f3b92103cb49a51ee33719260e66e3ff8b5
+frozen_cited: []

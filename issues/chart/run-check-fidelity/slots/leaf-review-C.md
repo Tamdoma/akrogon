@@ -1,0 +1,9 @@
+# Leaf review C — check-env-fidelity
+
+I endorse B's F1 and F2; both are confirmed: #110's shim hang is Off route in CHART.md yet `state.yaml` carries #110 in `sources`, and `readiness.yaml` omits the recorded P2 locale proof. My disagreements:
+
+1. **Design 3a contradicts criterion 3 on doc placement.** Design "Binding decisions, verbatim" 3a copies fork check-contract.md Taken text with the path silently rewritten: the fork reads "docs/guide/setup.md says the cut bus hides keyring credentials", the draft reads "docs say" while criterion 3 puts the gh rule in install.md only. The verbatim record must not drift, and the decision leaves a gap: setup.md "pass_env" is the existing line documenting the cut bus; install.md's prerequisite tells a consumer only that gh is needed. Change: either fix the 3a quote to name install.md as the new placement with a one-line reason, or add the gh/keyring consequence to the setup.md pass_env bullet alongside the install.md prerequisite. Install.md alone is defensible; the silent quote drift is not.
+
+2. **Criterion 1's `$${x}` arg is the right-but-unproven member.** P1 proved `${base}`, `${file.key}`, `$HOME`; `$$`→`$` unescaping is documented in the man page but unprobed. It also sits in the same fork answer, so keeping it is fine — but the plan must note P1 covered three of the four named args. Change: no re-probe needed; add one clause to the criterion's proof note or record the `$$` case's unprobed status so the implementer does not invent a second probe.
+
+Agree otherwise: `--expand-environment=no` before `--` is the one-arg fix (src/scope.ts runUnitArgv); LANG after `copied`, before env/pass_env matches process.env-only semantics (src/run-check.ts:63-65); nested criterion is reachable via spawnReal (tests/run-units.test.ts); `test` check exists in issues/config.yaml.

@@ -1,0 +1,3 @@
+# Rebuttal B — svg-set
+
+The “three separate dials” description must show the allowed combinations rather than imply independent switches. Autopilot permits only lifecycle delivery, and watch-issues monitors lifecycle work rather than being a general companion to direct-route charting. Label the autopilot-to-lifecycle constraint and attach optional watching to the execution side. Evidence: skills/chart-issues/SKILL.md Autopilot explicitly excludes the direct route; docs/guide/in-practice.md describes watch-issues as inspecting open leaves. Both were inspected earlier this session. The three distinctions are useful, but the visual must not offer an unsupported autopilot + direct combination.

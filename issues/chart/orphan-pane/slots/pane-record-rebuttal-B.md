@@ -1,0 +1,3 @@
+R1. The residual orphan is not limited to process death. A pane can be created successfully while the Herdr response is lost, or `saveState` can fail after the split returns. Both leave the pane unrecorded even if akrogon stays alive. Describe the limit as “pane creation succeeds but its ID is not durably saved,” rather than “only if the process dies” or a fixed one-round-trip window. This does not change the pick of (a).
+
+Evidence: `src/next.ts`, `allocate`, performs the external pane split before it can save the returned ID. `src/state.ts`, `saveState`, performs a separate `writeYaml` operation. Neither operation is atomic with Herdr pane creation.

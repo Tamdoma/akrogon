@@ -1,0 +1,31 @@
+slug: docs-use-plan
+phase: merged
+created: 2026-10-23
+repo: akrogon
+debate: "no"
+blocked-by:
+  - docs-pictures-concepts
+  - docs-pictures-operations
+  - docs-reference-commands
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tEF
+env_names: []
+env_generation: 1
+pane:
+  A: w8:pVX
+  B: w8:pVY
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-23T15:15:31.124Z
+frozen:
+  tests/door-reset.test.ts: af4756a4c5d35b58bbac930a451de1645b5cba6b
+frozen_cited: []

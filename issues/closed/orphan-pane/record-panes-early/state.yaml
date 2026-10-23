@@ -1,0 +1,40 @@
+slug: record-panes-early
+phase: merged
+created: 2026-10-22
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#116"
+busy_since:
+  B: 2026-10-22T19:37:32.797Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tE7
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pVC
+  B: w8:pVD
+prompted:
+  B: 01a16517-950f-76b2-8a9c-b098c5b19ac5
+prompted_at:
+  B: 2026-10-22T19:37:32.797Z
+delivery_error: {}
+merge_stamp: 2026-10-22T19:37:25.760Z
+broadcast:
+  kind: issue
+  name: orphan-pane
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/orphan-pane
+  pushed: c5e98748b9c79ae75a5e4cd2ddc410462435ffe8
+  sources:
+    - "Tamdoma/akrogon#116"
+frozen:
+  tests/green-merge.test.ts: db36980371e2e5a2c2d255f65bc8082f6856cc62
+  tests/seat-containment.test.ts: 168c6266643421ec2abcd1db71b3b6fe880e5b92
+frozen_cited: []

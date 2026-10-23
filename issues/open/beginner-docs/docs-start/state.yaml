@@ -1,0 +1,35 @@
+slug: docs-start
+phase: plan.synthesis
+created: 2026-10-23
+repo: akrogon
+debate: "no"
+blocked-by:
+  - docs-pictures-concepts
+  - docs-pictures-operations
+  - docs-reference-commands
+  - docs-reference-records
+  - docs-use-plan
+  - docs-use-finish
+  - docs-examples
+sources: []
+busy_since:
+  A: 2026-10-23T15:32:09.562Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tEH
+worktree: /home/ivan/.akrogon/worktrees/akrogon/docs-start
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pW1
+  B: w8:pW2
+prompted:
+  A: 59228099-8472-4a59-8bb1-45b56dcb8da6
+prompted_at:
+  A: 2026-10-23T15:32:09.562Z
+delivery_error: {}

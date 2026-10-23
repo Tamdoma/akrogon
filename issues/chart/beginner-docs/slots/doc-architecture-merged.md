@@ -1,0 +1,15 @@
+# Merged notes — doc-architecture
+
+Q1
+- (a) purpose folders start/ use/ reference/ examples/ (A,B). Reason: page purpose visible from its path; each detail has one authoritative home, linked from the reader paths that need it (A,B; wording per B rebuttal). Diátaxis used as a check per page, not as folder names (A,B; diataxis.fr how-to-use, practitioner, 2026-10-23).
+- start/ is the only ordered path: what the factory is → why it works → install → set up a project → first finished change; prepared readers skip ahead (A,B).
+- use/ pages by reader goal, not one per command; combine steps that serve one goal, but never fold all charting modes back into one page (B). A's list: chart, direct, autopilot, run and watch, stop and recover, merge and land (A); B adds capture an observation, save records, handle lessons (B).
+- Placement of current pages (B, A agrees): idea + minimal parts → start; full folder layouts and state fields → reference; install/setup → start, dense env/receipt/seat details → reference; create → use (intake, chart entry) + reference (hand-written leaves, blocked-by); chart → use/chart, use/direct, use/autopilot, peer-script internals linked to the skill; next/in-practice/problems/limits → run/watch and stop/recover; merge → short landing explanation, stale claims corrected; files/state/phases → reference; learn → lessons task; gacp → reachable from save records; cheat → absorbed into use index + command reference, no second full syntax table.
+- (b) flat book rejected: keeps appending to long pages (chart.md, setup.md, files.md) (A,B). (c) four Diátaxis folders rejected: readers shouldn't have to classify their need; can scatter "why" away from the learning path (A,B).
+- Cost: guide content is reorganized with moves, splits and merges; docs/reference-index.md stays at its path as the agents' index and gets a link to the human docs home (B rebuttal); ownership per subject must be fixed in the contract before writing (A,B).
+Q2
+- (a) short front door: what it is, who it is for, what you need box, overview SVG, one dominant start link, short set of task links (A,B). Command table, install, rollback move to their one home (A,B).
+- (b) rejected: collapsed sections still duplicate facts → drift (A,B; GitHub collapsed-sections doc, 2026-10-23).
+New question (B): what counts as success at the end of start/? B recommends one small change reaching checked, merged code. A agrees.
+Pitfalls: folders just reshuffle long mixed pages → one reader goal and owned subjects per page fixed before moving (A,B); each new feature becomes a mandatory beginner chapter → add to task chooser + reference, change start/ only when the minimum workflow changes (B); too many tiny pages → split only on distinct goals, each page ends with its next action (B); README turns into marketing or feature counts → concrete outcome and prerequisites, links not lists (A,B); overview suggests autopilot starts execution or deploys → boundaries drawn explicitly (B); A/B letters used for both chart consultants and execution seats → docs name them apart, once, in one concept page (A,B).
+Differences: none.

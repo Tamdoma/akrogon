@@ -1,0 +1,5 @@
+{"t":"2026-10-22T18:57:12.366Z","step":"wait-turn-end","result":"turn ended"}
+{"t":"2026-10-22T18:57:12.368Z","step":"recheck","result":"identity held"}
+{"t":"2026-10-22T18:57:12.670Z","step":"send-reset","result":"sent","reset":"/clear"}
+{"t":"2026-10-22T18:57:13.174Z","step":"wait-new-session","result":"confirmed","session":"691ac448-30e1-455b-a2a1-66da56d6e480"}
+{"t":"2026-10-22T18:57:13.777Z","step":"send-start-prompt","result":"sent"}

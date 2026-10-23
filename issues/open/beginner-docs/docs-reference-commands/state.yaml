@@ -1,0 +1,32 @@
+slug: docs-reference-commands
+phase: merged
+created: 2026-10-23
+repo: akrogon
+debate: "no"
+blocked-by:
+  - docs-pictures-concepts
+  - docs-pictures-operations
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tEA
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pVJ
+  B: w8:pVK
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-23T14:58:12.167Z
+frozen:
+  tests/command-reference.test.ts: 678c86a2fb933ed34a9a987e6b243a226890472b
+  tests/docs-links.test.ts: 8a8257dcdfbe976e34bfb8cc91dcf165e34112ff
+  tests/run-permit.test.ts: 1e465bc428c14ad0a91099a36b4336f6e5120dfa
+frozen_cited: []

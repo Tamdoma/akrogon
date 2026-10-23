@@ -1,0 +1,49 @@
+slug: config-refusals
+phase: merged
+created: 2026-10-22
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#113"
+  - "Tamdoma/akrogon#114"
+  - "Tamdoma/akrogon#115"
+busy_since:
+  B: 2026-10-22T19:51:22.730Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tE6
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pVA
+  B: w8:pVB
+prompted:
+  B: 01a16520-bea9-7943-b3c4-08ba2d18cbba
+prompted_at:
+  B: 2026-10-22T19:51:22.731Z
+delivery_error: {}
+merge_stamp: 2026-10-22T19:51:09.023Z
+broadcast:
+  kind: issue
+  name: config-walls
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/config-walls
+  pushed: 7efe3d672e15773ff5f59396b5c8a0bf7c8a9cd8
+  sources:
+    - "Tamdoma/akrogon#113"
+    - "Tamdoma/akrogon#114"
+    - "Tamdoma/akrogon#115"
+frozen:
+  tests/config.test.ts: 203364c8bf910f24dc70a255e0a6ea7d118f282a
+  tests/guard.test.ts: 2fc5b0f0d678044539b01acb9d970fd134d7cc0b
+  tests/init.test.ts: 10f6bb7c10e950374961c26e6d41efe5d4029adb
+  tests/next.test.ts: a73fa0a2bc207f3b6e6df9745e575dbb72bdb5c8
+  tests/sync.test.ts: 631673c616c0f22fba61b48f4cabccf8d6b17e02
+  tests/verify.test.ts: 84031c5580ce6c3f619e1354fa2a959c13991c3e
+  tests/worktree-store.test.ts: 9d719ab95e4aaeed23b086b91535166ee323deec
+frozen_cited: []

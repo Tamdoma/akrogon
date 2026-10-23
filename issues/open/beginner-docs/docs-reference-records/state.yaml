@@ -1,0 +1,29 @@
+slug: docs-reference-records
+phase: merged
+created: 2026-10-23
+repo: akrogon
+debate: "no"
+blocked-by:
+  - docs-pictures-concepts
+  - docs-pictures-operations
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tEB
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pVM
+  B: w8:pVN
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-23T14:47:23.980Z
+frozen: {}
+frozen_cited: []

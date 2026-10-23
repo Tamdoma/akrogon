@@ -1,0 +1,42 @@
+slug: check-env-fidelity
+phase: merged
+created: 2026-10-22
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#111"
+  - "Tamdoma/akrogon#112"
+busy_since:
+  B: 2026-10-22T19:02:42.936Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tE5
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pV8
+  B: w8:pV9
+prompted:
+  B: 01a164fc-e63d-7473-8bbc-06a82b05d8be
+prompted_at:
+  B: 2026-10-22T19:02:42.937Z
+delivery_error: {}
+merge_stamp: 2026-10-22T19:02:31.601Z
+broadcast:
+  kind: issue
+  name: run-check-fidelity
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/run-check-fidelity
+  pushed: bd996a7ad22225d35328088e7a7d1a1bc0c95d89
+  sources:
+    - "Tamdoma/akrogon#111"
+    - "Tamdoma/akrogon#112"
+frozen:
+  tests/run-check.test.ts: 4b1e01f93361fe177839db50d17b242735abb02d
+  tests/run-units.test.ts: 03f9650d361f0b4e8dfbfe08c3546de8d7c6b22b
+frozen_cited: []

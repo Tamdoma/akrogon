@@ -1,0 +1,35 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: 'P1 systemd-run --expand-environment=no in scope mode'
+    command: "systemd-run --user --scope --quiet [--expand-environment=no] -- printf '[%s]\\n' 'a ${base} b' '${file.key}' '$HOME'"
+    identity: 'operator user ivan, local systemd user manager, no credentials'
+    target: 'local transient scope units'
+    version: 'systemd 262 (262.1-1-arch)'
+    date: '2026-10-22'
+    result: 'without the flag: [a  b] [] [/home/ivan] plus two systemd warnings, and $${x} became ${x}; with the flag: [a ${base} b] [${file.key}] [$HOME] [$${x}], exit 0'
+    cleanup: 'transient scopes collected on exit; none left'
+    limits: 'systemd 262 only; versions below 254 lack the flag'
+    record: issues/chart/run-check-fidelity/forks/check-contract.md
+  - operation: 'P2 LANG=C.UTF-8 makes locale-aware tools read UTF-8'
+    command: "env -i PATH=$PATH sh -c 'printf Č | wc -m'; env -i PATH=$PATH LANG=C.UTF-8 sh -c 'printf Č | wc -m'"
+    identity: 'operator user ivan, local shell, no credentials'
+    target: 'local coreutils and glibc locale'
+    version: 'glibc 2.44, locale -a lists C.utf8'
+    date: '2026-10-22'
+    result: 'without LANG: 2; with LANG=C.UTF-8: 1'
+    cleanup: 'none needed'
+    limits: 'no JDK on this host; the JVM path-encoding effect is intake evidence (#111)'
+    record: issues/chart/run-check-fidelity/forks/check-contract.md
+  - operation: 'P3 gh api under a cut session bus'
+    command: 'env -i HOME=$HOME PATH=$PATH DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent [GH_TOKEN=<token>] gh api repos/<private repo> --jq .visibility'
+    identity: 'operator gh login (keyring), token value not recorded'
+    target: 'one private GitHub repo of the operator, read only'
+    version: 'gh 2.102.1'
+    date: '2026-10-22'
+    result: 'without GH_TOKEN: HTTP 404; with GH_TOKEN: private'
+    cleanup: 'read only; nothing to clean'
+    limits: 'file token storage not re-proven on this host; the 2026-10-13 T1 proof covers it'
+    record: issues/chart/run-check-fidelity/forks/check-contract.md

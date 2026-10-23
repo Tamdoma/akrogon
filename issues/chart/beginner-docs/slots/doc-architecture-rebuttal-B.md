@@ -1,0 +1,5 @@
+# Rebuttal B — doc-architecture
+
+- Replace “a new feature lands in one obvious place” with “each detail has one authoritative home, with links from the relevant reader paths.” One feature can legitimately need a task page, exact reference and a short first-run introduction. Diataxis separates reader needs, not features into mutually exclusive locations. Evidence: https://diataxis.fr/start-here/, read 2026-10-23, and B's proposed placement of charting and dispatch material across use and reference. Avoid interpreting single ownership as prohibiting those distinct purposes.
+
+- Replace “every page moves” with “guide content is reorganized, with moves, splits and consolidation.” The proposed architecture does not require moving every documentation file. In particular, docs/reference-index.md remains the code-grounding index at its current path. Evidence: that file's inspected local area links and the already taken grounding-index boundary. Preserve its role and update its human-documentation link.

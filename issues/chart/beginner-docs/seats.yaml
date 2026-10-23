@@ -1,0 +1,17 @@
+opened: '2026-10-23T10:21:53Z'
+seats:
+  - seat: A
+    pane: w8:pNP
+    harness: claude
+    session: 1c9d0b48-0ab4-43c9-be91-a873141eb04d
+  - seat: B
+    pane: w8:pV5
+    harness: codex
+    session: 01a167ac-6ab1-78e2-bd57-bba97dba2cde
+  - seat: B
+    pane: w8:pV5
+    harness: codex
+    session: 01a16848-2c63-7f03-acf6-873a08bc6bf9
+spans:
+  - from: '2026-10-23T10:21:53Z'
+    to: '2026-10-23T14:05:12Z'

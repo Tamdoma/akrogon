@@ -1,0 +1,7 @@
+# Leaf review brief: record-panes-early (slot C)
+
+Reading rule: read process text by named section with bounded output; read held content at most once per session; source code and the drafts are the subject and may be read in full.
+
+Review these drafts as the implementer who must satisfy them: /tmp/claude-1000/-home-ivan-Work-infra-akrogon/691ac448-30e1-455b-a2a1-66da56d6e480/scratchpad/orphan-pane/ISSUE.md, /tmp/claude-1000/-home-ivan-Work-infra-akrogon/691ac448-30e1-455b-a2a1-66da56d6e480/scratchpad/orphan-pane/record-panes-early/brief.md, design.md, readiness.yaml, state.yaml. Live surface: /home/ivan/Work/infra/akrogon at 92dddada (src/next.ts allocate and broadcastPass, tests/seat-containment.test.ts, tests/fake-herdr.ts, docs/guide/next.md). Contract rules: /home/ivan/.claude/skills/chart-issues/assets/shapes.md sections "Leaf files" and "Preflight and validation"; /home/ivan/.claude/skills/chart-issues/assets/standing-design.md.
+
+Return disagreements only, each with evidence (path and symbol) and the exact correction. Check: each criterion can pass within the owned surfaces, bug-fix criteria really fail on current code, test fixtures suffice without new machinery, binding decisions are carried, nothing touches issues/. If none, write "No disagreement." Write to /home/ivan/Work/infra/akrogon/issues/chart/orphan-pane/slots/leaf-review-C.md and nothing else. Do not edit the drafts.
