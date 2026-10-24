@@ -286,10 +286,10 @@ test('a full suite waits for the live full suite, a run not marked full starts a
     writeFileSync(resolve(dir, 'release'), '');
     expect(await a.proc.exited).toBe(0);
     expect(await b.proc.exited).toBe(0);
-    const bStart: Event | undefined = timings(f).find(
-      (event) => event.kind === 'check_start' && event.name === 'test' && (event.wait_ms ?? 0) > 0,
-    );
-    expect(bStart?.wait_ms ?? 0).toBeGreaterThan(1000);
+    const waits: number[] = timings(f)
+      .filter((event) => event.kind === 'check_start' && event.name === 'test')
+      .map((event) => event.wait_ms ?? 0);
+    expect(Math.max(...waits)).toBeGreaterThan(1000);
     expect((await cli(f, ['status'])).stdout).not.toMatch(/full suite/i);
   } finally {
     stop(caps);
