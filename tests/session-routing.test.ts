@@ -472,6 +472,59 @@ test('the land unit carries no HERDR_SOCKET_PATH and its calls route to the reso
   }
 }, 30000);
 
+test('land wake calls reach the resolved session under a stale parent socket', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    // A green check lets land push; the repo workspace lives in `main` while
+    // every call inherits `other`'s stale socket, like the land unit does.
+    yaml(resolve(f.root, 'issues/config.yaml'), { checks: { ok: 'true' }, grounding: 'none' });
+    await command(['git', 'add', 'issues/config.yaml'], f.root);
+    await command(['git', 'commit', '-m', 'checks'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    saveDatabase(f, {
+      ...database(f),
+      workspaces: [],
+      sessions: [
+        session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] }),
+        session('main', {
+          workspaces: [{ workspace_id: 'w5', label: 'repo' }],
+          tabs: [{ tab_id: 'w5:t1', label: 'host', workspace_id: 'w5' }],
+          panes: [{ ...seatedPane('w5:p1', 'w5:t1', '/var/elsewhere'), agent_status: 'idle' }],
+        }),
+      ],
+    });
+    const env: NodeJS.ProcessEnv = {
+      ...f.env,
+      HERDR_SOCKET_PATH: socket(f, 'other'),
+      FAKE_SYSTEMD_RUN_LOG: resolve(f.home, 'systemd-run.log'),
+    };
+    // A sibling leaf keeps the issue owner incomplete so the merged leaf's
+    // broadcast is unset and the wake may close its tab.
+    const path: string = leaf(f, 'landing', 'plan.synthesis', {}, 'issue-x');
+    leaf(f, 'zz', 'plan.synthesis', {}, 'issue-x');
+    expect((await next(f, ['landing'], env)).code).toBe(0);
+    const worktree: string = z.string().parse(readState(path).worktree);
+    writeFileSync(resolve(worktree, 'landed-file'), 'x\n');
+    await command(['git', 'add', 'landed-file'], worktree);
+    await command(['git', 'commit', '-m', 'work'], worktree);
+    saveState(path, { ...readState(path), phase: 'merge', merge_stamp: '2026-10-19T00:00:00.000Z' });
+    expect((await next(f, ['landing'], env)).code).toBe(0);
+    const attempt: string = z.string().parse(readState(path).batch?.attempt);
+    const landed: Result = await cli(f, ['land', 'landing', '--attempt', attempt], f.root, env);
+    expect(landed.code).toBe(0);
+    // The wake's merged-tab close lands in `main`; `other` sees no mutations.
+    expect(toSession(f, 'main').some((args) => args[2] === 'tab' && args[3] === 'close')).toBe(true);
+    expect(
+      toSession(f, 'other').filter(
+        (args) =>
+          (args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? '')) || args[2] === 'notification',
+      ),
+    ).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+}, 60000);
+
 test('phase renames and the failed notice carry the resolved session', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -555,6 +608,46 @@ test('the merge notice and main-red notice go to the resolved session', async ()
     f.clean();
   }
 }, 30000);
+
+test('the main-red notice reaches the running session holding the repo workspace', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    // The repo's workspace sits only in running session `held`; the caller's
+    // ambient session is `default`.
+    saveDatabase(f, {
+      ...database(f),
+      workspaces: [{ workspace_id: 'w3', label: 'other' }],
+      sessions: [session('held', { workspaces: [{ workspace_id: 'w4', label: 'repo' }] })],
+    });
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      // Red on head and base alike: the main-red notice fires on the red base
+      // run; a green base would make the head a new red with no notice.
+      checks: { unit: 'test -f never-exists' },
+      grounding: 'none',
+    });
+    await command(['git', 'add', 'issues/config.yaml'], f.root);
+    await command(['git', 'commit', '-m', 'checks'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const path: string = leaf(f, 'caller', 'implement');
+    const worktree: string = resolve(storeDir(f), 'caller');
+    await command(['git', 'worktree', 'add', '-b', 'caller', worktree], f.root);
+    writeFileSync(resolve(worktree, 'marker'), 'x\n');
+    await command(['git', 'add', 'marker'], worktree);
+    await command(['git', 'commit', '-m', 'marker'], worktree);
+    saveState(path, { ...readState(path), worktree });
+    await cli(f, ['verify', '--known-red'], worktree, {
+      ...f.env,
+      HERDR_SOCKET_PATH: socket(f, 'default'),
+    });
+    const receipt: string = readFileSync(resolve(f.root, 'issues/verify-runs.jsonl'), 'utf8');
+    expect(receipt).toContain('"notice":"shown"');
+    const notices: string[][] = toSession(f, 'held').filter((args) => args[2] === 'notification' && args[3] === 'show');
+    expect(notices.some((args) => args.join(' ').includes('main red'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+}, 60000);
 
 test('a stopped repo session suppresses the main-red notice but keeps the receipt', async () => {
   const f: DispatchFixture = await dispatchFixture();
