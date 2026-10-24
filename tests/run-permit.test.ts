@@ -297,6 +297,62 @@ test('a full suite waits for the live full suite, a run not marked full starts a
   }
 }, 75000);
 
+test('a full suite in one repo waits for a full suite in another repo sharing the state home', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const other: string = resolve(f.home, 'other');
+    mkdirSync(resolve(other, 'issues/open'), { recursive: true });
+    await command(['git', 'init', '-b', 'main', other]);
+    await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
+    await command(['git', 'config', 'user.name', 'Test'], other);
+    writeFileSync(resolve(other, 'file'), 'initial\n');
+    await command(['git', 'add', '.'], other);
+    await command(['git', 'commit', '-m', 'initial'], other);
+    await command(['git', 'init', '--bare', '-b', 'main', resolve(f.home, 'other.git')]);
+    await command(['git', 'remote', 'add', 'origin', resolve(f.home, 'other.git')], other);
+    await command(['git', 'push', 'origin', 'HEAD:main'], other);
+    yaml(resolve(other, 'issues/config.yaml'), FULL_CONFIG);
+    const global: Record<string, unknown> = Bun.YAML.parse(
+      readFileSync(resolve(f.home, 'config.yaml'), 'utf8'),
+    ) as Record<string, unknown>;
+    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, other } });
+    const otherTree: string = resolve(storeDir(f, 'other'), 'other-leaf');
+    await command(['git', 'worktree', 'add', otherTree, '-b', 'other-leaf'], other);
+    mkdirSync(resolve(other, 'issues/open/issue/other-leaf'), { recursive: true });
+    yaml(resolve(other, 'issues/open/issue/other-leaf/state.yaml'), {
+      slug: 'other-leaf',
+      phase: 'implement',
+      created: '2026-09-10',
+      repo: 'other',
+      debate: 'no',
+      'blocked-by': [],
+      worktree: otherTree,
+    });
+    const first: string = await leafWorktree(f, 'repo-leaf');
+    const a: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'a')], first);
+    caps.push(a);
+    await waitFor(resolve(dir, 'a.held'));
+    const b: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'b')], otherTree);
+    caps.push(b);
+    await waitForText(b, /waiting for full suite repo\/repo-leaf test/);
+    const small: Result = await cli(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'small')], otherTree);
+    expect(small.code).toBe(0);
+    expect(existsSync(resolve(dir, 'small'))).toBe(true);
+    expect(existsSync(resolve(dir, 'b'))).toBe(false);
+    expect((await cli(f, ['status'])).stdout).toMatch(/other\s+other-leaf\s+test\s+waiting 1/);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await a.proc.exited).toBe(0);
+    expect(await b.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'b'))).toBe(true);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
 test('full suites start in arrival order', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
