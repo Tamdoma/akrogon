@@ -133,6 +133,24 @@ test('capacity counts a seat living in another session and an unreadable session
   }
 }, 20000);
 
+test('capacity counts an unreadable session before any leaf has a seat', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'waiting', 'plan.synthesis');
+    saveDatabase(f, {
+      ...database(f),
+      sessions: [session('opaque', { paneListStdout: 'not json' })],
+    });
+    const result: Result = await next(f, ['waiting']);
+    expect(result.code).toBe(0);
+    expect(readState(path).tab).toBeUndefined();
+    expect(readState(path).worktree).toBeUndefined();
+    expect(database(f).tabs).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+}, 20000);
+
 // Criterion 2: the cross-session pane union vetoes worktree removal; a same-id
 // tab in a foreign session is no veto; an unreadable session keeps everything
 // its liveness could decide.
