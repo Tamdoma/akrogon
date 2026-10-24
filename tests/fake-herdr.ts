@@ -69,6 +69,7 @@ const databaseSchema = z.object({
   failNotification: z.boolean().default(false),
   failNotificationOnce: z.boolean().default(false),
   failRename: z.boolean().default(false),
+  failWorkspaceList: z.boolean().default(false),
   prompts: z.array(z.object({ pane: z.string(), text: z.string() })).default([]),
   starts: z.array(z.array(z.string())).default([]),
   startCgroups: z.array(z.object({ pane: z.string(), cgroup: z.string() })).default([]),
@@ -159,7 +160,10 @@ if (args[0] === 'pane' && args[1] === 'list') {
 }
 if (args[0] === 'pane' && args[1] === 'get') result({ pane: pane(args[2]) });
 if (args[0] === 'tab' && args[1] === 'list') result({ tabs: db.tabs });
-if (args[0] === 'workspace' && args[1] === 'list') result({ workspaces: db.workspaces });
+if (args[0] === 'workspace' && args[1] === 'list') {
+  if (db.failWorkspaceList) failure('server_not_running');
+  result({ workspaces: db.workspaces });
+}
 if (args[0] === 'tab' && args[1] === 'create') {
   const workspace: string = args.includes('--workspace') ? flag('--workspace') : 'w1';
   const focused: boolean = db.tabs.every((t) => !t.focused) || !args.includes('--no-focus');

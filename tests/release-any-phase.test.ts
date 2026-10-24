@@ -236,6 +236,57 @@ test('a pass from a session without the repo workspace keeps its slice and temp'
   }
 });
 
+// A merged leaf of a repo whose workspace is absent keeps worktree, temp and
+// slice: nothing of it is judged from another session.
+test('a pass from a session without the repo workspace keeps a merged leaf worktree', async () => {
+  const f: F = await fakes();
+  try {
+    const worktree: string = resolve(f.home, 'wt', 'away-merged');
+    await command(['git', 'worktree', 'add', '-b', 'away-merged', worktree], f.root);
+    leaf(f, 'away-merged', 'merged', { tab: 'w1:t2', worktree });
+    saveDatabase(f, { ...database(f), workspaces: [{ workspace_id: 'w3', label: 'other' }] });
+    const slice: string = leafSlice(repo(f), 'away-merged');
+    emptyCgroup(f, 'empty-away');
+    const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/empty-away' }]);
+    systemctlBin(f);
+    const temp: string = tempFor(f, 'away-merged');
+    mkdirSync(temp, { recursive: true });
+    await cli(f, ['next', '--all'], f.root, env(f, db, log));
+    expect(calls(log).some((line) => line.includes('stop') && line.includes(slice))).toBe(false);
+    expect(existsSync(worktree)).toBe(true);
+    expect(existsSync(temp)).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+// A failed workspace list counts as absent for every repo, on a typed pass and
+// on the tab_closed hook alike.
+test('a failed workspace list stops no slice on a typed pass or a tab_closed hook', async () => {
+  const f: F = await fakes();
+  try {
+    leaf(f, 'blind-slice', 'implement', { tab: 'w1:t3' });
+    stopLeaf(f, 'blind-slice');
+    saveDatabase(f, { ...database(f), failWorkspaceList: true });
+    const slice: string = leafSlice(repo(f), 'blind-slice');
+    busyCgroup(f, 'busy-blind');
+    const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/busy-blind' }]);
+    systemctlBin(f);
+    await cli(f, ['next', '--all'], f.root, env(f, db, log));
+    await cli(f, ['next'], f.root, {
+      ...env(f, db, log),
+      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+        event: 'tab_closed',
+        data: { type: 'tab_closed', tab_id: 'w1:t3', workspace_id: 'w1' },
+      }),
+    });
+    expect(calls(log).some((line) => line.includes('stop') && line.includes(slice))).toBe(false);
+    expect(unitsIn(db)).toContain(slice);
+  } finally {
+    f.clean();
+  }
+});
+
 // Criterion 2: the same leaf is kept by a live run record naming its slice.
 test('a live run record keeps an unfinished leaf slice and its temp', async () => {
   const f: F = await fakes();
@@ -431,6 +482,8 @@ test('the host slice step keeps unfinished leaf slices under the same tab rules'
     const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
     const otherTemp: string = resolve(leafTempRoot(f), hex(other).slice(0, 4), hex(`${other}\nother-gone`).slice(0, 8));
     mkdirSync(otherTemp, { recursive: true });
+    const otherStore: string = resolve(f.home, '.akrogon/worktrees/other/other-gone');
+    mkdirSync(otherStore, { recursive: true });
     liveRunRecord(f, 'held', 'other', 'other-run', runSlice, child.pid);
     const { db, log } = sliceDb(f, [
       { unit: tabSlice, sub: 'active', cgroup: '/host-tab' },
@@ -468,6 +521,7 @@ test('the host slice step keeps unfinished leaf slices under the same tab rules'
     expect(entries().some((entry) => entry.path === idleSlice && entry.reason === OTHER_REPO)).toBe(true);
     expect(unitsIn(db)).toContain(idleSlice);
     expect(existsSync(otherTemp)).toBe(true);
+    expect(existsSync(otherStore)).toBe(true);
   } finally {
     child.kill('SIGKILL');
     await child.exited;

@@ -15,7 +15,18 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { command, quote, spawnCaptured } from '../src/shell';
 import { readState } from '../src/state';
-import { fixture, cli, fakeAkrogon, leaf, leafTempRoot, holding, registerTemp, yaml, type Fixture } from './helpers';
+import {
+  fixture,
+  cli,
+  fakeAkrogon,
+  fakeHerdr,
+  leaf,
+  leafTempRoot,
+  holding,
+  registerTemp,
+  yaml,
+  type Fixture,
+} from './helpers';
 
 function writeLog(path: string, data: string | Buffer): void {
   mkdirSync(resolve(path, '..'), { recursive: true });
@@ -247,6 +258,8 @@ test('the .closing marker rides through the failed pack and is absent after the 
 test('run-check refuses closed and closing owners at start and right before publish', async () => {
   const f: Fixture = await fixture();
   try {
+    // Reconcile acts only on a repo whose workspace is in the herdr session.
+    const herdr: NodeJS.ProcessEnv = fakeHerdr(f).env;
     // Early refusal: target under issues/closed.
     const done: string = leaf(f, 'done', 'merge', holding(f), 'issue');
     writeLog(resolve(done, 'implementation/x.log'), 'x\n');
@@ -297,7 +310,7 @@ test('run-check refuses closed and closing owners at start and right before publ
     expect(existsSync(runRoot)).toBe(true);
     expect(existsSync(resolve(runRoot, '.owner'))).toBe(false);
     expect(readFileSync(resolve(runRoot, 'refusal.json'), 'utf8')).toContain('racer');
-    const next = await cli(f, ['next']);
+    const next = await cli(f, ['next'], f.root, herdr);
     expect(next.code).toBe(0);
     expect(readFileSync(outLog![1], 'utf8')).toContain('before-close');
     const kept: { path: string; reason: string }[] = JSON.parse(
@@ -305,7 +318,7 @@ test('run-check refuses closed and closing owners at start and right before publ
     ).kept;
     expect(kept.some((entry) => entry.path === runRoot && entry.reason !== '')).toBe(true);
     const before: string[] = readdirSync(resolve(f.root, 'issues/open'));
-    expect((await cli(f, ['next'])).code).toBe(0);
+    expect((await cli(f, ['next'], f.root, herdr)).code).toBe(0);
     expect(readdirSync(resolve(f.root, 'issues/open')).sort()).toEqual(before.sort());
 
     // A --holder under issues/chart is still accepted.
