@@ -438,10 +438,8 @@ async function activeCount(global: GlobalConfig, invocation: Invocation): Promis
   const registered: ReturnType<typeof registeredRepos> = registeredRepos(global, invocation);
   let total: number = registered.unknown ? global.max_active : 0;
   const unfinished = (leaf: Leaf): boolean => leaf.state.phase !== 'merged' && leaf.state.phase !== 'failed';
-  // A leaf counts active only while a pane could still sit in it: recorded
-  // tab or a live worktree. The session-tagged union is read once, lazily,
-  // the first time such a leaf exists — a null union makes occupancy
-  // unknowable and blocks launches for the pass.
+  // Read the session-tagged union even before the first seat: a null union
+  // makes occupancy unknowable and blocks launches for the pass.
   const seated = (leaf: Leaf): boolean =>
     unfinished(leaf) && (leaf.state.tab !== undefined || leaf.state.worktree !== undefined);
   let tagged: { session: string; pane: Pane }[] | null | undefined;
@@ -450,7 +448,7 @@ async function activeCount(global: GlobalConfig, invocation: Invocation): Promis
     const inventory: Inventory = discover(repo, invocation);
     const needs: boolean = inventory.leaves.some(seated);
     const resolution: ResolvedSession | null = await resolveQuiet(repo);
-    if (needs && resolution !== null) {
+    if (resolution !== null) {
       const all: { session: string; pane: Pane }[] | null = await union();
       if (all === null) return global.max_active;
       const live: Pane[] = all.filter((entry) => entry.session === resolution.session.name).map((entry) => entry.pane);
