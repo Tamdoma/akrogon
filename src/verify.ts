@@ -36,6 +36,7 @@ export const verifyRunSchema = z.strictObject({
       exit: z.number().int(),
       log: z.string(),
       reused: z.string().optional(),
+      blocked: z.string().optional(),
     }),
   ),
   start: z.string(),
@@ -148,14 +149,14 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
     const covered: boolean = await (async () => {
       for (const head of heads) {
         const red: VerifyRun['commands'][number] | undefined = entryOf(head);
-        if (red === undefined || red.exit === 0) continue;
+        if (red === undefined || red.exit === 0 || red.blocked !== undefined) continue;
         const names: string[] = await failedTests(repo, red.log);
         if (names.some((name) => noTestNames.includes(name))) continue;
         for (const baseRun of runs.filter(
           (run) => run.compares === head.run && run.sha === mergeBase && run.scope === scope && completed(run),
         )) {
           const onBase: VerifyRun['commands'][number] | undefined = entryOf(baseRun);
-          if (onBase === undefined || onBase.exit === 0) continue;
+          if (onBase === undefined || onBase.exit === 0 || onBase.blocked !== undefined) continue;
           const baseNames: string[] = await failedTests(repo, onBase.log);
           if (names.every((name) => baseNames.includes(name))) return true;
         }
@@ -193,7 +194,9 @@ type Unit = { scope: VerifyScope; name: string; command: string; test: string };
 
 function matching(run: VerifyRun, unit: Unit): VerifyRun['commands'][number] | undefined {
   return run.scope === unit.scope
-    ? run.commands.find((item) => item.name === unit.name && item.command === unit.command)
+    ? run.commands.find(
+        (item) => item.name === unit.name && item.command === unit.command && item.blocked === undefined,
+      )
     : undefined;
 }
 
@@ -215,7 +218,7 @@ async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[]): Promis
   };
   const units: Unit[] = [];
   for (const item of me.commands) {
-    if (item.exit === 0) continue;
+    if (item.exit === 0 || item.reused !== undefined || item.blocked !== undefined) continue;
     for (const test of await failedTests(repo, item.log))
       units.push({ scope: me.scope, name: item.name, command: item.command, test });
   }
@@ -402,7 +405,7 @@ async function runOnce(
       setup.code !== 0 ? { name: 'setup', exit: setup.code, log: setup.log } : ran.find((item) => item.exit !== 0);
     if (blocker !== undefined) {
       for (const item of members) {
-        ran.push({ ...item, exit: blocker.exit, log: blocker.log });
+        ran.push({ ...item, exit: blocker.exit, log: blocker.log, blocked: blocker.name });
         process.stdout.write(`verify ${item.name}: blocked by ${blocker.name} (${blocker.exit}) ${blocker.log}\n`);
       }
     } else {
