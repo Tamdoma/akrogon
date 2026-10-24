@@ -91,7 +91,7 @@ function baseState(slug: string, phase: string, extra: Record<string, unknown> =
 
 function writeLeaf(root: string, owner: string, slug: string, data: Record<string, unknown>): string {
   mkdirSync(resolve(root, 'issues'), { recursive: true });
-  writeFileSync(resolve(root, 'issues/config.yaml'), '{}');
+  writeFileSync(resolve(root, 'issues/config.yaml'), 'grounding: none\n');
   const dir: string = resolve(root, 'issues/open', owner, slug);
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, 'state.yaml'), Bun.YAML.stringify(data));

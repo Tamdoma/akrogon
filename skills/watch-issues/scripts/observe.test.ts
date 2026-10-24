@@ -141,7 +141,7 @@ function baseState(slug: string, phase: string, extra: Record<string, unknown> =
 // readRepo requires issues/config.yaml; repoSchema parses {} into defaults.
 function writeRepoConfig(root: string): void {
   mkdirSync(resolve(root, 'issues'), { recursive: true });
-  writeFileSync(resolve(root, 'issues/config.yaml'), '{}');
+  writeFileSync(resolve(root, 'issues/config.yaml'), 'grounding: none\n');
 }
 
 function writeLeaf(root: string, owner: string, slug: string, data: Record<string, unknown>): string {

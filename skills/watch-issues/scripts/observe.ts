@@ -2,6 +2,8 @@
 import { existsSync, readdirSync, type Dirent } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
+import { readRepo, type Repo } from '../../../src/config';
+import { herdrArgv, repoSession, type SessionResolution } from '../../../src/shell';
 import {
   repoInventory,
   RepoMismatchError,
@@ -82,10 +84,10 @@ async function resolveRepoKey(root: string, bin: string): Promise<string> {
   return repo;
 }
 
-async function agentStatuses(root: string, bin: string): Promise<Map<string, AgentEntry>> {
+async function agentStatuses(root: string, bin: string, session: string): Promise<Map<string, AgentEntry>> {
   let result: RunResult;
   try {
-    result = await run([bin, 'agent', 'list'], root);
+    result = await run(herdrArgv(['agent', 'list'], { session, exe: bin }), root);
   } catch (error) {
     throw new Error(`herdr agent list failed to spawn ${bin}: ${messageOf(error)}`);
   }
@@ -162,18 +164,14 @@ function resolveLog(paneId: string, entry: AgentEntry, home: string): string {
     return '-';
   } else if (entry.agent === 'claude') {
     if (entry.cwd === null || entry.cwd === undefined) return '-';
-    candidate = join(
-      home,
-      '.claude',
-      'projects',
-      entry.cwd.replaceAll(/[^A-Za-z0-9]/g, '-'),
-      `${session.value}.jsonl`,
-    );
+    candidate = join(home, '.claude', 'projects', entry.cwd.replaceAll(/[^A-Za-z0-9]/g, '-'), `${session.value}.jsonl`);
   } else if (entry.agent === 'codex') {
     const matches: string[] = codexSessionPaths(join(home, '.codex', 'sessions'), session.value);
     if (matches.length === 0) return '-';
     if (matches.length > 1) {
-      throw new Error(`Pane ${paneId} matches ${matches.length} codex sessions for id ${session.value}: ${matches.join(', ')}`);
+      throw new Error(
+        `Pane ${paneId} matches ${matches.length} codex sessions for id ${session.value}: ${matches.join(', ')}`,
+      );
     }
     candidate = matches[0];
   } else {
@@ -220,21 +218,22 @@ async function main(): Promise<void> {
   const herdrBin: string = process.env.OBSERVE_HERDR ?? 'herdr';
   const home: string = process.env.HOME ?? '';
   const repoKey: string = await resolveRepoKey(root, akrogonBin);
+  const repo: Repo = readRepo(repoKey, root);
+  const resolved: SessionResolution = await repoSession(repo, { exe: herdrBin });
+  if (!resolved.ok) throw new Error(resolved.reason);
+  console.log(`session=${resolved.session.name}`);
   const inv: Inventory = repoInventory({ name: repoKey, root }, ['open']);
   const leaves: Leaf[] = inv.leaves;
   const failures: LeafFailure[] = [
-    ...inv.unreadable.map(
-      (f): LeafFailure => ({ path: resolve(f.path, 'state.yaml'), error: f.error.replaceAll('\n', ' ') }),
-    ),
-    ...inv.foreign.map(
-      (f): LeafFailure => ({
-        path: resolve(f.path, 'state.yaml'),
-        error: new RepoMismatchError(f.path, f.stored, repoKey).message,
-      }),
-    ),
-    ...inv.unknown.map(
-      (f): LeafFailure => ({ path: f.path, error: f.error.replaceAll('\n', ' ') }),
-    ),
+    ...inv.unreadable.map((f): LeafFailure => ({
+      path: resolve(f.path, 'state.yaml'),
+      error: f.error.replaceAll('\n', ' '),
+    })),
+    ...inv.foreign.map((f): LeafFailure => ({
+      path: resolve(f.path, 'state.yaml'),
+      error: new RepoMismatchError(f.path, f.stored, repoKey).message,
+    })),
+    ...inv.unknown.map((f): LeafFailure => ({ path: f.path, error: f.error.replaceAll('\n', ' ') })),
   ].sort((a, b) => a.path.localeCompare(b.path));
   const reportFailures = (): void => {
     for (const failure of failures) console.log(`unreadable=${failure.path} error=${failure.error}`);
@@ -243,7 +242,7 @@ async function main(): Promise<void> {
     reportFailures();
     return;
   }
-  const entries: Map<string, AgentEntry> = await agentStatuses(root, herdrBin);
+  const entries: Map<string, AgentEntry> = await agentStatuses(root, herdrBin, resolved.session.name);
   const now: number = Date.now();
   const panes: Set<string> = new Set();
   for (const leaf of leaves) {
