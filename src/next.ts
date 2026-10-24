@@ -187,13 +187,22 @@ function ownsTab(tab: Tab, live: Pane[], workspaceId: string, worktree: string):
   );
 }
 
-function ownsPane(repo: Repo, leaf: Leaf, pane: Pane, live: Pane[], view: Tab[], workspaceId: string): boolean {
+function ownsPane(
+  repo: Repo,
+  leaf: Leaf,
+  pane: Pane | undefined,
+  paneId: string,
+  live: Pane[],
+  view: Tab[],
+  workspaceId: string,
+): boolean {
   return (
     view.some(
       (tab) =>
-        tab.tab_id === pane.tab_id && ownsTab(tab, live, workspaceId, resolve(worktreeStore(repo), leaf.state.slug)),
+        tab.tab_id === (pane === undefined ? leaf.state.tab : pane.tab_id) &&
+        ownsTab(tab, live, workspaceId, resolve(worktreeStore(repo), leaf.state.slug)),
     ) &&
-    (Object.values(leaf.state.pane).includes(pane.pane_id) || inWorktree(pane.cwd, leaf))
+    (Object.values(leaf.state.pane).includes(paneId) || (pane !== undefined && inWorktree(pane.cwd, leaf)))
   );
 }
 
@@ -1513,10 +1522,9 @@ async function paneOwners(
     const view: Tab[] | null = await tabs(resolution.session.name).catch(() => null);
     if (live === null || view === null) continue;
     const pane: Pane | undefined = live.find((pane) => pane.pane_id === hookPane);
-    if (pane === undefined) continue;
     owners.push(
       ...discover(repo, invocation)
-        .leaves.filter((leaf) => ownsPane(repo, leaf, pane, live, view, resolution.workspace.workspace_id))
+        .leaves.filter((leaf) => ownsPane(repo, leaf, pane, hookPane, live, view, resolution.workspace.workspace_id))
         .map((leaf) => ({ repo, leaf })),
     );
   }
