@@ -476,7 +476,7 @@ async function secondSeat(
     for (const pane of seated) {
       if (pane.cwd === null || !within(pane.cwd, worktree)) continue;
       const tab: Tab | undefined = sessionTabs.find((tab) => tab.tab_id === pane.tab_id);
-      if (tab?.workspace_id !== workspaceId)
+      if (session.name !== own.session || tab?.workspace_id !== workspaceId)
         throw new Error(
           `Pane ${pane.pane_id} in session ${session.name} already sits inside ${worktree} outside workspace ${workspaceId}`,
         );
