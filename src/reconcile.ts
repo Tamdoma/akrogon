@@ -1140,9 +1140,12 @@ export async function reconcile(
 // registered repos (open and closed leaf records) plus failed akrogon-run-*
 // units. A slice matching a finished leaf follows the same rule as the per-repo
 // step; a slice matching no leaf at all is stopped only when its cgroupfs
-// subtree holds no process. panesOnce is asked only when a tab has to be judged.
+// subtree holds no process. A leaf-matched slice is stopped only for a repo in
+// `acting`, the repos this pass reconciled; every registered repo still counts
+// for ownership. panesOnce is asked only when a tab has to be judged.
 export async function reconcileHost(
   repos: Repo[],
+  acting: ReadonlySet<string>,
   live: Pane[] | null,
   panesOnce: () => Promise<Pane[] | null>,
 ): Promise<void> {
@@ -1194,6 +1197,10 @@ export async function reconcileHost(
         const reason: string | null = sliceKeepReason(slice, match.leaf, view, own, runs);
         if (reason !== null) {
           keep(slice, reason, 'removed once the pass, recorded run or live tab ends and pane inventory is available');
+          continue;
+        }
+        if (!acting.has(match.repo.name)) {
+          keep(slice, 'repo not reconciled by this pass', 'removed by a pass for that repo from its own herdr session');
           continue;
         }
         const error: string | null = await stopSlice(slice);

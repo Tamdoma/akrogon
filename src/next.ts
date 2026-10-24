@@ -1298,14 +1298,24 @@ async function selectLeaves(
   return { repo, leaves: selected };
 }
 
+// Repo keys whose workspace is in the invoking herdr session; a failed list
+// means none, so a pass acts only on repos it can see.
+async function sessionRepos(): Promise<Set<string>> {
+  return new Set(((await workspaces().catch(() => null)) ?? []).map((workspace) => workspace.label));
+}
+
 async function reconcileRepos(
   repos: Repo[],
   invocation: Invocation,
   isAutomatic: boolean,
   panesOnce: () => Promise<Pane[] | null>,
 ): Promise<void> {
+  const visible: Set<string> = await sessionRepos();
+  const acting: Set<string> = new Set();
   for (const repo of repos) {
     if (isAutomatic && isPaused(repo.name)) continue;
+    if (!visible.has(repo.name)) continue;
+    acting.add(repo.name);
     const inventory: Inventory = discover(repo, invocation);
     try {
       await reconcile(
@@ -1319,7 +1329,7 @@ async function reconcileRepos(
       report(invocation, repo.name, repo.root, error);
     }
   }
-  await reconcileHost(registeredRepos(readGlobal(), invocation).repos, null, panesOnce);
+  await reconcileHost(registeredRepos(readGlobal(), invocation).repos, acting, null, panesOnce);
 }
 
 async function paneOwners(
@@ -1435,6 +1445,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
         if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
         if (owners.length === 0) return;
         if (isPaused(owners[0].repo.name)) return;
+        if (!(await sessionRepos()).has(owners[0].repo.name)) return;
         const completedSlug: string = owners[0].leaf.state.slug;
         try {
           const inventory: Inventory = discover(owners[0].repo, invocation);
@@ -1444,7 +1455,12 @@ export async function nextCommand(input: string | undefined, pressureDir: string
             (await reconcileNeedsPanes(owners[0].repo, inventory.leaves)) ? await panesOnce() : [],
             inventoryFailures(inventory),
           );
-          await reconcileHost(registeredRepos(global, invocation).repos, live, panesOnce);
+          await reconcileHost(
+            registeredRepos(global, invocation).repos,
+            new Set([owners[0].repo.name]),
+            live,
+            panesOnce,
+          );
         } catch (error) {
           if (!(error instanceof Error)) throw error;
           report(invocation, owners[0].repo.name, owners[0].leaf.path, error, completedSlug);
