@@ -122,14 +122,12 @@ function greenEntry(run: VerifyRun, item: NamedCommand): VerifyRun['commands'][n
 }
 
 // The newest completed run on the same tree and scope holding {name, command} green lends its entry.
-// A source whose log is gone lends a dead pointer, so the command runs fresh instead.
 function reuseSource(runs: VerifyRun[], tree: string, scope: VerifyScope, item: NamedCommand): VerifyRun | undefined {
-  const sources: VerifyRun[] = runs.filter((run) => {
-    if (run.tree !== tree || run.scope !== scope || !completed(run)) return false;
-    const entry = greenEntry(run, item);
-    return entry !== undefined && existsSync(entry.log);
-  });
-  return sources.length === 0 ? undefined : newest(sources);
+  return newest(
+    runs.filter(
+      (run) => run.tree === tree && run.scope === scope && completed(run) && greenEntry(run, item) !== undefined,
+    ),
+  );
 }
 
 // Per expected command, a head red is covered when a completed head run holds it red with every
