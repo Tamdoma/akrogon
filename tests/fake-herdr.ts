@@ -243,6 +243,7 @@ if (args[0] === 'integration' && args[1] === 'install') {
 }
 if (args[0] === 'plugin' && args[1] === 'link') {
   z.tuple([z.literal('plugin'), z.literal('link'), z.string().min(1)]).parse(args);
+  result({});
 }
 if (args[0] === 'pane' && args[1] === 'list') {
   if (dbS.delayMs !== undefined) Bun.sleepSync(dbS.delayMs);
@@ -294,7 +295,9 @@ if (args[0] === 'pane' && args[1] === 'split') {
   const left: number = Math.floor(parent.width / 2);
   source.rect = { ...parent, width: left };
   const sibling: FakePane = {
-    pane_id: `${source.tab_id}:p${++dbS.serial}`,
+    // Pane ids keep the historical w1 prefix regardless of the source tab's
+    // workspace; suites assert that shape.
+    pane_id: `w1:p${++dbS.serial}`,
     tab_id: source.tab_id,
     cwd: flag('--cwd'),
     agent: null,
