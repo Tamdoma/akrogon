@@ -646,7 +646,6 @@ test('recorded tab without a worktree member is neither closed nor reused', asyn
   }
 });
 
-
 test('resolved-session pane discovery refuses at the ten-second deadline', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {

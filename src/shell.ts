@@ -243,11 +243,23 @@ export async function herdr<T>(
 }
 
 export async function panes(session?: string, exe?: string): Promise<Pane[]> {
-  return (await herdr(['pane', 'list'], z.object({ panes: z.array(paneSchema) }), { session, exe })).panes;
+  return (
+    await herdr(['pane', 'list'], z.object({ panes: z.array(paneSchema) }), {
+      session,
+      exe,
+      deadlineMs: DISCOVERY_DEADLINE_MS,
+    })
+  ).panes;
 }
 
 export async function tabs(session?: string, exe?: string): Promise<Tab[]> {
-  return (await herdr(['tab', 'list'], z.object({ tabs: z.array(tabSchema) }), { session, exe })).tabs;
+  return (
+    await herdr(['tab', 'list'], z.object({ tabs: z.array(tabSchema) }), {
+      session,
+      exe,
+      deadlineMs: DISCOVERY_DEADLINE_MS,
+    })
+  ).tabs;
 }
 
 export async function workspaces(session?: string, exe?: string): Promise<Workspace[]> {
