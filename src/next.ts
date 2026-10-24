@@ -56,6 +56,7 @@ import {
   sessionPanes,
   DISCOVERY_DEADLINE_MS,
   type Pane,
+  type SessionPane,
   type Tab,
   type Result,
   type Session,
@@ -285,8 +286,7 @@ async function panesForRepo(repo: Repo, _invocation: Invocation): Promise<Pane[]
 // The second-seat veto and host reconcile read the union of every running
 // session's panes; the session-tagged source skips dead-but-listed sessions
 // and one unreadable session makes the union null (keep everything).
-async function allSessionPanes(): Promise<Pane[] | null> {
-  const tagged: { session: string; pane: Pane }[] | null = await sessionPanes();
+function allSessionPanes(tagged: SessionPane[] | null): Pane[] | null {
   return tagged === null ? null : tagged.map((entry) => entry.pane);
 }
 
@@ -1489,7 +1489,7 @@ async function reconcileRepos(
   repos: Repo[],
   invocation: Invocation,
   isAutomatic: boolean,
-  hostPanesOnce: () => Promise<Pane[] | null>,
+  hostPanesOnce: () => Promise<SessionPane[] | null>,
 ): Promise<void> {
   const acting: Set<string> = new Set();
   for (const repo of repos) {
@@ -1499,15 +1499,19 @@ async function reconcileRepos(
       acting.add(repo.name);
       const needsPanes: boolean = await reconcileNeedsPanes(repo, inventory.leaves);
       const live: Pane[] | null = needsPanes ? await panesForRepo(repo, invocation) : [];
-      const union: Pane[] | null = needsPanes ? await hostPanesOnce() : [];
+      const union: SessionPane[] | null = needsPanes ? await hostPanesOnce() : [];
       await reconcile(repo, inventory.leaves, live, union, inventoryFailures(inventory));
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       report(invocation, repo.name, repo.root, error);
     }
   }
-  await reconcileHost(registeredRepos(readGlobal(), invocation).repos, acting, null, hostPanesOnce, (repo: Repo) =>
-    panesForRepo(repo, invocation),
+  await reconcileHost(
+    registeredRepos(readGlobal(), invocation).repos,
+    acting,
+    null,
+    async () => allSessionPanes(await hostPanesOnce()),
+    (repo: Repo) => panesForRepo(repo, invocation),
   );
 }
 
@@ -1607,11 +1611,11 @@ export async function nextCommand(input: string | undefined, pressureDir: string
   }
   // One shared lazy cross-session pane list per pass; the host step shares it.
   let panesRequested: boolean = false;
-  let hostPanes: Pane[] | null = null;
-  const hostPanesOnce = async (): Promise<Pane[] | null> => {
+  let hostPanes: SessionPane[] | null = null;
+  const hostPanesOnce = async (): Promise<SessionPane[] | null> => {
     if (!panesRequested) {
       panesRequested = true;
-      hostPanes = await allSessionPanes();
+      hostPanes = await sessionPanes();
     }
     return hostPanes;
   };
@@ -1708,13 +1712,13 @@ export async function nextCommand(input: string | undefined, pressureDir: string
           const inventory: Inventory = discover(owners[0].repo, invocation);
           const needsPanes: boolean = await reconcileNeedsPanes(owners[0].repo, inventory.leaves);
           const live: Pane[] | null = needsPanes ? await panesForRepo(owners[0].repo, invocation) : [];
-          const union: Pane[] | null = needsPanes ? await hostPanesOnce() : [];
+          const union: SessionPane[] | null = needsPanes ? await hostPanesOnce() : [];
           await reconcile(owners[0].repo, inventory.leaves, live, union, inventoryFailures(inventory));
           await reconcileHost(
             registeredRepos(global, invocation).repos,
             new Set([owners[0].repo.name]),
-            hostPanes,
-            hostPanesOnce,
+            allSessionPanes(hostPanes),
+            async () => allSessionPanes(await hostPanesOnce()),
             (repo: Repo) => panesForRepo(repo, invocation),
           );
         } catch (error) {
@@ -1796,7 +1800,7 @@ export async function unpausePass(repo: Repo, pressureDir: string = '/proc/press
       false,
       false,
     );
-    await reconcileRepos([repo], invocation, false, allSessionPanes);
+    await reconcileRepos([repo], invocation, false, sessionPanes);
   });
   await mergePass(global, repo, invocation, false, pressureDir);
   if (invocation.skipped.size > 0)

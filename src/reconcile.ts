@@ -51,6 +51,7 @@ import {
   tabs,
   type Pane,
   type Result,
+  type SessionPane,
   type SessionResolution,
   type Tab,
 } from './shell';
@@ -262,8 +263,11 @@ function livePaneInside(live: Pane[], path: string): boolean {
 
 // A pane parked at the worktree root in the leaf's own tab is the leaf's
 // session being torn down, not a squatter; anything else inside blocks removal.
-function foreignPaneInside(live: Pane[], path: string, tab: string | undefined): boolean {
-  return live.some((pane) => pane.cwd !== null && within(pane.cwd, path) && (pane.cwd !== path || pane.tab_id !== tab));
+function foreignPaneInside(live: Pane[], foreign: Pane[], path: string, tab: string | undefined): boolean {
+  return (
+    livePaneInside(foreign, path) ||
+    live.some((pane) => pane.cwd !== null && within(pane.cwd, path) && (pane.cwd !== path || pane.tab_id !== tab))
+  );
 }
 
 function tabLive(live: Pane[], tab: string | undefined): boolean {
@@ -492,7 +496,7 @@ export async function reconcile(
   repo: Repo,
   leaves: Leaf[],
   live: Pane[] | null,
-  union: Pane[] | null = live,
+  union?: SessionPane[] | null,
   failures?: { ownedNames: ReadonlySet<string>; incomplete: boolean },
 ): Promise<Reconciled> {
   const removed: string[] = [];
@@ -757,7 +761,17 @@ export async function reconcile(
 
   const handled: Set<string> = new Set();
   const panes: Pane[] = live ?? [];
-  const panesUnion: Pane[] = union ?? [];
+  const panesUnion: Pane[] = union === undefined ? panes : (union ?? []).map((entry) => entry.pane);
+  const resolution: SessionResolution | null = union === undefined || union === null ? null : await repoSession(repo);
+  const ownPanes: Pane[] =
+    union === undefined
+      ? panes
+      : (union ?? [])
+          .filter((entry) => resolution !== null && resolution.ok && entry.session === resolution.session.name)
+          .map((entry) => entry.pane);
+  const foreignPanes: Pane[] = (union ?? [])
+    .filter((entry) => resolution === null || !resolution.ok || entry.session !== resolution.session.name)
+    .map((entry) => entry.pane);
   // One /proc scan per pass, run only when a candidate reaches removal.
   let scanned: Map<number, string[]> | undefined;
   const targets = (): Map<number, string[]> => scanned ?? (scanned = procTargets());
@@ -786,7 +800,7 @@ export async function reconcile(
       keep(worktree, 'active leaf', 'removed once the owning leaf finishes');
       return;
     }
-    if (foreignPaneInside(panesUnion, worktree, tab)) {
+    if (foreignPaneInside(ownPanes, foreignPanes, worktree, tab)) {
       keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
       return;
     }
@@ -851,7 +865,7 @@ export async function reconcile(
         keep(worktree, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
         continue;
       }
-      if (tabLive(panes, state.tab) || foreignPaneInside(panesUnion, worktree, state.tab)) {
+      if (tabLive(panes, state.tab) || foreignPaneInside(ownPanes, foreignPanes, worktree, state.tab)) {
         keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
         continue;
       }
@@ -1001,7 +1015,7 @@ export async function reconcile(
           if (live === null) keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
           else if (union === null)
             keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
-          else if (tabLive(panes, leaf.state.tab) || foreignPaneInside(panesUnion, path, leaf.state.tab))
+          else if (tabLive(panes, leaf.state.tab) || foreignPaneInside(ownPanes, foreignPanes, path, leaf.state.tab))
             keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
           else await removeWorktree(path, false, 'failed leaf');
           continue;
@@ -1088,7 +1102,7 @@ export async function reconcile(
         keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
         continue;
       }
-      if (tabLive(panes, ownerLeaf.state.tab) || foreignPaneInside(panesUnion, path, ownerLeaf.state.tab)) {
+      if (tabLive(panes, ownerLeaf.state.tab) || foreignPaneInside(ownPanes, foreignPanes, path, ownerLeaf.state.tab)) {
         keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
         continue;
       }

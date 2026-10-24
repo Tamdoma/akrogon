@@ -166,6 +166,7 @@ export const paneSchema = z.object({
 });
 
 export type Pane = z.infer<typeof paneSchema>;
+export type SessionPane = { session: string; pane: Pane };
 
 export const tabSchema = z.object({
   tab_id: z.string(),
@@ -309,10 +310,10 @@ export async function listSessions(exe: string = 'herdr'): Promise<Session[] | n
 // A session listed running whose pane read dies server_not_running is skipped
 // as stopped, like resolution's workspace probe; any other per-session read
 // error or a failed session list makes the whole union null.
-export async function sessionPanes(exe: string = 'herdr'): Promise<{ session: string; pane: Pane }[] | null> {
+export async function sessionPanes(exe: string = 'herdr'): Promise<SessionPane[] | null> {
   const sessions: Session[] | null = await listSessions(exe);
   if (sessions === null) return null;
-  const tagged: { session: string; pane: Pane }[] = [];
+  const tagged: SessionPane[] = [];
   for (const session of sessions) {
     if (!session.running) continue;
     try {
