@@ -37,7 +37,11 @@ function calls(f: DispatchFixture): string[][] {
   if (!existsSync(path)) return [];
   const text: string = readFileSync(path, 'utf8').trim();
   if (text === '') return [];
-  return text.split('\n').map((line) => JSON.parse(line) as string[]);
+  return text
+    .split('\n')
+    .map((line) => JSON.parse(line) as string[])
+    // Session routing adds discovery calls; strip them so assertions see work calls.
+    .filter((args) => args[0] !== 'session' && args[0] !== 'workspace');
 }
 
 function mutating(f: DispatchFixture): string[][] {

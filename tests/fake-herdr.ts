@@ -94,6 +94,7 @@ const sessionSchema = storeSchema.extend({
   default: z.boolean().default(false),
 });
 type Session = z.infer<typeof sessionSchema>;
+export type SessionInput = z.input<typeof sessionSchema>;
 const databaseSchema = storeSchema.extend({
   sessions: z.array(sessionSchema).optional(),
   sessionListError: z.string().optional(),

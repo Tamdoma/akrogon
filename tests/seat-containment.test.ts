@@ -25,6 +25,8 @@ function calls(f: DispatchFixture): string[][] {
         .trim()
         .split('\n')
         .map((line) => z.array(z.string()).parse(JSON.parse(line)))
+        // Session routing adds discovery calls; strip them so assertions see work calls.
+        .filter((args) => args[0] !== 'session' && args[0] !== 'workspace')
     : [];
 }
 function busctlCalls(f: DispatchFixture): BusctlCall[] {

@@ -5,7 +5,7 @@ import { fixture, cli, entry, leaf, fakeHerdr, storeDir, yaml, type Fixture } fr
 import { readState, saveState, type State } from '../src/state';
 import { command, spawnCaptured, type Result } from '../src/shell';
 import { z } from 'zod';
-import type { Database, DatabaseInput } from './fake-herdr';
+import type { Database, DatabaseInput, SessionInput } from './fake-herdr';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 type PaneSeed = {
@@ -30,7 +30,7 @@ type SessionSeed = {
   workspaces?: { workspace_id: string; label: string }[];
   serial?: number;
 };
-function session(name: string, over: Omit<SessionSeed, 'name'> = {}): DatabaseInput['sessions'] extends (infer T)[] | undefined ? T : never {
+function session(name: string, over: Omit<SessionSeed, 'name'> = {}): SessionInput {
   return {
     name,
     running: true,
@@ -94,11 +94,21 @@ async function nextAt(f: DispatchFixture, slug: string, now: number, env: NodeJS
 test('routes seats into the session holding the repo workspace', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
+    const worktree: string = resolve(storeDir(f), 'routed');
     saveDatabase(f, {
       ...database(f),
+      // Clear the flat default store's `repo` workspace so `main` holds the
+      // label uniquely; seed a free idle pane there so allocation takes the
+      // `pane split` path and the seated pane carries the worktree cwd.
+      workspaces: [],
+      panes: [],
       sessions: [
         session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] }),
-        session('main', { workspaces: [{ workspace_id: 'w5', label: 'repo' }] }),
+        session('main', {
+          workspaces: [{ workspace_id: 'w5', label: 'repo' }],
+          tabs: [{ tab_id: 'w5:t1', label: 'host', workspace_id: 'w5' }],
+          panes: [{ ...seatedPane('w5:p1', 'w5:t1', '/var/elsewhere'), agent_status: 'idle' }],
+        }),
       ],
     });
     const path: string = leaf(f, 'routed', 'plan.synthesis');
@@ -112,8 +122,7 @@ test('routes seats into the session holding the repo workspace', async () => {
     for (const verb of ['create', 'split', 'start', 'prompt', 'close', 'rename', 'show']) {
       expect(other.some((args) => args.includes(verb))).toBe(false);
     }
-    const worktree: string = z.string().parse(state.worktree);
-    expect(worktree).toBe(resolve(storeDir(f), 'routed'));
+    expect(z.string().parse(state.worktree)).toBe(worktree);
     const store = database(f).sessions!.find((s) => s.name === 'main')!;
     const pane = store.panes.find((p) => p.pane_id === state.pane.A)!;
     expect(pane.cwd).toBe(worktree);
@@ -127,6 +136,7 @@ test('refuses missing and duplicate repo workspaces while naming searched and sk
   try {
     saveDatabase(f, {
       ...database(f),
+      workspaces: [],
       sessions: [
         session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] }),
         session('resting', { running: false, workspaces: [{ workspace_id: 'w4', label: 'repo' }] }),
@@ -190,6 +200,7 @@ test('a refused repo reports once in --all while a healthy repo still dispatches
     yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, second } });
     saveDatabase(f, {
       ...database(f),
+      workspaces: [],
       sessions: [
         session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] }),
         session('main', { workspaces: [{ workspace_id: 'w5', label: 'second' }] }),
@@ -214,6 +225,7 @@ test('skips a listed-stopped session and a dead running session, and a read erro
     // Listed stopped holding the only repo workspace: skipped, refused.
     saveDatabase(f, {
       ...database(f),
+      workspaces: [],
       sessions: [session('down', { running: false, workspaces: [{ workspace_id: 'w4', label: 'repo' }] })],
     });
     const down: Result = await next(f, ['skipped']);
@@ -224,9 +236,10 @@ test('skips a listed-stopped session and a dead running session, and a read erro
     // Listed running but answering server_not_running: skipped as stopped.
     saveDatabase(f, {
       ...database(f),
+      workspaces: [],
       sessions: [
         session('ghost', { deadRead: true, workspaces: [{ workspace_id: 'w4', label: 'repo' }] }),
-        session('default', { workspaces: [{ workspace_id: 'w4', label: 'repo' }] }),
+        session('live', { workspaces: [{ workspace_id: 'w4', label: 'repo' }] }),
       ],
     });
     const ghost: Result = await next(f, ['skipped']);
@@ -236,6 +249,7 @@ test('skips a listed-stopped session and a dead running session, and a read erro
     // Any other error refuses as unreadable.
     saveDatabase(f, {
       ...database(f),
+      workspaces: [],
       sessions: [session('broken', { readError: 'exploded', workspaces: [] })],
     });
     const broken: Result = await next(f, ['skipped']);
@@ -252,6 +266,7 @@ test('a discovery read past the deadline refuses the repo', async () => {
   try {
     saveDatabase(f, {
       ...database(f),
+      workspaces: [],
       sessions: [session('slow', { workspaces: [], delayMs: 30000 })],
     });
     leaf(f, 'deadline', 'plan.synthesis');
@@ -411,7 +426,10 @@ test('tab reuse, pane close and liveness stay inside the resolved session', asyn
         session('other', {
           workspaces: [{ workspace_id: 'w9', label: 'misc' }],
           tabs: [{ tab_id: 'w1:tDup', label: 'reuse', workspace_id: 'w9' }],
-          panes: [{ ...seatedPane('w9:p9', 'w1:tDup', worktree), agent_status: 'idle' as const }],
+          // The foreign pane's cwd stays outside the leaf worktree: a pane in
+          // the worktree would trip the second-seat guard, which is not the
+          // behavior under test here.
+          panes: [{ ...seatedPane('w9:p9', 'w1:tDup', '/var/elsewhere'), agent_status: 'idle' as const }],
         }),
       ],
     });
@@ -552,7 +570,9 @@ test('a stopped repo session suppresses the main-red notice but keeps the receip
     });
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
-      checks: { unit: 'test -f marker' },
+      // The marker exists only on the leaf head, so `test ! -f marker` is red
+      // on the head and green on the base: a new red needing the notice.
+      checks: { unit: 'test ! -f marker' },
       grounding: 'none',
     });
     await command(['git', 'add', 'issues/config.yaml'], f.root);
@@ -564,27 +584,18 @@ test('a stopped repo session suppresses the main-red notice but keeps the receip
     writeFileSync(resolve(worktree, 'marker'), 'x\n');
     await command(['git', 'add', 'marker'], worktree);
     await command(['git', 'commit', '-m', 'marker'], worktree);
-    const sha: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
-    // The head is red (marker exists there but not on base), so --known-red
-    // runs base and the unit is a new red needing a notice.
-    const { appendFileSync } = await import('node:fs');
-    appendFileSync(resolve(worktree, 'marker'), 'x\n');
-    await command(['git', 'commit', '-am', 'bump'], worktree);
-    const headSha: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     saveState(path, { ...readState(path), worktree });
     const verified: Result = await cli(f, ['verify', '--known-red'], worktree, {
       ...f.env,
       HERDR_SOCKET_PATH: socket(f, 'default'),
     });
+    expect(verified.code).toBe(0);
     // Receipt persists regardless of notice delivery.
     const runs: string = resolve(f.root, 'issues/verify-runs.jsonl');
     expect(existsSync(runs)).toBe(true);
     const receipt = readFileSync(runs, 'utf8');
     expect(receipt).toContain('"notice":"error"');
     expect(toSession(f, 'held')).toHaveLength(0);
-    void sha;
-    void headSha;
-    void verified;
   } finally {
     f.clean();
   }
