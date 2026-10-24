@@ -71,6 +71,39 @@ async function next(
 ): Promise<Result> {
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
+function socket(f: DispatchFixture, name: string): string {
+  return `${f.db}-${name}.sock`;
+}
+// Hook events act only through the emitting socket and workspace: every
+// event invocation carries HERDR_SOCKET_PATH for `default` and a payload
+// workspace_id matching the fixture's resolved workspace w1.
+function paneEvent(f: DispatchFixture, pane: string, agent_status: string): NodeJS.ProcessEnv {
+  return {
+    HERDR_SOCKET_PATH: socket(f, 'default'),
+    HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+      event: 'pane_agent_status_changed',
+      data: { type: 'pane_agent_status_changed', pane_id: pane, workspace_id: 'w1', agent_status },
+    }),
+  };
+}
+function paneExited(f: DispatchFixture, pane: string): NodeJS.ProcessEnv {
+  return {
+    HERDR_SOCKET_PATH: socket(f, 'default'),
+    HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+      event: 'pane_exited',
+      data: { type: 'pane_exited', pane_id: pane, workspace_id: 'w1' },
+    }),
+  };
+}
+function tabClosed(f: DispatchFixture, tab: string, workspace_id: string = 'w1'): NodeJS.ProcessEnv {
+  return {
+    HERDR_SOCKET_PATH: socket(f, 'default'),
+    HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+      event: 'tab_closed',
+      data: { type: 'tab_closed', tab_id: tab, workspace_id },
+    }),
+  };
+}
 function tmpdirsOf(args: string[]): string[] {
   const found: string[] = [];
   for (let i: number = 0; i + 1 < args.length; i++)
@@ -168,7 +201,7 @@ test('next creates one worktree/tab under concurrent hooks, prompts configured A
     expect(calls(f).some((args) => args[0] === 'notification')).toBe(false);
     expect(readState(path).attempts.A).toBe(0);
     const a: string = readState(path).pane.A!;
-    expect((await next(f, [], { HERDR_PANE_ID: a })).code).toBe(0);
+    expect((await next(f, [], paneEvent(f, a, 'working'))).code).toBe(0);
     expect(readState(path).attempts.A).toBe(0);
     expect(await command(['git', 'branch', '--show-current'], readState(path).worktree)).toBe('build');
   } finally {
@@ -271,7 +304,7 @@ test('next does not re-prompt a slot whose prompted session is still alive, and 
       ...flicker,
       panes: flicker.panes.map((p) => (p.pane_id === a ? { ...p, agent_status: 'idle' } : p)),
     });
-    expect((await next(f, [], { HERDR_PANE_ID: a })).code).toBe(0);
+    expect((await next(f, [], paneEvent(f, a, 'idle'))).code).toBe(0);
     expect(database(f).prompts).toHaveLength(1);
     expect(readState(path).busy_since.A).toBeUndefined();
     expect(readState(path).busy_notified.A).toBeUndefined();
@@ -283,7 +316,7 @@ test('next does not re-prompt a slot whose prompted session is still alive, and 
         p.pane_id === a ? { ...p, agent_status: 'idle', agent_session: { kind: 'id', value: 'other' } } : p,
       ),
     });
-    expect((await next(f, [], { HERDR_PANE_ID: a })).code).toBe(0);
+    expect((await next(f, [], paneEvent(f, a, 'idle'))).code).toBe(0);
     expect(database(f).prompts).toHaveLength(2);
     expect(readState(path).attempts.A).toBe(0);
   } finally {
@@ -305,7 +338,7 @@ test('next waits on a blocked agent instead of counting attempts or flipping sea
     const a: string = readState(path).pane.A!;
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => (p.pane_id === a ? { ...p, agent_status: 'idle' } : p)) });
-    expect((await next(f, [], { HERDR_PANE_ID: a })).code).toBe(0);
+    expect((await next(f, [], paneEvent(f, a, 'idle'))).code).toBe(0);
     expect(database(f).prompts).toHaveLength(1);
     expect(database(f).prompts[0].pane).toBe(a);
     expect(readState(path).attempts.A).toBe(0);
@@ -577,12 +610,7 @@ test('a closed tab hook from a merged leaf starts the dependent', async () => {
       panes: db.panes.filter((pane) => pane.tab_id !== tab),
       workspaces: [{ workspace_id: 'w2', label: 'repo' }],
     });
-    const closed: Result = await next(f, [], {
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'tab_closed',
-        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w2' },
-      }),
-    });
+    const closed: Result = await next(f, [], tabClosed(f, tab, 'w2'));
     expect(closed.code).toBe(0);
     expect(database(f).tabs.map((item) => item.label)).toEqual(['second']);
     expect(database(f).tabs[0].tab_id.startsWith('w2:')).toBe(true);
@@ -641,23 +669,12 @@ for (const path of ['targeted', 'tab_closed', 'pane_hook'] as const) {
           tabs: closedDb.tabs.filter((item) => item.tab_id !== tab),
           panes: closedDb.panes.filter((pane) => pane.tab_id !== tab),
         });
-        const closed: Result = await next(f, [], {
-          HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-            event: 'tab_closed',
-            data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w2' },
-          }),
-        });
+        const closed: Result = await next(f, [], tabClosed(f, tab));
         expect(closed.code).toBe(0);
       } else {
         const exitedDb: Database = database(f);
         saveDatabase(f, { ...exitedDb, panes: exitedDb.panes.filter((pane) => pane.pane_id !== a) });
-        const exited: Result = await next(f, [], {
-          HERDR_PANE_ID: a,
-          HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-            event: 'pane_exited',
-            data: { type: 'pane_exited', pane_id: a, workspace_id: 'w1' },
-          }),
-        });
+        const exited: Result = await next(f, [], paneExited(f, a));
         expect(exited.code).toBe(0);
       }
       // Targeted and tab_closed passes close the merged tab via reconciliation;
@@ -904,13 +921,7 @@ test('exited hooks resolve persisted pane hints and preserve the surviving slot'
     const b: string = readState(path).pane.B!;
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.filter((pane) => pane.pane_id !== a) });
-    const recovered: Result = await next(f, [], {
-      HERDR_PANE_ID: a,
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'pane_exited',
-        data: { type: 'pane_exited', pane_id: a, workspace_id: 'w1' },
-      }),
-    });
+    const recovered: Result = await next(f, [], paneExited(f, a));
     expect(recovered.code).toBe(0);
     expect(readState(path).pane.B).toBe(b);
     expect(readState(path).pane.A).not.toBe(a);
@@ -931,15 +942,11 @@ test('delayed working and idle notifications from the prompted session never con
     const a: string = readState(path).pane.A!;
     const db: Database = database(f);
     saveDatabase(f, { ...db, panes: db.panes.map((p) => (p.pane_id === a ? { ...p, agent_status: 'idle' } : p)) });
-    const event = (status: string): string =>
-      JSON.stringify({
-        event: 'pane_agent_status_changed',
-        data: { type: 'pane_agent_status_changed', pane_id: a, workspace_id: 'w1', agent_status: status },
-      });
-    expect((await next(f, [], { HERDR_PANE_ID: a, HERDR_PLUGIN_EVENT_JSON: event('working') })).code).toBe(0);
+    const event = (status: string): NodeJS.ProcessEnv => paneEvent(f, a, status);
+    expect((await next(f, [], event('working'))).code).toBe(0);
     expect(readState(path).attempts.A).toBe(0);
     expect(database(f).prompts).toHaveLength(1);
-    expect((await next(f, [], { HERDR_PANE_ID: a, HERDR_PLUGIN_EVENT_JSON: event('idle') })).code).toBe(0);
+    expect((await next(f, [], event('idle'))).code).toBe(0);
     expect(readState(path).attempts.A).toBe(0);
     expect(database(f).prompts).toHaveLength(1);
   } finally {
@@ -1214,7 +1221,7 @@ for (const mode of ['startup', 'hook', 'cwd'] as const) {
       const result: Result = await next(
         f,
         mode === 'startup' ? ['--all'] : [],
-        mode === 'hook' ? { HERDR_PANE_ID: readState(healthy).pane.A } : {},
+        mode === 'hook' ? paneEvent(f, readState(healthy).pane.A!, 'idle') : {},
         mode === 'startup' ? f.home : f.root,
       );
       expect(result.code).toBe(1);
@@ -2468,17 +2475,11 @@ for (const kind of ['seat-B blocked', 'seat-B unknown', 'seat-A idle', 'seat-A e
         saveDatabase(f, { ...db, panes: db.panes.filter((item) => item.pane_id !== pane) });
       }
       const status: string = kind === 'seat-B blocked' ? 'blocked' : kind === 'seat-B unknown' ? 'unknown' : 'idle';
-      const result: Result = await next(f, [], {
-        HERDR_PANE_ID: pane,
-        HERDR_PLUGIN_EVENT_JSON: JSON.stringify(
-          kind === 'seat-A exited'
-            ? { event: 'pane_exited', data: { type: 'pane_exited', pane_id: pane, workspace_id: 'w1' } }
-            : {
-                event: 'pane_agent_status_changed',
-                data: { type: 'pane_agent_status_changed', pane_id: pane, workspace_id: 'w1', agent_status: status },
-              },
-        ),
-      });
+      const result: Result = await next(
+        f,
+        [],
+        kind === 'seat-A exited' ? paneExited(f, pane) : paneEvent(f, pane, status),
+      );
       expect(result.code).toBe(0);
       expect(database(f).tabs.map((tab) => tab.label)).toEqual(['done']);
       expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
@@ -2531,12 +2532,7 @@ test('a merged leaf whose tab is already gone makes no tab close call and a driv
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(probe.closed)).toBe(true);
     expect(existsSync(worktree)).toBe(false);
-    const closed: Result = await next(f, [], {
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'tab_closed',
-        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' },
-      }),
-    });
+    const closed: Result = await next(f, [], tabClosed(f, tab));
     expect(closed.code).toBe(0);
     expect(closed.stderr).toBe('');
     expect(calls(f).some((args) => args[0] === 'tab' && args[1] === 'close')).toBe(false);
@@ -2577,13 +2573,7 @@ test('a merged leaf whose closure failed during phase merged closes its tab on t
       ]),
     );
     const b: string = readState(path).pane.B!;
-    const result: Result = await next(f, [], {
-      HERDR_PANE_ID: b,
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'pane_agent_status_changed',
-        data: { type: 'pane_agent_status_changed', pane_id: b, workspace_id: 'w1', agent_status: 'idle' },
-      }),
-    });
+    const result: Result = await next(f, [], paneEvent(f, b, 'idle'));
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
     expect(existsSync(resolve(f.root, 'issues/closed/late-issue/late/state.yaml'))).toBe(true);
@@ -2606,13 +2596,7 @@ test('a seat-B idle hook closes the merged leaf tab while the worktree and branc
     saveState(path, { ...readState(path), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'done', 'merged'], f.root, f.env)).code).toBe(0);
     const b: string = readState(path).pane.B!;
-    const result: Result = await next(f, [], {
-      HERDR_PANE_ID: b,
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'pane_agent_status_changed',
-        data: { type: 'pane_agent_status_changed', pane_id: b, workspace_id: 'w1', agent_status: 'idle' },
-      }),
-    });
+    const result: Result = await next(f, [], paneEvent(f, b, 'idle'));
     expect(result.code).toBe(0);
     expect(database(f).tabs).toHaveLength(0);
     expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(1);
@@ -2761,7 +2745,7 @@ for (const route of ['--all', '.', 'hook']) {
       const result: Result = await next(
         f,
         route === 'hook' ? [] : [route],
-        route === 'hook' ? { HERDR_PANE_ID: readState(healthy).pane.A } : {},
+        route === 'hook' ? paneEvent(f, readState(healthy).pane.A!, 'idle') : {},
       );
       expect(result.code).toBe(1);
       expect(result.stderr).toContain(resolve(bad, 'state.yaml'));
@@ -4136,12 +4120,7 @@ test('closed tab scratch deletes merged folder and prunes inner worktree', async
       tabs: db.tabs.filter((item) => item.tab_id !== tab),
       panes: db.panes.filter((pane) => pane.tab_id !== tab),
     });
-    const closed: Result = await next(f, [], {
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'tab_closed',
-        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' },
-      }),
-    });
+    const closed: Result = await next(f, [], tabClosed(f, tab));
     expect(closed.code).toBe(0);
     expect(existsSync(scratch)).toBe(false);
     expect(existsSync(sentinel)).toBe(false);
@@ -4173,12 +4152,7 @@ test('closed tab scratch sweeps a failed leaf, keeps its branch', async () => {
       tabs: db.tabs.filter((item) => item.tab_id !== tab),
       panes: db.panes.filter((pane) => pane.tab_id !== tab),
     });
-    const closed: Result = await next(f, [], {
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'tab_closed',
-        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' },
-      }),
-    });
+    const closed: Result = await next(f, [], tabClosed(f, tab));
     expect(closed.code).toBe(0);
     expect(existsSync(scratch)).toBe(false);
     expect(existsSync(sentinel)).toBe(false);
@@ -5174,13 +5148,7 @@ test('an idle hook retries a faulted merge holder before its waiter', async () =
       promptScript: [{ code: 'agent_prompt_stalled', message: 'stalled' }],
     });
     const pane: string = readState(cc.path).pane.A!;
-    const env: NodeJS.ProcessEnv = {
-      HERDR_PANE_ID: pane,
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'pane_agent_status_changed',
-        data: { type: 'pane_agent_status_changed', pane_id: pane, agent_status: 'idle' },
-      }),
-    };
+    const env: NodeJS.ProcessEnv = paneEvent(f, pane, 'idle');
     expect((await next(f, [], env)).code).toBe(0);
     seatOwned(holder.path);
     expect((await next(f, [], env)).code).toBe(0);
@@ -5475,14 +5443,11 @@ test('blocked-report manual forms stay manual with pane and event set', async ()
   try {
     leaf(f, 'ready', 'plan.synthesis');
     leaf(f, 'blocked', 'plan.synthesis', { 'blocked-by': ['ready'] });
-    const event: string = JSON.stringify({
-      event: 'pane_agent_status_changed',
-      data: { type: 'pane_agent_status_changed', pane_id: 'p1', agent_status: 'idle' },
-    });
+    const event: NodeJS.ProcessEnv = paneEvent(f, 'p1', 'idle');
     const tPane: Result = await next(f, ['blocked'], { HERDR_PANE_ID: 'operator' });
-    const tEvent: Result = await next(f, ['blocked'], { HERDR_PLUGIN_EVENT_JSON: event });
+    const tEvent: Result = await next(f, ['blocked'], event);
     const aPane: Result = await next(f, ['--all'], { HERDR_PANE_ID: 'operator' });
-    const aEvent: Result = await next(f, ['--all'], { HERDR_PLUGIN_EVENT_JSON: event });
+    const aEvent: Result = await next(f, ['--all'], event);
     for (const r of [tPane, tEvent, aPane, aEvent]) {
       expect(r.code).toBe(0);
       expect(waits(r)).toEqual(['waiting: blocked on ready (plan.synthesis)']);
@@ -5500,13 +5465,7 @@ test('blocked-report automatic silence on hook, resume, and merge wake', async (
     leaf(f, 'failedleaf', 'failed');
     expect((await next(f, ['ready'])).code).toBe(0);
     const paneA: string = readState(readyPath).pane.A!;
-    const hook: Result = await next(f, [], {
-      HERDR_PANE_ID: paneA,
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'pane_agent_status_changed',
-        data: { type: 'pane_agent_status_changed', pane_id: paneA, agent_status: 'idle' },
-      }),
-    });
+    const hook: Result = await next(f, [], paneEvent(f, paneA, 'idle'));
     expect(hook.code).toBe(0);
     expect(hook.stderr).toBe('');
     saveState(readyPath, { ...readState(readyPath), 'blocked-by': ['ghost'] });
@@ -5546,13 +5505,7 @@ test('blocked-report real errors still report on automatic paths', async () => {
     const healthyPath: string = leaf(f, 'healthy', 'plan.synthesis');
     expect((await next(f, ['healthy'])).code).toBe(1);
     const paneA: string = readState(healthyPath).pane.A!;
-    const hook: Result = await next(f, [], {
-      HERDR_PANE_ID: paneA,
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'pane_agent_status_changed',
-        data: { type: 'pane_agent_status_changed', pane_id: paneA, agent_status: 'idle' },
-      }),
-    });
+    const hook: Result = await next(f, [], paneEvent(f, paneA, 'idle'));
     expect(hook.code).toBe(1);
     expect(hook.stderr).toContain(malformed);
     const resumed: Result = await next(f, ['--resume'], {}, f.home);
@@ -6139,12 +6092,7 @@ test('next --all, --resume and manual next record the registered or selected rep
         .some((args) => args[0] === 'agent' && args[1] === 'prompt'),
     ).toBe(true);
     const tabbed: number = calls(f).length;
-    const closed: Result = await selfUpdateCli(f, ['next'], {
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'tab_closed',
-        data: { type: 'tab_closed', tab_id: 'w1:t999', workspace_id: 'w1' },
-      }),
-    });
+    const closed: Result = await selfUpdateCli(f, ['next'], tabClosed(f, 'w1:t999'));
     expect(closed.code).toBe(0);
     expect(selfUpdateCalls(f)).toHaveLength(5);
     expect(calls(f)).toHaveLength(tabbed);

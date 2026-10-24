@@ -83,24 +83,26 @@ const hookEventSchema = z.discriminatedUnion('event', [
     data: z.object({
       type: z.literal('pane_agent_status_changed'),
       pane_id: z.string(),
+      workspace_id: z.string(),
       agent_status: paneSchema.shape.agent_status,
     }),
   }),
   z.object({
     event: z.literal('pane_exited'),
-    data: z.object({ type: z.literal('pane_exited'), pane_id: z.string() }),
+    data: z.object({ type: z.literal('pane_exited'), pane_id: z.string(), workspace_id: z.string() }),
   }),
   z.object({
     event: z.literal('pane_closed'),
-    data: z.object({ type: z.literal('pane_closed'), pane_id: z.string() }),
+    data: z.object({ type: z.literal('pane_closed'), pane_id: z.string(), workspace_id: z.string() }),
   }),
   z.object({
     event: z.literal('tab_closed'),
-    data: z.object({ type: z.literal('tab_closed'), tab_id: z.string() }),
+    data: z.object({ type: z.literal('tab_closed'), tab_id: z.string(), workspace_id: z.string() }),
   }),
 ]);
 
 type HookEvent = z.infer<typeof hookEventSchema>;
+type PaneEvent = Exclude<HookEvent, { event: 'tab_closed' }>;
 
 type Invocation = { skipped: Set<string>; dispatched: Set<string>; sessionRefusals: Set<string> };
 type DispatchOutcome = 'completed' | 'waiting' | 'skipped';
@@ -436,20 +438,32 @@ async function activeCount(global: GlobalConfig, invocation: Invocation): Promis
   const registered: ReturnType<typeof registeredRepos> = registeredRepos(global, invocation);
   let total: number = registered.unknown ? global.max_active : 0;
   const unfinished = (leaf: Leaf): boolean => leaf.state.phase !== 'merged' && leaf.state.phase !== 'failed';
-  const active =
-    (live: Pane[]) =>
-    (leaf: Leaf): boolean =>
-      unfinished(leaf) && live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf));
+  // A leaf counts active only while a pane could still sit in it: recorded
+  // tab or a live worktree. The session-tagged union is read once, lazily,
+  // the first time such a leaf exists — a null union makes occupancy
+  // unknowable and blocks launches for the pass.
+  const seated = (leaf: Leaf): boolean =>
+    unfinished(leaf) && (leaf.state.tab !== undefined || leaf.state.worktree !== undefined);
+  let tagged: { session: string; pane: Pane }[] | null | undefined;
+  const union = async (): Promise<{ session: string; pane: Pane }[] | null> => (tagged ??= await sessionPanes());
   for (const repo of registered.repos) {
     const inventory: Inventory = discover(repo, invocation);
-    const live: Pane[] | null = await panesForRepo(repo, invocation);
-    // A refused or unreadable session counts unreadable plus unfinished, never max_active.
-    total +=
-      live === null
-        ? inventory.unreadable.length + inventory.leaves.filter(unfinished).length
-        : inventory.unknown.length > 0
-          ? global.max_active
-          : inventory.leaves.filter(active(live)).length + inventory.unreadable.length;
+    const needs: boolean = inventory.leaves.some(seated);
+    const resolution: ResolvedSession | null = await resolveQuiet(repo);
+    if (needs && resolution !== null) {
+      const all: { session: string; pane: Pane }[] | null = await union();
+      if (all === null) return global.max_active;
+      const live: Pane[] = all.filter((entry) => entry.session === resolution.session.name).map((entry) => entry.pane);
+      const active = (leaf: Leaf): boolean =>
+        unfinished(leaf) &&
+        (live.some((pane) => pane.tab_id === leaf.state.tab) || all.some((entry) => inWorktree(entry.pane.cwd, leaf)));
+      total +=
+        (inventory.unknown.length > 0 ? global.max_active : inventory.leaves.filter(active).length) +
+        inventory.unreadable.length;
+    } else {
+      // A refused or unreadable session counts unreadable plus unfinished, never max_active.
+      total += inventory.unreadable.length + (needs ? inventory.leaves.filter(unfinished).length : 0);
+    }
   }
   return total;
 }
@@ -1485,10 +1499,10 @@ async function reconcileRepos(
     const inventory: Inventory = discover(repo, invocation);
     try {
       acting.add(repo.name);
-      const live: Pane[] | null = (await reconcileNeedsPanes(repo, inventory.leaves))
-        ? await panesForRepo(repo, invocation)
-        : [];
-      await reconcile(repo, inventory.leaves, live, live, inventoryFailures(inventory));
+      const needsPanes: boolean = await reconcileNeedsPanes(repo, inventory.leaves);
+      const live: Pane[] | null = needsPanes ? await panesForRepo(repo, invocation) : [];
+      const union: Pane[] | null = needsPanes ? await hostPanesOnce() : [];
+      await reconcile(repo, inventory.leaves, live, union, inventoryFailures(inventory));
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       report(invocation, repo.name, repo.root, error);
@@ -1499,14 +1513,62 @@ async function reconcileRepos(
   );
 }
 
+// A hook acts only for the repo the event came from: the resolved session
+// must be the emitting one and the resolved workspace must match the event.
+// A refused session reports into skipped once; a session or workspace mismatch
+// is expected filtering — one stderr line, exit stays 0.
+async function hookScope(
+  repo: Repo,
+  event: HookEvent,
+  emitting: Session,
+  invocation: Invocation,
+): Promise<ResolvedSession | null> {
+  const resolution: SessionResolution = await repoSession(repo);
+  if (!resolution.ok) {
+    const key: string = resolution.scope === 'invocation' ? '*' : repo.name;
+    if (!invocation.sessionRefusals.has(key)) {
+      invocation.sessionRefusals.add(key);
+      report(invocation, repo.name, repo.root, new Error(resolution.reason));
+    }
+    return null;
+  }
+  if (emitting.name !== resolution.session.name) {
+    console.error(
+      JSON.stringify({
+        repo: repo.name,
+        event: event.event,
+        reason: 'session mismatch',
+        emitting: emitting.name,
+        resolved: resolution.session.name,
+      }),
+    );
+    return null;
+  }
+  if (event.data.workspace_id !== resolution.workspace.workspace_id) {
+    console.error(
+      JSON.stringify({
+        repo: repo.name,
+        event: event.event,
+        reason: 'workspace mismatch',
+        event_workspace: event.data.workspace_id,
+        resolved_workspace: resolution.workspace.workspace_id,
+      }),
+    );
+    return null;
+  }
+  return resolution;
+}
+
 async function paneOwners(
   global: GlobalConfig,
   invocation: Invocation,
-  hookPane: string,
+  event: PaneEvent,
+  emitting: Session,
 ): Promise<{ repo: Repo; leaf: Leaf }[]> {
   const owners: { repo: Repo; leaf: Leaf }[] = [];
+  const hookPane: string = event.data.pane_id;
   for (const repo of registeredRepos(global, invocation).repos) {
-    const resolution: ResolvedSession | null = await resolveQuiet(repo);
+    const resolution: ResolvedSession | null = await hookScope(repo, event, emitting, invocation);
     if (resolution === null) continue;
     const live: Pane[] | null = await panes(resolution.session.name).catch(() => null);
     const view: Tab[] | null = await tabs(resolution.session.name).catch(() => null);
@@ -1528,7 +1590,23 @@ export async function nextCommand(input: string | undefined, pressureDir: string
   if (event?.event === 'pane_agent_status_changed' && event.data.agent_status === 'working') return;
   const global: GlobalConfig = readGlobal();
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
-  const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
+  // A hook event acts only for the session that emitted it: the running
+  // session whose socket the plugin injected. No socket match, no action.
+  let emitting: Session | undefined;
+  if (event !== undefined) {
+    const socket: string | undefined = process.env.HERDR_SOCKET_PATH;
+    const sessions: Session[] | null = await listSessions();
+    if (sessions === null) {
+      console.error(JSON.stringify({ event: event.event, error: 'session list failed' }));
+      process.exitCode = 1;
+      return;
+    }
+    emitting = sessions.find((session) => session.socket_path === socket && session.running);
+    if (emitting === undefined) {
+      console.error(JSON.stringify({ event: event.event, error: 'unknown origin', socket_path: socket ?? null }));
+      return;
+    }
+  }
   // One shared lazy cross-session pane list per pass; the host step shares it.
   let panesRequested: boolean = false;
   let hostPanes: Pane[] | null = null;
@@ -1539,9 +1617,11 @@ export async function nextCommand(input: string | undefined, pressureDir: string
     }
     return hostPanes;
   };
-  const hooked: boolean = event !== undefined;
   const selection: Selection | undefined =
-    input !== '--all' && input !== '--resume' && event?.event !== 'tab_closed' && (input !== undefined || !hooked)
+    input !== '--all' &&
+    input !== '--resume' &&
+    event?.event !== 'tab_closed' &&
+    (input !== undefined || event === undefined)
       ? await selectLeaves(global, invocation, input)
       : undefined;
   const updating: Repo[] =
@@ -1612,22 +1692,26 @@ export async function nextCommand(input: string | undefined, pressureDir: string
           );
         for (const repo of active) touched.set(repo.name, { repo, isAutomatic: true });
         await reconcileRepos(active, invocation, true, hostPanesOnce);
-      } else if (event?.event === 'tab_closed') {
-        const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
-          discover(repo, invocation)
-            .leaves.filter((leaf) => leaf.state.tab === event.data.tab_id)
-            .map((leaf) => ({ repo, leaf })),
-        );
+      } else if (event?.event === 'tab_closed' && emitting !== undefined) {
+        const owners: { repo: Repo; leaf: Leaf }[] = [];
+        for (const repo of registeredRepos(global, invocation).repos) {
+          if ((await hookScope(repo, event, emitting, invocation)) === null) continue;
+          owners.push(
+            ...discover(repo, invocation)
+              .leaves.filter((leaf) => leaf.state.tab === event.data.tab_id)
+              .map((leaf) => ({ repo, leaf })),
+          );
+        }
         if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
         if (owners.length === 0) return;
         if (isPaused(owners[0].repo.name)) return;
         const completedSlug: string = owners[0].leaf.state.slug;
         try {
           const inventory: Inventory = discover(owners[0].repo, invocation);
-          const live: Pane[] | null = (await reconcileNeedsPanes(owners[0].repo, inventory.leaves))
-            ? await panesForRepo(owners[0].repo, invocation)
-            : [];
-          await reconcile(owners[0].repo, inventory.leaves, live, live, inventoryFailures(inventory));
+          const needsPanes: boolean = await reconcileNeedsPanes(owners[0].repo, inventory.leaves);
+          const live: Pane[] | null = needsPanes ? await panesForRepo(owners[0].repo, invocation) : [];
+          const union: Pane[] | null = needsPanes ? await hostPanesOnce() : [];
+          await reconcile(owners[0].repo, inventory.leaves, live, union, inventoryFailures(inventory));
           await reconcileHost(
             registeredRepos(global, invocation).repos,
             new Set([owners[0].repo.name]),
@@ -1650,8 +1734,9 @@ export async function nextCommand(input: string | undefined, pressureDir: string
         );
         if (outcome === 'completed') await dispatchDependents(global, owners[0].repo, completedSlug, invocation, true);
         touched.set(owners[0].repo.name, { repo: owners[0].repo, isAutomatic: true });
-      } else if (input === undefined && hookPane !== undefined) {
-        const owners: { repo: Repo; leaf: Leaf }[] = await paneOwners(global, invocation, hookPane);
+      } else if (input === undefined && event !== undefined && event.event !== 'tab_closed' && emitting !== undefined) {
+        const hookPane: string = event.data.pane_id;
+        const owners: { repo: Repo; leaf: Leaf }[] = await paneOwners(global, invocation, event, emitting);
         if (owners.length > 1) throw new Error(`Multiple leaves own hook pane: ${hookPane}`);
         if (owners.length === 0) return;
         const owner: { repo: Repo; leaf: Leaf } = owners[0];
