@@ -492,6 +492,7 @@ export async function reconcile(
   repo: Repo,
   leaves: Leaf[],
   live: Pane[] | null,
+  union: Pane[] | null = live,
   failures?: { ownedNames: ReadonlySet<string>; incomplete: boolean },
 ): Promise<Reconciled> {
   const removed: string[] = [];
@@ -682,7 +683,11 @@ export async function reconcile(
       keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
       return true;
     }
-    if (livePaneInside(panes, path)) {
+    if (union === null) {
+      keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      return true;
+    }
+    if (livePaneInside(panesUnion, path)) {
       keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
       return true;
     }
@@ -752,6 +757,7 @@ export async function reconcile(
 
   const handled: Set<string> = new Set();
   const panes: Pane[] = live ?? [];
+  const panesUnion: Pane[] = union ?? [];
   // One /proc scan per pass, run only when a candidate reaches removal.
   let scanned: Map<number, string[]> | undefined;
   const targets = (): Map<number, string[]> => scanned ?? (scanned = procTargets());
@@ -766,6 +772,10 @@ export async function reconcile(
       keep(worktree, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
       return;
     }
+    if (union === null) {
+      keep(worktree, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      return;
+    }
     if (tabLive(panes, tab)) {
       const closed: boolean = await closeTab(worktree, z.string().parse(tab), leaf);
       if (open || !closed) {
@@ -776,7 +786,7 @@ export async function reconcile(
       keep(worktree, 'active leaf', 'removed once the owning leaf finishes');
       return;
     }
-    if (foreignPaneInside(panes, worktree, tab)) {
+    if (foreignPaneInside(panesUnion, worktree, tab)) {
       keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
       return;
     }
@@ -837,7 +847,11 @@ export async function reconcile(
         keep(worktree, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
         continue;
       }
-      if (tabLive(panes, state.tab) || foreignPaneInside(panes, worktree, state.tab)) {
+      if (union === null) {
+        keep(worktree, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+        continue;
+      }
+      if (tabLive(panes, state.tab) || foreignPaneInside(panesUnion, worktree, state.tab)) {
         keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
         continue;
       }
@@ -859,7 +873,11 @@ export async function reconcile(
       keep(worktree, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
       continue;
     }
-    if (livePaneInside(panes, worktree) || tabLive(panes, state.tab)) {
+    if (union === null) {
+      keep(worktree, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      continue;
+    }
+    if (livePaneInside(panesUnion, worktree) || tabLive(panes, state.tab)) {
       keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
       continue;
     }
@@ -889,7 +907,11 @@ export async function reconcile(
       keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
       return;
     }
-    if (livePaneInside(panes, path)) {
+    if (union === null) {
+      keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      return;
+    }
+    if (livePaneInside(panesUnion, path)) {
       keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
       return;
     }
@@ -977,7 +999,9 @@ export async function reconcile(
         if (leaf.state.phase === 'failed') {
           handled.add(path);
           if (live === null) keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
-          else if (tabLive(panes, leaf.state.tab) || foreignPaneInside(panes, path, leaf.state.tab))
+          else if (union === null)
+            keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+          else if (tabLive(panes, leaf.state.tab) || foreignPaneInside(panesUnion, path, leaf.state.tab))
             keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
           else await removeWorktree(path, false, 'failed leaf');
           continue;
@@ -1024,7 +1048,11 @@ export async function reconcile(
         keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
         continue;
       }
-      if (livePaneInside(panes, path)) {
+      if (union === null) {
+        keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+        continue;
+      }
+      if (livePaneInside(panesUnion, path)) {
         keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
         continue;
       }
@@ -1056,7 +1084,11 @@ export async function reconcile(
         keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
         continue;
       }
-      if (tabLive(panes, ownerLeaf.state.tab) || foreignPaneInside(panes, path, ownerLeaf.state.tab)) {
+      if (union === null) {
+        keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+        continue;
+      }
+      if (tabLive(panes, ownerLeaf.state.tab) || foreignPaneInside(panesUnion, path, ownerLeaf.state.tab)) {
         keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
         continue;
       }
@@ -1074,6 +1106,8 @@ export async function reconcile(
       const record: Owner | undefined = readOwner(path);
       if (record !== undefined && !ownerDead(record)) keep(path, 'live owner', 'removed once the owner exits');
       else if (live === null) keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      else if (union === null)
+        keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
       else dropChecked(path);
       continue;
     }
@@ -1151,7 +1185,9 @@ export async function reconcile(
             keep(dir, 'broadcast in progress', 'removed once the broadcast seat finishes');
           else if (live === null) {
             if (done) keep(dir, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
-          } else if (tabLive(live, leaf.state.tab) || livePaneInside(live, dir)) {
+          } else if (union === null) {
+            if (done) keep(dir, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+          } else if (tabLive(live, leaf.state.tab) || livePaneInside(panesUnion, dir)) {
             if (done) keep(dir, 'live pane inside', 'removed once the pane closes or leaves this path');
           } else if (kept.length === keptBefore) {
             // An unreadable unit inventory is no proof of a busy slice, so the
@@ -1194,7 +1230,7 @@ export async function reconcile(
 
   // Retired repo-side locks, exact names only: deleted when no process holds
   // them open and the pane list is available (D4).
-  if (live !== null)
+  if (live !== null && union !== null)
     for (const lock of [
       resolve(repo.root, await command(['git', 'rev-parse', '--git-path', 'akrogon-base-runs.lock'], repo.root)),
       resolve(repo.root, 'issues/.lock'),

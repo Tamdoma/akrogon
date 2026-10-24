@@ -1485,12 +1485,10 @@ async function reconcileRepos(
     const inventory: Inventory = discover(repo, invocation);
     try {
       acting.add(repo.name);
-      await reconcile(
-        repo,
-        inventory.leaves,
-        (await reconcileNeedsPanes(repo, inventory.leaves)) ? await panesForRepo(repo, invocation) : [],
-        inventoryFailures(inventory),
-      );
+      const live: Pane[] | null = (await reconcileNeedsPanes(repo, inventory.leaves))
+        ? await panesForRepo(repo, invocation)
+        : [];
+      await reconcile(repo, inventory.leaves, live, live, inventoryFailures(inventory));
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       report(invocation, repo.name, repo.root, error);
@@ -1626,14 +1624,10 @@ export async function nextCommand(input: string | undefined, pressureDir: string
         const completedSlug: string = owners[0].leaf.state.slug;
         try {
           const inventory: Inventory = discover(owners[0].repo, invocation);
-          await reconcile(
-            owners[0].repo,
-            inventory.leaves,
-            (await reconcileNeedsPanes(owners[0].repo, inventory.leaves))
-              ? await panesForRepo(owners[0].repo, invocation)
-              : [],
-            inventoryFailures(inventory),
-          );
+          const live: Pane[] | null = (await reconcileNeedsPanes(owners[0].repo, inventory.leaves))
+            ? await panesForRepo(owners[0].repo, invocation)
+            : [];
+          await reconcile(owners[0].repo, inventory.leaves, live, live, inventoryFailures(inventory));
           await reconcileHost(
             registeredRepos(global, invocation).repos,
             new Set([owners[0].repo.name]),
