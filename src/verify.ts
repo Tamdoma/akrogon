@@ -117,9 +117,7 @@ function greenRun(repo: Repo, tree: string, scope: VerifyScope): VerifyRun | und
 const noTestNames: readonly string[] = ['(no test name)', '(log gone)'];
 
 function greenEntry(run: VerifyRun, item: NamedCommand): VerifyRun['commands'][number] | undefined {
-  return run.commands.find(
-    (entry) => entry.name === item.name && entry.command === item.command && entry.exit === 0,
-  );
+  return run.commands.find((entry) => entry.name === item.name && entry.command === item.command && entry.exit === 0);
 }
 
 // The newest completed run on the same tree and scope holding {name, command} green lends its entry.
@@ -289,9 +287,7 @@ async function sendMainRedNotice(repo: Repo, runId: string, lock: string, names:
 export async function requireGreenReceipt(repo: Repo, sha: string, scope: VerifyScope): Promise<void> {
   const tree: string = await treeOf(repo, sha);
   const runs: VerifyRun[] = readVerifyRuns(repo);
-  const onTree: VerifyRun[] = runs.filter(
-    (run) => run.tree === tree && run.scope === scope && completed(run),
-  );
+  const onTree: VerifyRun[] = runs.filter((run) => run.tree === tree && run.scope === scope && completed(run));
   const green: boolean =
     onTree.length > 0 &&
     verifyCommands(repo.config, scope).every((item) => onTree.some((run) => greenEntry(run, item) !== undefined));
@@ -403,24 +399,21 @@ async function runOnce(
     }
     // A red sequential stage blocks the members: each is recorded with the blocker's exit and log.
     const blocker: { name: string; exit: number; log: string } | undefined =
-      setup.code !== 0
-        ? { name: 'setup', exit: setup.code, log: setup.log }
-        : ran.find((item) => item.exit !== 0);
+      setup.code !== 0 ? { name: 'setup', exit: setup.code, log: setup.log } : ran.find((item) => item.exit !== 0);
     if (blocker !== undefined) {
       for (const item of members) {
         ran.push({ ...item, exit: blocker.exit, log: blocker.log });
         process.stdout.write(`verify ${item.name}: blocked by ${blocker.name} (${blocker.exit}) ${blocker.log}\n`);
       }
     } else {
-      const settled: PromiseSettledResult<{ code: number; log: string; reused?: string }>[] =
-        await Promise.allSettled(
-          members.map((item) => {
-            const source: VerifyRun | undefined = reuseSource(ledger, tree, scope, item);
-            return source === undefined
-              ? checkedRun(repo, caller, akrogonBase, item.name, ['sh', '-c', item.command], target)
-              : Promise.resolve({ code: 0, log: greenEntry(source, item)!.log, reused: source.run });
-          }),
-        );
+      const settled: PromiseSettledResult<{ code: number; log: string; reused?: string }>[] = await Promise.allSettled(
+        members.map((item) => {
+          const source: VerifyRun | undefined = reuseSource(ledger, tree, scope, item);
+          return source === undefined
+            ? checkedRun(repo, caller, akrogonBase, item.name, ['sh', '-c', item.command], target)
+            : Promise.resolve({ code: 0, log: greenEntry(source, item)!.log, reused: source.run });
+        }),
+      );
       let first: unknown;
       for (const [index, result] of settled.entries()) {
         if (result.status === 'rejected') {
