@@ -180,8 +180,21 @@ function inWorktree(cwd: string | null, leaf: Leaf): boolean {
   return cwd !== null && leaf.state.worktree !== undefined && within(cwd, leaf.state.worktree);
 }
 
-function ownsPane(leaf: Leaf, pane: Pane | undefined, paneId: string): boolean {
-  return Object.values(leaf.state.pane).includes(paneId) || (pane !== undefined && inWorktree(pane.cwd, leaf));
+function ownsTab(tab: Tab, live: Pane[], workspaceId: string, worktree: string): boolean {
+  return (
+    tab.workspace_id === workspaceId &&
+    live.some((pane) => pane.tab_id === tab.tab_id && pane.cwd !== null && within(pane.cwd, worktree))
+  );
+}
+
+function ownsPane(repo: Repo, leaf: Leaf, pane: Pane, live: Pane[], view: Tab[], workspaceId: string): boolean {
+  return (
+    view.some(
+      (tab) =>
+        tab.tab_id === pane.tab_id && ownsTab(tab, live, workspaceId, resolve(worktreeStore(repo), leaf.state.slug)),
+    ) &&
+    (Object.values(leaf.state.pane).includes(pane.pane_id) || inWorktree(pane.cwd, leaf))
+  );
 }
 
 function busy(pane: Pane): boolean {
@@ -237,8 +250,10 @@ async function observeBusy(
   return notified;
 }
 
-async function currentPane(id: string, session: string): Promise<Pane> {
-  return (await herdr(['pane', 'get', id], z.object({ pane: paneSchema }), { session })).pane;
+async function currentPane(id: string, session: string, tabId: string): Promise<Pane> {
+  const pane: Pane = (await herdr(['pane', 'get', id], z.object({ pane: paneSchema }), { session })).pane;
+  if (pane.tab_id !== tabId) throw new Error(`Pane ${id} is outside the accepted tab ${tabId}`);
+  return pane;
 }
 
 // The resolved session's panes; a refusal or read failure reports once per repo and yields null.
@@ -496,11 +511,9 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     ...leaf,
     state: { ...leaf.state, worktree: resolve(worktreeStore(repo), leaf.state.slug) },
   };
-  const memberInside = (tab: Tab): boolean =>
-    listed.some((pane) => pane.tab_id === tab.tab_id && inWorktree(pane.cwd, expected));
   const accepted = (tab: Tab): boolean =>
-    tab.workspace_id === workspaceId &&
-    (tab.tab_id === leaf.state.tab || (tab.label === leaf.state.slug && memberInside(tab)));
+    ownsTab(tab, listed, workspaceId, z.string().parse(expected.state.worktree)) &&
+    (tab.tab_id === leaf.state.tab || tab.label === leaf.state.slug);
   const recorded: string[] = [leaf.state.pane.A, leaf.state.pane.B].filter((id): id is string => {
     const pane: Pane | undefined = listed.find((pane) => pane.pane_id === id);
     const tab: Tab | undefined = liveTabs.find((tab) => tab.tab_id === pane?.tab_id);
@@ -520,10 +533,8 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   const view: Tab[] = closed ? await tabs(session) : liveTabs;
   const matches: Tab[] = view.filter(
     (tab) =>
-      tab.workspace_id === workspaceId &&
-      (tab.tab_id === leaf.state.tab ||
-        (tab.label === leaf.state.slug &&
-          live.some((pane) => pane.tab_id === tab.tab_id && inWorktree(pane.cwd, expected)))),
+      ownsTab(tab, live, workspaceId, z.string().parse(expected.state.worktree)) &&
+      (tab.tab_id === leaf.state.tab || tab.label === leaf.state.slug),
   );
   if (matches.length > 1) throw new Error(`Multiple tabs for leaf: ${leaf.state.slug}`);
   if (matches.length === 0) {
@@ -663,9 +674,20 @@ async function dispatchSlot(
   const resolution: SessionResolution = await repoSession(repo);
   if (!resolution.ok) throw new Error(resolution.reason);
   const session: string = resolution.session.name;
+  const tabId: string = z.string().parse(leaf.state.tab);
+  const live: Pane[] = await panes(session);
+  const view: Tab[] = await tabs(session);
+  if (
+    !view.some(
+      (tab) =>
+        tab.tab_id === tabId &&
+        ownsTab(tab, live, resolution.workspace.workspace_id, resolve(worktreeStore(repo), leaf.state.slug)),
+    )
+  )
+    throw new Error(`Tab ${tabId} is outside the leaf workspace or worktree: ${leaf.state.slug}`);
 
   async function recordDelivery(): Promise<void> {
-    const current: Pane = await currentPane(z.string().parse(readState(leaf.path).pane[slot]), session);
+    const current: Pane = await currentPane(z.string().parse(readState(leaf.path).pane[slot]), session, tabId);
     const observed: State = await observeBusy(leaf.path, readState(leaf.path), slot, current, session, Date.now());
     saveState(leaf.path, {
       ...observed,
@@ -724,7 +746,7 @@ async function dispatchSlot(
 
   const recorded: State = readState(leaf.path);
   if (recorded.phase !== leaf.state.phase || recorded.done.includes(slot)) return;
-  const pane: Pane = await currentPane(z.string().parse(recorded.pane[slot]), session);
+  const pane: Pane = await currentPane(z.string().parse(recorded.pane[slot]), session, tabId);
   const state: State = await observeBusy(leaf.path, recorded, slot, pane, session, Date.now());
   if (pane.agent !== null && busy(pane)) return;
   if (
@@ -773,7 +795,7 @@ async function dispatchSlot(
       return;
     }
   }
-  const ready: Pane = await currentPane(pane.pane_id, session);
+  const ready: Pane = await currentPane(pane.pane_id, session, tabId);
   await observeBusy(leaf.path, readState(leaf.path), slot, ready, session, Date.now());
   if (!idle(ready)) return;
   if (state.phase === 'merge' && state.worktree !== undefined && existsSync(state.worktree))
@@ -1487,12 +1509,14 @@ async function paneOwners(
   for (const repo of registeredRepos(global, invocation).repos) {
     const resolution: ResolvedSession | null = await resolveQuiet(repo);
     if (resolution === null) continue;
-    const live: Pane | undefined = (await panes(resolution.session.name).catch(() => [])).find(
-      (pane) => pane.pane_id === hookPane,
-    );
+    const live: Pane[] | null = await panes(resolution.session.name).catch(() => null);
+    const view: Tab[] | null = await tabs(resolution.session.name).catch(() => null);
+    if (live === null || view === null) continue;
+    const pane: Pane | undefined = live.find((pane) => pane.pane_id === hookPane);
+    if (pane === undefined) continue;
     owners.push(
       ...discover(repo, invocation)
-        .leaves.filter((leaf) => ownsPane(leaf, live, hookPane))
+        .leaves.filter((leaf) => ownsPane(repo, leaf, pane, live, view, resolution.workspace.workspace_id))
         .map((leaf) => ({ repo, leaf })),
     );
   }
