@@ -203,6 +203,8 @@ test('a repeated allocation keeps live B recorded during every scope lookup', as
       wrapper,
       `#!/bin/sh
 set -eu
+# Skip the --session prefix session routing prepends.
+if [ "$1" = --session ]; then shift; shift; fi
 if [ "$1" = pane ] && [ "$2" = process-info ]; then
   cp ${quote(resolve(path, 'state.yaml'))} ${quote(snapshots)}/"$$"
 fi

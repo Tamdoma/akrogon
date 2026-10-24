@@ -532,7 +532,7 @@ test('race B: pause waits for a held launch lock, later automatic work is suppre
     mkdirSync(wrapper, { recursive: true });
     writeFileSync(
       resolve(wrapper, 'herdr'),
-      `#!/bin/sh\nif [ "$1" = "agent" ] && [ "$2" = "prompt" ] && [ ! -e '${barrier}/done' ]; then\n  touch '${barrier}/entered'\n  while [ ! -e '${barrier}/release' ]; do sleep 0.05; done\n  touch '${barrier}/done'\nfi\nexec '${resolve(f.home, 'bin/herdr')}' "$@"\n`,
+      `#!/bin/sh\n# Skip the --session prefix session routing prepends.\nif [ "$1" = "--session" ]; then shift; shift; fi\nif [ "$1" = "agent" ] && [ "$2" = "prompt" ] && [ ! -e '${barrier}/done' ]; then\n  touch '${barrier}/entered'\n  while [ ! -e '${barrier}/release' ]; do sleep 0.05; done\n  touch '${barrier}/done'\nfi\nexec '${resolve(f.home, 'bin/herdr')}' "$@"\n`,
     );
     chmodSync(resolve(wrapper, 'herdr'), 0o755);
     const env: NodeJS.ProcessEnv = cliEnv(f, {

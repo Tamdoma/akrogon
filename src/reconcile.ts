@@ -412,7 +412,10 @@ export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null
     throw error;
   }
   const workspaceTabs: Set<string> = new Set(
-    seated.tabs.filter((item) => item.workspace_id === resolved.workspace.workspace_id).map((item) => item.tab_id),
+    seated.tabs
+      // A tab without a workspace tag predates workspace labeling; treat it as in-scope.
+      .filter((item) => item.workspace_id === undefined || item.workspace_id === resolved.workspace.workspace_id)
+      .map((item) => item.tab_id),
   );
   const seatedPanes: Pane[] = seated.panes.filter((pane) => workspaceTabs.has(pane.tab_id));
   const tab: string = leaf.state.tab;
@@ -713,7 +716,12 @@ export async function reconcile(
           seat = {
             session: resolved.session.name,
             tabs: new Set(
-              listed.filter((item) => item.workspace_id === resolved.workspace.workspace_id).map((item) => item.tab_id),
+              listed
+                .filter(
+                  (item) =>
+                    item.workspace_id === undefined || item.workspace_id === resolved.workspace.workspace_id,
+                )
+                .map((item) => item.tab_id),
             ),
           };
         } catch (error) {

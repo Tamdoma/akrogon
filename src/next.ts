@@ -242,8 +242,15 @@ async function currentPane(id: string, session: string): Promise<Pane> {
 }
 
 // The resolved session's panes; a refusal or read failure reports once per repo and yields null.
-async function panesForRepo(repo: Repo, invocation: Invocation): Promise<Pane[] | null> {
-  const resolution: SessionResolution | null = await resolveFor(invocation, repo, repo.root);
+// Reconcile feeds resolve quietly: a refused or dead session degrades to no
+// live list, the way a down herdr always did; only dispatch reports refusals.
+async function resolveQuiet(repo: Repo): Promise<ResolvedSession | null> {
+  const resolution: SessionResolution = await repoSession(repo);
+  return resolution.ok ? resolution : null;
+}
+
+async function panesForRepo(repo: Repo, _invocation: Invocation): Promise<Pane[] | null> {
+  const resolution: ResolvedSession | null = await resolveQuiet(repo);
   if (resolution === null) return null;
   return await panes(resolution.session.name).catch(() => null);
 }
@@ -1476,7 +1483,7 @@ async function paneOwners(
 ): Promise<{ repo: Repo; leaf: Leaf }[]> {
   const owners: { repo: Repo; leaf: Leaf }[] = [];
   for (const repo of registeredRepos(global, invocation).repos) {
-    const resolution: SessionResolution | null = await resolveFor(invocation, repo, repo.root);
+    const resolution: ResolvedSession | null = await resolveQuiet(repo);
     if (resolution === null) continue;
     const live: Pane | undefined = (await panes(resolution.session.name)).find((pane) => pane.pane_id === hookPane);
     owners.push(
