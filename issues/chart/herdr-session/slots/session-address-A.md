@@ -1,0 +1,6 @@
+# session-address, seat A notes (before reading B, C)
+
+Q1 pick: discover. One `herdr session list --json`, then `--session <name> workspace list` per running session, exact label = registered repo key, exactly one match. Reason: matches the operator's stated expectation in #117, no new config, the label convention already exists (src/next.ts:407). Cost: N list calls per pass, so cache per pass. Rejected: declared per-repo session, second fact that drifts when the operator moves a workspace, and akrogon must still verify the workspace there. Rejected: ambient, the bug.
+Q2 pick: derive each pass, store nothing new. Reason: one source of truth. Cost: a recorded tab id read in a different session after a move can collide with an unrelated tab (ids are per server, w8 exists in two sessions today); so a recorded id is adopted only when its tab label equals the slug and a pane cwd sits in the worktree, the existing second arm at src/next.ts:396-402. Rejected: store session, stale exactly on reorganisation and needs a disagreement rule.
+Evidence: better-than-training, src/next.ts:395-408, src/state.ts tab/pane fields, herdr 0.9.1 probes by B and C 2026-10-24.
+Pitfall: allocate closes recorded panes (src/next.ts:383) before resolving; resolve first.

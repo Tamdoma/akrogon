@@ -1,0 +1,99 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-10-24'
+      answer: '1a (operation-proofs Q1: approve real herdr calls including one pi start and prompt in a throwaway workspace in session personal)'
+    principal: 'chart door seat A (claude, pane w8:pNP)'
+    account: 'local user ivan'
+    credential:
+      name: none
+      holder: repo
+    targets: ['herdr session personal']
+    fixtures:
+      - account: 'local user ivan'
+        purpose: 'prove --session routing of every herdr operation the leaves name'
+        marker: 'label akrogon-proof'
+        naming: 'workspace akrogon-proof, tab proof-tab, agent akrogon-proof'
+        count: 1
+        cleanup:
+          - step: 'pane close, tab close, workspace close'
+            identity: 'local user ivan'
+        absence_check: 'workspace list and agent list in personal and infra show no akrogon-proof'
+    operations: ['session list', 'workspace create/list/close', 'tab create/list/focus/rename/close', 'pane get/list/split/swap/process-info/close', 'notification show', 'agent start/prompt/wait/list/read (pi)']
+    effects: 'transient workspace and notice in session personal; one short pi model turn'
+    bounds: 'run once at charting 2026-10-24, done; leaf seats make no real herdr call and no model launch'
+    stop_line: 'no herdr call outside the throwaway workspace; no call by a leaf seat'
+retained: []
+proofs:
+  - operation: 'P1 session discovery'
+    command: "herdr session list --json"
+    identity: 'operator local user ivan, herdr CLI, no credential, inherited HERDR_SOCKET_PATH set to the infra socket'
+    target: 'herdr session personal, throwaway workspace akrogon-proof (w4)'
+    version: 'herdr 0.9.1'
+    date: '2026-10-24'
+    result: 'exit 0; five sessions with name, running, socket_path, session_dir, default'
+    cleanup: 'none, read only'
+    limits: 'does not show a session stopping mid-pass'
+    record: issues/chart/herdr-session/forks/operation-proofs.md
+  - operation: 'P2 session-scoped reads'
+    command: "herdr --session personal workspace list; tab list; pane list; pane get w4:p2"
+    identity: 'operator local user ivan, herdr CLI, no credential, inherited HERDR_SOCKET_PATH set to the infra socket'
+    target: 'herdr session personal, throwaway workspace akrogon-proof (w4)'
+    version: 'herdr 0.9.1'
+    date: '2026-10-24'
+    result: 'exit 0; personal rows returned although the inherited socket named infra'
+    cleanup: 'none, read only'
+    limits: 'reads only; no stopped-session read (see stopped-and-ambiguous B proof)'
+    record: issues/chart/herdr-session/forks/operation-proofs.md
+  - operation: 'P3 stopped-session read'
+    command: "herdr --session netreachconsulting workspace list"
+    identity: 'operator local user ivan, herdr CLI, no credential'
+    target: 'herdr session netreachconsulting (stopped)'
+    version: 'herdr 0.9.1'
+    date: '2026-10-24'
+    result: 'exit 1; structured server_not_running error; session still stopped afterwards'
+    cleanup: 'none, read only'
+    limits: 'one stopped named session; does not show a session stopping mid-pass'
+    record: issues/chart/herdr-session/forks/stopped-and-ambiguous.md
+  - operation: 'P4 tab create with worktree cwd'
+    command: "herdr --session personal tab create --workspace w4 --cwd <dir>/wt --label proof-tab --no-focus"
+    identity: 'operator local user ivan, herdr CLI, no credential, inherited HERDR_SOCKET_PATH set to the infra socket'
+    target: 'herdr session personal, throwaway workspace akrogon-proof (w4)'
+    version: 'herdr 0.9.1'
+    date: '2026-10-24'
+    result: 'exit 0; root pane cwd equals <dir>/wt'
+    cleanup: 'closed in P7'
+    limits: 'a plain directory, not a git worktree'
+    record: issues/chart/herdr-session/forks/operation-proofs.md
+  - operation: 'P5 pane and tab actions, notice, process-info'
+    command: "herdr --session personal pane split w4:p2 --direction right --cwd <dir>/wt; pane swap --source-pane w4:p2 --target-pane w4:p3; tab focus w4:t2; tab rename w4:t2 proof-renamed; pane process-info --pane w4:p2; notification show 'akrogon proof' --body ..."
+    identity: 'operator local user ivan, herdr CLI, no credential, inherited HERDR_SOCKET_PATH set to the infra socket'
+    target: 'herdr session personal, throwaway workspace akrogon-proof (w4)'
+    version: 'herdr 0.9.1'
+    date: '2026-10-24'
+    result: 'all exit 0'
+    cleanup: 'closed in P7'
+    limits: 'does not exercise akrogon''s own code paths'
+    record: issues/chart/herdr-session/forks/operation-proofs.md
+  - operation: 'P6 agent start, prompt, wait, list, read'
+    command: "herdr --session personal agent start akrogon-proof --kind pi --pane w4:p3 --timeout 60000; agent prompt w4:p3 'reply ok' --wait --until working --timeout 15000; agent wait; agent list; agent read"
+    identity: 'operator local user ivan, herdr CLI, no credential, inherited HERDR_SOCKET_PATH set to the infra socket'
+    target: 'herdr session personal, throwaway workspace akrogon-proof (w4)'
+    version: 'herdr 0.9.1'
+    date: '2026-10-24'
+    result: 'all exit 0; pi replied ok; agent list showed it in w4 of personal'
+    cleanup: 'pane closed in P7; pi session log kept'
+    limits: 'one pi turn; other harness kinds not run'
+    record: issues/chart/herdr-session/forks/operation-proofs.md
+  - operation: 'P7 pane close, tab close, absence'
+    command: "herdr --session personal pane close w4:p3; tab close w4:t2; workspace close w4; workspace list and agent list in personal and infra"
+    identity: 'operator local user ivan, herdr CLI, no credential, inherited HERDR_SOCKET_PATH set to the infra socket'
+    target: 'herdr session personal, throwaway workspace akrogon-proof (w4)'
+    version: 'herdr 0.9.1'
+    date: '2026-10-24'
+    result: 'all exit 0; no akrogon-proof workspace or agent in personal or infra'
+    cleanup: 'this step is the cleanup'
+    limits: 'none beyond the above'
+    record: issues/chart/herdr-session/forks/operation-proofs.md

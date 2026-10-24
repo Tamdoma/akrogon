@@ -6966,3 +6966,9 @@
 {"kind":"batch","slug":"docs-start","attempt":"8540d810-eac9-4660-93fb-96de78c2132a","holder":"docs-start","built_on":"b72f24d58fa86ce909d3a5a52d750a440e47da37","ts":"2026-10-23T15:48:39.930Z","repo":"akrogon"}
 {"kind":"visit_start","slug":"docs-start","phase":"merged","visit":0,"ts":"2026-10-23T15:48:43.287Z","repo":"akrogon"}
 {"kind":"prompt","slug":"docs-start","slot":"B","phase":"merged","visit":0,"session":"01a16971-6e5a-7433-8281-e8f0f40cfa3d","outcome":"delivered","ts":"2026-10-23T15:48:45.065Z","repo":"akrogon"}
+{"kind":"visit_start","slug":"session-routing","phase":"plan.synthesis","visit":0,"ts":"2026-10-24T13:58:45.215Z","repo":"akrogon"}
+{"kind":"prompt","slug":"session-routing","slot":"A","phase":"plan.synthesis","visit":0,"session":"/home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-session-routing--/2026-10-24T13-58-46-278Z_01a16e34-f306-71e0-af03-bd10b836b501.jsonl","outcome":"delivered","ts":"2026-10-24T13:58:50.801Z","repo":"akrogon"}
+{"kind":"visit_start","slug":"session-reads","phase":"plan.synthesis","visit":0,"ts":"2026-10-24T13:58:50.843Z","repo":"akrogon"}
+{"kind":"wait","slug":"session-reads","reason":"prerequisite","blocking":"session-routing","ts":"2026-10-24T13:58:50.857Z","repo":"akrogon"}
+{"kind":"visit_start","slug":"watch-session","phase":"plan.synthesis","visit":0,"ts":"2026-10-24T13:58:50.883Z","repo":"akrogon"}
+{"kind":"wait","slug":"watch-session","reason":"prerequisite","blocking":"session-routing","ts":"2026-10-24T13:58:50.900Z","repo":"akrogon"}

@@ -1,0 +1,8 @@
+# Brief, seat C: blind fork notes (call-coverage)
+Do not read A's draft, this fork's Findings, or other seats' notes for this fork.
+Permitted context: /home/ivan/Work/infra/akrogon/issues/chart/herdr-session/INTAKE.md; /home/ivan/Work/infra/akrogon/issues/chart/herdr-session/forks/call-coverage.md sections Question and Carries; locks in the Taken sections of /home/ivan/Work/infra/akrogon/issues/chart/herdr-session/forks/session-address.md, /home/ivan/Work/infra/akrogon/issues/chart/herdr-session/forks/stopped-and-ambiguous.md and /home/ivan/Work/infra/akrogon/issues/chart/herdr-session/forks/cross-session-reads.md.
+Write five-part blind notes per question as defined in /home/ivan/.claude/skills/chart-issues/assets/questions.md section "Blind peer exchange". Inventory every herdr caller from source, with path:line: src lifecycle calls through src/shell.ts herdr(), raw herdr spawns that bypass it (check at least src/next.ts and src/reconcile.ts), the land unit's socket forwarding (src/land.ts), plugin/herdr-plugin.toml hooks, skill scripts that call herdr (/home/ivan/.claude/skills/chart-issues/scripts and the watch-issues skill), and tests/fake-herdr.ts multi-session support. For each, say whether this chart must pin it under the taken locks, leave it, or split it out, and why. Make no herdr mutation and run no akrogon command.
+Return to /home/ivan/Work/infra/akrogon/issues/chart/herdr-session/slots/call-coverage-C.md
+
+## Reading rule
+Read process text by named section, bounded, at most once per session; unread, changed or compacted content stays readable; full source allowed when it is the subject; reads name sections, never line ranges.

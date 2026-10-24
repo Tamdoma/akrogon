@@ -1,0 +1,11 @@
+# Opening map, seat A (written before reading B and C)
+
+Verified: herdr sessions infra, mdconsultingny, personal run, each with its own socket (`herdr session list`, 2026-10-24). `herdr --session <name> workspace list` lists each session's workspaces. Workspace ids repeat shape across sessions (w1, w4 in mdconsultingny; w8, wA in infra), so a bare pane/tab id does not name a session. src/shell.ts herdr() spawns `herdr` with the inherited env, so the socket decides everything. src/next.ts workspace pick by label in that one session. src/land.ts forwards HERDR_SOCKET_PATH into the land unit.
+
+F1 Source of truth for a repo's session. Options: (a) discover: query every running session, the one workspace labelled repo.name wins, zero or several refuse with the list; (b) record a `herdr_session` per repo in the registry; (c) trust the invoking pane env (current, the bug). Pick (a): no new config, matches the operator's "the repo's own workspace" rule, refuses loudly on ambiguity. Cost: one list call per running session per dispatch, and it depends on `herdr session list` output shape. (b) adds config that can drift.
+F2 Where the session is applied. Pick: one place, the herdr() wrapper takes the resolved session and passes `--session` (or sets the socket in the child env), so every caller (next, phase, scope, verify, log, reconcile, land unit) follows. Pitfall: callers outside src (chart scripts, watch observer, plugin hooks) use their own herdr spawns; they run inside a pane whose env is correct by construction, but the door scripts in a stale background job would hit the same bug.
+F3 Leaf state ids. `tab`/`pane` stored without session; after the fix, the leaf must record the session (or derive it from the repo workspace each time). Pick: derive from the repo workspace every call; store nothing new. Pitfall: an existing leaf pointing at an id in another session.
+F4 Land unit and hooks. land.ts forwards the inherited socket; it must forward the resolved session instead.
+F5 Missing workspace. Refuse, never create (operator: never somewhere hidden).
+Fog: HERDR_PANE_ID uses (src/log.ts, src/next.ts hookPane) attribute moves to a pane in the inherited session; whether a stale pane id here can mis-attribute.
+Proofs: real `herdr --session` calls per session (read-only) before handoff.

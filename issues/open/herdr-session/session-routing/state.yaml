@@ -1,0 +1,29 @@
+slug: session-routing
+phase: plan.synthesis
+created: 2026-10-24
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#117"
+busy_since:
+  A: 2026-10-24T13:58:50.796Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tEK
+worktree: /home/ivan/.akrogon/worktrees/akrogon/session-routing
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pW4
+  B: w8:pW5
+prompted:
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-session-routing--/2026-10-24T13-58-46-278Z_01a16e34-f306-71e0-af03-bd10b836b501.jsonl
+prompted_at:
+  A: 2026-10-24T13:58:50.797Z
+delivery_error: {}
