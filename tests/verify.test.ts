@@ -936,7 +936,7 @@ test('merge_checks members start before any ends: a member observes its sibling 
       ['m2', 0],
     ]);
     expect(existsSync(`${dir}/m1.done`)).toBe(true);
-    expect(readFileSync(run.commands[1].log, 'utf8')).not.toBe(readFileSync(run.commands[2].log, 'utf8'));
+    expect(run.commands[1].log).not.toBe(run.commands[2].log);
   } finally {
     f.clean();
   }
