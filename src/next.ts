@@ -1473,7 +1473,13 @@ async function reconcileRepos(
       report(invocation, repo.name, repo.root, error);
     }
   }
-  await reconcileHost(registeredRepos(readGlobal(), invocation).repos, acting, null, hostPanesOnce);
+  await reconcileHost(
+    registeredRepos(readGlobal(), invocation).repos,
+    acting,
+    null,
+    hostPanesOnce,
+    (repo: Repo) => panesForRepo(repo, invocation),
+  );
 }
 
 async function paneOwners(
@@ -1485,7 +1491,9 @@ async function paneOwners(
   for (const repo of registeredRepos(global, invocation).repos) {
     const resolution: ResolvedSession | null = await resolveQuiet(repo);
     if (resolution === null) continue;
-    const live: Pane | undefined = (await panes(resolution.session.name)).find((pane) => pane.pane_id === hookPane);
+    const live: Pane | undefined = (await panes(resolution.session.name).catch(() => [])).find(
+      (pane) => pane.pane_id === hookPane,
+    );
     owners.push(
       ...discover(repo, invocation)
         .leaves.filter((leaf) => ownsPane(leaf, live, hookPane))
@@ -1611,6 +1619,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
             new Set([owners[0].repo.name]),
             hostPanes,
             hostPanesOnce,
+            (repo: Repo) => panesForRepo(repo, invocation),
           );
         } catch (error) {
           if (!(error instanceof Error)) throw error;

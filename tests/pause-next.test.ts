@@ -13,6 +13,7 @@ import {
   killTree,
   leaf,
   leafTempRoot,
+  storeDir,
   yaml,
   type Fixture,
 } from './helpers';
@@ -344,8 +345,19 @@ test('unpause runs deferred merged cleanup', async () => {
     leaf(f, 'live', 'merged', { tab: 'w1:t9' }, 'issue-a');
     leaf(f, 'dead', 'merged', { tab: 'w1:t8' }, 'issue-b');
     const db: Database = database(f);
-    db.tabs = [...db.tabs, { tab_id: 'w1:t9', label: 'live' }];
-    db.panes = [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'unknown' }];
+    // The live leaf's seat sits in the repo workspace inside its worktree path,
+    // the shape a recorded tab needs to be closable.
+    db.tabs = [...db.tabs, { tab_id: 'w1:t9', label: 'live', workspace_id: 'w1' }];
+    db.panes = [
+      ...db.panes,
+      {
+        pane_id: 'w1:p9',
+        tab_id: 'w1:t9',
+        cwd: resolve(storeDir(f), 'live'),
+        agent: null,
+        agent_status: 'unknown',
+      },
+    ];
     saveDatabase(f, db);
     const { createHash } = await import('node:crypto');
     const hex = (text: string): string => createHash('sha256').update(text).digest('hex');

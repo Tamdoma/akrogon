@@ -412,15 +412,16 @@ export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null
     throw error;
   }
   const workspaceTabs: Set<string> = new Set(
-    seated.tabs
-      // A tab without a workspace tag predates workspace labeling; treat it as in-scope.
-      .filter((item) => item.workspace_id === undefined || item.workspace_id === resolved.workspace.workspace_id)
-      .map((item) => item.tab_id),
+    seated.tabs.filter((item) => item.workspace_id === resolved.workspace.workspace_id).map((item) => item.tab_id),
   );
   const seatedPanes: Pane[] = seated.panes.filter((pane) => workspaceTabs.has(pane.tab_id));
   const tab: string = leaf.state.tab;
   if (!workspaceTabs.has(tab) || broadcastInProgress(leaf.state, seatedPanes)) return false;
-  if (!seatedPanes.some((pane) => pane.tab_id === tab)) return false;
+  // The recorded pane closes only inside the leaf's own seat tab: a member
+  // pane whose cwd is inside the leaf worktree.
+  const expected: string = leaf.state.worktree ?? resolve(worktreeStore(repo), leaf.state.slug);
+  if (!seatedPanes.some((pane) => pane.tab_id === tab && pane.cwd !== null && within(pane.cwd, expected)))
+    return false;
   await command(herdrArgv(['tab', 'close', tab], { session }));
   return true;
 }
@@ -717,10 +718,7 @@ export async function reconcile(
             session: resolved.session.name,
             tabs: new Set(
               listed
-                .filter(
-                  (item) =>
-                    item.workspace_id === undefined || item.workspace_id === resolved.workspace.workspace_id,
-                )
+                .filter((item) => item.workspace_id === resolved.workspace.workspace_id)
                 .map((item) => item.tab_id),
             ),
           };
@@ -733,14 +731,17 @@ export async function reconcile(
     return seat;
   };
 
-  async function closeTab(worktree: string, tab: string): Promise<boolean> {
+  async function closeTab(worktree: string, tab: string, leaf: Leaf): Promise<boolean> {
     const seated: { session: string; tabs: Set<string> } | null = await seatTabs();
     if (seated === null) {
       keep(worktree, 'repo session unavailable', 'resolve the repo session refusal and retry cleanup');
       return false;
     }
-    // The recorded tab is not in the resolved workspace: not this repo's seat.
+    // A recorded tab closes only in the repo's workspace with a member pane
+    // sitting in the leaf worktree; anything else is not this leaf's seat.
     if (!seated.tabs.has(tab)) return true;
+    const expected: string = resolve(store, leaf.state.slug);
+    if (!panes.some((pane) => pane.tab_id === tab && pane.cwd !== null && within(pane.cwd, expected))) return true;
     const closed: Result = await run(herdrArgv(['tab', 'close', tab], { session: seated.session }));
     if (closed.code === 0) return true;
     const detail: { code: string; message: string } = herdrError(closed);
@@ -769,7 +770,7 @@ export async function reconcile(
       return;
     }
     if (tabLive(panes, tab)) {
-      const closed: boolean = await closeTab(worktree, z.string().parse(tab));
+      const closed: boolean = await closeTab(worktree, z.string().parse(tab), leaf);
       if (open || !closed) {
         if (closed) keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
         return;
@@ -797,7 +798,7 @@ export async function reconcile(
         tabLive(panes, state.tab) &&
         !(within(leaf.path, openRoot) && ownerCompletes(repo, leaf))
       )
-        await closeTab(leaf.path, z.string().parse(state.tab));
+        await closeTab(leaf.path, z.string().parse(state.tab), leaf);
       continue;
     }
     handled.add(worktree);
@@ -1218,13 +1219,15 @@ export async function reconcile(
 // units. A slice matching a finished leaf follows the same rule as the per-repo
 // step; a slice matching no leaf at all is stopped only when its cgroupfs
 // subtree holds no process. A leaf-matched slice is stopped only for a repo in
-// `acting`, the repos this pass reconciled; every registered repo still counts
-// for ownership. panesOnce is asked only when a tab has to be judged.
+// `acting`, the repos this pass reconciled; leaf-tab judgements read that
+// repo's resolved session through panesForRepo while the filesystem veto keeps
+// the cross-session panesOnce union.
 export async function reconcileHost(
   repos: Repo[],
   acting: ReadonlySet<string>,
   live: Pane[] | null,
   panesOnce: () => Promise<Pane[] | null>,
+  panesForRepo: (repo: Repo) => Promise<Pane[] | null>,
 ): Promise<void> {
   const kept: KeptEntry[] = [];
   const keep = (unit: string, reason: string, clears: string): void => {
@@ -1238,6 +1241,15 @@ export async function reconcileHost(
       fetched = true;
     }
     return panes;
+  };
+  // Per-repo pane views, fetched lazily and memoized so one session is read once.
+  const repoPanes: Map<string, Promise<Pane[] | null>> = new Map();
+  const repoView = (repo: Repo): Promise<Pane[] | null> => {
+    const cached: Promise<Pane[] | null> | undefined = repoPanes.get(repo.name);
+    if (cached !== undefined) return cached;
+    const fetchedRepo: Promise<Pane[] | null> = panesForRepo(repo);
+    repoPanes.set(repo.name, fetchedRepo);
+    return fetchedRepo;
   };
   // One /proc scan per pass, run only when a candidate reaches removal.
   let scanned: Map<number, string[]> | undefined;
@@ -1270,7 +1282,7 @@ export async function reconcileHost(
     for (const slice of [...loaded].sort()) {
       const match: { repo: Repo; leaf: Leaf } | undefined = leafOf.get(slice);
       if (match !== undefined) {
-        const view: Pane[] | null = match.leaf.state.tab === undefined ? panes : await livePanes();
+        const view: Pane[] | null = match.leaf.state.tab === undefined ? panes : await repoView(match.repo);
         const reason: string | null = sliceKeepReason(slice, match.leaf, view, own, runs);
         if (reason !== null) {
           keep(slice, reason, 'removed once the pass, recorded run or live tab ends and pane inventory is available');
