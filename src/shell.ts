@@ -191,8 +191,7 @@ export const sessionSchema = z.object({
 export type Session = z.infer<typeof sessionSchema>;
 
 export type SessionResolution =
-  | { ok: true; session: Session; workspace: Workspace }
-  | { ok: false; reason: string; scope?: 'repo' | 'invocation' };
+  { ok: true; session: Session; workspace: Workspace } | { ok: false; reason: string; scope?: 'repo' | 'invocation' };
 
 // Discovery reads (session list, per-session workspace list, the second-seat
 // guard's pane/tab lists) get a fixed deadline; a hit counts as unreadable.
@@ -299,13 +298,11 @@ export function repoSession(repo: Repo, opts: { exe?: string } = {}): Promise<Se
   const key: string = exe + ' ' + repo.name;
   const cached: Promise<SessionResolution> | undefined = resolutions.get(key);
   if (cached !== undefined) return cached;
-  const resolved: Promise<SessionResolution> = resolveSession(repo, exe).catch(
-    (error: unknown): SessionResolution => ({
-      ok: false,
-      scope: 'repo',
-      reason: JSON.stringify({ workspace: repo.name, error: 'resolution failed: ' + describeError(error) }),
-    }),
-  );
+  const resolved: Promise<SessionResolution> = resolveSession(repo, exe).catch((error: unknown): SessionResolution => ({
+    ok: false,
+    scope: 'repo',
+    reason: JSON.stringify({ workspace: repo.name, error: 'resolution failed: ' + describeError(error) }),
+  }));
   resolutions.set(key, resolved);
   return resolved;
 }

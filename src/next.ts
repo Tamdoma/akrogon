@@ -1473,12 +1473,8 @@ async function reconcileRepos(
       report(invocation, repo.name, repo.root, error);
     }
   }
-  await reconcileHost(
-    registeredRepos(readGlobal(), invocation).repos,
-    acting,
-    null,
-    hostPanesOnce,
-    (repo: Repo) => panesForRepo(repo, invocation),
+  await reconcileHost(registeredRepos(readGlobal(), invocation).repos, acting, null, hostPanesOnce, (repo: Repo) =>
+    panesForRepo(repo, invocation),
   );
 }
 

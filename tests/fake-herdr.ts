@@ -125,7 +125,13 @@ function serverDead(): never {
 function socketOf(name: string, seeded: Session | undefined): string {
   return seeded?.socket_path ?? `${path}-${name}.sock`;
 }
-function sessionList(): { name: string; running: boolean; socket_path: string; session_dir: string; default: boolean }[] {
+function sessionList(): {
+  name: string;
+  running: boolean;
+  socket_path: string;
+  session_dir: string;
+  default: boolean;
+}[] {
   const extras: Session[] = db.sessions ?? [];
   const seeded: Session | undefined = extras.find((s) => s.name === 'default');
   return [

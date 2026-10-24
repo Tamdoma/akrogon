@@ -289,9 +289,7 @@ test('a failed session list is reported once per invocation', async () => {
     leaf(f, 'two', 'plan.synthesis');
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(1);
-    const lines: number = result.stderr
-      .split('\n')
-      .filter((line) => line.includes('fixture_session_list')).length;
+    const lines: number = result.stderr.split('\n').filter((line) => line.includes('fixture_session_list')).length;
     expect(lines).toBe(1);
     expect(database(f).tabs).toHaveLength(0);
   } finally {
@@ -335,9 +333,7 @@ test('agent start, prompt and the busy notice carry the resolved session', async
       ),
     });
     expect((await nextAt(f, 'routed2', now, { HERDR_SOCKET_PATH: socket(f, 'other') })).code).toBe(0);
-    const notices = toSession(f, 'default').filter(
-      (args) => args[2] === 'notification' && args[3] === 'show',
-    );
+    const notices = toSession(f, 'default').filter((args) => args[2] === 'notification' && args[3] === 'show');
     expect(notices).toHaveLength(1);
     expect(toSession(f, 'other').filter((args) => args[2] === 'notification')).toHaveLength(0);
   } finally {
@@ -495,16 +491,13 @@ test('phase renames and the failed notice carry the resolved session', async () 
     expect(moved.code).toBe(0);
     const routed = toSession(f, 'default');
     expect(routed.some((args) => args[2] === 'notification' && args[3] === 'show')).toBe(true);
-    expect(
-      routed.some((args) => args[2] === 'tab' && args[3] === 'rename' && args[5] === 'renamed failed'),
-    ).toBe(true);
+    expect(routed.some((args) => args[2] === 'tab' && args[3] === 'rename' && args[5] === 'renamed failed')).toBe(true);
     // Only mutations count: the second-seat guard legitimately reads pane/tab
     // lists in every running session, including `other`.
     expect(
       toSession(f, 'other').filter(
         (args) =>
-          (args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? '')) ||
-          args[2] === 'notification',
+          (args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? '')) || args[2] === 'notification',
       ),
     ).toHaveLength(0);
     // Recovery renames back in the same session.
@@ -514,9 +507,7 @@ test('phase renames and the failed notice carry the resolved session', async () 
     });
     expect(back.code).toBe(0);
     expect(
-      toSession(f, 'default').some(
-        (args) => args[2] === 'tab' && args[3] === 'rename' && args[5] === 'renamed',
-      ),
+      toSession(f, 'default').some((args) => args[2] === 'tab' && args[3] === 'rename' && args[5] === 'renamed'),
     ).toBe(true);
   } finally {
     f.clean();
@@ -557,9 +548,7 @@ test('the merge notice and main-red notice go to the resolved session', async ()
     });
     const result: Result = await next(f, ['--all'], env);
     expect(result.code).toBe(0);
-    const notices = toSession(f, 'default').filter(
-      (args) => args[2] === 'notification' && args[3] === 'show',
-    );
+    const notices = toSession(f, 'default').filter((args) => args[2] === 'notification' && args[3] === 'show');
     expect(notices.some((args) => args.join(' ').includes('merged, move it back'))).toBe(true);
     expect(toSession(f, 'other').filter((args) => args[2] === 'notification')).toHaveLength(0);
   } finally {

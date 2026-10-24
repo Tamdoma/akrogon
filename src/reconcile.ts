@@ -420,8 +420,7 @@ export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null
   // The recorded pane closes only inside the leaf's own seat tab: a member
   // pane whose cwd is inside the leaf worktree.
   const expected: string = leaf.state.worktree ?? resolve(worktreeStore(repo), leaf.state.slug);
-  if (!seatedPanes.some((pane) => pane.tab_id === tab && pane.cwd !== null && within(pane.cwd, expected)))
-    return false;
+  if (!seatedPanes.some((pane) => pane.tab_id === tab && pane.cwd !== null && within(pane.cwd, expected))) return false;
   await command(herdrArgv(['tab', 'close', tab], { session }));
   return true;
 }
@@ -717,9 +716,7 @@ export async function reconcile(
           seat = {
             session: resolved.session.name,
             tabs: new Set(
-              listed
-                .filter((item) => item.workspace_id === resolved.workspace.workspace_id)
-                .map((item) => item.tab_id),
+              listed.filter((item) => item.workspace_id === resolved.workspace.workspace_id).map((item) => item.tab_id),
             ),
           };
         } catch (error) {
