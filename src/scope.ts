@@ -118,11 +118,12 @@ export function ownSlices(): Set<string> {
   return new Set([...readFileSync(self, 'utf8').matchAll(/\b([a-zA-Z0-9_.\-]+\.slice)\b/g)].map((match) => match[1]));
 }
 
-async function shellPid(paneId: string): Promise<number> {
+async function shellPid(paneId: string, session: string): Promise<number> {
   return (
     await herdr(
       ['pane', 'process-info', '--pane', paneId],
       z.object({ process_info: z.object({ shell_pid: z.number().int().positive() }) }),
+      { session },
     )
   ).process_info.shell_pid;
 }
@@ -138,16 +139,16 @@ function startTime(pid: number): string {
   );
 }
 
-async function shell(paneId: string): Promise<Shell> {
-  const pid: number = await shellPid(paneId);
+async function shell(paneId: string, session: string): Promise<Shell> {
+  const pid: number = await shellPid(paneId, session);
   return { pid, start: startTime(pid) };
 }
 
-export async function adoptShell(slice: string, paneId: string): Promise<void> {
+export async function adoptShell(slice: string, paneId: string, session: string): Promise<void> {
   const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;
   if (runtime === undefined || runtime.trim() === '')
     throw new Error('XDG_RUNTIME_DIR is required to reach the user systemd bus');
-  const { pid, start }: Shell = await shell(paneId);
+  const { pid, start }: Shell = await shell(paneId, session);
   const argv: string[] = [
     'busctl',
     '--user',
@@ -187,8 +188,8 @@ function errnoMessage(error: unknown): string | undefined {
   return error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.message : undefined;
 }
 
-export async function inOwnScope(slice: string, paneId: string): Promise<ScopePlace> {
-  const pid: number = await shellPid(paneId);
+export async function inOwnScope(slice: string, paneId: string, session: string): Promise<ScopePlace> {
+  const pid: number = await shellPid(paneId, session);
   let start: string;
   let cgroup: string;
   try {

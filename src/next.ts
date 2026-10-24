@@ -42,7 +42,6 @@ import {
   herdr,
   panes,
   tabs,
-  workspaces,
   paneSchema,
   tabSchema,
   command,
@@ -50,11 +49,16 @@ import {
   CommandError,
   quote,
   retryable,
+  herdrArgv,
   herdrError,
+  repoSession,
+  listSessions,
+  DISCOVERY_DEADLINE_MS,
   type Pane,
   type Tab,
   type Result,
-  type Workspace,
+  type Session,
+  type SessionResolution,
 } from './shell';
 import { checkBase, localBase, trackingRef } from './preflight';
 import { checkLocation } from './guard';
@@ -97,7 +101,7 @@ const hookEventSchema = z.discriminatedUnion('event', [
 
 type HookEvent = z.infer<typeof hookEventSchema>;
 
-type Invocation = { skipped: Set<string>; dispatched: Set<string> };
+type Invocation = { skipped: Set<string>; dispatched: Set<string>; sessionRefusals: Set<string> };
 type DispatchOutcome = 'completed' | 'waiting' | 'skipped';
 
 function herdrDetail(error: unknown): string {
@@ -115,6 +119,26 @@ function report(invocation: Invocation, repo: string, path: string, error: Error
   invocation.skipped.add(key);
   if (slug !== undefined) invocation.skipped.add(identity);
   console.error(JSON.stringify({ repo, path, ...(slug === undefined ? {} : { slug }), error: error.message }));
+}
+
+type ResolvedSession = Extract<SessionResolution, { ok: true }>;
+
+// A refused session is reported once per repo per invocation; an
+// invocation-scope failure (the session list itself) once across repos.
+async function resolveFor(
+  invocation: Invocation,
+  repo: Repo,
+  path: string,
+  slug?: string,
+): Promise<ResolvedSession | null> {
+  const resolution: SessionResolution = await repoSession(repo);
+  if (resolution.ok) return resolution;
+  const key: string = resolution.scope === 'invocation' ? '*' : repo.name;
+  if (!invocation.sessionRefusals.has(key)) {
+    invocation.sessionRefusals.add(key);
+    report(invocation, repo.name, path, new Error(resolution.reason), slug);
+  }
+  return null;
 }
 
 function discover(repo: Repo, invocation: Invocation): Inventory {
@@ -170,7 +194,14 @@ function idle(pane: Pane): boolean {
 const STALL_MS: number = 60 * 60 * 1000;
 const PROMPT_GRACE_MS: number = 2 * 60 * 1000;
 
-async function observeBusy(path: string, state: State, seat: Slot, pane: Pane, now: number): Promise<State> {
+async function observeBusy(
+  path: string,
+  state: State,
+  seat: Slot,
+  pane: Pane,
+  session: string,
+  now: number,
+): Promise<State> {
   if (pane.agent === null || idle(pane)) {
     if (state.busy_since[seat] === undefined && state.busy_notified[seat] === undefined) return state;
     const cleared: State = {
@@ -188,12 +219,16 @@ async function observeBusy(path: string, state: State, seat: Slot, pane: Pane, n
   const elapsed: number = now - Date.parse(since);
   if (elapsed <= STALL_MS || observed.busy_notified[seat] !== undefined) return observed;
   const minutes: number = Math.floor(elapsed / 60000);
-  await command([
-    'herdr',
-    'notification',
-    'show',
-    `Busy leaf: ${state.repo}/${state.slug} seat ${seat} ${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`,
-  ]);
+  const notice: string[] = herdrArgv(
+    [
+      'notification',
+      'show',
+      `Busy leaf: ${state.repo}/${state.slug} seat ${seat} ${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`,
+    ],
+    { session },
+  );
+  const shown: Result = await run(notice);
+  if (shown.code !== 0) throw new CommandError(notice, process.cwd(), shown);
   const notified: State = {
     ...observed,
     busy_notified: { ...observed.busy_notified, [seat]: new Date(now).toISOString() },
@@ -202,8 +237,32 @@ async function observeBusy(path: string, state: State, seat: Slot, pane: Pane, n
   return notified;
 }
 
-async function currentPane(id: string): Promise<Pane> {
-  return (await herdr(['pane', 'get', id], z.object({ pane: paneSchema }))).pane;
+async function currentPane(id: string, session: string): Promise<Pane> {
+  return (await herdr(['pane', 'get', id], z.object({ pane: paneSchema }), { session })).pane;
+}
+
+// The resolved session's panes; a refusal or read failure reports once per repo and yields null.
+async function panesForRepo(repo: Repo, invocation: Invocation): Promise<Pane[] | null> {
+  const resolution: SessionResolution | null = await resolveFor(invocation, repo, repo.root);
+  if (resolution === null) return null;
+  return await panes(resolution.session.name).catch(() => null);
+}
+
+// The second-seat veto and host reconcile read the union of every running
+// session's panes; one unreadable session makes the union null (keep everything).
+async function allSessionPanes(): Promise<Pane[] | null> {
+  const sessions: Session[] | null = await listSessions();
+  if (sessions === null) return null;
+  const found: Pane[] = [];
+  for (const session of sessions) {
+    if (!session.running) continue;
+    try {
+      found.push(...(await panes(session.name)));
+    } catch {
+      return null;
+    }
+  }
+  return found;
 }
 
 function launch(global: GlobalConfig, repo: Repo, slot: Slot, leafPath?: string): { kind: string; args: string[] } {
@@ -351,50 +410,113 @@ export async function emitEnvFile(repo: Repo, worktree: string, names: string[])
 }
 
 async function activeCount(global: GlobalConfig, invocation: Invocation): Promise<number> {
-  const live: Pane[] = await panes();
   const registered: ReturnType<typeof registeredRepos> = registeredRepos(global, invocation);
   let total: number = registered.unknown ? global.max_active : 0;
-  const active = (leaf: Leaf): boolean =>
-    leaf.state.phase !== 'merged' &&
-    leaf.state.phase !== 'failed' &&
-    live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf));
+  const unfinished = (leaf: Leaf): boolean => leaf.state.phase !== 'merged' && leaf.state.phase !== 'failed';
+  const active =
+    (live: Pane[]) =>
+    (leaf: Leaf): boolean =>
+      unfinished(leaf) && live.some((pane) => pane.tab_id === leaf.state.tab || inWorktree(pane.cwd, leaf));
   for (const repo of registered.repos) {
     const inventory: Inventory = discover(repo, invocation);
+    const live: Pane[] | null = await panesForRepo(repo, invocation);
+    // A refused or unreadable session counts unreadable plus unfinished, never max_active.
     total +=
-      inventory.unknown.length > 0
-        ? global.max_active
-        : inventory.leaves.filter(active).length + inventory.unreadable.length;
+      live === null
+        ? inventory.unreadable.length + inventory.leaves.filter(unfinished).length
+        : inventory.unknown.length > 0
+          ? global.max_active
+          : inventory.leaves.filter(active(live)).length + inventory.unreadable.length;
   }
   return total;
 }
 
-async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation: Invocation): Promise<State | null> {
-  const slice: string = leafSlice(repo, leaf.state.slug);
-  const listed: Pane[] = await panes();
-  const recorded: string[] = [leaf.state.pane.A, leaf.state.pane.B].filter(
-    (id): id is string => id !== undefined && listed.some((pane) => pane.pane_id === id),
-  );
-  let closed: boolean = false;
-  for (const id of recorded) {
-    const place: ScopePlace = await inOwnScope(slice, id);
-    if (place.place === 'unreadable')
-      throw new Error(`Cannot read the scope of pane ${id} for leaf ${leaf.state.slug}: ${place.error}`);
-    if (place.place === 'outside') {
-      await herdr(['pane', 'close', id], z.object({}));
-      closed = true;
+// Before a new tab opens, every running session's panes are scanned: a pane
+// sitting in the expected worktree whose tab lives outside the repo's workspace
+// is another seat and refuses the allocation. The repo's own session reuses the
+// lists allocation just read; foreign sessions are probed under the deadline.
+async function secondSeat(
+  worktree: string,
+  workspaceId: string,
+  own: { session: string; panes: Pane[]; tabs: Tab[] },
+): Promise<void> {
+  const sessions: Session[] | null = await listSessions();
+  if (sessions === null) throw new Error(`The session list is unreadable; cannot prove ${worktree} is unseated`);
+  for (const session of sessions) {
+    if (!session.running) continue;
+    let seated: Pane[] = [];
+    let sessionTabs: Tab[] = [];
+    if (session.name === own.session) {
+      seated = own.panes;
+      sessionTabs = own.tabs;
+    } else {
+      const opts = { session: session.name, deadlineMs: DISCOVERY_DEADLINE_MS };
+      try {
+        // Liveness comes first so a dead-but-listed session is skipped on the
+        // cheapest read, like resolution's workspace probe.
+        await herdr(['workspace', 'list'], z.object({}), opts);
+        seated = (await herdr(['pane', 'list'], z.object({ panes: z.array(paneSchema) }), opts)).panes;
+        sessionTabs = (await herdr(['tab', 'list'], z.object({ tabs: z.array(tabSchema) }), opts)).tabs;
+      } catch (error) {
+        // A session listed running whose read dies server_not_running is stopped.
+        if (error instanceof CommandError && herdrError(error.result).code === 'server_not_running') continue;
+        throw new Error(
+          `Session ${session.name} is unreadable; cannot prove ${worktree} is unseated: ${herdrDetail(error)}`,
+          { cause: error },
+        );
+      }
+    }
+    for (const pane of seated) {
+      if (pane.cwd === null || !within(pane.cwd, worktree)) continue;
+      const tab: Tab | undefined = sessionTabs.find((tab) => tab.tab_id === pane.tab_id);
+      if (tab?.workspace_id !== workspaceId)
+        throw new Error(
+          `Pane ${pane.pane_id} in session ${session.name} already sits inside ${worktree} outside workspace ${workspaceId}`,
+        );
     }
   }
-  const live: Pane[] = closed ? await panes() : listed;
-  const liveTabs: Tab[] = await tabs();
+}
+
+async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation: Invocation): Promise<State | null> {
+  const resolution: SessionResolution | null = await resolveFor(invocation, repo, leaf.path, leaf.state.slug);
+  if (resolution === null) throw new Error(`Session refused for repo ${repo.name}`);
+  const session: string = resolution.session.name;
+  const workspaceId: string = resolution.workspace.workspace_id;
+  const slice: string = leafSlice(repo, leaf.state.slug);
+  const listed: Pane[] = await panes(session);
+  const liveTabs: Tab[] = await tabs(session);
   const expected: Leaf = {
     ...leaf,
     state: { ...leaf.state, worktree: resolve(worktreeStore(repo), leaf.state.slug) },
   };
-  const matches: Tab[] = liveTabs.filter(
+  const memberInside = (tab: Tab): boolean =>
+    listed.some((pane) => pane.tab_id === tab.tab_id && inWorktree(pane.cwd, expected));
+  const accepted = (tab: Tab): boolean =>
+    tab.workspace_id === workspaceId &&
+    (tab.tab_id === leaf.state.tab || (tab.label === leaf.state.slug && memberInside(tab)));
+  const recorded: string[] = [leaf.state.pane.A, leaf.state.pane.B].filter((id): id is string => {
+    const pane: Pane | undefined = listed.find((pane) => pane.pane_id === id);
+    const tab: Tab | undefined = liveTabs.find((tab) => tab.tab_id === pane?.tab_id);
+    return pane !== undefined && tab !== undefined && accepted(tab);
+  });
+  let closed: boolean = false;
+  for (const id of recorded) {
+    const place: ScopePlace = await inOwnScope(slice, id, session);
+    if (place.place === 'unreadable')
+      throw new Error(`Cannot read the scope of pane ${id} for leaf ${leaf.state.slug}: ${place.error}`);
+    if (place.place === 'outside') {
+      await herdr(['pane', 'close', id], z.object({}), { session });
+      closed = true;
+    }
+  }
+  const live: Pane[] = closed ? await panes(session) : listed;
+  const view: Tab[] = closed ? await tabs(session) : liveTabs;
+  const matches: Tab[] = view.filter(
     (tab) =>
-      tab.tab_id === leaf.state.tab ||
-      (tab.label === leaf.state.slug &&
-        live.some((pane) => pane.tab_id === tab.tab_id && inWorktree(pane.cwd, expected))),
+      tab.workspace_id === workspaceId &&
+      (tab.tab_id === leaf.state.tab ||
+        (tab.label === leaf.state.slug &&
+          live.some((pane) => pane.tab_id === tab.tab_id && inWorktree(pane.cwd, expected)))),
   );
   if (matches.length > 1) throw new Error(`Multiple tabs for leaf: ${leaf.state.slug}`);
   if (matches.length === 0) {
@@ -404,8 +526,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   const state: State = await ensureWorktree(repo, leaf, matches.length === 1);
   const scratch: string = ensureLeafTemp(repo, state.slug);
   const worktree: string = z.string().parse(state.worktree);
-  const workspace: Workspace | undefined = (await workspaces()).find((item) => item.label === repo.name);
-  if (workspace === undefined) throw new Error(`No herdr workspace labeled ${repo.name}`);
+  if (matches.length === 0) await secondSeat(worktree, workspaceId, { session, panes: live, tabs: view });
   const placement: string[] = [
     '--cwd',
     worktree,
@@ -419,15 +540,23 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     'NODE_DISABLE_COMPILE_CACHE=1',
     '--no-focus',
   ];
-  const target: string[] = ['--workspace', workspace.workspace_id];
+  const target: string[] = ['--workspace', workspaceId];
   const tab: Tab =
     matches.length === 1
       ? matches[0]
-      : (await herdr(['tab', 'create', '--label', state.slug, ...placement, ...target], z.object({ tab: tabSchema })))
-          .tab;
+      : (
+          await herdr(['tab', 'create', '--label', state.slug, ...placement, ...target], z.object({ tab: tabSchema }), {
+            session,
+          })
+        ).tab;
   const tabState: State = { ...state, tab: tab.tab_id };
   saveState(leaf.path, tabState);
-  const members: Pane[] = (await panes()).filter((pane) => pane.tab_id === tab.tab_id);
+  // A created tab's members are the panes that were not already listed; only a
+  // reused tab's members may hold recorded panes.
+  const members: Pane[] = (await panes(session)).filter(
+    (pane) =>
+      pane.tab_id === tab.tab_id && (matches.length === 1 || !listed.some((known) => known.pane_id === pane.pane_id)),
+  );
   if (members.length === 0) throw new Error(`Expected at least one pane in ${tab.tab_id}`);
   const recordedA: Pane | undefined = members.find((pane) => pane.pane_id === state.pane.A);
   const recordedB: Pane | undefined = members.find((pane) => pane.pane_id === state.pane.B);
@@ -441,6 +570,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
           await herdr(
             ['pane', 'split', (recordedB ?? members[0]).pane_id, '--direction', 'right', ...placement],
             z.object({ pane: paneSchema }),
+            { session },
           )
         ).pane);
   // A recorded pane may be unboxed only until the entry sweep or the box step runs; dispatch follows successful boxing.
@@ -449,17 +579,17 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     pane: { A: first.pane_id, ...(recordedB === undefined ? {} : { B: recordedB.pane_id }) },
   });
   async function box(pane: Pane): Promise<void> {
-    const place: ScopePlace = await inOwnScope(slice, pane.pane_id);
+    const place: ScopePlace = await inOwnScope(slice, pane.pane_id, session);
     if (place.place === 'unreadable')
       throw new Error(`Cannot read the scope of pane ${pane.pane_id} for leaf ${state.slug}: ${place.error}`);
     if (place.place === 'inside') return;
-    await adoptShell(slice, pane.pane_id);
+    await adoptShell(slice, pane.pane_id, session);
     // StartTransientUnit returns once systemd queues the job, so the shell lands in its scope a moment later.
     const deadline: number = Date.now() + 5000;
-    let adopted: ScopePlace = await inOwnScope(slice, pane.pane_id);
+    let adopted: ScopePlace = await inOwnScope(slice, pane.pane_id, session);
     while (adopted.place === 'outside' && Date.now() < deadline) {
       await Bun.sleep(50);
-      adopted = await inOwnScope(slice, pane.pane_id);
+      adopted = await inOwnScope(slice, pane.pane_id, session);
     }
     if (adopted.place !== 'inside')
       throw new Error(
@@ -468,14 +598,15 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   }
   await box(first);
   if (repairB !== undefined) {
-    const prev: string | undefined = (await tabs()).find((tab) => tab.focused === true)?.tab_id;
+    const prev: string | undefined = (await tabs(session)).find((tab) => tab.focused === true)?.tab_id;
     async function restoreFocus(): Promise<void> {
-      if (prev !== undefined && prev !== tab.tab_id) await herdr(['tab', 'focus', prev], z.object({}));
+      if (prev !== undefined && prev !== tab.tab_id) await herdr(['tab', 'focus', prev], z.object({}), { session });
     }
     try {
       const swapped = await herdr(
         ['pane', 'swap', '--source-pane', repairB.pane_id, '--target-pane', first.pane_id],
         z.object({ changed: z.boolean() }),
+        { session },
       );
       if (swapped.changed !== true) throw new Error('herdr pane swap returned changed:false');
     } catch (error) {
@@ -505,6 +636,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
       await herdr(
         ['pane', 'split', first.pane_id, '--direction', 'right', ...placement],
         z.object({ pane: paneSchema }),
+        { session },
       )
     ).pane;
   const allocated: State = { ...tabState, pane: { A: first.pane_id, B: second.pane_id } };
@@ -521,9 +653,13 @@ async function dispatchSlot(
   prompt: string,
   attempt?: string,
 ): Promise<void> {
+  const resolution: SessionResolution = await repoSession(repo);
+  if (!resolution.ok) throw new Error(resolution.reason);
+  const session: string = resolution.session.name;
+
   async function recordDelivery(): Promise<void> {
-    const current: Pane = await currentPane(z.string().parse(readState(leaf.path).pane[slot]));
-    const observed: State = await observeBusy(leaf.path, readState(leaf.path), slot, current, Date.now());
+    const current: Pane = await currentPane(z.string().parse(readState(leaf.path).pane[slot]), session);
+    const observed: State = await observeBusy(leaf.path, readState(leaf.path), slot, current, session, Date.now());
     saveState(leaf.path, {
       ...observed,
       prompted: { ...observed.prompted, [slot]: current.agent_session?.value },
@@ -581,8 +717,8 @@ async function dispatchSlot(
 
   const recorded: State = readState(leaf.path);
   if (recorded.phase !== leaf.state.phase || recorded.done.includes(slot)) return;
-  const pane: Pane = await currentPane(z.string().parse(recorded.pane[slot]));
-  const state: State = await observeBusy(leaf.path, recorded, slot, pane, Date.now());
+  const pane: Pane = await currentPane(z.string().parse(recorded.pane[slot]), session);
+  const state: State = await observeBusy(leaf.path, recorded, slot, pane, session, Date.now());
   if (pane.agent !== null && busy(pane)) return;
   if (
     pane.agent !== null &&
@@ -607,20 +743,22 @@ async function dispatchSlot(
   if (pane.agent === null) {
     const harness: { kind: string; args: string[] } = launch(global, repo, slot, leaf.path);
     const name: string = `akrogon-${createHash('sha256').update(pane.pane_id).digest('hex').slice(0, 24)}`;
-    const startArgv: string[] = [
-      'herdr',
-      'agent',
-      'start',
-      name,
-      '--kind',
-      harness.kind,
-      '--pane',
-      pane.pane_id,
-      '--timeout',
-      '30000',
-      '--',
-      ...harness.args,
-    ];
+    const startArgv: string[] = herdrArgv(
+      [
+        'agent',
+        'start',
+        name,
+        '--kind',
+        harness.kind,
+        '--pane',
+        pane.pane_id,
+        '--timeout',
+        '30000',
+        '--',
+        ...harness.args,
+      ],
+      { session },
+    );
     const started: Result = await run(startArgv);
     if (started.code !== 0) {
       const error: { code: string; message: string } = herdrError(started);
@@ -628,8 +766,8 @@ async function dispatchSlot(
       return;
     }
   }
-  const ready: Pane = await currentPane(pane.pane_id);
-  await observeBusy(leaf.path, readState(leaf.path), slot, ready, Date.now());
+  const ready: Pane = await currentPane(pane.pane_id, session);
+  await observeBusy(leaf.path, readState(leaf.path), slot, ready, session, Date.now());
   if (!idle(ready)) return;
   if (state.phase === 'merge' && state.worktree !== undefined && existsSync(state.worktree))
     await removeEmptyUntrackedDirs(state.worktree);
@@ -642,18 +780,10 @@ async function dispatchSlot(
       if (found !== undefined && found.isFile()) offset = found.size;
     }
   }
-  const args: string[] = [
-    'herdr',
-    'agent',
-    'prompt',
-    ready.pane_id,
-    prompt,
-    '--wait',
-    '--until',
-    'working',
-    '--timeout',
-    '5000',
-  ];
+  const args: string[] = herdrArgv(
+    ['agent', 'prompt', ready.pane_id, prompt, '--wait', '--until', 'working', '--timeout', '5000'],
+    { session },
+  );
   const result: Result = await run(args);
   if (result.code === 0) {
     await recordDelivery();
@@ -716,11 +846,18 @@ async function dispatchLeaf(
         phase: state.phase,
         visit: currentVisit(readLog(repo.root), slug, state.phase),
       });
+    // Resolution is lazy: it happens only when a pane read is coming, so
+    // paused, stopped, merged and wait-listed leaves never cost a session list.
+    let resolved: ResolvedSession | null = null;
+    const ownSession = async (): Promise<string | null> =>
+      (resolved ?? (resolved = await resolveFor(invocation, repo, leaf.path, slug)))?.session.name ?? null;
     if (state.phase !== 'merged' && state.phase !== 'failed' && Object.values(state.pane).length > 0) {
-      const live: Pane[] = await panes();
+      const session: string | null = await ownSession();
+      if (session === null) return 'skipped';
+      const live: Pane[] = await panes(session);
       for (const seat of ['A', 'B'] as const) {
         const pane: Pane | undefined = live.find((pane) => pane.pane_id === state.pane[seat]);
-        if (pane !== undefined) state = await observeBusy(leaf.path, state, seat, pane, Date.now());
+        if (pane !== undefined) state = await observeBusy(leaf.path, state, seat, pane, session, Date.now());
       }
     }
     if (state.phase === 'merged') {
@@ -729,10 +866,10 @@ async function dispatchLeaf(
       return 'completed';
     }
     if (state.phase === 'failed') {
-      const live: boolean =
-        state.tab !== undefined &&
-        state.failure?.cause !== 'attempts' &&
-        (await panes()).some((pane) => pane.tab_id === state.tab);
+      const tabbed: boolean = state.tab !== undefined && state.failure?.cause !== 'attempts';
+      const session: string | null = tabbed ? await ownSession() : null;
+      if (tabbed && session === null) return 'skipped';
+      const live: boolean = session !== null && (await panes(session)).some((pane) => pane.tab_id === state.tab);
       if (
         picked &&
         ((state.tab === undefined && state.worktree === undefined) || live || state.failure?.cause === 'attempts')
@@ -779,6 +916,7 @@ async function dispatchLeaf(
     // Mirrors ensureWorktree's path: a missing worktree needs remote proof, an existing one only local.
     const mustCreate: boolean = !existsSync(resolve(worktreeStore(repo), slug));
     await checkBase(repo, mustCreate);
+    if ((await ownSession()) === null) return 'skipped';
     const allocated: State | null = await allocate(global, repo, { path: leaf.path, state }, invocation);
     if (allocated === null) return end('none');
     for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds)) {
@@ -852,6 +990,12 @@ async function sweep(
 }
 
 async function mergeNotice(repo: Repo, slug: string): Promise<boolean> {
+  const resolution: SessionResolution = await repoSession(repo);
+  if (!resolution.ok) {
+    console.warn(JSON.stringify({ warning: 'merge notice failed', slug, error: resolution.reason }));
+    return false;
+  }
+  const session: string = resolution.session.name;
   const args: string[] = [
     'notification',
     'show',
@@ -863,7 +1007,7 @@ async function mergeNotice(repo: Repo, slug: string): Promise<boolean> {
   ];
   const schema = z.object({ shown: z.boolean(), reason: z.string() });
   try {
-    return (await herdr(args, schema)).shown;
+    return (await herdr(args, schema, { session })).shown;
   } catch (error) {
     if (!(error instanceof CommandError) || !retryable(error.result)) {
       console.warn(
@@ -877,7 +1021,7 @@ async function mergeNotice(repo: Repo, slug: string): Promise<boolean> {
     }
   }
   try {
-    return (await herdr(args, schema)).shown;
+    return (await herdr(args, schema, { session })).shown;
   } catch (error) {
     console.warn(
       JSON.stringify({
@@ -1159,7 +1303,7 @@ export async function mergeWake(
   committedTo?: Phase,
   pressureDir: string = '/proc/pressure',
 ): Promise<void> {
-  const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
+  const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
   try {
     if (committedTo === 'merged') await selfUpdate(repo);
     const paused: boolean = await withLock(resolve(globalHome(), '.lock'), async () => isPaused(repo.name));
@@ -1174,11 +1318,12 @@ export async function mergeWake(
 // The land run's wake after its push: the next merge turn, the merged leaf's dependents, and its tab when no broadcast waits.
 export async function landedWake(global: GlobalConfig, repo: Repo, slug: string): Promise<void> {
   await mergeWake(global, repo, 'merged');
-  const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
+  const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
   try {
     await dispatchDependents(global, repo, slug, invocation, true);
     const merged: Leaf | undefined = discover(repo, invocation).leaves.find((leaf) => leaf.state.slug === slug);
-    if (merged !== undefined && merged.state.broadcast === undefined) await closeMergedTab(repo, merged, await panes());
+    if (merged !== undefined && merged.state.broadcast === undefined)
+      await closeMergedTab(repo, merged, await panesForRepo(repo, invocation));
   } catch (error) {
     if (!(error instanceof Error)) throw error;
     report(invocation, repo.name, repo.root, error, slug);
@@ -1298,35 +1443,30 @@ async function selectLeaves(
   return { repo, leaves: selected };
 }
 
-// Repo keys whose workspace is in the invoking herdr session; a failed list
-// means none, so a pass acts only on repos it can see.
-async function sessionRepos(): Promise<Set<string>> {
-  return new Set(((await workspaces().catch(() => null)) ?? []).map((workspace) => workspace.label));
-}
-
 async function reconcileRepos(
   repos: Repo[],
   invocation: Invocation,
   isAutomatic: boolean,
-  panesOnce: () => Promise<Pane[] | null>,
+  hostPanesOnce: () => Promise<Pane[] | null>,
 ): Promise<void> {
-  let visible: Set<string> | undefined;
   const acting: Set<string> = new Set();
   for (const repo of repos) {
     if (isAutomatic && isPaused(repo.name)) continue;
     const inventory: Inventory = discover(repo, invocation);
     try {
-      const needsPanes: boolean = await reconcileNeedsPanes(repo, inventory.leaves);
-      // Tabs are judged only from the repo's own herdr session.
-      if (needsPanes && !(visible ??= await sessionRepos()).has(repo.name)) continue;
       acting.add(repo.name);
-      await reconcile(repo, inventory.leaves, needsPanes ? await panesOnce() : [], inventoryFailures(inventory));
+      await reconcile(
+        repo,
+        inventory.leaves,
+        (await reconcileNeedsPanes(repo, inventory.leaves)) ? await panesForRepo(repo, invocation) : [],
+        inventoryFailures(inventory),
+      );
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       report(invocation, repo.name, repo.root, error);
     }
   }
-  await reconcileHost(registeredRepos(readGlobal(), invocation).repos, acting, null, panesOnce);
+  await reconcileHost(registeredRepos(readGlobal(), invocation).repos, acting, null, hostPanesOnce);
 }
 
 async function paneOwners(
@@ -1334,12 +1474,18 @@ async function paneOwners(
   invocation: Invocation,
   hookPane: string,
 ): Promise<{ repo: Repo; leaf: Leaf }[]> {
-  const live: Pane | undefined = (await panes()).find((pane) => pane.pane_id === hookPane);
-  return registeredRepos(global, invocation).repos.flatMap((repo) =>
-    discover(repo, invocation)
-      .leaves.filter((leaf) => ownsPane(leaf, live, hookPane))
-      .map((leaf) => ({ repo, leaf })),
-  );
+  const owners: { repo: Repo; leaf: Leaf }[] = [];
+  for (const repo of registeredRepos(global, invocation).repos) {
+    const resolution: SessionResolution | null = await resolveFor(invocation, repo, repo.root);
+    if (resolution === null) continue;
+    const live: Pane | undefined = (await panes(resolution.session.name)).find((pane) => pane.pane_id === hookPane);
+    owners.push(
+      ...discover(repo, invocation)
+        .leaves.filter((leaf) => ownsPane(leaf, live, hookPane))
+        .map((leaf) => ({ repo, leaf })),
+    );
+  }
+  return owners;
 }
 
 export async function nextCommand(input: string | undefined, pressureDir: string = '/proc/pressure'): Promise<void> {
@@ -1348,17 +1494,17 @@ export async function nextCommand(input: string | undefined, pressureDir: string
   readPaused();
   if (event?.event === 'pane_agent_status_changed' && event.data.agent_status === 'working') return;
   const global: GlobalConfig = readGlobal();
-  const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
+  const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
   const hookPane: string | undefined = process.env.HERDR_PANE_ID || undefined;
-  // One shared lazy pane list per pass; reconcile and the host step share it.
+  // One shared lazy cross-session pane list per pass; the host step shares it.
   let panesRequested: boolean = false;
-  let live: Pane[] | null = null;
-  const panesOnce = async (): Promise<Pane[] | null> => {
+  let hostPanes: Pane[] | null = null;
+  const hostPanesOnce = async (): Promise<Pane[] | null> => {
     if (!panesRequested) {
       panesRequested = true;
-      live = await panes().catch(() => null);
+      hostPanes = await allSessionPanes();
     }
-    return live;
+    return hostPanes;
   };
   const hooked: boolean = event !== undefined;
   const selection: Selection | undefined =
@@ -1403,18 +1549,18 @@ export async function nextCommand(input: string | undefined, pressureDir: string
             await dispatchDependents(global, selection.repo, completedSlug, invocation, false);
         } else await sweep(global, selection.repo, selection.leaves, invocation, true, false);
         touched.set(selection.repo.name, { repo: selection.repo, isAutomatic: false });
-        await reconcileRepos([selection.repo], invocation, false, panesOnce);
+        await reconcileRepos([selection.repo], invocation, false, hostPanesOnce);
       } else if (input === '--all') {
         const current: Repo | null = await currentRepo(global, process.cwd());
         if (current === null) {
           await sweepAll(global, invocation, false);
           const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
           for (const repo of registered.repos) touched.set(repo.name, { repo, isAutomatic: false });
-          await reconcileRepos(registered.repos, invocation, false, panesOnce);
+          await reconcileRepos(registered.repos, invocation, false, hostPanesOnce);
         } else {
           await sweep(global, current, discover(current, invocation).leaves, invocation, true, false);
           touched.set(current.name, { repo: current, isAutomatic: false });
-          await reconcileRepos([current], invocation, false, panesOnce);
+          await reconcileRepos([current], invocation, false, hostPanesOnce);
         }
       } else if (input === '--resume') {
         const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
@@ -1432,7 +1578,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
             true,
           );
         for (const repo of active) touched.set(repo.name, { repo, isAutomatic: true });
-        await reconcileRepos(active, invocation, true, panesOnce);
+        await reconcileRepos(active, invocation, true, hostPanesOnce);
       } else if (event?.event === 'tab_closed') {
         const owners: { repo: Repo; leaf: Leaf }[] = registeredRepos(global, invocation).repos.flatMap((repo) =>
           discover(repo, invocation)
@@ -1442,21 +1588,22 @@ export async function nextCommand(input: string | undefined, pressureDir: string
         if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
         if (owners.length === 0) return;
         if (isPaused(owners[0].repo.name)) return;
-        if (!(await sessionRepos()).has(owners[0].repo.name)) return;
         const completedSlug: string = owners[0].leaf.state.slug;
         try {
           const inventory: Inventory = discover(owners[0].repo, invocation);
           await reconcile(
             owners[0].repo,
             inventory.leaves,
-            (await reconcileNeedsPanes(owners[0].repo, inventory.leaves)) ? await panesOnce() : [],
+            (await reconcileNeedsPanes(owners[0].repo, inventory.leaves))
+              ? await panesForRepo(owners[0].repo, invocation)
+              : [],
             inventoryFailures(inventory),
           );
           await reconcileHost(
             registeredRepos(global, invocation).repos,
             new Set([owners[0].repo.name]),
-            live,
-            panesOnce,
+            hostPanes,
+            hostPanesOnce,
           );
         } catch (error) {
           if (!(error instanceof Error)) throw error;
@@ -1502,7 +1649,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
               event.event !== 'pane_agent_status_changed' ||
               (event.data.agent_status !== 'blocked' && event.data.agent_status !== 'unknown'))
           )
-            await closeMergedTab(owner.repo, rediscovered, await panes());
+            await closeMergedTab(owner.repo, rediscovered, await panesForRepo(owner.repo, invocation));
         } catch (error) {
           if (!(error instanceof Error)) throw error;
           report(invocation, owner.repo.name, rediscovered?.path ?? owner.leaf.path, error, completedSlug);
@@ -1524,7 +1671,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
 
 export async function unpausePass(repo: Repo, pressureDir: string = '/proc/pressure'): Promise<void> {
   const global: GlobalConfig = readGlobal();
-  const invocation: Invocation = { skipped: new Set(), dispatched: new Set() };
+  const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
   await withLock(resolve(globalHome(), '.lock'), async () => {
     await sweep(
       global,
@@ -1536,7 +1683,7 @@ export async function unpausePass(repo: Repo, pressureDir: string = '/proc/press
       false,
       false,
     );
-    await reconcileRepos([repo], invocation, false, async () => await panes().catch(() => null));
+    await reconcileRepos([repo], invocation, false, allSessionPanes);
   });
   await mergePass(global, repo, invocation, false, pressureDir);
   if (invocation.skipped.size > 0)
