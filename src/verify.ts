@@ -96,6 +96,7 @@ function redRun(repo: Repo, tree: string, scope: VerifyScope): VerifyRun | undef
     readVerifyRuns(repo).filter(
       (run) =>
         run.tree === tree &&
+        run.scope === scope &&
         completed(run) &&
         sameCommands(run.commands, expected) &&
         run.commands.some((item) => item.exit !== 0),
@@ -108,6 +109,7 @@ function greenRun(repo: Repo, tree: string, scope: VerifyScope): VerifyRun | und
   return readVerifyRuns(repo).find(
     (run) =>
       run.tree === tree &&
+      run.scope === scope &&
       completed(run) &&
       sameCommands(run.commands, expected) &&
       run.commands.every((item) => item.exit === 0),
