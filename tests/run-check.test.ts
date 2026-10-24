@@ -503,7 +503,7 @@ test('run-check runs checks printed form, a merge_checks text with extra args an
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
       checks: { unit: 'echo unit-check' },
-      merge_checks: { suite: 'echo suite' },
+      merge_checks: { suite: 'echo suite', wide: 'printf %s a b' },
       grounding: 'none',
     });
     const { worktree } = await leafWorktree(f, 'still-runs');
@@ -517,6 +517,8 @@ test('run-check runs checks printed form, a merge_checks text with extra args an
       ['echo', 'suite', 'extra'],
       ['sh', '-c', 'echo suite', 'extra'],
       ['echo', 'other'],
+      // 'printf %s a b' configured: ['printf','%s','a b'] is not its words
+      ['printf', '%s', 'a b'],
     ]) {
       // every allowed argv keeps its own exit status and output
       expect(argv.length).toBeGreaterThan(0);
