@@ -11,11 +11,11 @@ You set four kinds of command in `issues/config.yaml`:
 | Setting | When it runs | Does a failure block? |
 | --- | --- | --- |
 | `checks` | On every leaf, and again at merge. | Yes. |
-| `merge_checks` | Only at merge, through the merge turn's `akrogon verify --attempt <id>`. `akrogon run-check` refuses them. | Yes. |
+| `merge_checks` | Only at merge, through the merge turn's `akrogon verify --attempt <id>`, its members all at once after the `checks` stage is green. `akrogon run-check` refuses them. | Yes. |
 | `merge_covers` | Not a command. It names `checks` entries that a merge check already covers, so merge skips them. | No. |
 | `advisory` | Seats run them next to the checks. `akrogon verify` does not run them. | No. Reviewers report a failure as a Nit. |
 
-So a leaf runs every `checks` command. A merge runs every `checks` command not named in `merge_covers`, then every `merge_checks` command. Source: `verifyCommands` in [src/verify.ts](../../src/verify.ts).
+So a leaf runs every `checks` command. A merge runs every `checks` command not named in `merge_covers`, then, once they are green, the `merge_checks` members all at once. Each stage runs only what lacks a green result for that command on the same tree, marking the receipt entry `reused` and naming the source run; a red `checks` entry leaves every member recorded not run. Source: `verifyCommands` in [src/verify.ts](../../src/verify.ts).
 
 `setup` runs first. It is the install command for a fresh checkout, such as `bun install --frozen-lockfile`. Before any check command, akrogon runs `setup` and then `akrogon guard own-modules`. When `setup` fails, every check in that run is recorded with the setup result, and the run cannot count as a receipt. `akrogon config` prints each check already wrapped this way, with the wrap in `withSetup` in [src/config.ts](../../src/config.ts).
 
@@ -46,13 +46,13 @@ When to keep output this way, and which commands are exempt, is a seat rule. See
 `akrogon verify` checks one commit, `HEAD` unless you pass `--sha <rev>`. It:
 
 1. Checks the commit out fresh in the worktree store, in a folder named `verify-<id>`.
-2. Runs `setup`, then every check for the scope, and logs each one.
-3. Writes one receipt line to `issues/verify-runs.jsonl` with each command, its exit code and its log path.
+2. Runs `setup`, then every check for the scope that lacks a green result under the same name and command text on the same tree (`merge_checks` members at the same time), and logs each one.
+3. Writes one receipt line to `issues/verify-runs.jsonl` with each command, its exit code and its log path; an entry copied from an earlier run carries `reused` naming the source run.
 4. Removes the fresh checkout.
 
 The scope is `leaf` while the leaf is in any phase other than `merge`. It is `merge` for a merge leaf (`--attempt <id>`) or a `--holder` run. While it runs, it prints `verify setup: <exit> <log>`, then `verify <name>: <exit> <log>` for each check, then `verify <scope> <sha>: green` or `red`.
 
-A receipt is reused. When a green receipt already exists for the same tree and the same list of command names and commands, verify prints `reuse receipt <run> tree=<tree>` and exits 0 without running anything. Changing a check command in config makes old receipts stop counting.
+A receipt is reused. When a green receipt already exists for the same tree and the same list of command names and commands, verify prints `reuse receipt <run> tree=<tree>` and exits 0 without running anything. Reuse is also per command: a green entry in a completed run on the same tree is copied into the new receipt with `reused`, so a changed command reruns while its siblings reuse. Changing a check command in config makes old receipts stop counting.
 
 These phase moves need a green receipt for the current commit:
 
@@ -62,19 +62,19 @@ These phase moves need a green receipt for the current commit:
 | `check.repair` to `merge` | `leaf` |
 | `merged`, including `akrogon land` and `merged --check` | `merge` |
 
-Without one, the move fails with `No green <scope> verify receipt for <sha> under the current config; run akrogon verify on this commit`. Source: `requireGreenReceipt` in [src/verify.ts](../../src/verify.ts) and its callers in [src/phase.ts](../../src/phase.ts).
+The gate counts a command green when a completed run holds it green on the same tree under the same name and command text, so entries may come from different runs. Without cover, the move fails with `No green <scope> verify receipt for <sha> under the current config; run akrogon verify on this commit`. Source: `requireGreenReceipt` in [src/verify.ts](../../src/verify.ts) and its callers in [src/phase.ts](../../src/phase.ts).
 
 ## Known red
 
 Sometimes a test is already red on the default branch. `akrogon verify --known-red` shows that the red is not caused by your change:
 
 1. It takes the newest finished red run of this tree and command set from the receipts, or runs the commit now. If that run is green, it stops with exit 0.
-2. It runs the merge-base of the commit and the tracked default branch, fresh, and links that run to the red head run.
+2. It runs the merge-base of the commit and the tracked default branch, reusing each command already green on the base tree under the same name and command text and running only what lacks one, and links that run to the red head run.
 3. It prints `verify known-red <sha>: pass` or `fail`.
 
-The pair passes only when both runs finished with `setup` passing, both ran the same commands, and every test that failed in a red head command also failed in the same command on the base. Akrogon reads failed test names from `(fail) <name>` lines in the logs. A red command whose log names no failed test makes the pair fail.
+A cover is found per red command: a completed run on the head tree holds the command red with named failed tests, and a completed run linked from that head run holds the same command red on the base tree with every one of those names. A base entry with exit 0 never covers a red head command, whatever its log says and whether it ran fresh or was reused, and commands green on the head need no cover. Akrogon reads failed test names from `(fail) <name>` lines in the logs. A red command whose log names no failed test is uncovered.
 
-A passing pair counts as a receipt for the phase moves above.
+A pass counts as a receipt for the phase moves above.
 
 When a seat should retry a red command, and when it should run known-red, is a seat rule. See the retry and known-red rules in [implement-issue](../../skills/implement-issue/SKILL.md), [check-issue](../../skills/check-issue/SKILL.md) and [merge-issue](../../skills/merge-issue/SKILL.md). Who may replace a wrong proof command is in [plan-issue](../../skills/plan-issue/SKILL.md) and [implement-issue](../../skills/implement-issue/SKILL.md).
 

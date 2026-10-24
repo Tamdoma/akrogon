@@ -17,7 +17,7 @@ When a leaf gets the turn, the command:
 
 The land run then does the rest on its own:
 
-1. Runs `akrogon verify --attempt <id>` on a fresh checkout. A merge runs every `checks` command not named in `merge_covers`, then every `merge_checks` command. See [Checks](../reference/checks.md).
+1. Runs `akrogon verify --attempt <id>` on a fresh checkout. A merge runs every `checks` command not named in `merge_covers`, then, once those are green, the `merge_checks` members all at once, reusing what is already green on the same tree. See [Checks](../reference/checks.md).
 2. Runs the `merged --check` gates, such as the `Test-Change:` trailer rule.
 3. Pushes the tested head fast-forward.
 4. Moves the leaf to `merged`.

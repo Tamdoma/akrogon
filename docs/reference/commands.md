@@ -46,7 +46,7 @@ Every `akrogon` command, one line each. Run commands from the registered reposit
 | Invocation | Effect |
 | --- | --- |
 | `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Run one command under the check environment, save its output as a log and print a `check <name>: <exit> <path>` line. Refuses a configured `merge_checks` command: only the merge turn's `akrogon verify --attempt <id>` runs it. |
-| `akrogon verify [--sha <rev>] [--attempt <id>] [--holder <dir>] [--known-red]` | Run every configured check on a fresh checkout of a commit and record a receipt in `issues/verify-runs.jsonl`. With `--known-red`, it also runs the base commit to show the same tests already fail there. |
+| `akrogon verify [--sha <rev>] [--attempt <id>] [--holder <dir>] [--known-red]` | Run the configured checks on a fresh checkout of a commit — `merge_checks` members all at once after the `checks` stage — reusing a command's green result on the same tree and recording a receipt in `issues/verify-runs.jsonl`. With `--known-red`, it also runs the base commit under the same reuse to show the same tests already fail there. |
 | `akrogon log <path>` | Print a saved check or verify log, even after it was packed. Runs from any directory. |
 | `akrogon stop-run [<run-id>]` | Stop a run started from your pane. With no id, it stops the only live run or lists them. |
 | `akrogon guard <ancestors\|own-modules>` | Fail when a folder above the checkout holds `node_modules` or `package.json`, or when the checkout lacks its own `node_modules`. |

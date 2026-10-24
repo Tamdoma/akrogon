@@ -67,7 +67,7 @@ Each record file is one JSON object per line. `akrogon sync` commits them with t
 | `log.jsonl`            | [log.ts](../../src/log.ts)           | Lifecycle move of a leaf.                                                                                      |
 | `timings.jsonl`        | [timing.ts](../../src/timing.ts)     | Timing event: `visit_start`, `prompt`, `seat_done`, `check_start`, `check_end`, `batch`, `wait`, `repo_pause`. |
 | `merge-attempts.jsonl` | [attempts.ts](../../src/attempts.ts) | Ended merge attempt, with holder, base, tested head and outcome.                                               |
-| `verify-runs.jsonl`    | [verify.ts](../../src/verify.ts)     | `akrogon verify` run: tree, each command's exit and log path, start and end.                                   |
+| `verify-runs.jsonl`    | [verify.ts](../../src/verify.ts)     | `akrogon verify` run: tree, each command's exit and log path (`reused` names the source run), start and end.   |
 
 ## Timing report
 
@@ -91,7 +91,7 @@ All three are read-only. Code: [timing-report.ts](../../src/timing-report.ts), [
 
 `akrogon flaky` reads `verify-runs.jsonl`. It finds a verify command that went red and then green on the same tree. For each failed test in the red log's `(fail)` lines it prints one line: count, last time, check name and test name.
 
-It skips runs that never finished and runs whose setup failed. A flip shows an inconsistent result on unchanged code. It does not say whether the test, the code or an outside input caused it. Treat each line as a lead to chart, not a verdict. Code: [flaky.ts](../../src/flaky.ts).
+It skips runs that never finished, runs whose setup failed and entries marked `reused` — a reused entry adds no observation. A flip shows an inconsistent result on unchanged code. It does not say whether the test, the code or an outside input caused it. Treat each line as a lead to chart, not a verdict. Code: [flaky.ts](../../src/flaky.ts).
 
 ## Worktree store
 
