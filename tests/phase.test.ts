@@ -39,6 +39,8 @@ function herdrCalls(db: string): string[][] {
         .trim()
         .split('\n')
         .map((line) => z.array(z.string()).parse(JSON.parse(line)))
+        // Session routing adds discovery calls; strip them so assertions see work calls.
+        .filter((args) => args[0] !== 'session' && args[0] !== 'workspace')
     : [];
 }
 const seatRefusal: string =
@@ -1473,7 +1475,7 @@ for (const { slug, phase, args, failNotification, code, calls, delivery } of [
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toMatchObject({
         slug,
-        command: ['herdr', ...calls[calls.length - 1]],
+        command: ['herdr', '--session', 'default', ...calls[calls.length - 1]],
         code: 'tab_not_found',
         message: 'fixture failure',
       });

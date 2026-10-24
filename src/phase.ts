@@ -27,7 +27,18 @@ import {
   type Slot,
   type Verdict,
 } from './routing';
-import { command, run, herdr, herdrError, retryable, CommandError, type Result } from './shell';
+import {
+  command,
+  run,
+  herdr,
+  herdrArgv,
+  herdrError,
+  repoSession,
+  retryable,
+  CommandError,
+  type Result,
+  type SessionResolution,
+} from './shell';
 import { logMove, readLog } from './log';
 import { appendTiming, currentVisit } from './timing';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
@@ -40,28 +51,31 @@ import { applyTop, buildStack, isAncestor } from './batch';
 import { requireGreenReceipt } from './verify';
 import { packFolder } from './pack';
 
-async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string): Promise<T> {
+async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string, session: string): Promise<T> {
   try {
-    return await herdr(args, schema);
+    return await herdr(args, schema, { session });
   } catch (error) {
     if (!(error instanceof CommandError) || !retryable(error.result)) throw error;
     console.warn(
       JSON.stringify({
         warning: 'herdr call failed, retrying',
         slug,
-        command: ['herdr', ...args],
+        command: herdrArgv(args, { session }),
         code: error.result.code,
         stderr: error.result.stderr,
       }),
     );
-    return await herdr(args, schema);
+    return await herdr(args, schema, { session });
   }
 }
 
-async function renameTab(tab: string, label: string, slug: string): Promise<void> {
+async function renameTab(repo: Repo, tab: string, label: string, slug: string): Promise<void> {
   const args: string[] = ['tab', 'rename', tab, label];
+  const resolved: SessionResolution = await repoSession(repo);
+  const argv: string[] = resolved.ok ? herdrArgv(args, { session: resolved.session.name }) : args;
   try {
-    await herdrCall(args, z.object({ tab: z.object({ label: z.string() }) }), slug);
+    if (!resolved.ok) throw new Error(resolved.reason);
+    await herdrCall(args, z.object({ tab: z.object({ label: z.string() }) }), slug, resolved.session.name);
   } catch (error) {
     if (!(error instanceof CommandError)) throw error;
     const parsed: { code: string; message: string } = herdrError(error.result);
@@ -70,7 +84,7 @@ async function renameTab(tab: string, label: string, slug: string): Promise<void
       JSON.stringify({
         warning: 'tab missing, skipping rename',
         slug,
-        command: ['herdr', ...args],
+        command: argv,
         code: parsed.code,
         message: parsed.message,
         stderr: error.result.stderr,
@@ -83,7 +97,9 @@ async function announceFailed(repo: Repo, leaf: Leaf, state: State): Promise<Sta
   const failure: Failure = failureSchema.parse(state.failure);
   let lastError: unknown;
   let delivery: string = 'error';
+  const resolved: SessionResolution = await repoSession(repo);
   try {
+    if (!resolved.ok) throw new Error(resolved.reason);
     const shown = await herdrCall(
       [
         'notification',
@@ -96,6 +112,7 @@ async function announceFailed(repo: Repo, leaf: Leaf, state: State): Promise<Sta
       ],
       z.object({ shown: z.boolean(), reason: z.string() }),
       state.slug,
+      resolved.session.name,
     );
     delivery = shown.reason;
   } catch (error) {
@@ -105,7 +122,7 @@ async function announceFailed(repo: Repo, leaf: Leaf, state: State): Promise<Sta
   saveState(leaf.path, announced);
   if (state.tab !== undefined) {
     try {
-      await renameTab(state.tab, `${state.slug} failed`, state.slug);
+      await renameTab(repo, state.tab, `${state.slug} failed`, state.slug);
     } catch (error) {
       lastError = error;
     }
@@ -159,7 +176,8 @@ export async function commitMove(
   let announced: State = after;
   try {
     if (to === 'failed') announced = await announceFailed(repo, leaf, after);
-    else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(after.tab, after.slug, after.slug);
+    else if (recorded.phase === 'failed' && after.tab !== undefined)
+      await renameTab(repo, after.tab, after.slug, after.slug);
     if (to === 'merged') await completeOwner(repo, leaf, true);
   } catch (error) {
     if (error instanceof MoveCommittedError) throw error;

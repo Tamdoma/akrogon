@@ -8,7 +8,7 @@ import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { trackingRef } from './preflight';
 import { checkedRun, leafFields, leafTarget, refuse, type LeafTarget } from './run-check';
-import { command, herdr } from './shell';
+import { command, herdr, repoSession, type SessionResolution } from './shell';
 import { allLeaves, withLock, type Leaf } from './state';
 import { isAncestor } from './batch';
 
@@ -238,7 +238,9 @@ async function sendMainRedNotice(repo: Repo, runId: string, lock: string, names:
   ];
   let delivery: string = 'error';
   try {
-    delivery = (await herdr(args, noticeSchema)).reason;
+    const resolved: SessionResolution = await repoSession(repo);
+    if (!resolved.ok) throw new Error(resolved.reason);
+    delivery = (await herdr(args, noticeSchema, { session: resolved.session.name })).reason;
   } catch (error) {
     process.stderr.write(`notice: ${error instanceof Error ? error.message : String(error)}\n`);
   }

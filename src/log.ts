@@ -2,7 +2,7 @@ import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { base, type Repo } from './config';
-import { command, panes, CommandError, type Pane } from './shell';
+import { command, panes, repoSession, CommandError, type Pane, type SessionResolution } from './shell';
 import { type State } from './state';
 import { phaseSchema, slotSchema, verdictSchema, type Slot } from './routing';
 
@@ -35,14 +35,19 @@ export async function logMove(repo: Repo, before: State, after: State, slot: Slo
   const diff: string = await command(['git', 'diff', '--shortstat', await base(repo, cwd)], cwd);
   const paneId: string | undefined = process.env.HERDR_PANE_ID || (slot === null ? undefined : before.pane[slot]);
   let pane: Pane | undefined;
-  if (paneId !== undefined)
-    try {
-      pane = (await panes()).find((item) => item.pane_id === paneId);
-    } catch (error) {
-      // The session field is diagnostic only; an unreachable herdr must not
-      // fail a move that already committed.
-      if (!(error instanceof CommandError)) throw error;
-    }
+  if (paneId !== undefined) {
+    // The pane lookup runs in the leaf's resolved session; a refused or
+    // stopped session yields no pane, same as an unreachable herdr.
+    const resolved: SessionResolution = await repoSession(repo);
+    if (resolved.ok)
+      try {
+        pane = (await panes(resolved.session.name)).find((item) => item.pane_id === paneId);
+      } catch (error) {
+        // The session field is diagnostic only; an unreachable herdr must not
+        // fail a move that already committed.
+        if (!(error instanceof CommandError)) throw error;
+      }
+  }
   const session: string | null = pane?.agent_session?.value ?? null;
   appendFileSync(
     resolve(repo.root, 'issues/log.jsonl'),

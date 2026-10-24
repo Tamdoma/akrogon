@@ -1,6 +1,6 @@
 # Reference
 
-- [Command](../src/AREA.md): lifecycle commands, configuration and dispatch; prompt delivery is one attempt per pass with timeout settlement.
+- [Command](../src/AREA.md): lifecycle commands, configuration and dispatch; prompt delivery is one attempt per pass with timeout settlement; every herdr call carries `--session <name>` from the resolved repo session.
 - [Tests](../tests/AREA.md): command scenarios and isolated fixtures.
 - [Skills](../skills/AREA.md): the ten agent workflows and their supporting resources.
 - [Integration](../plugin/): Herdr lifecycle hooks.

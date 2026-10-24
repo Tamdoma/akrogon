@@ -557,7 +557,7 @@ test('next preserves a live command attempt while its refused push restacks', as
   }
 }, 60000);
 
-test('the land service keeps the named Herdr socket without a seat identity', async () => {
+test('the land service drops the inherited Herdr socket and keeps no seat identity', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
   try {
     const socket: string = resolve(f.home, 'sessions/infra/herdr.sock');
@@ -567,7 +567,7 @@ test('the land service keeps the named Herdr socket without a seat identity', as
     toMerge(path);
     await claimed(f, path);
     expect(landLaunches(f)).toHaveLength(1);
-    expect(landLaunches(f)[0]).toContain(`--setenv=HERDR_SOCKET_PATH=${socket}`);
+    expect(landLaunches(f)[0]).not.toContain('HERDR_SOCKET_PATH');
     expect(landLaunches(f)[0]).not.toContain('HERDR_PANE_ID');
   } finally {
     f.clean();

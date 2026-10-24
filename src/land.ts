@@ -30,9 +30,6 @@ export async function launchLand(repo: Repo, slug: string, attempt: string): Pro
     `--setenv=HOME=${process.env.HOME ?? ''}`,
     `--setenv=DBUS_SESSION_BUS_ADDRESS=${sessionBusAddress()}`,
     ...(process.env.AKROGON_HOME === undefined ? [] : [`--setenv=AKROGON_HOME=${process.env.AKROGON_HOME}`]),
-    ...(process.env.HERDR_SOCKET_PATH === undefined
-      ? []
-      : [`--setenv=HERDR_SOCKET_PATH=${process.env.HERDR_SOCKET_PATH}`]),
     '--',
     process.execPath,
     resolve(toolRoot, 'src/akrogon.ts'),
