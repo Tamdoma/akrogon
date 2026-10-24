@@ -154,7 +154,10 @@ export async function runCheck(
   for (const t of Object.values(repo.config.merge_checks)) {
     const words: string[] = parse(t).map((tok) => (typeof tok === 'string' ? tok : 'op' in tok ? tok.op : ''));
     const forms: string[][] = [words, ['sh', '-c', t], ['sh', '-c', setupCommand(repo.config, t)]];
-    if (argv.join(' ') === t || forms.some((form) => form.length === argv.length && form.every((arg, i) => arg === argv[i]))) {
+    if (
+      argv.join(' ') === t ||
+      forms.some((form) => form.length === argv.length && form.every((arg, i) => arg === argv[i]))
+    ) {
       process.stderr.write(
         'Refusing to run a merge_checks command through run-check: run akrogon verify --attempt <id> instead; a red merge check is reproduced with a narrower command than the suite argv.\n',
       );
