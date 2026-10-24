@@ -211,7 +211,7 @@ test('an unfinished leaf slice is stopped and its temp removed once its recorded
   }
 });
 
-// A repo whose workspace is not in the invoking herdr session is not judged:
+// A repo whose workspace is in no running session is refused by resolution:
 // its vanished-tab slice and temp stay, whatever the pane list shows.
 test('a pass from a session without the repo workspace keeps its slice and temp', async () => {
   const f: F = await fakes();
@@ -230,14 +230,14 @@ test('a pass from a session without the repo workspace keeps its slice and temp'
     expect(calls(log).some((line) => line.includes('stop') && line.includes(slice))).toBe(false);
     expect(unitsIn(db)).toContain(slice);
     expect(existsSync(temp)).toBe(true);
-    expect(hostKept(f).some((entry) => entry.path === slice && entry.reason === OTHER_REPO)).toBe(true);
+    expect(hostKept(f).some((entry) => entry.path === slice && entry.reason === 'pane list unavailable')).toBe(true);
   } finally {
     f.clean();
   }
 });
 
-// A merged leaf of a repo whose workspace is absent keeps worktree, temp and
-// slice: nothing of it is judged from another session.
+// A merged leaf of a repo whose workspace resolves nowhere keeps worktree,
+// temp and slice: a refused session supplies no pane view.
 test('a pass from a session without the repo workspace keeps a merged leaf worktree', async () => {
   const f: F = await fakes();
   try {
