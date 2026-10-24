@@ -1473,3 +1473,29 @@ test('packing holder logs preserves same-tree command reuse', async () => {
     f.clean();
   }
 });
+
+test('merge verification selects green and red receipts from its own scope', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { checks: { unit: 'echo unit' } });
+    const { worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const holder: string = resolve(f.root, 'issues/chart/demo/direct');
+    mkdirSync(holder, { recursive: true });
+    const env: NodeJS.ProcessEnv = { ...noticeEnv(f), ...fakeAkrogon(f).env };
+    expect((await cli(f, ['verify'], worktree, env)).code).toBe(0);
+    expect((await cli(f, ['verify', '--holder', holder], worktree, env)).code).toBe(0);
+    expect(records(f).map((run) => run.scope)).toEqual(['leaf', 'merge']);
+    await requireGreenReceipt(readRepo('repo', f.root), head, 'merge');
+
+    config(f, { checks: { unit: 'echo "(fail) alpha"; exit 1' } });
+    expect((await cli(f, ['verify'], worktree, env)).code).toBe(1);
+    expect((await cli(f, ['verify', '--holder', holder, '--known-red'], worktree, env)).code).toBe(0);
+    const runs: VerifyRun[] = records(f);
+    expect(runs.map((run) => run.scope)).toEqual(['leaf', 'merge', 'leaf', 'merge', 'merge']);
+    expect(runs[4].compares).toBe(runs[3].run);
+    await requireGreenReceipt(readRepo('repo', f.root), head, 'merge');
+  } finally {
+    f.clean();
+  }
+});
