@@ -91,7 +91,7 @@ function idle(f: StopFixture, path: string): void {
 function paneEvent(pane: string): string {
   return JSON.stringify({
     event: 'pane_agent_status_changed',
-    data: { type: 'pane_agent_status_changed', pane_id: pane, agent_status: 'idle' },
+    data: { type: 'pane_agent_status_changed', pane_id: pane, workspace_id: 'w1', agent_status: 'idle' },
   });
 }
 
@@ -118,7 +118,11 @@ test('a stopped leaf is not dispatched by an automatic pass, and a picked manual
     const pane: string = z.string().parse(readState(path).pane.A);
     expect((await run(f, ['stop', 'build'])).code).toBe(0);
     idle(f, path);
-    const hooked: Result = await run(f, ['next'], { HERDR_PANE_ID: pane, HERDR_PLUGIN_EVENT_JSON: paneEvent(pane) });
+    const hooked: Result = await run(f, ['next'], {
+      HERDR_PANE_ID: pane,
+      HERDR_PLUGIN_EVENT_JSON: paneEvent(pane),
+      HERDR_SOCKET_PATH: `${f.db}-default.sock`,
+    });
     expect(hooked.code).toBe(0);
     expect(database(f).prompts).toEqual([]);
     const bare: Result = await run(f, ['next']);

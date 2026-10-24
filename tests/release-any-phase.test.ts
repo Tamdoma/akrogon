@@ -279,6 +279,7 @@ test('a failed workspace list stops no slice on a typed pass or a tab_closed hoo
         event: 'tab_closed',
         data: { type: 'tab_closed', tab_id: 'w1:t3', workspace_id: 'w1' },
       }),
+      HERDR_SOCKET_PATH: `${f.db}-default.sock`,
     });
     expect(calls(log).some((line) => line.includes('stop') && line.includes(slice))).toBe(false);
     expect(unitsIn(db)).toContain(slice);
@@ -630,8 +631,9 @@ test('a tab_closed pass re-dispatches seats into the same slice and the next pas
       ...e,
       HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
         event: 'tab_closed',
-        data: { type: 'tab_closed', tab_id: firstTab, workspace_id: 'w2' },
+        data: { type: 'tab_closed', tab_id: firstTab, workspace_id: 'w1' },
       }),
+      HERDR_SOCKET_PATH: `${f.db}-default.sock`,
     });
     expect(hook.code, hook.stderr).toBe(0);
     // The reconcile inside the hook pass stopped the dead tab's slice before

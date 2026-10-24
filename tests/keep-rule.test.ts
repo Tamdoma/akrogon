@@ -80,6 +80,7 @@ test('registered worktrees that are no leaf or scratch kind stay through both pa
         event: 'tab_closed',
         data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' },
       }),
+      HERDR_SOCKET_PATH: `${f.db}-default.sock`,
     });
     expect(closed.code).toBe(0);
     expect(existsSync(manual)).toBe(true);

@@ -65,15 +65,19 @@ async function next(
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
 
+function socket(f: DispatchFixture): string {
+  return `${f.db}-default.sock`;
+}
+
 function paneEvent(type: string, pane: string, status: string = 'idle'): string {
   return JSON.stringify({
     event: type,
-    data: { type, pane_id: pane, ...(type === 'pane_agent_status_changed' ? { agent_status: status } : {}) },
+    data: { type, pane_id: pane, workspace_id: 'w1', ...(type === 'pane_agent_status_changed' ? { agent_status: status } : {}) },
   });
 }
 
 function tabEvent(tab: string): string {
-  return JSON.stringify({ event: 'tab_closed', data: { type: 'tab_closed', tab_id: tab } });
+  return JSON.stringify({ event: 'tab_closed', data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' } });
 }
 
 /** Allocate a leaf with a manual pass, then leave its seats idle with expired grace so an automatic pass would prompt. */
@@ -108,8 +112,8 @@ for (const kind of ['pane_agent_status_changed', 'pane_exited', 'pane_closed', '
       const tab: string = readState(path).tab as string;
       const env: NodeJS.ProcessEnv =
         kind === 'tab_closed'
-          ? { HERDR_PLUGIN_EVENT_JSON: tabEvent(tab) }
-          : { HERDR_PANE_ID: pane, HERDR_PLUGIN_EVENT_JSON: paneEvent(kind, pane) };
+          ? { HERDR_PLUGIN_EVENT_JSON: tabEvent(tab), HERDR_SOCKET_PATH: socket(f) }
+          : { HERDR_PANE_ID: pane, HERDR_PLUGIN_EVENT_JSON: paneEvent(kind, pane), HERDR_SOCKET_PATH: socket(f) };
       const control: Result = await next(f, [], env);
       expect(control.code).toBe(0);
       expect(database(f).prompts.length).toBeGreaterThan(0);
@@ -239,7 +243,10 @@ test('manual next target dispatches a paused repo with an inherited event and st
   try {
     leaf(f, 'build', 'plan.synthesis');
     expect((await cli(f, ['pause'])).code).toBe(0);
-    const run: Result = await next(f, ['build'], { HERDR_PLUGIN_EVENT_JSON: tabEvent('w9:t9') });
+    const run: Result = await next(f, ['build'], {
+      HERDR_PLUGIN_EVENT_JSON: tabEvent('w9:t9'),
+      HERDR_SOCKET_PATH: socket(f),
+    });
     expect(run.code).toBe(0);
     expect(database(f).prompts.length).toBeGreaterThan(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
@@ -255,7 +262,10 @@ test('manual next all dispatches a paused repo with an inherited event and stays
   try {
     leaf(f, 'build', 'plan.synthesis');
     expect((await cli(f, ['pause'])).code).toBe(0);
-    const run: Result = await next(f, ['--all'], { HERDR_PLUGIN_EVENT_JSON: tabEvent('w9:t9') });
+    const run: Result = await next(f, ['--all'], {
+      HERDR_PLUGIN_EVENT_JSON: tabEvent('w9:t9'),
+      HERDR_SOCKET_PATH: socket(f),
+    });
     expect(run.code).toBe(0);
     expect(database(f).prompts.length).toBeGreaterThan(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
@@ -449,6 +459,7 @@ test('invalid pause file fails an automatic working event naming the file', asyn
     writeFileSync(file, '[invalid]\n');
     const run: Result = await next(f, [], {
       HERDR_PLUGIN_EVENT_JSON: paneEvent('pane_agent_status_changed', 'p1', 'working'),
+      HERDR_SOCKET_PATH: socket(f),
     });
     expect(run.code).not.toBe(0);
     expect(run.stderr).toContain(file);
