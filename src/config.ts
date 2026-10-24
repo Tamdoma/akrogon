@@ -47,6 +47,7 @@ export const repoSchema = z
     checks: z.record(text, text).default({}),
     merge_checks: z.record(text, text).default({}),
     merge_covers: z.array(text).default([]),
+    full: z.array(text).default([]),
     advisory: z.array(text).default([]),
     env: z.array(text).default([]),
     pass_env: z.array(text).default([]),
@@ -95,6 +96,10 @@ export const repoSchema = z
           path: ['merge_covers'],
           message: `Unknown checks name in merge_covers: ${name}`,
         });
+    }
+    for (const name of config.full) {
+      if (!Object.hasOwn(config.checks, name) && !Object.hasOwn(config.merge_checks, name))
+        ctx.addIssue({ code: 'custom', path: ['full'], message: `Unknown check name in full: ${name}` });
     }
     if (config.merge_covers.length > 0 && Object.keys(config.merge_checks).length === 0)
       ctx.addIssue({

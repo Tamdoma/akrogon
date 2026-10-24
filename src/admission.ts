@@ -14,6 +14,7 @@ export interface AdmissionHolder {
   slice: string;
   scope: string;
   unit: string;
+  full: boolean;
 }
 
 export type Admission =
@@ -28,11 +29,12 @@ const recordSchema = z.object({
   repo: z.string(),
   leaf: z.string(),
   check: z.string(),
-  state: z.enum(['live', 'ended']),
+  state: z.enum(['waiting', 'live', 'ended']),
   run: z.string(),
   slice: z.string(),
   scope: z.string(),
   unit: z.string(),
+  full: z.boolean().default(false),
   since: z.iso.datetime(),
 });
 export type RunRecord = z.infer<typeof recordSchema>;
@@ -104,6 +106,54 @@ export function liveRuns(): RunRecord[] {
     });
 }
 
+// Full suites from every repo, oldest first: holders (live or ended, whose
+// units may still be stopping) before waiters. Only one holder runs at a time.
+export function fullSuites(): RunRecord[] {
+  const dir: string = runsDir();
+  if (!existsSync(dir)) return [];
+  const boot: string = bootId();
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.yaml'))
+    .flatMap((name) => {
+      const record: RunRecord | undefined = readRecord(resolve(dir, name));
+      return record !== undefined && record.full && live(record, boot) ? [record] : [];
+    })
+    .sort(
+      (a, b) =>
+        Number(a.state === 'waiting') - Number(b.state === 'waiting') ||
+        a.since.localeCompare(b.since) ||
+        a.token_hash.localeCompare(b.token_hash),
+    );
+}
+
+const fullLock = (): string => resolve(runsDir(), 'locks', 'full-suite');
+const POLL_MS: number = 1000;
+
+// A full suite waits until it is the oldest full suite on the host. The turn
+// check and the switch to live share one exclusive lock, so two waiters never
+// both start.
+async function awaitFullTurn(record: RunRecord): Promise<void> {
+  let shown: string = '';
+  for (;;) {
+    const started: boolean = await withAdmissionLock(record.slice, () =>
+      withLock(fullLock(), async (): Promise<boolean> => {
+        if (!existsSync(recordPath(record.token_hash))) writeRecord(record);
+        const [first]: RunRecord[] = fullSuites();
+        if (first.token_hash !== record.token_hash) {
+          const holder: string = `${first.repo}/${first.leaf} ${first.check}`;
+          if (holder !== shown) process.stderr.write(`waiting for full suite ${holder}\n`);
+          shown = holder;
+          return false;
+        }
+        writeRecord({ ...record, state: 'live' });
+        return true;
+      }),
+    );
+    if (started) return;
+    await Bun.sleep(POLL_MS);
+  }
+}
+
 // Records whose writer is gone (or whose file is unreadable) are stale: drop
 // the file and best-effort stop the units it left behind. Hashes in skip name
 // records the caller still owns.
@@ -138,7 +188,9 @@ export function callerScope(): string {
 
 // Admission registers the run and starts it at once: the memory reading, the
 // 48 GiB limit, per-run reservations and the 30 s start spacing were dropped
-// by the operator on 2026-10-14 (run-units brief criterion 5).
+// by the operator on 2026-10-14 (run-units brief criterion 5). The one bound is
+// for runs the repo marks `full`: they start one at a time host-wide, in
+// arrival order (operator 2026-10-24, host-run-load).
 export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: Admission) => Promise<T>): Promise<T> {
   const inherited: string | undefined = process.env.AKROGON_RUN;
   if (inherited !== undefined && inherited !== '' && nested(inherited)) return fn({ kind: 'nested', token: inherited });
@@ -157,14 +209,16 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
     start_time: startTime(process.pid),
     boot_id: bootId(),
     ...holder,
-    state: 'live',
+    state: holder.full ? 'waiting' : 'live',
     since: new Date().toISOString(),
   };
   const begun: number = Date.now();
   try {
-    await withAdmissionLock(holder.slice, async (): Promise<void> => {
-      writeRecord(record);
-    });
+    if (holder.full) await awaitFullTurn(record);
+    else
+      await withAdmissionLock(holder.slice, async (): Promise<void> => {
+        writeRecord(record);
+      });
     process.stderr.write(`run ${holder.run}\n`);
     let ended: boolean = false;
     return await fn({
