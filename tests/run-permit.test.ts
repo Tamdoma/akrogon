@@ -385,7 +385,11 @@ test('a full suite inside a run not marked full waits for the live full suite', 
     const script: string = `akrogon run-check --name test -- touch ${dir}/inner`;
     const outer: Cap = run(f, ['run-check', '--name', 'format', '--', 'sh', '-c', script], worktree, shim);
     caps.push(outer);
-    await waitForText(outer, /waiting for full suite repo\/nested-small test/);
+    const begun: number = Date.now();
+    while (!/repo\s+nested-small\s+test\s+waiting 1/.test((await cli(f, ['status'])).stdout)) {
+      if (Date.now() - begun > 20000) throw new Error('inner full suite never waited');
+      await Bun.sleep(100);
+    }
     expect(existsSync(resolve(dir, 'inner'))).toBe(false);
     writeFileSync(resolve(dir, 'release'), '');
     expect(await holder.proc.exited).toBe(0);
