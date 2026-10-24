@@ -51,9 +51,30 @@ type AgentStub = {
   agent_session?: { kind: 'id' | 'path'; value: string } | null;
 };
 
+// Session-dispatching herdr fake, same shape as observe.test.ts's stub.
 function herdrOk(dir: string, agents: AgentStub[]): string {
-  const payload: string = JSON.stringify({ result: { agents } });
-  return stub(join(dir, 'herdr-stub'), '#!/usr/bin/env bun\nconsole.log(' + JSON.stringify(payload) + ');\n');
+  const agentsJson: string = JSON.stringify({ result: { agents } });
+  const body: string =
+    '#!/usr/bin/env bun\n' +
+    'const argv = process.argv.slice(2);\n' +
+    "if (argv[0] === 'session' && argv[1] === 'list' && argv[2] === '--json') {\n" +
+    "  console.log(JSON.stringify({ sessions: [{ name: 'sess', running: true, socket_path: '/sock/sess', session_dir: '/dir/sess', default: false }] }));\n" +
+    '  process.exit(0);\n' +
+    '}\n' +
+    "const args = argv[0] === '--session' ? argv.slice(2) : argv;\n" +
+    "if (args[0] === 'workspace' && args[1] === 'list') {\n" +
+    "  console.log(JSON.stringify({ result: { workspaces: [{ workspace_id: 'w1', label: 'testrepo' }] } }));\n" +
+    '  process.exit(0);\n' +
+    '}\n' +
+    "if (args[0] === 'agent' && args[1] === 'list') {\n" +
+    '  console.log(' +
+    JSON.stringify(agentsJson) +
+    ');\n' +
+    '  process.exit(0);\n' +
+    '}\n' +
+    "console.error('unknown herdr-stub call: ' + argv.join(' '));\n" +
+    'process.exit(1);\n';
+  return stub(join(dir, 'herdr-stub'), body);
 }
 
 function baseState(slug: string, phase: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -69,6 +90,8 @@ function baseState(slug: string, phase: string, extra: Record<string, unknown> =
 }
 
 function writeLeaf(root: string, owner: string, slug: string, data: Record<string, unknown>): string {
+  mkdirSync(resolve(root, 'issues'), { recursive: true });
+  writeFileSync(resolve(root, 'issues/config.yaml'), '{}');
   const dir: string = resolve(root, 'issues/open', owner, slug);
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, 'state.yaml'), Bun.YAML.stringify(data));
@@ -81,7 +104,10 @@ function sha8(s: string): string {
 
 // One output line per record; per-line trailing whitespace is a print detail the contract leaves open.
 function lines(stdout: string): string[] {
-  return stdout.split('\n').map((l) => l.trimEnd()).filter((l) => l !== '');
+  return stdout
+    .split('\n')
+    .map((l) => l.trimEnd())
+    .filter((l) => l !== '');
 }
 
 test('observe logA path feeds log-tail: pi fixture summarizes to six calls', async (): Promise<void> => {
@@ -103,6 +129,7 @@ test('observe logA path feeds log-tail: pi fixture summarizes to six calls', asy
     });
     expect(seen.code, seen.stderr).toBe(0);
     expect(lines(seen.stdout)).toEqual([
+      'session=sess',
       `slug=wire-pi phase=implement attempts=A0,B0 blocked= A=pane-p/working logA=${log} B=-/- notified=`,
     ]);
     const logA: RegExpMatchArray | null = seen.stdout.match(/ logA=(\S+)/);
@@ -116,7 +143,10 @@ test('observe logA path feeds log-tail: pi fixture summarizes to six calls', asy
       '2026-10-02T14:52:06.948Z bash false #' + sha8('false') + ' -> exit 1: (no output)',
       '2026-10-02T14:52:08.897Z bash echo done #' + sha8('echo done') + ' -> ok: done',
       '2026-10-02T14:52:10.556Z read note.txt - -> ok: hello',
-      '2026-10-02T14:52:13.129Z edit note.txt old#' + sha8('hello\n') + ' new#' + sha8('bye\n') +
+      '2026-10-02T14:52:13.129Z edit note.txt old#' +
+        sha8('hello\n') +
+        ' new#' +
+        sha8('bye\n') +
         ' -> ok: Successfully replaced 1 block(s) in note.txt.',
     ]);
   } finally {
