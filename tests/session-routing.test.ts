@@ -621,3 +621,27 @@ test('second-seat guard rejects equal workspace IDs in different sessions', asyn
     f.clean();
   }
 });
+
+test('recorded tab without a worktree member is neither closed nor reused', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const worktree: string = resolve(storeDir(f), 'foreign-cwd');
+    await command(['git', 'worktree', 'add', '-b', 'foreign-cwd', worktree], f.root);
+    leaf(f, 'foreign-cwd', 'plan.synthesis', { tab: 'w1:t90', pane: { A: 'w1:p90' }, worktree });
+    saveDatabase(f, {
+      ...database(f),
+      serial: 100,
+      tabs: [{ tab_id: 'w1:t90', label: 'unrelated', workspace_id: 'w1' }],
+      panes: [seatedPane('w1:p90', 'w1:t90', '/var/elsewhere')],
+    });
+    const result: Result = await next(f, ['foreign-cwd']);
+    expect(result.code).toBe(0);
+    const calls: string[][] = toSession(f, 'default');
+    expect(calls.some((args) => args[2] === 'pane' && args[3] === 'close' && args[4] === 'w1:p90')).toBe(false);
+    expect(calls.some((args) => args[2] === 'agent' && args.includes('w1:p90'))).toBe(false);
+    expect(database(f).panes.some((pane) => pane.pane_id === 'w1:p90')).toBe(true);
+    expect(readState(resolve(f.root, 'issues/open/issue/foreign-cwd')).tab).not.toBe('w1:t90');
+  } finally {
+    f.clean();
+  }
+});
