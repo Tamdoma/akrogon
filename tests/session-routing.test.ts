@@ -596,3 +596,28 @@ test('a stopped repo session suppresses the main-red notice but keeps the receip
     f.clean();
   }
 }, 60000);
+
+test('second-seat guard rejects equal workspace IDs in different sessions', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const worktree: string = resolve(storeDir(f), 'collision');
+    leaf(f, 'collision', 'plan.synthesis');
+    saveDatabase(f, {
+      ...database(f),
+      sessions: [
+        session('other', {
+          workspaces: [{ workspace_id: 'w1', label: 'misc' }],
+          tabs: [{ tab_id: 'w1:t90', label: 'collision', workspace_id: 'w1' }],
+          panes: [seatedPane('w1:p90', 'w1:t90', worktree)],
+        }),
+      ],
+    });
+    const result: Result = await next(f, ['collision']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('other');
+    expect(result.stderr).toContain('w1:p90');
+    expect(toSession(f, 'default').some((args) => args[2] === 'tab' && args[3] === 'create')).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
