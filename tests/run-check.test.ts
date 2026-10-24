@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { basename, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { fixture, cli, leaf, yaml, fakeAkrogon, printedChecks, leafTempRoot, type Fixture } from './helpers';
-import { command, type Result } from '../src/shell';
+import { command, quote, type Result } from '../src/shell';
+import { readRepo, setupCommand } from '../src/config';
 
 const sh = (script: string): string[] => ['sh', '-c', script];
 
@@ -455,6 +456,77 @@ test('pass_env names reach printed checks from the session without a .env entry'
     expect(passed.stderr).toMatch(/^run [0-9a-f-]{36}\n+check probe: 0 \S+\.log$/);
     expect(passed.code).toBe(0);
     expect(passed.stdout).toBe('session|');
+  } finally {
+    f.clean();
+  }
+});
+
+// C1: run-check refuses a configured merge_checks command in each of its three
+// forms and names the merge-turn route plus the narrower reproduction; nothing starts.
+test('run-check refuses a merge_checks entry in its words, sh -c and printed forms', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { leafPath, worktree } = await leafWorktree(f, 'merge-refusal');
+    for (const setup of [true, false]) {
+      const text = `touch ${quote(resolve(f.home, 'marker-' + (setup ? 'setup' : 'plain')))} && echo suite`;
+      yaml(resolve(f.root, 'issues/config.yaml'), {
+        ...(setup ? { setup: 'mkdir -p node_modules' } : {}),
+        checks: { unit: 'echo unit' },
+        merge_checks: { suite: text },
+        grounding: 'none',
+      });
+      const config = readRepo('repo', f.root).config;
+      const forms: string[][] = [
+        text.split(' '),
+        ['sh', '-c', text],
+        ['sh', '-c', setupCommand(config, text)],
+      ];
+      for (const argv of forms) {
+        const result: Result = await cli(f, ['run-check', '--', ...argv], worktree, baseEnv(f));
+        expect(result.code).not.toBe(0);
+        expect(result.stderr).toContain('akrogon verify --attempt');
+        expect(result.stderr).toMatch(/narrow/i);
+      }
+      expect(existsSync(resolve(f.home, 'marker-' + (setup ? 'setup' : 'plain')))).toBe(false);
+      expect(
+        existsSync(resolve(leafPath, 'implementation'))
+          ? readdirSync(resolve(leafPath, 'implementation')).filter((name) => name.startsWith('check-'))
+          : [],
+      ).toEqual([]);
+    }
+  } finally {
+    f.clean();
+  }
+});
+
+// C2: the printed form of a checks entry, the entry text with extra arguments
+// and any other command still run.
+test('run-check runs checks printed form, a merge_checks text with extra args and other commands', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: { unit: 'echo unit-check' },
+      merge_checks: { suite: 'echo suite' },
+      grounding: 'none',
+    });
+    const { worktree } = await leafWorktree(f, 'still-runs');
+    const printed: string = z
+      .object({ checks: z.record(z.string(), z.string()) })
+      .parse(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout)).checks.unit;
+    const fromConfig: Result = await printedChecks(f)(printed, worktree, baseEnv(f));
+    expect(fromConfig.code).toBe(0);
+    expect(fromConfig.stdout).toContain('unit-check');
+    for (const argv of [
+      ['echo', 'suite', 'extra'],
+      ['sh', '-c', 'echo suite', 'extra'],
+      ['echo', 'other'],
+    ]) {
+      // every allowed argv keeps its own exit status and output
+      expect(argv.length).toBeGreaterThan(0);
+      const result: Result = await cli(f, ['run-check', '--', ...argv], worktree, baseEnv(f));
+      expect(result.code).toBe(0);
+    }
   } finally {
     f.clean();
   }

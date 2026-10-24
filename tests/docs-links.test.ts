@@ -167,6 +167,15 @@ test('seat skills name the known-red command', (): void => {
   );
 });
 
+test('seat skills name the run-check refusal and the narrowest merge reproduction', (): void => {
+  const root: string = resolve(import.meta.dir, '..');
+  for (const site of ['implement-issue', 'merge-issue', 'check-issue']) {
+    const content: string = readFileSync(join(root, 'skills', site, 'SKILL.md'), 'utf8');
+    expect(content).toMatch(/run-check[^\n]*refus|refus[^\n]*run-check/i);
+    expect(content).toMatch(/narrowest[^\n]*command|narrower[^\n]*command/i);
+  }
+});
+
 test('chart-issues direct landing names the known-red command', (): void => {
   const content: string = readFileSync(resolve(import.meta.dir, '../skills/chart-issues/SKILL.md'), 'utf8');
   expect(content).toContain('verify --holder <chart>/direct --known-red');

@@ -348,7 +348,7 @@ test('config reports merge_checks separately from checks', async () => {
     expect(result.code).toBe(0);
     expect(Bun.YAML.parse(result.stdout)).toMatchObject({
       checks: { test: runCheck('test', guarded('bun test')) },
-      merge_checks: { full: runCheck('full', guarded('bun run verify')) },
+      merge_checks: { full: 'akrogon verify --attempt <id>' },
     });
   } finally {
     f.clean();
@@ -384,7 +384,7 @@ async function installFixture(f: Fixture, config: object): Promise<void> {
   yaml(resolve(f.root, 'issues/config.yaml'), config);
 }
 
-test('config composes setup into printed checks, merge_checks and advisory identically from worktree', async () => {
+test('config composes setup into printed checks and advisory; merge_checks print the merge-turn route', async () => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
@@ -401,7 +401,7 @@ test('config composes setup into printed checks, merge_checks and advisory ident
     expect(atRoot).toMatchObject({
       setup: 'bun install --frozen-lockfile',
       checks: { t: runCheck('t', composed('bun test')) },
-      merge_checks: { m: runCheck('m', composed('bun run verify')) },
+      merge_checks: { m: 'akrogon verify --attempt <id>' },
       advisory: [runCheck('advisory-0', composed('bun run lint'))],
     });
     const worktree: string = resolve(f.home, 'wt');
@@ -418,7 +418,7 @@ test('config composes setup into printed checks, merge_checks and advisory ident
     });
     expect(Bun.YAML.parse((await cli(f, ['config'])).stdout)).toMatchObject({
       checks: { t: runCheck('t', guarded('bun test')) },
-      merge_checks: { m: runCheck('m', guarded('bun run verify')) },
+      merge_checks: { m: 'akrogon verify --attempt <id>' },
       advisory: [runCheck('advisory-0', guarded('bun run lint'))],
     });
   } finally {
