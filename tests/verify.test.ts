@@ -30,6 +30,7 @@ import { command, finishCaptured, spawnFiles, type Result, type SpawnResult } fr
 import { readRepo, type Repo } from '../src/config';
 import { readState } from '../src/state';
 import { requireGreenReceipt, verifyCommands, verifyRunSchema, type VerifyRun } from '../src/verify';
+import { flakyLines } from '../src/flaky';
 
 function records(f: Fixture): VerifyRun[] {
   const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
@@ -1413,6 +1414,36 @@ test('known-red refuses when the only base result for a red head command is gree
     await expect(requireGreenReceipt(readRepo('repo', f.root), head, 'merge')).rejects.toThrow(
       'No green merge verify receipt',
     );
+  } finally {
+    f.clean();
+  }
+});
+
+test('blocked merge members cannot provide known-red cover or flaky observations', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const marker: string = resolve(f.home, 'member.ran');
+    const member: string = `touch ${marker}`;
+    config(f, {
+      checks: { cheap: 'echo "(fail) alpha"; exit 1' },
+      merge_checks: { member },
+    });
+    const { worktree } = await callerWorktree(f, 'caller', {
+      phase: 'merge',
+      batch: { attempt: 'att-blocked', built_on: 'x', holder: { base: 'x', head: 'x' }, applied: true },
+    });
+    const head: string = await commitIn(worktree, 'code.ts');
+    const env: NodeJS.ProcessEnv = { ...noticeEnv(f), ...fakeAkrogon(f).env };
+    const result: Result = await cli(f, ['verify', '--attempt', 'att-blocked', '--known-red'], worktree, env);
+    expect(existsSync(marker)).toBe(false);
+    expect(result.code).toBe(1);
+    await expect(requireGreenReceipt(readRepo('repo', f.root), head, 'merge')).rejects.toThrow(
+      `No green merge verify receipt for ${head}`,
+    );
+    config(f, { checks: { cheap: 'echo cheap' }, merge_checks: { member } });
+    expect((await cli(f, ['verify', '--attempt', 'att-blocked'], worktree, env)).code).toBe(0);
+    expect(existsSync(marker)).toBe(true);
+    expect(await flakyLines(readRepo('repo', f.root), records(f))).toEqual([]);
   } finally {
     f.clean();
   }
