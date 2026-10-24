@@ -17,4 +17,3 @@ broadcast:
     webhook_env: 
       - DISCORD_WEBHOOK_URL
       - DISCORD_WEBHOOK_URL_2
-full: [test]
