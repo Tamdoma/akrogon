@@ -17,8 +17,6 @@ You set four kinds of command in `issues/config.yaml`:
 
 So a leaf runs every `checks` command. A merge runs every `checks` command not named in `merge_covers`, then every `merge_checks` command. Source: `verifyCommands` in [src/verify.ts](../../src/verify.ts).
 
-Checks named in `full` run one at a time across every repo on the host, so two whole test suites never share the CPU. A full suite that has to wait prints `waiting for full suite <repo>/<leaf> <check>`, and `akrogon status` shows a full suites table while one waits. Source: `withAdmission` in [src/admission.ts](../../src/admission.ts).
-
 `setup` runs first. It is the install command for a fresh checkout, such as `bun install --frozen-lockfile`. Before any check command, akrogon runs `setup` and then `akrogon guard own-modules`. When `setup` fails, every check in that run is recorded with the setup result, and the run cannot count as a receipt. `akrogon config` prints each check already wrapped this way, with the wrap in `withSetup` in [src/config.ts](../../src/config.ts).
 
 ## Keep output with akrogon run-check

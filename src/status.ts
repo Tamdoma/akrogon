@@ -36,7 +36,6 @@ import { readStopped } from './stop';
 import { readHostKept, readKept } from './reconcile';
 import { currentReleaseCommit, readDeployRecord } from './release';
 import { landAlive, landUnit } from './land';
-import { fullSuites, type RunRecord } from './admission';
 
 type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
 type Scan =
@@ -253,15 +252,12 @@ const phaseColor: Record<string, string> = {
 
 const stageColor: Record<string, string> = { 'handed off': '32', charting: '33', empty: '2' };
 
-const suiteColor: Record<string, string> = { running: '32', waiting: '33' };
-
 function style(title: string, text: string, kind: 'header' | 'group' | 'leaf'): string {
   if (kind === 'header') return paint('2', text);
   if (title === 'LEAF' || title === 'CHART') return kind === 'group' ? paint('1', text) : text;
   if (title === 'PHASE') return paint(phaseColor[text.split('.')[0]] ?? '', text);
   if (title === 'STAGE') return paint(stageColor[text] ?? '', text);
   if (title === 'BLOCKED BY') return paint('2', text);
-  if (title === 'STATE') return paint(suiteColor[text.split(' ')[0]] ?? '', text);
   return text;
 }
 
@@ -330,20 +326,6 @@ function render(titles: string[], lines: string[][]): string[] {
 }
 
 const chartHeader: string[] = ['CHART', 'TAKEN', 'FOG', 'STAGE', 'AGE'];
-
-const suiteHeader: string[] = ['REPO', 'LEAF', 'CHECK', 'STATE', 'AGE'];
-
-// Shown only while a full suite waits: the running one first, then the queue.
-function suiteRows(suites: RunRecord[], now: number): string[][] {
-  const running: RunRecord[] = suites.filter((suite) => suite.state !== 'waiting');
-  return suites.map((suite) => [
-    `  ${suite.repo}`,
-    suite.leaf,
-    suite.check,
-    suite.state === 'waiting' ? `waiting ${suites.indexOf(suite) - running.length + 1}` : 'running',
-    clock(now - Date.parse(suite.since)),
-  ]);
-}
 
 export type ChartStage = 'handed off' | 'closed' | 'held';
 
@@ -538,11 +520,6 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     const lines: string[][] = [...rows(scan, now, stopped), ...separator, ...parked];
     if (lines.length > 0) console.log(render(header, [['  LEAF', ...header.slice(1)], ...lines]).join('\n'));
     else if (scan.failures.length === 0) console.log('  no open leaves');
-  }
-  const suites: RunRecord[] = fullSuites();
-  if (suites.some((suite) => suite.state === 'waiting')) {
-    console.log(paint('1;4', 'full suites (one at a time, all repos)'));
-    console.log(render(suiteHeader, [['  REPO', ...suiteHeader.slice(1)], ...suiteRows(suites, now)]).join('\n'));
   }
   if (scans.some((scan) => !scan.ok || scan.failures.length > 0)) process.exitCode = 1;
 }

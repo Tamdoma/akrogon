@@ -14,7 +14,6 @@ export interface AdmissionHolder {
   slice: string;
   scope: string;
   unit: string;
-  full: boolean;
 }
 
 export type Admission =
@@ -29,12 +28,11 @@ const recordSchema = z.object({
   repo: z.string(),
   leaf: z.string(),
   check: z.string(),
-  state: z.enum(['waiting', 'live', 'ended']),
+  state: z.enum(['live', 'ended']),
   run: z.string(),
   slice: z.string(),
   scope: z.string(),
   unit: z.string(),
-  full: z.boolean().default(false),
   since: z.iso.datetime(),
 });
 export type RunRecord = z.infer<typeof recordSchema>;
@@ -88,18 +86,10 @@ function readRecord(path: string): RunRecord | undefined {
 const live = (record: RunRecord, boot: string): boolean =>
   record.boot_id === boot && liveStartTime(record.pid) === record.start_time;
 
-// A full suite counts as nested only under a full suite: under any other run
-// it takes its own turn.
-function nested(token: string, full: boolean): boolean {
+function nested(token: string): boolean {
   const hash: string = createHash('sha256').update(token).digest('hex');
   const record: RunRecord | undefined = readRecord(recordPath(hash));
-  return (
-    record !== undefined &&
-    record.token_hash === hash &&
-    record.state === 'live' &&
-    (record.full || !full) &&
-    live(record, bootId())
-  );
+  return record !== undefined && record.token_hash === hash && record.state === 'live' && live(record, bootId());
 }
 
 export function liveRuns(): RunRecord[] {
@@ -112,54 +102,6 @@ export function liveRuns(): RunRecord[] {
       const record: RunRecord | undefined = readRecord(resolve(dir, name));
       return record !== undefined && record.state === 'live' && live(record, boot) ? [record] : [];
     });
-}
-
-// Full suites from every repo, oldest first: holders (live or ended, whose
-// units may still be stopping) before waiters. Only one holder runs at a time.
-export function fullSuites(): RunRecord[] {
-  const dir: string = runsDir();
-  if (!existsSync(dir)) return [];
-  const boot: string = bootId();
-  return readdirSync(dir)
-    .filter((name) => name.endsWith('.yaml'))
-    .flatMap((name) => {
-      const record: RunRecord | undefined = readRecord(resolve(dir, name));
-      return record !== undefined && record.full && live(record, boot) ? [record] : [];
-    })
-    .sort(
-      (a, b) =>
-        Number(a.state === 'waiting') - Number(b.state === 'waiting') ||
-        a.since.localeCompare(b.since) ||
-        a.token_hash.localeCompare(b.token_hash),
-    );
-}
-
-const fullLock = (): string => resolve(runsDir(), 'locks', 'full-suite');
-const POLL_MS: number = 1000;
-
-// A full suite waits until it is the oldest full suite on the host. The turn
-// check and the switch to live share one exclusive lock, so two waiters never
-// both start.
-async function awaitFullTurn(record: RunRecord): Promise<void> {
-  let shown: string = '';
-  for (;;) {
-    const started: boolean = await withAdmissionLock(record.slice, () =>
-      withLock(fullLock(), async (): Promise<boolean> => {
-        if (!existsSync(recordPath(record.token_hash))) writeRecord(record);
-        const [first]: RunRecord[] = fullSuites();
-        if (first.token_hash !== record.token_hash) {
-          const holder: string = `${first.repo}/${first.leaf} ${first.check}`;
-          if (holder !== shown) process.stderr.write(`waiting for full suite ${holder}\n`);
-          shown = holder;
-          return false;
-        }
-        writeRecord({ ...record, state: 'live' });
-        return true;
-      }),
-    );
-    if (started) return;
-    await Bun.sleep(POLL_MS);
-  }
 }
 
 // Records whose writer is gone (or whose file is unreadable) are stale: drop
@@ -196,13 +138,10 @@ export function callerScope(): string {
 
 // Admission registers the run and starts it at once: the memory reading, the
 // 48 GiB limit, per-run reservations and the 30 s start spacing were dropped
-// by the operator on 2026-10-14 (run-units brief criterion 5). The one bound is
-// for runs the repo marks `full`: they start one at a time host-wide, in
-// arrival order (operator 2026-10-24, host-run-load).
+// by the operator on 2026-10-14 (run-units brief criterion 5).
 export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: Admission) => Promise<T>): Promise<T> {
   const inherited: string | undefined = process.env.AKROGON_RUN;
-  if (inherited !== undefined && inherited !== '' && nested(inherited, holder.full))
-    return fn({ kind: 'nested', token: inherited });
+  if (inherited !== undefined && inherited !== '' && nested(inherited)) return fn({ kind: 'nested', token: inherited });
   mkdirSync(runsDir(), { recursive: true });
   const token: string = randomUUID();
   const ownHash: string = createHash('sha256').update(token).digest('hex');
@@ -218,16 +157,14 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
     start_time: startTime(process.pid),
     boot_id: bootId(),
     ...holder,
-    state: holder.full ? 'waiting' : 'live',
+    state: 'live',
     since: new Date().toISOString(),
   };
   const begun: number = Date.now();
   try {
-    if (holder.full) await awaitFullTurn(record);
-    else
-      await withAdmissionLock(holder.slice, async (): Promise<void> => {
-        writeRecord(record);
-      });
+    await withAdmissionLock(holder.slice, async (): Promise<void> => {
+      writeRecord(record);
+    });
     process.stderr.write(`run ${holder.run}\n`);
     let ended: boolean = false;
     return await fn({
