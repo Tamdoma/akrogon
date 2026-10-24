@@ -33,7 +33,7 @@ export async function logMove(repo: Repo, before: State, after: State, slot: Slo
   const cwd: string = after.worktree ?? repo.root;
   const head: string = await command(['git', 'rev-parse', 'HEAD'], cwd);
   const diff: string = await command(['git', 'diff', '--shortstat', await base(repo, cwd)], cwd);
-  const paneId: string | undefined = process.env.HERDR_PANE_ID || (slot === null ? undefined : before.pane[slot]);
+  const paneId: string | undefined = slot === null ? undefined : before.pane[slot];
   let pane: Pane | undefined;
   if (paneId !== undefined) {
     // The pane lookup runs in the leaf's resolved session; a refused or
