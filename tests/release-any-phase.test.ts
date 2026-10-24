@@ -156,6 +156,7 @@ function kept(file: string): { path: string; reason: string }[] {
 
 const repoKept = (f: F): { path: string; reason: string }[] => kept(resolve(f.home, 'reconcile', 'repo.json'));
 const hostKept = (f: F): { path: string; reason: string }[] => kept(resolve(f.home, 'reconcile-host.json'));
+const OTHER_REPO: string = 'repo not reconciled by this pass';
 
 function unitsIn(db: string): string[] {
   return z
@@ -205,6 +206,31 @@ test('an unfinished leaf slice is stopped and its temp removed once its recorded
     expect(calls(log).some((line) => line.includes(`stop ${slice}`))).toBe(true);
     expect(unitsIn(db)).not.toContain(slice);
     expect(existsSync(temp)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+// A repo whose workspace is not in the invoking herdr session is not judged:
+// its vanished-tab slice and temp stay, whatever the pane list shows.
+test('a pass from a session without the repo workspace keeps its slice and temp', async () => {
+  const f: F = await fakes();
+  try {
+    leaf(f, 'away-slice', 'implement', { tab: 'w1:t1' });
+    stopLeaf(f, 'away-slice');
+    saveDatabase(f, { ...database(f), workspaces: [{ workspace_id: 'w3', label: 'other' }] });
+    const slice: string = leafSlice(repo(f), 'away-slice');
+    busyCgroup(f, 'busy-away');
+    const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/busy-away' }]);
+    systemctlBin(f);
+    const temp: string = tempFor(f, 'away-slice');
+    mkdirSync(temp, { recursive: true });
+    const result: Result = await cli(f, ['next', '--all'], f.root, env(f, db, log));
+    expect(result.code).toBe(1);
+    expect(calls(log).some((line) => line.includes('stop') && line.includes(slice))).toBe(false);
+    expect(unitsIn(db)).toContain(slice);
+    expect(existsSync(temp)).toBe(true);
+    expect(hostKept(f).some((entry) => entry.path === slice && entry.reason === OTHER_REPO)).toBe(true);
   } finally {
     f.clean();
   }
@@ -376,6 +402,7 @@ test('an unreadable unit list keeps merged, failed and unfinished leaf temps', a
 
 // Criterion 6: the host-level step applies the same rules to slices matched to
 // unfinished leaves — a live tab keeps one, no recorded tab keeps the other.
+// A pass acts only on its own repos: another repo's slices and temps stay.
 test('the host slice step keeps unfinished leaf slices under the same tab rules', async () => {
   const f: F = await fakes();
   const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
@@ -388,6 +415,7 @@ test('the host slice step keeps unfinished leaf slices under the same tab rules'
     const other: string = await otherRepo(f);
     otherLeaf(other, 'other-gone', 'implement', { tab: 'w1:tg' });
     otherLeaf(other, 'other-run', 'implement', { tab: 'w1:tr' });
+    otherLeaf(other, 'other-idle', 'merged', { tab: 'w1:ti' });
     // One write: stopLeaf replaces the file, so all four entries go in together.
     writeYaml(resolve(f.home, 'stopped.yaml'), {
       'repo/host-tab': true,
@@ -399,13 +427,19 @@ test('the host slice step keeps unfinished leaf slices under the same tab rules'
     const noteSlice: string = leafSlice(repo(f), 'host-note');
     const goneSlice: string = leafSlice({ name: 'other' }, 'other-gone');
     const runSlice: string = leafSlice({ name: 'other' }, 'other-run');
+    const idleSlice: string = leafSlice({ name: 'other' }, 'other-idle');
+    const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
+    const otherTemp: string = resolve(leafTempRoot(f), hex(other).slice(0, 4), hex(`${other}\nother-gone`).slice(0, 8));
+    mkdirSync(otherTemp, { recursive: true });
     liveRunRecord(f, 'held', 'other', 'other-run', runSlice, child.pid);
     const { db, log } = sliceDb(f, [
       { unit: tabSlice, sub: 'active', cgroup: '/host-tab' },
       { unit: noteSlice, sub: 'active', cgroup: '/host-note' },
       { unit: goneSlice, sub: 'active', cgroup: '/other-gone' },
       { unit: runSlice, sub: 'active', cgroup: '/other-run' },
+      { unit: idleSlice, sub: 'active', cgroup: '/other-idle' },
     ]);
+    emptyCgroup(f, 'other-idle');
     emptyCgroup(f, 'host-tab');
     busyCgroup(f, 'host-note');
     busyCgroup(f, 'other-gone');
@@ -416,20 +450,24 @@ test('the host slice step keeps unfinished leaf slices under the same tab rules'
     const result: Result = await cli(f, ['next', '--all'], f.root, env(f, db, log));
     expect(result.code).toBe(1);
     const logLines: string[] = calls(log);
+    const entries = (): { path: string; reason: string }[] => hostKept(f);
     expect(logLines.some((line) => line.includes('stop') && line.includes(tabSlice))).toBe(false);
     expect(logLines.some((line) => line.includes('stop') && line.includes(noteSlice))).toBe(false);
-    // Host step, second repo: a vanished recorded tab stops even a busy slice,
-    // and a live run record vetoes the same stop.
-    expect(logLines.some((line) => line.includes(`stop ${goneSlice}`))).toBe(true);
-    expect(unitsIn(db)).not.toContain(goneSlice);
+    // Host step, second repo: a pass for `repo` never acts on `other`, so even
+    // a vanished recorded tab keeps its slice.
+    expect(logLines.some((line) => line.includes('stop') && line.includes(goneSlice))).toBe(false);
+    expect(unitsIn(db)).toContain(goneSlice);
+    expect(entries().some((entry) => entry.path === goneSlice && entry.reason === OTHER_REPO)).toBe(true);
     expect(logLines.some((line) => line.includes('stop') && line.includes(runSlice))).toBe(false);
     expect(unitsIn(db)).toContain(tabSlice);
     expect(unitsIn(db)).toContain(noteSlice);
     expect(unitsIn(db)).toContain(runSlice);
-    const entries: { path: string; reason: string }[] = hostKept(f);
-    expect(entries.some((entry) => entry.path === tabSlice && entry.reason === 'live tab')).toBe(true);
-    expect(entries.some((entry) => entry.path === noteSlice && entry.reason === 'unfinished leaf')).toBe(true);
-    expect(entries.some((entry) => entry.path === runSlice && entry.reason === 'live run record')).toBe(true);
+    expect(entries().some((entry) => entry.path === tabSlice && entry.reason === 'live tab')).toBe(true);
+    expect(entries().some((entry) => entry.path === noteSlice && entry.reason === 'unfinished leaf')).toBe(true);
+    expect(entries().some((entry) => entry.path === runSlice && entry.reason === 'live run record')).toBe(true);
+    expect(entries().some((entry) => entry.path === idleSlice && entry.reason === OTHER_REPO)).toBe(true);
+    expect(unitsIn(db)).toContain(idleSlice);
+    expect(existsSync(otherTemp)).toBe(true);
   } finally {
     child.kill('SIGKILL');
     await child.exited;
