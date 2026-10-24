@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, entry, leaf, fakeHerdr, storeDir, yaml, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
@@ -645,3 +645,28 @@ test('recorded tab without a worktree member is neither closed nor reused', asyn
     f.clean();
   }
 });
+
+
+test('resolved-session pane discovery refuses at the ten-second deadline', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'pane-deadline', 'plan.synthesis');
+    const wrapper: string = resolve(f.home, 'slow-bin');
+    mkdirSync(wrapper);
+    const herdr: string = resolve(wrapper, 'herdr');
+    writeFileSync(
+      herdr,
+      `#!/bin/sh
+if [ "$3" = pane ] && [ "$4" = list ]; then exec sleep 12; fi
+exec '${resolve(f.home, 'bin/herdr')}' "$@"
+`,
+    );
+    chmodSync(herdr, 0o755);
+    const result: Result = await next(f, ['pane-deadline'], { PATH: `${wrapper}:${f.env.PATH}` });
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('deadline 10000ms exceeded');
+    expect(database(f).tabs).toHaveLength(0);
+  } finally {
+    f.clean();
+  }
+}, 30000);
