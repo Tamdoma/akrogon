@@ -53,6 +53,7 @@ import {
   herdrError,
   repoSession,
   listSessions,
+  sessionPanes,
   DISCOVERY_DEADLINE_MS,
   type Pane,
   type Tab,
@@ -280,20 +281,11 @@ async function panesForRepo(repo: Repo, _invocation: Invocation): Promise<Pane[]
 }
 
 // The second-seat veto and host reconcile read the union of every running
-// session's panes; one unreadable session makes the union null (keep everything).
+// session's panes; the session-tagged source skips dead-but-listed sessions
+// and one unreadable session makes the union null (keep everything).
 async function allSessionPanes(): Promise<Pane[] | null> {
-  const sessions: Session[] | null = await listSessions();
-  if (sessions === null) return null;
-  const found: Pane[] = [];
-  for (const session of sessions) {
-    if (!session.running) continue;
-    try {
-      found.push(...(await panes(session.name)));
-    } catch {
-      return null;
-    }
-  }
-  return found;
+  const tagged: { session: string; pane: Pane }[] | null = await sessionPanes();
+  return tagged === null ? null : tagged.map((entry) => entry.pane);
 }
 
 function launch(global: GlobalConfig, repo: Repo, slot: Slot, leafPath?: string): { kind: string; args: string[] } {

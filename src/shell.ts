@@ -305,6 +305,26 @@ export async function listSessions(exe: string = 'herdr'): Promise<Session[] | n
   return list.ok ? list.sessions : null;
 }
 
+// Every running session's panes tagged with its name, re-fetched on each call.
+// A session listed running whose pane read dies server_not_running is skipped
+// as stopped, like resolution's workspace probe; any other per-session read
+// error or a failed session list makes the whole union null.
+export async function sessionPanes(exe: string = 'herdr'): Promise<{ session: string; pane: Pane }[] | null> {
+  const sessions: Session[] | null = await listSessions(exe);
+  if (sessions === null) return null;
+  const tagged: { session: string; pane: Pane }[] = [];
+  for (const session of sessions) {
+    if (!session.running) continue;
+    try {
+      for (const pane of await panes(session.name, exe)) tagged.push({ session: session.name, pane });
+    } catch (error) {
+      if (error instanceof CommandError && herdrError(error.result).code === 'server_not_running') continue;
+      return null;
+    }
+  }
+  return tagged;
+}
+
 export function repoSession(repo: Repo, opts: { exe?: string } = {}): Promise<SessionResolution> {
   const exe: string = opts.exe ?? 'herdr';
   const key: string = exe + ' ' + repo.name;
