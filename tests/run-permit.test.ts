@@ -371,6 +371,32 @@ test('a full suite inside a full suite runs at once', async () => {
   }
 }, 45000);
 
+test('a full suite inside a run not marked full waits for the live full suite', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const shim: NodeJS.ProcessEnv = fakeAkrogon(f).env;
+    const worktree: string = await leafWorktree(f, 'nested-small');
+    const holder: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'h')], worktree);
+    caps.push(holder);
+    await waitFor(resolve(dir, 'h.held'));
+    const script: string = `akrogon run-check --name test -- touch ${dir}/inner`;
+    const outer: Cap = run(f, ['run-check', '--name', 'format', '--', 'sh', '-c', script], worktree, shim);
+    caps.push(outer);
+    await waitForText(outer, /waiting for full suite repo\/nested-small test/);
+    expect(existsSync(resolve(dir, 'inner'))).toBe(false);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await holder.proc.exited).toBe(0);
+    expect(await outer.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'inner'))).toBe(true);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 60000);
+
 test('config refuses a full name that is not a check', async () => {
   const f: Fixture = await fixture();
   try {
