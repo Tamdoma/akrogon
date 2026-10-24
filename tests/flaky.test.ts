@@ -6,7 +6,7 @@ import { flakyLines } from '../src/flaky';
 import { type VerifyRun } from '../src/verify';
 import { cli, fixture, leaf, type Fixture } from './helpers';
 
-type Step = { tree: string; command: string; exit: number; log: string; end?: string; setup?: number };
+type Step = { tree: string; command: string; exit: number; log: string; end?: string; setup?: number; reused?: string };
 
 function run(step: Step, index: number): VerifyRun {
   return {
@@ -20,7 +20,15 @@ function run(step: Step, index: number): VerifyRun {
     pid: 1,
     boot_id: 'b',
     setup: step.setup ?? 0,
-    commands: [{ name: 'test', command: step.command, exit: step.exit, log: step.log }],
+    commands: [
+      {
+        name: 'test',
+        command: step.command,
+        exit: step.exit,
+        log: step.log,
+        ...(step.reused === undefined ? {} : { reused: step.reused }),
+      },
+    ],
     start: '2026-10-14T00:00:00.000Z',
     end: step.end,
   };
@@ -155,6 +163,36 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
       { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
     ];
     await expect(flakyLines(repo, absent.map(run))).rejects.toThrow(resolve(present, 'evidence.tar.zst'));
+  } finally {
+    f.clean();
+  }
+});
+
+test('a reused green entry adds no flip, while a real later green still records one', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const repo: Repo = readRepo('repo', f.root);
+    const dir: string = leaf(f, 'leaf', 'merge');
+    const redLog: string = resolve(dir, 'check-red.log');
+    writeFileSync(redLog, '(fail) alpha\n');
+    const greenLog: string = resolve(dir, 'check-green.log');
+    const steps: Step[] = [
+      { tree: 'A', command: 'bun test', exit: 1, log: redLog, end: '2026-10-14T01:00:00.000Z' },
+      // Reused receipt copies of the same green add no observation.
+      {
+        tree: 'A',
+        command: 'bun test',
+        exit: 0,
+        log: greenLog,
+        end: '2026-10-14T02:00:00.000Z',
+        reused: 'earlier-green',
+      },
+      // A real green run of the command records the flip.
+      { tree: 'A', command: 'bun test', exit: 0, log: greenLog, end: '2026-10-14T03:00:00.000Z' },
+    ];
+    expect(await flakyLines(repo, steps.map(run))).toEqual([
+      { name: 'test', test: 'alpha', count: 1, last: '2026-10-14T03:00:00.000Z' },
+    ]);
   } finally {
     f.clean();
   }
