@@ -58,7 +58,7 @@ Each registered checkout has `issues/config.yaml`. The [init-akrogon skill](../.
 | `implement` | `subagents` lets seat A hand units to worker agents. `inline` makes seat A do all the work itself. Default `subagents`. |
 | `setup` | A command that installs dependencies in each fresh checkout, such as `bun install --frozen-lockfile`. Akrogon runs it before check commands. Optional. |
 | `checks` | Named commands every leaf must pass. A red check blocks. Default empty. |
-| `merge_checks` | Named commands that run only at merge. Default empty. |
+| `merge_checks` | Named commands that run only at merge. `akrogon config` prints `akrogon verify --attempt <id>` for each entry — the merge turn's runner — and `akrogon run-check` refuses the command itself. Default empty. |
 | `merge_covers` | Names from `checks` that a merge check already covers, so merge skips them. Needs a non-empty `merge_checks`. Default empty. |
 | `advisory` | Commands that run but never block. Their failures are reported as small notes. Default empty. |
 | `env` | Names of environment variables. Each must be set in the checkout's `.env`, and akrogon writes them into each leaf worktree's `.env`. Check commands also get them from your shell. Default empty. |

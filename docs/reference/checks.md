@@ -11,7 +11,7 @@ You set four kinds of command in `issues/config.yaml`:
 | Setting | When it runs | Does a failure block? |
 | --- | --- | --- |
 | `checks` | On every leaf, and again at merge. | Yes. |
-| `merge_checks` | Only at merge. | Yes. |
+| `merge_checks` | Only at merge, through the merge turn's `akrogon verify --attempt <id>`. `akrogon run-check` refuses them. | Yes. |
 | `merge_covers` | Not a command. It names `checks` entries that a merge check already covers, so merge skips them. | No. |
 | `advisory` | Seats run them next to the checks. `akrogon verify` does not run them. | No. Reviewers report a failure as a Nit. |
 
@@ -36,6 +36,8 @@ check <label>: <exit> <path>
 `<path>` is the saved log. It lands in the leaf's `implementation/` folder as `check-<label>-<time>-<pid>.log`. Akrogon finds the leaf from your current worktree. A worker worktree named `<slug>-u<N>` saves into its leaf's folder. Outside a leaf worktree, pass `--leaf <path>` or `--holder <dir>`, and the log goes there.
 
 The command runs with a clean environment. It gets `HOME`, `PATH` and a few other basics, the names you list in `env` and `pass_env`, a private `TMPDIR` and `AKROGON_BASE`. Source: [src/run-check.ts](../../src/run-check.ts).
+
+run-check refuses a configured `merge_checks` command, given as its words, as `sh -c '<command>'`, or in the `sh -c` form `setup` would add: it exits non-zero, starts no process and saves no log, printing `akrogon verify --attempt <id>` as the merge suite's only runner and that a red merge check is reproduced with a narrower command, never the whole suite.
 
 When to keep output this way, and which commands are exempt, is a seat rule. See [implement-issue](../../skills/implement-issue/SKILL.md), [check-issue](../../skills/check-issue/SKILL.md) and [merge-issue](../../skills/merge-issue/SKILL.md).
 

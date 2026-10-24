@@ -45,7 +45,7 @@ Every `akrogon` command, one line each. Run commands from the registered reposit
 
 | Invocation | Effect |
 | --- | --- |
-| `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Run one command under the check environment, save its output as a log and print a `check <name>: <exit> <path>` line. |
+| `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Run one command under the check environment, save its output as a log and print a `check <name>: <exit> <path>` line. Refuses a configured `merge_checks` command: only the merge turn's `akrogon verify --attempt <id>` runs it. |
 | `akrogon verify [--sha <rev>] [--attempt <id>] [--holder <dir>] [--known-red]` | Run every configured check on a fresh checkout of a commit and record a receipt in `issues/verify-runs.jsonl`. With `--known-red`, it also runs the base commit to show the same tests already fail there. |
 | `akrogon log <path>` | Print a saved check or verify log, even after it was packed. Runs from any directory. |
 | `akrogon stop-run [<run-id>]` | Stop a run started from your pane. With no id, it stops the only live run or lists them. |
