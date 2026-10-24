@@ -1,0 +1,11 @@
+# Opening map brief: verify-waste (slots B and D)
+
+Read: /home/ivan/Work/infra/akrogon/issues/chart/verify-waste/INTAKE.md, /home/ivan/Work/infra/akrogon/issues/chart/verify-waste/CHART.md, /home/ivan/Work/infra/akrogon/issues/chart/verify-waste/slots/precharter-D.md and /home/ivan/Work/infra/akrogon/issues/chart/verify-waste/slots/precharter-A.md (pre-chart notes, intake only). Do not read other slots/map-*.md files.
+
+Task: an independent territory map for the destination in CHART.md. Inspect the live code: /home/ivan/Work/infra/akrogon/src (verify.ts, run-check.ts, config.ts, flaky.ts, scope.ts, land/merge flow), /home/ivan/Work/infra/akrogon/skills (implement-issue, check-issue, merge-issue SKILL.md), framework /home/ivan/Work/infra/tamdoma/framework (package.json verify scripts, issues/config.yaml, issues/verify-runs.jsonl, issues/timings.jsonl) and the systemd journal (journalctl --user, "akrogon-run-*.scope: Consumed" lines). Read earlier akrogon charts whose decisions bind this: issues/chart/base-red, check-reruns, clean-merge-gate, host-test-load, framework-test-scope (held), and framework issues/chart/verify-gate and verify-speed if present.
+
+Carries (locks): operator rejected host run caps, a one-at-a-time line, a CPU quota, fewer workers, seconds ceilings (2026-10-24). Every kept check blocks every merge; no test selection replacing the full suite at merge; no nightly suite (framework verify-speed 1a, verify-gate 2a/2c). base-red: "akrogon verify runs the exact base fresh, never reusing a receipt on the base side" (base-red/forks/red-base-policy.md:27): name what reusing would change and whether that lock's reason holds for green base receipts.
+
+Return, under 90 lines: measured numbers you recomputed (state the query), material forks with options, what each option breaks or invites later, pitfalls, practitioner sources (with URL and read date) where they exist, and your recommended pick per fork with reason. Also: is the pre-chart claim "I2 has no tradeoff" true? Cite path:line or ledger/journal counts per claim. Read-only: edit nothing, run no suites.
+
+Write to /home/ivan/Work/infra/akrogon/issues/chart/verify-waste/slots/map-<slot>.md, ending with `Last operation:` and `Next:`.
