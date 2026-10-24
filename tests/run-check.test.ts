@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { basename, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { fixture, cli, leaf, yaml, fakeAkrogon, printedChecks, leafTempRoot, type Fixture } from './helpers';
-import { command, quote, type Result } from '../src/shell';
+import { command, type Result } from '../src/shell';
 import { readRepo, setupCommand } from '../src/config';
 
 const sh = (script: string): string[] => ['sh', '-c', script];
@@ -468,7 +468,7 @@ test('run-check refuses a merge_checks entry in its words, sh -c and printed for
   try {
     const { leafPath, worktree } = await leafWorktree(f, 'merge-refusal');
     for (const setup of [true, false]) {
-      const text = `touch ${quote(resolve(f.home, 'marker-' + (setup ? 'setup' : 'plain')))} && echo suite`;
+      const text = `touch ${resolve(f.home, 'marker-' + (setup ? 'setup' : 'plain'))} && echo suite`;
       yaml(resolve(f.root, 'issues/config.yaml'), {
         ...(setup ? { setup: 'mkdir -p node_modules' } : {}),
         checks: { unit: 'echo unit' },
