@@ -88,10 +88,18 @@ function readRecord(path: string): RunRecord | undefined {
 const live = (record: RunRecord, boot: string): boolean =>
   record.boot_id === boot && liveStartTime(record.pid) === record.start_time;
 
-function nested(token: string): boolean {
+// A full suite counts as nested only under a full suite: under any other run
+// it takes its own turn.
+function nested(token: string, full: boolean): boolean {
   const hash: string = createHash('sha256').update(token).digest('hex');
   const record: RunRecord | undefined = readRecord(recordPath(hash));
-  return record !== undefined && record.token_hash === hash && record.state === 'live' && live(record, bootId());
+  return (
+    record !== undefined &&
+    record.token_hash === hash &&
+    record.state === 'live' &&
+    (record.full || !full) &&
+    live(record, bootId())
+  );
 }
 
 export function liveRuns(): RunRecord[] {
@@ -193,7 +201,8 @@ export function callerScope(): string {
 // arrival order (operator 2026-10-24, host-run-load).
 export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: Admission) => Promise<T>): Promise<T> {
   const inherited: string | undefined = process.env.AKROGON_RUN;
-  if (inherited !== undefined && inherited !== '' && nested(inherited)) return fn({ kind: 'nested', token: inherited });
+  if (inherited !== undefined && inherited !== '' && nested(inherited, holder.full))
+    return fn({ kind: 'nested', token: inherited });
   mkdirSync(runsDir(), { recursive: true });
   const token: string = randomUUID();
   const ownHash: string = createHash('sha256').update(token).digest('hex');
