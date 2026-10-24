@@ -247,6 +247,142 @@ test('status shows no Run lines while a run holds', async () => {
   }
 }, 45000);
 
+const FULL_CONFIG = { checks: { test: 'bun test', format: 'true' }, full: ['test'], grounding: 'none' };
+
+const record = (name: string, dir: string): string[] => ['sh', '-c', `echo ${name} >> ${dir}/order`];
+
+async function waitForText(cap: Cap, pattern: RegExp, ms: number = 20000): Promise<void> {
+  const begun: number = Date.now();
+  while (!pattern.test(await cap.text())) {
+    if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${pattern}: ${await cap.text()}`);
+    await Bun.sleep(50);
+  }
+}
+
+test('a full suite waits for the live full suite, a run not marked full starts at once, status shows the line only while one waits', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const first: string = await leafWorktree(f, 'leaf-one');
+    const second: string = await leafWorktree(f, 'leaf-two');
+    const a: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'a')], first);
+    caps.push(a);
+    await waitFor(resolve(dir, 'a.held'));
+    const quiet: Result = await cli(f, ['status']);
+    expect(quiet.stdout).not.toMatch(/full suite/i);
+    const b: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'b')], second);
+    caps.push(b);
+    await waitForText(b, /waiting for full suite repo\/leaf-one test/);
+    const small: Result = await cli(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'small')], second);
+    expect(small.code).toBe(0);
+    expect(existsSync(resolve(dir, 'small'))).toBe(true);
+    expect(existsSync(resolve(dir, 'b'))).toBe(false);
+    const board: string = (await cli(f, ['status'])).stdout;
+    expect(board).toMatch(/full suites/i);
+    expect(board).toMatch(/repo\s+leaf-one\s+test\s+running/);
+    expect(board).toMatch(/repo\s+leaf-two\s+test\s+waiting 1/);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await a.proc.exited).toBe(0);
+    expect(await b.proc.exited).toBe(0);
+    const bStart: Event | undefined = timings(f).find(
+      (event) => event.kind === 'check_start' && event.name === 'test' && (event.wait_ms ?? 0) > 0,
+    );
+    expect(bStart?.wait_ms ?? 0).toBeGreaterThan(1000);
+    expect((await cli(f, ['status'])).stdout).not.toMatch(/full suite/i);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test('full suites start in arrival order', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const worktree: string = await leafWorktree(f, 'queue');
+    const holder: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'h')], worktree);
+    caps.push(holder);
+    await waitFor(resolve(dir, 'h.held'));
+    for (const name of ['w1', 'w2', 'w3']) {
+      const waiter: Cap = run(f, ['run-check', '--name', 'test', '--', ...record(name, dir)], worktree);
+      caps.push(waiter);
+      await waitForText(waiter, /waiting for full suite/);
+    }
+    writeFileSync(resolve(dir, 'release'), '');
+    for (const cap of caps) expect(await cap.proc.exited).toBe(0);
+    expect(readFileSync(resolve(dir, 'order'), 'utf8').trim().split('\n')).toEqual(['w1', 'w2', 'w3']);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test('a killed full suite holder or waiter does not block the next full suite', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const worktree: string = await leafWorktree(f, 'killed');
+    const holder: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'h')], worktree);
+    caps.push(holder);
+    await waitFor(resolve(dir, 'h.held'));
+    const dead: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('dead', dir)], worktree);
+    caps.push(dead);
+    await waitForText(dead, /waiting for full suite/);
+    const next: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('next', dir)], worktree);
+    caps.push(next);
+    await waitForText(next, /waiting for full suite/);
+    killTree(dead.proc);
+    await dead.proc.exited;
+    killTree(holder.proc);
+    await holder.proc.exited;
+    expect(await next.proc.exited).toBe(0);
+    expect(readFileSync(resolve(dir, 'order'), 'utf8').trim()).toBe('next');
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test('a full suite inside a full suite runs at once', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const shim: NodeJS.ProcessEnv = fakeAkrogon(f).env;
+    const worktree: string = await leafWorktree(f, 'nested-full');
+    const script: string = `akrogon run-check --name test -- touch ${dir}/inner`;
+    const outer: Result = await cli(
+      f,
+      ['run-check', '--name', 'test', '--', 'sh', '-c', script],
+      worktree,
+      shim,
+      30000,
+    );
+    expect(outer.code).toBe(0);
+    expect(existsSync(resolve(dir, 'inner'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+}, 45000);
+
+test('config refuses a full name that is not a check', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { ...FULL_CONFIG, full: ['missing'] });
+    const result: Result = await cli(f, ['config']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/full.*missing/);
+  } finally {
+    f.clean();
+  }
+});
+
 test('a run-check runs without reading any memory stat', async () => {
   const f: Fixture = await fixture();
   try {
