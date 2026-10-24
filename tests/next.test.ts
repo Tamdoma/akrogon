@@ -136,7 +136,7 @@ for (const stdout of ['not-json-response', '{"result":{"panes":"invalid-panes"}}
       const response: { command: string[]; cwd: string; stdout: string; error: string } = z
         .object({ command: z.array(z.string()), cwd: z.string(), stdout: z.string(), error: z.string() })
         .parse(JSON.parse(diagnostic));
-      expect(response.command).toEqual(['herdr', 'pane', 'list']);
+      expect(response.command).toEqual(['herdr', '--session', 'default', 'pane', 'list']);
       expect(response.cwd).toBe(f.root);
       expect(response.stdout).toBe(stdout);
       expect(response.error).toMatch(stdout.startsWith('{') ? /array/ : /JSON/);
@@ -2999,8 +2999,10 @@ test('retryable prompt failure charges one attempt, records delivery_error, and 
     expect(err.code).toBe('agent_prompt_stalled');
     expect(err.message).toBe('stalled for test');
     expect(err.command[0]).toBe('herdr');
-    expect(err.command[1]).toBe('agent');
-    expect(err.command[2]).toBe('prompt');
+    expect(err.command[1]).toBe('--session');
+    expect(err.command[2]).toBe('default');
+    expect(err.command[3]).toBe('agent');
+    expect(err.command[4]).toBe('prompt');
     expect(err.pane).toBe(state.pane.A!);
     const db: Database = database(f);
     const pane = db.panes.find((item) => item.pane_id === state.pane.A)!;
