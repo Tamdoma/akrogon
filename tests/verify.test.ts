@@ -452,7 +452,6 @@ test('verify --known-red reruns the failing command on a fresh checkout of the e
     const { leafPath, worktree } = await callerWorktree(f);
     const head: string = await commitIn(worktree, 'code.ts');
     const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
-    greenReceipt(f, base, 'leaf');
     const result: Result = await verify(f, ['--known-red'], worktree);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain(`verify known-red ${head}: pass`);
@@ -858,12 +857,17 @@ test('a green on the same revision clears only the earlier main-red incident', a
 
     const base: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
     greenReceipt(f, base, 'leaf');
-    await commitIn(worktree, 'two.ts');
-    expect((await cli(f, ['verify', '--known-red'], worktree, env)).code).toBe(0);
+    // A fresh red base needs a merge-base past the seeded green: on the seed's tree
+    // the green entry is reused per command and the base can never show that red.
+    await commitIn(f.root, 'main2.ts');
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const { worktree: w2 } = await callerWorktree(f, 'after');
+    await commitIn(w2, 'two.ts');
+    expect((await cli(f, ['verify', '--known-red'], w2, env)).code).toBe(0);
     expect(noticeCalls(f)).toHaveLength(2);
 
-    await commitIn(worktree, 'three.ts');
-    expect((await cli(f, ['verify', '--known-red'], worktree, env)).code).toBe(0);
+    await commitIn(w2, 'three.ts');
+    expect((await cli(f, ['verify', '--known-red'], w2, env)).code).toBe(0);
     expect(noticeCalls(f)).toHaveLength(2);
   } finally {
     f.clean();
