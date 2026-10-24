@@ -229,6 +229,41 @@ test('foreign-session panes and unreadable sessions veto reconcile removal', asy
   }
 }, 40000);
 
+test('foreign-session panes with colliding tab ids keep merged and failed worktrees', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'sibling', 'failed', { tab: 'w1:tS' });
+    const merged: string = resolve(storeDir(f), 'merged');
+    const failed: string = resolve(storeDir(f), 'failed');
+    await command(['git', 'worktree', 'add', '-b', 'merged', merged], f.root);
+    await command(['git', 'worktree', 'add', '-b', 'failed', failed], f.root);
+    const mergedLeaf: string = leaf(f, 'merged', 'merged', { tab: 'w1:t1', worktree: merged });
+    const failedLeaf: string = leaf(f, 'failed', 'failed', { tab: 'w1:t2', worktree: failed });
+    saveDatabase(f, {
+      ...database(f),
+      sessions: [
+        session('other', {
+          workspaces: [{ workspace_id: 'w1', label: 'misc' }],
+          tabs: [
+            { tab_id: 'w1:t1', label: 'merged', workspace_id: 'w1' },
+            { tab_id: 'w1:t2', label: 'failed', workspace_id: 'w1' },
+          ],
+          panes: [seatedPane('w1:p1', 'w1:t1', merged), seatedPane('w1:p2', 'w1:t2', failed)],
+        }),
+      ],
+    });
+    const result: Result = await next(f, ['--all']);
+    expect(result.code, result.stderr).toBe(0);
+    expect(existsSync(merged)).toBe(true);
+    expect(existsSync(failed)).toBe(true);
+    expect(readState(mergedLeaf).worktree).toBe(merged);
+    expect(readState(failedLeaf).worktree).toBe(failed);
+    expect(toSession(f, 'other').some((args) => args[2] === 'tab' && args[3] === 'close')).toBe(false);
+  } finally {
+    f.clean();
+  }
+}, 20000);
+
 // Criterion 3: within one pass the inventory reflects launches already made;
 // a leaf whose recorded tab is gone counts nothing and reallocates.
 test('a fresh pane read sees the seat created earlier in the pass and ignores a closed tab', async () => {
