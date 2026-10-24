@@ -318,7 +318,11 @@ export async function sessionPanes(exe: string = 'herdr'): Promise<{ session: st
     try {
       // Liveness first on the cheapest read, like resolution's workspace
       // probe: a dead-but-listed session is skipped without a pane call.
-      await workspaces(session.name, exe);
+      await herdr(['workspace', 'list'], z.object({}), {
+        session: session.name,
+        exe,
+        deadlineMs: DISCOVERY_DEADLINE_MS,
+      });
       for (const pane of await panes(session.name, exe)) tagged.push({ session: session.name, pane });
     } catch (error) {
       if (error instanceof CommandError && herdrError(error.result).code === 'server_not_running') continue;
