@@ -1,0 +1,17 @@
+opened: '2026-10-24T14:15:52Z'
+seats:
+  - seat: A
+    pane: w8:pNP
+    harness: claude
+    session: bacd17ee-47fd-4d72-9f7c-ee61ee8698cf
+  - seat: B
+    pane: w8:pV5
+    harness: codex
+    session: 01a16e44-f654-74f1-ba45-6a5c9e43ff0c
+  - seat: C
+    pane: w8:pV6
+    harness: pi
+    session: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-10-24T14-16-20-418Z_01a16e45-08c2-7020-9a9e-d87c087086bf.jsonl
+spans:
+  - from: '2026-10-24T14:15:52Z'
+    to: '2026-10-24T15:20:34Z'

@@ -1,0 +1,3 @@
+# Brief, seat B: rebuttal (peer-session map)
+Read /home/ivan/Work/infra/akrogon/issues/chart/peer-session/slots/map-merged.md and the other seats' maps it links. Return disagreement only, with evidence, or "no disagreement": wrong tags, missing or misstated points from your map, and your position on D1-D6 after reading A's anchor (A's own agent session id). In particular, say whether A's anchor removes your objection or leaves a case it gets wrong. Make no herdr mutation, run no akrogon command or peer script.
+Return to /home/ivan/Work/infra/akrogon/issues/chart/peer-session/slots/map-rebuttal-B.md
