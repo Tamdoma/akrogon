@@ -357,7 +357,9 @@ export function withSetup(config: RepoConfig): RepoConfig {
   return {
     ...config,
     checks: map(config.checks),
-    merge_checks: map(config.merge_checks),
+    merge_checks: Object.fromEntries(
+      Object.keys(config.merge_checks).map((k): [string, string] => [k, 'akrogon verify --attempt <id>']),
+    ),
     advisory: config.advisory.map((cmd, i): string => runCheck(`advisory-${i}`, cmd)),
   };
 }

@@ -12,7 +12,8 @@ import {
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
-import { base, ensureLeafTemp, readGlobal, requireRepo, type Repo } from './config';
+import { parse } from 'shell-quote';
+import { base, ensureLeafTemp, readGlobal, requireRepo, setupCommand, type Repo } from './config';
 import { repoInventory, RepoMismatchError, readState, type Inventory, type Leaf, type State } from './state';
 import { command, spawnCaptured, type Result } from './shell';
 import { appendTiming } from './timing';
@@ -150,6 +151,16 @@ export async function runCheck(
     throw new Error('Usage: akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...');
   refuse();
   const repo: Repo = await requireRepo(readGlobal(), cwd);
+  for (const t of Object.values(repo.config.merge_checks)) {
+    const words: string[] = parse(t).map((tok) => (typeof tok === 'string' ? tok : 'op' in tok ? tok.op : ''));
+    const forms: string[][] = [words, ['sh', '-c', t], ['sh', '-c', setupCommand(repo.config, t)]];
+    if (argv.join(' ') === t || forms.some((form) => form.length === argv.length && form.every((arg, i) => arg === argv[i]))) {
+      process.stderr.write(
+        'Refusing to run a merge_checks command through run-check: run akrogon verify --attempt <id> instead; a red merge check is reproduced with a narrower command than the suite argv.\n',
+      );
+      return 1;
+    }
+  }
   const caller: LeafTarget = await leafTarget(repo, cwd, leafOverride, holder);
   const result: { code: number; log: string; stderr_final_nl: boolean } = await checkedRun(
     repo,
