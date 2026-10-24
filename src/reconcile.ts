@@ -39,7 +39,21 @@ import {
 } from './state';
 import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
 import { liveRuns, liveStartTime, withAdmissionLock } from './admission';
-import { command, herdrError, run, spawnCaptured, type Pane, type Result } from './shell';
+import {
+  CommandError,
+  command,
+  herdrArgv,
+  herdrError,
+  panes,
+  repoSession,
+  run,
+  spawnCaptured,
+  tabs,
+  type Pane,
+  type Result,
+  type SessionResolution,
+  type Tab,
+} from './shell';
 
 export type Reconciled = { removed: string[]; kept: { path: string; reason: string; clears?: string }[] };
 
@@ -380,11 +394,31 @@ export function processesInside(paths: string[]): Set<string> {
   return new Set(paths.filter((path) => pidsInside(targets, path).length > 0));
 }
 
+// The tab list and close run only in the session holding the repo workspace;
+// a refused, missing or stopped-at-call session means nothing is touched.
 export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null): Promise<boolean> {
-  if (leaf.state.tab === undefined || live === null || broadcastInProgress(leaf.state, live)) return false;
+  if (leaf.state.tab === undefined || live === null || broadcastPending(leaf.state)) return false;
+  const resolved: SessionResolution = await repoSession(repo);
+  if (!resolved.ok) return false;
+  const session: string = resolved.session.name;
+  let seated: { panes: Pane[]; tabs: Tab[] };
+  try {
+    seated = {
+      panes: await panes(session),
+      tabs: await tabs(session),
+    };
+  } catch (error) {
+    if (error instanceof CommandError && herdrError(error.result).code === 'server_not_running') return false;
+    throw error;
+  }
+  const workspaceTabs: Set<string> = new Set(
+    seated.tabs.filter((item) => item.workspace_id === resolved.workspace.workspace_id).map((item) => item.tab_id),
+  );
+  const seatedPanes: Pane[] = seated.panes.filter((pane) => workspaceTabs.has(pane.tab_id));
   const tab: string = leaf.state.tab;
-  if (!live.some((pane) => pane.tab_id === tab)) return false;
-  await command(['herdr', 'tab', 'close', tab]);
+  if (!workspaceTabs.has(tab) || broadcastInProgress(leaf.state, seatedPanes)) return false;
+  if (!seatedPanes.some((pane) => pane.tab_id === tab)) return false;
+  await command(herdrArgv(['tab', 'close', tab], { session }));
   return true;
 }
 
@@ -663,8 +697,43 @@ export async function reconcile(
     return true;
   }
 
+  // The repo's seat context for this pass: resolved session plus the tab ids
+  // of the resolved workspace. Fetched once, lazily, and only when a close is
+  // actually decided — a refused or dead session yields null, so nothing is
+  // closed in a session that cannot be proven the repo's.
+  let seat: { session: string; tabs: Set<string> } | null | undefined;
+  const seatTabs = async (): Promise<{ session: string; tabs: Set<string> } | null> => {
+    if (seat === undefined) {
+      const resolved: SessionResolution = await repoSession(repo);
+      if (!resolved.ok) {
+        seat = null;
+      } else {
+        try {
+          const listed: Tab[] = await tabs(resolved.session.name);
+          seat = {
+            session: resolved.session.name,
+            tabs: new Set(
+              listed.filter((item) => item.workspace_id === resolved.workspace.workspace_id).map((item) => item.tab_id),
+            ),
+          };
+        } catch (error) {
+          if (!(error instanceof CommandError) || herdrError(error.result).code !== 'server_not_running') throw error;
+          seat = null;
+        }
+      }
+    }
+    return seat;
+  };
+
   async function closeTab(worktree: string, tab: string): Promise<boolean> {
-    const closed: Result = await run(['herdr', 'tab', 'close', tab]);
+    const seated: { session: string; tabs: Set<string> } | null = await seatTabs();
+    if (seated === null) {
+      keep(worktree, 'repo session unavailable', 'resolve the repo session refusal and retry cleanup');
+      return false;
+    }
+    // The recorded tab is not in the resolved workspace: not this repo's seat.
+    if (!seated.tabs.has(tab)) return true;
+    const closed: Result = await run(herdrArgv(['tab', 'close', tab], { session: seated.session }));
     if (closed.code === 0) return true;
     const detail: { code: string; message: string } = herdrError(closed);
     keep(
