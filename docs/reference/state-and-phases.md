@@ -123,7 +123,7 @@ Exact shapes are in [src/state.ts](../../src/state.ts).
 
 `delivery_error` (`deliveryErrorSchema`) is one entry per seat, written when a prompt cannot be delivered and cleared when one is:
 
-- `command`, `code` and `message` are the herdr call and its error.
+- `command`, `code` and `message` are the herdr call and its error. `command` is the routed argv, including the `--session <name>` the resolver picked.
 - `pane` and `session` are the pane and agent session it targeted.
 - `at` is when it failed.
 - `offset` is where the agent's session file ended before a timed-out paste. The next pass uses it to see whether the prompt arrived late.
