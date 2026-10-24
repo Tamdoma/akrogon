@@ -1987,27 +1987,32 @@ for (const edge of ['interrupted', 'empty', 'recreated'] as const) {
       });
       const before: number = calls(f).length;
       const result: Result = await next(f, ['allocation']);
+      expect(result.code).toBe(0);
+      const allocated: State = readState(path);
+      const updated: Database = database(f);
+      expect(allocated.pane.A).toBe(updated.panes[0].pane_id);
+      expect(allocated.pane.B).not.toBe('operator');
+      expect(
+        calls(f)
+          .slice(before)
+          .filter((args) => args[0] === 'pane' && args[1] === 'split'),
+      ).toHaveLength(1);
+      expect(updated.prompts.at(-1)?.pane).toBe(allocated.pane.A);
+      if (edge === 'recreated') {
+        expect(allocated.tab).not.toBe(state.tab);
+        expect(allocated.pane.A).not.toBe(state.pane.A);
+        expect(allocated.pane.B).not.toBe(state.pane.B);
+      }
       if (edge === 'empty') {
-        expect(result.code).toBe(1);
-        expect(result.stderr).toContain(state.tab!);
-        expect(database(f).panes).toHaveLength(0);
-      } else {
-        expect(result.code).toBe(0);
-        const allocated: State = readState(path);
-        const updated: Database = database(f);
-        expect(allocated.pane.A).toBe(updated.panes[0].pane_id);
-        expect(allocated.pane.B).not.toBe('operator');
+        // The emptied tab is not reusable (no member inside the worktree), so
+        // it is left alone and a replacement carries the seats.
+        expect(allocated.tab).not.toBe(state.tab);
+        expect(updated.tabs.some((tab) => tab.tab_id === state.tab)).toBe(true);
         expect(
           calls(f)
             .slice(before)
-            .filter((args) => args[0] === 'pane' && args[1] === 'split'),
-        ).toHaveLength(1);
-        expect(updated.prompts.at(-1)?.pane).toBe(allocated.pane.A);
-        if (edge === 'recreated') {
-          expect(allocated.tab).not.toBe(state.tab);
-          expect(allocated.pane.A).not.toBe(state.pane.A);
-          expect(allocated.pane.B).not.toBe(state.pane.B);
-        }
+            .filter((args) => args[0] === 'tab' && args[1] === 'close' && args[2] === state.tab),
+        ).toHaveLength(0);
       }
     } finally {
       f.clean();
