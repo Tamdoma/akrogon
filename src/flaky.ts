@@ -30,6 +30,7 @@ export async function flips(repo: Repo, runs: VerifyRun[]): Promise<Flip[]> {
   const out: Flip[] = [];
   for (const run of completed)
     for (const item of run.commands) {
+      if (item.reused !== undefined) continue;
       const key: string = `${run.tree}\0${item.command}`;
       if (item.exit !== 0) {
         red.set(key, item);
