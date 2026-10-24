@@ -1448,3 +1448,28 @@ test('blocked merge members cannot provide known-red cover or flaky observations
     f.clean();
   }
 });
+
+test('packing holder logs preserves same-tree command reuse', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const counter: string = resolve(f.home, 'good.count');
+    config(f, { checks: { good: `echo x >> ${counter}`, bad: 'exit 7' } });
+    const direct: string = resolve(storeDir(f), 'direct');
+    await command(['git', 'worktree', 'add', direct, '-b', 'direct'], f.root);
+    const holder: string = resolve(f.root, 'issues/chart/demo/direct');
+    mkdirSync(holder, { recursive: true });
+    const env: NodeJS.ProcessEnv = fakeAkrogon(f).env;
+    expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(1);
+    const first: VerifyRun = records(f)[0];
+    expect((await cli(f, ['pack', 'issues/chart/demo'], f.root, env)).code).toBe(0);
+    expect(existsSync(first.commands[0].log)).toBe(false);
+    expect((await cli(f, ['log', first.commands[0].log], f.root, env)).code).toBe(0);
+    expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(1);
+    const second: VerifyRun = records(f)[1];
+    expect(second.commands[0]).toMatchObject({ reused: first.run, log: first.commands[0].log });
+    expect(second.commands[1]).not.toHaveProperty('reused');
+    expect(readFileSync(counter, 'utf8').trim().split('\n')).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+});
