@@ -72,7 +72,12 @@ function socket(f: DispatchFixture): string {
 function paneEvent(type: string, pane: string, status: string = 'idle'): string {
   return JSON.stringify({
     event: type,
-    data: { type, pane_id: pane, workspace_id: 'w1', ...(type === 'pane_agent_status_changed' ? { agent_status: status } : {}) },
+    data: {
+      type,
+      pane_id: pane,
+      workspace_id: 'w1',
+      ...(type === 'pane_agent_status_changed' ? { agent_status: status } : {}),
+    },
   });
 }
 
