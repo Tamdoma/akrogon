@@ -1298,10 +1298,11 @@ async function selectLeaves(
   return { repo, leaves: selected };
 }
 
-// Repo keys whose workspace is in the invoking herdr session; a failed list
-// means none, so a pass acts only on repos it can see.
-async function sessionRepos(): Promise<Set<string>> {
-  return new Set(((await workspaces().catch(() => null)) ?? []).map((workspace) => workspace.label));
+// Repo keys whose workspace is in the invoking herdr session, or null when the
+// list fails; callers then judge with no pane list, which keeps every tab.
+async function sessionRepos(): Promise<Set<string> | null> {
+  const list: Workspace[] | null = await workspaces().catch(() => null);
+  return list === null ? null : new Set(list.map((workspace) => workspace.label));
 }
 
 async function reconcileRepos(
@@ -1310,20 +1311,19 @@ async function reconcileRepos(
   isAutomatic: boolean,
   panesOnce: () => Promise<Pane[] | null>,
 ): Promise<void> {
-  const visible: Set<string> = await sessionRepos();
+  let visible: Set<string> | null | undefined;
   const acting: Set<string> = new Set();
   for (const repo of repos) {
     if (isAutomatic && isPaused(repo.name)) continue;
-    if (!visible.has(repo.name)) continue;
-    acting.add(repo.name);
     const inventory: Inventory = discover(repo, invocation);
     try {
-      await reconcile(
-        repo,
-        inventory.leaves,
-        (await reconcileNeedsPanes(repo, inventory.leaves)) ? await panesOnce() : [],
-        inventoryFailures(inventory),
-      );
+      const needsPanes: boolean = await reconcileNeedsPanes(repo, inventory.leaves);
+      // Tabs are judged only from the repo's own herdr session.
+      if (needsPanes && visible === undefined) visible = await sessionRepos();
+      if (needsPanes && visible !== null && visible !== undefined && !visible.has(repo.name)) continue;
+      acting.add(repo.name);
+      const live: Pane[] | null = !needsPanes ? [] : visible === null ? null : await panesOnce();
+      await reconcile(repo, inventory.leaves, live, inventoryFailures(inventory));
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       report(invocation, repo.name, repo.root, error);
@@ -1445,7 +1445,8 @@ export async function nextCommand(input: string | undefined, pressureDir: string
         if (owners.length > 1) throw new Error(`Multiple leaves own closed tab: ${event.data.tab_id}`);
         if (owners.length === 0) return;
         if (isPaused(owners[0].repo.name)) return;
-        if (!(await sessionRepos()).has(owners[0].repo.name)) return;
+        const visible: Set<string> | null = await sessionRepos();
+        if (visible !== null && !visible.has(owners[0].repo.name)) return;
         const completedSlug: string = owners[0].leaf.state.slug;
         try {
           const inventory: Inventory = discover(owners[0].repo, invocation);
