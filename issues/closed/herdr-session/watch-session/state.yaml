@@ -1,0 +1,33 @@
+slug: watch-session
+phase: merged
+created: 2026-10-24
+repo: akrogon
+debate: "no"
+blocked-by:
+  - session-routing
+sources:
+  - "Tamdoma/akrogon#117"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tEP
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pWB
+  B: w8:pWC
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-24T20:13:41.534Z
+frozen:
+  skills/watch-issues/scripts/fixtures/herdr-session-list.json: 7c94899ce3da6660061ddedce0b965a95c739150
+  skills/watch-issues/scripts/fixtures/herdr-workspace-list.json: 45d1b527fec5301950cc3db0cc07743b9b78360b
+  skills/watch-issues/scripts/observe-log-tail.test.ts: 5a1c0ee758e0da15d50de13bb98c071ad25b1baf
+  skills/watch-issues/scripts/observe.test.ts: a22449bb9f5d7bddae19577a60b4ca8233c495c9
+frozen_cited: []

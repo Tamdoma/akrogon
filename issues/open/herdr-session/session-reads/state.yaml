@@ -1,7 +1,0 @@
-slug: session-reads
-phase: plan.synthesis
-created: '2026-10-24'
-repo: akrogon
-debate: 'no'
-blocked-by: [session-routing]
-sources: ['Tamdoma/akrogon#117']

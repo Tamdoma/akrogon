@@ -1,0 +1,40 @@
+slug: session-reads
+phase: merged
+created: 2026-10-24
+repo: akrogon
+debate: "no"
+blocked-by:
+  - session-routing
+sources:
+  - "Tamdoma/akrogon#117"
+busy_since:
+  B: 2026-10-24T21:41:53.211Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tEN
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pW8
+  B: w8:pWA
+prompted:
+  B: 01a16fc7-70e0-7440-813d-8cb4f1e5db9a
+prompted_at:
+  B: 2026-10-24T21:41:53.211Z
+delivery_error: {}
+merge_stamp: 2026-10-24T21:41:45.187Z
+broadcast:
+  kind: issue
+  name: herdr-session
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/herdr-session
+  pushed: 50c91f47218a1cf55f82fbefcd0c41d799b43be2
+  sources:
+    - "Tamdoma/akrogon#117"
+frozen:
+  tests/session-reads.test.ts: c68728a30d11a737c2060bd5e0b27359de7a812d
+frozen_cited: []

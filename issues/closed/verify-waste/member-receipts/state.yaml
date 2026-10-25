@@ -1,0 +1,39 @@
+slug: member-receipts
+phase: merged
+created: 2026-10-24
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources: []
+busy_since:
+  B: 2026-10-24T22:56:00.775Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tEQ
+worktree: /home/ivan/.akrogon/worktrees/akrogon/member-receipts
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pWE
+  B: w8:pWF
+prompted:
+  B: 01a1700a-3fd2-7471-814b-87e2b9315a91
+prompted_at:
+  B: 2026-10-24T22:56:00.775Z
+delivery_error: {}
+merge_stamp: 2026-10-24T22:55:56.261Z
+broadcast:
+  kind: issue
+  name: verify-waste
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/verify-waste
+  pushed: 5b7b2a577861da1d0faed0e279fcd8382f8a10b8
+  sources: []
+frozen:
+  tests/flaky.test.ts: 927b6b8a9c7afe27df49aa469be7d9c395da1838
+  tests/verify.test.ts: 846bcc6e7a4e774dc72ef8943e061f7bdf4b1a68
+frozen_cited: []

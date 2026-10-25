@@ -1,0 +1,30 @@
+slug: suite-refusal
+phase: merged
+created: 2026-10-24
+repo: akrogon
+debate: "no"
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tER
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pWG
+  B: w8:pWH
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-24T21:56:33.424Z
+frozen:
+  tests/config.test.ts: e857a3e39262379a095356c9b45465c7d036426e
+  tests/docs-links.test.ts: ed720715e69f572a8e640ec264c6802456778938
+  tests/run-check.test.ts: 641a3d4e36ca54d46811b51fb8a73838a341f61c
+frozen_cited: []

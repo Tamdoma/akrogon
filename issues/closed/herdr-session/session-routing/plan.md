@@ -74,3 +74,10 @@ Red evidence: `akrogon run-check --name session-routing -- bun test tests/sessio
 ## Docs
 
 One line each: `src/AREA.md` (shell wraps herdr calls with the repo-resolved `--session`; discovery carries a 10 s deadline), `tests/AREA.md` (fake-herdr sessions + `.calls-raw`), `docs/reference/state-and-phases.md` (delivery `command` is the routed argv). No skills or other human docs are affected.
+
+## Implementation notes
+
+- 2026-10-24: `reconcileHost` keeps main's `acting` gate (a leaf-matched slice is stopped only when this pass reconciled its repo, covering paused repos) and gains `panesForRepo` for leaf-tab judgements per D7; the filesystem veto keeps the cross-session union. `reconcile`'s recorded `closeTab` and `closeMergedTab` enforce the design's acting-use rule as written: workspace membership AND a member pane whose cwd is inside the leaf's expected worktree (`state.worktree`, else `resolve(worktreeStore(repo), slug)`). Untagged `workspace_id` tabs stay out of scope (D5's strict equality); the earlier "untagged tabs stay in scope" relaxation was reverted because it closed foreign tabs.
+- 2026-10-24: rebasing onto origin/main surfaced `sessionRepos` (an invoking-session `workspace list` gate for reconcile and tab_closed). It is removed: per-repo `repoSession` resolution subsumes it, and keeping it would skip repos invisible to the invoking session — the failure this leaf fixes.
+
+- 2026-10-24: F2 repairs also corroborate hook ownsPane and dispatch pane-get membership, as required by design session-address Q2's acting-use rule; allocation alone does not cover these named entry paths.

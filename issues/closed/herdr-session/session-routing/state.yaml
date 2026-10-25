@@ -1,33 +1,29 @@
 slug: session-routing
-phase: implement
+phase: merged
 created: 2026-10-24
 repo: akrogon
 debate: "no"
 blocked-by: []
 sources:
   - "Tamdoma/akrogon#117"
-busy_since:
-  A: 2026-10-24T14:24:06.477Z
-busy_notified:
-  A: 2026-10-24T15:57:04.650Z
+busy_since: {}
+busy_notified: {}
 attempts:
   A: 0
   B: 0
 done: []
-fix_rounds: 0
+fix_rounds: 1
 verdict: {}
 tab: w8:tEK
-worktree: /home/ivan/.akrogon/worktrees/akrogon/session-routing
 env_names: []
 env_generation: 0
 pane:
-  A: w8:pW4
+  A: w8:pW7
   B: w8:pW5
-prompted:
-  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-session-routing--/2026-10-24T13-58-46-278Z_01a16e34-f306-71e0-af03-bd10b836b501.jsonl
-prompted_at:
-  A: 2026-10-24T14:24:06.477Z
+prompted: {}
+prompted_at: {}
 delivery_error: {}
+merge_stamp: 2026-10-24T18:47:34.071Z
 frozen:
   tests/fake-herdr.ts: 446d6666f57a7a056bd7f9fa7a2eaf44e9a9863c
   tests/session-routing.test.ts: 9ff917b920a2dd3f81f941d09fa894e9ee4e0eee
