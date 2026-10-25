@@ -15,7 +15,6 @@ done: []
 fix_rounds: 1
 verdict: {}
 tab: w8:tEQ
-worktree: /home/ivan/.akrogon/worktrees/akrogon/member-receipts
 env_names: []
 env_generation: 0
 pane:

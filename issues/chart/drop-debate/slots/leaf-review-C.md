@@ -1,0 +1,13 @@
+# Leaf review C: remove-plan-debate
+
+Read 2026-10-25: the five drafts, both forks' `## Taken`, CHART.md, and `src/init.ts` `init`, `src/config.ts` `readRepo`/`effectiveConfig`, `src/timing-report.ts` `Visit`/`requiredSlots` call, `skills/watch-issues/scripts/observe.ts` imports, `docs/pictures/chart-door.svg` text.
+
+## Disagreements
+
+1. Settle the `init` Open question now; it is a missing owned surface. `src/init.ts` `init` parses `repoSchema` directly from the existing `issues/config.yaml` when no proposal is given, and from the operator's proposal file otherwise. All 11 registered repos carry `rebuttal: true`, so `akrogon init` re-run in any of them fails after this leaf unless the strip runs there too. Correction: design "Owned surfaces" adds `src/init.ts`; `src/config.ts` gains one `parseRepoConfig(raw)` that strips `rebuttal` and parses, called by `readRepo`, `init` and the `{ grounding: 'none' }` default in `effectiveConfig`; the Open question is deleted. Criterion 1 adds "and through `akrogon init` on a repo whose config carries `rebuttal`". Practitioner, 2026-10-25.
+
+2. Narrow the `Phase`-typed-consumer Open question to its one real case. `failure.phase` has no reader in `src/` (no `failure.phase` or `failure?.phase` reference; `routing[...]` is indexed only with `state.phase` in `transition` and `allocated.phase` in `next.ts`). The only consumer that carries a log or timing phase as `Phase` is `src/timing-report.ts`: `Visit.phase` is typed `Phase`, is passed to `requiredSlots(visit.phase, visit.rounds)` and tested with `startsWith('plan.')`. Correction: replace the broad question with "Open for the plan: `timing-report.ts` `Visit.phase` becomes the historical type; `requiredSlots` is live-only, so the report needs the retired phases' seat count (both were A+B) from a small retired table beside the historical enum in `routing.ts`, or the report skips seat attribution for retired visits." Practitioner, 2026-10-25.
+
+3. Settle the `observe.ts` Open question now: no. `skills/watch-issues/scripts/observe.ts` imports `repoInventory` from `src/state` and `readRepo` from `src/config` and defines no phase or state schema of its own (its only zod schemas are `herdrListSchema` and `agentStatusSchema`). It inherits both strips. Correction: delete the question; the listed `observe.test.ts` and `observe-log-tail.test.ts` fixture edits remain. Practitioner, 2026-10-25.
+
+Everything else: no disagreement. The exclusion of `docs/pictures/chart-door.svg` is right; its only matching text is "merge and rebuttal", the charting round. The draft `state.yaml` keeping `debate: 'no'` is right, since the installed release still requires it and criterion 2 covers its removal on the next save.

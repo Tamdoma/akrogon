@@ -1,0 +1,37 @@
+slug: remove-plan-debate
+phase: merged
+created: 2026-10-25
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since:
+  B: 2026-10-25T07:37:52.402Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tET
+worktree: /home/ivan/.akrogon/worktrees/akrogon/remove-plan-debate
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pWM
+  B: w8:pWN
+prompted:
+  B: 01a171f9-5622-7d33-a69f-aaba93116b71
+prompted_at:
+  B: 2026-10-25T07:37:52.402Z
+delivery_error: {}
+merge_stamp: 2026-10-25T07:34:26.595Z
+broadcast:
+  kind: issue
+  name: drop-debate
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/drop-debate
+  pushed: 1deb1fb0d750e3f21154697743aa797ff15dd79d
+  sources: []
+frozen:
+  tests/retired-debate.test.ts: 88833779ad02a6f12d7eb2c5d8f4be7f5f44ccf0
+frozen_cited: []
