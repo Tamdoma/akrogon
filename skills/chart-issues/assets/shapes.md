@@ -24,7 +24,7 @@ Charts stay here after handoff. They have no state.yaml or lifecycle phase. Crea
 
 <observable outcome>
 
-Route: <lifecycle (debate no|yes) | direct>
+Route: <lifecycle | direct>
 
 ## Forks taken
 
@@ -59,7 +59,7 @@ Every mode entry's session id is the live `agent_session.value` `herdr agent lis
 - breach: <each observed boundary breach, first in the section>
 - switch-on: <INTAKE.md reference carrying the operator's verbatim words>
 - consultant: <each named consultant; each loss with its reason, the charts run without it and ignored late returns>
-- route: <lifecycle with its debate choice>
+- route: <lifecycle | direct>
 - handed off: <each leaf handed off>
 - main step: <each completed step on main or lesson write for handed work>
 - wait: <the exact missing need, approval or prerequisite> — next: <next step>
@@ -332,15 +332,14 @@ proofs:
 
 ```yaml
 slug: sample-change
-phase: plan.synthesis # plan.positions when debate: 'yes'
+phase: plan.synthesis
 created: '2026-09-11'
 repo: registered-key
-debate: 'no'
 blocked-by: []
 sources: []
 ```
 
-Replace sample values with the chosen slug, creation date and registered repo key. `debate: 'no'` starts at `plan.synthesis`; `debate: 'yes'` starts at `plan.positions`. Debate is one door election, default no, with very small issues using no without a question. A direct-route chart writes no leaf files or state.yaml. Every leaf gets `sources`, empty when unsourced. Attempts, done, fix_rounds, frozen, frozen_cited, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
+Replace sample values with the chosen slug, creation date and registered repo key. A direct-route chart writes no leaf files or state.yaml. Every leaf gets `sources`, empty when unsourced. Attempts, done, fix_rounds, frozen, frozen_cited, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
 
 A GitHub report has exactly one completion owner, an issue or an epic: every leaf beneath that owner carries its exact identity in sources. For an epic owner, that includes leaves of every child issue. Do not distribute one identity across unrelated completion owners. Legacy source paths stay in intake provenance, not sources. One stated exception: a report whose close depends on a step on main that can only follow a leaf's merge is withheld from `sources` of every leaf whose completion could close it; the identity stays open, mirrored by `akrogon pull`, and the door makes and verifies the edit, then runs `akrogon close <id> --by <text>` naming what delivered it.
 

@@ -1,6 +1,6 @@
 ---
 name: plan-issue
-description: Write a leaf's execution plan through blind positions, one rebuttal round, or slot A synthesis, including direct synthesis when debate is off.
+description: Write a leaf's execution plan as one slot A synthesis from the brief and design.
 ---
 
 At every phase prompt, re-read this file, its references and the leaf's `brief.md` and `design.md` from disk before acting, even when read earlier in this thread.
@@ -38,25 +38,9 @@ When the brief and the locked design disagree, the design wins: the conflict is 
 
 A reusable lesson found here is one line in `learnings/LESSONS.md` naming mechanism, date and history path, plus `learnings/history/<date>-<slug>.md` with the case, evidence and abstract learning, and the write follows the [lesson rule](../lesson-rule.md).
 
-## plan.positions
-
-Write only `positions-<slot>.md` under the `leaf=` folder from the shared brief and live surfaces, without reading the peer's position, covering recommendation, concrete changes, risks, simpler alternative and acceptance evidence.
-
-With repo `rebuttal: true`, a substantive behavioral fork belongs in the rebuttal round; a conceded defect or wording preference needs no new debate.
-
-Finish with `akrogon phase <slug> plan.rebuttal --slot <A|B>` when rebuttal is enabled, otherwise `akrogon phase <slug> plan.synthesis --slot <A|B>`, then print the footer and stop.
-
-## plan.rebuttal
-
-Read both independent positions and write only `rebuttal-<slot>.md` under the `leaf=` folder, resolving real forks against the locked design and live evidence without reading or answering the peer's rebuttal.
-
-No real fork is a substantive agreement statement, not a manufactured objection; this is the one configured round.
-
-Finish with `akrogon phase <slug> plan.synthesis --slot <A|B>`, then print the footer and stop.
-
 ## plan.synthesis
 
-As A, write `plan.md` under the `leaf=` folder with stable D1…Dn decisions, read-first paths, needed interfaces, a file/criterion checklist grouped into waves, and concrete verification, integrating both positions and any configured rebuttals when debate ran, or directly using the brief/design when `debate: no`. Each unit lists the paths it owns, any shared test resource it uses (a live fixture, account or test site counts) and the units that must land first. Units with disjoint owned paths, no shared test resource and no dependency on another member of the same wave share a wave, up to 3 per wave. A unit whose prerequisite is in an earlier wave goes in a later wave, and units needing the same landed prerequisite can share that later wave. When every wave ends up holding exactly one unit — whether the serial order comes from a prerequisite, a shared path or a shared test resource — the run is serial-solo and implement-issue's rule has A implement the plan itself with no workers. The checklist names every affected agent and human doc one line each, or states in one line that no doc is affected.
+As A, write `plan.md` under the `leaf=` folder with stable D1…Dn decisions, read-first paths, needed interfaces, a file/criterion checklist grouped into waves, and concrete verification, working from the brief and design. Each unit lists the paths it owns, any shared test resource it uses (a live fixture, account or test site counts) and the units that must land first. Units with disjoint owned paths, no shared test resource and no dependency on another member of the same wave share a wave, up to 3 per wave. A unit whose prerequisite is in an earlier wave goes in a later wave, and units needing the same landed prerequisite can share that later wave. When every wave ends up holding exactly one unit — whether the serial order comes from a prerequisite, a shared path or a shared test resource — the run is serial-solo and implement-issue's rule has A implement the plan itself with no workers. The checklist names every affected agent and human doc one line each, or states in one line that no doc is affected.
 
 plan.md maps each done-criterion to the observation that proves it: the real boundary, the state before and after, the product failure it catches and the command that observes it, plus a size (seconds, minutes, hours or unknown) and a rerun trigger, which for a model or outside stage names its model-facing inputs, its recording and the real consumers that replay it under standing-design's recorded-output rule; a command that only creates an artifact or exercises a helper is no evidence for a consumer result it does not observe. A slow-run leaf's plan names its restart boundaries.
 

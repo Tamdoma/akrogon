@@ -38,13 +38,13 @@ Each review seat reuses `grants[]` for the operations they cover, within their b
 
 During initial review, both A and B work blind: do not contact or wait for the peer, or read the peer's current review. Record unresolved questions as findings in your own `review-<slot>.md` under the `leaf=` folder and account for them in your verdict under the Fix/Nit rules below. Uncertainty alone is not a Fix.
 
-As B, read your own `positions-B.md` and `rebuttal-B.md` first when debate produced them. Each seat judges the whole initial diff against the plan's decisions, criteria, change list and checklist, the brief's done-criteria, the design's exclusions, the report and live contracts, following affected docs and index pointers and checking any lesson claim against its evidence.
+Each seat judges the whole initial diff against the plan's decisions, criteria, change list and checklist, the brief's done-criteria, the design's exclusions, the report and live contracts, following affected docs and index pointers and checking any lesson claim against its evidence.
 
 For each `AREA.md` in the reviewed diff, use one shell command to list the paths it names and whether they exist from the repository root. Record a missing path as a Fix only with its realistic source, its consequence today, and the criterion or gap it hits, citing the live listing as the trace and the dead-pointer consequence today. For a deleted area file, review the deletion and affected index pointers against the plan without opening the removed file.
 
 Start from the changed behavior and open the doc page describing it even when the page is unchanged. A wrong claim or a path that does not exist is a Fix only with its realistic source, its consequence today, and the criterion or gap it hits, citing the live listing as the trace for a dead pointer. Otherwise write one line that no documented behavior changed.
 
-B's earlier arguments focus attention but are not additional acceptance criteria; missing debate artifacts on a `debate: no` leaf are expected, and `learnings/LESSONS.md` is not review input.
+`learnings/LESSONS.md` is not review input.
 
 B also lists the `Test-Change:` trailers in `<target>..HEAD` in `review-B.md` and judges each against its cited source; the changed-file path rule lives in `src/test-files.ts`.
 
