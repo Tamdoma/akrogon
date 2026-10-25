@@ -107,7 +107,7 @@ test('one bad leaf stops only itself: next, phase, config, run-check and status 
 for (const variant of [
   {
     name: 'unknown top-level key',
-    body: 'slug: bad-leaf\nphase: plan.synthesis\ncreated: 2026-10-19\nrepo: repo\ndebate: "no"\nblocked-by: []\nnotes: stray\n',
+    body: 'slug: bad-leaf\nphase: plan.synthesis\ncreated: 2026-10-19\nrepo: repo\nblocked-by: []\nnotes: stray\n',
   },
   { name: 'invalid known value', body: 'slug: bad-leaf\nphase: not-a-phase\n' },
   { name: 'malformed YAML', body: 'slug: [' },

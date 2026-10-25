@@ -119,7 +119,6 @@ export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}
     phase,
     created: '2026-09-10',
     repo: 'repo',
-    debate: 'no',
     'blocked-by': [],
     ...extra,
   });

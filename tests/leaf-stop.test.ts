@@ -298,7 +298,6 @@ test('stop --all skips merged and closed leaves that keep their tab', async () =
       phase: 'merged',
       created: '2026-09-10',
       repo: 'repo',
-      debate: 'no',
       'blocked-by': [],
       tab: 'w1:t8',
     });

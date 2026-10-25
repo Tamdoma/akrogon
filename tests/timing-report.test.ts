@@ -420,7 +420,6 @@ function carrier(
     phase: 'implement',
     created,
     repo: 'repo',
-    debate: 'no',
     'blocked-by': [],
     sources,
   });

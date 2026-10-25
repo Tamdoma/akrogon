@@ -20,7 +20,6 @@ const canonical: z.input<typeof stateSchema> = {
   phase: 'implement',
   created: '2026-09-10',
   repo: 'repo',
-  debate: 'no',
   'blocked-by': [],
 };
 

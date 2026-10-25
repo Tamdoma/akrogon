@@ -172,7 +172,6 @@ function leafIn(root: string, repo: string, slug: string, phase: string, extra: 
     phase,
     created: '2026-09-10',
     repo,
-    debate: 'no',
     'blocked-by': [],
     ...extra,
   });

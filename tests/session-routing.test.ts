@@ -193,7 +193,6 @@ test('a refused repo reports once in --all while a healthy repo still dispatches
       phase: 'plan.synthesis',
       created: '2026-09-10',
       repo: 'second',
-      debate: 'no',
       'blocked-by': [],
     });
     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as Record<string, unknown>;

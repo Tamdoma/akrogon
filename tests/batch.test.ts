@@ -12,7 +12,6 @@ const baseState: object = {
   phase: 'merge',
   created: '2026-10-05',
   repo: 'repo',
-  debate: 'no',
   'blocked-by': [],
 };
 

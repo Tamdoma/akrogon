@@ -132,7 +132,6 @@ function baseState(slug: string, phase: string, extra: Record<string, unknown> =
     phase,
     created: '2026-09-10',
     repo: 'testrepo',
-    debate: 'no',
     'blocked-by': [],
     ...extra,
   };
@@ -187,7 +186,7 @@ test('mixed A working and B idle', async (): Promise<void> => {
       root,
       'owner',
       'mix-leaf',
-      baseState('mix-leaf', 'plan.positions', {
+      baseState('mix-leaf', 'check.review', {
         attempts: { A: 1, B: 2 },
         pane: { A: 'pane-a', B: 'pane-b' },
       }),
@@ -201,7 +200,7 @@ test('mixed A working and B idle', async (): Promise<void> => {
     expect(r.code, r.stderr).toBe(0);
     expect(lines(r.stdout)).toEqual([
       'session=sess',
-      'slug=mix-leaf phase=plan.positions attempts=A1,B2 blocked= A=pane-a/working logA=- B=pane-b/idle notified=',
+      'slug=mix-leaf phase=check.review attempts=A1,B2 blocked= A=pane-a/working logA=- B=pane-b/idle notified=',
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });

@@ -68,35 +68,35 @@ test('real same-slot and different-slot races record once and refuse stale moves
   const f: Fixture = await fixture();
   try {
     const stamp: string = '2026-09-11T12:00:00.000Z';
-    const path: string = leaf(f, 'race', 'plan.positions', {
+    const path: string = leaf(f, 'race', 'check.review', {
       busy_since: { A: stamp },
       busy_notified: { A: stamp },
     });
     const same: Result[] = await Promise.all([
-      cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'A']),
-      cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'A']),
+      cli(f, ['phase', 'race', 'merge', '--slot', 'A', '--verdict', 'ready']),
+      cli(f, ['phase', 'race', 'merge', '--slot', 'A', '--verdict', 'ready']),
     ]);
     expect(same.map((r) => r.code).sort()).toEqual([0, 1]);
     expect(readState(path).done).toEqual(['A']);
     const before: string = bytes(path);
-    expect((await cli(f, ['phase', 'race', 'merge', '--slot', 'B'])).code).not.toBe(0);
+    expect((await cli(f, ['phase', 'race', 'implement', '--slot', 'B'])).code).not.toBe(0);
     expect(bytes(path)).toBe(before);
-    expect((await cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'B'])).code).toBe(0);
+    expect((await cli(f, ['phase', 'race', 'merge', '--slot', 'B', '--verdict', 'ready'])).code).toBe(0);
     expect(readState(path)).toMatchObject({
-      phase: 'plan.rebuttal',
+      phase: 'merge',
       busy_since: { A: stamp },
       busy_notified: { A: stamp },
     });
     const moved: string = bytes(path);
-    expect((await cli(f, ['phase', 'race', 'plan.rebuttal', '--slot', 'B'])).code).not.toBe(0);
+    expect((await cli(f, ['phase', 'race', 'merge', '--slot', 'B', '--verdict', 'ready'])).code).not.toBe(0);
     expect(bytes(path)).toBe(moved);
-    const other: string = leaf(f, 'other', 'plan.positions');
+    const other: string = leaf(f, 'other', 'check.review');
     const different: Result[] = await Promise.all(
-      ['A', 'B'].map((slot) => cli(f, ['phase', 'other', 'plan.rebuttal', '--slot', slot])),
+      ['A', 'B'].map((slot) => cli(f, ['phase', 'other', 'merge', '--slot', slot, '--verdict', 'ready'])),
     );
     expect(different.every((r) => r.code === 0)).toBe(true);
-    expect(different.filter((r) => r.stdout === 'moved plan.rebuttal')).toHaveLength(1);
-    expect(readState(other)).toMatchObject({ phase: 'plan.rebuttal', done: [], attempts: { A: 0, B: 0 } });
+    expect(different.filter((r) => r.stdout === 'moved merge')).toHaveLength(1);
+    expect(readState(other)).toMatchObject({ phase: 'merge', done: [], attempts: { A: 0, B: 0 } });
     expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n')).toHaveLength(2);
   } finally {
     f.clean();
@@ -989,20 +989,20 @@ test('planning move refuses issue files on branch naming leaf path, then records
   try {
     const worktree: string = resolve(f.home, 'wt-stray');
     await command(['git', 'worktree', 'add', '-b', 'stray', worktree], f.root);
-    const path: string = leaf(f, 'stray', 'plan.positions', { worktree });
+    const path: string = leaf(f, 'stray', 'plan.synthesis', { worktree });
     mkdirSync(resolve(worktree, 'issues/open/issue/stray'), { recursive: true });
-    writeFileSync(resolve(worktree, 'issues/open/issue/stray/positions-B.md'), 'stray artifact\n');
+    writeFileSync(resolve(worktree, 'issues/open/issue/stray/notes.md'), 'stray artifact\n');
     await command(['git', 'add', 'issues'], worktree);
     await command(['git', 'commit', '-m', 'artifact on branch'], worktree);
-    const refused: Result = await cli(f, ['phase', 'stray', 'plan.rebuttal', '--slot', 'A']);
+    const refused: Result = await cli(f, ['phase', 'stray', 'implement', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain(resolve(f.root, 'issues/open/issue/stray'));
-    expect(refused.stderr).toContain('positions-B.md');
-    expect(readState(path)).toMatchObject({ phase: 'plan.positions', done: [] });
+    expect(refused.stderr).toContain('notes.md');
+    expect(readState(path)).toMatchObject({ phase: 'plan.synthesis', done: [] });
     await command(['git', 'reset', '--hard', 'HEAD~1'], worktree);
-    const recorded: Result = await cli(f, ['phase', 'stray', 'plan.rebuttal', '--slot', 'A']);
-    expect(recorded.stdout).toBe('recorded');
-    expect(readState(path).done).toEqual(['A']);
+    const recorded: Result = await cli(f, ['phase', 'stray', 'implement', '--slot', 'A']);
+    expect(recorded.stdout).toBe('moved implement');
+    expect(readState(path).phase).toBe('implement');
   } finally {
     f.clean();
   }
@@ -1070,23 +1070,13 @@ test('stops land in failed immediately without phase advance and validate slots'
   const f: Fixture = await fixture();
   try {
     const herdr = fakeHerdr(f);
-    yaml(resolve(f.root, 'issues/config.yaml'), { rebuttal: true, grounding: 'none' });
-    const truePath: string = leaf(f, 'pos-true', 'plan.positions');
+    const planPath: string = leaf(f, 'stop-plan', 'plan.synthesis');
     expect(
-      (await cli(f, ['phase', 'pos-true', 'failed', '--slot', 'A', '--reason', 'x'], f.root, herdr.env)).stdout,
+      (await cli(f, ['phase', 'stop-plan', 'failed', '--slot', 'A', '--reason', 'x'], f.root, herdr.env)).stdout,
     ).toBe('moved failed');
-    expect(readState(truePath)).toMatchObject({
-      phase: 'failed',
-      failure: { cause: 'blocked', phase: 'plan.positions', slot: 'A', reason: 'x' },
-    });
-    yaml(resolve(f.root, 'issues/config.yaml'), { rebuttal: false, grounding: 'none' });
-    const falsePath: string = leaf(f, 'pos-false', 'plan.positions');
-    expect(
-      (await cli(f, ['phase', 'pos-false', 'failed', '--slot', 'A', '--reason', 'x'], f.root, herdr.env)).stdout,
-    ).toBe('moved failed');
-    expect(readState(falsePath).failure).toEqual({
+    expect(readState(planPath).failure).toEqual({
       cause: 'blocked',
-      phase: 'plan.positions',
+      phase: 'plan.synthesis',
       slot: 'A',
       reason: 'x',
       delivery: 'shown',
@@ -1120,7 +1110,7 @@ test('stops land in failed immediately without phase advance and validate slots'
     const bad: Result = await cli(f, ['phase', 'bad-slot', 'failed', '--slot', 'B', '--reason', 'x']);
     expect(bad.code).not.toBe(0);
     expect(bad.stderr).toContain('required --slot');
-    const donePath: string = leaf(f, 'done-slot', 'plan.positions', { done: ['A'] });
+    const donePath: string = leaf(f, 'done-slot', 'check.review', { done: ['A'] });
     const doneBefore: string = bytes(donePath);
     const done: Result = await cli(f, ['phase', 'done-slot', 'failed', '--slot', 'A', '--reason', 'x']);
     expect(done.code).not.toBe(0);

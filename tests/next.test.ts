@@ -426,7 +426,7 @@ async function nextAt(f: DispatchFixture, slug: string, now: number): Promise<Re
 test('busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const path: string = leaf(f, 'busy', 'plan.positions');
+    const path: string = leaf(f, 'busy', 'check.review');
     const now: number = Date.parse('2026-09-11T12:00:00Z');
     expect((await nextAt(f, 'busy', now)).code).toBe(0);
     const started: State = readState(path);
@@ -915,7 +915,7 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
 test('exited hooks resolve persisted pane hints and preserve the surviving slot', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const path: string = leaf(f, 'exited', 'plan.positions');
+    const path: string = leaf(f, 'exited', 'check.review');
     expect((await next(f, ['exited'])).code).toBe(0);
     const a: string = readState(path).pane.A!;
     const b: string = readState(path).pane.B!;
@@ -926,7 +926,7 @@ test('exited hooks resolve persisted pane hints and preserve the surviving slot'
     expect(readState(path).pane.B).toBe(b);
     expect(readState(path).pane.A).not.toBe(a);
     expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
-    expect(database(f).prompts.at(-1)?.text).toBe(`plan-issue exited slot=A phase=plan.positions leaf=${path}`);
+    expect(database(f).prompts.at(-1)?.text).toBe(`check-issue exited slot=A phase=check.review leaf=${path}`);
     expect(database(f).starts.at(-1)).toContain('strong-a');
     expect(database(f).tabs).toHaveLength(1);
   } finally {
@@ -2827,29 +2827,6 @@ test('merge leaf with landed branch re-prompts its idle seat instead of auto-rec
   }
 }, 15000);
 
-test('debate leaf without positions files refuses dispatch until positions exist', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const path: string = leaf(f, 'debate', 'plan.synthesis', { debate: 'yes' });
-    const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
-    const result: Result = await next(f, ['debate']);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain('debate');
-    expect(result.stderr).toContain('plan.positions');
-    expect(database(f).tabs).toHaveLength(0);
-    expect(database(f).panes).toHaveLength(0);
-    expect(database(f).prompts).toHaveLength(0);
-    expect(readState(path).worktree).toBeUndefined();
-    expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
-    writeFileSync(resolve(path, 'positions-A.md'), 'A\n');
-    writeFileSync(resolve(path, 'positions-B.md'), 'B\n');
-    expect((await next(f, ['debate'])).code).toBe(0);
-    expect(database(f).prompts.at(-1)?.text).toBe(`plan-issue debate slot=A phase=plan.synthesis leaf=${path}`);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
 test('typed next from a leaf pane sweeps and removes merged worktrees', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -3577,7 +3554,7 @@ test('next uses repo seat overrides for both seats with spaced model as one argv
         b: { harness: 'fake', model: 'repo-b', effort: 'low' },
       },
     });
-    const path: string = leaf(f, 'override', 'plan.positions');
+    const path: string = leaf(f, 'override', 'check.review');
     expect((await next(f, ['override'])).code).toBe(0);
     const state: State = readState(path);
     const db: Database = database(f);
@@ -3605,7 +3582,7 @@ test('next inherits non-overridden seat from global slots', async () => {
       grounding: 'none',
       slots: { a: { harness: 'fake', model: 'only-a', effort: 'low' } },
     });
-    const path: string = leaf(f, 'inherit', 'plan.positions');
+    const path: string = leaf(f, 'inherit', 'check.review');
     expect((await next(f, ['inherit'])).code).toBe(0);
     const state: State = readState(path);
     const db: Database = database(f);
@@ -3655,7 +3632,7 @@ const seatByPane = (db: Database, state: State, slot: 'A' | 'B'): string[] => {
 test('next resolves seats from EPIC.md front matter and falls back per seat', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const path: string = leaf(f, 'epic-seats', 'plan.positions', {}, 'epic/issue');
+    const path: string = leaf(f, 'epic-seats', 'check.review', {}, 'epic/issue');
     writeFileSync(
       resolve(f.root, 'issues/open/epic/EPIC.md'),
       '---\nslots:\n  a:\n    harness: fake\n    model: epic-a\n    effort: low\n---\n# Epic\n',
@@ -3679,7 +3656,7 @@ test('next resolves seats from EPIC.md front matter and falls back per seat', as
 test('next prefers ISSUE.md seats over EPIC.md and applies a standalone issue block', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const path: string = leaf(f, 'nested', 'plan.positions', {}, 'epic/issue');
+    const path: string = leaf(f, 'nested', 'check.review', {}, 'epic/issue');
     writeFileSync(
       resolve(f.root, 'issues/open/epic/EPIC.md'),
       '---\nslots:\n  b:\n    harness: fake\n    model: epic-b\n    effort: low\n---\n# Epic\n',
@@ -3703,7 +3680,7 @@ test('next prefers ISSUE.md seats over EPIC.md and applies a standalone issue bl
     expect(startB).not.toContain('epic-b');
     expect(startB).not.toContain('repo-b');
 
-    const alone: string = leaf(f, 'standalone', 'plan.positions');
+    const alone: string = leaf(f, 'standalone', 'check.review');
     writeFileSync(
       resolve(f.root, 'issues/open/issue/ISSUE.md'),
       '---\nslots:\n  a:\n    harness: fake\n    model: issue-a\n    effort: low\n---\n# Issue\n',
@@ -5267,7 +5244,6 @@ test('blocked-report dep detail labels parked, missing, unreadable and skips mer
       phase: 'plan.synthesis',
       created: '2026-10-08',
       repo: 'repo',
-      debate: 'no',
       'blocked-by': [],
     });
     const brokenPath: string = leaf(f, 'unreadable-dep', 'plan.synthesis', {}, 'deps');

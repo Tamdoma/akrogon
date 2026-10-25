@@ -83,7 +83,6 @@ function baseState(slug: string, phase: string, extra: Record<string, unknown> =
     phase,
     created: '2026-09-10',
     repo: 'testrepo',
-    debate: 'no',
     'blocked-by': [],
     ...extra,
   };
