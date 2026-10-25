@@ -90,7 +90,7 @@ On the direct route no leaf files or `state.yaml` are written, `Closed <YYYY-MM-
 
 The direct route is a second ending for the handoff: the door implements one small settled chart itself in a worktree, B — the first named peer — reviews, and the door lands it on the default branch without leaf files. It needs no repo setting: the door offers it at its own discretion whenever the chart is eligible, and the operator can always decline.
 
-Direct is not offered, and the review names the refusal in one line and asks the lifecycle questions as today, when any of these holds:
+Direct is not offered, and the review names the refusal in one line and the handoff goes to the lifecycle, when any of these holds:
 
 - the draft needs `inputs`, `grants`, `produces` or `retained`;
 - a done-criterion needs a live run or outside call during implementation (charting proofs do not count);
