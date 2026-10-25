@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, readFileSync, existsSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { spawnCaptured, type SpawnResult } from '../src/shell';
+import { quote, spawnCaptured, type SpawnResult } from '../src/shell';
 import { registerTemp } from './helpers';
 
 const script: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/door-reset.ts');
@@ -219,7 +219,7 @@ test('a session change during the turn wait is logged and nothing is sent', asyn
         '  echo >> "$FAKE_HERDR.lists"',
         `  [ "$(wc -l < "$FAKE_HERDR.lists")" -eq 3 ] && sed -i 's/"value":"${session}"/"value":"sess-later"/' "$FAKE_HERDR"`,
         'fi',
-        `exec ${resolve(import.meta.dir, 'fake-herdr.ts')} "$@"`,
+        `exec ${quote(resolve(import.meta.dir, 'fake-herdr.ts'))} "$@"`,
         '',
       ].join('\n'),
       { mode: 0o755 },
