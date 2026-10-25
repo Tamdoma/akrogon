@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, type Dirent } from 'node:fs';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
-import { phaseSchema, slotSchema, verdictSchema } from './routing';
-import { within, type Repo } from './config';
+import { historicalPhaseSchema, phaseSchema, slotSchema, verdictSchema } from './routing';
+import { within, withoutKey, type Repo } from './config';
 import { writeYaml } from './shell';
 import { issueFolders } from './park';
 
@@ -11,7 +11,7 @@ const text = z.string().min(1);
 
 export const failureSchema = z.strictObject({
   cause: z.enum(['blocked', 'attempts']),
-  phase: phaseSchema,
+  phase: historicalPhaseSchema,
   slot: slotSchema,
   reason: z.string().trim().min(1),
   delivery: z.string().optional(),
@@ -84,7 +84,6 @@ export const stateSchema = z
     phase: phaseSchema,
     created: z.string(),
     repo: z.string(),
-    debate: z.enum(['yes', 'no']),
     'blocked-by': z.array(z.string()),
     sources: z.array(z.string().regex(sourcePattern)).optional(),
     busy_since: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
@@ -142,7 +141,7 @@ export function readState(path: string): State {
     throw new Error(`Invalid state ${file}: ${error.message}`, { cause: error });
   }
   try {
-    return stateSchema.parse(parsed);
+    return stateSchema.parse(withoutKey(parsed, 'debate'));
   } catch (error) {
     if (error instanceof z.ZodError)
       throw new z.ZodRealError([{ code: 'custom', path: [], message: `Invalid state ${file}` }, ...error.issues]);

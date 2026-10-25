@@ -336,12 +336,6 @@ export async function transition(
     );
   if (requested === 'failed' && reason === undefined) throw new Error('Failed requires --reason');
   if (requested !== 'failed' && reason !== undefined) throw new Error('--reason is only valid for failed');
-  if (
-    state.phase === 'plan.positions' &&
-    requested !== 'failed' &&
-    requested !== (repo.config.rebuttal ? 'plan.rebuttal' : 'plan.synthesis')
-  )
-    throw new Error('Destination contradicts rebuttal config');
   const required: readonly Slot[] = requiredSlots(state.phase, state.fix_rounds);
   const slot: Slot | undefined = explicitSlot ?? (required.length === 1 ? required[0] : undefined);
   if (state.phase !== 'failed' && (slot === undefined || !required.includes(slot)))

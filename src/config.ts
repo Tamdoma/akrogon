@@ -40,7 +40,6 @@ export const repoSchema = z
     remote: text.default('origin'),
     default_branch: text.default('main'),
     worktree_root: text.optional(),
-    rebuttal: z.boolean().default(true),
     fix_rounds: z.number().int().positive().default(3),
     implement: z.enum(['subagents', 'inline']).default('subagents'),
     setup: text.optional(),
@@ -216,13 +215,25 @@ export function readGlobal(): GlobalConfig {
   }
 }
 
+type Yaml = ReturnType<typeof Bun.YAML.parse>;
+
+// Retired keys stay in old files; dropping them here keeps the strict schema refusing every other unknown key.
+export function withoutKey(raw: Yaml, key: string): Yaml {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return raw;
+  return Object.fromEntries(Object.entries<unknown>({ ...raw }).filter(([name]): boolean => name !== key));
+}
+
+export function parseRepoConfig(raw: Yaml): RepoConfig {
+  return repoSchema.parse(withoutKey(raw, 'rebuttal'));
+}
+
 export function readRepo(name: string, path: string): Repo {
   const root: string = realpathSync(expandPath(path, globalHome()));
   try {
     return {
       name,
       root,
-      config: repoSchema.parse(Bun.YAML.parse(readFileSync(resolve(root, 'issues/config.yaml'), 'utf8'))),
+      config: parseRepoConfig(Bun.YAML.parse(readFileSync(resolve(root, 'issues/config.yaml'), 'utf8'))),
     };
   } catch (error) {
     if (!(error instanceof Error)) throw new Error(`repo ${name}: ${String(error)}`, { cause: error });

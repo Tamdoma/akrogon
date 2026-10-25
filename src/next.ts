@@ -919,12 +919,6 @@ async function dispatchLeaf(
         throw new Error(`Leaf is failed and needs phase recovery: ${slug}`);
       return end('none');
     }
-    if (
-      state.debate === 'yes' &&
-      state.phase === 'plan.synthesis' &&
-      !['positions-A.md', 'positions-B.md'].every((n) => existsSync(resolve(leaf.path, n)))
-    )
-      throw new Error(`Debate leaf skipped its debate: ${slug}; set phase: plan.positions`);
     const detail: ReturnType<typeof blockDetail> = blockDetail(
       global,
       repo,

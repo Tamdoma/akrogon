@@ -5,7 +5,7 @@ import { attemptRecordSchema } from './attempts';
 import { readGlobal, requireRepo, type Repo } from './config';
 import { readLog, type LogRecord } from './log';
 import { originSource } from './pull';
-import { requiredSlots, type Phase, type Slot } from './routing';
+import { historicalSlots, type HistoricalPhase, type Slot } from './routing';
 import { retryCommand } from './shell';
 import { repoInventory, sourcePattern, type ForeignLeaf, type Inventory, type Leaf, type LeafFailure } from './state';
 import { readTimings, type TimingEvent, type WaitReason } from './timing';
@@ -26,7 +26,7 @@ type WaitKind = 'repo_pause' | Exclude<WaitReason, 'none'>;
 const waitOrder: WaitKind[] = ['repo_pause', 'parked', 'prerequisite', 'merge_turn'];
 
 type Visit = {
-  phase: Phase;
+  phase: HistoricalPhase;
   visit: number;
   start: number;
   end: number | null;
@@ -173,7 +173,7 @@ function checkPairs(
 function visitGaps(events: TimingEvent[], slug: string, visit: Visit): string[] {
   if (visit.end === null || visit.failed) return [];
   const missing: string[] = [];
-  const slots: readonly Slot[] = visit.seatless ? [] : requiredSlots(visit.phase, visit.rounds);
+  const slots: readonly Slot[] = visit.seatless ? [] : historicalSlots(visit.phase, visit.rounds);
   const present: Slot[] = slots.filter((slot) => delivered(events, slug, visit, slot));
   if (slots.length > 0 && present.length === 0) missing.push('prompt');
   else for (const slot of slots.filter((slot) => !present.includes(slot))) missing.push(`prompt:${slot}`);

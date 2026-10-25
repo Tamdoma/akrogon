@@ -1,7 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { type RepoConfig, type GlobalConfig, globalHome, readGlobal, repoSchema, seats, worktreeStore } from './config';
+import {
+  type RepoConfig,
+  type GlobalConfig,
+  globalHome,
+  parseRepoConfig,
+  readGlobal,
+  seats,
+  worktreeStore,
+} from './config';
 import { command, writeYaml } from './shell';
 
 export function writeRepoConfig(root: string, config: RepoConfig): void {
@@ -31,7 +39,7 @@ export async function initialize(
   const repoName: string = basename(root);
   let config: RepoConfig;
   try {
-    config = repoSchema.parse(
+    config = parseRepoConfig(
       proposal !== undefined
         ? Bun.YAML.parse(readFileSync(resolve(cwd, proposal), 'utf8'))
         : existsSync(repoPath)

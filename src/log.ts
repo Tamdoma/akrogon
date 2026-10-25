@@ -4,14 +4,14 @@ import { z } from 'zod';
 import { base, type Repo } from './config';
 import { command, panes, repoSession, CommandError, type Pane, type SessionResolution } from './shell';
 import { type State } from './state';
-import { phaseSchema, slotSchema, verdictSchema, type Slot } from './routing';
+import { historicalPhaseSchema, slotSchema, verdictSchema, type Slot } from './routing';
 
 export const logSchema = z.object({
   ts: z.iso.datetime(),
   repo: z.string(),
   slug: z.string(),
-  from: phaseSchema,
-  to: phaseSchema,
+  from: historicalPhaseSchema,
+  to: historicalPhaseSchema,
   slot: slotSchema.nullable(),
   attempts: z.object({ A: z.number().int().nonnegative(), B: z.number().int().nonnegative() }),
   fix_rounds: z.number().int().nonnegative(),

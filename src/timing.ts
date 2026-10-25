@@ -3,16 +3,16 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { type Repo } from './config';
 import { type LogRecord } from './log';
-import { phaseSchema, slotSchema, type Phase } from './routing';
+import { historicalPhaseSchema, slotSchema, type Phase } from './routing';
 
 const stamp = { ts: z.iso.datetime(), repo: z.string() };
 const slugged = { ...stamp, slug: z.string() };
 const visit = z.number().int().nonnegative();
 const attempt = z.string();
-const seat = { slot: slotSchema, phase: phaseSchema, visit };
+const seat = { slot: slotSchema, phase: historicalPhaseSchema, visit };
 const checkCore = {
   run: z.string(),
-  phase: phaseSchema.optional(),
+  phase: historicalPhaseSchema.optional(),
   name: z.string(),
   scope: z.enum(['leaf', 'worker', 'base']),
   unit: z.string().optional(),
@@ -23,7 +23,7 @@ const waitReasonSchema = z.enum(['prerequisite', 'parked', 'merge_turn', 'none']
 export type WaitReason = z.infer<typeof waitReasonSchema>;
 
 export const timingEventSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ ...slugged, kind: z.literal('visit_start'), phase: phaseSchema, visit }),
+  z.strictObject({ ...slugged, kind: z.literal('visit_start'), phase: historicalPhaseSchema, visit }),
   z.strictObject({
     ...slugged,
     kind: z.literal('prompt'),
