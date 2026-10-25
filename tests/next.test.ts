@@ -5591,14 +5591,14 @@ function expectRefused(f: DispatchFixture, paths: string[], before: string[]): v
   expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
 }
 
-test('named target equivalence: owner name matches folder path from root, subfolder and worktree', async () => {
-  const owners: { name: string; path: string; slugs: string[] }[] = [
-    { name: 'epic-e', path: 'issues/open/epic-e', slugs: ['e1-l1', 'e1-l2', 'e2-l1'] },
-    { name: 'n1', path: 'issues/open/epic-e/n1', slugs: ['e1-l1', 'e1-l2'] },
-    { name: 'top-t', path: 'issues/open/top-t', slugs: ['t-l1', 't-l2'] },
-  ];
-  for (const owner of owners) {
-    for (const cwd of ['root', 'sub', 'worktree'] as const) {
+const namedTargetOwners: { name: string; path: string; slugs: string[] }[] = [
+  { name: 'epic-e', path: 'issues/open/epic-e', slugs: ['e1-l1', 'e1-l2', 'e2-l1'] },
+  { name: 'n1', path: 'issues/open/epic-e/n1', slugs: ['e1-l1', 'e1-l2'] },
+  { name: 'top-t', path: 'issues/open/top-t', slugs: ['t-l1', 't-l2'] },
+];
+for (const owner of namedTargetOwners) {
+  for (const cwd of ['root', 'sub', 'worktree'] as const) {
+    test(`named target equivalence: owner ${owner.name} matches folder path ${owner.path} from ${cwd}`, async () => {
       const named: DispatchFixture = await namedTargetRepo();
       const pathed: DispatchFixture = await namedTargetRepo();
       try {
@@ -5621,9 +5621,9 @@ test('named target equivalence: owner name matches folder path from root, subfol
         named.clean();
         pathed.clean();
       }
-    }
+    }, 15000);
   }
-}, 60000);
+}
 
 test('leaf slug selection keeps open and closed behavior', async () => {
   const f: DispatchFixture = await dispatchFixture();

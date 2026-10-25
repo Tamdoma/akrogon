@@ -35,9 +35,9 @@ function register(f: Fixture, repos: Record<string, string>): void {
   const global: object = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
   yaml(resolve(f.home, 'config.yaml'), { ...global, repos });
 }
-function event(slug: string, to: string, minutes: number, marker: string = ''): string {
+function event(slug: string, to: string, minutes: number, marker: string = '', now: number = Date.now()): string {
   return JSON.stringify({
-    ts: new Date(Date.now() - minutes * 60000).toISOString(),
+    ts: new Date(now - minutes * 60000).toISOString(),
     repo: 'repo',
     slug,
     from: 'implement',
@@ -51,9 +51,9 @@ function event(slug: string, to: string, minutes: number, marker: string = ''): 
     session: null,
   });
 }
-function mergeRecord(slug: string, minutes: number): string {
+function mergeRecord(slug: string, minutes: number, now: number = Date.now()): string {
   return JSON.stringify({
-    ts: new Date(Date.now() - minutes * 60000).toISOString(),
+    ts: new Date(now - minutes * 60000).toISOString(),
     repo: 'repo',
     slug,
     from: 'check.review',
@@ -70,7 +70,12 @@ function mergeRecord(slug: string, minutes: number): string {
 function log(f: Fixture, lines: string[]): void {
   writeFileSync(resolve(f.root, 'issues/log.jsonl'), lines.join('\n') + '\n');
 }
-function prompt(slug: string, minutes: number, outcome: 'delivered' | 'failed' = 'delivered'): string {
+function prompt(
+  slug: string,
+  minutes: number,
+  outcome: 'delivered' | 'failed' = 'delivered',
+  now: number = Date.now(),
+): string {
   return JSON.stringify({
     kind: 'prompt',
     slug,
@@ -79,7 +84,7 @@ function prompt(slug: string, minutes: number, outcome: 'delivered' | 'failed' =
     visit: 0,
     session: null,
     outcome,
-    ts: new Date(Date.now() - minutes * 60000).toISOString(),
+    ts: new Date(now - minutes * 60000).toISOString(),
     repo: 'repo',
   });
 }
@@ -121,13 +126,14 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     leaf(g, 'remote-leaf', 'check.review', { repo: 'other' });
     mkdirSync(resolve(failed, 'plan.md'));
     mkdirSync(resolve(failed, 'review-A.md'));
+    const at: number = Date.now();
     log(f, [
-      event('broken', 'failed', 40),
-      event('broken', 'implement', 1),
-      event('broken', 'failed', 7),
-      event('ordinary', 'failed', 0),
+      event('broken', 'failed', 40, '', at),
+      event('broken', 'implement', 1, '', at),
+      event('broken', 'failed', 7, '', at),
+      event('ordinary', 'failed', 0, '', at),
     ]);
-    timings(f, [prompt('broken', 30)]);
+    timings(f, [prompt('broken', 30, 'delivered', at)]);
     const env: NodeJS.ProcessEnv = fakeHerdr(f).env;
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const otherBefore: Record<string, string> = snapshot(resolve(g.root, 'issues'));
@@ -201,17 +207,18 @@ test('time for a merged or failed leaf stops at its move into that phase and doe
     leaf(f, 'broke', 'failed');
     leaf(f, 'unmoved', 'merged');
     leaf(f, 'reversed', 'failed');
+    const at: number = Date.now();
     const write = (shift: number): void => {
       timings(f, [
-        prompt('landed', 1100 + shift),
-        prompt('broke', 40 + shift),
-        prompt('unmoved', 20 + shift),
-        prompt('reversed', 10 + shift),
+        prompt('landed', 1100 + shift, 'delivered', at),
+        prompt('broke', 40 + shift, 'delivered', at),
+        prompt('unmoved', 20 + shift, 'delivered', at),
+        prompt('reversed', 10 + shift, 'delivered', at),
       ]);
       log(f, [
-        event('landed', 'merged', 52 + shift),
-        event('broke', 'failed', 11 + shift),
-        event('reversed', 'failed', 15 + shift),
+        event('landed', 'merged', 52 + shift, '', at),
+        event('broke', 'failed', 11 + shift, '', at),
+        event('reversed', 'failed', 15 + shift, '', at),
       ]);
     };
     write(0);
