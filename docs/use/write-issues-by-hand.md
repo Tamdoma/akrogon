@@ -38,14 +38,13 @@ slug: <slug>
 phase: plan.synthesis
 created: <date>
 repo: <repo>
-debate: 'no'
 blocked-by: []
 sources: []
 ```
 
 - `slug` must match the leaf folder name. Use lowercase words joined by `-`. Each slug must be unique in the repository. Two leaves with the same slug are both reported as unreadable.
 - `repo` is the repository's name from the `repos` list in your machine config. A leaf with a different name is skipped.
-- `debate: 'no'` starts at `plan.synthesis`, where seat A writes the plan alone. `debate: 'yes'` starts at `plan.positions`, where both seats write a position first.
+- A leaf starts at `plan.synthesis`, where seat A writes the plan.
 - Optional: list GitHub reports this leaf delivers in `sources`, as `owner/repo#n`. They are closed when the leaf's issue or epic completes.
 
 Leave every other field to the commands. Field details are in [state-and-phases.md](../reference/state-and-phases.md).
@@ -69,7 +68,6 @@ slug: <slug>
 phase: plan.synthesis
 created: <date>
 repo: <repo>
-debate: 'no'
 blocked-by:
   - <other-slug>
 sources: []

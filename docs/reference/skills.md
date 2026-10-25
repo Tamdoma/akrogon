@@ -20,9 +20,9 @@ Chart consultants are different from seats A and B. A consultant is a peer pane 
 
 ## plan-issue
 
-- **Result:** the leaf's `plan.md`, the execution plan. Seats A and B write blind positions, then one rebuttal round, then seat A writes the synthesis. When debate is off, seat A writes the synthesis directly.
+- **Result:** the leaf's `plan.md`, the execution plan. Seat A writes `plan.md` from the brief and design.
 - **When to use:** a leaf is in a `plan.*` phase.
-- **Who starts it:** the command, dispatching seats A and B for `plan.positions` and `plan.rebuttal`, and seat A alone for `plan.synthesis`.
+- **Who starts it:** the command, dispatching seat A for `plan.synthesis`.
 - **Source:** [`skills/plan-issue/SKILL.md`](../../skills/plan-issue/SKILL.md)
 
 ## implement-issue

@@ -53,7 +53,6 @@ Each registered checkout has `issues/config.yaml`. The [init-akrogon skill](../.
 | `remote` | The git remote to push to. Default `origin`. |
 | `default_branch` | The branch leaves start from and land on. Default `main`. |
 | `worktree_root` | Where leaf worktrees go. It must be outside the checkout. Default `~/.akrogon/worktrees/<repo-name>`. |
-| `rebuttal` | Whether planning has a rebuttal round after the two positions. Default `true`. |
 | `fix_rounds` | How many repair rounds the chart door's direct route may use. Default 3. |
 | `implement` | `subagents` lets seat A hand units to worker agents. `inline` makes seat A do all the work itself. Default `subagents`. |
 | `setup` | A command that installs dependencies in each fresh checkout, such as `bun install --frozen-lockfile`. Akrogon runs it before check commands. Optional. |
@@ -75,7 +74,6 @@ Environment variable names in `env` and `pass_env` use capital letters, digits a
 ```yaml
 remote: origin
 default_branch: main
-rebuttal: true
 fix_rounds: 3
 implement: subagents
 setup: <install-command>

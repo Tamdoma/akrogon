@@ -2,14 +2,12 @@
 
 Each leaf has a `state.yaml` file in its folder. It says which phase the leaf is in and holds the records the commands keep while seats work. This page lists every phase, who moves it, and every field in the file. The exact shapes live in [src/state.ts](../../src/state.ts) and [src/routing.ts](../../src/routing.ts).
 
-![Leaf phases from plan.positions through merged. With rebuttal on, plan.positions goes to plan.rebuttal, with rebuttal off it goes straight to plan.synthesis, where a leaf without debate starts. A fix verdict in check.review loops through check.repair and check.fix back to check.review. Any boxed phase can stop in failed.](../pictures/phases.svg)
+![Leaf phases from plan.synthesis through merged. A leaf starts at plan.synthesis. A fix verdict in check.review loops through check.repair and check.fix back to check.review. Any boxed phase can stop in failed.](../pictures/phases.svg)
 
 ## Phases
 
 | Phase          | Skill                                                    | Seats that work                                                                  | Who moves it on                                                                                                                            | Allowed next                          |
 | -------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
-| plan.positions | [plan-issue](../../skills/plan-issue/SKILL.md)           | A and B                                                                          | each seat with `--slot`, the leaf moves after both are done                                                                                | plan.rebuttal, plan.synthesis, failed |
-| plan.rebuttal  | [plan-issue](../../skills/plan-issue/SKILL.md)           | A and B                                                                          | each seat, the leaf moves after both are done                                                                                              | plan.synthesis, failed                |
 | plan.synthesis | [plan-issue](../../skills/plan-issue/SKILL.md)           | A                                                                                | A                                                                                                                                          | implement, failed                     |
 | implement      | [implement-issue](../../skills/implement-issue/SKILL.md) | A                                                                                | A                                                                                                                                          | check.review, failed                  |
 | check.review   | [check-issue](../../skills/check-issue/SKILL.md)         | A and B, only B once `fix_rounds` is above 0                                     | the required seats, each with a verdict (`ready`, `nits` or `fix`)                                                                         | merge, check.repair, failed           |
@@ -19,11 +17,7 @@ Each leaf has a `state.yaml` file in its folder. It says which phase the leaf is
 | merged         | none                                                     | none                                                                             | terminal                                                                                                                                   | none                                  |
 | failed         | none                                                     | none                                                                             | the operator, with no `--slot`                                                                                                             | any active phase except merged        |
 
-Where a leaf starts:
-
-- `debate: 'no'` starts the leaf at plan.synthesis. `debate: 'yes'` starts it at plan.positions.
-- The repo setting `rebuttal` (on by default) picks the move out of plan.positions. On, the leaf must go to plan.rebuttal. Off, it must go to plan.synthesis.
-- `akrogon next` refuses a debate leaf that sits in plan.synthesis without `positions-A.md` and `positions-B.md` in its folder.
+Every leaf starts at plan.synthesis.
 
 ## How a phase moves
 
@@ -68,7 +62,6 @@ slug: export-csv
 phase: plan.synthesis
 created: <date>
 repo: widgets
-debate: 'no'
 blocked-by: []
 sources: []
 ```
@@ -79,7 +72,6 @@ sources: []
 | `phase`      | The current phase. You set the start phase. After that only akrogon commands change it: `akrogon phase` and the command's own land run at merge. |
 | `created`    | The creation date.                                                                                                                               |
 | `repo`       | The registered repo key. A leaf whose key does not match the repo it sits in is reported and skipped.                                            |
-| `debate`     | `'yes'` or `'no'`. Says whether planning starts with both seats writing positions.                                                               |
 | `blocked-by` | Slugs of leaves that must be merged before this leaf gets work.                                                                                  |
 | `sources`    | GitHub reports this leaf delivers, as `owner/repo#n`. The command closes them when the leaf's issue or epic completes.                           |
 

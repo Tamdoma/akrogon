@@ -17,7 +17,7 @@ The chart's destination named the three outcomes. Seat A wrote each fork as a fu
 - Where to measure speed. A picked a new blocking gate on the built site, with one pinned Lighthouse version and the browser the project already used. A preview deploy would have added a deploy step.
 - How to handle heavy images. A picked encoding raster brand images to WebP in the one place that already publishes them, reusing the photo encoder. A format ban would have added a manual step to every build.
 - Who ranks the speed data. A picked the audit's existing preflight script, so the skippable second step went away. Another option needed a paid model session.
-- How to split the work. A picked three standalone issues with one leaf each, no `blocked-by`, and debate no. The fixes did not need each other.
+- How to split the work. A picked three standalone issues with one leaf each, and no `blocked-by`. The fixes did not need each other.
 
 Two things stayed off route: moving another audit's Lighthouse runner, and changing how analytics scripts load. Both are listed under `Off route`.
 
@@ -29,7 +29,7 @@ The whole chart took one operator turn. The usage lines in `USAGE.md` came from 
 
 Handed-off leaves do not start by themselves. They started through `akrogon next`, which prompts the seats each phase needs. See [Run work](../use/run-work.md) and [commands.md](../reference/commands.md#run-work).
 
-Each leaf followed the phases in [state-and-phases.md](../reference/state-and-phases.md#phases). With debate no, A wrote the plan with [plan-issue](../../skills/plan-issue/SKILL.md), then built it with [implement-issue](../../skills/implement-issue/SKILL.md). Tests went in first and failed. The product change then made them pass. A got a green `akrogon verify` receipt before moving to `check.review`.
+Each leaf followed the phases in [state-and-phases.md](../reference/state-and-phases.md#phases). A wrote the plan with [plan-issue](../../skills/plan-issue/SKILL.md), then built it with [implement-issue](../../skills/implement-issue/SKILL.md). Tests went in first and failed. The product change then made them pass. A got a green `akrogon verify` receipt before moving to `check.review`.
 
 In `check.review`, A and B each reviewed the diff with [check-issue](../../skills/check-issue/SKILL.md). Each review is a file in the leaf folder.
 

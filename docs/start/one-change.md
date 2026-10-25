@@ -24,7 +24,7 @@ The brief listed eight done-criteria. Three examples:
 
 ## Handoff
 
-At the handoff review the operator approved the leaf with no debate, so it would start with A writing the plan alone. The door wrote the leaf folder under `issues/open/`, inside an issue inside an epic. The folder held `brief.md`, `design.md`, `readiness.yaml` and `state.yaml`, and the door marked the chart `Handed off`. See [Review the handoff](../use/plan-work.md#review-the-handoff).
+At the handoff review the operator approved the leaf. The door wrote the leaf folder under `issues/open/`, inside an issue inside an epic. The folder held `brief.md`, `design.md`, `readiness.yaml` and `state.yaml`, and the door marked the chart `Handed off`. See [Review the handoff](../use/plan-work.md#review-the-handoff).
 
 The design copied each settled decision word for word from its fork, so the seats would not have to look them up. It also named two earlier leaves this one built on: the sign-in leaf and the roles leaf. They went into `blocked-by` in `state.yaml`. See [Order leaves with blocked-by](../use/write-issues-by-hand.md#order-leaves-with-blocked-by).
 
@@ -34,7 +34,7 @@ The operator ran `akrogon next`. The leaf waited until both earlier leaves had m
 
 ## The plan
 
-With no debate, the leaf started at `plan.synthesis`. A read the brief, the design and the live code, and wrote `plan.md` with [plan-issue](../../skills/plan-issue/SKILL.md).
+The leaf started at `plan.synthesis`. A read the brief, the design and the live code, and wrote `plan.md` with [plan-issue](../../skills/plan-issue/SKILL.md).
 
 The plan found one gap between the design and the code. The design said the sign-in record is confirmed only for a finished session. The code confirmed every session, including the one made after the password and before the code. The plan made that rule true in this leaf and wrote a note so the reviewers would see why.
 

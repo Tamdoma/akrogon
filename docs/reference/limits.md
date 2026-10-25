@@ -19,7 +19,7 @@ This page lists what Akrogon does not do for you, and the work that stays yours.
 
 ## What stays your job
 
-- Choose the work. You open the chart door, answer each fork and approve the handoff. A recommendation cannot stand in for your answer. You also pick `debate` at the handoff review. See [chart-issues](../../skills/chart-issues/SKILL.md).
+- Choose the work. You open the chart door, answer each fork and approve the handoff. A recommendation cannot stand in for your answer. See [chart-issues](../../skills/chart-issues/SKILL.md).
 - Keep contracts correct. Review checks the diff against the contract. It cannot add a requirement the contract left out. If you approve the wrong columns for a CSV export, a correct build of those columns is still wrong.
 - Supply needs and credentials. The chart door lists every key, file and approval a leaf needs. You create missing outside-account keys and give approvals, including grant and secret-save approvals.
 - Do the operator actions a review names. When a fix needs a permission, token scope or live change that only you can grant, the review seat writes the exact action under `Operator actions` in its review file. The leaf stops as failed once the other fixes are done.

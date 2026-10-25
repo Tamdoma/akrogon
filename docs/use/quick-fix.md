@@ -25,8 +25,7 @@ When it refuses, you get the normal lifecycle questions.
 
 When the chart is eligible, the review asks one route question with the door's pick:
 
-- lifecycle, debate no
-- lifecycle, debate yes
+- lifecycle
 - direct
 
 The door may still recommend lifecycle for a small job it thinks is risky. You can always decline direct. Your choice is saved in `CHART.md` as the `Route:` line.

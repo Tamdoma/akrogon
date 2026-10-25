@@ -21,6 +21,8 @@ It prints `rolled back <old> -> <previous>`. When there is no previous release, 
 
 The hold ends on its own. Once main moves to a newer commit, that commit deploys normally and the hold record is removed.
 
+Older releases require a `debate` field in each leaf's `state.yaml`. Leaf records created or saved without `debate` need `debate: 'no'` restored before the previous release can load them.
+
 Source: [src/rollback.ts](../../src/rollback.ts), [src/release.ts](../../src/release.ts), [src/self-update.ts](../../src/self-update.ts) (`deployStage`).
 
 ## Roll back by hand
