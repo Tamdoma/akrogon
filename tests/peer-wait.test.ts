@@ -208,7 +208,7 @@ test('done while herdr still reports working', async (): Promise<void> => {
 test('unproven kind waits out the budget on idle', async (): Promise<void> => {
   const s: Setup = setup([{ agent: 'fake', agent_status: 'idle' }]);
   try {
-    const result: RunResult = await s.run(pane, s.file, '11');
+    const result: RunResult = await s.run(pane, s.file, '4');
     expectOutcome(result, {
       outcome: 'budget',
       pane,
@@ -227,7 +227,7 @@ test('unproven kind waits out the budget on done with a 0-byte return file', asy
   const s: Setup = setup([{ agent: 'fake', agent_status: 'done' }]);
   try {
     writeFileSync(s.file, '');
-    const result: RunResult = await s.run(pane, s.file, '11');
+    const result: RunResult = await s.run(pane, s.file, '4');
     expectOutcome(result, {
       outcome: 'budget',
       pane,
@@ -314,7 +314,7 @@ test.each<[string, PaneSeed]>([
 ])('pi peer without authority stays unproven: %s', async (_name: string, paneSeed: PaneSeed): Promise<void> => {
   const s: Setup = setup([paneSeed]);
   try {
-    const result: RunResult = await s.run(pane, s.file, '11');
+    const result: RunResult = await s.run(pane, s.file, '4');
     expectOutcome(result, {
       outcome: 'budget',
       pane,
@@ -435,7 +435,7 @@ test.each<[string, (s: Setup) => { exchange: Exchange } | { exchange: Exchange; 
     const s: Setup = setup([codexPane(codexSession)]);
     try {
       const { exchange } = fixture(s);
-      const result: RunResult = await s.run(pane, s.file, '11', JSON.stringify(exchange));
+      const result: RunResult = await s.run(pane, s.file, '4', JSON.stringify(exchange));
       expectOutcome(result, {
         outcome: 'budget',
         pane,
@@ -457,7 +457,7 @@ test('codex peer with no session is unproven', async (): Promise<void> => {
     const result: RunResult = await s.run(
       pane,
       s.file,
-      '11',
+      '4',
       JSON.stringify({ kind: 'codex', session: null, boundary: null, turn: null }),
     );
     expectOutcome(result, {
@@ -585,7 +585,7 @@ test('an unproven harness session change keeps waiting with its original exchang
     (): WaitEntry[] => [{ status: 'idle' }, { session: 'session-B' }],
   );
   try {
-    const result: RunResult = await s.run(pane, s.file, '1');
+    const result: RunResult = await s.run(pane, s.file, '4');
     const exchange: Exchange = seed('antigravity', 'session-A');
     expectOutcome(result, {
       outcome: 'budget',
@@ -596,7 +596,7 @@ test('an unproven harness session change keeps waiting with its original exchang
       session: 'session-B',
       exchange,
     });
-    const rerun: RunResult = await s.run(pane, s.file, '1', JSON.stringify(JSON.parse(result.stdout).exchange));
+    const rerun: RunResult = await s.run(pane, s.file, '4', JSON.stringify(JSON.parse(result.stdout).exchange));
     expectOutcome(rerun, {
       outcome: 'budget',
       pane,
@@ -632,7 +632,7 @@ test('a pi session change is ignored while hook authority holds', async (): Prom
 test('a pi losing hook authority turns unproven', async (): Promise<void> => {
   const s: Setup = setup([piAuthority], (): WaitEntry[] => [{ status: 'idle' }, { screenSkipped: false }]);
   try {
-    const result: RunResult = await s.run(pane, s.file, '11');
+    const result: RunResult = await s.run(pane, s.file, '4');
     expectOutcome(result, {
       outcome: 'budget',
       pane,
@@ -655,7 +655,7 @@ test('outcome session is the post-exchange session when herdr adopted it during 
     (): WaitEntry[] => [{ status: 'idle' }, { session: 'sess-new' }],
   );
   try {
-    const result: RunResult = await s.run(pane, s.file, '11');
+    const result: RunResult = await s.run(pane, s.file, '4');
     expectOutcome(result, {
       outcome: 'budget',
       pane,
@@ -676,7 +676,7 @@ test('a codex session appearing after the prompt is on the outcome line', async 
     { session: codexSession },
   ]);
   try {
-    const result: RunResult = await s.run(pane, s.file, '11');
+    const result: RunResult = await s.run(pane, s.file, '4');
     expectOutcome(result, {
       outcome: 'budget',
       pane,
@@ -899,7 +899,7 @@ test('budget clamps each wait timeout to the remaining budget', async (): Promis
 test('budget keeps the last status herdr returned', async (): Promise<void> => {
   const s: Setup = setup([{ agent: 'fake', agent_status: 'working' }], (): WaitEntry[] => [{ status: 'working' }]);
   try {
-    const result: RunResult = await s.run(pane, s.file, '0.3');
+    const result: RunResult = await s.run(pane, s.file, '2');
     expectOutcome(result, {
       outcome: 'budget',
       pane,

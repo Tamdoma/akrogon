@@ -207,16 +207,24 @@ test('a session change during the turn wait is logged and nothing is sent', asyn
   const s: Setup = setup(claudePane());
   try {
     writeTranscript(s.home, session, false);
-    const pending: Promise<RunResult> = s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, session, s.log, START);
-    await Bun.sleep(700);
+    // The session changes on the third agent list read: the parent check and the child check see
+    // the original identity, the turn wait's first read sees the new one.
+    const herdr: string = resolve(s.dir, 'bin', 'herdr');
+    rmSync(herdr);
     writeFileSync(
-      s.db,
-      readFileSync(s.db, 'utf8').replaceAll(
-        JSON.stringify(idSession(session, 'herdr:claude')),
-        JSON.stringify(idSession('sess-later', 'herdr:claude')),
-      ),
+      herdr,
+      [
+        '#!/bin/sh',
+        'if [ "$1 $2" = "agent list" ]; then',
+        '  echo >> "$FAKE_HERDR.lists"',
+        `  [ "$(wc -l < "$FAKE_HERDR.lists")" -eq 3 ] && sed -i 's/"value":"${session}"/"value":"sess-later"/' "$FAKE_HERDR"`,
+        'fi',
+        `exec ${resolve(import.meta.dir, 'fake-herdr.ts')} "$@"`,
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
     );
-    const result: RunResult = await pending;
+    const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, session, s.log, START);
     expect(result.code).toBe(1);
     expect(s.logLines().some((l) => l.step === 'wait-turn-end' && l.result === 'identity changed')).toBe(true);
     expect(s.promptCalls()).toHaveLength(0);
