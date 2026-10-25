@@ -104,6 +104,8 @@ test('bad leaf ownership keeps uncertain slices without aborting failed-unit cle
 
 const realRuntime: string = `/run/user/${uid}`;
 const realBus: string = `unix:path=${realRuntime}/bus`;
+// Real systemd slices are host-wide: a per-process slug suffix keeps concurrent copies of this file apart.
+const unique = (slug: string): string => `${slug}-${process.pid}`;
 
 test('a shell run admitted while another slice stops protects its own slice', async () => {
   const f: SliceFixture = await slicesFixture();
@@ -308,7 +310,7 @@ async function sleeper(f: SliceFixture, sliceName: string): Promise<number> {
     // systemd-run eats one $$ pair per specifier pass, so $$$$ reaches sh as $$.
     `echo $$$$ > ${pidFile}; exec sleep 300`,
   );
-  expect(finished.code).toBe(0);
+  expect(finished.code, `${finished.stdout} | ${finished.stderr}`).toBe(0);
   for (let i: number = 0; i < 100 && !existsSync(pidFile); i++) await Bun.sleep(50);
   const pid: number = Number(readFileSync(pidFile, 'utf8').trim());
   expect(pidAlive(pid)).toBe(true);
@@ -324,10 +326,12 @@ test('merged and failed leaf slices with gone tabs are stopped and their process
   const f: SliceFixture = await slicesFixture();
   const units: string[] = [];
   try {
-    const mergedPath: string = await dispatchLeaf(f, 'merged-leaf');
-    const failedPath: string = await dispatchLeaf(f, 'failed-leaf');
-    const mergedSlice: string = leafSlice({ name: 'repo' }, 'merged-leaf');
-    const failedSlice: string = leafSlice({ name: 'repo' }, 'failed-leaf');
+    const mergedSlug: string = unique('merged-leaf');
+    const failedSlug: string = unique('failed-leaf');
+    const mergedPath: string = await dispatchLeaf(f, mergedSlug);
+    const failedPath: string = await dispatchLeaf(f, failedSlug);
+    const mergedSlice: string = leafSlice({ name: 'repo' }, mergedSlug);
+    const failedSlice: string = leafSlice({ name: 'repo' }, failedSlug);
     const mergedPid: number = await sleeper(f, mergedSlice);
     const failedPid: number = await sleeper(f, failedSlice);
     units.push(mergedSlice, failedSlice);
@@ -351,15 +355,16 @@ test('merged and failed leaf slices with gone tabs are stopped and their process
 
 test('a finished leaf with a live tab keeps its slice, and the pass fetched the pane list', async () => {
   const f: SliceFixture = await slicesFixture();
-  const sliceName: string = leafSlice({ name: 'repo' }, 'tabbed-merged');
+  const slug: string = unique('tabbed-merged');
+  const sliceName: string = leafSlice({ name: 'repo' }, slug);
   const units: string[] = [sliceName];
   try {
-    const path: string = leaf(f, 'tabbed-merged', 'merged', { tab: 'w1:t9' });
+    const path: string = leaf(f, slug, 'merged', { tab: 'w1:t9' });
     expect(readState(path).worktree).toBeUndefined();
     const db: Database = database(f);
     saveDatabase(f, {
       ...db,
-      tabs: [...db.tabs, { tab_id: 'w1:t9', label: 'tabbed-merged', focused: false }],
+      tabs: [...db.tabs, { tab_id: 'w1:t9', label: slug, focused: false }],
       panes: [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' }],
     });
     const pid: number = await sleeper(f, sliceName);
@@ -380,12 +385,14 @@ test('a finished leaf with a live tab keeps its slice, and the pass fetched the 
 test('a finished leaf slice named by a live run record is not stopped', async () => {
   const f: SliceFixture = await slicesFixture();
   let sliceName: string | undefined;
-  const control: string = leafSlice({ name: 'repo' }, 'control-leaf');
+  const runSlug: string = unique('run-leaf');
+  const controlSlug: string = unique('control-leaf');
+  const control: string = leafSlice({ name: 'repo' }, controlSlug);
   try {
-    const path: string = await dispatchLeaf(f, 'run-leaf');
-    const controlPath: string = await dispatchLeaf(f, 'control-leaf');
+    const path: string = await dispatchLeaf(f, runSlug);
+    const controlPath: string = await dispatchLeaf(f, controlSlug);
     const worktree: string = z.string().parse(readState(path).worktree);
-    sliceName = leafSlice({ name: 'repo' }, 'run-leaf');
+    sliceName = leafSlice({ name: 'repo' }, runSlug);
     const controlPid: number = await sleeper(f, control);
     const cap: Cap = spawnReal(f, ['run-check', '--name', 'hold', '--', 'sleep', '60'], worktree);
     try {
@@ -486,8 +493,9 @@ test('a reconcile pass running inside a leaf slice does not stop that slice', as
   const f: SliceFixture = await slicesFixture();
   let sliceName: string | undefined;
   try {
-    const path: string = await dispatchLeaf(f, 'self-leaf');
-    sliceName = leafSlice({ name: 'repo' }, 'self-leaf');
+    const slug: string = unique('self-leaf');
+    const path: string = await dispatchLeaf(f, slug);
+    sliceName = leafSlice({ name: 'repo' }, slug);
     closeTab(f, z.string().parse(readState(path).tab));
     saveState(path, { ...readState(path), phase: 'merged' });
     // Fake systemctl marks the leaf slice a stop candidate (loaded, no live tab)
@@ -521,7 +529,8 @@ test('a reconcile pass running inside a leaf slice does not stop that slice', as
       `${process.execPath} ${entry} next --all;`,
       `echo $? > ${marker}`,
     ].join(' ');
-    await sdrun('--scope', '--quiet', `--slice=${sliceName}`, '--', 'sh', '-c', inner);
+    const started: SpawnResult = await sdrun('--scope', '--quiet', `--slice=${sliceName}`, '--', 'sh', '-c', inner);
+    expect(started.code, `${started.stdout} | ${started.stderr}`).toBe(0);
     for (let i: number = 0; i < 300 && !existsSync(marker); i++) await Bun.sleep(100);
     expect(existsSync(marker)).toBe(true);
     expect(readFileSync(marker, 'utf8').trim()).toBe('0');
@@ -540,8 +549,9 @@ test('akrogon phase merged inside the leaf slice stops no slice', async () => {
   const f: SliceFixture = await slicesFixture();
   let sliceName: string | undefined;
   try {
-    leaf(f, 'phase-leaf', 'merge', { ...holding(f), merge_stamp: '2026-10-15T20:00:00Z' }, 'standalone');
-    sliceName = leafSlice({ name: 'repo' }, 'phase-leaf');
+    const slug: string = unique('phase-leaf');
+    leaf(f, slug, 'merge', { ...holding(f), merge_stamp: '2026-10-15T20:00:00Z' }, 'standalone');
+    sliceName = leafSlice({ name: 'repo' }, slug);
     const pid: number = await sleeper(f, sliceName);
     const marker: string = resolve(f.home, 'phase.exit');
     const inner: string = [
@@ -556,10 +566,11 @@ test('akrogon phase merged inside the leaf slice stops no slice', async () => {
       `XDG_RUNTIME_DIR=${realRuntime}`,
       `DBUS_SESSION_BUS_ADDRESS=${realBus}`,
       `PATH=${resolve(f.home, 'bin')}:${process.env.PATH}`,
-      `${process.execPath} ${entry} phase phase-leaf merged 2> ${marker}.err;`,
+      `${process.execPath} ${entry} phase ${slug} merged 2> ${marker}.err;`,
       `echo $? > ${marker}`,
     ].join(' ');
-    await sdrun('--scope', '--quiet', `--slice=${sliceName}`, '--', 'sh', '-c', inner);
+    const started: SpawnResult = await sdrun('--scope', '--quiet', `--slice=${sliceName}`, '--', 'sh', '-c', inner);
+    expect(started.code, `${started.stdout} | ${started.stderr}`).toBe(0);
     for (let i: number = 0; i < 300 && !existsSync(marker); i++) await Bun.sleep(100);
     expect(existsSync(marker)).toBe(true);
     const code: string = readFileSync(marker, 'utf8').trim();
@@ -567,7 +578,7 @@ test('akrogon phase merged inside the leaf slice stops no slice', async () => {
     expect(code, err).toBe('0');
     expect(pidAlive(pid)).toBe(true);
     expect(await isActive(sliceName)).toBe(true);
-    const moved: State = readState(resolve(f.root, 'issues/closed/standalone/phase-leaf'));
+    const moved: State = readState(resolve(f.root, 'issues/closed/standalone', slug));
     expect(moved.phase).toBe('merged');
   } finally {
     if (sliceName !== undefined) await cleanupUnit(sliceName);
