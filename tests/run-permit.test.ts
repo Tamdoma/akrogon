@@ -324,6 +324,58 @@ test('listed runs of one repo wait for their repo holder, print the holder, and 
   }
 }, 75000);
 
+test('a listed run waits for the holder record to be removed, not just the holder to exit', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const first: string = await leafWorktree(f, 'line-one');
+    const second: string = await leafWorktree(f, 'line-two');
+    // Hold the holder's unit stop (and so its record removal) until flagged.
+    const real: string = (await command(['sh', '-c', 'command -v systemctl || true'])).trim();
+    const delayBin: string = resolve(f.home, 'delaybin');
+    mkdirSync(delayBin, { recursive: true });
+    writeFileSync(
+      resolve(delayBin, 'systemctl'),
+      `#!/bin/sh\nif [ "$2" = 'stop' ]; then\n  while [ ! -e '${dir}/unstop' ]; do sleep 0.05; done\n  exit 0\nfi\n${real === '' ? 'exit 0' : `exec ${real} "$@"`}\n`,
+      { mode: 0o755 },
+    );
+    const a: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'a')], first, {
+      PATH: `${delayBin}:${unitBin(f)}:${process.env.PATH}`,
+    });
+    caps.push(a);
+    await waitFor(resolve(dir, 'a.held'));
+    const b: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'b')], second);
+    caps.push(b);
+    await waitForText(b, /waiting for repo\//);
+    const aId: string = ((await a.text()).match(/run ([0-9a-f-]+)/) ?? [])[1] as string;
+    writeFileSync(resolve(dir, 'release'), '');
+    // a's command is done and its record is ended, but the shim holds its unit
+    // stop — and so its record removal — until flagged.
+    const deadline: number = Date.now() + 10000;
+    for (;;) {
+      const record: Record<string, unknown> | undefined = (await runRecords(f)).find((entry) => entry.run === aId);
+      if (record !== undefined && record.state === 'ended') break;
+      if (Date.now() > deadline) throw new Error('holder record never reached ended');
+      await Bun.sleep(20);
+    }
+    // The holder's record is ended and still present: b must not start yet.
+    // Outwait one promotion poll so an implementation that promotes over an
+    // ended record shows dir/b before this assert, not after it.
+    await Bun.sleep(1500);
+    expect(existsSync(resolve(dir, 'b'))).toBe(false);
+    writeFileSync(resolve(dir, 'unstop'), '');
+    expect(await a.proc.exited).toBe(0);
+    expect(await b.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'b'))).toBe(true);
+    expect((await runRecords(f)).some((entry) => entry.run === aId)).toBe(false);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 60000);
+
 test('a listed run of another repo and an unlisted run start at once over the line', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
@@ -408,11 +460,13 @@ test('a listed run nests under its repo holder and queues under an unlisted run'
     const shim: NodeJS.ProcessEnv = fakeAkrogon(f).env;
     const worktree: string = await leafWorktree(f, 'nested-line');
     // A listed run inside the same repo's listed holder runs at once and writes no record.
-    const script: string = `akrogon run-check --name test -- touch ${dir}/inner`;
+    // The outer command stays alive until its one record has been counted.
+    const script: string = `akrogon run-check --name test -- touch ${dir}/inner; while [ ! -e ${dir}/outer-release ]; do sleep 0.05; done`;
     const outer: Cap = run(f, ['run-check', '--name', 'test', '--', 'sh', '-c', script], worktree, shim);
     caps.push(outer);
     await waitFor(resolve(dir, 'inner'), 20000);
     expect(await runRecords(f)).toHaveLength(1);
+    writeFileSync(resolve(dir, 'outer-release'), '');
     expect(await outer.proc.exited).toBe(0);
     expect(await outer.text()).not.toMatch(/waiting for/);
     // A listed run inside an unlisted run takes its own turn behind the live holder.
