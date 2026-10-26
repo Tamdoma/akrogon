@@ -1961,6 +1961,47 @@ test('merge, check.fix, check.repair and post-repair review dispatch to their sw
   }
 }, 15000);
 
+test('two-seat review refreshes pane and tab lists after the first seat starts or receives a prompt', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'two-seats', 'check.review');
+    expect((await next(f, ['two-seats'])).code).toBe(0);
+    const state: State = readState(path);
+    for (const agent of [null, 'fake'] as const) {
+      resetPrompts(f, path);
+      const db: Database = database(f);
+      saveDatabase(f, {
+        ...db,
+        panes: db.panes.map((pane) =>
+          pane.pane_id === state.pane.A
+            ? { ...pane, agent, agent_session: agent === null ? null : pane.agent_session }
+            : pane,
+        ),
+      });
+      const before: number = calls(f).length;
+      expect((await next(f, ['two-seats'])).code).toBe(0);
+      const invoked: string[][] = calls(f).slice(before);
+      const prompts: number[] = invoked.flatMap((args, index) =>
+        args[0] === 'agent' && args[1] === 'prompt' ? [index] : [],
+      );
+      expect(prompts.map((index) => invoked[index][2])).toEqual([state.pane.A!, state.pane.B!]);
+      const between: string[][] = invoked.slice(prompts[0] + 1, prompts[1]);
+      expect(between.filter((args) => args[0] === 'pane' && args[1] === 'list')).toHaveLength(1);
+      expect(between.filter((args) => args[0] === 'tab' && args[1] === 'list')).toHaveLength(1);
+      const starts: number[] = invoked.flatMap((args, index) =>
+        args[0] === 'agent' && args[1] === 'start' ? [index] : [],
+      );
+      expect(starts).toHaveLength(agent === null ? 1 : 0);
+      if (agent === null)
+        expect(invoked.slice(starts[0] + 1, prompts[0]).some((args) => args[0] === 'pane' && args[1] === 'get')).toBe(
+          true,
+        );
+    }
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 for (const missing of ['neither', 'A', 'B', 'both'] as const) {
   test(`recorded seats stay authoritative with an extra pane first and ${missing} missing allocation carries TMPDIR`, async () => {
     const f: DispatchFixture = await dispatchFixture();
