@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { appendFileSync, openSync, readFileSync, statSync } from 'node:fs';
+import { appendFileSync, openSync, readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { z } from 'zod';
 import {
@@ -261,7 +261,7 @@ async function main(): Promise<void> {
   }
   let boundary: number;
   try {
-    boundary = statSync(recordPath(live.agent, live, session)).size;
+    boundary = readFileSync(recordPath(live.agent, live, session)).byteLength;
   } catch (error) {
     process.stderr.write(`refused: pane ${pane} session record unreadable: ${errorMessage(error)}\n`);
     process.exit(1);
