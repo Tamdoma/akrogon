@@ -54,7 +54,6 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
           : `on ${symbolic.stdout}, not ${repo.config.default_branch}; ${await lag()}`,
     };
   }
-  const local: string = await command(['git', 'rev-parse', 'HEAD'], root);
   const tracking: Result = await run(
     ['git', 'rev-parse', '--verify', '--quiet', `refs/remotes/${target}^{commit}`],
     root,
