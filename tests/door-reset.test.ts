@@ -122,20 +122,111 @@ function writeRollout(home: string, sess: string, lines: string): string {
   return path;
 }
 
+function writeSessionRecord(home: string, seed: PaneSeed, sess: string, closed: boolean = true): void {
+  if (seed.agent === 'claude') writeTranscript(home, sess, closed);
+  if (seed.agent === 'codex')
+    writeRollout(
+      home,
+      sess,
+      closed
+        ? `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't1' } })}\n`
+        : `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n`,
+    );
+  if (seed.agent === 'pi' && seed.agent_session !== undefined && seed.agent_session !== null)
+    writeFileSync(
+      seed.agent_session.value,
+      `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`,
+    );
+}
+
+// Operator-input records copied from real sessions on this machine
+// (/home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/0218f863-24eb-4467-9613-f9f6f4e21171.jsonl and
+// /home/ivan/.claude/projects/-home-ivan-Work/d674fa89-28f3-44d7-acda-5339e3304d30.jsonl,
+// /home/ivan/.codex/sessions/2026/10/11/rollout-2026-10-11T19-46-35-01a12c12-d6b0-7d82-aa14-7acddfe4a526.jsonl,
+// /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-cost-rules--/2026-10-26T10-26-12-959Z_01a177bf-115f-744f-b22d-e9c72f434b49.jsonl,
+// all 2026-10-26), fields trimmed to what the parser reads.
+const claudeUser: string = JSON.stringify({
+  type: 'user',
+  message: { role: 'user', content: 'operator text' },
+  origin: { kind: 'human' },
+  promptSource: 'typed',
+});
+const claudeQueued: string = JSON.stringify({
+  type: 'attachment',
+  attachment: { type: 'queued_command', prompt: 'absorbed text', origin: { kind: 'human' } },
+});
+const claudeToolResult: string = JSON.stringify({
+  type: 'user',
+  message: { role: 'user', content: [{ type: 'tool_result', content: 'ok' }] },
+});
+const claudeTaskNotify: string = JSON.stringify({
+  type: 'user',
+  message: { role: 'user', content: '<task-notification>done</task-notification>' },
+  origin: { kind: 'task-notification' },
+  promptSource: 'system',
+});
+const codexTaskStarted: string = JSON.stringify({
+  type: 'event_msg',
+  payload: { type: 'task_started', turn_id: 't2' },
+});
+const codexUserMsg: string = JSON.stringify({
+  type: 'response_item',
+  payload: { type: 'message', role: 'user', content: [{ type: 'text', text: 'mid-run text' }] },
+});
+const piUserMsg: string = JSON.stringify({
+  type: 'message',
+  id: 'u1',
+  timestamp: '2026-10-26T00:00:01.000Z',
+  message: { role: 'user', content: [{ type: 'text', text: 'mid-run text' }] },
+});
+const piToolResult: string = JSON.stringify({
+  type: 'message',
+  id: 'tr1',
+  timestamp: '2026-10-26T00:00:01.000Z',
+  message: { role: 'toolResult', toolCallId: 't:1', toolName: 'read', content: [{ type: 'text', text: 'ok' }] },
+});
+
 const claudePane = (sess = session, status = 'idle'): PaneSeed => ({
   agent: 'claude',
   agent_status: status,
   agent_session: idSession(sess, 'herdr:claude'),
 });
 
-const piAuthority: PaneSeed = {
-  agent: 'pi',
-  agent_status: 'idle',
-  agent_session: { kind: 'path', value: '/tmp/pi-session.jsonl', source: 'herdr:pi', agent: 'pi' },
-  screen_detection_skipped: true,
-};
+const codexPane = (sess = session, status = 'idle'): PaneSeed => ({
+  agent: 'codex',
+  agent_status: status,
+  agent_session: idSession(sess, 'herdr:codex'),
+  screen_detection_skipped: null,
+});
 
-const piSession: string = '/tmp/pi-session.jsonl';
+const piPane = (sess: string, status: string): PaneSeed => ({
+  agent: 'pi',
+  agent_status: status,
+  agent_session: { kind: 'path', value: sess, source: 'herdr:pi', agent: 'pi' },
+  screen_detection_skipped: true,
+});
+
+// A wrapper herdr that records each `agent list` and runs <actions> on the named counts
+// (1-based, parent read included), then delegates to fake-herdr.
+function wrapLists(s: Setup, actions: string): void {
+  const herdr: string = resolve(s.dir, 'bin', 'herdr');
+  rmSync(herdr);
+  writeFileSync(
+    herdr,
+    [
+      '#!/bin/sh',
+      'if [ "$1 $2" = "agent list" ]; then',
+      '  echo >> "$FAKE_HERDR.lists"',
+      '  N=$(wc -l < "$FAKE_HERDR.lists")',
+      actions,
+      'fi',
+      `exec ${quote(resolve(import.meta.dir, 'fake-herdr.ts'))} "$@"`,
+      '',
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+}
+
 const START: string = 'start prompt text';
 
 // Criterion 2: unknown kind or mismatched session refuses without sending or logging.
@@ -150,6 +241,7 @@ test.each<[string, PaneSeed, string]>([
 ])('refuses when %s', async (_name: string, seed: PaneSeed, sess: string): Promise<void> => {
   const s: Setup = setup(seed);
   try {
+    writeSessionRecord(s.home, s.dir, seed, sess);
     const result: RunResult = await s.run({}, pane, sess, s.log, START);
     expect(result.code).toBe(1);
     expect(result.stderr).not.toBe('');
@@ -163,6 +255,7 @@ test.each<[string, PaneSeed, string]>([
 test('refuses a session mismatch even when the passed session has a transcript', async (): Promise<void> => {
   const s: Setup = setup(claudePane('sess-other'));
   try {
+    writeTranscript(s.home, 'sess-other', true);
     writeTranscript(s.home, session, true);
     const result: RunResult = await s.run({}, pane, session, s.log, START);
     expect(result.code).toBe(1);
@@ -176,9 +269,12 @@ test('refuses a session mismatch even when the passed session has a transcript',
 
 // Criterion 3: an open turn at the bound logs it and sends nothing.
 test('pi turn still open at the bound is logged and nothing is sent', async (): Promise<void> => {
-  const s: Setup = setup({ ...piAuthority, agent_status: 'working' });
+  const piDir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-')));
+  const piSess: string = resolve(piDir, 'session.jsonl');
+  writeFileSync(piSess, `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`);
+  const s: Setup = setup(piPane(piSess, 'working'));
   try {
-    const result: RunResult = await s.run({}, pane, piSession, s.log, START);
+    const result: RunResult = await s.run({}, pane, piSess, s.log, START);
     expect(result.code).toBe(1);
     const lines: Record<string, unknown>[] = s.logLines();
     expect(lines.length).toBeGreaterThan(0);
@@ -235,9 +331,12 @@ test('a session change during the turn wait is logged and nothing is sent', asyn
 
 // Criterion 4: an unconfirmed reset is logged and no start prompt is sent.
 test('unconfirmed reset is logged and no start prompt is sent', async (): Promise<void> => {
-  const s: Setup = setup(piAuthority);
+  const piDir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-')));
+  const piSess: string = resolve(piDir, 'session.jsonl');
+  writeFileSync(piSess, `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`);
+  const s: Setup = setup(piPane(piSess, 'idle'));
   try {
-    const result: RunResult = await s.run({}, pane, piSession, s.log, START);
+    const result: RunResult = await s.run({}, pane, piSess, s.log, START);
     expect(result.code).toBe(1);
     const lines: Record<string, unknown>[] = s.logLines();
     expect(lines.some((l) => l.step === 'wait-new-session' && l.result === 'reset unconfirmed')).toBe(true);
@@ -293,18 +392,10 @@ test('claude handover sends reset then start prompt after the new session appear
 
 // Codex gets the harmless check prompt before the start prompt.
 test('codex handover sends reset, one check prompt, then start prompt', async (): Promise<void> => {
-  const s: Setup = setup(
-    {
-      agent: 'codex',
-      agent_status: 'idle',
-      agent_session: idSession(session, 'herdr:codex'),
-      screen_detection_skipped: null,
-    },
-    {
-      promptScript: [{ status: 'idle' }],
-      waitScript: [{ status: 'done', session: 'sess-new' }],
-    },
-  );
+  const s: Setup = setup(codexPane(), {
+    promptScript: [{ status: 'idle' }],
+    waitScript: [{ status: 'done', session: 'sess-new' }],
+  });
   try {
     writeRollout(
       s.home,
@@ -338,12 +429,7 @@ test.each<[string, string]>([
 ])(
   'codex turn still open at the bound with %s is logged and nothing is sent',
   async (_name: string, rollout: string): Promise<void> => {
-    const s: Setup = setup({
-      agent: 'codex',
-      agent_status: 'idle',
-      agent_session: idSession(session, 'herdr:codex'),
-      screen_detection_skipped: null,
-    });
+    const s: Setup = setup(codexPane());
     try {
       writeRollout(s.home, session, rollout);
       const result: RunResult = await s.run({}, pane, session, s.log, START);
@@ -358,18 +444,10 @@ test.each<[string, string]>([
 
 // Criterion 5: a stalled codex check prompt is logged as failure, with no retry.
 test('a stalled codex check prompt is logged as failure and not retried', async (): Promise<void> => {
-  const s: Setup = setup(
-    {
-      agent: 'codex',
-      agent_status: 'idle',
-      agent_session: idSession(session, 'herdr:codex'),
-      screen_detection_skipped: null,
-    },
-    {
-      promptScript: [{ status: 'idle' }, { code: 'agent_prompt_stalled' }],
-      waitScript: [],
-    },
-  );
+  const s: Setup = setup(codexPane(), {
+    promptScript: [{ status: 'idle' }, { code: 'agent_prompt_stalled' }],
+    waitScript: [],
+  });
   try {
     writeRollout(
       s.home,
@@ -388,18 +466,10 @@ test('a stalled codex check prompt is logged as failure and not retried', async 
 
 // The check turn still working at the bound is logged, and no start prompt is sent.
 test('a codex check turn still working at the bound sends no start prompt', async (): Promise<void> => {
-  const s: Setup = setup(
-    {
-      agent: 'codex',
-      agent_status: 'idle',
-      agent_session: idSession(session, 'herdr:codex'),
-      screen_detection_skipped: null,
-    },
-    {
-      promptScript: [{ status: 'idle' }],
-      waitScript: [{}],
-    },
-  );
+  const s: Setup = setup(codexPane(), {
+    promptScript: [{ status: 'idle' }],
+    waitScript: [{}],
+  });
   try {
     writeRollout(
       s.home,
@@ -418,11 +488,14 @@ test('a codex check turn still working at the bound sends no start prompt', asyn
 
 // Pi happy path through hook authority.
 test('pi handover sends reset then start prompt', async (): Promise<void> => {
-  const s: Setup = setup(piAuthority, {
+  const piDir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-')));
+  const piSess: string = resolve(piDir, 'session.jsonl');
+  writeFileSync(piSess, `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`);
+  const s: Setup = setup(piPane(piSess, 'idle'), {
     promptScript: [{ session: '/tmp/pi-new.jsonl', status: 'idle' }],
   });
   try {
-    const result: RunResult = await s.run({}, pane, piSession, s.log, START);
+    const result: RunResult = await s.run({}, pane, piSess, s.log, START);
     expect(result.code).toBe(0);
     const prompts: string[][] = s.promptCalls();
     expect(prompts).toHaveLength(2);
@@ -449,4 +522,225 @@ test('docs describe the handover entries and footer wording', (): void => {
   expect(skill).toContain('handover queued');
   expect(skill).toContain('/clear');
   expect(skill).toContain('/new');
+  expect(skill).toContain('attended next');
+  expect(shapes).toContain('attended next');
+  expect(skill).toContain('continue attended (handover');
+  expect(shapes).toContain('continue attended (handover');
 });
+
+// Criterion 1: operator input recorded after the handover was queued cancels the reset.
+// The boundary is the session record's byte length at queue time, so records appended after
+// `run()` spawns the child stand for input typed while the handover was queued.
+test.each<[string, PaneSeed, string, string]>([
+  ['claude user entry', claudePane(), 'claude', claudeUser],
+  ['claude queued_command attachment', claudePane(), 'claude', claudeQueued],
+  ['codex task_started', codexPane(), 'codex', codexTaskStarted],
+  ['codex user message', codexPane(), 'codex', codexUserMsg],
+  ['pi user message', piPane('placeholder', 'working'), 'pi', piUserMsg],
+])(
+  'a %s recorded while the turn wait runs cancels with superseded',
+  async (_name: string, seed: PaneSeed, kind: string, record: string): Promise<void> => {
+    const piDir: string | null = kind === 'pi' ? registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-'))) : null;
+    const sess: string = piDir === null ? session : resolve(piDir, 'session.jsonl');
+    const liveSeed: PaneSeed = kind === 'pi' ? piPane(sess, 'working') : seed;
+    const s: Setup = setup(liveSeed);
+    try {
+      writeSessionRecord(s.home, liveSeed, sess, false);
+      const recordPath: string =
+        kind === 'claude'
+          ? resolve(s.home, `.claude/projects/proj/${sess}.jsonl`)
+          : kind === 'codex'
+            ? resolve(s.home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`)
+            : sess;
+      wrapLists(s, `[ "$N" -eq 4 ] && echo '${record.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}`);
+      const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, sess, s.log, START);
+      expect(result.code).toBe(1);
+      expect(s.logLines().some((l) => l.step === 'wait-turn-end' && l.result === 'superseded')).toBe(true);
+      expect(s.promptCalls()).toHaveLength(0);
+    } finally {
+      s.clean();
+    }
+  },
+);
+
+// Criterion 1, second timing: input first appearing after the turn end was seen cancels at the
+// recheck, the last read before the reset is sent.
+test.each<[string, string]>([
+  ['claude', claudeUser],
+  ['codex', codexUserMsg],
+  ['pi', piUserMsg],
+])(
+  'a %s user input first appearing after the turn end cancels with superseded at the recheck',
+  async (kind: string, record: string): Promise<void> => {
+    const piDir: string | null = kind === 'pi' ? registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-'))) : null;
+    const sess: string = piDir === null ? session : resolve(piDir, 'session.jsonl');
+    const seed: PaneSeed = kind === 'pi' ? piPane(sess, 'idle') : kind === 'claude' ? claudePane() : codexPane();
+    const s: Setup = setup(seed);
+    try {
+      writeSessionRecord(s.home, seed, sess);
+      const recordPath: string =
+        kind === 'claude'
+          ? resolve(s.home, `.claude/projects/proj/${sess}.jsonl`)
+          : kind === 'codex'
+            ? resolve(s.home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`)
+            : sess;
+      wrapLists(s, `[ "$N" -eq 3 ] && echo '${record.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}`);
+      const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, sess, s.log, START);
+      expect(result.code).toBe(1);
+      expect(s.logLines().some((l) => l.step === 'recheck' && l.result === 'superseded')).toBe(true);
+      expect(s.promptCalls()).toHaveLength(0);
+    } finally {
+      s.clean();
+    }
+  },
+);
+
+// Criterion 1: claude input absorbed into the running turn (a queued_command attachment) cancels.
+// Covered by the wait variant above; this is the turn-open form staying a cancel.
+test('a claude queued_command absorbed mid-turn cancels with superseded', async (): Promise<void> => {
+  const s: Setup = setup(claudePane());
+  try {
+    writeTranscript(s.home, session, false);
+    const recordPath: string = resolve(s.home, `.claude/projects/proj/${session}.jsonl`);
+    wrapLists(s, `[ "$N" -eq 4 ] && echo '${claudeQueued.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}`);
+    const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, session, s.log, START);
+    expect(result.code).toBe(1);
+    expect(s.logLines().some((l) => l.result === 'superseded')).toBe(true);
+    expect(s.promptCalls()).toHaveLength(0);
+  } finally {
+    s.clean();
+  }
+});
+
+// Criterion 2: the queuing turn's own records do not cancel. claude tool results and a
+// task-notification, then the turn's own end; the reset and start prompt go out as before.
+test.each<[string, string, string]>([
+  ['claude tool result', 'claude', claudeToolResult],
+  ['claude task notification', 'claude', claudeTaskNotify],
+  ['codex turn context', 'codex', JSON.stringify({ type: 'turn_context', payload: { model: 'm' } })],
+  ['pi tool result', 'pi', piToolResult],
+])(
+  'a %s record after the queue boundary still sends the reset and start prompt',
+  async (name: string, kind: string, record: string): Promise<void> => {
+    const piDir: string | null = kind === 'pi' ? registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-'))) : null;
+    const sess: string = piDir === null ? session : resolve(piDir, 'session.jsonl');
+    const seed: PaneSeed = kind === 'pi' ? piPane(sess, 'idle') : kind === 'claude' ? claudePane() : codexPane();
+    const s: Setup = setup(seed, {
+      promptScript:
+        kind === 'codex'
+          ? [{ status: 'idle' }, { session: 'sess-new', status: 'idle' }]
+          : kind === 'pi'
+            ? [{ session: '/tmp/pi-new.jsonl', status: 'idle' }]
+            : [{ session: 'sess-new', status: 'idle' }],
+      ...(kind === 'codex' ? { waitScript: [{ status: 'done' }] } : {}),
+    });
+    try {
+      writeSessionRecord(s.home, seed, sess, false);
+      const recordPath: string =
+        kind === 'claude'
+          ? resolve(s.home, `.claude/projects/proj/${sess}.jsonl`)
+          : kind === 'codex'
+            ? resolve(s.home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`)
+            : sess;
+      wrapLists(
+        s,
+        kind === 'claude'
+          ? `[ "$N" -eq 3 ] && echo '${record.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}\n  [ "$N" -eq 5 ] && echo '${JSON.stringify({ type: 'system', subtype: 'turn_duration' })}' >> ${quote(recordPath)}`
+          : kind === 'codex'
+            ? `[ "$N" -eq 3 ] && echo '${record.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}\n  [ "$N" -eq 5 ] && echo '${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't1' } })}' >> ${quote(recordPath)}`
+            : `[ "$N" -eq 3 ] && echo '${record.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}`,
+      );
+      const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, sess, s.log, START);
+      expect(result.code, name).toBe(0);
+      expect(s.logLines().some((l) => l.result === 'superseded')).toBe(false);
+      const prompts: string[][] = s.promptCalls();
+      expect(prompts[prompts.length - 1][3]).toBe(START);
+    } finally {
+      s.clean();
+    }
+  },
+);
+
+// Criterion 2, boundary guard: input recorded before the handover was queued does not cancel.
+test('claude operator input recorded before the queue boundary still sends the reset', async (): Promise<void> => {
+  const s: Setup = setup(claudePane(), {
+    promptScript: [{ session: 'sess-new', status: 'idle' }],
+  });
+  try {
+    writeTranscript(s.home, session, false);
+    const recordPath: string = resolve(s.home, `.claude/projects/proj/${session}.jsonl`);
+    // The earlier operator turn's input then its turn's end, both before the queue point.
+    writeFileSync(
+      recordPath,
+      `${claudeUser}\n${JSON.stringify({ type: 'system', subtype: 'turn_duration' })}\n`,
+    );
+    const result: RunResult = await s.run({}, pane, session, s.log, START);
+    expect(result.code).toBe(0);
+    expect(s.promptCalls()).toHaveLength(2);
+  } finally {
+    s.clean();
+  }
+});
+
+// Criterion 3: an unreadable session record at queue time refuses like an identity mismatch:
+// reason on stderr, non-zero exit, nothing sent, no log.
+test.each<[string, PaneSeed]>([
+  ['claude', claudePane()],
+  ['codex', codexPane()],
+])('an unreadable %s record at queue time is refused with no log and nothing sent', async (_n: string, seed: PaneSeed): Promise<void> => {
+  const s: Setup = setup(seed);
+  try {
+    const result: RunResult = await s.run({}, pane, session, s.log, START);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('refused');
+    expect(existsSync(s.log)).toBe(false);
+    expect(s.promptCalls()).toHaveLength(0);
+  } finally {
+    s.clean();
+  }
+});
+
+test('a missing pi record at queue time is refused with no log and nothing sent', async (): Promise<void> => {
+  const s: Setup = setup(piPane(resolve(tmpdir(), 'pi-sess-missing.jsonl'), 'idle'));
+  try {
+    const result: RunResult = await s.run({}, pane, resolve(tmpdir(), 'pi-sess-missing.jsonl'), s.log, START);
+    expect(result.code).toBe(1);
+    expect(result.stderr).not.toBe('');
+    expect(existsSync(s.log)).toBe(false);
+    expect(s.promptCalls()).toHaveLength(0);
+  } finally {
+    s.clean();
+  }
+});
+
+// Criterion 3: a record that goes unreadable while waiting logs the reason and sends nothing.
+test.each<[string, string]>([
+  ['claude', 'claude'],
+  ['codex', 'codex'],
+  ['pi', 'pi'],
+])(
+  'a %s record deleted while waiting is logged and nothing is sent',
+  async (_n: string, kind: string): Promise<void> => {
+    const piDir: string | null = kind === 'pi' ? registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-'))) : null;
+    const sess: string = piDir === null ? session : resolve(piDir, 'session.jsonl');
+    const seed: PaneSeed = kind === 'pi' ? piPane(sess, 'working') : kind === 'claude' ? claudePane() : codexPane();
+    const s: Setup = setup(seed);
+    try {
+      writeSessionRecord(s.home, seed, sess, false);
+      const recordPath: string =
+        kind === 'claude'
+          ? resolve(s.home, `.claude/projects/proj/${sess}.jsonl`)
+          : kind === 'codex'
+            ? resolve(s.home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`)
+            : sess;
+      wrapLists(s, `[ "$N" -eq 4 ] && rm ${quote(recordPath)}`);
+      const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, sess, s.log, START);
+      expect(result.code).toBe(1);
+      expect(s.logLines().length).toBeGreaterThan(0);
+      expect(s.logLines().some((l) => l.result === 'record unreadable')).toBe(true);
+      expect(s.promptCalls()).toHaveLength(0);
+    } finally {
+      s.clean();
+    }
+  },
+);
