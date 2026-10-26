@@ -1,0 +1,34 @@
+bun test v1.4.4 (38afee6c8) 4x PARALLEL
+
+tests/install.test.ts:
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/.evidence/install-prune-links/home-listing.json
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+
+tests/batch.test.ts:
+{"ok":true,"top":"4d1df1e0dfa48409df25bd2d43be889b7196fa40"}
+
+tests/next.test.ts:
+plan-issue build slot=A phase=plan.synthesis leaf=/tmp/akrogon-suite-H9SMlU/akrogon-4LKIvv/repo/issues/open/issue/build
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-DQl1DU/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-DQl1DU/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-DQl1DU/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-DQl1DU/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-v0Ujtg/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-v0Ujtg/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-v0Ujtg/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-v0Ujtg/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-x4P6TE/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-x4P6TE/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-LzlHS3/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-LzlHS3/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-x4P6TE/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-x4P6TE/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-LzlHS3/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-LzlHS3/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-w3Eagx/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-w3Eagx/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-H08bGh/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-H08bGh/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-w3Eagx/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-w3Eagx/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-H9SMlU/akrogon-H08bGh/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-H9SMlU/akrogon-H08bGh/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+error: Missing leaf: resting (parked)
+error: Missing leaf: resting (parked)
+
+ 1175 pass
+ 0 fail
+ 11716 expect() calls
+Ran 1175 tests across 69 files. [101.02s]
+exit=0

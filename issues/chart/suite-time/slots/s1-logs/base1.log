@@ -1,0 +1,32 @@
+bun test v1.4.4 (38afee6c8)
+
+tests/install.test.ts:
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/.evidence/install-prune-links/home-listing.json
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+{"ok":true,"top":"3a02b1a7c707e745aabc46a8a4d6d1182072ba1c"}
+
+tests/next.test.ts:
+plan-issue build slot=A phase=plan.synthesis leaf=/tmp/akrogon-suite-InOOPN/akrogon-E7iLqn/repo/issues/open/issue/build
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-wHsg6e/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-wHsg6e/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-wHsg6e/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-wHsg6e/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-iEiqNa/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-iEiqNa/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-iEiqNa/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-iEiqNa/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-Ewa5aP/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-Ewa5aP/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-Ewa5aP/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-Ewa5aP/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-RnSPH0/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-RnSPH0/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-RnSPH0/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-RnSPH0/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-ObvIqZ/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-ObvIqZ/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-akHqfL/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-akHqfL/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-ObvIqZ/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-ObvIqZ/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+error: Missing leaf: resting (parked)
+{"repo":"repo","path":"/tmp/akrogon-suite-InOOPN/akrogon-akHqfL/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-InOOPN/akrogon-akHqfL/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+error: Missing leaf: resting (parked)
+
+ 1167 pass
+ 0 fail
+ 11714 expect() calls
+Ran 1167 tests across 69 files. [215.72s]
+exit=0

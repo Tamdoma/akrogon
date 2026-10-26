@@ -1,0 +1,3 @@
+# Rebuttal brief: load-sensitive-tests (slot B)
+
+Read /home/ivan/Work/infra/akrogon/issues/chart/suite-time/slots/load-tests-merged.md and the other slot's notes (load-tests-B.md or load-tests-C.md, whichever is not yours). Write a disagreement-only rebuttal as defined in /home/ivan/.claude/skills/chart-issues/assets/questions.md section "Blind peer exchange": only lines you dispute, each with evidence, plus any merge tag that misstates your notes. Agreement needs no line. Pay attention to A's whole-suite max-concurrency measurements in item 5. Do not run full suites. Write to /home/ivan/Work/infra/akrogon/issues/chart/suite-time/slots/load-tests-rebuttal-B.md. Plain words, short sentences.

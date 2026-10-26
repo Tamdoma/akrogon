@@ -1,0 +1,44 @@
+bun test v1.4.4 (38afee6c8) 2x PARALLEL
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+(fail) the holder gets a batch record rebased onto the remote and only the holder is prompted [15006.42ms]
+  ^ this test timed out after 15000ms.
+
+tests/batch.test.ts:
+{"ok":true,"top":"2aba77bc4d5847b6f7700ea75fb8a26daa736b99"}
+
+tests/install.test.ts:
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/.evidence/install-prune-links/home-listing.json
+
+tests/next.test.ts:
+plan-issue build slot=A phase=plan.synthesis leaf=/tmp/akrogon-suite-6BejYv/akrogon-Krwr1z/repo/issues/open/issue/build
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-LJrlqb/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-LJrlqb/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-LJrlqb/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-LJrlqb/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-0exnhD/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-0exnhD/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-0exnhD/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-0exnhD/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-YIcAK5/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-YIcAK5/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-i5jiGV/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-i5jiGV/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-YIcAK5/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-YIcAK5/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-i5jiGV/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-i5jiGV/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-t7RUDu/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-t7RUDu/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-t7RUDu/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-t7RUDu/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-joN2Py/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-joN2Py/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-6BejYv/akrogon-joN2Py/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-6BejYv/akrogon-joN2Py/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+error: Missing leaf: resting (parked)
+error: Missing leaf: resting (parked)
+(fail) the prompt delivery fault holder exit wakes the next merge leaf without a manual next [15001.09ms]
+  ^ this test timed out after 15000ms.
+(fail) a leaf re-entering merge queues behind the two leaves stamped earlier [15000.09ms]
+  ^ this test timed out after 15000ms.
+(fail) an idle hook retries a faulted merge holder before its waiter [15001.00ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner name matches folder path from root, subfolder and worktree [60000.67ms]
+  ^ this test timed out after 60000ms.
+
+ 1162 pass
+ 5 fail
+ 11714 expect() calls
+Ran 1167 tests across 69 files. [175.51s]
+exit=1

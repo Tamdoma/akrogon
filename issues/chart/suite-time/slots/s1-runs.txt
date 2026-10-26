@@ -1,0 +1,81 @@
+base1 start=20:19:57 wall/user/sys=215.731 1066.817 395.618 load_before=8.81 5.99 7.89 load_after=29.56 15.63 11.04  1167 pass 0 fail 11714 expect() calls Ran 1167 tests across 69 files. [215.72s] exit=0 
+after1 start=20:23:33 wall/user/sys=89.407 1083.743 398.933 load_before=29.56 15.63 11.04 load_after=33.86 22.67 14.09  1166 pass 1 fail 11714 expect() calls Ran 1167 tests across 69 files. [89.40s] exit=1 
+base2 start=20:25:02 wall/user/sys=192.398 996.274 385.412 load_before=33.86 22.67 14.09 load_after=15.92 19.03 14.24  1167 pass 0 fail 11714 expect() calls Ran 1167 tests across 69 files. [192.39s] exit=0 
+after2 start=20:28:14 wall/user/sys=84.371 1094.427 395.509 load_before=15.92 19.03 14.24 load_after=31.38 25.08 16.89  1167 pass 0 fail 11714 expect() calls Ran 1167 tests across 69 files. [84.37s] exit=0 
+triple-c start=20:29:47 wall/user/sys=181.590 1107.522 413.587 load_before=28.86 24.66 16.80 load_after=86.43 66.24 35.23  1140 pass 27 fail 11698 expect() calls Ran 1167 tests across 69 files. [181.59s] exit=1 
+triple-a start=20:29:47 wall/user/sys=188.676 1096.311 411.025 load_before=28.86 24.66 16.80 load_after=81.27 65.51 35.16  1145 pass 22 fail 11704 expect() calls Ran 1167 tests across 69 files. [188.67s] exit=1 
+triple-b start=20:29:47 wall/user/sys=188.676 1096.180 409.792 load_before=28.86 24.66 16.80 load_after=81.27 65.51 35.16  1148 pass 19 fail 11704 expect() calls Ran 1167 tests across 69 files. [188.67s] exit=1 
+p2-triple-a start=20:33:10 wall/user/sys=174.186 1062.363 381.043 load_before=63.27 62.30 34.60 load_after=67.94 69.64 42.52  1158 pass 9 fail 11706 expect() calls Ran 1167 tests across 69 files. [174.18s] exit=1 
+p2-triple-b start=20:33:10 wall/user/sys=175.514 1058.641 378.583 load_before=63.27 62.30 34.60 load_after=67.94 69.64 42.52  1162 pass 5 fail 11714 expect() calls Ran 1167 tests across 69 files. [175.51s] exit=1 
+p2-triple-c start=20:33:10 wall/user/sys=187.121 1035.474 387.642 load_before=63.27 62.30 34.60 load_after=57.81 67.41 42.08  1162 pass 5 fail 11705 expect() calls Ran 1167 tests across 69 files. [187.12s] exit=1 
+p2-single start=20:36:17 wall/user/sys=105.738 1014.216 361.863 load_before=57.81 67.41 42.08 load_after=26.17 54.62 40.27  1167 pass 0 fail 11714 expect() calls Ran 1167 tests across 69 files. [105.74s] exit=0 
+serial-triple-a start=20:38:18 wall/user/sys=253.759 1076.390 410.903 load_before=20.72 52.02 39.65 load_after=44.88 46.73 39.92  1166 pass 1 fail 11714 expect() calls Ran 1167 tests across 69 files. [253.75s] exit=1 
+serial-triple-c start=20:38:18 wall/user/sys=277.233 1063.826 414.704 load_before=20.72 52.02 39.65 load_after=34.89 44.27 39.28  1162 pass 5 fail 11707 expect() calls Ran 1167 tests across 69 files. [277.22s] exit=1 
+serial-triple-b start=20:38:18 wall/user/sys=279.610 1067.640 413.261 load_before=20.72 52.02 39.65 load_after=34.89 44.27 39.28  1163 pass 4 fail 11704 expect() calls Ran 1167 tests across 69 files. [279.60s] exit=1 
+
+# After L1 landed (main 51ee341c), 2026-10-25
+l1-serial-1 start=22:44:36 wall/user/sys=163.126 900.884 326.392 load_before=0.58 3.52 4.72 load_after=12.74 7.17 5.84  1175 pass 0 fail 11716 expect() calls Ran 1175 tests across 69 files. [163.12s] exit=0 
+l1-c20-1 start=22:47:20 wall/user/sys=61.591 1007.922 341.739 load_before=12.74 7.17 5.84 load_after=33.21 14.14 8.32  1175 pass 0 fail 11716 expect() calls Ran 1175 tests across 69 files. [61.59s] exit=0 
+l1-c4-1 start=22:48:21 wall/user/sys=103.309 824.097 287.648 load_before=33.21 14.14 8.32 load_after=17.89 14.64 9.12  1175 pass 0 fail 11716 expect() calls Ran 1175 tests across 69 files. [103.31s] exit=0 
+l1-serial-2 start=22:50:04 wall/user/sys=163.922 905.102 328.983 load_before=17.89 14.64 9.12 load_after=11.78 12.30 9.04  1175 pass 0 fail 11716 expect() calls Ran 1175 tests across 69 files. [163.91s] exit=0 
+l1-c20-2 start=22:52:48 wall/user/sys=60.237 1002.190 339.826 load_before=11.78 12.30 9.04 load_after=44.22 21.29 12.31  1175 pass 0 fail 11716 expect() calls Ran 1175 tests across 69 files. [60.23s] exit=0 
+l1-c4-2 start=22:53:49 wall/user/sys=101.026 809.120 282.043 load_before=44.22 21.29 12.31 load_after=16.85 19.07 12.52  1175 pass 0 fail 11716 expect() calls Ran 1175 tests across 69 files. [101.02s] exit=0 
+l1-x3-1-b start=22:55:42 wall/user/sys=165.873 1118.117 422.720 load_before=14.34 18.46 12.39 load_after=150.89 76.10 35.30  1133 pass 42 fail 11701 expect() calls Ran 1175 tests across 69 files. [165.87s] exit=1 
+l1-x3-1-a start=22:55:42 wall/user/sys=166.164 1121.502 422.723 load_before=14.34 18.46 12.39 load_after=150.89 76.10 35.30  1134 pass 41 fail 11701 expect() calls Ran 1175 tests across 69 files. [166.16s] exit=1 
+l1-x3-1-c start=22:55:42 wall/user/sys=166.246 1118.519 421.315 load_before=14.34 18.46 12.39 load_after=150.89 76.10 35.30  1136 pass 39 fail 11701 expect() calls Ran 1175 tests across 69 files. [166.24s] exit=1 
+l1-x3-2-a start=22:58:28 wall/user/sys=164.413 1121.798 413.646 load_before=150.89 76.10 35.30 load_after=167.09 112.76 55.81  1134 pass 41 fail 11710 expect() calls Ran 1175 tests across 69 files. [164.41s] exit=1 
+l1-x3-2-b start=22:58:28 wall/user/sys=164.443 1115.843 411.108 load_before=150.89 76.10 35.30 load_after=167.09 112.76 55.81  1134 pass 41 fail 11701 expect() calls Ran 1175 tests across 69 files. [164.44s] exit=1 
+l1-x3-2-c start=22:58:28 wall/user/sys=164.446 1122.518 417.779 load_before=150.89 76.10 35.30 load_after=167.09 112.76 55.81  1136 pass 39 fail 11706 expect() calls Ran 1175 tests across 69 files. [164.44s] exit=1 
+l1-x2-1-b start=23:01:31 wall/user/sys=110.543 1090.715 375.667 load_before=120.38 105.62 54.68 load_after=110.37 106.51 60.68  1162 pass 13 fail 11710 expect() calls Ran 1175 tests across 69 files. [110.54s] exit=1 
+l1-x2-1-a start=23:01:31 wall/user/sys=110.584 1087.530 374.663 load_before=120.38 105.62 54.68 load_after=110.37 106.51 60.68  1163 pass 12 fail 11711 expect() calls Ran 1175 tests across 69 files. [110.58s] exit=1 
+l1-x2-2-b start=23:03:22 wall/user/sys=110.732 1085.928 377.168 load_before=110.37 106.51 60.68 load_after=111.25 107.33 66.04  1166 pass 9 fail 11712 expect() calls Ran 1175 tests across 69 files. [110.73s] exit=1 
+l1-x2-2-a start=23:03:22 wall/user/sys=110.742 1084.145 377.008 load_before=110.37 106.51 60.68 load_after=111.25 107.33 66.04  1165 pass 10 fail 11708 expect() calls Ran 1175 tests across 69 files. [110.74s] exit=1 
+
+# Neighbour and two-at-once runs on main 51ee341c, 2026-10-25/26
+nb-serial-1-nbr start=23:55:47 wall/user/sys=199.096 994.318 366.980 load_before=1.33 5.75 6.81 load_after=43.98 21.46 12.41  1174 pass 1 fail 11716 expect() calls Ran 1175 tests across 69 files. [199.09s] exit=1 
+nb-serial-1 start=23:55:47 wall/user/sys=200.196 995.469 371.322 load_before=1.33 5.75 6.81 load_after=43.98 21.46 12.41  1174 pass 1 fail 11716 expect() calls Ran 1175 tests across 69 files. [200.19s] exit=1 
+nb-s1-1 start=23:59:07 wall/user/sys=63.155 1018.627 347.057 load_before=43.98 21.46 12.41 load_after=55.25 29.25 15.71  1175 pass 0 fail 11716 expect() calls Ran 1175 tests across 69 files. [63.15s] exit=0 
+nb-s1-1-nbr start=23:59:07 wall/user/sys=196.832 935.057 340.945 load_before=43.98 21.46 12.41 load_after=24.09 25.93 16.22  1175 pass 0 fail 11716 expect() calls Ran 1175 tests across 69 files. [196.82s] exit=0 
+nb-serial-2-nbr start=00:02:24 wall/user/sys=198.491 997.765 367.587 load_before=24.09 25.93 16.22 load_after=39.28 30.26 19.49  1174 pass 1 fail 11716 expect() calls Ran 1175 tests across 69 files. [198.49s] exit=1 
+nb-serial-2 start=00:02:24 wall/user/sys=199.838 996.874 370.882 load_before=24.09 25.93 16.22 load_after=39.28 30.26 19.49  1174 pass 1 fail 11716 expect() calls Ran 1175 tests across 69 files. [199.83s] exit=1 
+nb-s1-2 start=00:05:44 wall/user/sys=61.786 1008.707 342.938 load_before=39.28 30.26 19.49 load_after=50.59 35.58 22.07  1175 pass 0 fail 11716 expect() calls Ran 1175 tests across 69 files. [61.78s] exit=0 
+nb-s1-2-nbr start=00:05:44 wall/user/sys=192.497 915.064 333.798 load_before=39.28 30.26 19.49 load_after=22.87 30.08 21.80  1175 pass 0 fail 11716 expect() calls Ran 1175 tests across 69 files. [192.49s] exit=0 
+q2-s1-1-b start=00:09:20 wall/user/sys=104.893 1083.769 371.168 load_before=16.53 28.17 21.35 load_after=93.51 51.84 30.59  1170 pass 5 fail 11713 expect() calls Ran 1175 tests across 69 files. [104.89s] exit=1 
+q2-s1-1-a start=00:09:20 wall/user/sys=104.962 1081.837 369.906 load_before=16.53 28.17 21.35 load_after=93.51 51.84 30.59  1169 pass 6 fail 11713 expect() calls Ran 1175 tests across 69 files. [104.96s] exit=1 
+q2-s1-2-a start=00:11:05 wall/user/sys=105.046 1082.148 375.834 load_before=93.51 51.84 30.59 load_after=114.91 70.77 39.61  1169 pass 6 fail 11716 expect() calls Ran 1175 tests across 69 files. [105.04s] exit=1 
+q2-s1-2-b start=00:11:05 wall/user/sys=105.276 1082.146 373.245 load_before=93.51 51.84 30.59 load_after=114.91 70.77 39.61  1169 pass 6 fail 11716 expect() calls Ran 1175 tests across 69 files. [105.27s] exit=1 
+# nb-serial pairs: each copy failed 'a leaf re-entering merge queues behind the two leaves stamped earlier' at its 15000 ms cap
+# q2 (two S1 copies at once): 7 next.test.ts names fail at 15000 ms caps, 5-6 per copy
+# Landed be59c9e2: akrogon verify --holder issues/chart/suite-time/direct, test 0, 1175 pass, 0 fail, 11676 expects, 70.27 s (check-test-1792973818300-22365.log); serial receipt on 51ee341c had 11676 expects, 165.99 s
+# Seven-test fix runs (worktree next-load-tests). fh = compiled fake herdr only; fh2 = compiled plus one-pass leaf allocation; fh3 = bytecode bundle plus one-pass allocation (landed 083d3048)
+fh-solo-1 start=00:28:11 wall/user/sys=47.078 647.274 257.260 load_before=6.26 7.14 17.54 load_after=17.18 10.10 18.07  1175 pass 0 fail 11676 expect() calls Ran 1175 tests across 69 files. [47.08s] exit=0 
+fh-q2-1-b start=00:28:58 wall/user/sys=79.704 716.903 320.562 load_before=17.18 10.10 18.07 load_after=72.77 30.61 24.66  1174 pass 1 fail 11676 expect() calls Ran 1175 tests across 69 files. [79.70s] exit=1 
+fh-q2-1-a start=00:28:58 wall/user/sys=80.981 720.415 323.350 load_before=17.18 10.10 18.07 load_after=72.77 30.61 24.66  1175 pass 0 fail 11676 expect() calls Ran 1175 tests across 69 files. [80.98s] exit=0 
+fh-q2-2-b start=00:30:19 wall/user/sys=79.652 723.495 324.472 load_before=72.77 30.61 24.66 load_after=90.89 47.49 31.15  1175 pass 0 fail 11676 expect() calls Ran 1175 tests across 69 files. [79.65s] exit=0 
+fh-q2-2-a start=00:30:19 wall/user/sys=79.898 722.475 322.721 load_before=72.77 30.61 24.66 load_after=90.89 47.49 31.15  1175 pass 0 fail 11676 expect() calls Ran 1175 tests across 69 files. [79.89s] exit=0 
+fh-q2-3-b start=00:31:39 wall/user/sys=80.416 723.444 324.191 load_before=90.89 47.49 31.15 load_after=102.46 61.72 37.52  1175 pass 0 fail 11676 expect() calls Ran 1175 tests across 69 files. [80.41s] exit=0 
+fh-q2-3-a start=00:31:39 wall/user/sys=81.521 723.908 326.550 load_before=90.89 47.49 31.15 load_after=102.46 61.72 37.52  1175 pass 0 fail 11676 expect() calls Ran 1175 tests across 69 files. [81.52s] exit=0 
+fh-solo-2 start=00:33:01 wall/user/sys=47.299 651.142 259.726 load_before=102.46 61.72 37.52 load_after=60.14 56.84 37.14  1175 pass 0 fail 11676 expect() calls Ran 1175 tests across 69 files. [47.30s] exit=0 
+fh2-solo-1 start=00:35:27 wall/user/sys=47.090 641.765 256.655 load_before=18.49 42.50 33.96 load_after=26.51 41.43 34.02  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [47.09s] exit=0 
+fh2-q2-1-b start=00:36:14 wall/user/sys=79.265 718.193 319.715 load_before=26.51 41.43 34.02 load_after=79.21 55.60 39.65  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [79.26s] exit=0 
+fh2-q2-1-a start=00:36:14 wall/user/sys=79.345 719.230 322.237 load_before=26.51 41.43 34.02 load_after=79.21 55.60 39.65  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [79.34s] exit=0 
+fh2-q2-2-a start=00:37:34 wall/user/sys=82.179 723.835 322.111 load_before=79.21 55.60 39.65 load_after=100.32 67.90 45.28  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [82.18s] exit=0 
+fh2-q2-2-b start=00:37:34 wall/user/sys=82.476 727.311 326.638 load_before=79.21 55.60 39.65 load_after=92.44 66.80 45.05  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [82.47s] exit=0 
+fh2-q2-3-b start=00:38:56 wall/user/sys=81.719 723.521 322.864 load_before=92.44 66.80 45.05 load_after=94.42 74.21 49.47  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [81.72s] exit=0 
+fh2-q2-3-a start=00:38:56 wall/user/sys=82.158 721.176 321.821 load_before=92.44 66.80 45.05 load_after=94.42 74.21 49.47  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [82.16s] exit=0 
+fh2-q2-4-b start=00:40:18 wall/user/sys=87.543 729.012 330.689 load_before=94.42 74.21 49.47 load_after=104.48 82.54 54.56  1174 pass 1 fail 11667 expect() calls Ran 1175 tests across 69 files. [87.54s] exit=1 
+fh2-q2-4-a start=00:40:18 wall/user/sys=88.121 732.779 336.913 load_before=94.42 74.21 49.47 load_after=96.35 81.22 54.28  1174 pass 1 fail 11667 expect() calls Ran 1175 tests across 69 files. [88.12s] exit=1 
+fh2-x3-1-a start=00:41:46 wall/user/sys=128.238 768.255 395.217 load_before=96.35 81.22 54.28 load_after=142.69 105.65 66.68  1162 pass 13 fail 11667 expect() calls Ran 1175 tests across 69 files. [128.24s] exit=1 
+fh2-x3-1-b start=00:41:46 wall/user/sys=128.712 767.136 398.087 load_before=96.35 81.22 54.28 load_after=142.69 105.65 66.68  1159 pass 16 fail 11667 expect() calls Ran 1175 tests across 69 files. [128.71s] exit=1 
+fh2-x3-1-c start=00:41:46 wall/user/sys=128.896 765.972 393.805 load_before=96.35 81.22 54.28 load_after=142.69 105.65 66.68  1160 pass 15 fail 11667 expect() calls Ran 1175 tests across 69 files. [128.89s] exit=1 
+fh3-solo-1 start=00:47:15 wall/user/sys=48.132 696.687 262.105 load_before=18.34 58.51 55.32 load_after=30.19 55.99 54.66  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [48.13s] exit=0 
+fh3-q2-1-a start=00:48:03 wall/user/sys=86.430 763.942 323.445 load_before=30.19 55.99 54.66 load_after=83.16 66.41 58.40  1174 pass 1 fail 11667 expect() calls Ran 1175 tests across 69 files. [86.43s] exit=1 
+fh3-q2-1-b start=00:48:03 wall/user/sys=86.526 768.306 326.511 load_before=30.19 55.99 54.66 load_after=83.16 66.41 58.40  1174 pass 1 fail 11667 expect() calls Ran 1175 tests across 69 files. [86.52s] exit=1 
+fh3-q2-2-b start=00:49:50 wall/user/sys=84.532 755.559 320.349 load_before=59.69 62.14 57.17 load_after=86.68 71.06 60.78  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [84.53s] exit=0 
+fh3-q2-2-a start=00:49:50 wall/user/sys=84.618 757.985 320.731 load_before=59.69 62.14 57.17 load_after=86.68 71.06 60.78  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [84.61s] exit=0 
+fh3-q2-3-a start=00:51:35 wall/user/sys=80.516 749.666 317.402 load_before=62.27 66.51 59.50 load_after=90.24 74.18 62.76  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [80.51s] exit=0 
+fh3-q2-3-b start=00:51:35 wall/user/sys=81.111 755.315 319.418 load_before=62.27 66.51 59.50 load_after=90.24 74.18 62.76  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [81.11s] exit=0 
+fh3-q2-4-b start=00:53:16 wall/user/sys=83.295 753.663 319.144 load_before=64.96 69.45 61.45 load_after=92.60 78.06 65.22  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [83.29s] exit=0 
+fh3-q2-4-a start=00:53:16 wall/user/sys=83.646 754.125 319.969 load_before=64.96 69.45 61.45 load_after=92.60 78.06 65.22  1175 pass 0 fail 11667 expect() calls Ran 1175 tests across 69 files. [83.64s] exit=0 
+# fh3 q2: 6 of 8 copies green; the only fail is 'a leaf re-entering merge queues behind the two leaves stamped earlier' at 15000 ms (pair 1, start load 30-56 from other host work)
+# Landed 083d3048: akrogon verify --holder issues/chart/suite-time/direct, test 0, 1175 pass, 0 fail, 11667 expects, 55.88 s (check-test-1792976183749-1150573.log)

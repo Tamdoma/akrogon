@@ -1,0 +1,93 @@
+bun test v1.4.4 (38afee6c8)
+
+tests/leaf-slices.test.ts:
+363 |       panes: [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' }],
+364 |     });
+365 |     const pid: number = await sleeper(f, sliceName);
+366 |     const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
+367 |     expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
+368 |     expect(await isActive(sliceName)).toBe(true);
+                                            ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/tests/leaf-slices.test.ts:368:39)
+(fail) a finished leaf with a live tab keeps its slice, and the pass fetched the pane list [776.82ms]
+309 |     `echo $$$$ > ${pidFile}; exec sleep 300`,
+310 |   );
+311 |   expect(finished.code).toBe(0);
+312 |   for (let i: number = 0; i < 100 && !existsSync(pidFile); i++) await Bun.sleep(50);
+313 |   const pid: number = Number(readFileSync(pidFile, 'utf8').trim());
+314 |   expect(pidAlive(pid)).toBe(true);
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at sleeper (/home/ivan/Work/infra/akrogon/tests/leaf-slices.test.ts:314:25)
+      at async <anonymous> (/home/ivan/Work/infra/akrogon/tests/leaf-slices.test.ts:332:37)
+(fail) merged and failed leaf slices with gone tabs are stopped and their processes end [2597.28ms]
+398 |       const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
+399 |       expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
+400 |       // The control proves the pass stopped finished slices this run; only the
+401 |       // live run record protects run-leaf's slice.
+402 |       await waitFor(async () => !(await isActive(control)) && !pidAlive(controlPid));
+403 |       expect(await isActive(z.string().parse(sliceName))).toBe(true);
+                                                                ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/tests/leaf-slices.test.ts:403:59)
+(fail) a finished leaf slice named by a live run record is not stopped [2893.85ms]
+521 |       `${process.execPath} ${entry} next --all;`,
+522 |       `echo $? > ${marker}`,
+523 |     ].join(' ');
+524 |     await sdrun('--scope', '--quiet', `--slice=${sliceName}`, '--', 'sh', '-c', inner);
+525 |     for (let i: number = 0; i < 300 && !existsSync(marker); i++) await Bun.sleep(100);
+526 |     expect(existsSync(marker)).toBe(true);
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/tests/leaf-slices.test.ts:526:32)
+(fail) a reconcile pass running inside a leaf slice does not stop that slice [31898.23ms]
+
+tests/install.test.ts:
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/.evidence/install-prune-links/home-listing.json
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+{"ok":true,"top":"476e721d5900d3c3d20c2d4ffd323506d112b18c"}
+
+tests/next.test.ts:
+plan-issue build slot=A phase=plan.synthesis leaf=/tmp/akrogon-suite-xWxiJL/akrogon-DVM6ba/repo/issues/open/issue/build
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-TOxw3U/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-TOxw3U/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-TOxw3U/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-TOxw3U/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-nlapgA/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-nlapgA/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-nlapgA/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-nlapgA/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-4AF9Vu/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-4AF9Vu/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-4AF9Vu/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-4AF9Vu/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-mF9AmP/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-mF9AmP/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-mF9AmP/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-mF9AmP/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-kF5xMR/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-kF5xMR/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-QxwYpG/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-QxwYpG/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+error: Missing leaf: resting (parked)
+error: Missing leaf: resting (parked)
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-QxwYpG/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-QxwYpG/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-xWxiJL/akrogon-kF5xMR/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-xWxiJL/akrogon-kF5xMR/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+(fail) a leaf re-entering merge queues behind the two leaves stamped earlier [15000.43ms]
+  ^ this test timed out after 15000ms.
+
+ 1162 pass
+ 5 fail
+ 11707 expect() calls
+Ran 1167 tests across 69 files. [277.22s]
+exit=1

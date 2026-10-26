@@ -1,0 +1,57 @@
+bun test v1.4.4 (38afee6c8) 4x PARALLEL
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+
+tests/install.test.ts:
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/.evidence/install-prune-links/home-listing.json
+
+tests/peer-wait.test.ts:
+128 |   },
+129 | ): void {
+130 |   expect(result.code).toBe(0);
+131 |   expect(result.stdout.split('\n')).toHaveLength(2);
+132 |   expect(result.stdout.endsWith('\n')).toBe(true);
+133 |   expect(JSON.parse(result.stdout)).toEqual(expected);
+                                          ^
+error: expect(received).toEqual(expected)
+
+@@ -12,3 +12,3 @@
+    "signal": "unproven",
+-   "status": "working",
++   "status": null,
+  }
+
+- Expected  - 1
++ Received  + 1
+
+      at expectOutcome (/home/ivan/Work/infra/akrogon/tests/peer-wait.test.ts:133:37)
+      at <anonymous> (/home/ivan/Work/infra/akrogon/tests/peer-wait.test.ts:903:5)
+(fail) budget keeps the last status herdr returned [743.39ms]
+
+tests/batch.test.ts:
+{"ok":true,"top":"5175ce6cd77a0767fb6ba7ec7009a5a3f4819ecd"}
+
+tests/next.test.ts:
+plan-issue build slot=A phase=plan.synthesis leaf=/tmp/akrogon-suite-GjNu53/akrogon-D49Efz/repo/issues/open/issue/build
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-YD8ofs/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-YD8ofs/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-YD8ofs/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-YD8ofs/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-aVMAcQ/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-aVMAcQ/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-aVMAcQ/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-aVMAcQ/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-CkRm58/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-CkRm58/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-CkRm58/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-CkRm58/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-1USc7A/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-1USc7A/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-kDkcLC/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-kDkcLC/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-9r7dMA/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-9r7dMA/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-kDkcLC/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-kDkcLC/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-1USc7A/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-1USc7A/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-GjNu53/akrogon-9r7dMA/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-GjNu53/akrogon-9r7dMA/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+error: Missing leaf: resting (parked)
+error: Missing leaf: resting (parked)
+
+ 1166 pass
+ 1 fail
+ 11714 expect() calls
+Ran 1167 tests across 69 files. [89.40s]
+exit=1

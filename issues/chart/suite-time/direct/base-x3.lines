@@ -1,0 +1,475 @@
+run 9cf6bf3a-6178-4221-832e-de6ff74f0157
+run b8643b6c-74a1-46bc-a595-baf7d7c9ab16
+run 5d3f12e3-18e6-42ec-b03a-24b825a60cac
+
+tests/leaf-slices.test.ts:
+(pass) akrogon phase merged inside the leaf slice stops no slice [600.37ms]
+(pass) bad leaf ownership keeps uncertain slices without aborting failed-unit cleanup [812.48ms]
+(pass) the host step removes retired leftovers and keeps unprovable items [1067.48ms]
+(pass) a pass with the pane list unavailable stops no slice of a leaf that has a recorded tab [1149.22ms]
+(pass) a repo-local pass preserves another registered repo slice with a live tab [1154.30ms]
+363 |       panes: [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' }],
+364 |     });
+365 |     const pid: number = await sleeper(f, sliceName);
+366 |     const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
+367 |     expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
+368 |     expect(await isActive(sliceName)).toBe(true);
+                                            ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/faster-suite-files/tests/leaf-slices.test.ts:368:39)
+(fail) a finished leaf with a live tab keeps its slice, and the pass fetched the pane list [1190.23ms]
+(pass) a shell run admitted while another slice stops protects its own slice [1599.12ms]
+(pass) a finished leaf temp stays while its retained slice holds a running unit with the tab gone [1631.82ms]
+(pass) a finished leaf temp stays while its slice holds a running unit [1654.63ms]
+(pass) a loaded failed akrogon-run unit is cleared by a reconcile pass [2029.72ms]
+(pass) the run guard unit is submitted with CollectMode=inactive-or-failed [2087.06ms]
+(pass) a loaded slice matching no leaf record is stopped only when it holds no process [2153.69ms]
+(pass) a reconcile pass running inside a leaf slice does not stop that slice [2397.24ms]
+(pass) merged and failed leaf slices with gone tabs are stopped and their processes end [3138.01ms]
+(pass) a finished leaf slice named by a live run record is not stopped [3214.51ms]
+
+ 14 pass
+ 1 fail
+ 78 expect() calls
+Ran 15 tests across 1 file. [3.25s]
+
+tests/leaf-slices.test.ts:
+(pass) akrogon phase merged inside the leaf slice stops no slice [658.94ms]
+(pass) bad leaf ownership keeps uncertain slices without aborting failed-unit cleanup [936.83ms]
+(pass) a pass with the pane list unavailable stops no slice of a leaf that has a recorded tab [1017.15ms]
+(pass) the host step removes retired leftovers and keeps unprovable items [1062.00ms]
+(pass) a repo-local pass preserves another registered repo slice with a live tab [1131.28ms]
+363 |       panes: [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' }],
+364 |     });
+365 |     const pid: number = await sleeper(f, sliceName);
+366 |     const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
+367 |     expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
+368 |     expect(await isActive(sliceName)).toBe(true);
+                                            ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/faster-suite-files/tests/leaf-slices.test.ts:368:39)
+(fail) a finished leaf with a live tab keeps its slice, and the pass fetched the pane list [1183.19ms]
+(pass) a shell run admitted while another slice stops protects its own slice [1540.06ms]
+(pass) a finished leaf temp stays while its slice holds a running unit [1630.11ms]
+(pass) a finished leaf temp stays while its retained slice holds a running unit with the tab gone [1645.42ms]
+(pass) a loaded failed akrogon-run unit is cleared by a reconcile pass [2058.97ms]
+(pass) the run guard unit is submitted with CollectMode=inactive-or-failed [2103.20ms]
+(pass) a loaded slice matching no leaf record is stopped only when it holds no process [2149.94ms]
+(pass) a reconcile pass running inside a leaf slice does not stop that slice [2401.03ms]
+(pass) merged and failed leaf slices with gone tabs are stopped and their processes end [3163.49ms]
+(pass) a finished leaf slice named by a live run record is not stopped [3216.41ms]
+
+ 14 pass
+ 1 fail
+ 78 expect() calls
+Ran 15 tests across 1 file. [3.25s]
+check base-x3-leaf-slices-2: 1 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-leaf-slices-2-1792963306679-2606412.log
+check base-x3-leaf-slices-3: 1 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-leaf-slices-3-1792963306679-2606413.log
+
+tests/leaf-slices.test.ts:
+(pass) akrogon phase merged inside the leaf slice stops no slice [605.43ms]
+(pass) bad leaf ownership keeps uncertain slices without aborting failed-unit cleanup [757.80ms]
+(pass) the host step removes retired leftovers and keeps unprovable items [942.98ms]
+(pass) a pass with the pane list unavailable stops no slice of a leaf that has a recorded tab [1063.58ms]
+(pass) a repo-local pass preserves another registered repo slice with a live tab [1145.68ms]
+(pass) a finished leaf with a live tab keeps its slice, and the pass fetched the pane list [1161.95ms]
+(pass) a shell run admitted while another slice stops protects its own slice [1534.43ms]
+(pass) a finished leaf temp stays while its retained slice holds a running unit with the tab gone [1617.20ms]
+(pass) a finished leaf temp stays while its slice holds a running unit [1646.50ms]
+(pass) a loaded failed akrogon-run unit is cleared by a reconcile pass [2071.08ms]
+(pass) the run guard unit is submitted with CollectMode=inactive-or-failed [2088.48ms]
+(pass) a loaded slice matching no leaf record is stopped only when it holds no process [2138.85ms]
+(pass) merged and failed leaf slices with gone tabs are stopped and their processes end [3153.32ms]
+(pass) a finished leaf slice named by a live run record is not stopped [3222.87ms]
+521 |       `${process.execPath} ${entry} next --all;`,
+522 |       `echo $? > ${marker}`,
+523 |     ].join(' ');
+524 |     await sdrun('--scope', '--quiet', `--slice=${sliceName}`, '--', 'sh', '-c', inner);
+525 |     for (let i: number = 0; i < 300 && !existsSync(marker); i++) await Bun.sleep(100);
+526 |     expect(existsSync(marker)).toBe(true);
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/faster-suite-files/tests/leaf-slices.test.ts:526:32)
+(fail) a reconcile pass running inside a leaf slice does not stop that slice [32441.64ms]
+
+ 14 pass
+ 1 fail
+ 76 expect() calls
+Ran 15 tests across 1 file. [32.48s]
+check base-x3-leaf-slices-1: 1 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-leaf-slices-1-1792963335906-2606411.log
+run ee4dc62c-62d0-4b0b-a606-3ec4d23cc791
+run c7c8faa6-b27c-4822-85a8-548366db0f3f
+run 48883b1e-d6b3-4028-9588-5b61aa07ab81
+
+tests/peer-wait.test.ts:
+(pass) passes a non-timeout herdr failure through unchanged [258.40ms]
+(pass) done while herdr still reports working [361.94ms]
+(pass) blocked wins over a non-empty return file [375.53ms]
+(pass) codex peer fails on its bound turn turn_aborted [423.69ms]
+(pass) unproven peer that answers during the grace ends done [453.42ms]
+(pass) pi peer fails on idle only while hook authority holds [515.00ms]
+(pass) done when the return file is written during a timed-out wait [529.01ms]
+(pass) codex peer fails on its bound turn task_complete [769.64ms]
+(pass) blocked read at a grace check ends the wait blocked [573.41ms]
+(pass) a kind change between grace checks is an error [477.22ms]
+(pass) a session change between grace checks is an error for claude [485.45ms]
+(pass) a session change between grace checks is an error for codex [547.80ms]
+(pass) a pi session change is ignored while hook authority holds [590.72ms]
+(pass) an agent gone from the list is the No herdr agent error [647.97ms]
+(pass) a session null at start and set later is adopted [840.91ms]
+(pass) budget clamps each wait timeout to the remaining budget [770.13ms]
+(pass) a carried kind or session that no longer matches is an error [1099.71ms]
+(pass) rejects missing args and a non-numeric budget [199.80ms]
+(pass) an unproven harness session change keeps waiting with its original exchange [2566.13ms]
+(pass) budget keeps the last status herdr returned [617.65ms]
+(pass) a carried codex turn becomes unproven when its rollout is missing or ambiguous [4012.65ms]
+(pass) unproven kind waits out the budget on done with a 0-byte return file [11160.55ms]
+(pass) codex peer is unproven: task completed before the boundary never ends the wait [11164.90ms]
+(pass) codex peer is unproven: no rollout match [11164.43ms]
+(pass) codex peer is unproven: several rollout matches [11173.99ms]
+(pass) pi peer without authority stays unproven: source not herdr:pi [11200.11ms]
+(pass) codex peer is unproven: no task_started after the boundary [11206.63ms]
+(pass) unproven kind waits out the budget on idle [11232.77ms]
+(pass) pi peer without authority stays unproven: screen_detection_skipped absent [11238.76ms]
+(pass) pi peer without authority stays unproven: screen_detection_skipped null [11257.64ms]
+(pass) codex peer with no session is unproven [11234.89ms]
+(pass) codex peer is unproven: no carried exchange means no boundary [11298.12ms]
+(pass) claude peer keeps the transcript check [11413.58ms]
+(pass) a pi losing hook authority turns unproven [11109.46ms]
+(pass) a codex session appearing after the prompt is on the outcome line [11097.25ms]
+(pass) outcome session is the post-exchange session when herdr adopted it during the wait [11246.73ms]
+(pass) carried exchange binds the original turn on rerun [22303.92ms]
+
+ 37 pass
+ 0 fail
+ 173 expect() calls
+Ran 37 tests across 1 file. [23.31s]
+check base-x3-peer-wait-3: 0 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-peer-wait-3-1792963359311-2627431.log
+
+tests/peer-wait.test.ts:
+(pass) passes a non-timeout herdr failure through unchanged [206.79ms]
+(pass) done while herdr still reports working [337.01ms]
+(pass) blocked wins over a non-empty return file [389.57ms]
+(pass) done when the return file is written during a timed-out wait [432.95ms]
+(pass) unproven peer that answers during the grace ends done [528.44ms]
+(pass) pi peer fails on idle only while hook authority holds [564.51ms]
+(pass) codex peer fails on its bound turn task_complete [623.28ms]
+(pass) codex peer fails on its bound turn turn_aborted [781.74ms]
+(pass) blocked read at a grace check ends the wait blocked [617.10ms]
+(pass) a kind change between grace checks is an error [604.44ms]
+(pass) a session change between grace checks is an error for claude [617.20ms]
+(pass) a session change between grace checks is an error for codex [651.38ms]
+(pass) a pi session change is ignored while hook authority holds [620.27ms]
+(pass) a session null at start and set later is adopted [524.73ms]
+(pass) an agent gone from the list is the No herdr agent error [552.24ms]
+(pass) budget clamps each wait timeout to the remaining budget [906.58ms]
+(pass) a carried kind or session that no longer matches is an error [1277.96ms]
+(pass) rejects missing args and a non-numeric budget [136.60ms]
+(pass) budget keeps the last status herdr returned [624.05ms]
+(pass) an unproven harness session change keeps waiting with its original exchange [2601.81ms]
+(pass) a carried codex turn becomes unproven when its rollout is missing or ambiguous [3567.84ms]
+(pass) unproven kind waits out the budget on idle [11183.34ms]
+(pass) pi peer without authority stays unproven: screen_detection_skipped null [11177.14ms]
+(pass) pi peer without authority stays unproven: source not herdr:pi [11191.61ms]
+(pass) codex peer with no session is unproven [11179.97ms]
+(pass) codex peer is unproven: several rollout matches [11191.10ms]
+(pass) codex peer is unproven: no carried exchange means no boundary [11185.96ms]
+(pass) unproven kind waits out the budget on done with a 0-byte return file [11227.84ms]
+(pass) pi peer without authority stays unproven: screen_detection_skipped absent [11245.90ms]
+(pass) codex peer is unproven: no rollout match [11247.30ms]
+(pass) codex peer is unproven: no task_started after the boundary [11284.33ms]
+(pass) codex peer is unproven: task completed before the boundary never ends the wait [11295.67ms]
+(pass) claude peer keeps the transcript check [11406.54ms]
+(pass) a pi losing hook authority turns unproven [11112.90ms]
+(pass) outcome session is the post-exchange session when herdr adopted it during the wait [11131.46ms]
+(pass) a codex session appearing after the prompt is on the outcome line [11143.28ms]
+(pass) carried exchange binds the original turn on rerun [22273.79ms]
+
+ 37 pass
+ 0 fail
+ 173 expect() calls
+Ran 37 tests across 1 file. [23.39s]
+check base-x3-peer-wait-2: 0 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-peer-wait-2-1792963359385-2627430.log
+
+tests/peer-wait.test.ts:
+(pass) done while herdr still reports working [325.95ms]
+(pass) blocked wins over a non-empty return file [341.75ms]
+(pass) passes a non-timeout herdr failure through unchanged [375.69ms]
+(pass) unproven peer that answers during the grace ends done [435.93ms]
+(pass) codex peer fails on its bound turn turn_aborted [534.45ms]
+(pass) pi peer fails on idle only while hook authority holds [543.02ms]
+(pass) done when the return file is written during a timed-out wait [575.19ms]
+(pass) a kind change between grace checks is an error [316.47ms]
+(pass) codex peer fails on its bound turn task_complete [690.10ms]
+(pass) blocked read at a grace check ends the wait blocked [520.96ms]
+(pass) a session change between grace checks is an error for claude [543.63ms]
+(pass) a session change between grace checks is an error for codex [754.81ms]
+(pass) an agent gone from the list is the No herdr agent error [443.95ms]
+(pass) a session null at start and set later is adopted [579.06ms]
+(pass) a pi session change is ignored while hook authority holds [929.69ms]
+(pass) budget clamps each wait timeout to the remaining budget [835.65ms]
+(pass) a carried kind or session that no longer matches is an error [1131.82ms]
+(pass) rejects missing args and a non-numeric budget [249.43ms]
+(pass) budget keeps the last status herdr returned [533.42ms]
+(pass) an unproven harness session change keeps waiting with its original exchange [2539.50ms]
+(pass) a carried codex turn becomes unproven when its rollout is missing or ambiguous [4252.25ms]
+(pass) unproven kind waits out the budget on idle [11105.99ms]
+(pass) pi peer without authority stays unproven: screen_detection_skipped null [11159.72ms]
+(pass) codex peer is unproven: no task_started after the boundary [11179.08ms]
+(pass) codex peer is unproven: no carried exchange means no boundary [11180.09ms]
+(pass) unproven kind waits out the budget on done with a 0-byte return file [11212.30ms]
+(pass) codex peer with no session is unproven [11208.20ms]
+(pass) pi peer without authority stays unproven: screen_detection_skipped absent [11232.01ms]
+(pass) codex peer is unproven: several rollout matches [11236.24ms]
+(pass) pi peer without authority stays unproven: source not herdr:pi [11302.14ms]
+(pass) codex peer is unproven: task completed before the boundary never ends the wait [11298.09ms]
+(pass) codex peer is unproven: no rollout match [11308.42ms]
+(pass) claude peer keeps the transcript check [11428.08ms]
+(pass) a pi losing hook authority turns unproven [11104.48ms]
+(pass) outcome session is the post-exchange session when herdr adopted it during the wait [11116.42ms]
+(pass) a codex session appearing after the prompt is on the outcome line [11138.82ms]
+(pass) carried exchange binds the original turn on rerun [22274.27ms]
+
+ 37 pass
+ 0 fail
+ 173 expect() calls
+Ran 37 tests across 1 file. [23.49s]
+check base-x3-peer-wait-1: 0 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-peer-wait-1-1792963359489-2627429.log
+run acc5e1cc-3394-4703-af37-4c66dce673bf
+run ba0c000f-991a-4cd1-85f1-8c811eaf1698
+run 386e2a83-0112-4067-aae3-4808fb32e677
+
+tests/door-reset.test.ts:
+(pass) docs describe the handover entries and footer wording [0.60ms]
+(pass) refuses when unsupported kind [91.97ms]
+(pass) refuses when pane without agent [101.37ms]
+(pass) refuses a session mismatch even when the passed session has a transcript [140.49ms]
+(pass) refuses when session mismatch [194.72ms]
+(pass) a stalled codex check prompt is logged as failure and not retried [405.58ms]
+(pass) pi handover sends reset then start prompt [397.31ms]
+(pass) a stalled start prompt is logged as failure and not retried [419.09ms]
+(pass) claude handover sends reset then start prompt after the new session appears [427.25ms]
+(pass) a codex check turn still working at the bound sends no start prompt [429.19ms]
+(pass) codex handover sends reset, one check prompt, then start prompt [495.31ms]
+(pass) codex turn still open at the bound with a single open task is logged and nothing is sent [704.57ms]
+(pass) codex turn still open at the bound with an older completed task before the open one is logged and nothing is sent [720.52ms]
+(pass) pi turn still open at the bound is logged and nothing is sent [727.74ms]
+(pass) unconfirmed reset is logged and no start prompt is sent [732.08ms]
+(pass) claude turn still open at the bound is logged and nothing is sent [738.37ms]
+(pass) a session change during the turn wait is logged and nothing is sent [765.68ms]
+
+ 17 pass
+ 0 fail
+ 75 expect() calls
+Ran 17 tests across 1 file. [792.00ms]
+check base-x3-door-reset-3: 0 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-door-reset-3-1792963360387-2751285.log
+
+tests/door-reset.test.ts:
+(pass) docs describe the handover entries and footer wording [1.39ms]
+(pass) refuses when unsupported kind [138.63ms]
+(pass) refuses when session mismatch [144.80ms]
+(pass) refuses when pane without agent [153.18ms]
+(pass) refuses a session mismatch even when the passed session has a transcript [180.45ms]
+(pass) a stalled start prompt is logged as failure and not retried [403.39ms]
+(pass) pi handover sends reset then start prompt [384.79ms]
+(pass) a stalled codex check prompt is logged as failure and not retried [406.11ms]
+(pass) a codex check turn still working at the bound sends no start prompt [407.11ms]
+(pass) claude handover sends reset then start prompt after the new session appears [426.68ms]
+(pass) codex handover sends reset, one check prompt, then start prompt [502.68ms]
+(pass) pi turn still open at the bound is logged and nothing is sent [716.40ms]
+(pass) codex turn still open at the bound with an older completed task before the open one is logged and nothing is sent [713.14ms]
+(pass) a session change during the turn wait is logged and nothing is sent [754.16ms]
+(pass) claude turn still open at the bound is logged and nothing is sent [755.67ms]
+(pass) unconfirmed reset is logged and no start prompt is sent [770.25ms]
+(pass) codex turn still open at the bound with a single open task is logged and nothing is sent [771.96ms]
+
+ 17 pass
+ 0 fail
+ 75 expect() calls
+Ran 17 tests across 1 file. [815.00ms]
+
+tests/door-reset.test.ts:
+(pass) docs describe the handover entries and footer wording [0.27ms]
+(pass) refuses when unsupported kind [96.19ms]
+(pass) refuses when session mismatch [149.08ms]
+(pass) refuses when pane without agent [159.86ms]
+(pass) refuses a session mismatch even when the passed session has a transcript [173.38ms]
+(pass) a stalled codex check prompt is logged as failure and not retried [364.14ms]
+(pass) claude handover sends reset then start prompt after the new session appears [402.83ms]
+(pass) pi handover sends reset then start prompt [390.47ms]
+(pass) a stalled start prompt is logged as failure and not retried [419.92ms]
+(pass) a codex check turn still working at the bound sends no start prompt [418.13ms]
+(pass) codex handover sends reset, one check prompt, then start prompt [466.50ms]
+(pass) codex turn still open at the bound with a single open task is logged and nothing is sent [687.04ms]
+(pass) pi turn still open at the bound is logged and nothing is sent [716.12ms]
+(pass) claude turn still open at the bound is logged and nothing is sent [716.46ms]
+(pass) unconfirmed reset is logged and no start prompt is sent [752.81ms]
+(pass) codex turn still open at the bound with an older completed task before the open one is logged and nothing is sent [753.41ms]
+(pass) a session change during the turn wait is logged and nothing is sent [784.42ms]
+
+ 17 pass
+ 0 fail
+ 75 expect() calls
+Ran 17 tests across 1 file. [813.00ms]
+check base-x3-door-reset-2: 0 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-door-reset-2-1792963360409-2751284.log
+check base-x3-door-reset-1: 0 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-door-reset-1-1792963360409-2751283.log
+run 0f990046-6212-4091-9faa-dffb39fb8320
+run c295a81b-87c0-4ff0-92ba-8258753cb285
+run 2474132a-ec01-4f81-adb1-23eb7837f79d
+
+tests/status.test.ts:
+(pass) overview reports no open leaves for a missing open directory without writes [288.97ms]
+(pass) overview reports no open leaves for a empty open directory without writes [293.41ms]
+(pass) busy durations appear in NOTE for every recorded seat without writes or herdr calls [335.20ms]
+(pass) leftovers fails naming the kept report when it is invalid or unreadable [377.66ms]
+(pass) time for a merged or failed leaf stops at its move into that phase and does not grow [425.50ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [441.07ms]
+(pass) --charts derives stage from last terminal marker line [430.17ms]
+(pass) leftovers lists kept paths by reason and host items, skips missing paths and in-use work, and writes nothing [485.91ms]
+(pass) --charts lists every chart with taken counts, fog items, stage and age [488.85ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [651.69ms]
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [738.32ms]
+(pass) a leaf with the removed hand_built key is unreadable while healthy repos remain visible [732.11ms]
+(pass) time runs from the first delivered prompt to now for a running leaf and is unavailable without one [769.55ms]
+(pass) delivery errors surface as prompt tokens unless the seat is busy [542.38ms]
+(pass) repo mismatch identifies both keys in overview and detail while healthy repos remain visible [827.58ms]
+(pass) failed leaves show cause and reason in NOTE and terminal phases suppress busy [538.48ms]
+(pass) status identifies dormant epic/issue/resting and prefers open or closed leaves [877.96ms]
+(pass) status identifies dormant issue/resting and prefers open or closed leaves [879.67ms]
+(pass) status reports invalid open/ while showing another repo without writes [965.53ms]
+(pass) status prints Missing lines after Failed lines and before the repo section without env values [630.70ms]
+(pass) TURN names the holder and later stamp places [525.76ms]
+(pass) status reports invalid open/epic/issue/extra/invalid while showing another repo without writes [962.24ms]
+(pass) status reports invalid open/invalid while showing another repo without writes [963.56ms]
+(pass) status detail prints Missing lines between state and History without env values [609.27ms]
+(pass) TURN orders unstamped merge leaves by last to: merge record and marks no record last [515.40ms]
+(pass) TURN is empty for ineligible merge leaves and non-merge leaves [549.69ms]
+(pass) status detail prints the seats the next agent start uses with the file each came from [432.55ms]
+(pass) merged leaves show gaps in open and closed detail but not overview [668.79ms]
+(pass) overview NOTE marks only leaves whose seat comes from an index [378.42ms]
+(pass) invalid readiness.yaml reports its path in overview and detail [679.24ms]
+(pass) status rejects malformed epic front matter when the issue overrides both seats [412.76ms]
+(pass) malformed index (missing seat field) reports unreadable in overview and fails detail naming the file [343.96ms]
+(pass) malformed index (unparseable front matter) reports unreadable in overview and fails detail naming the file [408.11ms]
+(pass) unpacked folders are listed with their pack command and open .closing names next [376.69ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [1405.64ms]
+
+ 35 pass
+ 0 fail
+ 367 expect() calls
+Ran 35 tests across 1 file. [1435.00ms]
+
+tests/status.test.ts:
+(pass) overview reports no open leaves for a missing open directory without writes [299.69ms]
+(pass) overview reports no open leaves for a empty open directory without writes [300.44ms]
+(pass) busy durations appear in NOTE for every recorded seat without writes or herdr calls [327.98ms]
+(pass) leftovers fails naming the kept report when it is invalid or unreadable [362.17ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [414.69ms]
+(pass) time for a merged or failed leaf stops at its move into that phase and does not grow [446.42ms]
+(pass) --charts derives stage from last terminal marker line [426.59ms]
+(pass) leftovers lists kept paths by reason and host items, skips missing paths and in-use work, and writes nothing [481.42ms]
+(pass) --charts lists every chart with taken counts, fog items, stage and age [483.89ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [657.07ms]
+(pass) time runs from the first delivered prompt to now for a running leaf and is unavailable without one [726.84ms]
+(pass) a leaf with the removed hand_built key is unreadable while healthy repos remain visible [719.90ms]
+(pass) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [730.23ms]
+(pass) failed leaves show cause and reason in NOTE and terminal phases suppress busy [455.56ms]
+(pass) delivery errors surface as prompt tokens unless the seat is busy [508.90ms]
+(pass) repo mismatch identifies both keys in overview and detail while healthy repos remain visible [856.56ms]
+(pass) status identifies dormant issue/resting and prefers open or closed leaves [844.66ms]
+(pass) status identifies dormant epic/issue/resting and prefers open or closed leaves [843.01ms]
+(pass) status prints Missing lines after Failed lines and before the repo section without env values [608.44ms]
+(pass) status reports invalid open/ while showing another repo without writes [934.39ms]
+(pass) status reports invalid open/epic/issue/extra/invalid while showing another repo without writes [931.37ms]
+(pass) status reports invalid open/invalid while showing another repo without writes [958.64ms]
+(pass) status detail prints Missing lines between state and History without env values [608.99ms]
+(pass) TURN names the holder and later stamp places [525.04ms]
+(pass) TURN orders unstamped merge leaves by last to: merge record and marks no record last [507.07ms]
+(pass) TURN is empty for ineligible merge leaves and non-merge leaves [485.66ms]
+(pass) merged leaves show gaps in open and closed detail but not overview [625.62ms]
+(pass) overview NOTE marks only leaves whose seat comes from an index [367.51ms]
+(pass) status detail prints the seats the next agent start uses with the file each came from [433.01ms]
+(pass) invalid readiness.yaml reports its path in overview and detail [674.15ms]
+(pass) status rejects malformed epic front matter when the issue overrides both seats [434.08ms]
+(pass) malformed index (missing seat field) reports unreadable in overview and fails detail naming the file [412.04ms]
+(pass) malformed index (unparseable front matter) reports unreadable in overview and fails detail naming the file [442.06ms]
+(pass) unpacked folders are listed with their pack command and open .closing names next [404.73ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [1401.48ms]
+
+ 35 pass
+ 0 fail
+ 367 expect() calls
+Ran 35 tests across 1 file. [1433.00ms]
+
+tests/status.test.ts:
+(pass) overview reports no open leaves for a empty open directory without writes [283.05ms]
+(pass) overview reports no open leaves for a missing open directory without writes [285.15ms]
+(pass) busy durations appear in NOTE for every recorded seat without writes or herdr calls [328.92ms]
+(pass) leftovers fails naming the kept report when it is invalid or unreadable [389.22ms]
+(pass) overview rejects repo mismatches and duplicate slugs within an open repo [429.34ms]
+(pass) time for a merged or failed leaf stops at its move into that phase and does not grow [436.21ms]
+(pass) leftovers lists kept paths by reason and host items, skips missing paths and in-use work, and writes nothing [485.04ms]
+(pass) --charts derives stage from last terminal marker line [466.31ms]
+(pass) --charts lists every chart with taken counts, fog items, stage and age [487.34ms]
+(pass) detail resolves authoritative closed state from a worktree, limits history, and never reads prose or writes [677.99ms]
+144 |     expect(noteText).toContain('fix rounds 2');
+145 |     expect(noteText).toContain('A:fix');
+146 |     expect(noteText).toContain('B:nits');
+147 |     expect(noteText).not.toContain('w1:t9');
+148 |     expect(cell(result.stdout, row, 'BLOCKED BY')).toBe('missing');
+149 |     expect(cell(result.stdout, row, 'TIME')).toBe('0h 23m');
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "0h 23m"
+Received: "0h 22m"
+
+      at <anonymous> (/home/ivan/.akrogon/worktrees/akrogon/faster-suite-files/tests/status.test.ts:149:46)
+(pass) a leaf with the removed hand_built key is unreadable while healthy repos remain visible [753.00ms]
+(fail) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [760.38ms]
+(pass) time runs from the first delivered prompt to now for a running leaf and is unavailable without one [763.16ms]
+(pass) delivery errors surface as prompt tokens unless the seat is busy [536.91ms]
+(pass) failed leaves show cause and reason in NOTE and terminal phases suppress busy [535.98ms]
+(pass) repo mismatch identifies both keys in overview and detail while healthy repos remain visible [837.03ms]
+(pass) status identifies dormant epic/issue/resting and prefers open or closed leaves [900.64ms]
+(pass) status identifies dormant issue/resting and prefers open or closed leaves [902.36ms]
+(pass) status prints Missing lines after Failed lines and before the repo section without env values [628.08ms]
+(pass) status reports invalid open/invalid while showing another repo without writes [953.64ms]
+(pass) status reports invalid open/epic/issue/extra/invalid while showing another repo without writes [952.07ms]
+(pass) status reports invalid open/ while showing another repo without writes [973.70ms]
+(pass) TURN names the holder and later stamp places [507.10ms]
+(pass) TURN orders unstamped merge leaves by last to: merge record and marks no record last [542.67ms]
+(pass) status detail prints Missing lines between state and History without env values [665.37ms]
+(pass) TURN is empty for ineligible merge leaves and non-merge leaves [550.50ms]
+(pass) merged leaves show gaps in open and closed detail but not overview [667.51ms]
+(pass) invalid readiness.yaml reports its path in overview and detail [672.71ms]
+(pass) status detail prints the seats the next agent start uses with the file each came from [426.51ms]
+(pass) overview NOTE marks only leaves whose seat comes from an index [357.25ms]
+(pass) status rejects malformed epic front matter when the issue overrides both seats [410.54ms]
+(pass) malformed index (unparseable front matter) reports unreadable in overview and fails detail naming the file [408.46ms]
+(pass) malformed index (missing seat field) reports unreadable in overview and fails detail naming the file [378.14ms]
+(pass) unpacked folders are listed with their pack command and open .closing names next [397.08ms]
+(pass) incomplete repositories report exact paths before readable trees and exit nonzero [1400.54ms]
+
+1 tests failed:
+(fail) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [760.38ms]
+
+ 34 pass
+ 1 fail
+ 351 expect() calls
+Ran 35 tests across 1 file. [1431.00ms]
+check base-x3-status-3: 0 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-status-3-1792963361943-2755509.log
+check base-x3-status-1: 0 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-status-1-1792963361943-2755507.log
+check base-x3-status-2: 1 /home/ivan/Work/infra/akrogon/issues/chart/suite-time/direct/check-base-x3-status-2-1792963361943-2755508.log

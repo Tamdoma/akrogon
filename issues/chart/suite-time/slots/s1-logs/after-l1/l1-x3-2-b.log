@@ -1,0 +1,132 @@
+bun test v1.4.4 (38afee6c8) 4x PARALLEL
+
+tests/peer-wait.test.ts:
+881 |     expect(elapsed).toBeGreaterThanOrEqual(budgetMs);
+882 |     const timeouts: number[] = s
+883 |       .calls()
+884 |       .filter((args: string[]): boolean => args[0] === 'agent' && args[1] === 'wait')
+885 |       .map((args: string[]): number => Number(args[args.indexOf('--timeout') + 1]));
+886 |     expect(timeouts.length).toBeGreaterThan(0);
+                                  ^
+error: expect(received).toBeGreaterThan(expected)
+
+Expected: > 0
+Received: 0
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/tests/peer-wait.test.ts:886:29)
+(fail) budget clamps each wait timeout to the remaining budget [1107.26ms]
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+
+tests/install.test.ts:
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/.evidence/install-prune-links/home-listing.json
+
+tests/batch-dispatch.test.ts:
+(fail) the holder gets a batch record rebased onto the remote and only the holder is prompted [15000.06ms]
+  ^ this test timed out after 15000ms.
+(fail) an interrupted build is discarded and rebuilt under a new attempt [15000.06ms]
+  ^ this test timed out after 15000ms.
+(fail) empty untracked folders are removed before an applied merge prompt [15000.58ms]
+  ^ this test timed out after 15000ms.
+(fail) unreadable ignored folders do not stop empty-folder cleanup before merge [15000.07ms]
+  ^ this test timed out after 15000ms.
+
+tests/batch.test.ts:
+{"ok":true,"top":"051524048d86c93806b9d2227eeec44d59ee39b6"}
+
+tests/next.test.ts:
+plan-issue build slot=A phase=plan.synthesis leaf=/tmp/akrogon-suite-NY2ZNa/akrogon-xPQAeN/repo/issues/open/issue/build
+(fail) next resumes interrupted tab creation, then retries every failing pass without failing [15000.78ms]
+  ^ this test timed out after 15000ms.
+(fail) unknown panes wait, warn after an hour and keep busy observations [15003.00ms]
+  ^ this test timed out after 15000ms.
+(fail) merged phase closes tab on typed next and starts the dependent [15000.09ms]
+  ^ this test timed out after 15000ms.
+(fail) a stale prompt never re-prompts a busy or done seat, and repeated delivery failures keep the leaf in phase [20000.96ms]
+  ^ this test timed out after 20000ms.
+(fail) next recovers only merge-phase work by ancestry against a non-default remote target [15000.08ms]
+  ^ this test timed out after 15000ms.
+(fail) busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes [30012.63ms]
+  ^ this test timed out after 30000ms.
+(fail) bad YAML and invalid states reserve occupancy at capacity 3 [15007.06ms]
+  ^ this test timed out after 15000ms.
+(fail) dirty merged worktree is kept while its tab lives, then removed once clean [15000.18ms]
+  ^ this test timed out after 15000ms.
+(fail) merge, check.fix, check.repair and post-repair review dispatch to their swapped seats [15000.08ms]
+  ^ this test timed out after 15000ms.
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-AlkGS2/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-AlkGS2/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-ffE8Qr/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-ffE8Qr/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-AlkGS2/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-AlkGS2/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-ffE8Qr/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-ffE8Qr/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-Qyf8OW/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-Qyf8OW/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-VpwSXj/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-VpwSXj/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-g3F0pa/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-g3F0pa/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-Qyf8OW/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-Qyf8OW/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-VpwSXj/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-VpwSXj/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-g3F0pa/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-g3F0pa/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-14Ia2j/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-14Ia2j/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-NY2ZNa/akrogon-14Ia2j/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-NY2ZNa/akrogon-14Ia2j/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+error: Missing leaf: resting (parked)
+error: Missing leaf: resting (parked)
+(fail) next --resume re-prompts allocated idle leaves in every registered repo without allocating new work [15000.08ms]
+  ^ this test timed out after 15000ms.
+(fail) new tab keeps existing scratch for checks that outlive their tab, and seats disable the node compile cache [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) sweep scratch catch-up deletes open and closed folders with no live panes [15000.06ms]
+  ^ this test timed out after 15000ms.
+(fail) fixture temp root isolates every TMPDIR and envs carry override [15000.84ms]
+  ^ this test timed out after 15000ms.
+(fail) a live tab freezes .env while a dead tab lets the next dispatch rewrite it [15004.84ms]
+  ^ this test timed out after 15000ms.
+(fail) dispatch recreates a deleted .env file in a reused worktree once its tab is gone [15000.13ms]
+  ^ this test timed out after 15000ms.
+(fail) only the earlier-stamped merge leaf is prompted while the waiting leaf keeps its tab and panes [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) an ineligible merge leaf never holds the turn (blocked-by) [15000.23ms]
+  ^ this test timed out after 15000ms.
+(fail) the seat merged holder exit wakes the next merge leaf without a manual next [15000.34ms]
+  ^ this test timed out after 15000ms.
+(fail) the seat check.fix holder exit wakes the next merge leaf without a manual next [15000.09ms]
+  ^ this test timed out after 15000ms.
+(fail) the seat failed holder exit wakes the next merge leaf without a manual next [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) the prompt delivery fault holder exit wakes the next merge leaf without a manual next [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) the operator merged holder exit wakes the next merge leaf without a manual next [15002.31ms]
+  ^ this test timed out after 15000ms.
+(fail) a leaf re-entering merge queues behind the two leaves stamped earlier [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) a merge seat consumes one delivery attempt per pass and retries instead of failing [15001.64ms]
+  ^ this test timed out after 15000ms.
+(fail) an idle hook retries a faulted merge holder before its waiter [15000.09ms]
+  ^ this test timed out after 15000ms.
+(fail) unstamped merge dispatch uses log order and refuses unreadable history [15000.57ms]
+  ^ this test timed out after 15000ms.
+(fail) blocked-report manual forms bare, all inside, all outside match [15000.09ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner epic-e matches folder path issues/open/epic-e from root [15000.04ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner epic-e matches folder path issues/open/epic-e from sub [15000.19ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner epic-e matches folder path issues/open/epic-e from worktree [15000.30ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner n1 matches folder path issues/open/epic-e/n1 from root [15000.80ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner n1 matches folder path issues/open/epic-e/n1 from sub [15000.39ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner n1 matches folder path issues/open/epic-e/n1 from worktree [15000.09ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner top-t matches folder path issues/open/top-t from root [15000.22ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner top-t matches folder path issues/open/top-t from sub [15000.20ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner top-t matches folder path issues/open/top-t from worktree [15003.74ms]
+  ^ this test timed out after 15000ms.
+
+ 1134 pass
+ 41 fail
+ 11701 expect() calls
+Ran 1175 tests across 69 files. [164.44s]
+exit=1

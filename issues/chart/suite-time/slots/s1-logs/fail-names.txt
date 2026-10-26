@@ -1,0 +1,48 @@
+      6 the holder gets a batch record rebased onto the remote and only the holder is prompted
+      6 a finished leaf with a live tab keeps its slice, and the pass fetched the pane list
+      6 a finished leaf slice named by a live run record is not stopped
+      5 a reconcile pass running inside a leaf slice does not stop that slice
+      4 a leaf re-entering merge queues behind the two leaves stamped earlier
+      3 unreadable ignored folders do not stop empty-folder cleanup before merge
+      3 the prompt delivery fault holder exit wakes the next merge leaf without a manual next
+      3 named target equivalence: owner name matches folder path from root, subfolder and worktree
+      3 empty untracked folders are removed before an applied merge prompt
+      3 an interrupted build is discarded and rebuilt under a new attempt
+      3 an idle hook retries a faulted merge holder before its waiter
+      3 akrogon phase merged inside the leaf slice stops no slice
+      3 a failed removal stops the merge prompt
+      3 a dirty holder worktree drops the batch to solo and keeps its branch
+      2 merged phase closes tab on typed next and starts the dependent
+      2 merge, check.fix, check.repair and post-repair review dispatch to their swapped seats
+      2 dirty merged worktree is kept while its tab lives, then removed once clean
+      2 busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes
+      2 budget keeps the last status herdr returned
+      2 bad YAML and invalid states reserve occupancy at capacity 4
+      2 bad YAML and invalid states reserve occupancy at capacity 3
+      2 a stale prompt never re-prompts a busy or done seat, and repeated delivery failures keep the leaf in phase
+      2 an unproven harness session change keeps waiting with its original exchange
+      2 a merge seat consumes one delivery attempt per pass and retries instead of failing
+      1 unstamped merge dispatch uses log order and refuses unreadable history
+      1 the seat merged holder exit wakes the next merge leaf without a manual next
+      1 the seat failed holder exit wakes the next merge leaf without a manual next
+      1 the seat check.fix holder exit wakes the next merge leaf without a manual next
+      1 the operator merged holder exit wakes the next merge leaf without a manual next
+      1 retryable agent start failures keep the leaf in phase until a start succeeds
+      1 overview reads multiple repos outside git, retains hierarchy and recorded fields without writes
+      1 only the earlier-stamped merge leaf is prompted while the waiting leaf keeps its tab and panes
+      1 next recovers only merge-phase work by ancestry against a non-default remote target
+      1 merged and failed leaf slices with gone tabs are stopped and their processes end
+      1 foreign leaves do not consume capacity while healthy leaves in both repos dispatch
+      1 fixture temp root isolates every TMPDIR and envs carry override
+      1 empty untracked folders are removed before a solo merge prompt
+      1 blocked-report no line for merge turn waits
+      1 blocked-report manual forms stay manual with pane and event set
+      1 blocked-report manual forms bare, all inside, all outside match
+      1 blocked-report automatic silence on hook, resume, and merge wake
+      1 a session change during the turn wait is logged and nothing is sent
+      1 a saved holder failure wakes the stamped queue when the log is a directory
+      1 an ineligible merge leaf never holds the turn (blocked-by)
+      1 a live tab freezes .env while a dead tab lets the next dispatch rewrite it
+      1 a holder that cannot be rebased takes a solo turn with nothing stacked
+      1 a committed merge whose log append fails still wakes the next leaf
+      1 a blocked non-merge seat does not stall a merge leaf

@@ -1,0 +1,60 @@
+bun test v1.4.4 (38afee6c8) 4x PARALLEL
+
+tests/install.test.ts:
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/.evidence/install-prune-links/home-listing.json
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+
+tests/batch.test.ts:
+{"ok":true,"top":"880ac1a256b16531be23d8203106d6fff25e2948"}
+
+tests/next.test.ts:
+plan-issue build slot=A phase=plan.synthesis leaf=/tmp/akrogon-suite-0KCnfB/akrogon-7cpYcy/repo/issues/open/issue/build
+(fail) next resumes interrupted tab creation, then retries every failing pass without failing [15000.08ms]
+  ^ this test timed out after 15000ms.
+(fail) unknown panes wait, warn after an hour and keep busy observations [15000.29ms]
+  ^ this test timed out after 15000ms.
+(fail) a merged leaf with its tab still open does not count toward max_active [15003.34ms]
+  ^ this test timed out after 15000ms.
+(fail) merged phase closes tab on typed next and starts the dependent [15000.10ms]
+  ^ this test timed out after 15000ms.
+(fail) a stale prompt never re-prompts a busy or done seat, and repeated delivery failures keep the leaf in phase [20003.54ms]
+  ^ this test timed out after 20000ms.
+(fail) busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes [30003.31ms]
+  ^ this test timed out after 30000ms.
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-I5M3ut/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-I5M3ut/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-I5M3ut/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-I5M3ut/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-UeXmeE/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-UeXmeE/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-Yk36Q0/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-Yk36Q0/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-UeXmeE/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-UeXmeE/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-Yk36Q0/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-Yk36Q0/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-fb4upw/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-fb4upw/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-fb4upw/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-fb4upw/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-XuxCOs/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-XuxCOs/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-XuxCOs/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-XuxCOs/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-6Gs1lz/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-6Gs1lz/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-0KCnfB/akrogon-6Gs1lz/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-0KCnfB/akrogon-6Gs1lz/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+error: Missing leaf: resting (parked)
+error: Missing leaf: resting (parked)
+(fail) merge, check.fix, check.repair and post-repair review dispatch to their swapped seats [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) the prompt delivery fault holder exit wakes the next merge leaf without a manual next [15000.13ms]
+  ^ this test timed out after 15000ms.
+(fail) a leaf re-entering merge queues behind the two leaves stamped earlier [15000.60ms]
+  ^ this test timed out after 15000ms.
+(fail) an idle hook retries a faulted merge holder before its waiter [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner epic-e matches folder path issues/open/epic-e from root [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner epic-e matches folder path issues/open/epic-e from sub [15000.16ms]
+  ^ this test timed out after 15000ms.
+(fail) named target equivalence: owner epic-e matches folder path issues/open/epic-e from worktree [15000.07ms]
+  ^ this test timed out after 15000ms.
+
+ 1162 pass
+ 13 fail
+ 11710 expect() calls
+Ran 1175 tests across 69 files. [110.54s]
+exit=1

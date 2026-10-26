@@ -1,0 +1,106 @@
+bun test v1.4.4 (38afee6c8) 4x PARALLEL
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+
+tests/install.test.ts:
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/.evidence/install-prune-links/home-listing.json
+
+tests/batch-dispatch.test.ts:
+(fail) the holder gets a batch record rebased onto the remote and only the holder is prompted [15000.39ms]
+  ^ this test timed out after 15000ms.
+(fail) an interrupted build is discarded and rebuilt under a new attempt [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) a dirty holder worktree drops the batch to solo and keeps its branch [15000.42ms]
+  ^ this test timed out after 15000ms.
+(fail) empty untracked folders are removed before an applied merge prompt [15000.06ms]
+  ^ this test timed out after 15000ms.
+(fail) unreadable ignored folders do not stop empty-folder cleanup before merge [15000.06ms]
+  ^ this test timed out after 15000ms.
+(fail) a failed removal stops the merge prompt [15000.06ms]
+  ^ this test timed out after 15000ms.
+
+tests/batch.test.ts:
+{"ok":true,"top":"a35f18194b6d416ee953d495a24369d54568f388"}
+
+tests/next.test.ts:
+plan-issue build slot=A phase=plan.synthesis leaf=/tmp/akrogon-suite-FjgUOW/akrogon-FyM5vv/repo/issues/open/issue/build
+
+tests/status.test.ts:
+144 |     expect(noteText).toContain('fix rounds 2');
+145 |     expect(noteText).toContain('A:fix');
+146 |     expect(noteText).toContain('B:nits');
+147 |     expect(noteText).not.toContain('w1:t9');
+148 |     expect(cell(result.stdout, row, 'BLOCKED BY')).toBe('missing');
+149 |     expect(cell(result.stdout, row, 'TIME')).toBe('0h 23m');
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "0h 23m"
+Received: "0h 22m"
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/tests/status.test.ts:149:46)
+(fail) overview reads multiple repos outside git, retains hierarchy and recorded fields without writes [494.89ms]
+
+tests/next.test.ts:
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-JqJE77/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-JqJE77/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-JqJE77/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-JqJE77/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-fXXa4B/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-fXXa4B/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-fXXa4B/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-fXXa4B/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-qgjjNe/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-qgjjNe/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-qgjjNe/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-qgjjNe/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-yqQ2nH/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-yqQ2nH/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-I42E6K/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-I42E6K/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-955q31/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-955q31/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-yqQ2nH/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-yqQ2nH/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-I42E6K/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-I42E6K/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-FjgUOW/akrogon-955q31/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-FjgUOW/akrogon-955q31/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+error: Missing leaf: resting (parked)
+error: Missing leaf: resting (parked)
+(fail) retryable agent start failures keep the leaf in phase until a start succeeds [15008.63ms]
+  ^ this test timed out after 15000ms.
+(fail) fixture temp root isolates every TMPDIR and envs carry override [15000.09ms]
+  ^ this test timed out after 15000ms.
+(fail) a live tab freezes .env while a dead tab lets the next dispatch rewrite it [15000.17ms]
+  ^ this test timed out after 15000ms.
+(fail) only the earlier-stamped merge leaf is prompted while the waiting leaf keeps its tab and panes [15000.10ms]
+  ^ this test timed out after 15000ms.
+(fail) an ineligible merge leaf never holds the turn (blocked-by) [15000.18ms]
+  ^ this test timed out after 15000ms.
+(fail) the seat merged holder exit wakes the next merge leaf without a manual next [15000.14ms]
+  ^ this test timed out after 15000ms.
+(fail) the seat check.fix holder exit wakes the next merge leaf without a manual next [15000.09ms]
+  ^ this test timed out after 15000ms.
+(fail) the seat failed holder exit wakes the next merge leaf without a manual next [15000.12ms]
+  ^ this test timed out after 15000ms.
+(fail) the prompt delivery fault holder exit wakes the next merge leaf without a manual next [15000.43ms]
+  ^ this test timed out after 15000ms.
+(fail) the operator merged holder exit wakes the next merge leaf without a manual next [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) a committed merge whose log append fails still wakes the next leaf [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) a leaf re-entering merge queues behind the two leaves stamped earlier [15008.27ms]
+  ^ this test timed out after 15000ms.
+(fail) a merge seat consumes one delivery attempt per pass and retries instead of failing [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) an idle hook retries a faulted merge holder before its waiter [15000.81ms]
+  ^ this test timed out after 15000ms.
+(fail) a saved holder failure wakes the stamped queue when the log is a directory [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) unstamped merge dispatch uses log order and refuses unreadable history [15002.92ms]
+  ^ this test timed out after 15000ms.
+(fail) blocked-report manual forms bare, all inside, all outside match [15000.20ms]
+  ^ this test timed out after 15000ms.
+(fail) blocked-report manual forms stay manual with pane and event set [15000.11ms]
+  ^ this test timed out after 15000ms.
+(fail) blocked-report automatic silence on hook, resume, and merge wake [15000.07ms]
+  ^ this test timed out after 15000ms.
+(fail) blocked-report no line for merge turn waits [15000.08ms]
+  ^ this test timed out after 15000ms.
+
+ 1140 pass
+ 27 fail
+ 11698 expect() calls
+Ran 1167 tests across 69 files. [181.59s]
+exit=1
