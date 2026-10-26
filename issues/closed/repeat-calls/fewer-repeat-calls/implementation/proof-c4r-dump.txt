@@ -1,0 +1,18 @@
+== dump comparison: shellPid/expectedSlice on both commits ==
+DUMP-IDENTICAL
+w1:p1 14347
+w1:p2 38945
+w8:pWP 56586
+x 38070
+pane-42 35135
+repo/build akrogon-lc99b2410bc2c.slice
+akrogon/fewer-repeat-calls akrogon-lc0056dfcfede.slice
+a/b akrogon-lc14cddc033f6.slice
+w1:p1 14347
+w1:p2 38945
+w8:pWP 56586
+x 38070
+pane-42 35135
+repo/build akrogon-lc99b2410bc2c.slice
+akrogon/fewer-repeat-calls akrogon-lc0056dfcfede.slice
+a/b akrogon-lc14cddc033f6.slice

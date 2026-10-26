@@ -1,0 +1,9 @@
+c6 head run 1: user=645.073 sys=310.168 real=201.370   11693 expect() calls
+c6 head run 2: user=565.418 sys=278.827 real=84.479   11702 expect() calls
+c6 head run 3: user=703.010 sys=350.308 real=271.132   11684 expect() calls
+c6r head-1: user=522.018 sys=242.954 real=48.269   1178 pass  0 fail 
+c6r base-1: user=637.507 sys=273.197 real=66.555   1175 pass  0 fail 
+c6r head-2: user=527.042 sys=245.517 real=48.373   1178 pass  0 fail 
+c6r base-2: user=667.643 sys=282.045 real=58.457   1175 pass  0 fail 
+c6r head-3: user=535.569 sys=258.109 real=52.550   1178 pass  0 fail 
+c6r base-3: user=657.720 sys=276.039 real=56.209   1175 pass  0 fail 

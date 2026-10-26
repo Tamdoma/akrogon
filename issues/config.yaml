@@ -8,6 +8,7 @@ checks:
   format: bunx prettier --check src tests skills/chart-issues/scripts
   test: bun test --timeout=30000 --parallel=4 --no-isolate
   typecheck: bun run typecheck
+full: [test]
 advisory: 
   []
 grounding: 

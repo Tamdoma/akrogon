@@ -1,0 +1,36 @@
+slug: cost-rules
+phase: merged
+created: 2026-10-26
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since:
+  B: 2026-10-26T12:18:48.460Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tEZ
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pWX
+  B: w8:pWY
+prompted:
+  B: 01a177ee-de35-78a1-bf37-7e4e1253f258
+prompted_at:
+  B: 2026-10-26T12:18:48.461Z
+delivery_error: {}
+merge_stamp: 2026-10-26T12:17:40.770Z
+broadcast:
+  kind: issue
+  name: door-cost
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/door-cost
+  pushed: 672a2ab513d80e9705e17cbb3f883f57153a258f
+  sources: []
+frozen:
+  tests/door-reset.test.ts: 04438bd4a0a0a2f4b39609ebfc5c9a6e16dab941
+frozen_cited: []

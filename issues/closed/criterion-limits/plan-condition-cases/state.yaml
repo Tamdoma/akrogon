@@ -14,7 +14,6 @@ done: []
 fix_rounds: 0
 verdict: {}
 tab: w8:tEX
-worktree: /home/ivan/.akrogon/worktrees/akrogon/plan-condition-cases
 env_names: []
 env_generation: 0
 pane:

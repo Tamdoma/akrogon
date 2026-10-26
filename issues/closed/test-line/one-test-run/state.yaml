@@ -1,0 +1,40 @@
+slug: one-test-run
+phase: merged
+created: 2026-10-26
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since:
+  B: 2026-10-26T12:47:30.724Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tE0
+worktree: /home/ivan/.akrogon/worktrees/akrogon/one-test-run
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pWZ
+  B: w8:pW0
+prompted:
+  B: 01a1782c-abc9-7023-9930-65284041b93c
+prompted_at:
+  B: 2026-10-26T12:47:30.725Z
+delivery_error: {}
+merge_stamp: 2026-10-26T12:46:28.118Z
+broadcast:
+  kind: issue
+  name: test-line
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/test-line
+  pushed: 249d01cfb63a4bc0f4073ac46e255cf976527868
+  sources: []
+frozen:
+  tests/leaf-slices.test.ts: 41a5375db73ffc1200f760b4cb4cd260571e9023
+  tests/run-permit.test.ts: 64ac80bff8df7808209639fd1599507a8a08b3d2
+  tests/state-home.test.ts: b013f2ea350e50ca559a30a5ebdfe2f9c597f801
+  tests/status.test.ts: d4d2fa3a0d6cc6b39e4cc96fb16a7a96cb646649
+frozen_cited: []

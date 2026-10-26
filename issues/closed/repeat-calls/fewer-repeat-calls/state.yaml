@@ -1,0 +1,38 @@
+slug: fewer-repeat-calls
+phase: merged
+created: 2026-10-26
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since:
+  B: 2026-10-26T12:27:02.902Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: w8:tEV
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pWP
+  B: w8:pWQ
+prompted:
+  B: 01a17763-7e1d-7252-b91c-da2760d6b973
+prompted_at:
+  B: 2026-10-26T12:27:02.902Z
+delivery_error: {}
+merge_stamp: 2026-10-26T12:25:52.384Z
+broadcast:
+  kind: issue
+  name: repeat-calls
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/repeat-calls
+  pushed: 790953873c47303bd216fa6754e30463d56b02da
+  sources: []
+frozen:
+  tests/fake-busctl.ts: 78d3cf8b0a722c6b85856f999d163e327ec8bb28
+  tests/next.test.ts: 60768f77728af0be9dda97ce1d86b6137743cc5d
+  tests/seat-containment.test.ts: 15e7ada99881debfd5dadbefabfc30effaa1a751
+frozen_cited: []

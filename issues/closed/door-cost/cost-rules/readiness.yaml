@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr agent start <name> --kind pi --pane <pane> -- (empty argv), through peer-create.ts with seat C unnamed
+    command: bun skills/chart-issues/scripts/peer-create.ts /home/ivan/Work/infra/akrogon w8:pWV '[{"seat":"C","kind":"pi","argv":[]}]'
+    identity: operator's local herdr and pi login, no secret values
+    target: throwaway tab w8:tEY (label door-cost-proof) in workspace w8
+    version: herdr 0.9.1
+    date: '2026-10-26'
+    result: exit 0, printed {"seat":"C","pane":"w8:pWW","kind":"pi","state":"started"}; herdr agent list showed pi idle in w8:pWW with a new session file
+    cleanup: herdr tab close w8:tEY returned ok; no tab or agent row left for w8:tEY or w8:pWW; the empty pi session file was deleted
+    limits: the model pi starts comes from ~/.pi/agent/settings.json (meta muse-wonder-full-1.0-contributor, thinking high, read 2026-10-26), not observed in the session file, which had no entries before a first prompt; no prompt was sent
+    record: issues/chart/door-cost/forks/carry-rules.md
+  - operation: herdr agent prompt <pane> /clear (claude) or /new (codex, pi), then a start prompt, through door-reset.ts
+    command: recorded live runs in issues/chart/door-handover/forks/handover.md (2026-10-17) and autopilot handovers in issues/chart/config-walls/CHART.md and issues/chart/orphan-pane/CHART.md (2026-10-22)
+    identity: operator's local herdr and harness logins, no secret values
+    target: throwaway tabs w8:tDH and w8:tDJ (2026-10-17), the door pane (2026-10-22)
+    version: herdr 0.9.1
+    date: '2026-10-22'
+    result: reset and start prompt delivered for claude, codex and pi; the leaf changes no herdr call, only when the helper stops
+    cleanup: tabs closed at the time
+    limits: attended continuation and the superseded cancel are proven by done-criteria 1-4, not by these runs
+    record: issues/chart/door-handover/forks/handover.md

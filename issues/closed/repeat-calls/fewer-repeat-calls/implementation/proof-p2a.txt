@@ -1,0 +1,2 @@
+p2a head: exits a=1 b=1 c=1 fails=[14 fail 16 fail 14 fail ] load=[load average: 26.45, 38.46, 52.36]
+p2a base: exits a=1 b=1 c=1 fails=[59 fail 64 fail 64 fail ] load=[load average: 67.67, 53.58, 56.20]
