@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dlopen, FFIType } from 'bun:ffi';
@@ -15,7 +15,39 @@ const libc = dlopen('libc.so.6', {
 if (libc.symbols.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) !== 0)
   throw new Error('prctl(PR_SET_CHILD_SUBREAPER) failed');
 
-export const suiteRoot: string = mkdtempSync(join(tmpdir(), 'akrogon-suite-'));
+// bun test never runs process 'exit' handlers, so each worker removes the roots of workers that have exited.
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false;
+    if ((error as NodeJS.ErrnoException).code === 'EPERM') return true;
+    throw error;
+  }
+}
+for (const name of readdirSync(tmpdir())) {
+  const owner: RegExpExecArray | null = /^akrogon-suite-(\d+)-/.exec(name);
+  if (owner === null || alive(Number(owner[1]))) continue;
+  // The rename claims the root under this pid, so a worker starting at the same time skips it.
+  const claimed: string = join(tmpdir(), `akrogon-suite-${process.pid}-removing-${name}`);
+  try {
+    renameSync(join(tmpdir(), name), claimed);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+    throw error;
+  }
+  // A test cut off at its cap can leave a folder at mode 0 (batch-dispatch unreadable-folder case).
+  const opened: Bun.SyncSubprocess<'pipe', 'pipe'> = Bun.spawnSync(['chmod', '-R', 'u+rwx', claimed], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  if (opened.exitCode !== 0)
+    throw new Error(`chmod ${claimed} failed (${opened.exitCode}): ${opened.stderr.toString()}`);
+  rmSync(claimed, { recursive: true, force: true });
+}
+
+export const suiteRoot: string = mkdtempSync(join(tmpdir(), `akrogon-suite-${process.pid}-`));
 
 // process.env writes alone do not reach libc getenv (os.homedir, tmpdir), so both are set.
 function setEnv(name: string, value: string): void {
