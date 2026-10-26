@@ -76,7 +76,7 @@ import { selfUpdate } from './self-update';
 import { blockDetail, dependentCounts, mergeQueue, twinConflict, type DepDetail, type QueueEntry } from './turn';
 import { appendTiming, currentVisit, readTimings, recordWait, type WaitReason } from './timing';
 import { closeMergedTab, reconcile, reconcileHost, reconcileNeedsPanes } from './reconcile';
-import { adoptShell, inOwnScope, leafSlice, type ScopePlace } from './scope';
+import { adoptShell, inOwnScope, leafSlice, paneShell, type ScopePlace, type Shell } from './scope';
 
 const hookEventSchema = z.discriminatedUnion('event', [
   z.object({
@@ -227,23 +227,24 @@ async function observeBusy(
   pane: Pane,
   session: string,
   now: number,
-): Promise<State> {
+): Promise<{ state: State; notified: boolean }> {
   if (pane.agent === null || idle(pane)) {
-    if (state.busy_since[seat] === undefined && state.busy_notified[seat] === undefined) return state;
+    if (state.busy_since[seat] === undefined && state.busy_notified[seat] === undefined)
+      return { state, notified: false };
     const cleared: State = {
       ...state,
       busy_since: { ...state.busy_since, [seat]: undefined },
       busy_notified: { ...state.busy_notified, [seat]: undefined },
     };
     saveState(path, cleared);
-    return cleared;
+    return { state: cleared, notified: false };
   }
-  if (!busy(pane)) return state;
+  if (!busy(pane)) return { state, notified: false };
   const since: string = state.busy_since[seat] ?? new Date(now).toISOString();
   const observed: State = { ...state, busy_since: { ...state.busy_since, [seat]: since } };
   if (state.busy_since[seat] === undefined) saveState(path, observed);
   const elapsed: number = now - Date.parse(since);
-  if (elapsed <= STALL_MS || observed.busy_notified[seat] !== undefined) return observed;
+  if (elapsed <= STALL_MS || observed.busy_notified[seat] !== undefined) return { state: observed, notified: false };
   const minutes: number = Math.floor(elapsed / 60000);
   const notice: string[] = herdrArgv(
     [
@@ -255,12 +256,12 @@ async function observeBusy(
   );
   const shown: Result = await run(notice);
   if (shown.code !== 0) throw new CommandError(notice, process.cwd(), shown);
-  const notified: State = {
+  const recorded: State = {
     ...observed,
     busy_notified: { ...observed.busy_notified, [seat]: new Date(now).toISOString() },
   };
-  saveState(path, notified);
-  return notified;
+  saveState(path, recorded);
+  return { state: recorded, notified: true };
 }
 
 async function currentPane(id: string, session: string, tabId: string): Promise<Pane> {
@@ -340,12 +341,9 @@ async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<St
   if (existsSync(path)) {
     if (realpathSync(await command(['git', 'rev-parse', '--show-toplevel'], path)) !== realpathSync(path))
       throw new Error(`Not a worktree root: ${path}`);
-    const expectedCommon: string = resolve(
-      repo.root,
-      await command(['git', 'rev-parse', '--git-common-dir'], repo.root),
-    );
-    const actualCommon: string = resolve(path, await command(['git', 'rev-parse', '--git-common-dir'], path));
-    if (realpathSync(expectedCommon) !== realpathSync(actualCommon)) throw new Error(`Unrelated worktree: ${path}`);
+    const expectedCommon: string | null = await commonDirectory(repo.root);
+    const actualCommon: string | null = await commonDirectory(path);
+    if (expectedCommon === null || expectedCommon !== actualCommon) throw new Error(`Unrelated worktree: ${path}`);
   } else {
     const branch: Result = await run(
       ['git', 'show-ref', '--verify', '--quiet', `refs/heads/${leaf.state.slug}`],
@@ -512,14 +510,21 @@ async function secondSeat(
   }
 }
 
-async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation: Invocation): Promise<State | null> {
+async function allocate(
+  global: GlobalConfig,
+  repo: Repo,
+  leaf: Leaf,
+  invocation: Invocation,
+  listed?: Pane[],
+): Promise<{ state: State | null; sight?: { panes: Pane[]; tabs: Tab[] } }> {
   const resolution: SessionResolution | null = await resolveFor(invocation, repo, leaf.path, leaf.state.slug);
   if (resolution === null) throw new Error(`Session refused for repo ${repo.name}`);
   const session: string = resolution.session.name;
   const workspaceId: string = resolution.workspace.workspace_id;
   const slice: string = leafSlice(repo, leaf.state.slug);
-  const listed: Pane[] = await panes(session);
+  listed ??= await panes(session);
   const liveTabs: Tab[] = await tabs(session);
+  let wrote: boolean = false;
   const expected: Leaf = {
     ...leaf,
     state: { ...leaf.state, worktree: resolve(worktreeStore(repo), leaf.state.slug) },
@@ -534,11 +539,13 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   });
   let closed: boolean = false;
   for (const id of recorded) {
-    const place: ScopePlace = await inOwnScope(slice, id, session);
+    const shell: Shell = await paneShell(id, session);
+    const place: ScopePlace = await inOwnScope(slice, id, session, shell);
     if (place.place === 'unreadable')
       throw new Error(`Cannot read the scope of pane ${id} for leaf ${leaf.state.slug}: ${place.error}`);
     if (place.place === 'outside') {
       await herdr(['pane', 'close', id], z.object({}), { session });
+      wrote = true;
       closed = true;
     }
   }
@@ -552,7 +559,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   if (matches.length > 1) throw new Error(`Multiple tabs for leaf: ${leaf.state.slug}`);
   if (matches.length === 0) {
     const total: number = await activeCount(global, invocation);
-    if (total >= global.max_active) return null;
+    if (total >= global.max_active) return { state: null };
   }
   const state: State = await ensureWorktree(repo, leaf, matches.length === 1);
   const scratch: string = ensureLeafTemp(repo, state.slug);
@@ -572,19 +579,19 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
     '--no-focus',
   ];
   const target: string[] = ['--workspace', workspaceId];
-  const tab: Tab =
+  const created: { tab: Tab } | null =
     matches.length === 1
-      ? matches[0]
-      : (
-          await herdr(['tab', 'create', '--label', state.slug, ...placement, ...target], z.object({ tab: tabSchema }), {
-            session,
-          })
-        ).tab;
+      ? null
+      : await herdr(['tab', 'create', '--label', state.slug, ...placement, ...target], z.object({ tab: tabSchema }), {
+          session,
+        });
+  if (created !== null) wrote = true;
+  const tab: Tab = created === null ? matches[0] : created.tab;
   const tabState: State = { ...state, tab: tab.tab_id };
   saveState(leaf.path, tabState);
   // A created tab's members are the panes that were not already listed; only a
-  // reused tab's members may hold recorded panes.
-  const members: Pane[] = (await panes(session)).filter(
+  // reused tab's members may hold recorded panes. A reused tab is a held list.
+  const members: Pane[] = (matches.length === 1 ? live : await panes(session)).filter(
     (pane) =>
       pane.tab_id === tab.tab_id && (matches.length === 1 || !listed.some((known) => known.pane_id === pane.pane_id)),
   );
@@ -593,34 +600,34 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
   const recordedB: Pane | undefined = members.find((pane) => pane.pane_id === state.pane.B);
   const bootstrap: boolean = matches.length === 0 || (state.pane.A === undefined && state.pane.B === undefined);
   const repairB: Pane | undefined = !bootstrap && recordedA === undefined ? recordedB : undefined;
-  const first: Pane =
-    recordedA ??
-    (bootstrap
-      ? members[0]
-      : (
-          await herdr(
-            ['pane', 'split', (recordedB ?? members[0]).pane_id, '--direction', 'right', ...placement],
-            z.object({ pane: paneSchema }),
-            { session },
-          )
-        ).pane);
+  async function split(source: string): Promise<Pane> {
+    const created: { pane: Pane } = await herdr(
+      ['pane', 'split', source, '--direction', 'right', ...placement],
+      z.object({ pane: paneSchema }),
+      { session },
+    );
+    wrote = true;
+    return created.pane;
+  }
+  const first: Pane = recordedA ?? (bootstrap ? members[0] : await split((recordedB ?? members[0]).pane_id));
   // A recorded pane may be unboxed only until the entry sweep or the box step runs; dispatch follows successful boxing.
   saveState(leaf.path, {
     ...tabState,
     pane: { A: first.pane_id, ...(recordedB === undefined ? {} : { B: recordedB.pane_id }) },
   });
   async function box(pane: Pane): Promise<void> {
-    const place: ScopePlace = await inOwnScope(slice, pane.pane_id, session);
+    const identity: Shell = await paneShell(pane.pane_id, session);
+    const place: ScopePlace = await inOwnScope(slice, pane.pane_id, session, identity);
     if (place.place === 'unreadable')
       throw new Error(`Cannot read the scope of pane ${pane.pane_id} for leaf ${state.slug}: ${place.error}`);
     if (place.place === 'inside') return;
-    await adoptShell(slice, pane.pane_id, session);
+    await adoptShell(slice, pane.pane_id, session, identity);
     // StartTransientUnit returns once systemd queues the job, so the shell lands in its scope a moment later.
     const deadline: number = Date.now() + 5000;
-    let adopted: ScopePlace = await inOwnScope(slice, pane.pane_id, session);
+    let adopted: ScopePlace = await inOwnScope(slice, pane.pane_id, session, identity);
     while (adopted.place === 'outside' && Date.now() < deadline) {
       await Bun.sleep(50);
-      adopted = await inOwnScope(slice, pane.pane_id, session);
+      adopted = await inOwnScope(slice, pane.pane_id, session, identity);
     }
     if (adopted.place !== 'inside')
       throw new Error(
@@ -640,6 +647,7 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
         { session },
       );
       if (swapped.changed !== true) throw new Error('herdr pane swap returned changed:false');
+      wrote = true;
     } catch (error) {
       try {
         await restoreFocus();
@@ -661,19 +669,11 @@ async function allocate(global: GlobalConfig, repo: Repo, leaf: Leaf, invocation
       throw new Error(`tab focus restore failed for leaf ${state.slug}: ${herdrDetail(error)}`, { cause: error });
     }
   }
-  const second: Pane =
-    recordedB ??
-    (
-      await herdr(
-        ['pane', 'split', first.pane_id, '--direction', 'right', ...placement],
-        z.object({ pane: paneSchema }),
-        { session },
-      )
-    ).pane;
+  const second: Pane = recordedB ?? (await split(first.pane_id));
   const allocated: State = { ...tabState, pane: { A: first.pane_id, B: second.pane_id } };
   saveState(leaf.path, allocated);
   await box(second);
-  return allocated;
+  return { state: allocated, sight: wrote ? undefined : { panes: live, tabs: view } };
 }
 
 async function dispatchSlot(
@@ -683,13 +683,14 @@ async function dispatchSlot(
   slot: Slot,
   prompt: string,
   attempt?: string,
+  seen?: { panes: Pane[]; tabs: Tab[] },
 ): Promise<void> {
   const resolution: SessionResolution = await repoSession(repo);
   if (!resolution.ok) throw new Error(resolution.reason);
   const session: string = resolution.session.name;
   const tabId: string = z.string().parse(leaf.state.tab);
-  const live: Pane[] = await panes(session);
-  const view: Tab[] = await tabs(session);
+  const live: Pane[] = seen?.panes ?? (await panes(session));
+  const view: Tab[] = seen?.tabs ?? (await tabs(session));
   if (
     !view.some(
       (tab) =>
@@ -701,7 +702,7 @@ async function dispatchSlot(
 
   async function recordDelivery(): Promise<void> {
     const current: Pane = await currentPane(z.string().parse(readState(leaf.path).pane[slot]), session, tabId);
-    const observed: State = await observeBusy(leaf.path, readState(leaf.path), slot, current, session, Date.now());
+    const { state: observed } = await observeBusy(leaf.path, readState(leaf.path), slot, current, session, Date.now());
     saveState(leaf.path, {
       ...observed,
       prompted: { ...observed.prompted, [slot]: current.agent_session?.value },
@@ -760,7 +761,7 @@ async function dispatchSlot(
   const recorded: State = readState(leaf.path);
   if (recorded.phase !== leaf.state.phase || recorded.done.includes(slot)) return;
   const pane: Pane = await currentPane(z.string().parse(recorded.pane[slot]), session, tabId);
-  const state: State = await observeBusy(leaf.path, recorded, slot, pane, session, Date.now());
+  const { state } = await observeBusy(leaf.path, recorded, slot, pane, session, Date.now());
   if (pane.agent !== null && busy(pane)) return;
   if (
     pane.agent !== null &&
@@ -893,13 +894,19 @@ async function dispatchLeaf(
     let resolved: ResolvedSession | null = null;
     const ownSession = async (): Promise<string | null> =>
       (resolved ?? (resolved = await resolveFor(invocation, repo, leaf.path, slug)))?.session.name ?? null;
+    let listed: Pane[] | undefined;
     if (state.phase !== 'merged' && state.phase !== 'failed' && Object.values(state.pane).length > 0) {
       const session: string | null = await ownSession();
       if (session === null) return 'skipped';
       const live: Pane[] = await panes(session);
+      listed = live;
       for (const seat of ['A', 'B'] as const) {
         const pane: Pane | undefined = live.find((pane) => pane.pane_id === state.pane[seat]);
-        if (pane !== undefined) state = await observeBusy(leaf.path, state, seat, pane, session, Date.now());
+        if (pane === undefined) continue;
+        const observed = await observeBusy(leaf.path, state, seat, pane, session, Date.now());
+        state = observed.state;
+        // A stall notification is a herdr call: the held list no longer feeds allocate.
+        if (observed.notified) listed = undefined;
       }
     }
     if (state.phase === 'merged') {
@@ -953,16 +960,30 @@ async function dispatchLeaf(
     const mustCreate: boolean = !existsSync(resolve(worktreeStore(repo), slug));
     await checkBase(repo, mustCreate);
     if ((await ownSession()) === null) return 'skipped';
-    const allocated: State | null = await allocate(global, repo, { path: leaf.path, state }, invocation);
-    if (allocated === null) return end('none');
-    for (const slot of requiredSlots(allocated.phase, allocated.fix_rounds)) {
-      const delivery: string = `${repo.name}/${slug}/${allocated.phase}/${slot}`;
+    const allocated: { state: State | null; sight?: { panes: Pane[]; tabs: Tab[] } } = await allocate(
+      global,
+      repo,
+      { path: leaf.path, state },
+      invocation,
+      listed,
+    );
+    if (allocated.state === null) return end('none');
+    for (const slot of requiredSlots(allocated.state.phase, allocated.state.fix_rounds)) {
+      const delivery: string = `${repo.name}/${slug}/${allocated.state.phase}/${slot}`;
       if (invocation.dispatched.has(delivery)) continue;
       invocation.dispatched.add(delivery);
       const prompt: string =
-        `${routing[allocated.phase].skill} ${slug} slot=${slot} phase=${allocated.phase} leaf=${leaf.path}` +
+        `${routing[allocated.state.phase].skill} ${slug} slot=${slot} phase=${allocated.state.phase} leaf=${leaf.path}` +
         (mergeContext === undefined ? '' : ` ${mergeContext}`);
-      await dispatchSlot(global, repo, { path: leaf.path, state: allocated }, slot, prompt, attempt);
+      await dispatchSlot(
+        global,
+        repo,
+        { path: leaf.path, state: allocated.state },
+        slot,
+        prompt,
+        attempt,
+        allocated.sight,
+      );
     }
     return end('none');
   } catch (error) {
@@ -1271,15 +1292,22 @@ async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invoc
         );
         if (fresh === undefined || fresh.state.broadcast === undefined || !broadcastPending(fresh.state)) return;
         const handoff: Broadcast = fresh.state.broadcast;
-        const allocated: State | null = await allocate(global, repo, fresh, invocation);
-        if (allocated === null) return;
+        const allocated: { state: State | null; sight?: { panes: Pane[]; tabs: Tab[] } } = await allocate(
+          global,
+          repo,
+          fresh,
+          invocation,
+        );
+        if (allocated.state === null) return;
         const sources: string = handoff.sources.length === 0 ? 'none' : handoff.sources.join(',');
         await dispatchSlot(
           global,
           repo,
-          { path: fresh.path, state: allocated },
+          { path: fresh.path, state: allocated.state },
           'B',
           `broadcast-issue ${fresh.state.slug} slot=B owner=${handoff.kind}:${handoff.name} closed=${handoff.destination} sha=${handoff.pushed} sources=${sources} leaf=${fresh.path}`,
+          undefined,
+          allocated.sight,
         );
       });
     } catch (error) {
