@@ -330,7 +330,7 @@ test('a listed run of another repo and an unlisted run start at once over the li
   try {
     const dir: string = marks(f);
     yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
-    const other: string = resolve(f.home, 'other');
+    const other: string = resolve(f.home, 'zzrepo');
     mkdirSync(resolve(other, 'issues/open'), { recursive: true });
     await command(['git', 'init', '-b', 'main', other]);
     await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
@@ -345,15 +345,15 @@ test('a listed run of another repo and an unlisted run start at once over the li
     const global: Record<string, unknown> = Bun.YAML.parse(
       readFileSync(resolve(f.home, 'config.yaml'), 'utf8'),
     ) as Record<string, unknown>;
-    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, other } });
-    const otherTree: string = resolve(storeDir(f, 'other'), 'other-leaf');
-    await command(['git', 'worktree', 'add', otherTree, '-b', 'other-leaf'], other);
-    mkdirSync(resolve(other, 'issues/open/issue/other-leaf'), { recursive: true });
-    yaml(resolve(other, 'issues/open/issue/other-leaf/state.yaml'), {
-      slug: 'other-leaf',
+    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, zzrepo: other } });
+    const otherTree: string = resolve(storeDir(f, 'zzrepo'), 'zz-leaf');
+    await command(['git', 'worktree', 'add', otherTree, '-b', 'zz-leaf'], other);
+    mkdirSync(resolve(other, 'issues/open/issue/zz-leaf'), { recursive: true });
+    yaml(resolve(other, 'issues/open/issue/zz-leaf/state.yaml'), {
+      slug: 'zz-leaf',
       phase: 'implement',
       created: '2026-09-10',
-      repo: 'other',
+      repo: 'zzrepo',
       'blocked-by': [],
       worktree: otherTree,
     });
