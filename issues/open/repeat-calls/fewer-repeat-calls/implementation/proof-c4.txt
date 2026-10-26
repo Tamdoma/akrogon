@@ -1,0 +1,32 @@
+== fake-herdr pane list: base bundle vs head bundle, 20 calls each ==
+fake-herdr pane list base: median=24ms samples=[ 27 21 21 35 26 29 39 25 25 24 25 19 22 17 20 24 17 26 26 19 ]
+fake-herdr pane list head: median=16ms samples=[ 17 14 24 20 15 16 16 14 14 18 12 17 17 17 15 19 14 14 17 19 ]
+== fake-busctl call: base source vs head bundle, 20 calls each ==
+fake-busctl call base: median=30ms samples=[ 36 29 29 24 30 33 27 25 40 38 38 26 28 35 42 32 30 30 31 34 ]
+fake-busctl call head: median=13ms samples=[ 14 16 12 13 13 13 13 11 12 14 13 11 11 11 14 14 15 14 14 15 ]
+== per-binary output equality ==
+pane list output IDENTICAL
+1,7c1,7
+< 69 | // Real systemd queues the job and moves the shell after the call returns.
+< 70 | if (existsSync(resolve(home, 'busctl.delay')))
+< 71 |   Bun.spawn(['sh', '-c', 'sleep 0.5 && printf %s "$1" > "$2"', 'sh', cgroup, cgroupFile], {
+< 72 |     stdio: ['ignore', 'ignore', 'ignore'],
+< 73 |   }).unref();
+< 74 | else writeFileSync(cgroupFile, cgroup);
+<           ^
+---
+> 4354 | `;
+> 4355 | if (import_node_fs.existsSync(import_node_path2.resolve(home, "busctl.delay")))
+> 4356 |   Bun.spawn(["sh", "-c", 'sleep 0.5 && printf %s "$1" > "$2"', "sh", cgroup, cgroupFile], {
+> 4357 |     stdio: ["ignore", "ignore", "ignore"]
+> 4358 |   }).unref();
+> 4359 |   import_node_fs.writeFileSync(cgroupFile, cgroup);
+>                                      ^
+14c14,16
+<       at /home/ivan/.akrogon/worktrees/akrogon/fewer-repeat-calls-mbase-a/tests/fake-busctl.ts:74:6
+---
+>       at <anonymous> (/var/tmp/akr-1000/5d20/ef6e9a84/proof-c4/busctl-head/fake-busctl.js:4359:31)
+> note: missing sourcemaps for /var/tmp/akr-1000/5d20/ef6e9a84/proof-c4/busctl-head/fake-busctl.js
+> note: consider bundling with '--sourcemap' to get unminified traces
+busctl.calls record IDENTICAL
+busctl stdout IDENTICAL

@@ -1,0 +1,32 @@
+slug: fewer-repeat-calls
+phase: check.fix
+created: 2026-10-26
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since:
+  A: 2026-10-26T09:03:07.240Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tEV
+worktree: /home/ivan/.akrogon/worktrees/akrogon/fewer-repeat-calls
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pWP
+  B: w8:pWQ
+prompted:
+  A: /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-fewer-repeat-calls--/2026-10-26T07-49-01-752Z_01a1772f-28b8-7441-8d20-8e3b23ed2788.jsonl
+prompted_at:
+  A: 2026-10-26T09:03:07.240Z
+delivery_error: {}
+frozen:
+  tests/fake-busctl.ts: 78d3cf8b0a722c6b85856f999d163e327ec8bb28
+  tests/next.test.ts: 60768f77728af0be9dda97ce1d86b6137743cc5d
+  tests/seat-containment.test.ts: 15e7ada99881debfd5dadbefabfc30effaa1a751
+frozen_cited: []

@@ -1,0 +1,10 @@
+pair 1 (first=base): wall=102986ms base_exit=0 head_exit=0
+pair 2 (first=head): wall=105125ms base_exit=0 head_exit=0
+pair 3 (first=base): wall=105228ms base_exit=0 head_exit=0
+pair 4 (first=head): wall=104343ms base_exit=0 head_exit=0
+pair 5 (first=base): wall=103816ms base_exit=0 head_exit=0
+pair 6 (first=head): wall=104272ms base_exit=0 head_exit=0
+pair 7 (first=base): wall=106292ms base_exit=0 head_exit=0
+pair 8 (first=head): wall=103216ms base_exit=0 head_exit=0
+pair 9 (first=base): wall=103577ms base_exit=0 head_exit=0
+pair 10 (first=head): wall=101571ms base_exit=0 head_exit=0

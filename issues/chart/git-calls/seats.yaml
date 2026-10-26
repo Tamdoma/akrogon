@@ -24,4 +24,14 @@ seats:
     pane: w8:pV5
     harness: codex
     session: 01a17480-2aad-78d1-aa09-ceb71065fc5a
-spans: []
+  - seat: C
+    pane: w8:pWJ
+    harness: pi
+    session: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-10-26T07-07-49-074Z_01a17709-6dd1-73a9-bf2e-045aaf5df656.jsonl
+  - seat: B
+    pane: w8:pV5
+    harness: codex
+    session: 01a17709-5dff-7513-be9e-5b98548e92aa
+spans:
+  - from: '2026-10-26T07:07:39Z'
+    to: '2026-10-26T07:44:35Z'

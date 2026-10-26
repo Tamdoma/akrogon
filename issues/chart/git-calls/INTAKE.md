@@ -22,3 +22,9 @@ akrogon spends less CPU on repeated subprocess calls (git, the fake tools in tes
 - Caching risk: akrogon moves refs during a run, so only facts fixed for the run may be cached (C P2).
 - Fake herdr prebuild landed 083d3048 from chart suite-time: each test worker builds one bytecode bundle; next.test.ts 25.4 s to 16.7 s alone. akrogon's own `next` work (about 200 ms and about 25 git calls per call) is the remaining cost (A, 2026-10-26).
 - Every `bun test` run leaves its worker suite roots in /tmp despite the exit handler at tests/isolation.ts:94-100 serial and parallel alike; 186 folders, 37 GB of tmpfs on 2026-10-26, some 708 MB each from akrogon-state-home-* folders (A, 2026-10-26). Fixed 02dc5f91 (operator "d1 yes, delete them and fix the leak"): bun test never runs exit handlers, so each worker now removes roots of exited workers at preload. Runs under `akrogon verify` were not affected, since their TMPDIR is the run root that akrogon removes.
+
+## Autopilot switch-on 2026-10-26
+
+Operator, door pane w8:pNP, 2026-10-26T07:07:39Z, after the suite-time answer listing O1-O4 for the one remaining two-at-once fail:
+
+"o2, consult with both conultants on this, and fix it on autopilot. Do proper testing."

@@ -1,0 +1,3 @@
+c6 base sequential: wall=54353ms
+c6 head sequential: wall=45953ms
+c6 head re-enter: wall=46256ms

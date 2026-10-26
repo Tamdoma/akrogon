@@ -1,0 +1,3 @@
+# Map rebuttal B, criterion-limits, 2026-10-26
+
+- **F1 — Base-green cases:** Disagree with Class's claim that the red-first rule “never asks” for these cases, and with C's guard label as an alternative to red proof. `plan.synthesis` already requires each new test to be shown red for missing **or intentionally broken** behavior. Passing on the base does not exempt a condition case. The missing step is selecting that case, not permission to prove it by a deliberate break. Evidence: **better-than-training**, `skills/plan-issue/SKILL.md`, `## plan.synthesis`, paragraph beginning “With `plan.md` written”, read 2026-10-26.

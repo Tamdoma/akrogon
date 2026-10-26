@@ -1,0 +1,36 @@
+slug: plan-condition-cases
+phase: merged
+created: 2026-10-26
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since:
+  B: 2026-10-26T08:55:27.219Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tEX
+worktree: /home/ivan/.akrogon/worktrees/akrogon/plan-condition-cases
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pWS
+  B: w8:pWT
+prompted:
+  B: 01a17768-cef1-7421-8b55-f97687ee40d2
+prompted_at:
+  B: 2026-10-26T08:55:27.220Z
+delivery_error: {}
+merge_stamp: 2026-10-26T08:54:23.227Z
+broadcast:
+  kind: issue
+  name: criterion-limits
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/criterion-limits
+  pushed: abf1909958c01438cc78e662180e8e2eddb115af
+  sources: []
+frozen: {}
+frozen_cited: []
