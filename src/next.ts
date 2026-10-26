@@ -968,6 +968,7 @@ async function dispatchLeaf(
       listed,
     );
     if (allocated.state === null) return end('none');
+    let sight: { panes: Pane[]; tabs: Tab[] } | undefined = allocated.sight;
     for (const slot of requiredSlots(allocated.state.phase, allocated.state.fix_rounds)) {
       const delivery: string = `${repo.name}/${slug}/${allocated.state.phase}/${slot}`;
       if (invocation.dispatched.has(delivery)) continue;
@@ -975,15 +976,8 @@ async function dispatchLeaf(
       const prompt: string =
         `${routing[allocated.state.phase].skill} ${slug} slot=${slot} phase=${allocated.state.phase} leaf=${leaf.path}` +
         (mergeContext === undefined ? '' : ` ${mergeContext}`);
-      await dispatchSlot(
-        global,
-        repo,
-        { path: leaf.path, state: allocated.state },
-        slot,
-        prompt,
-        attempt,
-        allocated.sight,
-      );
+      await dispatchSlot(global, repo, { path: leaf.path, state: allocated.state }, slot, prompt, attempt, sight);
+      sight = undefined;
     }
     return end('none');
   } catch (error) {
