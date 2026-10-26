@@ -59,6 +59,7 @@ Each registered checkout has `issues/config.yaml`. The [init-akrogon skill](../.
 | `checks` | Named commands every leaf must pass. A red check blocks. Default empty. |
 | `merge_checks` | Named commands that run only at merge, all at once once the `checks` stage is green. `akrogon config` prints `akrogon verify --attempt <id>` for each entry — the merge turn's runner — and `akrogon run-check` refuses the command itself. Default empty. |
 | `merge_covers` | Names from `checks` that a merge check already covers, so merge skips them. Needs a non-empty `merge_checks`. Default empty. |
+| `full` | Names from `checks` or `merge_checks` that run a whole test suite. A run with one of these names, from `akrogon verify` or a seat's `run-check --name`, waits until no other `full` run of the same registered repo is running, in arrival order across that repo's leaves, seats and verifies. Other repos' runs and unlisted checks start at once. Default empty. |
 | `advisory` | Commands that run but never block. Their failures are reported as small notes. Default empty. |
 | `env` | Names of environment variables. Each must be set in the checkout's `.env`, and akrogon writes them into each leaf worktree's `.env`. Check commands also get them from your shell. Default empty. |
 | `pass_env` | Names of environment variables check commands get from your shell, with no `.env` copy. Default empty. |
@@ -82,6 +83,7 @@ checks:
 merge_checks:
   <merge-check-name>: <command>
 merge_covers: [<check-name>]
+full: [<check-name>]
 advisory: []
 env: [<VAR_NAME>]
 pass_env: []

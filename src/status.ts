@@ -36,6 +36,7 @@ import { readStopped } from './stop';
 import { readHostKept, readKept } from './reconcile';
 import { currentReleaseCommit, readDeployRecord } from './release';
 import { landAlive, landUnit } from './land';
+import { lineRuns, type RunRecord } from './admission';
 
 type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
 type Scan =
@@ -252,12 +253,15 @@ const phaseColor: Record<string, string> = {
 
 const stageColor: Record<string, string> = { 'handed off': '32', charting: '33', empty: '2' };
 
+const lineColor: Record<string, string> = { running: '32', waiting: '33', ended: '2' };
+
 function style(title: string, text: string, kind: 'header' | 'group' | 'leaf'): string {
   if (kind === 'header') return paint('2', text);
   if (title === 'LEAF' || title === 'CHART') return kind === 'group' ? paint('1', text) : text;
   if (title === 'PHASE') return paint(phaseColor[text.split('.')[0]] ?? '', text);
   if (title === 'STAGE') return paint(stageColor[text] ?? '', text);
   if (title === 'BLOCKED BY') return paint('2', text);
+  if (title === 'STATE') return paint(lineColor[text.split(' ')[0]] ?? '', text);
   return text;
 }
 
@@ -326,6 +330,28 @@ function render(titles: string[], lines: string[][]): string[] {
 }
 
 const chartHeader: string[] = ['CHART', 'TAKEN', 'FOG', 'STAGE', 'AGE'];
+
+const lineHeader: string[] = ['REPO', 'LEAF', 'CHECK', 'STATE', 'AGE', 'RUN'];
+
+// Shown only while a listed run waits: each repo's holder first, then its
+// waiters in queue order.
+function lineRows(runs: RunRecord[], now: number): string[][] {
+  let perRepo: number = 0;
+  let lastRepo: string = '';
+  return runs.map((run) => {
+    perRepo = run.repo === lastRepo ? perRepo : 0;
+    lastRepo = run.repo;
+    if (run.state === 'waiting') perRepo += 1;
+    return [
+      `  ${run.repo}`,
+      run.leaf,
+      run.check,
+      run.state === 'waiting' ? `waiting ${perRepo}` : run.state === 'ended' ? 'ended' : 'running',
+      clock(now - Date.parse(run.since)),
+      run.run,
+    ];
+  });
+}
 
 export type ChartStage = 'handed off' | 'closed' | 'held';
 
@@ -520,6 +546,11 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     const lines: string[][] = [...rows(scan, now, stopped), ...separator, ...parked];
     if (lines.length > 0) console.log(render(header, [['  LEAF', ...header.slice(1)], ...lines]).join('\n'));
     else if (scan.failures.length === 0) console.log('  no open leaves');
+  }
+  const runs: RunRecord[] = lineRuns();
+  if (runs.some((run) => run.state === 'waiting')) {
+    console.log(paint('1;4', 'run line (one per repo)'));
+    console.log(render(lineHeader, [['  REPO', ...lineHeader.slice(1)], ...lineRows(runs, now)]).join('\n'));
   }
   if (scans.some((scan) => !scan.ok || scan.failures.length > 0)) process.exitCode = 1;
 }

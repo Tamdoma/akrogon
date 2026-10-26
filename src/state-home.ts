@@ -23,7 +23,7 @@ const liveness = z.looseObject({
   pid: z.number().int(),
   start_time: z.string(),
   boot_id: z.string(),
-  state: z.enum(['live', 'ended']),
+  state: z.enum(['waiting', 'live', 'ended', 'cancelled']),
 });
 
 const bootId = (): string => readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
@@ -50,7 +50,9 @@ function liveRecords(runsDir: string): number {
     .flatMap((name): object[] => {
       try {
         const record = liveness.parse(Bun.YAML.parse(readFileSync(resolve(runsDir, name), 'utf8')));
-        return record.state === 'live' && record.boot_id === boot && liveStartTime(record.pid) === record.start_time
+        return (record.state === 'live' || record.state === 'waiting') &&
+          record.boot_id === boot &&
+          liveStartTime(record.pid) === record.start_time
           ? [record]
           : [];
       } catch {

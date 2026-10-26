@@ -1,4 +1,4 @@
-import { callerScope, liveRuns, type RunRecord } from './admission';
+import { callerScope, cancelWaitingRun, liveRuns, type RunRecord } from './admission';
 import { runUnitBase, sessionBusAddress } from './scope';
 import { CommandError, spawnCaptured, type SpawnResult } from './shell';
 
@@ -20,6 +20,13 @@ export async function stopRunCommand(id: string | undefined): Promise<void> {
   } else {
     const found: RunRecord | undefined = candidates.find((record) => record.run === id);
     if (found === undefined) throw new Error(`No run ${id} owned by scope ${scope}`);
+    // A waiting run has no units yet: cancel its record under the queue locks
+    // and let its poll exit the run. If promotion beat the cancel, or the
+    // record vanished or was already cancelled, fall through or return.
+    if (found.state === 'waiting') {
+      const result: 'cancelled' | 'gone' | 'live' = await cancelWaitingRun(found);
+      if (result !== 'live') return;
+    }
     units = matched(found);
   }
   const argv: string[] = ['systemctl', '--user', 'stop', ...units];

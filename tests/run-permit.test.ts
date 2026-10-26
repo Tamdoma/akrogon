@@ -406,7 +406,13 @@ test('a listed run nests under its repo holder and queues under an unlisted run'
     const innerScript: string = `akrogon run-check --name test -- touch ${dir}/inner2`;
     const outer2: Cap = run(f, ['run-check', '--name', 'format', '--', 'sh', '-c', innerScript], worktree, shim);
     caps.push(outer2);
-    await waitForText(outer2, /waiting for repo\//);
+    // The inner's waiting stderr is buffered in outer2's log until its command
+    // exits, so the wait is observed on its record, not the stream.
+    const deadline: number = Date.now() + 20000;
+    while (!(await runRecords(f)).some((entry) => entry.state === 'waiting')) {
+      if (Date.now() > deadline) throw new Error('the inner listed run never waited');
+      await Bun.sleep(50);
+    }
     expect(existsSync(resolve(dir, 'inner2'))).toBe(false);
     writeFileSync(resolve(dir, 'release'), '');
     expect(await h.proc.exited).toBe(0);
@@ -457,28 +463,52 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
     const h: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'h')], worktree, scoped);
     caps.push(h);
     await waitFor(resolve(dir, 'h.held'));
-    const w1: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('w1', dir)], worktree, scoped);
-    const w2: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('w2', dir)], worktree, scoped);
-    const w3: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('w3', dir)], worktree, scoped);
+    // One leaf per waiter so each record maps to exactly one process.
+    const w1: Cap = run(
+      f,
+      ['run-check', '--name', 'test', '--', ...record('w1', dir)],
+      await leafWorktree(f, 'wait-one'),
+      scoped,
+    );
+    const w2: Cap = run(
+      f,
+      ['run-check', '--name', 'test', '--', ...record('w2', dir)],
+      await leafWorktree(f, 'wait-two'),
+      scoped,
+    );
+    const w3: Cap = run(
+      f,
+      ['run-check', '--name', 'test', '--', ...record('w3', dir)],
+      await leafWorktree(f, 'wait-three'),
+      scoped,
+    );
     caps.push(w1, w2, w3);
     for (const cap of [w1, w2, w3]) await waitForText(cap, /waiting for repo\//);
-    const wIds: string[] = (await runRecords(f))
-      .filter((entry) => entry.state === 'waiting')
-      .sort((a, b) => String(a.since).localeCompare(String(b.since)))
-      .map((entry) => String(entry.run));
-    expect(wIds).toHaveLength(3);
+    const wId = async (leafName: string): Promise<string> => {
+      const begun: number = Date.now();
+      for (;;) {
+        const found: Record<string, unknown> | undefined = (await runRecords(f)).find(
+          (entry) => entry.state === 'waiting' && entry.leaf === leafName,
+        );
+        if (found !== undefined) return String(found.run);
+        if (Date.now() - begun > 10000) throw new Error(`no waiting record for ${leafName}`);
+        await Bun.sleep(50);
+      }
+    };
+    const w1Id: string = await wId('wait-one');
+    const w3Id: string = await wId('wait-three');
     // Cancel the suspended w3 first: it exits when resumed and its record is
     // not rewritten while it is stopped.
     w3.proc.kill('SIGSTOP');
-    const suspended: Result = await cli(f, ['stop-run', wIds[2]], worktree, scoped);
+    const suspended: Result = await cli(f, ['stop-run', w3Id], worktree, scoped);
     expect(suspended.code).toBe(0);
     const begun: number = Date.now();
-    while ((await runRecords(f)).find((entry) => entry.run === wIds[2])?.state !== 'cancelled') {
+    while ((await runRecords(f)).find((entry) => entry.run === w3Id)?.state !== 'cancelled') {
       if (Date.now() - begun > 10000) throw new Error('suspended run record never cancelled');
       await Bun.sleep(50);
     }
     expect(w3.proc.exitCode).toBeNull();
-    const cancelled: Result = await cli(f, ['stop-run', wIds[0]], worktree, scoped);
+    const cancelled: Result = await cli(f, ['stop-run', w1Id], worktree, scoped);
     expect(cancelled.code).toBe(0);
     expect(await w1.proc.exited).not.toBe(0);
     writeFileSync(resolve(dir, 'release'), '');
@@ -487,7 +517,7 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
     w3.proc.kill('SIGCONT');
     expect(await w3.proc.exited).not.toBe(0);
     expect(readFileSync(resolve(dir, 'order'), 'utf8').trim()).toBe('w2');
-    expect((await runRecords(f)).some((entry) => entry.run === wIds[0] || entry.run === wIds[2])).toBe(false);
+    expect((await runRecords(f)).some((entry) => entry.run === w1Id || entry.run === w3Id)).toBe(false);
   } finally {
     for (const cap of caps) {
       if (cap.proc.exitCode === null) cap.proc.kill('SIGCONT');

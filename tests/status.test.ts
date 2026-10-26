@@ -1206,7 +1206,8 @@ test('status shows the run line only while a listed run waits', async () => {
     expect(board).toMatch(/other\s+oleaf\s+test\s+running\s+\d+h \d+m\s+other-h/);
     expect(board).toMatch(/other\s+oleaf2\s+test\s+waiting 1\s+\d+h \d+m\s+other-w/);
     expect(board).not.toMatch(/unlisted/);
-    expect(board).not.toMatch(/r-ended/);
+    // An ended record still holds its repo's line until removal, so it shows its real state.
+    expect(board).toMatch(/repo\s+seeded\s+test\s+ended\s+\d+h \d+m\s+r-ended/);
   } finally {
     f.clean();
   }

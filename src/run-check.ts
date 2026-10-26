@@ -229,7 +229,16 @@ export async function checkedRun(
     const slice: string = runSlice(slug === 'checkout' ? 'akrogon.slice' : leafSlice(repo, slug));
     const runUnit: string = `${runUnitBase(run)}.scope`;
     return await withAdmission(
-      { repo: repo.name, leaf: slug, check: name, run, slice, scope: callerScope(), unit: runUnit },
+      {
+        repo: repo.name,
+        leaf: slug,
+        check: name,
+        run,
+        slice,
+        scope: callerScope(),
+        unit: runUnit,
+        full: repo.config.full.includes(name),
+      },
       async (admission) => {
         env.AKROGON_RUN = admission.token;
         appendTiming(repo, {

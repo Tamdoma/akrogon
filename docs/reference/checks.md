@@ -17,6 +17,8 @@ You set four kinds of command in `issues/config.yaml`:
 
 So a leaf runs every `checks` command. A merge runs every `checks` command not named in `merge_covers`, then, once they are green, the `merge_checks` members all at once. Each stage runs only what lacks a green result for that command on the same tree, marking the receipt entry `reused` and naming the source run; a red `checks` entry leaves every member recorded not run. Source: `verifyCommands` in [src/verify.ts](../../src/verify.ts).
 
+Checks named in `full` run one at a time within their registered repo: a run waits for every earlier `full` run of the same repo, but never for another repo's run or for checks not on the list. A `full` run that has to wait prints `waiting for <repo>/<leaf> <check>` on stderr, `akrogon status` shows a run line table while one waits, and `akrogon stop-run <id>` cancels a waiting run instead of stopping units. Source: `withAdmission` in [src/admission.ts](../../src/admission.ts).
+
 `setup` runs first. It is the install command for a fresh checkout, such as `bun install --frozen-lockfile`. Before any check command, akrogon runs `setup` and then `akrogon guard own-modules`. When `setup` fails, every check in that run is recorded with the setup result, and the run cannot count as a receipt. `akrogon config` prints each check already wrapped this way, with the wrap in `withSetup` in [src/config.ts](../../src/config.ts).
 
 ## Keep output with akrogon run-check

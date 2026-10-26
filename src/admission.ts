@@ -14,6 +14,7 @@ export interface AdmissionHolder {
   slice: string;
   scope: string;
   unit: string;
+  full: boolean;
 }
 
 export type Admission =
@@ -28,11 +29,12 @@ const recordSchema = z.object({
   repo: z.string(),
   leaf: z.string(),
   check: z.string(),
-  state: z.enum(['live', 'ended']),
+  state: z.enum(['waiting', 'live', 'ended', 'cancelled']),
   run: z.string(),
   slice: z.string(),
   scope: z.string(),
   unit: z.string(),
+  full: z.boolean().default(false),
   since: z.iso.datetime(),
 });
 export type RunRecord = z.infer<typeof recordSchema>;
@@ -86,10 +88,18 @@ function readRecord(path: string): RunRecord | undefined {
 const live = (record: RunRecord, boot: string): boolean =>
   record.boot_id === boot && liveStartTime(record.pid) === record.start_time;
 
-function nested(token: string): boolean {
+// A run named in its repo's `full` list counts as nested only under a run that
+// itself holds its repo's line: under any other run it takes its own turn.
+function nested(token: string, full: boolean): boolean {
   const hash: string = createHash('sha256').update(token).digest('hex');
   const record: RunRecord | undefined = readRecord(recordPath(hash));
-  return record !== undefined && record.token_hash === hash && record.state === 'live' && live(record, bootId());
+  return (
+    record !== undefined &&
+    record.token_hash === hash &&
+    record.state === 'live' &&
+    (record.full || !full) &&
+    live(record, bootId())
+  );
 }
 
 export function liveRuns(): RunRecord[] {
@@ -100,8 +110,78 @@ export function liveRuns(): RunRecord[] {
     .filter((name) => name.endsWith('.yaml'))
     .flatMap((name) => {
       const record: RunRecord | undefined = readRecord(resolve(dir, name));
-      return record !== undefined && record.state === 'live' && live(record, boot) ? [record] : [];
+      return record !== undefined && (record.state === 'live' || record.state === 'waiting') && live(record, boot)
+        ? [record]
+        : [];
     });
+}
+
+// Runs named in a `full` list from every repo, sorted for each repo's line:
+// the holder (live or ended, whose units may still be stopping) before waiters
+// in arrival order. Cancelled and unreadable records never join.
+export function lineRuns(): RunRecord[] {
+  const dir: string = runsDir();
+  if (!existsSync(dir)) return [];
+  const boot: string = bootId();
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.yaml'))
+    .flatMap((name) => {
+      const record: RunRecord | undefined = readRecord(resolve(dir, name));
+      return record !== undefined && record.full && record.state !== 'cancelled' && live(record, boot) ? [record] : [];
+    })
+    .sort(
+      (a, b) =>
+        a.repo.localeCompare(b.repo) ||
+        Number(a.state === 'waiting') - Number(b.state === 'waiting') ||
+        a.since.localeCompare(b.since) ||
+        a.token_hash.localeCompare(b.token_hash),
+    );
+}
+
+const lineLock = (repo: string): string => resolve(runsDir(), 'locks', `line-${repo}`);
+const POLL_MS: number = 1000;
+
+// A listed run waits until it is the oldest listed run of its repo. The turn
+// check and the switch to live share one exclusive lock, so two waiters of the
+// same repo never both start; a cancel write takes the same lock pair.
+async function awaitLineTurn(record: RunRecord): Promise<void> {
+  let shown: string = '';
+  for (;;) {
+    const started: boolean = await withAdmissionLock(record.slice, () =>
+      withLock(lineLock(record.repo), async (): Promise<boolean> => {
+        const mine: RunRecord | undefined = readRecord(recordPath(record.token_hash));
+        if (mine === undefined) writeRecord(record);
+        else if (mine.state === 'cancelled') throw new Error(`run ${record.run} cancelled by akrogon stop-run`);
+        const queue: RunRecord[] = lineRuns().filter((entry) => entry.repo === record.repo);
+        const first: RunRecord | undefined = queue[0];
+        if (first === undefined || first.token_hash !== record.token_hash) {
+          const holder: string = first === undefined ? 'the line' : `${first.repo}/${first.leaf} ${first.check}`;
+          if (holder !== shown) process.stderr.write(`waiting for ${holder}\n`);
+          shown = holder;
+          return false;
+        }
+        writeRecord({ ...record, state: 'live' });
+        return true;
+      }),
+    );
+    if (started) return;
+    await Bun.sleep(POLL_MS);
+  }
+}
+
+// Cancel a waiting record under the lock pair its promotion uses, so the two
+// serialize. 'gone' covers a vanished record and one already cancelled; 'live'
+// means a promotion won and the caller should stop the run's units instead.
+export async function cancelWaitingRun(record: RunRecord): Promise<'cancelled' | 'gone' | 'live'> {
+  return withAdmissionLock(record.slice, () =>
+    withLock(lineLock(record.repo), async (): Promise<'cancelled' | 'gone' | 'live'> => {
+      const current: RunRecord | undefined = readRecord(recordPath(record.token_hash));
+      if (current === undefined || current.state === 'cancelled') return 'gone';
+      if (current.state !== 'waiting') return 'live';
+      writeRecord({ ...current, state: 'cancelled' });
+      return 'cancelled';
+    }),
+  );
 }
 
 // Records whose writer is gone (or whose file is unreadable) are stale: drop
@@ -138,10 +218,13 @@ export function callerScope(): string {
 
 // Admission registers the run and starts it at once: the memory reading, the
 // 48 GiB limit, per-run reservations and the 30 s start spacing were dropped
-// by the operator on 2026-10-14 (run-units brief criterion 5).
+// by the operator on 2026-10-14 (run-units brief criterion 5). The one bound is
+// for runs the repo names in `full`: they start one at a time per repo, in
+// arrival order (operator 2026-10-24, host-run-load; per-repo 2026-10-26).
 export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: Admission) => Promise<T>): Promise<T> {
   const inherited: string | undefined = process.env.AKROGON_RUN;
-  if (inherited !== undefined && inherited !== '' && nested(inherited)) return fn({ kind: 'nested', token: inherited });
+  if (inherited !== undefined && inherited !== '' && nested(inherited, holder.full))
+    return fn({ kind: 'nested', token: inherited });
   mkdirSync(runsDir(), { recursive: true });
   const token: string = randomUUID();
   const ownHash: string = createHash('sha256').update(token).digest('hex');
@@ -157,14 +240,16 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
     start_time: startTime(process.pid),
     boot_id: bootId(),
     ...holder,
-    state: 'live',
+    state: holder.full ? 'waiting' : 'live',
     since: new Date().toISOString(),
   };
   const begun: number = Date.now();
   try {
-    await withAdmissionLock(holder.slice, async (): Promise<void> => {
-      writeRecord(record);
-    });
+    if (holder.full) await awaitLineTurn(record);
+    else
+      await withAdmissionLock(holder.slice, async (): Promise<void> => {
+        writeRecord(record);
+      });
     process.stderr.write(`run ${holder.run}\n`);
     let ended: boolean = false;
     return await fn({
