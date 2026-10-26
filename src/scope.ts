@@ -188,12 +188,7 @@ function errnoMessage(error: unknown): string | undefined {
   return error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.message : undefined;
 }
 
-export async function inOwnScope(
-  slice: string,
-  paneId: string,
-  session: string,
-  prior?: Shell,
-): Promise<ScopePlace> {
+export async function inOwnScope(slice: string, paneId: string, session: string, prior?: Shell): Promise<ScopePlace> {
   const pid: number = prior?.pid ?? (await shellPid(paneId, session));
   let start: string;
   let cgroup: string;

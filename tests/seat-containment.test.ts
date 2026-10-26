@@ -100,9 +100,7 @@ test('next boxes every pane shell in its own scope under the leaf slice before t
     expect(db.startCgroups[0].pane).toBe(state.pane.A!);
     expect(db.startCgroups[0].cgroup.endsWith(`/${slice}/${expectedScope(slice, state.pane.A!)}`)).toBe(true);
     // One scope check reads the shell pid once: two boxed panes, two process-info reads.
-    expect(
-      calls(f).filter((args) => args[0] === 'pane' && args[1] === 'process-info'),
-    ).toHaveLength(2);
+    expect(calls(f).filter((args) => args[0] === 'pane' && args[1] === 'process-info')).toHaveLength(2);
     // The pane check before a start or prompt still goes to herdr.
     for (const start of db.starts) {
       const invoked: string[][] = calls(f);
@@ -122,9 +120,7 @@ test('next boxes every pane shell in its own scope under the leaf slice before t
     expect((await next(f, ['build'])).code).toBe(0);
     expect(busctlCalls(f)).toHaveLength(adopted.length);
     // The sweep and the re-box each ask for the shell pid once per pane.
-    expect(
-      calls(f).filter((args) => args[0] === 'pane' && args[1] === 'process-info'),
-    ).toHaveLength(6);
+    expect(calls(f).filter((args) => args[0] === 'pane' && args[1] === 'process-info')).toHaveLength(6);
     expect(calls(f).some((args) => args[0] === 'pane' && args[1] === 'close')).toBe(false);
   } finally {
     f.clean();

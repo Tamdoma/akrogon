@@ -1864,11 +1864,8 @@ test('one pass reads the registered root common dir and remote url once each', a
     );
     expect((await next(f, ['--all'], { REAL_GIT: realGit, GIT_CALL_LOG: gitLog })).code).toBe(0);
     const lines: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');
-    const count = (cwd: string, args: string): number =>
-      lines.filter((line) => line === `${cwd}|${args}`).length;
-    const worktrees: string[] = [aa.path, bb.path].map(
-      (path) => readState(path).worktree!,
-    );
+    const count = (cwd: string, args: string): number => lines.filter((line) => line === `${cwd}|${args}`).length;
+    const worktrees: string[] = [aa.path, bb.path].map((path) => readState(path).worktree!);
     // One read per registered root per run; a worktree's own common dir keeps its one read.
     expect(count(f.root, 'rev-parse --git-common-dir')).toBe(1);
     for (const worktree of worktrees) expect(count(worktree, 'rev-parse --git-common-dir')).toBe(1);
@@ -2006,20 +2003,14 @@ for (const missing of ['neither', 'A', 'B', 'both'] as const) {
         expect(invoked.filter((args) => args[0] === 'tab' && args[1] === 'list')).toHaveLength(1);
         const prompt: number = invoked.findIndex((args) => args[0] === 'agent' && args[1] === 'prompt');
         expect(prompt).toBeGreaterThanOrEqual(0);
-        expect(
-          invoked
-            .slice(0, prompt)
-            .some((args) => args[0] === 'pane' && args[1] === 'get'),
-        ).toBe(true);
+        expect(invoked.slice(0, prompt).some((args) => args[0] === 'pane' && args[1] === 'get')).toBe(true);
       }
       if (missing === 'A') {
         const start: number = invoked.findIndex((args) => args[0] === 'agent' && args[1] === 'start');
         const prompt: number = invoked.findIndex((args) => args[0] === 'agent' && args[1] === 'prompt');
         expect(start).toBeGreaterThanOrEqual(0);
         expect(prompt).toBeGreaterThan(start);
-        expect(
-          invoked.slice(start + 1, prompt).some((args) => args[0] === 'pane' && args[1] === 'get'),
-        ).toBe(true);
+        expect(invoked.slice(start + 1, prompt).some((args) => args[0] === 'pane' && args[1] === 'get')).toBe(true);
       }
       expect(invoked.filter((args) => args[0] === 'agent').every((args) => !args.includes('operator'))).toBe(true);
       for (const split of splits) expect(tmpdirOf(split)).toBe(freshTmp);
