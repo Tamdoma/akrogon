@@ -14,7 +14,6 @@ done: []
 fix_rounds: 1
 verdict: {}
 tab: w8:tE0
-worktree: /home/ivan/.akrogon/worktrees/akrogon/one-test-run
 env_names: []
 env_generation: 0
 pane:

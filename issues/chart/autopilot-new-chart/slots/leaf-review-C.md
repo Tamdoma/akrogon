@@ -1,0 +1,5 @@
+# Leaf review, slot C
+
+- **LR1 The existing-open-chart branch of the trigger has no stated action, so the implementer must invent it.** Brief criterion 1 and Design (Trigger) allow a proposal park only when "no existing open leaf or chart already covers it". The existing-leaf case is recoverable from existing rules (`blocked-by` on that leaf; shapes.md Preflight resolves `blocked-by` to an existing leaf folder with valid state). The existing-open-chart case is not: a chart has no `state.yaml` or leaves yet (shapes.md Chart records), so the waiting chart cannot hand off against it, and criterion 1 forbids parking it for a proposal. Neither the brief nor the design says what A does then (wait naming that chart until its leaves are written, in which order if it sits later in the handed list, or something else). As written, the leaf can pass every criterion while the door still guesses in exactly that case, which is the guessing the brief's Why says this leaf removes. Add the branch to forks/hold-proposal.md, brief criterion 1 and the design's Trigger decision, or narrow the condition to existing open leaves only.
+
+No disagreement on the rest.

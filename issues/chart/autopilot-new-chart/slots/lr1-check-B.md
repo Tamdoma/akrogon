@@ -1,0 +1,3 @@
+Disagreement: “when that chart is on the handed list, A takes it next” must also require that chart to be runnable. An existing dependency chart can itself be waiting on an approval, need or prerequisite; list membership does not clear that wait.
+Evidence: skills/chart-issues/SKILL.md, Autopilot limits handover to “the next runnable handed chart”; Drain skips charts whose waits have not cleared. The new unconditional instruction contradicts that selection rule.
+Correction: take the existing chart next when it is handed and runnable; otherwise keep the dependency wait and continue to another runnable handed chart, or end the pass if none remain.

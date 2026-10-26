@@ -1,0 +1,36 @@
+slug: new-chart-proposal
+phase: merged
+created: 2026-10-26
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since:
+  B: 2026-10-26T17:14:44.192Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tF2
+worktree: /home/ivan/.akrogon/worktrees/akrogon/new-chart-proposal
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pX2
+  B: w8:pX3
+prompted:
+  B: 01a17932-3b62-7d71-8e20-5ae344cac020
+prompted_at:
+  B: 2026-10-26T17:14:44.193Z
+delivery_error: {}
+merge_stamp: 2026-10-26T17:13:39.510Z
+broadcast:
+  kind: issue
+  name: autopilot-new-chart
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/autopilot-new-chart
+  pushed: 16c28b2eeb3f42cc0d3742bd8606bf835ee848be
+  sources: []
+frozen: {}
+frozen_cited: []

@@ -1,0 +1,5 @@
+# Focused check on LR1 correction, slot C
+
+C found the existing-open-chart branch had no action. Correction, now in /tmp/claude-1000/-home-ivan-Work-infra-akrogon/71d2bdae-1e69-468c-a627-3d0b39e5f72e/scratchpad/draft/autopilot-new-chart/new-chart-proposal/brief.md criterion 1 and /tmp/claude-1000/-home-ivan-Work-infra-akrogon/71d2bdae-1e69-468c-a627-3d0b39e5f72e/scratchpad/draft/autopilot-new-chart/new-chart-proposal/design.md Trigger line: "When an existing open chart already covers it, A writes no proposal: the waiting chart's wait: line names that chart and the chart resumes once that chart's leaves are written, then follows the yes-path ordering (blocked-by in the same destination repo, else the cross-repo wait); when that chart is on the handed list, A takes it next.". Check only this correction against inspected text and the other decisions. Disagreement-only with evidence, else "no disagreement". Under 10 lines. Write nothing in the repo or drafts.
+
+Return file (exact path): /tmp/claude-1000/-home-ivan-Work-infra-akrogon/71d2bdae-1e69-468c-a627-3d0b39e5f72e/scratchpad/chart/lr1-check-C.md
