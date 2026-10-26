@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { readGlobal, readRepo, requireRepo, type GlobalConfig, type Repo } from './config';
+import { readGlobal, readRepo, remoteUrl, requireRepo, type GlobalConfig, type Repo } from './config';
 import { command, retryCommand, CommandError } from './shell';
 import { sourcePattern, type Leaf } from './state';
 
@@ -40,7 +40,7 @@ function slug(title: string): string {
 }
 
 export async function originSource(repo: Repo): Promise<string> {
-  const origin: string = await command(['git', 'remote', 'get-url', 'origin'], repo.root);
+  const origin: string = await remoteUrl(repo.root, 'origin');
   const match: RegExpExecArray | null =
     /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([a-zA-Z0-9-]+)\/([a-zA-Z0-9._-]+?)(?:\.git)?\/?$/.exec(
       origin,

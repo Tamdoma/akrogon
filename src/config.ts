@@ -247,13 +247,47 @@ export function within(path: string, parent: string): boolean {
   return diff === '' || (!diff.startsWith('../') && diff !== '..');
 }
 
-export async function commonDirectory(cwd: string): Promise<string | null> {
+// Root identity is stable within a run: only non-null answers stay cached.
+// A null (non-repo) or a failure is evicted so the next call respawns git.
+const commonDirectories: Map<string, Promise<string | null>> = new Map();
+
+async function queryCommonDirectory(cwd: string): Promise<string | null> {
   const result: Result = await run(['git', 'rev-parse', '--git-common-dir'], cwd);
   if (result.code !== 0) {
     if (result.stderr.includes('not a git repository')) return null;
     throw new Error(JSON.stringify({ cwd, ...result }));
   }
   return realpathSync(resolve(cwd, result.stdout));
+}
+
+export async function commonDirectory(cwd: string): Promise<string | null> {
+  let key: string;
+  try {
+    key = realpathSync(cwd);
+  } catch {
+    key = cwd;
+  }
+  const cached: Promise<string | null> | undefined = commonDirectories.get(key);
+  if (cached !== undefined) return cached;
+  const queried: Promise<string | null> = queryCommonDirectory(cwd);
+  commonDirectories.set(key, queried);
+  queried.then(
+    (dir: string | null) => dir === null && commonDirectories.delete(key),
+    () => commonDirectories.delete(key),
+  );
+  return queried;
+}
+
+const remoteUrls: Map<string, Promise<string>> = new Map();
+
+export async function remoteUrl(root: string, remote: string): Promise<string> {
+  const key: string = `${root}\n${remote}`;
+  const cached: Promise<string> | undefined = remoteUrls.get(key);
+  if (cached !== undefined) return cached;
+  const queried: Promise<string> = command(['git', 'remote', 'get-url', remote], root);
+  remoteUrls.set(key, queried);
+  queried.catch(() => remoteUrls.delete(key));
+  return queried;
 }
 
 export async function currentRepo(global: GlobalConfig, cwd: string): Promise<Repo | null> {

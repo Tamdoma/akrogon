@@ -1,4 +1,4 @@
-import { readGlobal, requireRepo, type Repo } from './config';
+import { readGlobal, remoteUrl, requireRepo, type Repo } from './config';
 import { run, CommandError, type Result } from './shell';
 
 export function trackingRef(repo: Repo): string {
@@ -32,8 +32,12 @@ export class PreflightError extends Error {
 
 async function ensureRemote(repo: Repo): Promise<void> {
   const argv: string[] = ['git', 'remote', 'get-url', repo.config.remote];
-  const result: Result = await run(argv, repo.root);
-  if (result.code !== 0) throw new PreflightError('C1', argv, repo.root, result, repo);
+  try {
+    await remoteUrl(repo.root, repo.config.remote);
+  } catch (error) {
+    if (!(error instanceof CommandError)) throw error;
+    throw new PreflightError('C1', argv, repo.root, error.result, repo);
+  }
 }
 
 export async function localBase(repo: Repo): Promise<string> {
@@ -45,7 +49,6 @@ export async function localBase(repo: Repo): Promise<string> {
 }
 
 export async function remoteBase(repo: Repo): Promise<void> {
-  await ensureRemote(repo);
   const argv: string[] = [
     'git',
     'ls-remote',
