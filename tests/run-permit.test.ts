@@ -543,6 +543,41 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
   }
 }, 75000);
 
+test('stop-run cancels the sole waiting run without an id', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const worktree: string = await leafWorktree(f, 'cancel-sole');
+    const systemctlLog: string = resolve(dir, 'systemctl');
+    writeFileSync(resolve(unitBin(f), 'systemctl'), `#!/bin/sh\necho called >> ${systemctlLog}\nexit 5\n`, {
+      mode: 0o755,
+    });
+    const h: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'h')], worktree, {
+      AKROGON_PROC_ROOT: scopedProcRoot(f, 'holder.scope'),
+    });
+    caps.push(h);
+    await waitFor(resolve(dir, 'h.held'));
+    const scoped: NodeJS.ProcessEnv = { AKROGON_PROC_ROOT: scopedProcRoot(f, 'waiter.scope') };
+    const waiter: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'waiter')], worktree, scoped);
+    caps.push(waiter);
+    await waitForText(waiter, /waiting for repo\//);
+    const cancelled: Result = await cli(f, ['stop-run'], worktree, scoped);
+    expect(cancelled.code).toBe(0);
+    expect(existsSync(systemctlLog)).toBe(false);
+    expect(await waiter.proc.exited).not.toBe(0);
+    expect(existsSync(resolve(dir, 'waiter'))).toBe(false);
+    expect((await runRecords(f)).some((entry) => entry.scope === 'waiter.scope')).toBe(false);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await h.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'waiter'))).toBe(false);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 30000);
+
 test('config refuses a full name that is not a check', async () => {
   const f: Fixture = await fixture();
   try {
