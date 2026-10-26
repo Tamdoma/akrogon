@@ -4859,6 +4859,13 @@ async function allocatedLeaf(f: DispatchFixture, slug: string): Promise<{ path: 
   return { path, b: allocated.pane.B! };
 }
 
+// One dispatch pass allocates every leaf, instead of one targeted pass per leaf.
+async function allocatedLeaves(f: DispatchFixture, slugs: string[]): Promise<{ path: string; b: string }[]> {
+  const paths: string[] = slugs.map((slug) => leaf(f, slug, 'plan.synthesis'));
+  expect((await next(f, [])).code).toBe(0);
+  return paths.map((path) => ({ path, b: readState(path).pane.B! }));
+}
+
 function toMerge(path: string, mergeStamp: string, extra: object = {}): State {
   const moved: State = { ...readState(path), phase: 'merge', merge_stamp: mergeStamp, ...extra };
   saveState(path, moved);
@@ -4938,8 +4945,7 @@ for (const exit of [
   test(`the ${exit} holder exit wakes the next merge leaf without a manual next`, async () => {
     const f: DispatchFixture = await dispatchFixture();
     try {
-      const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
-      const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+      const [aa, bb]: { path: string; b: string }[] = await allocatedLeaves(f, ['aa', 'bb']);
       toMerge(aa.path, '2026-09-11T00:00:00.000Z', exit.endsWith('merged') ? testedTurn(f) : {});
       toMerge(bb.path, '2026-09-12T00:00:00.000Z');
       const stalled: { code: string; message: string } = { code: 'agent_prompt_stalled', message: 'stalled' };
@@ -5019,9 +5025,7 @@ test('a committed merge whose log append fails still wakes the next leaf', async
 test('a leaf re-entering merge queues behind the two leaves stamped earlier', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
-    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
-    const cc: { path: string; b: string } = await allocatedLeaf(f, 'cc');
+    const [aa, bb, cc]: { path: string; b: string }[] = await allocatedLeaves(f, ['aa', 'bb', 'cc']);
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     toMerge(cc.path, '2026-09-13T00:00:00.000Z');
@@ -5111,9 +5115,7 @@ test('a merge seat consumes one delivery attempt per pass and retries instead of
 test('an idle hook retries a faulted merge holder before its waiter', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
-    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
-    const cc: { path: string; b: string } = await allocatedLeaf(f, 'cc');
+    const [aa, bb, cc]: { path: string; b: string }[] = await allocatedLeaves(f, ['aa', 'bb', 'cc']);
     const order: string[] = readdirSync(resolve(aa.path, '..')).filter((slug) => slug !== 'cc');
     const waiter: { path: string; b: string } = order[0] === 'aa' ? aa : bb;
     const holder: { path: string; b: string } = order[1] === 'aa' ? aa : bb;

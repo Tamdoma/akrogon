@@ -29,6 +29,22 @@ setEnv('TMPDIR', suiteRoot);
 mkdirSync(process.env.HOME!, { recursive: true });
 mkdirSync(process.env.AKROGON_LEAF_TEMP_ROOT!, { recursive: true });
 
+// akrogon calls herdr about 25 times per `next`; a bytecode bundle halves the CPU of `bun fake-herdr.ts`.
+export const fakeHerdrBin: string = join(suiteRoot, 'fake-herdr', 'fake-herdr.js');
+const built: Bun.SyncSubprocess<'pipe', 'pipe'> = Bun.spawnSync(
+  [
+    process.execPath,
+    'build',
+    join(import.meta.dir, 'fake-herdr.ts'),
+    '--target=bun',
+    '--bytecode',
+    '--outdir',
+    join(suiteRoot, 'fake-herdr'),
+  ],
+  { cwd: suiteRoot, stdout: 'pipe', stderr: 'pipe' },
+);
+if (built.exitCode !== 0) throw new Error(`fake herdr build failed (${built.exitCode}): ${built.stderr.toString()}`);
+
 // The kernel exposes children only per thread at /proc/<pid>/task/<tid>/children.
 export function descendantsOf(root: number = process.pid): number[] {
   const found: { pid: number; depth: number }[] = [];
