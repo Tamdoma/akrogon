@@ -90,14 +90,14 @@ const live = (record: RunRecord, boot: string): boolean =>
 
 // A run named in its repo's `full` list counts as nested only under a run that
 // itself holds its repo's line: under any other run it takes its own turn.
-function nested(token: string, full: boolean): boolean {
+function nested(token: string, repo: string, full: boolean): boolean {
   const hash: string = createHash('sha256').update(token).digest('hex');
   const record: RunRecord | undefined = readRecord(recordPath(hash));
   return (
     record !== undefined &&
     record.token_hash === hash &&
     record.state === 'live' &&
-    (record.full || !full) &&
+    ((record.full && record.repo === repo) || !full) &&
     live(record, bootId())
   );
 }
@@ -223,7 +223,7 @@ export function callerScope(): string {
 // arrival order (operator 2026-10-24, host-run-load; per-repo 2026-10-26).
 export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: Admission) => Promise<T>): Promise<T> {
   const inherited: string | undefined = process.env.AKROGON_RUN;
-  if (inherited !== undefined && inherited !== '' && nested(inherited, holder.full))
+  if (inherited !== undefined && inherited !== '' && nested(inherited, holder.repo, holder.full))
     return fn({ kind: 'nested', token: inherited });
   mkdirSync(runsDir(), { recursive: true });
   const token: string = randomUUID();
