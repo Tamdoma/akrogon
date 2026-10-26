@@ -1,5 +1,14 @@
 import { expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, readFileSync, existsSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { quote, spawnCaptured, type SpawnResult } from '../src/shell';
@@ -721,6 +730,34 @@ test('a missing pi record at queue time is refused with no log and nothing sent'
     s.clean();
   }
 });
+
+test.each(['claude', 'codex', 'pi'])(
+  'an existing unreadable %s record at queue time is refused with no log and nothing sent',
+  async (kind: string): Promise<void> => {
+    const piDir: string | null = kind === 'pi' ? registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-'))) : null;
+    const sess: string = piDir === null ? session : resolve(piDir, 'session.jsonl');
+    const seed: PaneSeed = kind === 'pi' ? piPane(sess, 'idle') : kind === 'claude' ? claudePane() : codexPane();
+    const s: Setup = setup(seed);
+    try {
+      writeSessionRecord(s.home, seed, sess);
+      const recordPath: string =
+        kind === 'claude'
+          ? resolve(s.home, `.claude/projects/proj/${sess}.jsonl`)
+          : kind === 'codex'
+            ? resolve(s.home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`)
+            : sess;
+      chmodSync(recordPath, 0);
+      const result: RunResult = await s.run({}, pane, sess, s.log, START);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('EACCES');
+      expect(result.stdout).toBe('');
+      expect(existsSync(s.log)).toBe(false);
+      expect(s.promptCalls()).toHaveLength(0);
+    } finally {
+      s.clean();
+    }
+  },
+);
 
 // Criterion 3: a record that goes unreadable while waiting logs the reason and sends nothing.
 test.each<[string, string]>([
