@@ -77,6 +77,22 @@ const built: Bun.SyncSubprocess<'pipe', 'pipe'> = Bun.spawnSync(
 );
 if (built.exitCode !== 0) throw new Error(`fake herdr build failed (${built.exitCode}): ${built.stderr.toString()}`);
 
+export const fakeBusctlBin: string = join(suiteRoot, 'fake-busctl', 'fake-busctl.js');
+const builtBusctl: Bun.SyncSubprocess<'pipe', 'pipe'> = Bun.spawnSync(
+  [
+    process.execPath,
+    'build',
+    join(import.meta.dir, 'fake-busctl.ts'),
+    '--target=bun',
+    '--bytecode',
+    '--outdir',
+    join(suiteRoot, 'fake-busctl'),
+  ],
+  { cwd: suiteRoot, stdout: 'pipe', stderr: 'pipe' },
+);
+if (builtBusctl.exitCode !== 0)
+  throw new Error(`fake busctl build failed (${builtBusctl.exitCode}): ${builtBusctl.stderr.toString()}`);
+
 // The kernel exposes children only per thread at /proc/<pid>/task/<tid>/children.
 export function descendantsOf(root: number = process.pid): number[] {
   const found: { pid: number; depth: number }[] = [];

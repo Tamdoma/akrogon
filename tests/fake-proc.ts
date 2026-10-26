@@ -1,12 +1,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 
 export const SHELL_START: string = '4242';
 export const OUTSIDE_CGROUP: string = '0::/user.slice/user-1000.slice/user@1000.service/app.slice/herdr.scope';
 
 export function shellPid(paneId: string): number {
-  return 10000 + (parseInt(createHash('sha256').update(paneId).digest('hex').slice(0, 6), 16) % 50000);
+  return 10000 + (parseInt(new Bun.CryptoHasher('sha256').update(paneId).digest('hex').slice(0, 6), 16) % 50000);
 }
 
 export function procDir(root: string, pid: number): string {
@@ -24,7 +23,7 @@ export function seedShell(root: string, paneId: string, cgroup: string): void {
 }
 
 export function expectedSlice(repoName: string, slug: string): string {
-  return `akrogon-l${createHash('sha256').update(`${repoName}/${slug}`).digest('hex').slice(0, 12)}.slice`;
+  return `akrogon-l${new Bun.CryptoHasher('sha256').update(`${repoName}/${slug}`).digest('hex').slice(0, 12)}.slice`;
 }
 
 export function expectedScope(slice: string, paneId: string): string {

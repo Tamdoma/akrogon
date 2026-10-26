@@ -6,7 +6,7 @@ import { command, spawnCaptured, type Result, type SpawnResult } from '../src/sh
 import { readRepo } from '../src/config';
 import { verifyCommands, verifyRunSchema, type VerifyRun, type VerifyScope } from '../src/verify';
 import { findLeaf, readState, saveState, type Batch } from '../src/state';
-import { descendantsOf, fakeHerdrBin } from './isolation';
+import { descendantsOf, fakeBusctlBin, fakeHerdrBin } from './isolation';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
 const tempDirs: Set<string> = new Set();
@@ -134,7 +134,7 @@ export function fakeHerdr(f: Fixture): HerdrFixture {
   const bin: string = resolve(f.home, 'bin');
   mkdirSync(bin);
   symlinkSync(fakeHerdrBin, resolve(bin, 'herdr'));
-  symlinkSync(resolve(import.meta.dir, 'fake-busctl.ts'), resolve(bin, 'busctl'));
+  symlinkSync(fakeBusctlBin, resolve(bin, 'busctl'));
   const db: string = resolve(f.home, 'herdr.json');
   writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, prompts: [], starts: [] }));
   mkdirSync(procRoot(f));

@@ -8,7 +8,7 @@
 ## Key files
 
 - `tests/helpers.ts` supplies temporary repos, CLI invocations and leaf fixtures; `tests/deploy-fixture.ts` builds the deployed-release fixture (seed repo, release stub, `deployedPair`).
-- `tests/isolation.ts` is the `bunfig.toml` `[test]` preload: per-worker scratch HOME and leaf-temp, a subreaper plus descendant sweep so the suite never reaches real HOME or `/var/tmp/akr-<uid>` and leaves no process.
+- `tests/isolation.ts` is the `bunfig.toml` `[test]` preload: per-worker scratch HOME and leaf-temp, a subreaper plus descendant sweep so the suite never reaches real HOME or `/var/tmp/akr-<uid>` and leaves no process, and per-worker bytecode bundles for the fake herdr and fake busctl.
 - `tests/phase.test.ts` checks real transitions, races and handoff refusal.
 - `tests/command-reference.test.ts` checks the command table in `docs/reference/commands.md` against the dispatched verbs and their argument contracts; `tests/docs-links.test.ts` checks relative links, heading anchors and image references in README, every Markdown page under `docs/` and the skills.
 - `tests/watch-issues-scripts.test.ts` is the `skills/watch-issues` gate, running its scripts tests and typecheck.
