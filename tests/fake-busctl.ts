@@ -72,4 +72,14 @@ if (existsSync(resolve(home, 'busctl.delay')))
     stdio: ['ignore', 'ignore', 'ignore'],
   }).unref();
 else writeFileSync(cgroupFile, cgroup);
+// A recycled shell between the identity read and the placement: the pid's stat
+// field 22 changes, which a /proc-only adoption check must refuse.
+if (existsSync(resolve(home, 'busctl.restime'))) {
+  const statFile: string = resolve(procDir(procRoot, call.pid), 'stat');
+  const stat: string = readFileSync(statFile, 'utf8');
+  const head: number = stat.lastIndexOf(')') + 1;
+  const fields: string[] = stat.slice(head).trim().split(' ');
+  fields[19] = '99999';
+  writeFileSync(statFile, stat.slice(0, head) + ' ' + fields.join(' ') + '\n');
+}
 console.log('o "/org/freedesktop/systemd1/job/1"');

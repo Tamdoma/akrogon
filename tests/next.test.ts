@@ -1850,6 +1850,36 @@ for (const seat of ['B'] as const) {
   });
 }
 
+test('one pass reads the registered root common dir and remote url once each', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    const realGit: string = await command(['sh', '-c', 'command -v git']);
+    const gitLog: string = resolve(f.home, 'git.calls');
+    writeFileSync(
+      resolve(f.home, 'bin/git'),
+      '#!/bin/sh\nprintf "%s|%s\\n" "$(pwd)" "$*" >> "$GIT_CALL_LOG"\nexec "$REAL_GIT" "$@"\n',
+      { mode: 0o755 },
+    );
+    expect((await next(f, ['--all'], { REAL_GIT: realGit, GIT_CALL_LOG: gitLog })).code).toBe(0);
+    const lines: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');
+    const count = (cwd: string, args: string): number =>
+      lines.filter((line) => line === `${cwd}|${args}`).length;
+    const worktrees: string[] = [aa.path, bb.path].map(
+      (path) => readState(path).worktree!,
+    );
+    // One read per registered root per run; a worktree's own common dir keeps its one read.
+    expect(count(f.root, 'rev-parse --git-common-dir')).toBe(1);
+    for (const worktree of worktrees) expect(count(worktree, 'rev-parse --git-common-dir')).toBe(1);
+    expect(count(f.root, 'remote get-url origin')).toBe(1);
+    // The branch tip is re-read on every decision; the single remaining read is self-update's.
+    expect(count(f.root, 'rev-parse HEAD')).toBe(1);
+  } finally {
+    f.clean();
+  }
+}, 20000);
+
 test('a blocked non-merge seat does not stall a merge leaf', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -1967,6 +1997,30 @@ for (const missing of ['neither', 'A', 'B', 'both'] as const) {
       if (missing === 'A' || missing === 'B') expect(splits[0][2]).toBe(state.pane[missing === 'A' ? 'B' : 'A']!);
       if (missing === 'both') expect(splits.map((args) => args[2])).toEqual(['operator', allocated.pane.A!]);
       expect(database(f).prompts.at(-1)?.pane).toBe(allocated.pane.A);
+      if (missing === 'neither') {
+        // No herdr write ran this pass: dispatchLeaf's pane list feeds
+        // allocation and dispatch, and the host union feeds host reconcile;
+        // reconcile itself still lists per repo (an earlier repo can close a
+        // tab before a later repo reads).
+        expect(invoked.filter((args) => args[0] === 'pane' && args[1] === 'list')).toHaveLength(3);
+        expect(invoked.filter((args) => args[0] === 'tab' && args[1] === 'list')).toHaveLength(1);
+        const prompt: number = invoked.findIndex((args) => args[0] === 'agent' && args[1] === 'prompt');
+        expect(prompt).toBeGreaterThanOrEqual(0);
+        expect(
+          invoked
+            .slice(0, prompt)
+            .some((args) => args[0] === 'pane' && args[1] === 'get'),
+        ).toBe(true);
+      }
+      if (missing === 'A') {
+        const start: number = invoked.findIndex((args) => args[0] === 'agent' && args[1] === 'start');
+        const prompt: number = invoked.findIndex((args) => args[0] === 'agent' && args[1] === 'prompt');
+        expect(start).toBeGreaterThanOrEqual(0);
+        expect(prompt).toBeGreaterThan(start);
+        expect(
+          invoked.slice(start + 1, prompt).some((args) => args[0] === 'pane' && args[1] === 'get'),
+        ).toBe(true);
+      }
       expect(invoked.filter((args) => args[0] === 'agent').every((args) => !args.includes('operator'))).toBe(true);
       for (const split of splits) expect(tmpdirOf(split)).toBe(freshTmp);
       expect(freshTmp.startsWith(leafTempRoot(f) + '/')).toBe(true);

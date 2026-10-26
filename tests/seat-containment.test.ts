@@ -99,13 +99,58 @@ test('next boxes every pane shell in its own scope under the leaf slice before t
     expect(db.startCgroups).toHaveLength(1);
     expect(db.startCgroups[0].pane).toBe(state.pane.A!);
     expect(db.startCgroups[0].cgroup.endsWith(`/${slice}/${expectedScope(slice, state.pane.A!)}`)).toBe(true);
+    // One scope check reads the shell pid once: two boxed panes, two process-info reads.
+    expect(
+      calls(f).filter((args) => args[0] === 'pane' && args[1] === 'process-info'),
+    ).toHaveLength(2);
+    // The pane check before a start or prompt still goes to herdr.
+    for (const start of db.starts) {
+      const invoked: string[][] = calls(f);
+      const at: number = invoked.findIndex(
+        (args) => args[0] === 'agent' && args[1] === 'start' && args.join('\n') === start.join('\n'),
+      );
+      const after: string[][] = invoked.slice(at + 1);
+      expect(
+        after
+          .slice(
+            0,
+            after.findIndex((args) => args[0] === 'agent' && args[1] === 'prompt'),
+          )
+          .some((args) => args[0] === 'pane' && args[1] === 'get'),
+      ).toBe(true);
+    }
     expect((await next(f, ['build'])).code).toBe(0);
     expect(busctlCalls(f)).toHaveLength(adopted.length);
+    // The sweep and the re-box each ask for the shell pid once per pane.
+    expect(
+      calls(f).filter((args) => args[0] === 'pane' && args[1] === 'process-info'),
+    ).toHaveLength(6);
     expect(calls(f).some((args) => args[0] === 'pane' && args[1] === 'close')).toBe(false);
   } finally {
     f.clean();
   }
 }, 20000);
+
+test('a pane whose shell start changed after its identity read is refused naming the pane', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const path: string = leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    const state = readState(path);
+    writeFileSync(cgroupPath(f, state.pane.A!), OUTSIDE_CGROUP + '\n');
+    writeFileSync(resolve(f.home, 'busctl.restime'), '');
+    const result: Result = await next(f, ['build']);
+    const errors = skipped(result).filter((entry) => entry.slug === 'build');
+    expect(errors).toHaveLength(1);
+    const changed: string = z
+      .string()
+      .parse(database(f).panes.find((pane) => pane.pane_id !== state.pane.A && pane.pane_id !== state.pane.B)?.pane_id);
+    expect(errors[0].error).toContain(changed);
+    expect(errors[0].error).toContain('changed');
+  } finally {
+    f.clean();
+  }
+}, 30000);
 
 test('new leaf pane shells keep the session bus; only check runs cut it', async () => {
   const f: DispatchFixture = await dispatchFixture();
