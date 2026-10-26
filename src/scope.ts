@@ -8,7 +8,7 @@ import { CommandError, herdr, quote, run, spawnCaptured, type SpawnResult } from
 export type ScopePlace =
   { place: 'inside' } | { place: 'outside'; cgroup: string } | { place: 'unreadable'; error: string };
 
-type Shell = { pid: number; start: string };
+export type Shell = { pid: number; start: string };
 
 export function leafSlice(repo: Pick<Repo, 'name'>, slug: string): string {
   return `akrogon-l${createHash('sha256').update(`${repo.name}/${slug}`).digest('hex').slice(0, 12)}.slice`;
@@ -139,16 +139,16 @@ function startTime(pid: number): string {
   );
 }
 
-async function shell(paneId: string, session: string): Promise<Shell> {
+export async function paneShell(paneId: string, session: string): Promise<Shell> {
   const pid: number = await shellPid(paneId, session);
   return { pid, start: startTime(pid) };
 }
 
-export async function adoptShell(slice: string, paneId: string, session: string): Promise<void> {
+export async function adoptShell(slice: string, paneId: string, session: string, shell?: Shell): Promise<void> {
   const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;
   if (runtime === undefined || runtime.trim() === '')
     throw new Error('XDG_RUNTIME_DIR is required to reach the user systemd bus');
-  const { pid, start }: Shell = await shell(paneId, session);
+  const { pid, start }: Shell = shell ?? (await paneShell(paneId, session));
   const argv: string[] = [
     'busctl',
     '--user',
@@ -188,8 +188,13 @@ function errnoMessage(error: unknown): string | undefined {
   return error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.message : undefined;
 }
 
-export async function inOwnScope(slice: string, paneId: string, session: string): Promise<ScopePlace> {
-  const pid: number = await shellPid(paneId, session);
+export async function inOwnScope(
+  slice: string,
+  paneId: string,
+  session: string,
+  prior?: Shell,
+): Promise<ScopePlace> {
+  const pid: number = prior?.pid ?? (await shellPid(paneId, session));
   let start: string;
   let cgroup: string;
   try {
@@ -200,6 +205,8 @@ export async function inOwnScope(slice: string, paneId: string, session: string)
     if (message === undefined) throw error;
     return { place: 'unreadable', error: message };
   }
+  if (prior !== undefined && start !== prior.start)
+    throw new Error(`Pane ${paneId} shell start changed: expected ${prior.start}, reads ${start}`);
   return cgroup.endsWith(`/${slice}/${paneScope(slice, paneId, pid, start)}`)
     ? { place: 'inside' }
     : { place: 'outside', cgroup };
