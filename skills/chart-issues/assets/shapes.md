@@ -65,6 +65,7 @@ Every mode entry's session id is the live `agent_session.value` `herdr agent lis
 - handed off: <each leaf handed off>
 - main step: <each completed step on main or lesson write for handed work>
 - wait: <the exact missing need, approval or prerequisite> — next: <next step>
+- proposal: <the proposed destination, its goal, the criterion that cannot pass without it, the waiting chart and the fixed question>; one line per proposed destination, written beside that chart's wait: line
 - pending step: after <leaf> lands, open a chart door to finish <step>
 - pick against recommendation: <the round, the pick and its reason>
 - recorded only: <each seed match, close offer, flaky test or failed leaf outside the handed list>

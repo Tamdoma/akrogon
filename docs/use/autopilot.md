@@ -31,6 +31,7 @@ Every handed chart takes the lifecycle route. The direct route is not offered. T
 These make a chart wait while the door moves on to the next chart on the list:
 
 - Every approval, such as a live-account grant, fixture retention or saving a secret.
+- A needed new chart: when the chart finds work it cannot hand off without and that work needs its own destination, the door writes a `proposal:` line asking "chart <X> on its own (yes) or bring it into <waiting chart> (no)?". Yes adds that chart to the list you handed it; no brings the work into the waiting chart.
 - A proof call that changes something or costs money.
 - A missing need, such as a key.
 - A step only a person can do.
@@ -47,7 +48,7 @@ On a long run, the door can hand itself to a fresh conversation in the same pane
 
 ## Read the record
 
-Each chart's `CHART.md` has an `## Autopilot` section. It lists boundary breaches first, then the switch-on words, consultants and any losses, the route, handed-off leaves, waits, and picks that went against the recommendation. The door also prints one line per chart at the end of each pass.
+Each chart's `CHART.md` has an `## Autopilot` section. It lists boundary breaches first, then the switch-on words, consultants and any losses, the route, handed-off leaves, waits, new-chart proposals, and picks that went against the recommendation. The door also prints one line per chart at the end of each pass.
 
 Read the record before you run the handed-off leaves. A wrong pick can reach main once those leaves run and merge. Do not hand the same work to two doors at the same moment.
 
