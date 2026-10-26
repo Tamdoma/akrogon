@@ -154,15 +154,19 @@ function checkIdentity(pane: string, live: ListAgent, exchange: Exchange): void 
   if (exchange.session === null && liveSession !== null) exchange.session = liveSession;
 }
 
-// herdr shows a Claude pane idle during long silent thinking, so for Claude the session
-// transcript decides: the turn is open until a turn_duration entry follows the last prompt.
-export function claudeTurnOpen(session: string): boolean {
+export function claudeTranscript(session: string): string {
   const matches: string[] = Array.from(
     new Bun.Glob(`*/${session}.jsonl`).scanSync({ cwd: `${homedir()}/.claude/projects`, absolute: true }),
   );
   if (matches.length !== 1)
     throw new Error(`Expected one Claude transcript for session ${session}, found ${matches.length}`);
-  const lines: string[] = readFileSync(matches[0], 'utf8').trimEnd().split('\n');
+  return matches[0];
+}
+
+// herdr shows a Claude pane idle during long silent thinking, so for Claude the session
+// transcript decides: the turn is open until a turn_duration entry follows the last prompt.
+export function claudeTurnOpen(session: string): boolean {
+  const lines: string[] = readFileSync(claudeTranscript(session), 'utf8').trimEnd().split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
     const parsed = transcriptLineSchema.safeParse(parseJson(lines[i]));
     if (!parsed.success) continue;
