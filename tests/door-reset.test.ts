@@ -271,7 +271,10 @@ test('refuses a session mismatch even when the passed session has a transcript',
 test('pi turn still open at the bound is logged and nothing is sent', async (): Promise<void> => {
   const piDir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-')));
   const piSess: string = resolve(piDir, 'session.jsonl');
-  writeFileSync(piSess, `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`);
+  writeFileSync(
+    piSess,
+    `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`,
+  );
   const s: Setup = setup(piPane(piSess, 'working'));
   try {
     const result: RunResult = await s.run({}, pane, piSess, s.log, START);
@@ -333,7 +336,10 @@ test('a session change during the turn wait is logged and nothing is sent', asyn
 test('unconfirmed reset is logged and no start prompt is sent', async (): Promise<void> => {
   const piDir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-')));
   const piSess: string = resolve(piDir, 'session.jsonl');
-  writeFileSync(piSess, `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`);
+  writeFileSync(
+    piSess,
+    `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`,
+  );
   const s: Setup = setup(piPane(piSess, 'idle'));
   try {
     const result: RunResult = await s.run({}, pane, piSess, s.log, START);
@@ -490,7 +496,10 @@ test('a codex check turn still working at the bound sends no start prompt', asyn
 test('pi handover sends reset then start prompt', async (): Promise<void> => {
   const piDir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-')));
   const piSess: string = resolve(piDir, 'session.jsonl');
-  writeFileSync(piSess, `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`);
+  writeFileSync(
+    piSess,
+    `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`,
+  );
   const s: Setup = setup(piPane(piSess, 'idle'), {
     promptScript: [{ session: '/tmp/pi-new.jsonl', status: 'idle' }],
   });
@@ -670,10 +679,7 @@ test('claude operator input recorded before the queue boundary still sends the r
     writeTranscript(s.home, session, false);
     const recordPath: string = resolve(s.home, `.claude/projects/proj/${session}.jsonl`);
     // The earlier operator turn's input then its turn's end, both before the queue point.
-    writeFileSync(
-      recordPath,
-      `${claudeUser}\n${JSON.stringify({ type: 'system', subtype: 'turn_duration' })}\n`,
-    );
+    writeFileSync(recordPath, `${claudeUser}\n${JSON.stringify({ type: 'system', subtype: 'turn_duration' })}\n`);
     const result: RunResult = await s.run({}, pane, session, s.log, START);
     expect(result.code).toBe(0);
     expect(s.promptCalls()).toHaveLength(2);
@@ -687,18 +693,21 @@ test('claude operator input recorded before the queue boundary still sends the r
 test.each<[string, PaneSeed]>([
   ['claude', claudePane()],
   ['codex', codexPane()],
-])('an unreadable %s record at queue time is refused with no log and nothing sent', async (_n: string, seed: PaneSeed): Promise<void> => {
-  const s: Setup = setup(seed);
-  try {
-    const result: RunResult = await s.run({}, pane, session, s.log, START);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain('refused');
-    expect(existsSync(s.log)).toBe(false);
-    expect(s.promptCalls()).toHaveLength(0);
-  } finally {
-    s.clean();
-  }
-});
+])(
+  'an unreadable %s record at queue time is refused with no log and nothing sent',
+  async (_n: string, seed: PaneSeed): Promise<void> => {
+    const s: Setup = setup(seed);
+    try {
+      const result: RunResult = await s.run({}, pane, session, s.log, START);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('refused');
+      expect(existsSync(s.log)).toBe(false);
+      expect(s.promptCalls()).toHaveLength(0);
+    } finally {
+      s.clean();
+    }
+  },
+);
 
 test('a missing pi record at queue time is refused with no log and nothing sent', async (): Promise<void> => {
   const s: Setup = setup(piPane(resolve(tmpdir(), 'pi-sess-missing.jsonl'), 'idle'));
