@@ -373,10 +373,26 @@ test('a listed run of another repo and an unlisted run start at once over the li
     expect(existsSync(resolve(dir, 'small'))).toBe(true);
     expect(existsSync(resolve(dir, 'ob'))).toBe(true);
     expect(existsSync(resolve(dir, 'c'))).toBe(false);
+    const innerTree: string = await leafWorktree(f, 'cross-repo-inner');
+    const shim: NodeJS.ProcessEnv = fakeAkrogon(f).env;
+    const script: string = `cd ${innerTree}; akrogon run-check --name test -- touch ${dir}/inner`;
+    const outer: Cap = run(f, ['run-check', '--name', 'test', '--', 'sh', '-c', script], otherTree, shim);
+    caps.push(outer);
+    const deadline: number = Date.now() + 20000;
+    while (
+      !existsSync(resolve(dir, 'inner')) &&
+      !(await runRecords(f)).some((entry) => entry.leaf === 'cross-repo-inner' && entry.state === 'waiting')
+    ) {
+      if (Date.now() > deadline) throw new Error('the cross-repo inner run neither waited nor started');
+      await Bun.sleep(50);
+    }
+    expect(existsSync(resolve(dir, 'inner'))).toBe(false);
     writeFileSync(resolve(dir, 'release'), '');
     expect(await a.proc.exited).toBe(0);
     expect(await c.proc.exited).toBe(0);
     expect(existsSync(resolve(dir, 'c'))).toBe(true);
+    expect(await outer.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'inner'))).toBe(true);
   } finally {
     stop(caps);
     f.clean();
