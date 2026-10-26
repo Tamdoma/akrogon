@@ -49,8 +49,10 @@ Route: <lifecycle | direct>
 ## Mode record
 
 - mode <time> <door pane> <A session id>: <on | off | changed list | continue autopilot> <detail>
-- mode <time> <door pane> <A session id>: handover <time> <log>: handed <remaining list>; consultants <surviving>
+- mode <time> <door pane> <A session id>: handover <time> <log>: handed <remaining list>; consultants <surviving>; instructions <verbatim with provenance and scope, or none>
+- mode <time> <door pane> <A session id>: handover <time> <log>: attended next <chart>; consultants <surviving>; instructions <verbatim with provenance and scope, or none>
 - mode <time> <door pane> <A session id>: continue autopilot (handover <time>)
+- mode <time> <door pane> <A session id>: continue attended (handover <time>)
 
 Every mode entry's session id is the live `agent_session.value` `herdr agent list` prints for A's pane; a fresh A reads it before appending and never invents one.
 
@@ -86,7 +88,7 @@ Every mode entry's session id is the live `agent_session.value` `herdr agent lis
 - landed SHA: <sha pushed, after landing>
 ```
 
-Under autopilot the CHART.md carries `## Mode record` — one `- mode` line appended per mode change (on, off, changed list, "continue autopilot") with its time, the door pane and A's session id, the latest entry governing — and `## Autopilot`, written as the pass goes with every line a `- ` list item so no line parses as a chart marker; it records observed states only, never "started" or "merged" without evidence. Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts. The `handover` and `continue autopilot (handover <time>)` entries are appended during an autopilot switch, so a fresh session can resume the same handed list.
+The CHART.md carries `## Mode record` for every chart, empty until a mode or handover entry lands — under autopilot one `- mode` line is appended per mode change (on, off, changed list, "continue autopilot") with its time, the door pane and A's session id, the latest entry governing — and, under autopilot, `## Autopilot`, written as the pass goes with every line a `- ` list item so no line parses as a chart marker; it records observed states only, never "started" or "merged" without evidence. Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts. A CHART.md created for a next chart with no folder holds `pending map by fresh A (<seed path, legacy path or operator note reference>)` under Destination plus the Mode record, and no INTAKE.md, until fresh A writes the Destination after its map. The `handover` and `continue <mode> (handover <time>)` entries are appended on a chart switch per SKILL.md `## Handover`, so a fresh session resumes where the switch left off — the same handed list under autopilot, the named chart under attended.
 
 ```markdown
 # Intake: <chart-slug>
