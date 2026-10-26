@@ -247,6 +247,268 @@ test('status shows no Run lines while a run holds', async () => {
   }
 }, 45000);
 
+const FULL_CONFIG = { checks: { test: 'bun test', format: 'true' }, full: ['test'], grounding: 'none' };
+
+const record = (name: string, dir: string): string[] => ['sh', '-c', `echo ${name} >> ${dir}/order`];
+
+async function waitForText(cap: Cap, pattern: RegExp, ms: number = 20000): Promise<void> {
+  const begun: number = Date.now();
+  while (!pattern.test(await cap.text())) {
+    if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${pattern}: ${await cap.text()}`);
+    await Bun.sleep(50);
+  }
+}
+
+async function runRecords(f: Fixture): Promise<Record<string, unknown>[]> {
+  const dir: string = resolve(f.home, 'runs');
+  if (!existsSync(dir)) return [];
+  const records: Record<string, unknown>[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.yaml')) continue;
+    try {
+      records.push(Bun.YAML.parse(readFileSync(resolve(dir, name), 'utf8')) as Record<string, unknown>);
+    } catch {
+      // unreadable records are ignored by every reader
+    }
+  }
+  return records;
+}
+
+// A caller whose /proc/self/cgroup names <scopeName>.scope, so a waiting run's
+// record and the stop-run caller land in the same scope.
+function scopedProcRoot(f: Fixture, scopeName: string): string {
+  const root: string = resolve(f.home, 'scopes', scopeName);
+  mkdirSync(resolve(root, 'self'), { recursive: true });
+  writeFileSync(resolve(root, 'self', 'cgroup'), `0::/pane/${scopeName}\n`);
+  return root;
+}
+
+test('listed runs of one repo wait for their repo holder, print the holder, and start in arrival order', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const first: string = await leafWorktree(f, 'leaf-one');
+    const second: string = await leafWorktree(f, 'leaf-two');
+    const a: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'a')], first);
+    caps.push(a);
+    await waitFor(resolve(dir, 'a.held'));
+    const b: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'b')], second);
+    caps.push(b);
+    await waitForText(b, /waiting for repo\/leaf-one test/);
+    expect(existsSync(resolve(dir, 'b'))).toBe(false);
+    for (const name of ['w1', 'w2', 'w3']) {
+      const waiter: Cap = run(f, ['run-check', '--name', 'test', '--', ...record(name, dir)], first);
+      caps.push(waiter);
+      await waitForText(waiter, /waiting for repo\/(leaf-one|leaf-two) test/);
+      expect(existsSync(resolve(dir, 'order'))).toBe(false);
+    }
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await a.proc.exited).toBe(0);
+    // a's command ended and its record file is gone; b may only start now.
+    const aId: string = ((await a.text()).match(/run ([0-9a-f-]+)/) ?? [])[1] as string;
+    expect(aId).toBeDefined();
+    expect(await b.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'b'))).toBe(true);
+    expect((await runRecords(f)).some((entry) => entry.run === aId)).toBe(false);
+    for (const cap of caps) expect(await cap.proc.exited).toBe(0);
+    expect(readFileSync(resolve(dir, 'order'), 'utf8').trim().split('\n')).toEqual(['w1', 'w2', 'w3']);
+    const waits: number[] = timings(f)
+      .filter((event) => event.kind === 'check_start' && event.name === 'test')
+      .map((event) => event.wait_ms ?? 0);
+    expect(Math.max(...waits)).toBeGreaterThan(0);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test('a listed run of another repo and an unlisted run start at once over the line', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const other: string = resolve(f.home, 'other');
+    mkdirSync(resolve(other, 'issues/open'), { recursive: true });
+    await command(['git', 'init', '-b', 'main', other]);
+    await command(['git', 'config', 'user.email', 'test@example.invalid'], other);
+    await command(['git', 'config', 'user.name', 'Test'], other);
+    writeFileSync(resolve(other, 'file'), 'initial\n');
+    await command(['git', 'add', '.'], other);
+    await command(['git', 'commit', '-m', 'initial'], other);
+    await command(['git', 'init', '--bare', '-b', 'main', resolve(f.home, 'other.git')]);
+    await command(['git', 'remote', 'add', 'origin', resolve(f.home, 'other.git')], other);
+    await command(['git', 'push', 'origin', 'HEAD:main'], other);
+    yaml(resolve(other, 'issues/config.yaml'), FULL_CONFIG);
+    const global: Record<string, unknown> = Bun.YAML.parse(
+      readFileSync(resolve(f.home, 'config.yaml'), 'utf8'),
+    ) as Record<string, unknown>;
+    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, other } });
+    const otherTree: string = resolve(storeDir(f, 'other'), 'other-leaf');
+    await command(['git', 'worktree', 'add', otherTree, '-b', 'other-leaf'], other);
+    mkdirSync(resolve(other, 'issues/open/issue/other-leaf'), { recursive: true });
+    yaml(resolve(other, 'issues/open/issue/other-leaf/state.yaml'), {
+      slug: 'other-leaf',
+      phase: 'implement',
+      created: '2026-09-10',
+      repo: 'other',
+      'blocked-by': [],
+      worktree: otherTree,
+    });
+    const first: string = await leafWorktree(f, 'leaf-one');
+    const second: string = await leafWorktree(f, 'leaf-two');
+    const a: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'a')], first);
+    caps.push(a);
+    await waitFor(resolve(dir, 'a.held'));
+    // A same-repo listed run proves the queue itself is engaged.
+    const c: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'c')], second);
+    caps.push(c);
+    await waitForText(c, /waiting for repo\/leaf-one test/);
+    const small: Result = await cli(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'small')], second);
+    expect(small.code).toBe(0);
+    const ob: Result = await cli(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'ob')], otherTree);
+    expect(ob.code).toBe(0);
+    expect(existsSync(resolve(dir, 'small'))).toBe(true);
+    expect(existsSync(resolve(dir, 'ob'))).toBe(true);
+    expect(existsSync(resolve(dir, 'c'))).toBe(false);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await a.proc.exited).toBe(0);
+    expect(await c.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'c'))).toBe(true);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test('a listed run nests under its repo holder and queues under an unlisted run', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const shim: NodeJS.ProcessEnv = fakeAkrogon(f).env;
+    const worktree: string = await leafWorktree(f, 'nested-line');
+    // A listed run inside the same repo's listed holder runs at once and writes no record.
+    const script: string = `akrogon run-check --name test -- touch ${dir}/inner`;
+    const outer: Cap = run(f, ['run-check', '--name', 'test', '--', 'sh', '-c', script], worktree, shim);
+    caps.push(outer);
+    await waitFor(resolve(dir, 'inner'), 20000);
+    expect(await runRecords(f)).toHaveLength(1);
+    expect(await outer.proc.exited).toBe(0);
+    expect(await outer.text()).not.toMatch(/waiting for/);
+    // A listed run inside an unlisted run takes its own turn behind the live holder.
+    const h: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'h')], worktree);
+    caps.push(h);
+    await waitFor(resolve(dir, 'h.held'));
+    const innerScript: string = `akrogon run-check --name test -- touch ${dir}/inner2`;
+    const outer2: Cap = run(f, ['run-check', '--name', 'format', '--', 'sh', '-c', innerScript], worktree, shim);
+    caps.push(outer2);
+    await waitForText(outer2, /waiting for repo\//);
+    expect(existsSync(resolve(dir, 'inner2'))).toBe(false);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await h.proc.exited).toBe(0);
+    expect(await outer2.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'inner2'))).toBe(true);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 60000);
+
+test('a killed holder or waiter does not block the line', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const worktree: string = await leafWorktree(f, 'killed');
+    const holder: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'h')], worktree);
+    caps.push(holder);
+    await waitFor(resolve(dir, 'h.held'));
+    const dead: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('dead', dir)], worktree);
+    caps.push(dead);
+    await waitForText(dead, /waiting for repo\//);
+    const next: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('next', dir)], worktree);
+    caps.push(next);
+    await waitForText(next, /waiting for repo\//);
+    killTree(dead.proc);
+    await dead.proc.exited;
+    killTree(holder.proc);
+    await holder.proc.exited;
+    expect(await next.proc.exited).toBe(0);
+    expect(readFileSync(resolve(dir, 'order'), 'utf8').trim()).toBe('next');
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test('stop-run cancels a waiting run and the next waiter takes its place', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const scoped: NodeJS.ProcessEnv = { AKROGON_PROC_ROOT: scopedProcRoot(f, 'paneA.scope') };
+    const worktree: string = await leafWorktree(f, 'cancel');
+    const h: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'h')], worktree, scoped);
+    caps.push(h);
+    await waitFor(resolve(dir, 'h.held'));
+    const w1: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('w1', dir)], worktree, scoped);
+    const w2: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('w2', dir)], worktree, scoped);
+    const w3: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('w3', dir)], worktree, scoped);
+    caps.push(w1, w2, w3);
+    for (const cap of [w1, w2, w3]) await waitForText(cap, /waiting for repo\//);
+    const wIds: string[] = (await runRecords(f))
+      .filter((entry) => entry.state === 'waiting')
+      .sort((a, b) => String(a.since).localeCompare(String(b.since)))
+      .map((entry) => String(entry.run));
+    expect(wIds).toHaveLength(3);
+    // Cancel the suspended w3 first: it exits when resumed and its record is
+    // not rewritten while it is stopped.
+    w3.proc.kill('SIGSTOP');
+    const suspended: Result = await cli(f, ['stop-run', wIds[2]], worktree, scoped);
+    expect(suspended.code).toBe(0);
+    const begun: number = Date.now();
+    while ((await runRecords(f)).find((entry) => entry.run === wIds[2])?.state !== 'cancelled') {
+      if (Date.now() - begun > 10000) throw new Error('suspended run record never cancelled');
+      await Bun.sleep(50);
+    }
+    expect(w3.proc.exitCode).toBeNull();
+    const cancelled: Result = await cli(f, ['stop-run', wIds[0]], worktree, scoped);
+    expect(cancelled.code).toBe(0);
+    expect(await w1.proc.exited).not.toBe(0);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await h.proc.exited).toBe(0);
+    expect(await w2.proc.exited).toBe(0);
+    w3.proc.kill('SIGCONT');
+    expect(await w3.proc.exited).not.toBe(0);
+    expect(readFileSync(resolve(dir, 'order'), 'utf8').trim()).toBe('w2');
+    expect((await runRecords(f)).some((entry) => entry.run === wIds[0] || entry.run === wIds[2])).toBe(false);
+  } finally {
+    for (const cap of caps) {
+      if (cap.proc.exitCode === null) cap.proc.kill('SIGCONT');
+    }
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test('config refuses a full name that is not a check', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { ...FULL_CONFIG, full: ['missing'] });
+    const result: Result = await cli(f, ['config']);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/full.*missing/);
+  } finally {
+    f.clean();
+  }
+});
+
 test('a run-check runs without reading any memory stat', async () => {
   const f: Fixture = await fixture();
   try {

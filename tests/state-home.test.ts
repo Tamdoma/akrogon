@@ -142,6 +142,21 @@ test('cutover is deferred while a live run record exists in the tool root runs/'
   expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(true);
 });
 
+test('cutover is deferred while a waiting run record exists in the tool root runs/', async () => {
+  const home: string = temp();
+  const root: string = toolCopy(home, globalConfig);
+  mkdirSync(resolve(root, 'runs'), { recursive: true });
+  writeFileSync(resolve(root, `runs/${'b'.repeat(64)}.yaml`), liveRecord().replace('state: live', 'state: waiting'));
+  const skipped: SpawnResult = await cli(root, home, ['config']);
+  expect(skipped.code).toBe(0);
+  expect(skipped.stderr).not.toContain('moved state home');
+  expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(false);
+  rmSync(resolve(root, `runs/${'b'.repeat(64)}.yaml`));
+  const moved: SpawnResult = await cli(root, home, ['config']);
+  expect(moved.stderr).toContain('moved state home');
+  expect(existsSync(resolve(home, '.akrogon/config.yaml'))).toBe(true);
+});
+
 test('a process holding the tool root as cwd does not defer cutover', async () => {
   const home: string = temp();
   const root: string = toolCopy(home, globalConfig);

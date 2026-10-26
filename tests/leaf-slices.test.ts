@@ -808,6 +808,68 @@ test('a finished leaf temp stays while its retained slice holds a running unit w
   }
 });
 
+// Criterion 7: a waiting run counts as live for slice protection.
+test('a finished leaf temp stays while its slice is named by a waiting run record', async () => {
+  const f: SliceFixture = await slicesFixture();
+  const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
+  try {
+    leaf(f, 'no-tab-wait', 'merged');
+    const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
+    const temp: string = resolve(leafTempRoot(f), hex(f.root).slice(0, 4), hex(`${f.root}\nno-tab-wait`).slice(0, 8));
+    mkdirSync(temp, { recursive: true });
+    const slice: string = leafSlice({ name: 'repo' }, 'no-tab-wait');
+    const cgRoot: string = resolve(f.home, 'cgroups');
+    mkdirSync(resolve(cgRoot, 'busy'), { recursive: true });
+    writeFileSync(resolve(cgRoot, 'busy', 'cgroup.procs'), `${process.pid}\n`);
+    const sysDb: string = resolve(f.home, 'systemctl.json');
+    writeFileSync(sysDb, JSON.stringify({ units: [{ unit: slice, sub: 'active', cgroup: '/busy' }] }));
+    const log: string = resolve(f.home, 'systemctl.log');
+    symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(f.home, 'bin', 'systemctl'));
+    const stat: string = readFileSync(`/proc/${child.pid}/stat`, 'utf8');
+    const runs: string = resolve(f.home, 'runs');
+    mkdirSync(runs, { recursive: true });
+    writeFileSync(
+      resolve(runs, 'seed.yaml'),
+      [
+        `token_hash: "${'0'.repeat(64)}"`,
+        `pid: ${child.pid}`,
+        `start_time: "${stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]}"`,
+        `boot_id: "${readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()}"`,
+        'repo: repo',
+        'leaf: no-tab-wait',
+        'check: test',
+        'state: waiting',
+        'full: true',
+        'run: rw1',
+        `slice: ${slice}`,
+        'scope: s1',
+        'unit: u1',
+        'since: 2026-10-26T00:00:00Z',
+      ].join('\n') + '\n',
+    );
+    const env: NodeJS.ProcessEnv = {
+      ...f.env,
+      FAKE_SYSTEMCTL_DB: sysDb,
+      FAKE_SYSTEMCTL_LOG: log,
+      AKROGON_CGROUP_ROOT: cgRoot,
+    };
+    expect((await cli(f, ['next', '--all'], f.root, env)).code).toBe(0);
+    expect(existsSync(temp)).toBe(true);
+    // Once the waiter's record ends and the unit empties, the temp goes.
+    writeFileSync(
+      resolve(runs, 'seed.yaml'),
+      readFileSync(resolve(runs, 'seed.yaml'), 'utf8').replace('state: waiting', 'state: ended'),
+    );
+    writeFileSync(resolve(cgRoot, 'busy', 'cgroup.procs'), '');
+    expect((await cli(f, ['next', '--all'], f.root, env)).code).toBe(0);
+    expect(existsSync(temp)).toBe(false);
+  } finally {
+    child.kill('SIGKILL');
+    await child.exited;
+    f.clean();
+  }
+});
+
 test('a loaded failed akrogon-run unit is cleared by a reconcile pass', async () => {
   const f: SliceFixture = await slicesFixture();
   const unit: string = `akrogon-run-flp-${process.pid}-dead`;

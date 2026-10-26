@@ -11,6 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve, relative } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import { fixture, cli, leaf, yaml, fakeHerdr, registerTemp, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
 import { z } from 'zod';
@@ -1139,6 +1140,73 @@ test('unpacked folders are listed with their pack command and open .closing name
     expect(remaining.some((line) => line.includes('ended'))).toBe(false);
     expect(remaining.some((line) => line.includes('moved'))).toBe(true);
     expect(remaining.some((line) => line.includes('halted'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+function statStart(pid: number): string {
+  const stat: string = readFileSync(`/proc/${pid}/stat`, 'utf8');
+  return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+}
+
+function seedRunRecord(f: Fixture, fields: Record<string, unknown>): string {
+  const dir: string = resolve(f.home, 'runs');
+  mkdirSync(dir, { recursive: true });
+  const runId: string = (fields.run as string | undefined) ?? randomUUID();
+  const token: string = randomUUID();
+  const record: Record<string, unknown> = {
+    token_hash: createHash('sha256').update(token).digest('hex'),
+    pid: process.pid,
+    start_time: statStart(process.pid),
+    boot_id: readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(),
+    repo: 'repo',
+    leaf: 'seeded',
+    check: 'test',
+    state: 'live',
+    full: true,
+    since: new Date().toISOString(),
+    run: runId,
+    slice: 'akrogon.slice',
+    scope: 'seeded.scope',
+    unit: `akrogon-run-${runId}.scope`,
+    ...fields,
+  };
+  writeFileSync(resolve(dir, `${record.token_hash as string}.yaml`), Bun.YAML.stringify(record));
+  return runId;
+}
+
+test('status shows the run line only while a listed run waits', async () => {
+  const f: Fixture = await fixture();
+  try {
+    // No records, an unlisted run, and listed runs with nobody waiting all print nothing.
+    expect((await cli(f, ['status'])).stdout).not.toMatch(/run line/);
+    seedRunRecord(f, { run: 'unlisted', full: false });
+    expect((await cli(f, ['status'])).stdout).not.toMatch(/run line/);
+    seedRunRecord(f, { run: 'r-live', since: '2026-10-26T10:00:00Z' });
+    seedRunRecord(f, { run: 'r-ended', state: 'ended', since: '2026-10-26T10:00:01Z' });
+    expect((await cli(f, ['status'])).stdout).not.toMatch(/run line/);
+    // While listed runs wait: the holder first per repo, then waiters numbered per repo.
+    seedRunRecord(f, { run: 'repo-w1', leaf: 'leaf-two', state: 'waiting', since: '2026-10-26T10:00:02Z' });
+    seedRunRecord(f, { run: 'repo-w2', leaf: 'leaf-one', state: 'waiting', since: '2026-10-26T10:00:03Z' });
+    seedRunRecord(f, { run: 'other-h', repo: 'other', leaf: 'oleaf', since: '2026-10-26T10:00:04Z' });
+    seedRunRecord(f, {
+      run: 'other-w',
+      repo: 'other',
+      leaf: 'oleaf2',
+      state: 'waiting',
+      since: '2026-10-26T10:00:05Z',
+    });
+    const board: string = (await cli(f, ['status'])).stdout;
+    expect(board).toMatch(/run line/);
+    expect(board).toMatch(/REPO\s+LEAF\s+CHECK\s+STATE\s+AGE\s+RUN/);
+    expect(board).toMatch(/repo\s+seeded\s+test\s+running\s+\d+h \d+m\s+r-live/);
+    expect(board).toMatch(/repo\s+leaf-two\s+test\s+waiting 1\s+\d+h \d+m\s+repo-w1/);
+    expect(board).toMatch(/repo\s+leaf-one\s+test\s+waiting 2\s+\d+h \d+m\s+repo-w2/);
+    expect(board).toMatch(/other\s+oleaf\s+test\s+running\s+\d+h \d+m\s+other-h/);
+    expect(board).toMatch(/other\s+oleaf2\s+test\s+waiting 1\s+\d+h \d+m\s+other-w/);
+    expect(board).not.toMatch(/unlisted/);
+    expect(board).not.toMatch(/r-ended/);
   } finally {
     f.clean();
   }
