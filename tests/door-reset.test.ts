@@ -241,7 +241,7 @@ test.each<[string, PaneSeed, string]>([
 ])('refuses when %s', async (_name: string, seed: PaneSeed, sess: string): Promise<void> => {
   const s: Setup = setup(seed);
   try {
-    writeSessionRecord(s.home, s.dir, seed, sess);
+    writeSessionRecord(s.home, seed, sess);
     const result: RunResult = await s.run({}, pane, sess, s.log, START);
     expect(result.code).toBe(1);
     expect(result.stderr).not.toBe('');
