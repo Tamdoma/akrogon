@@ -64,6 +64,8 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
       'AKROGON_BASE',
       'AKROGON_RUN',
       'AKROGON_HOME',
+      'AKROGON_CAPTURE_OWNER',
+      'AKROGON_CAPTURE_RUN',
       'DBUS_SESSION_BUS_ADDRESS',
       'LANG',
       'CHECK_TOKEN',
@@ -75,6 +77,8 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
     expect(names.has('CHECK_TOKEN')).toBe(true);
     expect(names.has('TMPDIR')).toBe(true);
     expect(names.has('AKROGON_BASE')).toBe(true);
+    expect(names.has('AKROGON_CAPTURE_OWNER')).toBe(true);
+    expect(names.has('AKROGON_CAPTURE_RUN')).toBe(true);
   } finally {
     f.clean();
   }
@@ -166,10 +170,10 @@ test('run-check TMPDIR is a fresh run root under the leaf temp dir and is remove
   }
 });
 
-test('run-check captures the command output inside its run root, not in the caller TMPDIR', async () => {
+test('run-check gives the command a private run root as TMPDIR and captures output live in the holder', async () => {
   const f: Fixture = await fixture();
   try {
-    const { worktree } = await leafWorktree(f, 'capture-leaf');
+    const { leafPath, worktree } = await leafWorktree(f, 'capture-leaf');
     const callerTmp: string = resolve(f.home, 'caller-tmp');
     mkdirSync(callerTmp);
     const result = await cli(
@@ -179,8 +183,11 @@ test('run-check captures the command output inside its run root, not in the call
       baseEnv(f, { TMPDIR: callerTmp }),
     );
     expect(result.code).toBe(0);
-    expect(result.stdout).toMatch(/^akrogon-io-/m);
+    // The run root holds only the .owner record: captures live in the holder,
+    // never in the caller TMPDIR.
+    expect(result.stdout).toMatch(/^\.owner$/m);
     expect(readdirSync(callerTmp)).toEqual([]);
+    expect(readdirSync(resolve(leafPath, 'implementation')).every((name) => !name.startsWith('capture-'))).toBe(true);
   } finally {
     f.clean();
   }
@@ -453,7 +460,7 @@ test('pass_env names reach printed checks from the session without a .env entry'
       .object({ checks: z.record(z.string(), z.string()) })
       .parse(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout)).checks.probe;
     const passed: Result = await check(printed, worktree, { SESSION_TOKEN: 'session', EXTRA_TOKEN: 'omit' });
-    expect(passed.stderr).toMatch(/^run [0-9a-f-]{36}\n+check probe: 0 \S+\.log$/);
+    expect(passed.stderr).toMatch(/^run [0-9a-f-]{36}\ncapture probe: \S+ \S+\n.*check probe: 0 \S+\.log$/s);
     expect(passed.code).toBe(0);
     expect(passed.stdout).toBe('session|');
   } finally {

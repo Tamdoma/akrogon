@@ -107,7 +107,7 @@ test('run-check accepts an open owner with a closed namesake', async () => {
   }
 });
 
-test('run-check refuses owner-root holders before running and after completion', async () => {
+test('run-check refuses owner-root holders before running, and same-owner completion inside a capture refuses fast naming the run', async () => {
   const f: Fixture = await fixture();
   try {
     const closing: string = resolve(f.root, 'issues/open/closing');
@@ -128,22 +128,43 @@ test('run-check refuses owner-root holders before running and after completion',
       checks: {},
       grounding: 'none',
     });
-    await mergingLeaf(f, 'root-racer', 'racing');
+    await mergingLeaf(f, 'a-racer', 'racing');
+    writeLog(resolve(f.root, 'issues/closed/other/z-racer/implementation/pack-me.log'), 'pack me\n');
     const owner: string = resolve(f.root, 'issues/open/racing');
     const result = await cli(
       f,
-      ['run-check', '--holder', owner, '--', 'sh', '-c', 'echo root-output; akrogon phase root-racer merged'],
+      [
+        'run-check',
+        '--holder',
+        owner,
+        '--name',
+        'root',
+        '--',
+        'sh',
+        '-c',
+        'echo root-output; akrogon phase a-racer merged || echo SELF-REFUSED; akrogon pack issues/closed/other',
+      ],
       f.root,
       { ...shimEnv(f), AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) },
     );
-    expect(result.code).not.toBe(0);
-    expect(existsSync(owner)).toBe(false);
-    expect(existsSync(resolve(f.root, 'issues/closed/racing'))).toBe(true);
-    const capture: RegExpMatchArray | null = result.stderr.match(/(\S*run-[^/\s]*\/out\.log)/);
-    expect(capture).not.toBeNull();
-    expect(readFileSync(capture![1], 'utf8')).toContain('root-output');
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).toMatch(/check root: 0 \S+\.log/);
+    // The enclosing run's own owner is refused fast and stays open; a pack of
+    // a different owner only waits on that owner's lock and succeeds.
+    expect(result.stderr).toMatch(/inside run-check run [0-9a-f-]{36}/);
+    expect(result.stdout).toContain('SELF-REFUSED');
+    expect(result.stdout).toContain('packed issues/closed/other');
+    expect(existsSync(owner)).toBe(true);
+    expect(existsSync(resolve(owner, '.closing'))).toBe(false);
+    const members: Map<string, Buffer> | null = await archiveMembers(
+      resolve(f.root, 'issues/closed/other/evidence.tar.zst'),
+    );
+    expect(members).not.toBeNull();
+    expect(members!.get('z-racer/implementation/pack-me.log')!.toString()).toBe('pack me\n');
+    const keptLog: RegExpMatchArray | null = result.stderr.match(/check root: 0 (\S+\.log)/);
+    expect(readFileSync(keptLog![1], 'utf8')).toContain('root-output');
     expect((await cli(f, ['next'])).code).toBe(0);
-    expect(readFileSync(capture![1], 'utf8')).toContain('root-output');
+    expect(readFileSync(keptLog![1], 'utf8')).toContain('root-output');
   } finally {
     f.clean();
   }
@@ -255,11 +276,9 @@ test('the .closing marker rides through the failed pack and is absent after the 
   }
 });
 
-test('run-check refuses closed and closing owners at start and right before publish', async () => {
+test('run-check refuses closed and closing owners at start', async () => {
   const f: Fixture = await fixture();
   try {
-    // Reconcile acts only on a repo whose workspace is in the herdr session.
-    const herdr: NodeJS.ProcessEnv = fakeHerdr(f).env;
     // Early refusal: target under issues/closed.
     const done: string = leaf(f, 'done', 'merge', holding(f), 'issue');
     writeLog(resolve(done, 'implementation/x.log'), 'x\n');
@@ -279,47 +298,6 @@ test('run-check refuses closed and closing owners at start and right before publ
     expect(existsSync(mark)).toBe(false);
     expect(existsSync(resolve(closing, 'implementation'))).toBe(false);
     rmSync(resolve(f.root, 'issues/open/issue2'), { recursive: true });
-
-    // Late refusal: the leaf's own merge lands mid-run and closes the owner.
-    yaml(resolve(f.root, 'issues/config.yaml'), {
-      env: ['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT'],
-      checks: {},
-      grounding: 'none',
-    });
-    const worktree: string = await mergingLeaf(f, 'racer', 'issue3');
-    const raced = await cli(
-      f,
-      [
-        'run-check',
-        '--name',
-        'during',
-        '--',
-        'sh',
-        '-c',
-        'echo before-close; akrogon phase racer merged >/dev/null 2>&1',
-      ],
-      worktree,
-      { HOME: f.home, ...shimEnv(f), AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) },
-    );
-    expect(raced.code).not.toBe(0);
-    const outLog: RegExpMatchArray | null = raced.stderr.match(/(\S*run-[^/\s]*\/out\.log)/);
-    expect(outLog).not.toBeNull();
-    const runRoot: string = resolve(outLog![1], '..');
-    expect(readFileSync(outLog![1], 'utf8')).toContain('before-close');
-    expect(existsSync(resolve(f.root, 'issues/open/issue'))).toBe(false);
-    expect(existsSync(runRoot)).toBe(true);
-    expect(existsSync(resolve(runRoot, '.owner'))).toBe(false);
-    expect(readFileSync(resolve(runRoot, 'refusal.json'), 'utf8')).toContain('racer');
-    const next = await cli(f, ['next'], f.root, herdr);
-    expect(next.code).toBe(0);
-    expect(readFileSync(outLog![1], 'utf8')).toContain('before-close');
-    const kept: { path: string; reason: string }[] = JSON.parse(
-      readFileSync(resolve(f.home, 'reconcile/repo.json'), 'utf8'),
-    ).kept;
-    expect(kept.some((entry) => entry.path === runRoot && entry.reason !== '')).toBe(true);
-    const before: string[] = readdirSync(resolve(f.root, 'issues/open'));
-    expect((await cli(f, ['next'], f.root, herdr)).code).toBe(0);
-    expect(readdirSync(resolve(f.root, 'issues/open')).sort()).toEqual(before.sort());
 
     // A --holder under issues/chart is still accepted.
     const direct: string = resolve(f.root, 'issues/chart/camp/direct');
