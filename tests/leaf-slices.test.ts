@@ -289,8 +289,13 @@ function pidAlive(pid: number): boolean {
   }
 }
 
-async function dispatchLeaf(f: SliceFixture, slug: string, extra: object = {}): Promise<string> {
-  const path: string = leaf(f, slug, 'plan.synthesis', extra);
+async function dispatchLeaf(
+  f: SliceFixture,
+  slug: string,
+  extra: object = {},
+  container: string = 'issue',
+): Promise<string> {
+  const path: string = leaf(f, slug, 'plan.synthesis', extra, container);
   const result: Result = await cli(f, ['next', slug], f.root, f.env);
   expect(result.code).toBe(0);
   return path;
@@ -389,7 +394,11 @@ test('a finished leaf slice named by a live run record is not stopped', async ()
   const controlSlug: string = unique('control-leaf');
   const control: string = leafSlice({ name: 'repo' }, controlSlug);
   try {
-    const path: string = await dispatchLeaf(f, runSlug);
+    // run-leaf owns issue 'run-issue' with an unmerged sibling: the pass never
+    // completes that owner, so reconcile reaches the slice step while the run
+    // is still live and the record is what protects the slice.
+    const path: string = await dispatchLeaf(f, runSlug, {}, 'run-issue');
+    leaf(f, 'sibling', 'implement', {}, 'run-issue');
     const controlPath: string = await dispatchLeaf(f, controlSlug);
     const worktree: string = z.string().parse(readState(path).worktree);
     sliceName = leafSlice({ name: 'repo' }, runSlug);
@@ -417,7 +426,7 @@ test('a finished leaf slice named by a live run record is not stopped', async ()
   } finally {
     f.clean();
   }
-}, 40000);
+}, 90000);
 
 test('a pass with the pane list unavailable stops no slice of a leaf that has a recorded tab', async () => {
   const f: SliceFixture = await slicesFixture();
