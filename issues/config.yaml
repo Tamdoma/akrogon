@@ -3,7 +3,7 @@ default_branch: main
 rebuttal: true
 fix_rounds: 8
 implement: subagents
-setup: bun install --frozen-lockfile
+setup: bun install --frozen-lockfile --backend=copyfile
 checks:
   format: bunx prettier --check src tests skills/chart-issues/scripts
   test: bun test --timeout=30000 --parallel=4 --no-isolate
