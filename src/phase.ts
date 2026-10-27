@@ -49,7 +49,8 @@ import { trackingRef } from './preflight';
 import { retiredLessonsPresent } from './lessons';
 import { applyTop, buildStack, isAncestor } from './batch';
 import { requireGreenReceipt } from './verify';
-import { packFolder } from './pack';
+import { enclosingCapture, packFolderLocked } from './pack';
+import { flockHold } from './flock';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string, session: string): Promise<T> {
   try {
@@ -142,6 +143,32 @@ export class MoveCommittedError extends Error {
   }
 }
 
+// A merged move that completes the caller's own run-check capture owner
+// refuses before the merge commits, marking the leaf failed so the next pass
+// leaves it for recovery instead of dispatching the blocked turn; a different
+// owner proceeds and waits on its lock. Already-merged leaves hit the same
+// refusal inside completeOwner before the .closing marker.
+function refuseEnclosingCompletion(repo: Repo, leaf: Leaf, recorded: State, batch: Batch | undefined, slot: Slot | null): void {
+  const completing: CompletedOwner | null = ownerCompletion(repo, leaf, { ...recorded, phase: 'merged' });
+  if (completing === null) return;
+  const owner: string = resolve(repo.root, 'issues/open', completing.name);
+  const run: string | undefined = enclosingCapture(owner);
+  if (run === undefined) return;
+  const reason: string = `Refusing to complete ${owner}: inside run-check run ${run}`;
+  saveState(leaf.path, {
+    ...recorded,
+    phase: 'failed',
+    batch,
+    failure: {
+      cause: 'blocked',
+      phase: recorded.phase,
+      slot: slot ?? requiredSlots(recorded.phase, recorded.fix_rounds)[0],
+      reason,
+    },
+  });
+  throw new Error(reason);
+}
+
 export async function commitMove(
   repo: Repo,
   leaf: Leaf,
@@ -169,6 +196,9 @@ export async function commitMove(
         : recorded.fix_rounds,
     merge_stamp: to === 'merge' ? new Date().toISOString() : recorded.merge_stamp,
   };
+  // After the candidate record: a refusal here keeps after.batch so recovery
+  // sees the candidate already pushed or recorded by land/finishPush.
+  if (to === 'merged') refuseEnclosingCompletion(repo, leaf, recorded, after.batch, slot);
   saveState(leaf.path, after);
   console.log(`moved ${to}`);
   onCommitted?.();
@@ -293,11 +323,21 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   }
   if (completed === null) return null;
   if (justMerged) console.log(`${completed.kind} complete ${completed.name}`);
-  writeFileSync(resolve(owner, '.closing'), '');
-  await packFolder(repo, owner, leaf.path);
-  mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
-  renameSync(owner, completed.destination);
-  rmSync(resolve(completed.destination, '.closing'));
+  const enclosing: string | undefined = enclosingCapture(owner);
+  if (enclosing !== undefined)
+    throw new Error(`Refusing to complete ${owner}: inside run-check run ${enclosing}`);
+  // The exclusive hold covers the marker, the pack and the move: a capture
+  // writer publishes before any of them or never sees the owner go.
+  const holder: { release: () => Promise<void> } = await flockHold(resolve(owner, '.lock'), '-x');
+  try {
+    writeFileSync(resolve(owner, '.closing'), '');
+    await packFolderLocked(repo, owner, leaf.path);
+    mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
+    renameSync(owner, completed.destination);
+    rmSync(resolve(completed.destination, '.closing'));
+  } finally {
+    await holder.release();
+  }
   return completed;
 }
 
@@ -674,6 +714,10 @@ async function batchPush(
   const worktree: string = state.worktree ?? repo.root;
   const head: string = await mergeHead(repo, state, record);
   if (!record.applied) throw new Error('Batch record is not applied; a restack or the next pass owns it');
+  // A self-close refusal runs before any candidate or push: an applied record
+  // left on the leaf would dispatch a seat for a merge the enclosing capture
+  // still blocks.
+  refuseEnclosingCompletion(repo, leaf, state, undefined, null);
   if (record.top !== undefined) await requireBatchTop(worktree, record, head);
   if (tested && head !== record.tested_top)
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);

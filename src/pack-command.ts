@@ -3,7 +3,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { type Repo } from './config';
 import { run, type Result } from './shell';
 import { readMember, LogError } from './evidence';
-import { packFolder } from './pack';
+import { enclosingCapture, packFolder } from './pack';
 
 const FORMS: string = 'accepted forms: issues/closed/<owner> or issues/chart/<chart>';
 const ARCHIVE: string = 'evidence.tar.zst';
@@ -103,6 +103,11 @@ async function packOne(repo: Repo, target: Target): Promise<void> {
         for (const reason of refusals) console.error(`refused ${target.arg}: ${reason}`);
         throw new RefusalError();
       }
+    }
+    const enclosing: string | undefined = enclosingCapture(target.packDir);
+    if (enclosing !== undefined) {
+      console.error(`refused ${target.arg}: inside run-check run ${enclosing}`);
+      throw new RefusalError();
     }
     writeFileSync(marker, '');
     const plain: string[] = plainLogs(target.packDir);

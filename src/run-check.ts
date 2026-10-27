@@ -1,12 +1,13 @@
 import {
-  appendFileSync,
-  copyFileSync,
+  closeSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
   rmSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -15,10 +16,11 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { parse } from 'shell-quote';
 import { base, ensureLeafTemp, readGlobal, requireRepo, setupCommand, type Repo } from './config';
 import { repoInventory, RepoMismatchError, readState, type Inventory, type Leaf, type State } from './state';
-import { command, spawnCaptured, type Result } from './shell';
+import { command, type Result } from './shell';
 import { appendTiming } from './timing';
 import { callerScope, withAdmission } from './admission';
-import { locate } from './evidence';
+import { locate, type LogTarget } from './evidence';
+import { flockHold } from './flock';
 import { leafSlice, runSlice, runUnitArgv, runUnitBase, sessionBusAddress, startRunGuard, stopRunUnits } from './scope';
 import { type Phase } from './routing';
 
@@ -70,17 +72,33 @@ export function constructedEnv(repo: Repo, runRoot: string): Record<string, stri
   return env;
 }
 
+// The command writes into run-unique capture files inside the holder from
+// launch, so a killed wrapper leaves its output where the check would publish.
+// Reads go through fds opened beside the writer sinks: the holder may be
+// renamed under us while the command runs, which removes the paths but not
+// the captured bytes.
 export async function spawnLogged(
   argv: string[],
   cwd: string,
   env: Record<string, string>,
-  log: string,
+  capture: { out: string; err: string },
 ): Promise<Result> {
-  // env.TMPDIR is the run root (constructedEnv), so captures share its owner-checked cleanup instead of lying loose in leaf temp.
-  const { code, stdout, stderr }: Result = await spawnCaptured(argv, { cwd, env, captureRoot: env.TMPDIR });
-  appendFileSync(log, stdout);
-  appendFileSync(log, stderr);
-  return { code, stdout, stderr };
+  const outRead: number = openSync(capture.out, 'r');
+  const errRead: number = openSync(capture.err, 'r');
+  try {
+    const child: Bun.Subprocess = Bun.spawn(argv, {
+      cwd,
+      env,
+      stdin: 'ignore',
+      stdout: Bun.file(capture.out),
+      stderr: Bun.file(capture.err),
+    });
+    const code: number = await child.exited;
+    return { code, stdout: readFileSync(outRead, 'utf8'), stderr: readFileSync(errRead, 'utf8') };
+  } finally {
+    closeSync(outRead);
+    closeSync(errRead);
+  }
 }
 
 export interface LeafTarget {
@@ -174,7 +192,11 @@ export async function runCheck(
   return result.code;
 }
 
-export class PublishRefusedError extends Error {}
+export class PublishRefusedError extends Error {
+  constructor(reason: string, log?: string) {
+    super(log === undefined ? reason : `${reason}; captured output stays in ${log}`);
+  }
+}
 
 // A publish target under an owner that already sits in issues/closed, or that
 // holds .closing while packing, is refused; chart-direct holders resolve to a
@@ -191,6 +213,16 @@ async function ownerRefusal(target: string, repo: Repo, late: boolean): Promise<
   if (existsSync(resolve(open, '.closing'))) return `owner closing: ${target}`;
   if (late && state === 'open' && !existsSync(open)) return `owner gone: ${target}`;
   return undefined;
+}
+
+// The directory whose .lock the capture writers hold: the holder itself for a
+// target outside issues/, the chart's direct dir, or the open-state owner.
+export async function captureOwner(target: string, repo: Repo): Promise<string> {
+  const recorded: string = resolve(target, 'out.log');
+  const found: LogTarget | null = await locate(recorded, repo.root, repo);
+  if (found === null) return target;
+  if (found.ownerDirs.length === 1) return found.ownerDirs[0];
+  return resolve(recorded, ...found.member.split('/').map(() => '..'));
 }
 
 export async function checkedRun(
@@ -217,6 +249,7 @@ export async function checkedRun(
     env.AKROGON_BASE = akrogonBase;
     const log: string = join(runRoot, 'out.log');
     const run: string = randomUUID();
+    const owner: string = await captureOwner(target, repo);
     const check = {
       slug,
       run,
@@ -241,49 +274,91 @@ export async function checkedRun(
       },
       async (admission) => {
         env.AKROGON_RUN = admission.token;
-        appendTiming(repo, {
-          kind: 'check_start',
-          ...check,
-          ...(admission.kind === 'held' ? { wait_ms: admission.wait_ms } : {}),
-        });
-        const started: number = Date.now();
-        const result: Result =
-          admission.kind === 'nested'
-            ? await spawnLogged(argv, cwd, env, log)
-            : await (async () => {
-                await startRunGuard(slice, run, process.pid, admission.record_path);
-                try {
-                  return await spawnLogged(
-                    runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS),
-                    cwd,
-                    { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
-                    log,
-                  );
-                } finally {
-                  admission.release();
-                  await stopRunUnits(runUnit, `${runUnitBase(run)}-guard.service`);
-                }
-              })();
-        process.stdout.write(result.stdout);
-        process.stderr.write(result.stderr);
-        const refusedReason: string | undefined = await ownerRefusal(target, repo, true);
-        if (refusedReason !== undefined) {
-          writeFileSync(resolve(runRoot, 'refusal.json'), JSON.stringify({ reason: refusedReason }));
+        env.AKROGON_CAPTURE_OWNER = owner;
+        env.AKROGON_CAPTURE_RUN = run;
+        const lockPath: string = resolve(owner, '.lock');
+        // flock creates the lock file but not its parent: a --holder target
+        // that does not exist yet must not ENOENT before capture files can.
+        mkdirSync(owner, { recursive: true });
+        const refusePublish = (reason: string, result?: Result): never => {
+          const bytes: string = result === undefined ? '' : result.stdout + result.stderr;
+          writeFileSync(log, bytes);
+          writeFileSync(resolve(runRoot, 'refusal.json'), JSON.stringify({ reason }));
           rmSync(resolve(runRoot, '.owner'));
           refused = true;
-          throw new PublishRefusedError(`${refusedReason}; captured output stays in ${log}`);
+          throw new PublishRefusedError(reason, log);
+        };
+        const holder: { release: () => Promise<void> } = await flockHold(lockPath, '-s');
+        try {
+          const fenced: string | undefined = await ownerRefusal(target, repo, true);
+          if (fenced !== undefined) refusePublish(fenced);
+          if (!existsSync(owner)) refusePublish(`owner gone: ${target}`);
+          mkdirSync(target, { recursive: true });
+          const captureOut: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-out.log`);
+          const captureErr: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-err.log`);
+          writeFileSync(captureOut, '');
+          writeFileSync(captureErr, '');
+          process.stderr.write(`capture ${name}: ${captureOut} ${captureErr}\n`);
+          appendTiming(repo, {
+            kind: 'check_start',
+            ...check,
+            ...(admission.kind === 'held' ? { wait_ms: admission.wait_ms } : {}),
+          });
+          const started: number = Date.now();
+          const result: Result =
+            admission.kind === 'nested'
+              ? await spawnLogged(['flock', '-s', lockPath, ...argv], cwd, env, {
+                  out: captureOut,
+                  err: captureErr,
+                })
+              : await (async () => {
+                  await startRunGuard(slice, run, process.pid, admission.record_path);
+                  try {
+                    return await spawnLogged(
+                      [
+                        'flock',
+                        '-s',
+                        lockPath,
+                        ...runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS),
+                      ],
+                      cwd,
+                      { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+                      { out: captureOut, err: captureErr },
+                    );
+                  } finally {
+                    admission.release();
+                    await stopRunUnits(runUnit, `${runUnitBase(run)}-guard.service`);
+                  }
+                })();
+          process.stdout.write(result.stdout);
+          process.stderr.write(result.stderr);
+          const refusedReason: string | undefined = await ownerRefusal(target, repo, true);
+          if (refusedReason !== undefined) {
+            // The holder may have moved mid-run: drop the stale captures under
+            // every owner dir their member resolves to, or at the written path.
+            for (const captured of [captureOut, captureErr]) {
+              const hit: LogTarget | null = await locate(captured, repo.root, repo);
+              const targets: string[] =
+                hit === null ? [captured] : hit.ownerDirs.map((dir) => resolve(dir, hit.member));
+              for (const path of targets) rmSync(path, { force: true });
+            }
+            refusePublish(refusedReason, result);
+          }
+          const kept: string = resolve(target, `check-${encodeURIComponent(name)}-${Date.now()}-${process.pid}.log`);
+          writeFileSync(kept, result.stdout + result.stderr);
+          appendTiming(repo, {
+            kind: 'check_end',
+            ...check,
+            exit: result.code,
+            duration_ms: Date.now() - started,
+            log: kept,
+          });
+          unlinkSync(captureOut);
+          unlinkSync(captureErr);
+          return { code: result.code, log: kept, stderr_final_nl: result.stderr.endsWith('\n') };
+        } finally {
+          await holder.release();
         }
-        mkdirSync(target, { recursive: true });
-        const kept: string = resolve(target, `check-${encodeURIComponent(name)}-${Date.now()}-${process.pid}.log`);
-        copyFileSync(log, kept);
-        appendTiming(repo, {
-          kind: 'check_end',
-          ...check,
-          exit: result.code,
-          duration_ms: Date.now() - started,
-          log: kept,
-        });
-        return { code: result.code, log: kept, stderr_final_nl: result.stderr.endsWith('\n') };
       },
     );
   } finally {

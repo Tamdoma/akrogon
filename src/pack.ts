@@ -1,15 +1,58 @@
-import { existsSync, lstatSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { existsSync, lstatSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, dirname, relative, resolve } from 'node:path';
 import { type Repo } from './config';
 import { locate, readMember } from './evidence';
+import { flockHold } from './flock';
 
 const ARCHIVE: string = 'evidence.tar.zst';
+
+// The enclosing run-check capture, when the caller sits inside one that owns
+// this folder: the owner dir itself, its parent (a --holder <chart>/direct
+// capture against the chart folder), or its open/closed/parked sibling moved
+// since the run started. The check is env state, so it refuses before the
+// folder's own lock wait could deadlock on the caller's held lock.
+export function enclosingCapture(folder: string): string | undefined {
+  const owner: string | undefined = process.env.AKROGON_CAPTURE_OWNER;
+  const run: string | undefined = process.env.AKROGON_CAPTURE_RUN;
+  if (owner === undefined || owner === '' || run === undefined || run === '') return undefined;
+  const real = (path: string): string => {
+    try {
+      return realpathSync(path);
+    } catch {
+      return resolve(path);
+    }
+  };
+  const o: string = real(owner);
+  const f: string = real(folder);
+  if (o === f || dirname(o) === f) return run;
+  const sibling = (dir: string): string | undefined => {
+    const state: string = basename(dir);
+    return ['open', 'closed', 'parked'].includes(state) ? dirname(dir) : undefined;
+  };
+  const fsib: string | undefined = sibling(dirname(f));
+  if (fsib !== undefined && fsib === sibling(dirname(o)) && basename(f) === basename(o)) return run;
+  return undefined;
+}
 
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return a.length === b.length && a.every((byte, index) => byte === b[index]);
 }
 
 export async function packFolder(repo: Repo, folder: string, cwd: string = repo.root): Promise<void> {
+  const enclosing: string | undefined = enclosingCapture(folder);
+  if (enclosing !== undefined)
+    throw new Error(`Refusing to pack ${folder}: inside run-check run ${enclosing}`);
+  const holder: { release: () => Promise<void> } = await flockHold(resolve(folder, '.lock'), '-x');
+  try {
+    await packFolderLocked(repo, folder, cwd);
+  } finally {
+    await holder.release();
+  }
+}
+
+// The pack under a lock the caller already holds: completeOwner wraps its own
+// .closing, pack and move in the same exclusive hold.
+export async function packFolderLocked(repo: Repo, folder: string, cwd: string): Promise<void> {
   const plain: Map<string, Uint8Array> = new Map();
   for (const name of new Bun.Glob('**/*.log').scanSync({ cwd: folder, dot: true, onlyFiles: false })) {
     const stat = lstatSync(resolve(folder, name));
