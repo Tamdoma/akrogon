@@ -21,6 +21,7 @@ import { appendTiming } from './timing';
 import { callerScope, withAdmission } from './admission';
 import { locate, type LogTarget } from './evidence';
 import { FlockError, flockHold } from './flock';
+import { captureAncestry } from './pack';
 import { leafSlice, runSlice, runUnitArgv, runUnitBase, sessionBusAddress, startRunGuard, stopRunUnits } from './scope';
 import { type Phase } from './routing';
 
@@ -274,8 +275,7 @@ export async function checkedRun(
       },
       async (admission) => {
         env.AKROGON_RUN = admission.token;
-        env.AKROGON_CAPTURE_OWNER = owner;
-        env.AKROGON_CAPTURE_RUN = run;
+        env.AKROGON_CAPTURES = JSON.stringify([...captureAncestry, { owner, run }]);
         const lockPath: string = resolve(owner, '.lock');
         const refusePublish = (reason: string, result?: Result): never => {
           const bytes: string = result === undefined ? '' : result.stdout + result.stderr;

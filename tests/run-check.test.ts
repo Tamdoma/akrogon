@@ -425,7 +425,16 @@ test('run-check creates new ordinary and chart direct holders on first use', asy
   try {
     mkdirSync(resolve(f.root, 'issues/chart/new-chart'), { recursive: true });
     for (const holder of [resolve(f.home, 'new-holder'), resolve(f.root, 'issues/chart/new-chart/direct')]) {
-      const result: Result = await cli(f, ['run-check', '--holder', holder, '--name', 'new', '--', 'echo', 'new-output']);
+      const result: Result = await cli(f, [
+        'run-check',
+        '--holder',
+        holder,
+        '--name',
+        'new',
+        '--',
+        'echo',
+        'new-output',
+      ]);
       expect(result.code, result.stderr).toBe(0);
       expect(result.stdout).toBe('new-output');
       const logs: string[] = readdirSync(holder).filter((name) => name.startsWith('check-new-'));

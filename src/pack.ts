@@ -1,10 +1,16 @@
 import { existsSync, lstatSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, relative, resolve } from 'node:path';
+import { z } from 'zod';
 import { type Repo } from './config';
 import { locate, readMember } from './evidence';
 import { flockHold } from './flock';
 
 const ARCHIVE: string = 'evidence.tar.zst';
+const captureSchema = z.array(z.strictObject({ owner: z.string(), run: z.string() }));
+type Capture = z.infer<typeof captureSchema>[number];
+const recordedCaptures: string | undefined = process.env.AKROGON_CAPTURES;
+export const captureAncestry: readonly Capture[] =
+  recordedCaptures === undefined ? [] : captureSchema.parse(JSON.parse(recordedCaptures));
 
 // The enclosing run-check capture, when the caller sits inside one that owns
 // this folder: the owner dir itself, its parent (a --holder <chart>/direct
@@ -12,9 +18,6 @@ const ARCHIVE: string = 'evidence.tar.zst';
 // since the run started. The check is env state, so it refuses before the
 // folder's own lock wait could deadlock on the caller's held lock.
 export function enclosingCapture(folder: string): string | undefined {
-  const owner: string | undefined = process.env.AKROGON_CAPTURE_OWNER;
-  const run: string | undefined = process.env.AKROGON_CAPTURE_RUN;
-  if (owner === undefined || owner === '' || run === undefined || run === '') return undefined;
   const real = (path: string): string => {
     try {
       return realpathSync(path);
@@ -22,15 +25,17 @@ export function enclosingCapture(folder: string): string | undefined {
       return resolve(path);
     }
   };
-  const o: string = real(owner);
   const f: string = real(folder);
-  if (o === f || dirname(o) === f) return run;
   const sibling = (dir: string): string | undefined => {
     const state: string = basename(dir);
     return ['open', 'closed', 'parked'].includes(state) ? dirname(dir) : undefined;
   };
   const fsib: string | undefined = sibling(dirname(f));
-  if (fsib !== undefined && fsib === sibling(dirname(o)) && basename(f) === basename(o)) return run;
+  for (const { owner, run } of captureAncestry.toReversed()) {
+    const o: string = real(owner);
+    if (o === f || dirname(o) === f) return run;
+    if (fsib !== undefined && fsib === sibling(dirname(o)) && basename(f) === basename(o)) return run;
+  }
   return undefined;
 }
 

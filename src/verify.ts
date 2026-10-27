@@ -503,6 +503,7 @@ const passForwarded: readonly string[] = [
   'AKROGON_CGROUP_ROOT',
   'AKROGON_RUN_SLICE',
   'AKROGON_RUN',
+  'AKROGON_CAPTURES',
   'XDG_RUNTIME_DIR',
   'XDG_CACHE_HOME',
   'NODE_DISABLE_COMPILE_CACHE',

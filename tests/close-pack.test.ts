@@ -122,8 +122,15 @@ test('nested run-check refuses packing an outer capture owner and retains both r
     const result = await cli(
       f,
       [
-        'run-check', '--holder', outer, '--name', 'outer', '--',
-        'sh', '-c', `echo outer-output; exec akrogon run-check --holder ${quote(inner)} --name inner -- sh -c 'echo inner-output; timeout --kill-after=1s 2s akrogon pack issues/chart/outer'`,
+        'run-check',
+        '--holder',
+        outer,
+        '--name',
+        'outer',
+        '--',
+        'sh',
+        '-c',
+        `echo outer-output; exec akrogon run-check --holder ${quote(inner)} --name inner -- sh -c 'echo inner-output; timeout --kill-after=1s 2s akrogon pack issues/chart/outer'`,
       ],
       f.root,
       { ...shimEnv(f), AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) },
