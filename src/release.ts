@@ -66,7 +66,7 @@ export async function buildRelease(repo: Repo, sha: string): Promise<string> {
   mkdirSync(staging, { recursive: true });
   try {
     await command(['tar', '-xf', tar], staging);
-    await command([process.execPath, 'install', '--frozen-lockfile'], staging);
+    await command([process.execPath, 'install', '--frozen-lockfile', '--backend=copyfile'], staging);
   } finally {
     rmSync(tar, { force: true });
   }
