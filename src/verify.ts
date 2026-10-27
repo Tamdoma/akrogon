@@ -735,10 +735,11 @@ export async function verify(
   if (recorded === undefined) {
     const head: { id: string; code: number } = joined ?? (await passOnce(repo, caller, sha, scope, akrogonBase));
     headId = head.id;
-    if (head.code === 0) return 0;
+    if (head.code !== 1) return head.code;
   } else headId = recorded.run;
   const baseSha: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
-  await passOnce(repo, caller, baseSha, scope, baseSha, headId);
+  const compared: { id: string; code: number } = await passOnce(repo, caller, baseSha, scope, baseSha, headId);
+  if (compared.code === 2) return compared.code;
   const pass: boolean = await knownRedReceipt(repo, sha, scope);
   process.stdout.write(`verify known-red ${sha}: ${pass ? 'pass' : 'fail'}\n`);
   return pass ? 0 : 1;
