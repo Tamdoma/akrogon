@@ -148,7 +148,13 @@ export class MoveCommittedError extends Error {
 // leaves it for recovery instead of dispatching the blocked turn; a different
 // owner proceeds and waits on its lock. Already-merged leaves hit the same
 // refusal inside completeOwner before the .closing marker.
-function refuseEnclosingCompletion(repo: Repo, leaf: Leaf, recorded: State, batch: Batch | undefined, slot: Slot | null): void {
+function refuseEnclosingCompletion(
+  repo: Repo,
+  leaf: Leaf,
+  recorded: State,
+  batch: Batch | undefined,
+  slot: Slot | null,
+): void {
   const completing: CompletedOwner | null = ownerCompletion(repo, leaf, { ...recorded, phase: 'merged' });
   if (completing === null) return;
   const owner: string = resolve(repo.root, 'issues/open', completing.name);
@@ -324,8 +330,7 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   if (completed === null) return null;
   if (justMerged) console.log(`${completed.kind} complete ${completed.name}`);
   const enclosing: string | undefined = enclosingCapture(owner);
-  if (enclosing !== undefined)
-    throw new Error(`Refusing to complete ${owner}: inside run-check run ${enclosing}`);
+  if (enclosing !== undefined) throw new Error(`Refusing to complete ${owner}: inside run-check run ${enclosing}`);
   // The exclusive hold covers the marker, the pack and the move: a capture
   // writer publishes before any of them or never sees the owner go.
   const holder: { release: () => Promise<void> } = await flockHold(resolve(owner, '.lock'), '-x');

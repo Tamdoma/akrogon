@@ -277,9 +277,6 @@ export async function checkedRun(
         env.AKROGON_CAPTURE_OWNER = owner;
         env.AKROGON_CAPTURE_RUN = run;
         const lockPath: string = resolve(owner, '.lock');
-        // flock creates the lock file but not its parent: a --holder target
-        // that does not exist yet must not ENOENT before capture files can.
-        mkdirSync(owner, { recursive: true });
         const refusePublish = (reason: string, result?: Result): never => {
           const bytes: string = result === undefined ? '' : result.stdout + result.stderr;
           writeFileSync(log, bytes);
@@ -288,11 +285,14 @@ export async function checkedRun(
           refused = true;
           throw new PublishRefusedError(reason, log);
         };
+        // flock creates the lock file but not its parent: a gone owner is
+        // refused before the mkdir below can recreate it.
+        if (!existsSync(owner)) refusePublish(`owner gone: ${target}`);
+        mkdirSync(owner, { recursive: true });
         const holder: { release: () => Promise<void> } = await flockHold(lockPath, '-s');
         try {
           const fenced: string | undefined = await ownerRefusal(target, repo, true);
           if (fenced !== undefined) refusePublish(fenced);
-          if (!existsSync(owner)) refusePublish(`owner gone: ${target}`);
           mkdirSync(target, { recursive: true });
           const captureOut: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-out.log`);
           const captureErr: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-err.log`);
@@ -315,12 +315,7 @@ export async function checkedRun(
                   await startRunGuard(slice, run, process.pid, admission.record_path);
                   try {
                     return await spawnLogged(
-                      [
-                        'flock',
-                        '-s',
-                        lockPath,
-                        ...runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS),
-                      ],
+                      ['flock', '-s', lockPath, ...runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS)],
                       cwd,
                       { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
                       { out: captureOut, err: captureErr },

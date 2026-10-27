@@ -40,8 +40,7 @@ function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
 
 export async function packFolder(repo: Repo, folder: string, cwd: string = repo.root): Promise<void> {
   const enclosing: string | undefined = enclosingCapture(folder);
-  if (enclosing !== undefined)
-    throw new Error(`Refusing to pack ${folder}: inside run-check run ${enclosing}`);
+  if (enclosing !== undefined) throw new Error(`Refusing to pack ${folder}: inside run-check run ${enclosing}`);
   const holder: { release: () => Promise<void> } = await flockHold(resolve(folder, '.lock'), '-x');
   try {
     await packFolderLocked(repo, folder, cwd);
