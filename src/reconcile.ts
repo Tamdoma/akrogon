@@ -27,6 +27,7 @@ import {
   type Repo,
 } from './config';
 import { readVerifyRuns, type VerifyRun } from './verify';
+import { passLive, readPassRecord } from './verify-pass';
 import {
   broadcastPending,
   inventoryUnder,
@@ -1484,6 +1485,26 @@ export async function reconcileHost(
   }
   const lastStart: string = resolve(home, 'runs/last-start');
   if (existsSync(lastStart)) await dropPath(lastStart, false);
+
+  // Dead verify pass dirs: the record carries the pass pid, and a finished
+  // pass's waiter may still be draining, so only aged dirs are dropped.
+  const passes: string = resolve(home, 'verify-passes');
+  if (existsSync(passes))
+    for (const entry of readdirSync(passes)) {
+      const dir: string = resolve(passes, entry);
+      const stat: Stats | undefined = lstatSync(dir, { throwIfNoEntry: false });
+      if (stat === undefined || !stat.isDirectory()) continue;
+      const record = readPassRecord(dir);
+      if (record !== undefined && passLive(record)) {
+        keep(dir, `verify pass ${record.run} in progress`, 'removed once the pass exits');
+        continue;
+      }
+      if (Date.now() - stat.mtimeMs < 60 * 60_000) {
+        keep(dir, 'verify pass younger than 60m', 'removed once the drain window closes');
+        continue;
+      }
+      await dropPath(dir, true);
+    }
 
   // Retired locks by exact name: held open by no live process means free.
   const retiredLockDir: string = resolve(homedir(), '.akrogon');

@@ -1,16 +1,57 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { base, readGlobal, requireRepo, setupCommand, worktreeStore, type Repo, type RepoConfig } from './config';
+import {
+  base,
+  readGlobal,
+  readRepo,
+  requireRepo,
+  setupCommand,
+  toolRoot,
+  worktreeStore,
+  type Repo,
+  type RepoConfig,
+} from './config';
 import { failedTests } from './flaky';
 import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { trackingRef } from './preflight';
 import { checkedRun, leafFields, leafTarget, refuse, type LeafTarget } from './run-check';
-import { command, herdr, repoSession, type SessionResolution } from './shell';
+import {
+  command,
+  CommandError,
+  herdr,
+  repoSession,
+  spawnCaptured,
+  type SessionResolution,
+  type SpawnResult,
+} from './shell';
 import { allLeaves, withLock, type Leaf } from './state';
 import { isAncestor } from './batch';
+import { callerScope } from './admission';
+import { sessionBusAddress } from './scope';
+import {
+  bootId,
+  listPassRecords,
+  passCaller,
+  passLive,
+  passesRoot,
+  passUnit,
+  pidAlive,
+  readPassRecord,
+  writePassRecord,
+  type PassRecord,
+} from './verify-pass';
 
 const verifyScopeSchema = z.enum(['leaf', 'merge']);
 
@@ -74,7 +115,7 @@ function treeOf(repo: Repo, sha: string): Promise<string> {
   return command(['git', 'rev-parse', `${sha}^{tree}`], repo.root);
 }
 
-function sameCommands(actual: VerifyRun['commands'], expected: NamedCommand[]): boolean {
+function sameCommands(actual: readonly NamedCommand[], expected: readonly NamedCommand[]): boolean {
   return (
     actual.length === expected.length &&
     actual.every((item, index) => item.name === expected[index].name && item.command === expected[index].command)
@@ -166,21 +207,6 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
     if (!covered) return false;
   }
   return true;
-}
-
-function pidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-
-function bootId(): string {
-  return existsSync('/proc/sys/kernel/random/boot_id')
-    ? readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
-    : '';
 }
 
 // A reservation covers only while its process lives on this boot; `error` never covers.
@@ -321,21 +347,17 @@ async function verifyCaller(
   };
 }
 
-async function runOnce(
-  repo: Repo,
-  caller: LeafTarget,
-  sha: string,
-  scope: VerifyScope,
-  akrogonBase: string,
-  compares?: string,
-): Promise<VerifyRun> {
-  const tree: string = await treeOf(repo, sha);
-  const id: string = randomUUID();
+// The body of one pass, run inside the akrogon-verify-<id> service. Every
+// resolved input arrives through the record the caller wrote, so a service
+// checkout repeats the caller's exact decision surface.
+async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
+  const { run: id, sha, tree, scope, compares, akrogon_base: akrogonBase } = record;
+  const caller: LeafTarget = passCaller(record);
   const target: string = resolve(worktreeStore(repo), `verify-${id}`);
   checkLocation(target);
   const lock: string = await recordLock(repo);
   mkdirSync(caller.target, { recursive: true });
-  const record: VerifyRun = {
+  const receipt: VerifyRun = {
     run: id,
     repo: repo.name,
     leaf: caller.slug,
@@ -345,14 +367,12 @@ async function runOnce(
     ...(compares === undefined ? {} : { compares }),
     path: target,
     pid: process.pid,
-    boot_id: existsSync('/proc/sys/kernel/random/boot_id')
-      ? readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
-      : '',
+    boot_id: bootId(),
     commands: [],
     start: new Date().toISOString(),
   };
   await withLock(lock, async () => {
-    appendFileSync(recordsPath(repo), JSON.stringify(record) + '\n');
+    appendFileSync(recordsPath(repo), JSON.stringify(receipt) + '\n');
   });
   const ran: VerifyRun['commands'] = [];
   let setupExit: number | undefined;
@@ -371,9 +391,8 @@ async function runOnce(
     );
     setupExit = setup.code;
     process.stdout.write(`verify setup: ${setup.code} ${setup.log}\n`);
-    const expected: NamedCommand[] = verifyCommands(repo.config, scope);
-    const members: NamedCommand[] =
-      scope === 'merge' ? expected.slice(expected.length - Object.keys(repo.config.merge_checks).length) : [];
+    const expected: NamedCommand[] = record.commands;
+    const members: NamedCommand[] = expected.slice(expected.length - record.member_count);
     const sequential: NamedCommand[] = expected.slice(0, expected.length - members.length);
     const ledger: VerifyRun[] = readVerifyRuns(repo);
     for (const item of sequential) {
@@ -458,7 +477,7 @@ async function runOnce(
     if (existsSync(target)) await command(['git', 'worktree', 'remove', '--force', target], repo.root);
   }
   return {
-    ...record,
+    ...receipt,
     ...(setupExit === undefined ? {} : { setup: setupExit }),
     commands: ran,
     ...(end === undefined ? {} : { end }),
@@ -469,6 +488,208 @@ function reportRun(scope: VerifyScope, run: VerifyRun): number {
   const green: boolean = run.setup === 0 && run.commands.every((item) => item.exit === 0);
   process.stdout.write(`verify ${scope} ${run.sha}: ${green ? 'green' : 'red'}\n`);
   return green ? 0 : 1;
+}
+
+// Names the service inherits from the caller: the check environment policy is
+// unchanged, these only carry what the caller's own constructedEnv and
+// overrides already select, plus the unit-level paths.
+const passForwarded: readonly string[] = [
+  'HOME',
+  'PATH',
+  'AKROGON_HOME',
+  'AKROGON_LEAF_TEMP_ROOT',
+  'AKROGON_RETIRED_TEMP_ROOT',
+  'AKROGON_PROC_ROOT',
+  'AKROGON_CGROUP_ROOT',
+  'AKROGON_RUN_SLICE',
+  'XDG_RUNTIME_DIR',
+  'XDG_CACHE_HOME',
+  'NODE_DISABLE_COMPILE_CACHE',
+  'FAKE_SYSTEMD_RUN_LOG',
+  'FAKE_SYSTEMCTL_DB',
+  'FAKE_SYSTEMCTL_LOG',
+  'FAKE_HERDR',
+  'FAKE_BUSCTL_HOME',
+];
+
+async function launchPass(repo: Repo, record: PassRecord, dir: string): Promise<void> {
+  const names: string[] = [...new Set([...passForwarded, ...repo.config.env, ...repo.config.pass_env])];
+  const argv: string[] = [
+    'systemd-run',
+    '--user',
+    '--quiet',
+    `--unit=${record.unit_name}`,
+    '--slice=akrogon.slice',
+    '-p',
+    'CollectMode=inactive-or-failed',
+    '-p',
+    'TimeoutStopSec=5',
+    `--working-directory=${record.root}`,
+    `--setenv=DBUS_SESSION_BUS_ADDRESS=${sessionBusAddress()}`,
+    ...names.filter((name) => process.env[name] !== undefined).map((name) => `--setenv=${name}=${process.env[name]}`),
+    '--',
+    'env',
+    `AKROGON_SCOPE=${record.caller_scope}`,
+    process.execPath,
+    resolve(toolRoot, 'src/akrogon.ts'),
+    'verify-pass',
+    dir,
+  ];
+  const result: SpawnResult = await spawnCaptured(argv, {
+    cwd: record.root,
+    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+  });
+  if (result.code !== 0) throw new CommandError(argv, record.root, result);
+}
+
+// The waiter replays the pass's streams and returns its recorded outcome; a
+// dead pass with no status is a failure, never a join or a green.
+async function waitPass(dir: string): Promise<number> {
+  let outOffset: number = 0;
+  let errOffset: number = 0;
+  const drain = (file: string, offset: number): { chunk: string; offset: number } => {
+    if (!existsSync(file)) return { chunk: '', offset };
+    const buffer: Buffer = readFileSync(file);
+    return { chunk: buffer.subarray(offset).toString('utf8'), offset: buffer.length };
+  };
+  for (;;) {
+    const out = drain(resolve(dir, 'out'), outOffset);
+    outOffset = out.offset;
+    process.stdout.write(out.chunk);
+    const err = drain(resolve(dir, 'err'), errOffset);
+    errOffset = err.offset;
+    process.stderr.write(err.chunk);
+    const record: PassRecord | undefined = readPassRecord(dir);
+    if (record === undefined || !passLive(record)) {
+      const lastOut = drain(resolve(dir, 'out'), outOffset);
+      process.stdout.write(lastOut.chunk);
+      const lastErr = drain(resolve(dir, 'err'), errOffset);
+      process.stderr.write(lastErr.chunk);
+      const status: string = resolve(dir, 'status');
+      return existsSync(status) ? Number.parseInt(readFileSync(status, 'utf8'), 10) : 1;
+    }
+    await Bun.sleep(200);
+  }
+}
+
+function samePass(
+  record: PassRecord,
+  key: Omit<PassRecord, 'run' | 'unit_name' | 'pid' | 'boot_id' | 'pending' | 'created' | 'root' | 'repo'>,
+): boolean {
+  return (
+    record.caller_scope === key.caller_scope &&
+    record.caller.target === key.caller.target &&
+    record.caller.slug === key.caller.slug &&
+    record.caller.unit === key.caller.unit &&
+    record.caller.scope === key.caller.scope &&
+    record.tree === key.tree &&
+    record.scope === key.scope &&
+    record.setup === key.setup &&
+    record.compares === key.compares &&
+    sameCommands(record.commands, key.commands)
+  );
+}
+
+// One live pass per join key: under the receipt lock either an existing live
+// pass is joined or a new pending record claims the key before the launch.
+async function passOnce(
+  repo: Repo,
+  caller: LeafTarget,
+  sha: string,
+  scope: VerifyScope,
+  akrogonBase: string,
+  compares?: string,
+): Promise<{ id: string; code: number }> {
+  const tree: string = await treeOf(repo, sha);
+  const lock: string = await recordLock(repo);
+  const memberCount: number = scope === 'merge' ? Object.keys(repo.config.merge_checks).length : 0;
+  const fields = {
+    caller: {
+      slug: caller.slug,
+      target: caller.target,
+      scope: caller.scope,
+      ...(caller.unit === undefined ? {} : { unit: caller.unit }),
+      ...(caller.phase === undefined ? {} : { phase: caller.phase }),
+      ...(caller.attempt === undefined ? {} : { attempt: caller.attempt }),
+    },
+    caller_scope: callerScope(),
+    sha,
+    tree,
+    scope,
+    commands: verifyCommands(repo.config, scope),
+    member_count: memberCount,
+    setup: setupCommand(repo.config, 'true'),
+    akrogon_base: akrogonBase,
+    ...(compares === undefined ? {} : { compares }),
+  };
+  let launched: { dir: string; record: PassRecord } | undefined;
+  const dir: string = await withLock(lock, async (): Promise<string> => {
+    const live: { dir: string; record: PassRecord } | undefined = listPassRecords().find(
+      (entry) => entry.record.repo === repo.name && passLive(entry.record) && samePass(entry.record, fields),
+    );
+    if (live !== undefined) return live.dir;
+    const id: string = randomUUID();
+    const fresh: string = resolve(passesRoot(), id);
+    mkdirSync(fresh, { recursive: true });
+    const record: PassRecord = {
+      run: id,
+      repo: repo.name,
+      root: repo.root,
+      unit_name: passUnit(id),
+      ...fields,
+      pid: 0,
+      boot_id: bootId(),
+      pending: true,
+      created: new Date().toISOString(),
+    };
+    writePassRecord(fresh, record);
+    launched = { dir: fresh, record };
+    return fresh;
+  });
+  const record: PassRecord = launched === undefined ? readPassRecord(dir)! : launched.record;
+  process.stderr.write(`run ${record.run}\n`);
+  if (launched !== undefined) {
+    try {
+      await launchPass(repo, launched.record, dir);
+    } catch (error) {
+      rmSync(dir, { recursive: true, force: true });
+      throw error;
+    }
+  }
+  return { id: record.run, code: await waitPass(dir) };
+}
+
+// The service entry point: run one pass from its record, tee output into the
+// pass dir, and leave the exit status for every waiter.
+export async function verifyPassCommand(dir: string): Promise<void> {
+  const record: PassRecord | undefined = readPassRecord(dir);
+  if (record === undefined) throw new Error(`No pass record in ${dir}`);
+  writePassRecord(dir, { ...record, pid: process.pid, boot_id: bootId(), pending: false });
+  process.env.AKROGON_SCOPE = record.caller_scope;
+  const patch = (stream: NodeJS.WriteStream, file: string): void => {
+    const original: typeof stream.write = stream.write.bind(stream);
+    stream.write = ((chunk: string | Uint8Array, ...rest: unknown[]): boolean => {
+      try {
+        appendFileSync(file, chunk);
+      } catch {
+        // A pass dir that vanished keeps the stream alive; the outcome is the
+        // status file, not the tee.
+      }
+      return (original as (...args: unknown[]) => boolean)(chunk, ...rest);
+    }) as typeof stream.write;
+  };
+  patch(process.stdout, resolve(dir, 'out'));
+  patch(process.stderr, resolve(dir, 'err'));
+  const repo: Repo = readRepo(record.repo, record.root);
+  let status: number;
+  try {
+    status = reportRun(record.scope, await runOnce(repo, record));
+  } catch (error) {
+    status = 2;
+    writeFileSync(resolve(dir, 'status'), `${status}\n`);
+    throw error;
+  }
+  writeFileSync(resolve(dir, 'status'), `${status}\n`);
 }
 
 export async function verify(
@@ -491,15 +712,16 @@ export async function verify(
     return 0;
   }
   const akrogonBase: string = await base(repo, at);
-  if (!knownRed) return reportRun(scope, await runOnce(repo, caller, sha, scope, akrogonBase));
+  if (!knownRed) return (await passOnce(repo, caller, sha, scope, akrogonBase)).code;
   const recorded: VerifyRun | undefined = redRun(repo, tree, scope);
-  const head: VerifyRun = recorded ?? (await runOnce(repo, caller, sha, scope, akrogonBase));
+  let headId: string;
   if (recorded === undefined) {
-    const code: number = reportRun(scope, head);
-    if (code === 0) return 0;
-  }
+    const head: { id: string; code: number } = await passOnce(repo, caller, sha, scope, akrogonBase);
+    headId = head.id;
+    if (head.code === 0) return 0;
+  } else headId = recorded.run;
   const baseSha: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
-  await runOnce(repo, caller, baseSha, scope, baseSha, head.run);
+  await passOnce(repo, caller, baseSha, scope, baseSha, headId);
   const pass: boolean = await knownRedReceipt(repo, sha, scope);
   process.stdout.write(`verify known-red ${sha}: ${pass ? 'pass' : 'fail'}\n`);
   return pass ? 0 : 1;

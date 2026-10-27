@@ -204,6 +204,11 @@ async function sweepStale(skip: ReadonlySet<string>): Promise<void> {
 }
 
 export function callerScope(): string {
+  // A verify pass service carries its starting caller's scope under its own
+  // name: the cgroup holds only akrogon-verify-*.service and AKROGON_RUN stays
+  // reserved for the nested-run case.
+  const carried: string | undefined = process.env.AKROGON_SCOPE;
+  if (carried !== undefined && carried !== '') return carried;
   const token: string | undefined = process.env.AKROGON_RUN;
   if (token !== undefined && token !== '') {
     const hash: string = createHash('sha256').update(token).digest('hex');

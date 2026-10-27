@@ -237,6 +237,11 @@ switch (verb) {
     );
     break;
   }
+  case 'verify-pass': {
+    const [dir]: [string] = z.tuple([z.string()]).parse(positionals);
+    await (await import('./verify')).verifyPassCommand(dir);
+    break;
+  }
   case 'guard':
     process.exitCode = await (await import('./guard')).guard(process.cwd(), positionals);
     break;
