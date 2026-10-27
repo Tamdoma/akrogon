@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parse } from 'shell-quote';
 import { base, ensureLeafTemp, readGlobal, requireRepo, setupCommand, type Repo } from './config';
 import { repoInventory, RepoMismatchError, readState, type Inventory, type Leaf, type State } from './state';
@@ -20,7 +20,7 @@ import { command, type Result } from './shell';
 import { appendTiming } from './timing';
 import { callerScope, withAdmission } from './admission';
 import { locate, type LogTarget } from './evidence';
-import { flockHold } from './flock';
+import { FlockError, flockHold } from './flock';
 import { leafSlice, runSlice, runUnitArgv, runUnitBase, sessionBusAddress, startRunGuard, stopRunUnits } from './scope';
 import { type Phase } from './routing';
 
@@ -285,15 +285,20 @@ export async function checkedRun(
           refused = true;
           throw new PublishRefusedError(reason, log);
         };
-        // flock creates the lock file but not its parent: a gone owner is
-        // refused before the mkdir below can recreate it.
         if (!existsSync(owner)) refusePublish(`owner gone: ${target}`);
-        mkdirSync(owner, { recursive: true });
-        const holder: { release: () => Promise<void> } = await flockHold(lockPath, '-s');
+        const holder: { release: () => Promise<void> } = await flockHold(lockPath, '-s').catch((error: Error) => {
+          if (error instanceof FlockError && !existsSync(owner)) refusePublish(`owner gone: ${target}`);
+          throw error;
+        });
         try {
           const fenced: string | undefined = await ownerRefusal(target, repo, true);
           if (fenced !== undefined) refusePublish(fenced);
-          mkdirSync(target, { recursive: true });
+          const ownerFd: number = openSync(owner, 'r');
+          try {
+            mkdirSync(resolve(`/proc/self/fd/${ownerFd}`, relative(owner, target)), { recursive: true });
+          } finally {
+            closeSync(ownerFd);
+          }
           const captureOut: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-out.log`);
           const captureErr: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-err.log`);
           writeFileSync(captureOut, '');
