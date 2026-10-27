@@ -793,6 +793,82 @@ test.serial(
 );
 
 test.serial(
+  'a repeat verify during checkout removal joins the live pass and returns its cleanup failure',
+  async () => {
+    const { f, slice } = await realFixture();
+    const out: string = outDir(f);
+    const worktree: string = await leafWorktree(f, 'pass-cleanup-join');
+    rewriteConfig(f, { setup: 'mkdir -p node_modules', checks: { test: 'true' } });
+    const bin: string = resolve(f.home, 'cleanup-bin');
+    mkdirSync(bin);
+    const removing: string = resolve(out, 'removing');
+    const release: string = resolve(out, 'release-removal');
+    const joinedOut: string = resolve(out, 'joined-out');
+    const joinedErr: string = resolve(out, 'joined-err');
+    const git: string = await command(['sh', '-c', 'command -v git']);
+    writeFileSync(
+      resolve(bin, 'git'),
+      [
+        '#!/bin/sh',
+        'if [ "$1" = worktree ] && [ "$2" = remove ]; then',
+        `  touch ${quote(removing)}`,
+        `  while [ ! -e ${quote(release)} ]; do sleep 0.05; done`,
+        '  exit 1',
+        'fi',
+        `exec ${quote(git)} "$@"`,
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    const env: NodeJS.ProcessEnv = {
+      AKROGON_RUN_SLICE: slice,
+      PATH: `${bin}:${resolve(f.home, 'bin')}:${process.env.PATH}`,
+    };
+    const first: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, env);
+    const receipt: VerifyRun = await waitReceipt(f, 'pass-cleanup-join');
+    let joined: RealCap | undefined;
+    try {
+      await waitPath(removing);
+      expect(leafReceipts(f, 'pass-cleanup-join')[0].end).toBeDefined();
+      joined = spawnScoped(
+        f,
+        'callerA.scope',
+        [
+          'run-check',
+          '--name',
+          'repeat',
+          '--',
+          'sh',
+          '-c',
+          `${quote(process.execPath)} ${quote(entry)} verify >${quote(joinedOut)} 2>${quote(joinedErr)}`,
+        ],
+        worktree,
+        env,
+      );
+      await waitPath(joinedOut);
+      const deadline: number = Date.now() + 15000;
+      while (readFileSync(joinedOut, 'utf8') === '') {
+        if (Date.now() > deadline) throw new Error('repeat verify produced no output');
+        await Bun.sleep(50);
+      }
+      writeFileSync(release, '');
+      const [original, repeat]: SpawnResult[] = await Promise.all([first.result, joined.result]);
+      expect(original.code).toBe(2);
+      expect(repeat.code).toBe(original.code);
+      expect(readFileSync(joinedErr, 'utf8')).toContain(`run ${receipt.run}`);
+      expect(readFileSync(joinedOut, 'utf8')).toContain('verify test: 0');
+      expect(leafReceipts(f, 'pass-cleanup-join')).toHaveLength(1);
+    } finally {
+      writeFileSync(release, '');
+      await first.result;
+      if (joined !== undefined) await joined.result;
+      await waitInactive(`akrogon-verify-${receipt.run}.service`);
+    }
+  },
+  45000,
+);
+
+test.serial(
   'a verify pass survives its caller being SIGKILLed mid-check and finishes like an uninterrupted run',
   async () => {
     const { f, slice } = await realFixture();
