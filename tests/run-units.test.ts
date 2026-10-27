@@ -841,7 +841,7 @@ test.serial(
           '--',
           'sh',
           '-c',
-          `${quote(process.execPath)} ${quote(entry)} verify >${quote(joinedOut)} 2>${quote(joinedErr)}`,
+          `${quote(process.execPath)} ${quote(entry)} verify --known-red >${quote(joinedOut)} 2>${quote(joinedErr)}`,
         ],
         worktree,
         env,
