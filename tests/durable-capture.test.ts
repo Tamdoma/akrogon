@@ -1,8 +1,17 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { command, spawnFiles, finishCaptured, type Result, type SpawnResult } from '../src/shell';
-import { fixture, cli, leaf, yaml, fakeAkrogon, fakeHerdr, leafTempRoot, holding, type Fixture } from './helpers';
+import { fixture, cli, entry, leaf, yaml, fakeHerdr, leafTempRoot, holding, type Fixture } from './helpers';
 import type { Captured } from '../src/shell';
 
 type Live = { proc: Bun.Subprocess; captured: Captured; result: Promise<SpawnResult> };
@@ -122,7 +131,8 @@ test('a SIGKILLed nested run-check leaves its captures in its own holder after r
       checks: {},
       grounding: 'none',
     });
-    const shim: { env: NodeJS.ProcessEnv } = fakeAkrogon(f);
+    const herdr: { env: NodeJS.ProcessEnv } = fakeHerdr(f);
+    symlinkSync(entry, resolve(f.home, 'bin', 'akrogon'));
     const innerLeaf: string = leaf(f, 'inner', 'implement');
     const innerImpl: string = resolve(innerLeaf, 'implementation');
     mkdirSync(innerImpl, { recursive: true });
@@ -150,7 +160,7 @@ test('a SIGKILLed nested run-check leaves its captures in its own holder after r
         blocking(f, 'inner'),
       ],
       realpathSync(outerWork),
-      { ...shim.env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) },
+      { ...herdr.env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) },
     );
     try {
       await waitFor(() => existsSync(`${f.home}/ready-inner`), 'inner ready file');
@@ -174,7 +184,7 @@ test('a SIGKILLed nested run-check leaves its captures in its own holder after r
           return true;
         }
       }, 'inner wrapper exit');
-      expect((await cli(f, ['next'], f.root, fakeHerdr(f).env)).code).toBe(0);
+      expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
       const kept: { out: string; err: string }[] = captures(innerImpl);
       expect(kept).toHaveLength(1);
       expect(readFileSync(kept[0].out, 'utf8')).toContain('MARKER-inner-OUT');

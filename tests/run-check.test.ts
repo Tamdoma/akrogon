@@ -178,7 +178,7 @@ test('run-check gives the command a private run root as TMPDIR and captures outp
     mkdirSync(callerTmp);
     const result = await cli(
       f,
-      ['run-check', '--', ...sh('ls "$TMPDIR"')],
+      ['run-check', '--', ...sh('ls -A "$TMPDIR"')],
       worktree,
       baseEnv(f, { TMPDIR: callerTmp }),
     );
