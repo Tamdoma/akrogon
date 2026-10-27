@@ -217,12 +217,12 @@ async function ownerRefusal(target: string, repo: Repo, late: boolean): Promise<
 
 // The directory whose .lock the capture writers hold: the holder itself for a
 // target outside issues/, the chart's direct dir, or the open-state owner.
-export async function captureOwner(target: string, repo: Repo): Promise<string> {
+export async function captureOwner(target: string, repo: Repo): Promise<{ path: string; kind: 'holder' | 'issue' }> {
   const recorded: string = resolve(target, 'out.log');
   const found: LogTarget | null = await locate(recorded, repo.root, repo);
-  if (found === null) return target;
-  if (found.ownerDirs.length === 1) return found.ownerDirs[0];
-  return resolve(recorded, ...found.member.split('/').map(() => '..'));
+  if (found === null) return { path: target, kind: 'holder' };
+  if (found.ownerDirs.length === 1) return { path: found.ownerDirs[0], kind: 'holder' };
+  return { path: resolve(recorded, ...found.member.split('/').map(() => '..')), kind: 'issue' };
 }
 
 export async function checkedRun(
@@ -249,7 +249,7 @@ export async function checkedRun(
     env.AKROGON_BASE = akrogonBase;
     const log: string = join(runRoot, 'out.log');
     const run: string = randomUUID();
-    const owner: string = await captureOwner(target, repo);
+    const { path: owner, kind }: { path: string; kind: 'holder' | 'issue' } = await captureOwner(target, repo);
     const check = {
       slug,
       run,
@@ -285,7 +285,8 @@ export async function checkedRun(
           refused = true;
           throw new PublishRefusedError(reason, log);
         };
-        if (!existsSync(owner)) refusePublish(`owner gone: ${target}`);
+        if (kind === 'holder') mkdirSync(owner, { recursive: true });
+        else if (!existsSync(owner)) refusePublish(`owner gone: ${target}`);
         const holder: { release: () => Promise<void> } = await flockHold(lockPath, '-s').catch((error: Error) => {
           if (error instanceof FlockError && !existsSync(owner)) refusePublish(`owner gone: ${target}`);
           throw error;
