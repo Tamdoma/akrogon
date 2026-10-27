@@ -799,7 +799,7 @@ test.serial(
     const { f, slice } = await realFixture();
     const out: string = outDir(f);
     const worktree: string = await leafWorktree(f, 'pass-cleanup-join');
-    rewriteConfig(f, { setup: 'mkdir -p node_modules', checks: { test: 'true' } });
+    rewriteConfig(f, { setup: 'mkdir -p node_modules', checks: { test: 'printf cleanup-proof' } });
     const bin: string = resolve(f.home, 'cleanup-bin');
     mkdirSync(bin);
     const removing: string = resolve(out, 'removing');
