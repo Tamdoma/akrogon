@@ -7,6 +7,7 @@ import {
   entry,
   fakeAkrogon,
   fixture,
+  killTree,
   leaf,
   leafTempRoot,
   seedStat,
@@ -14,7 +15,8 @@ import {
   yaml,
   type Fixture,
 } from './helpers';
-import { command, finishCaptured, spawnFiles, run, type Result, type SpawnResult } from '../src/shell';
+import { command, finishCaptured, spawnFiles, quote, run, type Result, type SpawnResult } from '../src/shell';
+import { verifyRunSchema, type VerifyRun } from '../src/verify';
 import { expectedSlice } from './fake-proc';
 
 const GIB: number = 1024 * 1024 * 1024;
@@ -425,7 +427,7 @@ test.serial(
     }).result;
     writeFileSync(config, before);
     expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
-    expect(result.stderr.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(2);
+    expect(result.stderr.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(3);
     const setup: string = readFileSync(resolve(out, 'setup.cg'), 'utf8');
     const cmd: string = readFileSync(resolve(out, 'cmd.cg'), 'utf8');
     const setupScope: string | undefined = setup.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];
@@ -705,4 +707,253 @@ test.serial(
     }
   },
   45000,
+);
+
+function verifyReceipts(f: Fixture): VerifyRun[] {
+  const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => verifyRunSchema.parse(JSON.parse(line)));
+}
+
+// A full replace: keys dropped between rewrites must not linger for the next test.
+function rewriteConfig(f: Fixture, config: object): void {
+  yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', ...config });
+}
+
+async function waitReceipt(f: Fixture, ms: number = 15000): Promise<VerifyRun> {
+  const begun: number = Date.now();
+  for (;;) {
+    const first: VerifyRun | undefined = verifyReceipts(f)[0];
+    if (first !== undefined) return first;
+    if (Date.now() - begun > ms) throw new Error('No verify receipt appeared');
+    await Bun.sleep(50);
+  }
+}
+
+async function waitCheckRecord(f: Fixture, name: string, ms: number = 15000): Promise<Record<string, unknown>> {
+  const begun: number = Date.now();
+  for (;;) {
+    const live: Record<string, unknown> | undefined = (await liveRuns(f)).find((record) => record.check === name);
+    if (live !== undefined) return live;
+    if (Date.now() - begun > ms) throw new Error(`No live record for ${name}`);
+    await Bun.sleep(50);
+  }
+}
+
+test.serial(
+  'a verify pass survives its caller being SIGKILLed mid-check and finishes like an uninterrupted run',
+  async () => {
+    const { f, slice } = await realFixture();
+    const out: string = outDir(f);
+    const worktree: string = await leafWorktree(f, 'pass-survivor');
+    rewriteConfig(f, {
+      setup: 'mkdir -p node_modules',
+      env: [],
+      checks: { test: `sleep 4 && touch ${quote(resolve(out, 'check-done'))}` },
+    });
+    const cap: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+      AKROGON_RUN_SLICE: slice,
+    });
+    try {
+      await waitCheckRecord(f, 'test');
+      killTree(cap.proc);
+      const result: SpawnResult = await cap.result;
+      expect(result.signalCode).toBe('SIGKILL');
+      const deadline: number = Date.now() + 30000;
+      let receipt: VerifyRun | undefined;
+      while (receipt === undefined || receipt.end === undefined) {
+        receipt = verifyReceipts(f)[0];
+        if (receipt?.end !== undefined) break;
+        if (Date.now() > deadline) throw new Error('pass receipt still incomplete after the caller died');
+        await Bun.sleep(200);
+      }
+      expect(receipt.setup).toBe(0);
+      expect(receipt.commands).toHaveLength(1);
+      expect(receipt.commands[0].exit).toBe(0);
+      expect(receipt.commands[0].log).toContain('check-');
+      expect(existsSync(receipt.commands[0].log)).toBe(true);
+      expect(existsSync(receipt.path)).toBe(false);
+      expect(existsSync(resolve(out, 'check-done'))).toBe(true);
+    } finally {
+      if (cap.proc.exitCode === null) killTree(cap.proc);
+      void cap.result.catch(() => undefined);
+    }
+  },
+  90000,
+);
+
+test.serial(
+  'a repeat verify joins the live pass while a different scope or tree starts its own',
+  async () => {
+    const { f, slice } = await realFixture();
+    const worktree: string = await leafWorktree(f, 'pass-join');
+    rewriteConfig(f, { setup: 'mkdir -p node_modules', env: [], checks: { test: 'sleep 4' } });
+    const first: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+      AKROGON_RUN_SLICE: slice,
+    });
+    const receipt: VerifyRun = await waitReceipt(f);
+    let joined: RealCap | undefined;
+    let other: RealCap | undefined;
+    try {
+      // Both repeats launch while the first pass still sleeps: the same-key
+      // call must join it, the different-scope call must start its own.
+      joined = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+        AKROGON_RUN_SLICE: slice,
+      });
+      other = spawnScoped(f, 'callerB.scope', ['verify'], worktree, {
+        AKROGON_RUN_SLICE: slice,
+      });
+      const deadline: number = Date.now() + 15000;
+      while (verifyReceipts(f).length < 2) {
+        if (Date.now() > deadline) throw new Error('different scope started no second pass');
+        await Bun.sleep(50);
+      }
+      const [joinedResult, r1, r2] = await Promise.all([joined.result, first.result, other.result]);
+      expect(joinedResult.code, `stderr: ${joinedResult.stderr}`).toBe(0);
+      expect(joinedResult.stderr).toContain(`run ${receipt.run}`);
+      expect(joinedResult.stdout).toContain('verify test: 0');
+      expect(joinedResult.stdout).toContain(': green');
+      expect(r1.code, `stderr: ${r1.stderr}`).toBe(0);
+      expect(r2.code, `stderr: ${r2.stderr}`).toBe(0);
+      writeFileSync(resolve(worktree, 't2'), 't2\n');
+      await command(['git', 'add', 't2'], worktree);
+      await command(['git', 'commit', '-qm', 't2'], worktree);
+      const third: SpawnResult = await spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+        AKROGON_RUN_SLICE: slice,
+      }).result;
+      expect(third.code, `stderr: ${third.stderr}`).toBe(0);
+      expect(third.stderr).toMatch(/run [0-9a-f-]{36}/);
+      expect(verifyReceipts(f)).toHaveLength(3);
+    } finally {
+      for (const cap of [first, joined, other]) if (cap !== undefined && cap.proc.exitCode === null) killTree(cap.proc);
+    }
+  },
+  90000,
+);
+
+test.serial(
+  'stop-run <pass id> stops the whole pass, another scope is refused, and a stop leaves no reusable receipt',
+  async () => {
+    const { f, slice } = await realFixture();
+    const out: string = outDir(f);
+    const worktree: string = await leafWorktree(f, 'pass-stop');
+    rewriteConfig(f, {
+      setup: 'mkdir -p node_modules',
+      env: [],
+      checks: { early: 'sleep 30', late: `touch ${quote(resolve(out, 'late-done'))}` },
+    });
+    const cap: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+      AKROGON_RUN_SLICE: slice,
+    });
+    const receipt: VerifyRun = await waitReceipt(f);
+    try {
+      await waitCheckRecord(f, 'early');
+      const refused: SpawnResult = await spawnScoped(f, 'callerB.scope', ['stop-run', receipt.run], worktree).result;
+      expect(refused.code).not.toBe(0);
+      expect((await sysctl('is-active', `akrogon-verify-${receipt.run}.service`)).code).toBe(0);
+      const stopped: SpawnResult = await spawnScoped(f, 'callerA.scope', ['stop-run', receipt.run], worktree).result;
+      expect(stopped.code).toBe(0);
+      await waitInactive(`akrogon-verify-${receipt.run}.service`);
+      const result: SpawnResult = await cap.result;
+      expect(result.code).not.toBe(0);
+      const settled: VerifyRun = verifyReceipts(f)[0];
+      expect(settled.end).toBeUndefined();
+      expect(settled.commands.some((entry) => entry.name === 'late')).toBe(false);
+      expect(existsSync(resolve(out, 'late-done'))).toBe(false);
+      // A stopped pass is dead: the repeat verifies under a new pass id.
+      rewriteConfig(f, {
+        checks: { done: `touch ${quote(resolve(out, 'rerun-done'))}` },
+      });
+      const repeat: SpawnResult = await spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+        AKROGON_RUN_SLICE: slice,
+      }).result;
+      expect(repeat.code, `stderr: ${repeat.stderr}`).toBe(0);
+      expect(repeat.stderr).toContain('run ');
+      expect(repeat.stderr).not.toContain(`run ${receipt.run}`);
+      expect(existsSync(resolve(out, 'rerun-done'))).toBe(true);
+    } finally {
+      if (cap.proc.exitCode === null) killTree(cap.proc);
+      void cap.result.catch(() => undefined);
+    }
+  },
+  90000,
+);
+
+test.serial(
+  'stop-run <pass id> while a full check waits for admission ends the pass before the check starts',
+  async () => {
+    const { f, slice } = await realFixture();
+    const out: string = outDir(f);
+    const worktree: string = await leafWorktree(f, 'pass-full');
+    rewriteConfig(f, {
+      setup: 'mkdir -p node_modules',
+      env: [],
+      checks: { full1: `touch ${quote(resolve(out, 'full-ran'))}` },
+      full: ['full1'],
+    });
+    await seedRunRecord(f, { check: 'holder', full: true });
+    const cap: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+      AKROGON_RUN_SLICE: slice,
+    });
+    const receipt: VerifyRun = await waitReceipt(f);
+    try {
+      const deadline: number = Date.now() + 15000;
+      for (;;) {
+        const waiting: boolean = (await runRecords(f)).some(
+          (record) => record.check === 'full1' && record.state === 'waiting',
+        );
+        if (waiting) break;
+        if (Date.now() > deadline) throw new Error('full1 never reached the admission line');
+        await Bun.sleep(50);
+      }
+      const stopped: SpawnResult = await spawnScoped(f, 'callerA.scope', ['stop-run', receipt.run], worktree).result;
+      expect(stopped.code).toBe(0);
+      await waitInactive(`akrogon-verify-${receipt.run}.service`);
+      const result: SpawnResult = await cap.result;
+      expect(result.code).not.toBe(0);
+      expect(existsSync(resolve(out, 'full-ran'))).toBe(false);
+      expect(verifyReceipts(f)[0].end).toBeUndefined();
+    } finally {
+      if (cap.proc.exitCode === null) killTree(cap.proc);
+      void cap.result.catch(() => undefined);
+    }
+  },
+  90000,
+);
+
+test.serial(
+  'a pass keeps the starting caller scope as owner of its check runs, so plain stop-run still reaches them',
+  async () => {
+    const { f, slice } = await realFixture();
+    const worktree: string = await leafWorktree(f, 'pass-owner');
+    rewriteConfig(f, { setup: 'mkdir -p node_modules', env: [], checks: { slow: 'sleep 30' } });
+    const cap: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+      AKROGON_RUN_SLICE: slice,
+    });
+    try {
+      const record: Record<string, unknown> = await waitCheckRecord(f, 'slow');
+      expect(record.scope).toBe('callerA.scope');
+      const checkId: string = record.run as string;
+      const stopped: SpawnResult = await spawnScoped(f, 'callerA.scope', ['stop-run', checkId], worktree).result;
+      expect(stopped.code).toBe(0);
+      const result: SpawnResult = await cap.result;
+      expect(result.code).not.toBe(0);
+      const deadline: number = Date.now() + 30000;
+      let receipt: VerifyRun | undefined;
+      while (receipt === undefined || receipt.end === undefined) {
+        receipt = verifyReceipts(f)[0];
+        if (receipt?.end !== undefined) break;
+        if (Date.now() > deadline) throw new Error('pass did not complete after its check was stopped');
+        await Bun.sleep(200);
+      }
+      expect(receipt.commands[0].exit).not.toBe(0);
+    } finally {
+      if (cap.proc.exitCode === null) killTree(cap.proc);
+      void cap.result.catch(() => undefined);
+    }
+  },
+  90000,
 );

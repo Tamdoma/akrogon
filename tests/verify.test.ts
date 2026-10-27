@@ -260,15 +260,21 @@ test('a non-leaf caller with --holder verifies at merge scope and logs into the 
   }
 });
 
-test('a run killed during setup leaves a record with start and no end or removal', async () => {
+test('a failure after the receipt is written exits non-zero with the receipt kept complete', async () => {
   const f: Fixture = await fixture();
   try {
-    yaml(resolve(f.root, 'issues/config.yaml'), { setup: 'sleep 30', checks: { test: 'true' }, grounding: 'none' });
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: { test: 'rm -f .git' },
+      grounding: 'none',
+    });
     const { worktree } = await callerWorktree(f);
-    await expect(verify(f, [], worktree, 6000)).rejects.toThrow();
+    const result: Result = await verify(f, [], worktree);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/run [0-9a-f-]{36}/);
     const run: VerifyRun = records(f)[0];
-    expect(typeof run.start).toBe('string');
-    expect(run.end).toBeUndefined();
+    expect(run.setup).toBe(0);
+    expect(run.end).not.toBeUndefined();
   } finally {
     f.clean();
   }
