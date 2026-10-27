@@ -95,9 +95,9 @@ await import(${JSON.stringify(entry)});
     expect(existsSync(owner)).toBe(false);
     expect(existsSync(resolve(parked, 'racing/state.yaml'))).toBe(true);
     expect(existsSync(marker)).toBe(false);
-    const runs: string[] = scratchRuns(f);
-    expect(runs).toHaveLength(1);
-    expect(readFileSync(resolve(runs[0], 'refusal.json'), 'utf8')).toContain('owner gone');
+    const refusals: string[] = [...new Bun.Glob('**/run-*/refusal.json').scanSync({ cwd: leafTempRoot(f) })];
+    expect(refusals).toHaveLength(1);
+    expect(readFileSync(resolve(leafTempRoot(f), refusals[0]), 'utf8')).toContain('owner gone');
   } finally {
     f.clean();
   }
