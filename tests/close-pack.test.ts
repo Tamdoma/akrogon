@@ -107,6 +107,40 @@ test('run-check accepts an open owner with a closed namesake', async () => {
   }
 });
 
+test('nested run-check refuses packing an outer capture owner and retains both runs output', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      pass_env: ['AKROGON_LEAF_TEMP_ROOT'],
+      checks: {},
+      grounding: 'none',
+    });
+    const outer: string = resolve(f.root, 'issues/chart/outer/direct');
+    const inner: string = resolve(f.root, 'issues/chart/inner/direct');
+    mkdirSync(outer, { recursive: true });
+    mkdirSync(inner, { recursive: true });
+    const result = await cli(
+      f,
+      [
+        'run-check', '--holder', outer, '--name', 'outer', '--',
+        'sh', '-c', `echo outer-output; exec akrogon run-check --holder ${quote(inner)} --name inner -- sh -c 'echo inner-output; timeout --kill-after=1s 2s akrogon pack issues/chart/outer'`,
+      ],
+      f.root,
+      { ...shimEnv(f), AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) },
+    );
+    expect(result.code).toBe(1);
+    const run: RegExpMatchArray | null = result.stderr.match(/^run ([0-9a-f-]{36})/);
+    expect(run).not.toBeNull();
+    expect(result.stderr).toContain(`inside run-check run ${run![1]}`);
+    expect(existsSync(resolve(outer, '../.closing'))).toBe(false);
+    expect(existsSync(resolve(outer, 'evidence.tar.zst'))).toBe(false);
+    expect(readFileSync(findLogs(outer)[0], 'utf8')).toContain('outer-output');
+    expect(readFileSync(findLogs(inner)[0], 'utf8')).toContain('inner-output');
+  } finally {
+    f.clean();
+  }
+}, 15000);
+
 test('run-check refuses owner-root holders before running, and same-owner completion inside a capture refuses fast naming the run', async () => {
   const f: Fixture = await fixture();
   try {
