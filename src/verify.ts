@@ -573,10 +573,9 @@ async function waitPass(dir: string): Promise<number> {
   }
 }
 
-function samePass(
-  record: PassRecord,
-  key: Omit<PassRecord, 'run' | 'unit_name' | 'pid' | 'boot_id' | 'pending' | 'created' | 'root' | 'repo'>,
-): boolean {
+type PassKey = Pick<PassRecord, 'caller' | 'caller_scope' | 'tree' | 'scope' | 'setup' | 'compares' | 'commands'>;
+
+function samePass(record: PassRecord, key: PassKey): boolean {
   return (
     record.caller_scope === key.caller_scope &&
     record.caller.target === key.caller.target &&
@@ -588,6 +587,12 @@ function samePass(
     record.setup === key.setup &&
     record.compares === key.compares &&
     sameCommands(record.commands, key.commands)
+  );
+}
+
+function livePass(repo: Repo, key: PassKey): { dir: string; record: PassRecord } | undefined {
+  return listPassRecords().find(
+    (entry) => entry.record.repo === repo.name && passLive(entry.record) && samePass(entry.record, key),
   );
 }
 
@@ -625,9 +630,7 @@ async function passOnce(
   };
   let launched: { dir: string; record: PassRecord } | undefined;
   const dir: string = await withLock(lock, async (): Promise<string> => {
-    const live: { dir: string; record: PassRecord } | undefined = listPassRecords().find(
-      (entry) => entry.record.repo === repo.name && passLive(entry.record) && samePass(entry.record, fields),
-    );
+    const live: { dir: string; record: PassRecord } | undefined = livePass(repo, fields);
     if (live !== undefined) return live.dir;
     const id: string = randomUUID();
     const fresh: string = resolve(passesRoot(), id);
@@ -707,17 +710,30 @@ export async function verify(
   const scope: VerifyScope = caller.phase === undefined || caller.phase === 'merge' ? 'merge' : 'leaf';
   const sha: string = await command(['git', 'rev-parse', '--verify', `${rev ?? 'HEAD'}^{commit}`], at);
   const tree: string = await treeOf(repo, sha);
-  const reused: VerifyRun | undefined = greenRun(repo, tree, scope);
+  const live: { dir: string; record: PassRecord } | undefined = await withLock(await recordLock(repo), async () =>
+    livePass(repo, {
+      caller,
+      caller_scope: callerScope(),
+      tree,
+      scope,
+      setup: setupCommand(repo.config, 'true'),
+      commands: verifyCommands(repo.config, scope),
+    }),
+  );
+  if (live !== undefined) process.stderr.write(`run ${live.record.run}\n`);
+  const joined: { id: string; code: number } | undefined =
+    live === undefined ? undefined : { id: live.record.run, code: await waitPass(live.dir) };
+  const reused: VerifyRun | undefined = joined === undefined ? greenRun(repo, tree, scope) : undefined;
   if (reused !== undefined) {
     process.stdout.write(`reuse receipt ${reused.run} tree=${tree}\n`);
     return 0;
   }
   const akrogonBase: string = await base(repo, at);
-  if (!knownRed) return (await passOnce(repo, caller, sha, scope, akrogonBase)).code;
-  const recorded: VerifyRun | undefined = redRun(repo, tree, scope);
+  if (!knownRed) return (joined ?? (await passOnce(repo, caller, sha, scope, akrogonBase))).code;
+  const recorded: VerifyRun | undefined = joined === undefined ? redRun(repo, tree, scope) : undefined;
   let headId: string;
   if (recorded === undefined) {
-    const head: { id: string; code: number } = await passOnce(repo, caller, sha, scope, akrogonBase);
+    const head: { id: string; code: number } = joined ?? (await passOnce(repo, caller, sha, scope, akrogonBase));
     headId = head.id;
     if (head.code === 0) return 0;
   } else headId = recorded.run;
