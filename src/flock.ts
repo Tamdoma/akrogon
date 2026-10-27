@@ -18,7 +18,7 @@ export async function flockHold(path: string, mode: '-s' | '-x'): Promise<{ rele
     { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
   );
   const reader: ReadableStreamDefaultReader<Uint8Array> = child.stdout.getReader();
-  const first: ReadableStreamReadResult<Uint8Array> = await reader.read();
+  const first: Awaited<ReturnType<typeof reader.read>> = await reader.read();
   reader.releaseLock();
   if (first.done) throw new FlockError(path, await child.exited, await new Response(child.stderr).text());
   return {
