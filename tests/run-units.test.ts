@@ -750,6 +750,49 @@ async function waitCheckRecord(f: Fixture, name: string, ms: number = 15000): Pr
 }
 
 test.serial(
+  'a verify nested inside a full run-check completes without queuing behind its parent',
+  async () => {
+    const { f, slice } = await realFixture();
+    const worktree: string = await leafWorktree(f, 'pass-nested-full');
+    rewriteConfig(f, {
+      setup: 'mkdir -p node_modules',
+      checks: { test: 'true' },
+      full: ['test'],
+    });
+    const cap: RealCap = spawnScoped(
+      f,
+      'callerA.scope',
+      ['run-check', '--name', 'test', '--', process.execPath, entry, 'verify'],
+      worktree,
+      { AKROGON_RUN_SLICE: slice },
+    );
+    const receipt: VerifyRun = await waitReceipt(f, 'pass-nested-full');
+    try {
+      const deadline: number = Date.now() + 15000;
+      while (cap.proc.exitCode === null) {
+        const waiting: boolean = (await runRecords(f)).some(
+          (record) => record.check === 'test' && record.state === 'waiting',
+        );
+        expect(waiting, 'the nested pass must not queue behind its own full parent').toBe(false);
+        if (Date.now() > deadline) throw new Error('nested verify did not finish');
+        await Bun.sleep(50);
+      }
+      const result: SpawnResult = await cap.result;
+      expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
+      expect(leafReceipts(f, 'pass-nested-full')[0].commands[0].exit).toBe(0);
+    } finally {
+      if (cap.proc.exitCode === null) {
+        const stopped: SpawnResult = await spawnScoped(f, 'callerA.scope', ['stop-run', receipt.run], worktree).result;
+        expect(stopped.code).toBe(0);
+        await cap.result;
+      }
+      await waitInactive(`akrogon-verify-${receipt.run}.service`);
+    }
+  },
+  45000,
+);
+
+test.serial(
   'a verify pass survives its caller being SIGKILLed mid-check and finishes like an uninterrupted run',
   async () => {
     const { f, slice } = await realFixture();
