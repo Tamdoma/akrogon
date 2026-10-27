@@ -756,6 +756,7 @@ test.serial(
     const worktree: string = await leafWorktree(f, 'pass-nested-full');
     rewriteConfig(f, {
       setup: 'mkdir -p node_modules',
+      pass_env: ['AKROGON_LEAF_TEMP_ROOT'],
       checks: { test: 'true' },
       full: ['test'],
     });
