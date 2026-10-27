@@ -420,6 +420,24 @@ test('run-check on the registered checkout requires --holder and writes the log 
   }
 });
 
+test('run-check creates new ordinary and chart direct holders on first use', async () => {
+  const f: Fixture = await fixture();
+  try {
+    mkdirSync(resolve(f.root, 'issues/chart/new-chart'), { recursive: true });
+    for (const holder of [resolve(f.home, 'new-holder'), resolve(f.root, 'issues/chart/new-chart/direct')]) {
+      const result: Result = await cli(f, ['run-check', '--holder', holder, '--name', 'new', '--', 'echo', 'new-output']);
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.stdout).toBe('new-output');
+      const logs: string[] = readdirSync(holder).filter((name) => name.startsWith('check-new-'));
+      expect(logs).toHaveLength(1);
+      expect(readFileSync(resolve(holder, logs[0]), 'utf8')).toBe('new-output\n');
+      expect(readdirSync(holder).filter((name) => name.startsWith('capture-'))).toEqual([]);
+    }
+  } finally {
+    f.clean();
+  }
+});
+
 test('run-check refuses forbidden env for a repo without setup', async () => {
   const f: Fixture = await fixture();
   try {
