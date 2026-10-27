@@ -916,13 +916,14 @@ test.serial(
   async () => {
     const { f, slice } = await realFixture();
     const worktree: string = await leafWorktree(f, 'pass-join');
-    rewriteConfig(f, { setup: 'mkdir -p node_modules', env: [], checks: { test: 'sleep 4' } });
+    rewriteConfig(f, { setup: 'mkdir -p node_modules', env: [], checks: { test: 'sleep 6' } });
     const first: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
       AKROGON_RUN_SLICE: slice,
     });
     const receipt: VerifyRun = await waitReceipt(f, 'pass-join');
     let joined: RealCap | undefined;
     let other: RealCap | undefined;
+    let thirdCap: RealCap | undefined;
     try {
       // Both repeats launch while the first pass still sleeps: the same-key
       // call must join it, the different-scope call must start its own.
@@ -937,24 +938,37 @@ test.serial(
         if (Date.now() > deadline) throw new Error('different scope started no second pass');
         await Bun.sleep(50);
       }
-      const [joinedResult, r1, r2] = await Promise.all([joined.result, first.result, other.result]);
+      // A same-scope, same-caller call on a different tree must start its own
+      // pass while the first is still live, never join it.
+      writeFileSync(resolve(worktree, 't2'), 't2\n');
+      await command(['git', 'add', 't2'], worktree);
+      await command(['git', 'commit', '-qm', 't2'], worktree);
+      thirdCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+        AKROGON_RUN_SLICE: slice,
+      });
+      while (leafReceipts(f, 'pass-join').length < 3) {
+        if (Date.now() > deadline) throw new Error('different tree started no third pass');
+        await Bun.sleep(50);
+      }
+      const [joinedResult, r1, r2, third] = await Promise.all([
+        joined.result,
+        first.result,
+        other.result,
+        thirdCap.result,
+      ]);
       expect(joinedResult.code, `stderr: ${joinedResult.stderr}`).toBe(0);
       expect(joinedResult.stderr).toContain(`run ${receipt.run}`);
       expect(joinedResult.stdout).toContain('verify test: 0');
       expect(joinedResult.stdout).toContain(': green');
       expect(r1.code, `stderr: ${r1.stderr}`).toBe(0);
       expect(r2.code, `stderr: ${r2.stderr}`).toBe(0);
-      writeFileSync(resolve(worktree, 't2'), 't2\n');
-      await command(['git', 'add', 't2'], worktree);
-      await command(['git', 'commit', '-qm', 't2'], worktree);
-      const third: SpawnResult = await spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
-        AKROGON_RUN_SLICE: slice,
-      }).result;
       expect(third.code, `stderr: ${third.stderr}`).toBe(0);
       expect(third.stderr).toMatch(/run [0-9a-f-]{36}/);
+      expect(third.stderr).not.toContain(`run ${receipt.run}`);
       expect(leafReceipts(f, 'pass-join')).toHaveLength(3);
     } finally {
-      for (const cap of [first, joined, other]) if (cap !== undefined && cap.proc.exitCode === null) killTree(cap.proc);
+      for (const cap of [first, joined, other, thirdCap])
+        if (cap !== undefined && cap.proc.exitCode === null) killTree(cap.proc);
     }
   },
   90000,
