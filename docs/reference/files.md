@@ -42,7 +42,7 @@ Seat lookup reads these files in [config.ts](../../src/config.ts). [chart-issues
 
 ## Leaf folder records
 
-Every file below sits in the leaf folder in the registered checkout. A leaf branch never holds files under `issues/`.
+The files below sit in the leaf folder in the registered checkout; the owner-level `.lock` sits in the owner folder. A leaf branch never holds files under `issues/`.
 
 | File                                         | Written by                                               | What it is                                                                                                                                                           |
 | -------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -54,6 +54,8 @@ Every file below sits in the leaf folder in the registered checkout. A leaf bran
 | `implementation/report.md`                   | [implement-issue](../../skills/implement-issue/SKILL.md) | What was built, commands run with results, base and head, limits and unverified criteria.                                                                            |
 | `implementation/brief-<n>.md`                | [implement-issue](../../skills/implement-issue/SKILL.md) | One sub-brief per unit when A delegates to workers.                                                                                                                  |
 | `implementation/check-<name>-<ms>-<pid>.log` | [run-check.ts](../../src/run-check.ts)                   | Output kept by `akrogon run-check`. Its last line names it as `check <name>: <exit> <path>`.                                                                         |
+| `implementation/capture-<name>-<run>-out.log` and `-err.log` | [run-check.ts](../../src/run-check.ts) | The command's live stdout and stderr, one file each, written before it starts. They fold into the check log on exit and are removed; a killed run leaves them, read through `akrogon log`. |
+| `<owner>/.lock`                                  | [run-check.ts](../../src/run-check.ts), [pack.ts](../../src/pack.ts) | The owner folder's capture lock, shared by every live capture's writers and publication and taken by `akrogon pack` and owner completion so they wait for captures to finish. Never committed, never packed. |
 | `review-A.md`, `review-B.md`                 | [check-issue](../../skills/check-issue/SKILL.md)         | Each seat's findings and verdict. At merge, B also records rebase, verify and failure results in `review-B.md` per [merge-issue](../../skills/merge-issue/SKILL.md). |
 
 ## Repo records

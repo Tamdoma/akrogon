@@ -26,7 +26,7 @@
 - `tests/timing-report.test.ts` checks `akrogon timing` against fixture records: visit decomposition, expected-event flags and cohort verdicts.
 - `tests/pause-status.test.ts` checks pause marks on the board, targeted status and chart headings; `tests/log-reader.test.ts` checks `akrogon log` byte output, archive members, outside-repo resolution and the skill/doc mentions.
 - `tests/hold-retired.test.ts` checks the retired merge verbs refuse, a legacy hold record stays inert, and the docs carry no retired surface.
-- `tests/close-pack.test.ts` checks the `.closing` marker, packing `*.log` into `evidence.tar.zst`, sync exclusions, init log ignores and the run-check closed/closing refusal; `tests/folder-pack.test.ts` checks `akrogon pack` on chart `direct/` and closed owners, tracked-log refusals, `.closing` retries and refusal forms.
+- `tests/durable-capture.test.ts` checks live `capture-` files stream stdout and stderr, a killed run leaves them readable through `akrogon log` with no completed check, and `pack` and owner completion wait on the owner `.lock` or refuse `inside run-check run <uuid>` from inside that owner's capture; `tests/close-pack.test.ts` checks the `.closing` marker, packing `*.log` into `evidence.tar.zst`, sync exclusions, init log ignores and the run-check closed/closing refusal; `tests/folder-pack.test.ts` checks `akrogon pack` on chart `direct/` and closed owners, tracked-log refusals, `.closing` retries and refusal forms.
 - `tests/rollback.test.ts` checks `akrogon rollback` end to end: flip and hold, the held-deploy loop, the manual README path on a broken release, the no-previous and bad-config refusals, and link restore with its failure leaving `current` on the previous release.
 
 ## Non-obvious patterns

@@ -45,7 +45,7 @@ Every `akrogon` command, one line each. Run commands from the registered reposit
 
 | Invocation | Effect |
 | --- | --- |
-| `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Run one command under the check environment, save its output as a log and print a `check <name>: <exit> <path>` line. Refuses a configured `merge_checks` command: only the merge turn's `akrogon verify --attempt <id>` runs it. |
+| `akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...` | Run one command under the check environment, save its output as a log and print a `check <name>: <exit> <path>` line. From launch it also streams stdout and stderr into `capture-<name>-<run>-out.log`/`-err.log` in the holder, and prints a `capture <name>: <out> <err>` line while the command runs. Refuses a configured `merge_checks` command: only the merge turn's `akrogon verify --attempt <id>` runs it. |
 | `akrogon verify [--sha <rev>] [--attempt <id>] [--holder <dir>] [--known-red]` | Run the configured checks on a fresh checkout of a commit — `merge_checks` members all at once after the `checks` stage — reusing a command's green result on the same tree and recording a receipt in `issues/verify-runs.jsonl`. Each pass runs in its own `akrogon-verify-<id>` user service, so the suite survives the caller; verify prints `run <pass id>` first, then waits, streams the pass's output and returns its exit code. A repeat call with the same caller scope, caller target, tree, verify scope, command set and `compares` link joins the live pass; any other call starts its own. With `--known-red`, it also runs the base commit under the same reuse to show the same tests already fail there. |
 | `akrogon verify-pass <dir>` | Internal: run one verify pass from the record in `<dir>`; the entry point of the `akrogon-verify-<id>` service. |
 | `akrogon log <path>` | Print a saved check or verify log, even after it was packed. Runs from any directory. |
@@ -57,5 +57,5 @@ Every `akrogon` command, one line each. Run commands from the registered reposit
 | Invocation | Effect |
 | --- | --- |
 | `akrogon sync` | Commit changed issue records on the default branch, rebase and push. |
-| `akrogon pack <folder>...` | Pack the `*.log` files of a closed issue or a chart's `direct/` folder into `evidence.tar.zst`. |
+| `akrogon pack <folder>...` | Pack the `*.log` files of a closed issue or a chart's `direct/` folder into `evidence.tar.zst`. Waits for the owner's live capture files to finish; called on the owner from inside one of its own run-check captures, it refuses `inside run-check run <uuid>` before waiting. |
 | `akrogon rollback` | Point the installed release back at the previous one and keep the rolled-away commit from redeploying. Runs from any directory. |

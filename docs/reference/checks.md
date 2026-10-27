@@ -37,6 +37,16 @@ check <label>: <exit> <path>
 
 `<path>` is the saved log. It lands in the leaf's `implementation/` folder as `check-<label>-<time>-<pid>.log`. Akrogon finds the leaf from your current worktree. A worker worktree named `<slug>-u<N>` saves into its leaf's folder. Outside a leaf worktree, pass `--leaf <path>` or `--holder <dir>`, and the log goes there.
 
+From launch, the command's stdout and stderr also stream into two files in the same folder: `capture-<name>-<run>-out.log` and `capture-<name>-<run>-err.log`. While the command runs, run-check prints a line to stderr naming them:
+
+```text
+capture <name>: <out> <err>
+```
+
+It claims no exit code; the `check` line still prints after the command ends. When the check log publishes, the capture files fold into it and are removed. If the run is killed, the capture files stay behind with the output so far and no `check` line, `check_end` or verify receipt is produced; `akrogon log` reads them by their plain path.
+
+Every live capture holds the owner folder's `.lock` file, which `akrogon pack` and owner completion also take, so either one waits until no capture is live before it packs or moves the folder. A `pack` or `phase <slug> merged` call made on that owner from inside one of its own run-check captures is refused instead, before any waiting.
+
 The command runs with a clean environment. It gets `HOME`, `PATH` and a few other basics, the names you list in `env` and `pass_env`, a private `TMPDIR` and `AKROGON_BASE`. Source: [src/run-check.ts](../../src/run-check.ts).
 
 run-check refuses a configured `merge_checks` command, given as its words, as `sh -c '<command>'`, or in the `sh -c` form `setup` would add: it exits non-zero, starts no process and saves no log, printing `akrogon verify --attempt <id>` as the merge suite's only runner and that a red merge check is reproduced with a narrower command, never the whole suite.
@@ -124,7 +134,7 @@ Every `check` line and every verify line ends in a log path. Print that log with
 akrogon log <path>
 ```
 
-It works from any directory. It also works after a closed issue's logs were packed into `evidence.tar.zst` by `akrogon pack`, because it reads the log out of the archive. Source: `readLog` in [src/evidence.ts](../../src/evidence.ts).
+It works from any directory. It also works after a closed issue's logs were packed into `evidence.tar.zst` by `akrogon pack`, because it reads the log out of the archive. A `capture-<name>-<run>-out.log` or `-err.log` file a killed run left behind reads by the same plain path. Source: `readLog` in [src/evidence.ts](../../src/evidence.ts).
 
 `akrogon flaky` lists checks and tests that went red and then green on the same tree, newest first, from the receipts. Each line shows the count, the last time, the check name and the test name. Source: [src/flaky.ts](../../src/flaky.ts).
 
@@ -145,6 +155,7 @@ It works from any directory. It also works after a closed issue's logs were pack
 | `No merge leaf for attempt: <id>` | No leaf in `merge` holds that attempt. | Check the attempt id in the batch record of the leaf's `state.yaml`. |
 | `owner closed: <path>` or `owner closing: <path>` | The leaf that would own the log is closed or being closed. | Do not keep new output for it. |
 | `owner gone: <path>; captured output stays in <log>` | The leaf closed while the command ran. | Read the output at the named log path. |
+| `inside run-check run <uuid>` | `akrogon pack` or `akrogon phase <slug> merged` was called on the owner whose live run-check capture the caller runs inside. | Run it outside that capture, or after the check exits. Another owner is not refused; it only waits for the captures to finish. |
 | `no log for recorded path: <path>` | The path does not point into an issue folder, or the log and its archive are gone. | Copy the path exactly from the `check` or verify line. |
 | `recorded path <path> matches repos: <names>` | Run outside a repository, the path fits more than one registered repository. | Run `akrogon log` from inside the right repository. |
 | `unreadable archive: <path>` or `no member <name> in <path>` | The packed archive is damaged or lacks that log. | The log cannot be read back. Rerun the check if you need the output. |
