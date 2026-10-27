@@ -119,8 +119,7 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
       'AKROGON_BASE',
       'AKROGON_RUN',
       'AKROGON_HOME',
-      'AKROGON_CAPTURE_OWNER',
-      'AKROGON_CAPTURE_RUN',
+      'AKROGON_CAPTURES',
       'DBUS_SESSION_BUS_ADDRESS',
       'LANG',
       'CHECK_TOKEN',
@@ -132,8 +131,7 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
     expect(names.has('CHECK_TOKEN')).toBe(true);
     expect(names.has('TMPDIR')).toBe(true);
     expect(names.has('AKROGON_BASE')).toBe(true);
-    expect(names.has('AKROGON_CAPTURE_OWNER')).toBe(true);
-    expect(names.has('AKROGON_CAPTURE_RUN')).toBe(true);
+    expect(names.has('AKROGON_CAPTURES')).toBe(true);
   } finally {
     f.clean();
   }
