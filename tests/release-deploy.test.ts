@@ -8,6 +8,7 @@ import {
   readlinkSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -119,6 +120,21 @@ test.serial('deploy builds a complete release, flips current and prints the depl
     expect(readFileSync(resolve(releases(d), sha, 'src/akrogon.ts'), 'utf8')).toBe('console.log("release");\n');
     expect(existsSync(resolve(releases(d), sha, 'node_modules'))).toBe(true);
     expect(readdirSync(releases(d)).sort()).toEqual([sha]);
+  } finally {
+    d.f.clean();
+  }
+});
+
+test.serial('a built release holds private copies of its file: dependency, not shared files', async () => {
+  const d: DeployFixture = await deployFixture();
+  try {
+    const sha: string = await head(d);
+    const result: Result = await cli(d.f, ['next', '--all'], d.f.root, d.env);
+    expect(result.code).toBe(0);
+    const release: string = resolve(releases(d), sha);
+    const installed: number = statSync(resolve(release, 'node_modules/tiny/package.json')).ino;
+    const vendored: number = statSync(resolve(release, 'vendor/tiny/package.json')).ino;
+    expect(installed).not.toBe(vendored);
   } finally {
     d.f.clean();
   }
