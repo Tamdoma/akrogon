@@ -24,7 +24,7 @@ Detail scales with the work: scale detail to what a broad-audience reader needs,
 
 ## Send
 
-Install the skill-local dependencies with `bun install --cwd <skill-folder> --frozen-lockfile` before its first use.
+Install the skill-local dependencies with `bun install --cwd <skill-folder> --frozen-lockfile --backend=copyfile` before its first use.
 
 Use [scripts/discord-send.ts](scripts/discord-send.ts) when sending, passing the configured target names as repeated `--target NAME` arguments and one JSON payload on stdin, then report its exit status without writing a delivery record.
 

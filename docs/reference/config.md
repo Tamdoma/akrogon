@@ -55,7 +55,7 @@ Each registered checkout has `issues/config.yaml`. The [init-akrogon skill](../.
 | `worktree_root` | Where leaf worktrees go. It must be outside the checkout. Default `~/.akrogon/worktrees/<repo-name>`. |
 | `fix_rounds` | How many repair rounds the chart door's direct route may use. Default 3. |
 | `implement` | `subagents` lets seat A hand units to worker agents. `inline` makes seat A do all the work itself. Default `subagents`. |
-| `setup` | A command that installs dependencies in each fresh checkout, such as `bun install --frozen-lockfile`. Akrogon runs it before check commands. Optional. |
+| `setup` | A command that installs dependencies in each fresh checkout, such as `bun install --frozen-lockfile --backend=copyfile`. Akrogon runs it before check commands. Optional. |
 | `checks` | Named commands every leaf must pass. A red check blocks. Default empty. |
 | `merge_checks` | Named commands that run only at merge, all at once once the `checks` stage is green. `akrogon config` prints `akrogon verify --attempt <id>` for each entry — the merge turn's runner — and `akrogon run-check` refuses the command itself. Default empty. |
 | `merge_covers` | Names from `checks` that a merge check already covers, so merge skips them. Needs a non-empty `merge_checks`. Default empty. |

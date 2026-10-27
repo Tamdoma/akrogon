@@ -61,7 +61,7 @@ To keep this folder somewhere else, set `AKROGON_HOME` to that folder. Akrogon t
 From your Akrogon checkout, for example `~/code/akrogon`, run:
 
 ```sh
-bun install
+bun install --backend=copyfile
 bun src/akrogon.ts install
 ```
 
