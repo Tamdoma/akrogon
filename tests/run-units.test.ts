@@ -723,12 +723,18 @@ function rewriteConfig(f: Fixture, config: object): void {
   yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', ...config });
 }
 
-async function waitReceipt(f: Fixture, ms: number = 15000): Promise<VerifyRun> {
+// The shared fixture's ledger keeps receipts from earlier tests: a pass is
+// found by its caller leaf slug, not by position.
+function leafReceipts(f: Fixture, slug: string): VerifyRun[] {
+  return verifyReceipts(f).filter((run) => run.leaf === slug);
+}
+
+async function waitReceipt(f: Fixture, slug: string, ms: number = 15000): Promise<VerifyRun> {
   const begun: number = Date.now();
   for (;;) {
-    const first: VerifyRun | undefined = verifyReceipts(f)[0];
+    const first: VerifyRun | undefined = leafReceipts(f, slug)[0];
     if (first !== undefined) return first;
-    if (Date.now() - begun > ms) throw new Error('No verify receipt appeared');
+    if (Date.now() - begun > ms) throw new Error(`No verify receipt for ${slug}`);
     await Bun.sleep(50);
   }
 }
@@ -765,7 +771,7 @@ test.serial(
       const deadline: number = Date.now() + 30000;
       let receipt: VerifyRun | undefined;
       while (receipt === undefined || receipt.end === undefined) {
-        receipt = verifyReceipts(f)[0];
+        receipt = leafReceipts(f, 'pass-survivor')[0];
         if (receipt?.end !== undefined) break;
         if (Date.now() > deadline) throw new Error('pass receipt still incomplete after the caller died');
         await Bun.sleep(200);
@@ -794,7 +800,7 @@ test.serial(
     const first: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
       AKROGON_RUN_SLICE: slice,
     });
-    const receipt: VerifyRun = await waitReceipt(f);
+    const receipt: VerifyRun = await waitReceipt(f, 'pass-join');
     let joined: RealCap | undefined;
     let other: RealCap | undefined;
     try {
@@ -807,7 +813,7 @@ test.serial(
         AKROGON_RUN_SLICE: slice,
       });
       const deadline: number = Date.now() + 15000;
-      while (verifyReceipts(f).length < 2) {
+      while (leafReceipts(f, 'pass-join').length < 2) {
         if (Date.now() > deadline) throw new Error('different scope started no second pass');
         await Bun.sleep(50);
       }
@@ -826,7 +832,7 @@ test.serial(
       }).result;
       expect(third.code, `stderr: ${third.stderr}`).toBe(0);
       expect(third.stderr).toMatch(/run [0-9a-f-]{36}/);
-      expect(verifyReceipts(f)).toHaveLength(3);
+      expect(leafReceipts(f, 'pass-join')).toHaveLength(3);
     } finally {
       for (const cap of [first, joined, other]) if (cap !== undefined && cap.proc.exitCode === null) killTree(cap.proc);
     }
@@ -848,7 +854,7 @@ test.serial(
     const cap: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
       AKROGON_RUN_SLICE: slice,
     });
-    const receipt: VerifyRun = await waitReceipt(f);
+    const receipt: VerifyRun = await waitReceipt(f, 'pass-stop');
     try {
       await waitCheckRecord(f, 'early');
       const refused: SpawnResult = await spawnScoped(f, 'callerB.scope', ['stop-run', receipt.run], worktree).result;
@@ -859,7 +865,7 @@ test.serial(
       await waitInactive(`akrogon-verify-${receipt.run}.service`);
       const result: SpawnResult = await cap.result;
       expect(result.code).not.toBe(0);
-      const settled: VerifyRun = verifyReceipts(f)[0];
+      const settled: VerifyRun = leafReceipts(f, 'pass-stop')[0];
       expect(settled.end).toBeUndefined();
       expect(settled.commands.some((entry) => entry.name === 'late')).toBe(false);
       expect(existsSync(resolve(out, 'late-done'))).toBe(false);
@@ -898,7 +904,7 @@ test.serial(
     const cap: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
       AKROGON_RUN_SLICE: slice,
     });
-    const receipt: VerifyRun = await waitReceipt(f);
+    const receipt: VerifyRun = await waitReceipt(f, 'pass-full');
     try {
       const deadline: number = Date.now() + 15000;
       for (;;) {
@@ -915,7 +921,7 @@ test.serial(
       const result: SpawnResult = await cap.result;
       expect(result.code).not.toBe(0);
       expect(existsSync(resolve(out, 'full-ran'))).toBe(false);
-      expect(verifyReceipts(f)[0].end).toBeUndefined();
+      expect(leafReceipts(f, 'pass-full')[0].end).toBeUndefined();
     } finally {
       if (cap.proc.exitCode === null) killTree(cap.proc);
       void cap.result.catch(() => undefined);
@@ -944,7 +950,7 @@ test.serial(
       const deadline: number = Date.now() + 30000;
       let receipt: VerifyRun | undefined;
       while (receipt === undefined || receipt.end === undefined) {
-        receipt = verifyReceipts(f)[0];
+        receipt = leafReceipts(f, 'pass-owner')[0];
         if (receipt?.end !== undefined) break;
         if (Date.now() > deadline) throw new Error('pass did not complete after its check was stopped');
         await Bun.sleep(200);
