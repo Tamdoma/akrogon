@@ -137,8 +137,7 @@ test('a SIGKILLed nested run-check leaves its captures in its own holder after r
     const innerImpl: string = resolve(innerLeaf, 'implementation');
     mkdirSync(innerImpl, { recursive: true });
     const outerLeaf: string = leaf(f, 'outer', 'implement');
-    const outerWork: string = resolve(f.home, 'wt', 'outer');
-    await command(['git', 'worktree', 'add', '-b', 'outer', outerWork, 'origin/main'], f.root);
+    writeFileSync(resolve(f.root, '.env'), `AKROGON_HOME=declared\nAKROGON_LEAF_TEMP_ROOT=declared\n`);
     const cap: Live = spawnCheck(
       f,
       [
@@ -159,8 +158,12 @@ test('a SIGKILLed nested run-check leaves its captures in its own holder after r
         '-c',
         blocking(f, 'inner'),
       ],
-      realpathSync(outerWork),
-      { ...herdr.env, AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f) },
+      f.root,
+      {
+        ...herdr.env,
+        PATH: `${resolve(f.home, 'bin')}:${resolve(f.home, 'unitbin')}:${process.env.PATH}`,
+        AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+      },
     );
     try {
       await waitFor(() => existsSync(`${f.home}/ready-inner`), 'inner ready file');
@@ -184,7 +187,13 @@ test('a SIGKILLed nested run-check leaves its captures in its own holder after r
           return true;
         }
       }, 'inner wrapper exit');
-      expect((await cli(f, ['next'], f.root, herdr.env)).code).toBe(0);
+      // Reconcile (driven by next) sweeps the dead inner run root while the
+      // holder keeps both capture files.
+      await cli(f, ['next'], f.root, herdr.env);
+      const remaining: string[] = [
+        ...new Bun.Glob('**/run-*/.owner').scanSync({ cwd: leafTempRoot(f), onlyFiles: true }),
+      ].map((name) => resolve(leafTempRoot(f), name));
+      expect(remaining.map((path) => JSON.parse(readFileSync(path, 'utf8')).pid as number)).not.toContain(innerPid);
       const kept: { out: string; err: string }[] = captures(innerImpl);
       expect(kept).toHaveLength(1);
       expect(readFileSync(kept[0].out, 'utf8')).toContain('MARKER-inner-OUT');
