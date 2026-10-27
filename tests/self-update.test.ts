@@ -51,7 +51,7 @@ async function selfUpdateFixture(): Promise<SelfUpdateFixture> {
   await command(['git', 'init', '-b', 'main', seed]);
   await command(['git', 'config', 'user.email', 'test@example.invalid'], seed);
   await command(['git', 'config', 'user.name', 'Test'], seed);
-  await command([process.execPath, 'install'], seed);
+  await command([process.execPath, 'install', '--backend=copyfile'], seed);
   await command(['git', 'add', '.'], seed);
   await command(['git', 'commit', '-m', 'initial'], seed);
   await command(['git', 'init', '--bare', '-b', 'main', remote]);

@@ -39,7 +39,7 @@ export async function deployFixture(): Promise<DeployFixture> {
     resolve(seed, 'package.json'),
     '{"name":"fixture-release","dependencies":{"tiny":"file:vendor/tiny"}}\n',
   );
-  await command([process.execPath, 'install'], seed);
+  await command([process.execPath, 'install', '--backend=copyfile'], seed);
   await command(['git', 'add', '-A'], seed);
   await command(['git', 'commit', '-m', 'shape'], seed);
   await command(['git', 'push', 'origin', 'HEAD:main'], seed);
