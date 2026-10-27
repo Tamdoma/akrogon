@@ -2,8 +2,8 @@ import { test, expect } from 'bun:test';
 import { z } from 'zod';
 import { basename, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
-import { fixture, cli, leaf, yaml, fakeAkrogon, printedChecks, leafTempRoot, type Fixture } from './helpers';
-import { command, type Result } from '../src/shell';
+import { fixture, cli, entry, leaf, yaml, fakeAkrogon, printedChecks, leafTempRoot, type Fixture } from './helpers';
+import { command, spawnCaptured, type Result } from '../src/shell';
 import { readRepo, setupCommand } from '../src/config';
 
 const sh = (script: string): string[] => ['sh', '-c', script];
@@ -47,6 +47,61 @@ function scratchRuns(f: Fixture): string[] {
         )
     : [];
 }
+
+test('run-check never recreates an owner moved between the existence check and lock acquisition', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const target: string = leaf(f, 'racing', 'implement');
+    const owner: string = resolve(target, '..');
+    const parked: string = resolve(f.root, 'issues/parked/issue');
+    const marker: string = resolve(f.home, 'command-ran');
+    const script: string = resolve(f.home, 'move-before-lock.ts');
+    writeFileSync(
+      script,
+      `import { mock } from 'bun:test';
+import * as fs from 'node:fs';
+const originalExists = fs.existsSync;
+const owner = ${JSON.stringify(owner)};
+const parked = ${JSON.stringify(parked)};
+let moved = false;
+mock.module('node:fs', () => ({ ...fs, existsSync(path) {
+  const exists = originalExists(path);
+  if (path === owner && exists && !moved) {
+    moved = true;
+    fs.mkdirSync(${JSON.stringify(resolve(parked, '..'))}, { recursive: true });
+    fs.renameSync(owner, parked);
+  }
+  return exists;
+} }));
+await import(${JSON.stringify(entry)});
+`,
+    );
+    const result: Result = await spawnCaptured(
+      [process.execPath, script, 'run-check', '--leaf', target, '--', 'touch', marker],
+      {
+        cwd: f.root,
+        env: {
+          ...process.env,
+          HOME: f.home,
+          AKROGON_HOME: f.home,
+          AKROGON_RUN: '',
+          AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+          PATH: `${resolve(f.home, 'unitbin')}:${process.env.PATH}`,
+        },
+      },
+    );
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('owner gone');
+    expect(existsSync(owner)).toBe(false);
+    expect(existsSync(resolve(parked, 'racing/state.yaml'))).toBe(true);
+    expect(existsSync(marker)).toBe(false);
+    const runs: string[] = scratchRuns(f);
+    expect(runs).toHaveLength(1);
+    expect(readFileSync(resolve(runs[0], 'refusal.json'), 'utf8')).toContain('owner gone');
+  } finally {
+    f.clean();
+  }
+});
 
 test('run-check builds an allowlisted env, copies declared names and omits undeclared ones', async () => {
   const f: Fixture = await fixture();
