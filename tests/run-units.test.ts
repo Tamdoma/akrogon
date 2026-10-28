@@ -7,6 +7,7 @@ import {
   entry,
   fakeAkrogon,
   fixture,
+  greenReceipt,
   killTree,
   leaf,
   leafTempRoot,
@@ -407,6 +408,79 @@ for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
     45000,
   );
 }
+
+test.serial(
+  "a killed run-check pair refuses the leaf's non-failed phase moves under the real run unit",
+  async () => {
+    const { f, slice } = await realFixture();
+    const out: string = outDir(f);
+    const worktree: string = await leafWorktree(f, 'gatekill');
+    writeFileSync(resolve(worktree, 'gatekill.txt'), 'seed\n');
+    await command(['git', 'add', 'gatekill.txt'], worktree);
+    await command(['git', 'commit', '-qm', 'seed'], worktree);
+    greenReceipt(f, (await command(['git', 'rev-parse', 'HEAD'], worktree)).trim(), 'leaf');
+    const leafDir: string = resolve(f.root, 'issues/open/issue/gatekill');
+    const implDir: string = resolve(leafDir, 'implementation');
+    const cap: RealCap = spawnReal(f, ['run-check', '--name', 'gatekill', '--', 'sleep', '30'], worktree, {
+      RUN_UNITS_OUT: out,
+      AKROGON_RUN_SLICE: slice,
+    });
+    try {
+      const deadline: number = Date.now() + 15000;
+      let record: Record<string, unknown> | undefined;
+      while (record === undefined) {
+        record = (await liveRuns(f)).find((row) => row.check === 'gatekill');
+        if (record === undefined && Date.now() > deadline) throw new Error('No live gatekill record');
+        else if (record === undefined) await Bun.sleep(50);
+      }
+      const run: string = record.run as string;
+      const unit: string = record.unit as string;
+      const outLog: string = resolve(implDir, `capture-gatekill-${run}-out.log`);
+      const errLog: string = resolve(implDir, `capture-gatekill-${run}-err.log`);
+      const outDeadline: number = Date.now() + 15000;
+      while (!existsSync(outLog)) {
+        if (cap.proc.exitCode !== null) {
+          const early: SpawnResult = await cap.result;
+          throw new Error(`wrapper exited ${early.code}: ${early.stdout} ${early.stderr}`);
+        }
+        if (Date.now() > outDeadline) throw new Error(`Timed out waiting for ${outLog}`);
+        await Bun.sleep(50);
+      }
+      // Live holder, live unit: a non-failed move stays open for the leaf.
+      const live: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
+      expect(live.code, `stdout: ${live.stdout} stderr: ${live.stderr}`).toBe(0);
+      cap.proc.kill('SIGKILL');
+      const cgroupProcs: string = resolve(unitDir('/sys/fs/cgroup', slice, unit), 'cgroup.procs');
+      const drainDeadline: number = Date.now() + 10000;
+      let drained: boolean = false;
+      while (!drained && Date.now() < drainDeadline) {
+        drained =
+          (await sysctl('is-active', unit)).code !== 0 &&
+          (!existsSync(cgroupProcs) || readFileSync(cgroupProcs, 'utf8').trim() === '');
+        if (!drained) await Bun.sleep(150);
+      }
+      expect(drained, `${unit} did not drain`).toBe(true);
+      const result: SpawnResult = await cap.result;
+      expect(result.signalCode).toBe('SIGKILL');
+      // Wrapper and last fd holder are gone: the pair is abandoned and refuses.
+      expect(existsSync(outLog)).toBe(true);
+      expect(existsSync(errLog)).toBe(true);
+      const refused: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
+      expect(refused.code).not.toBe(0);
+      const refusal: string = refused.stdout + refused.stderr;
+      expect(refusal).toContain(outLog);
+      expect(refusal).toContain(errLog);
+      expect(refusal).toContain(`cleared-${run}.md`);
+      writeFileSync(resolve(implDir, `cleared-${run}.md`), 'recorded and cleaned\n');
+      const passed: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
+      expect(passed.code, `stdout: ${passed.stdout} stderr: ${passed.stderr}`).toBe(0);
+    } finally {
+      if (cap.proc.exitCode === null) cap.proc.kill('SIGKILL');
+      void cap.result;
+    }
+  },
+  45000,
+);
 
 test.serial(
   'a verify runs setup and each command in its own run unit under the leaf slice',
