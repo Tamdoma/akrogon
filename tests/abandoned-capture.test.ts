@@ -116,6 +116,57 @@ exec ${quote(flock)} "$@"
   }
 }, 30000);
 
+test('a capture published after the probe opens it never refuses a move', async () => {
+  const f: Fixture = await fixture();
+  const herdr = fakeHerdr(f);
+  const paused: string = resolve(f.home, 'probe-paused');
+  const release: string = resolve(f.home, 'probe-release');
+  const flock: string = Bun.which('flock')!;
+  try {
+    const leafPath: string = leaf(f, 'publishing', 'implement');
+    const impl: string = resolve(leafPath, 'implementation');
+    writeFileSync(
+      resolve(f.home, 'bin/flock'),
+      `#!/bin/sh
+if [ "$1" = '-n' ] && [ "$2" = '-x' ] && [ "$3" = '0' ]; then
+  touch ${quote(paused)}
+  while [ ! -e ${quote(release)} ]; do sleep 0.01; done
+fi
+exec ${quote(flock)} "$@"
+`,
+      { mode: 0o755 },
+    );
+    const cap: Live = spawnCheck(
+      f,
+      ['run-check', '--leaf', leafPath, '--name', 'publishing', '--', 'sh', '-c', blocking(f, 'publish')],
+      f.root,
+    );
+    try {
+      await waitFor(() => existsSync(`${f.home}/ready-publish`), 'command ready');
+      const phase: Live = spawnCheck(f, ['phase', 'publishing', 'check.review', '--check'], f.root, herdr.env);
+      try {
+        await waitFor(() => existsSync(paused), 'probe opened capture');
+        writeFileSync(`${f.home}/release-publish`, '');
+        const published: SpawnResult = await cap.result;
+        expect(published.code, published.stderr).toBe(0);
+        expect(captures(impl)).toHaveLength(0);
+        writeFileSync(release, '');
+        const moved: SpawnResult = await phase.result;
+        expect(moved.code, moved.stderr).toBe(0);
+        expect(captures(impl)).toHaveLength(0);
+      } finally {
+        writeFileSync(release, '');
+        await phase.result;
+      }
+    } finally {
+      writeFileSync(`${f.home}/release-publish`, '');
+      await cap.result;
+    }
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
 test('an abandoned capture pair refuses non-failed moves, and a non-blank cleared-<run>.md clears it', async () => {
   const f: Fixture = await fixture();
   const herdr = fakeHerdr(f);
