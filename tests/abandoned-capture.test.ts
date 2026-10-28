@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
+import { finishCaptured, quote, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import type { Captured } from '../src/shell';
 import { cli, entry, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
 
@@ -81,6 +81,40 @@ async function gone(pid: number): Promise<void> {
     }
   }, `pid ${pid} gone`);
 }
+
+test('a starting run-check never exposes an unlocked capture', async () => {
+  const f: Fixture = await fixture();
+  const herdr = fakeHerdr(f);
+  const paused: string = resolve(f.home, 'lock-paused');
+  const release: string = resolve(f.home, 'lock-release');
+  const flock: string = Bun.which('flock')!;
+  try {
+    const leafPath: string = leaf(f, 'starting', 'implement');
+    writeFileSync(
+      resolve(f.home, 'bin/flock'),
+      `#!/bin/sh
+if [ "$1" = '-s' ] && [ "$2" = '0' ]; then
+  touch ${quote(paused)}
+  while [ ! -e ${quote(release)} ]; do sleep 0.01; done
+fi
+exec ${quote(flock)} "$@"
+`,
+      { mode: 0o755 },
+    );
+    const cap: Live = spawnCheck(f, ['run-check', '--leaf', leafPath, '--name', 'starting', '--', 'true'], f.root);
+    try {
+      await waitFor(() => existsSync(paused), 'capture lock helper paused');
+      const moved: Result = await cli(f, ['phase', 'starting', 'check.review', '--check'], f.root, herdr.env);
+      expect(moved.code, moved.stderr).toBe(0);
+    } finally {
+      writeFileSync(release, '');
+      const result: SpawnResult = await cap.result;
+      expect(result.code, result.stderr).toBe(0);
+    }
+  } finally {
+    f.clean();
+  }
+}, 30000);
 
 test('an abandoned capture pair refuses non-failed moves, and a non-blank cleared-<run>.md clears it', async () => {
   const f: Fixture = await fixture();
