@@ -164,6 +164,9 @@ test('an abandoned capture pair refuses non-failed moves, and a non-blank cleare
     writeFileSync(cleared, 'found the test user, cleaned it, absence read returned none\n');
     const passed: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, herdr.env);
     expect(passed.code, passed.stderr).toBe(0);
+    expect(existsSync(out)).toBe(true);
+    expect(existsSync(err)).toBe(true);
+    expect(existsSync(out2)).toBe(true);
     expect(readFileSync(out, 'utf8')).toBe(outBytes);
     expect(readFileSync(err, 'utf8')).toBe(errBytes);
     const logged: Result = await cli(f, ['log', out], f.root);
@@ -179,9 +182,10 @@ test('an abandoned capture pair refuses non-failed moves, and a non-blank cleare
       f.root,
     );
     expect(red.code).toBe(3);
-    expect(captures(impl)).toHaveLength(1);
+    expect(captures(impl)).toHaveLength(2);
     const after: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, herdr.env);
     expect(after.code, after.stderr).toBe(0);
+    expect(readFileSync(out, 'utf8')).toBe(outBytes);
   } finally {
     f.clean();
   }

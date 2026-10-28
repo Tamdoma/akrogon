@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { readGlobal, requireRepo, target, globalHome, type GlobalConfig, type Repo, within } from './config';
 import {
@@ -146,22 +146,10 @@ export class MoveCommittedError extends Error {
 
 // An abandoned capture pair refuses until a non-blank cleared-<run>.md
 // stands beside it; the operator clears and retries, so nothing is marked
-// failed. A refusal retires pairs already cleared: their note says the bytes
-// were read and acted on, so the pair drops out of the way like a published
-// one.
+// failed and cleared pairs keep their names and bytes.
 function refuseAbandonedCaptures(folder: string): void {
   const pairs: { out: string; err: string; cleared: string }[] = abandonedCaptures(folder);
   if (pairs.length === 0) return;
-  for (const member of new Bun.Glob('**/capture-*-out.log').scanSync({ cwd: folder, dot: true, onlyFiles: false })) {
-    const run: RegExpMatchArray | null = basename(member).match(
-      /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-out\.log$/,
-    );
-    if (run === null) continue;
-    const cleared: string = join(dirname(resolve(folder, member)), `cleared-${run[1]}.md`);
-    if (!existsSync(cleared) || readFileSync(cleared, 'utf8').trim().length === 0) continue;
-    rmSync(resolve(folder, member), { force: true });
-    rmSync(resolve(folder, member.replace(/-out\.log$/, '-err.log')), { force: true });
-  }
   throw new Error(
     `Refusing over an abandoned capture pair in ${folder}: read the pair, run the leaf grant's discovery, cleanup and absence read for that run, then write a non-blank cleared-<run>.md beside it.\n` +
       pairs.map((pair) => `${pair.out} ${pair.err} -> ${pair.cleared}`).join('\n'),
