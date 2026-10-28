@@ -82,7 +82,7 @@ export async function spawnLogged(
   argv: string[],
   cwd: string,
   env: Record<string, string>,
-  capture: { out: string; err: string },
+  capture: { out: string; outFd: number; err: string },
 ): Promise<Result> {
   const outRead: number = openSync(capture.out, 'r');
   const errRead: number = openSync(capture.err, 'r');
@@ -91,7 +91,7 @@ export async function spawnLogged(
       cwd,
       env,
       stdin: 'ignore',
-      stdout: Bun.file(capture.out),
+      stdout: capture.outFd,
       stderr: Bun.file(capture.err),
     });
     const code: number = await child.exited;
@@ -100,6 +100,39 @@ export async function spawnLogged(
     closeSync(outRead);
     closeSync(errRead);
   }
+}
+
+// A capture pair whose writer is gone: nothing has cleared it and its out file
+// no longer carries the shared lock the run held on the write description. The
+// probe opens read-only so scanning never creates the file, and takes the
+// exclusive lock only to prove none is held.
+export function abandonedCaptures(folder: string): { out: string; err: string; cleared: string }[] {
+  const name: RegExp = /^capture-.+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-out\.log$/;
+  const found: { out: string; err: string; cleared: string }[] = [];
+  for (const member of new Bun.Glob('**/capture-*-out.log').scanSync({ cwd: folder, dot: true, onlyFiles: false })) {
+    const matched: RegExpMatchArray | null = basename(member).match(name);
+    if (matched === null) continue;
+    const out: string = resolve(folder, member);
+    const cleared: string = join(dirname(out), `cleared-${matched[1]}.md`);
+    if (existsSync(cleared) && readFileSync(cleared, 'utf8').trim().length > 0) continue;
+    let fd: number;
+    try {
+      fd = openSync(out, 'r');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    try {
+      const probe: Bun.SyncSubprocess<'pipe', 'ignore'> = Bun.spawnSync(['flock', '-n', '-x', '0'], {
+        stdin: fd,
+        stderr: 'ignore',
+      });
+      if (probe.exitCode === 0) found.push({ out, err: out.replace(/-out\.log$/, '-err.log'), cleared });
+    } finally {
+      closeSync(fd);
+    }
+  }
+  return found;
 }
 
 export interface LeafTarget {
@@ -302,61 +335,75 @@ export async function checkedRun(
           }
           const captureOut: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-out.log`);
           const captureErr: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-err.log`);
-          writeFileSync(captureOut, '');
-          writeFileSync(captureErr, '');
-          process.stderr.write(`capture ${name}: ${captureOut} ${captureErr}\n`);
-          appendTiming(repo, {
-            kind: 'check_start',
-            ...check,
-            ...(admission.kind === 'held' ? { wait_ms: admission.wait_ms } : {}),
-          });
-          const started: number = Date.now();
-          const result: Result =
-            admission.kind === 'nested'
-              ? await spawnLogged(['flock', '-s', lockPath, ...argv], cwd, env, {
-                  out: captureOut,
-                  err: captureErr,
-                })
-              : await (async () => {
-                  await startRunGuard(slice, run, process.pid, admission.record_path);
-                  try {
-                    return await spawnLogged(
-                      ['flock', '-s', lockPath, ...runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS)],
-                      cwd,
-                      { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
-                      { out: captureOut, err: captureErr },
-                    );
-                  } finally {
-                    admission.release();
-                    await stopRunUnits(runUnit, `${runUnitBase(run)}-guard.service`);
-                  }
-                })();
-          process.stdout.write(result.stdout);
-          process.stderr.write(result.stderr);
-          const refusedReason: string | undefined = await ownerRefusal(target, repo, true);
-          if (refusedReason !== undefined) {
-            // The holder may have moved mid-run: drop the stale captures under
-            // every owner dir their member resolves to, or at the written path.
-            for (const captured of [captureOut, captureErr]) {
-              const hit: LogTarget | null = await locate(captured, repo.root, repo);
-              const targets: string[] =
-                hit === null ? [captured] : hit.ownerDirs.map((dir) => resolve(dir, hit.member));
-              for (const path of targets) rmSync(path, { force: true });
+          const capFd: number = openSync(captureOut, 'w');
+          try {
+            // The lock lives on capFd's open description for the run's life:
+            // the command inherits the fd, so the pair reads as live until the
+            // last writer exits. Bun maps no extra fds into children, so the
+            // helper locks the same description through its stdin slot.
+            const locked: Bun.SyncSubprocess<'pipe', 'pipe'> = Bun.spawnSync(['flock', '-s', '0'], {
+              stdin: capFd,
+              stderr: 'pipe',
+            });
+            if (locked.exitCode !== 0) throw new FlockError(captureOut, locked.exitCode, locked.stderr.toString());
+            writeFileSync(captureErr, '');
+            process.stderr.write(`capture ${name}: ${captureOut} ${captureErr}\n`);
+            appendTiming(repo, {
+              kind: 'check_start',
+              ...check,
+              ...(admission.kind === 'held' ? { wait_ms: admission.wait_ms } : {}),
+            });
+            const started: number = Date.now();
+            const result: Result =
+              admission.kind === 'nested'
+                ? await spawnLogged(['flock', '-s', lockPath, ...argv], cwd, env, {
+                    out: captureOut,
+                    outFd: capFd,
+                    err: captureErr,
+                  })
+                : await (async () => {
+                    await startRunGuard(slice, run, process.pid, admission.record_path);
+                    try {
+                      return await spawnLogged(
+                        ['flock', '-s', lockPath, ...runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS)],
+                        cwd,
+                        { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+                        { out: captureOut, outFd: capFd, err: captureErr },
+                      );
+                    } finally {
+                      admission.release();
+                      await stopRunUnits(runUnit, `${runUnitBase(run)}-guard.service`);
+                    }
+                  })();
+            process.stdout.write(result.stdout);
+            process.stderr.write(result.stderr);
+            const refusedReason: string | undefined = await ownerRefusal(target, repo, true);
+            if (refusedReason !== undefined) {
+              // The holder may have moved mid-run: drop the stale captures under
+              // every owner dir their member resolves to, or at the written path.
+              for (const captured of [captureOut, captureErr]) {
+                const hit: LogTarget | null = await locate(captured, repo.root, repo);
+                const targets: string[] =
+                  hit === null ? [captured] : hit.ownerDirs.map((dir) => resolve(dir, hit.member));
+                for (const path of targets) rmSync(path, { force: true });
+              }
+              refusePublish(refusedReason, result);
             }
-            refusePublish(refusedReason, result);
+            const kept: string = resolve(target, `check-${encodeURIComponent(name)}-${Date.now()}-${process.pid}.log`);
+            writeFileSync(kept, result.stdout + result.stderr);
+            appendTiming(repo, {
+              kind: 'check_end',
+              ...check,
+              exit: result.code,
+              duration_ms: Date.now() - started,
+              log: kept,
+            });
+            unlinkSync(captureOut);
+            unlinkSync(captureErr);
+            return { code: result.code, log: kept, stderr_final_nl: result.stderr.endsWith('\n') };
+          } finally {
+            closeSync(capFd);
           }
-          const kept: string = resolve(target, `check-${encodeURIComponent(name)}-${Date.now()}-${process.pid}.log`);
-          writeFileSync(kept, result.stdout + result.stderr);
-          appendTiming(repo, {
-            kind: 'check_end',
-            ...check,
-            exit: result.code,
-            duration_ms: Date.now() - started,
-            log: kept,
-          });
-          unlinkSync(captureOut);
-          unlinkSync(captureErr);
-          return { code: result.code, log: kept, stderr_final_nl: result.stderr.endsWith('\n') };
         } finally {
           await holder.release();
         }
