@@ -337,7 +337,7 @@ export async function checkedRun(
           }
           const captureOut: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-out.log`);
           const captureErr: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-err.log`);
-          const pending: string = `${captureOut}.tmp`;
+          const pending: string = join(target, `.${basename(captureOut)}`);
           const capFd: number = openSync(pending, 'w');
           try {
             // The lock lives on capFd's open description for the run's life:
