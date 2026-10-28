@@ -6,6 +6,7 @@ import {
   openSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   unlinkSync,
   writeFileSync,
@@ -335,7 +336,8 @@ export async function checkedRun(
           }
           const captureOut: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-out.log`);
           const captureErr: string = resolve(target, `capture-${encodeURIComponent(name)}-${run}-err.log`);
-          const capFd: number = openSync(captureOut, 'w');
+          const pending: string = `${captureOut}.tmp`;
+          const capFd: number = openSync(pending, 'w');
           try {
             // The lock lives on capFd's open description for the run's life:
             // the command inherits the fd, so the pair reads as live until the
@@ -346,6 +348,7 @@ export async function checkedRun(
               stderr: 'pipe',
             });
             if (locked.exitCode !== 0) throw new FlockError(captureOut, locked.exitCode, locked.stderr.toString());
+            renameSync(pending, captureOut);
             writeFileSync(captureErr, '');
             process.stderr.write(`capture ${name}: ${captureOut} ${captureErr}\n`);
             appendTiming(repo, {
@@ -403,6 +406,7 @@ export async function checkedRun(
             return { code: result.code, log: kept, stderr_final_nl: result.stderr.endsWith('\n') };
           } finally {
             closeSync(capFd);
+            rmSync(pending, { force: true });
           }
         } finally {
           await holder.release();
