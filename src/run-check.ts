@@ -128,7 +128,8 @@ export function abandonedCaptures(folder: string): { out: string; err: string; c
         stdin: fd,
         stderr: 'ignore',
       });
-      if (probe.exitCode === 0) found.push({ out, err: out.replace(/-out\.log$/, '-err.log'), cleared });
+      if (probe.exitCode === 0 && existsSync(out))
+        found.push({ out, err: out.replace(/-out\.log$/, '-err.log'), cleared });
     } finally {
       closeSync(fd);
     }
