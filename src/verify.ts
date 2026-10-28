@@ -404,9 +404,12 @@ function decideSlow(runs: VerifyRun[], index: number, boot: string): SlowDecisio
     : open?.first;
   let close: 'recovered' | 'accepted' | undefined;
   if (open !== undefined) {
-    const window: VerifyRun[] = earlier.filter(slowEligible).slice(-20);
+    const window: VerifyRun[] = [...earlier, me].filter(slowEligible).slice(-20);
     if (!flagged && slowEligible(me)) close = 'recovered';
-    else if (window.length === 20 && window.every((run) => run.slow?.first?.run === open.first!.run))
+    else if (
+      window.length === 20 &&
+      window.every((run) => run.run === me.run || run.slow?.first?.run === open.first!.run)
+    )
       close = 'accepted';
   }
   const send: boolean =
