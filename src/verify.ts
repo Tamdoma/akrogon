@@ -364,15 +364,7 @@ async function sendMainRedNotice(repo: Repo, runId: string, lock: string, names:
 
 // One notice per episode, retried by later in-episode runs until a reply lands.
 async function sendMergeSlowNotice(repo: Repo, runId: string, lock: string, body: string): Promise<void> {
-  const args: string[] = [
-    'notification',
-    'show',
-    `${repo.name} merge slow`,
-    '--body',
-    body,
-    '--sound',
-    'none',
-  ];
+  const args: string[] = ['notification', 'show', `${repo.name} merge slow`, '--body', body, '--sound', 'none'];
   let delivery: string = 'error';
   try {
     delivery = await noticeSend(repo, args);
@@ -422,11 +414,18 @@ function decideSlow(runs: VerifyRun[], index: number, boot: string): SlowDecisio
     !earlier.some(
       (row) =>
         row.slow?.first?.run === first.run &&
-        (row.slow!.notice === 'shown' ||
-          (row.slow!.notice === 'pending' && row.boot_id === boot && pidAlive(row.pid))),
+        (row.slow!.notice === 'shown' || (row.slow!.notice === 'pending' && row.boot_id === boot && pidAlive(row.pid))),
     );
   const print: string | undefined = flagged
-    ? 'verify slow: ' + minutes(ms) + 'm measured vs ' + minutes(normal) + 'm normal; first seen at ' + first!.leaf + ' ' + first!.run + (close === 'accepted' ? '; accepted as new normal' : '')
+    ? 'verify slow: ' +
+      minutes(ms) +
+      'm measured vs ' +
+      minutes(normal) +
+      'm normal; first seen at ' +
+      first!.leaf +
+      ' ' +
+      first!.run +
+      (close === 'accepted' ? '; accepted as new normal' : '')
     : undefined;
   return {
     slow: {
@@ -439,7 +438,15 @@ function decideSlow(runs: VerifyRun[], index: number, boot: string): SlowDecisio
     ...(print === undefined ? {} : { print }),
     ...(send
       ? {
-          send: 'merge verify ' + minutes(ms) + 'm vs ' + minutes(normal) + 'm normal; first seen at ' + first!.leaf + ' ' + first!.run,
+          send:
+            'merge verify ' +
+            minutes(ms) +
+            'm vs ' +
+            minutes(normal) +
+            'm normal; first seen at ' +
+            first!.leaf +
+            ' ' +
+            first!.run,
         }
       : {}),
   };

@@ -2,16 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import {
-  cli,
-  fakeAkrogon,
-  fakeHerdr,
-  fixture,
-  seedRun,
-  storeDir,
-  yaml,
-  type Fixture,
-} from './helpers';
+import { cli, fakeAkrogon, fakeHerdr, fixture, seedRun, storeDir, yaml, type Fixture } from './helpers';
 import type { Database } from './fake-herdr';
 import { command, type Result } from '../src/shell';
 import { readRepo } from '../src/config';
@@ -116,8 +107,7 @@ async function backdate(f: Fixture, ms: number): Promise<string> {
     });
     if (index !== -1) {
       const row = JSON.parse(lines[index]) as { run: string; start: string };
-      if (Date.parse(row.start) > Date.now() - ms)
-        row.start = new Date(Date.now() - ms).toISOString();
+      if (Date.parse(row.start) > Date.now() - ms) row.start = new Date(Date.now() - ms).toISOString();
       lines[index] = JSON.stringify(row);
       writeFileSync(file, lines.join('\n') + '\n');
       return row.run;
@@ -219,12 +209,7 @@ test('only eligible rows enter the normal and checked bounds follow the design',
     });
     // The known-red head must hold check.sh: verify the pushed main tip.
     await command(['git', 'checkout', '-b', 'kr', 'origin/main'], direct);
-    const pendingKr: Promise<Result> = cli(
-      f,
-      ['verify', '--holder', holder, '--known-red'],
-      direct,
-      mergeEnv(f),
-    );
+    const pendingKr: Promise<Result> = cli(f, ['verify', '--holder', holder, '--known-red'], direct, mergeEnv(f));
     const headId: string = await backdate(f, 600000);
     const knownRed: Result = await pendingKr;
     expect(knownRed.code).toBe(0);
@@ -319,10 +304,7 @@ test('a failed slow notice is retried by the next in-episode run and a stale pen
       writeFileSync(file, lines.join('\n') + '\n');
     }
     const env: NodeJS.ProcessEnv = mergeEnv(f);
-    writeFileSync(
-      resolve(f.home, 'herdr.json'),
-      JSON.stringify({ ...herdrDb(f), failNotificationOnce: true }),
-    );
+    writeFileSync(resolve(f.home, 'herdr.json'), JSON.stringify({ ...herdrDb(f), failNotificationOnce: true }));
 
     const aId: string = await (async () => {
       const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
@@ -368,12 +350,7 @@ test('a failed slow notice is retried by the next in-episode run and a stale pen
         writeFileSync(file, lines.join('\n') + '\n');
       }
       const gId: string = await (async () => {
-        const pending: Promise<Result> = cli(
-          g,
-          ['verify', '--holder', other.holder],
-          other.direct,
-          mergeEnv(g),
-        );
+        const pending: Promise<Result> = cli(g, ['verify', '--holder', other.holder], other.direct, mergeEnv(g));
         const id: string = await backdate(g, 600000);
         expect((await pending).code).toBe(0);
         return id;
@@ -424,9 +401,7 @@ test('status prints Slow merge only while that repo episode is open', async () =
     register(f, { repo: f.root, other: g.root });
     const episode: string = seedEpisode(f);
     const open: Result = await cli(f, ['status'], f.home, mergeEnv(f));
-    const line: string | undefined = open.stdout
-      .split('\n')
-      .find((entry) => entry.startsWith('Slow merge:'));
+    const line: string | undefined = open.stdout.split('\n').find((entry) => entry.startsWith('Slow merge:'));
     expect(line).toBe(`Slow merge: repo first seen at firstleaf ${episode}, last 10m vs normal 5m`);
     expect(open.stdout.split('\n').filter((entry) => entry.startsWith('Slow merge:'))).toHaveLength(1);
 
