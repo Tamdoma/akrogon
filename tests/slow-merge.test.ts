@@ -136,17 +136,11 @@ test('a slow merge run is flagged, recorded, printed and notified once', async (
     });
     const { direct, holder } = await mergeCaller(f);
     for (let i = 0; i < 4; i++) seedMerge(f, 300000);
-    // Run A is the fifth eligible row's own wall: only 4 eligible earlier.
-    const aId: string = await (async () => {
-      const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
-      const id: string = await backdate(f, 300000);
-      const result: Result = await pending;
-      expect(result.code).toBe(0);
-      return id;
-    })();
-    const a: VerifyRun = records(f).find((run) => run.run === aId)!;
-    expect(a.slow).toMatchObject({ normal_ms: 300000 });
-    expect(a.slow!.first).toBeUndefined();
+    // Run A is the fifth eligible row: it sees only 4 eligible earlier rows
+    // and is never compared, so it carries no `slow` record at all.
+    expect((await cli(f, ['verify', '--holder', holder], direct, mergeEnv(f))).code).toBe(0);
+    const a: VerifyRun = records(f).at(-1)!;
+    expect(a.slow).toBeUndefined();
     expect(noticeCalls(f)).toEqual([]);
 
     await bump(direct, 'code.ts');
@@ -195,13 +189,8 @@ test('only eligible rows enter the normal and checked bounds follow the design',
     seedMerge(f, 5500, { compares: 'some-head' });
 
     // Only 4 eligible earlier rows: silent.
-    const firstId: string = await (async () => {
-      const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
-      const id: string = await backdate(f, 1000);
-      expect((await pending).code).toBe(0);
-      return id;
-    })();
-    expect(records(f).find((run) => run.run === firstId)!.slow).toBeUndefined();
+    expect((await cli(f, ['verify', '--holder', holder], direct, mergeEnv(f))).code).toBe(0);
+    expect(records(f).at(-1)!.slow).toBeUndefined();
 
     // Run 2 sees 5 eligible rows: the ineligible kinds at 5500ms never count.
     await bump(direct, 'second.ts');
