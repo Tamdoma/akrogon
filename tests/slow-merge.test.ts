@@ -418,6 +418,34 @@ test('the twentieth eligible episode run closes accepted', async () => {
   }
 }, 30000);
 
+test('an unflagged partial accepted close prints the acceptance', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: { unit: 'echo unit', extra: 'echo extra' },
+      grounding: 'none',
+    });
+    const { direct, holder } = await mergeCaller(f);
+    const episode: string = seedEpisode(f, 5);
+    const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], direct);
+    for (let i: number = 0; i < 19; i++)
+      seedMerge(f, 500000, {
+        ...(i === 18 ? { tree } : {}),
+        slow: { ms: 500000, normal_ms: 300000, first: { run: episode, leaf: 'firstleaf' } },
+      });
+    const result: Result = await cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
+    expect(result.code).toBe(0);
+    const row: VerifyRun = records(f).at(-1)!;
+    expect(row.commands.find((item) => item.name === 'unit')!.reused).toBeDefined();
+    expect(row.slow).toMatchObject({ first: { run: episode }, close: 'accepted' });
+    const line: string | undefined = result.stdout.split('\n').find((entry) => entry.startsWith('verify slow:'));
+    expect(line).toContain('accepted');
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
 test('status prints Slow merge only while that repo episode is open', async () => {
   const f: Fixture = await fixture();
   const g: Fixture = await fixture();
