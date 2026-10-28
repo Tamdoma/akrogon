@@ -80,6 +80,15 @@ export const verifyRunSchema = z.strictObject({
       blocked: z.string().optional(),
     }),
   ),
+  slow: z
+    .strictObject({
+      ms: z.number().int(),
+      normal_ms: z.number().int(),
+      first: z.strictObject({ run: z.string(), leaf: z.string() }).optional(),
+      close: z.enum(['recovered', 'accepted']).optional(),
+      notice: z.string().optional(),
+    })
+    .optional(),
   start: z.string(),
   end: z.string().optional(),
 });
@@ -162,6 +171,32 @@ const noTestNames: readonly string[] = ['(no test name)', '(log gone)'];
 
 function greenEntry(run: VerifyRun, item: NamedCommand): VerifyRun['commands'][number] | undefined {
   return run.commands.find((entry) => entry.name === item.name && entry.command === item.command && entry.exit === 0);
+}
+
+// A completed merge head run is checked against the normal; base comparisons
+// and unfinished passes never are.
+function slowChecked(run: VerifyRun): boolean {
+  return run.scope === 'merge' && run.compares === undefined && run.end !== undefined;
+}
+
+// Only a fully executed green-setup run enters the normal: reused and blocked
+// entries say nothing about the machine's real wall time.
+function slowEligible(run: VerifyRun): boolean {
+  return (
+    slowChecked(run) &&
+    run.setup === 0 &&
+    run.commands.every((item) => item.reused === undefined && item.blocked === undefined)
+  );
+}
+
+function median(values: number[]): number {
+  const sorted: number[] = [...values].sort((a, b) => a - b);
+  const mid: number = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+function minutes(ms: number): number {
+  return Math.round(ms / 60000);
 }
 
 // The newest completed run on the same tree and scope holding {name, command} green lends its entry.
@@ -282,6 +317,31 @@ async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[]): Promis
 
 const noticeSchema = z.object({ shown: z.boolean(), reason: z.string() });
 
+// One locked read-mutate-rewrite of a single ledger row by run id.
+async function rewriteRun(
+  repo: Repo,
+  lock: string,
+  runId: string,
+  mutate: (run: VerifyRun) => VerifyRun,
+): Promise<void> {
+  await withLock(lock, async () => {
+    const file: string = recordsPath(repo);
+    const runs: VerifyRun[] = readVerifyRuns(repo);
+    const index: number = runs.findIndex((run) => run.run === runId);
+    if (index === -1) return;
+    runs[index] = mutate(runs[index]);
+    const temporary: string = `${file}.${process.pid}.tmp`;
+    writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
+    renameSync(temporary, file);
+  });
+}
+
+async function noticeSend(repo: Repo, args: string[]): Promise<string> {
+  const resolved: SessionResolution = await repoSession(repo);
+  if (!resolved.ok) throw new Error(resolved.reason);
+  return (await herdr(args, noticeSchema, { session: resolved.session.name })).reason;
+}
+
 // The reply reason or `error` replaces the pending reservation; a failed send only prints.
 async function sendMainRedNotice(repo: Repo, runId: string, lock: string, names: string[]): Promise<void> {
   const args: string[] = [
@@ -295,22 +355,94 @@ async function sendMainRedNotice(repo: Repo, runId: string, lock: string, names:
   ];
   let delivery: string = 'error';
   try {
-    const resolved: SessionResolution = await repoSession(repo);
-    if (!resolved.ok) throw new Error(resolved.reason);
-    delivery = (await herdr(args, noticeSchema, { session: resolved.session.name })).reason;
+    delivery = await noticeSend(repo, args);
   } catch (error) {
     process.stderr.write(`notice: ${error instanceof Error ? error.message : String(error)}\n`);
   }
-  await withLock(lock, async () => {
-    const file: string = recordsPath(repo);
-    const runs: VerifyRun[] = readVerifyRuns(repo);
-    const index: number = runs.findIndex((run) => run.run === runId);
-    if (index === -1) return;
-    runs[index] = { ...runs[index], notice: delivery };
-    const temporary: string = `${file}.${process.pid}.tmp`;
-    writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
-    renameSync(temporary, file);
-  });
+  await rewriteRun(repo, lock, runId, (run) => ({ ...run, notice: delivery }));
+}
+
+// One notice per episode, retried by later in-episode runs until a reply lands.
+async function sendMergeSlowNotice(repo: Repo, runId: string, lock: string, body: string): Promise<void> {
+  const args: string[] = [
+    'notification',
+    'show',
+    `${repo.name} merge slow`,
+    '--body',
+    body,
+    '--sound',
+    'none',
+  ];
+  let delivery: string = 'error';
+  try {
+    delivery = await noticeSend(repo, args);
+  } catch (error) {
+    process.stderr.write(`notice: ${error instanceof Error ? error.message : String(error)}\n`);
+  }
+  await rewriteRun(repo, lock, runId, (run) => ({ ...run, slow: { ...run.slow!, notice: delivery } }));
+}
+
+type SlowDecision = { slow: NonNullable<VerifyRun['slow']>; print?: string; send?: string };
+
+// Decided once inside the run's locked final rewrite over earlier ledger rows
+// only (ledger order is append order). An open episode pins its pre-jump
+// normal; outside an episode the normal is the median of the last 20 eligible
+// rows, computed only at 5 or more.
+function decideSlow(runs: VerifyRun[], index: number, boot: string): SlowDecision | undefined {
+  const me: VerifyRun = runs[index];
+  if (!slowChecked(me)) return undefined;
+  const ms: number = Date.parse(me.end!) - Date.parse(me.start);
+  const earlier: VerifyRun[] = runs.slice(0, index);
+  const latest: VerifyRun | undefined = earlier.findLast((run) => run.slow !== undefined);
+  const open: NonNullable<VerifyRun['slow']> | undefined =
+    latest !== undefined && latest.slow!.first !== undefined && latest.slow!.close === undefined
+      ? latest.slow!
+      : undefined;
+  let normal: number;
+  if (open !== undefined) {
+    normal = open.normal_ms;
+  } else {
+    const eligible: VerifyRun[] = earlier.filter(slowEligible).slice(-20);
+    if (eligible.length < 5) return undefined;
+    normal = median(eligible.map((run) => Date.parse(run.end!) - Date.parse(run.start)));
+  }
+  const flagged: boolean = ms > 1.5 * normal && ms - normal >= 120000;
+  const first: { run: string; leaf: string } | undefined = flagged
+    ? (open?.first ?? { run: me.run, leaf: me.leaf })
+    : open?.first;
+  let close: 'recovered' | 'accepted' | undefined;
+  if (open !== undefined) {
+    const window: VerifyRun[] = earlier.filter(slowEligible).slice(-20);
+    if (!flagged && slowEligible(me)) close = 'recovered';
+    else if (window.length === 20 && window.every((run) => run.slow?.first?.run === open.first!.run))
+      close = 'accepted';
+  }
+  const send: boolean =
+    first !== undefined &&
+    !earlier.some(
+      (row) =>
+        row.slow?.first?.run === first.run &&
+        (row.slow!.notice === 'shown' ||
+          (row.slow!.notice === 'pending' && row.boot_id === boot && pidAlive(row.pid))),
+    );
+  const print: string | undefined = flagged
+    ? 'verify slow: ' + minutes(ms) + 'm measured vs ' + minutes(normal) + 'm normal; first seen at ' + first!.leaf + ' ' + first!.run + (close === 'accepted' ? '; accepted as new normal' : '')
+    : undefined;
+  return {
+    slow: {
+      ms,
+      normal_ms: normal,
+      ...(first === undefined ? {} : { first }),
+      ...(close === undefined ? {} : { close }),
+      ...(send ? { notice: 'pending' as const } : {}),
+    },
+    ...(print === undefined ? {} : { print }),
+    ...(send
+      ? {
+          send: 'merge verify ' + minutes(ms) + 'm vs ' + minutes(normal) + 'm normal; first seen at ' + first!.leaf + ' ' + first!.run,
+        }
+      : {}),
+  };
 }
 
 export async function requireGreenReceipt(repo: Repo, sha: string, scope: VerifyScope): Promise<void> {
@@ -378,6 +510,8 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
   let setupExit: number | undefined;
   let end: string | undefined;
   let send: string[] = [];
+  let slowPrint: string | undefined;
+  let slowSend: string | undefined;
   try {
     await createSparseWorktree(repo, target, sha, { detach: true });
     await emitEnvFile(repo, target, repo.config.env);
@@ -469,11 +603,19 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
         send = await newRedUnits(repo, runs[index], runs);
         if (send.length > 0) runs[index] = { ...runs[index], notice: 'pending' };
       }
+      const decision: SlowDecision | undefined = decideSlow(runs, index, bootId());
+      if (decision !== undefined) {
+        runs[index] = { ...runs[index], slow: decision.slow };
+        slowPrint = decision.print;
+        slowSend = decision.send;
+      }
       const temporary: string = `${file}.${process.pid}.tmp`;
       writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
       renameSync(temporary, file);
     });
     if (send.length > 0) await sendMainRedNotice(repo, id, lock, send);
+    if (slowPrint !== undefined) process.stdout.write(slowPrint + '\n');
+    if (slowSend !== undefined) await sendMergeSlowNotice(repo, id, lock, slowSend);
     if (existsSync(target)) await command(['git', 'worktree', 'remove', '--force', target], repo.root);
   }
   return {

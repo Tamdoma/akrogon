@@ -37,6 +37,7 @@ import { readHostKept, readKept } from './reconcile';
 import { currentReleaseCommit, readDeployRecord } from './release';
 import { landAlive, landUnit } from './land';
 import { lineRuns, type RunRecord } from './admission';
+import { readVerifyRuns, type VerifyRun } from './verify';
 
 type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
 type Scan =
@@ -49,6 +50,7 @@ type Scan =
       timings: TimingEvent[];
       queue: QueueEntry[];
       failures: LeafFailure[];
+      slow: VerifyRun | undefined;
     }
   | { ok: false; repo: string; path: string; error: string };
 
@@ -92,7 +94,9 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     const log: LogRecord[] = readLog(repo.root);
     const queue: QueueEntry[] = mergeQueue(global, repo, inventory.leaves, () => log);
     const timings: TimingEvent[] = readTimings(repo.root);
-    return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log, timings, queue, failures };
+    path = resolve(repo.root, 'issues/verify-runs.jsonl');
+    const slow: VerifyRun | undefined = readVerifyRuns(repo).findLast((run) => run.slow !== undefined);
+    return { ok: true, repo, leaves, parked: issueFolders(repo.root, 'issues/parked'), log, timings, queue, failures, slow };
   } catch (error) {
     if (error instanceof SeatIndexError) path = error.file;
     if (
@@ -529,6 +533,10 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
   }
   for (const scan of scans) {
     if (scan.ok) for (const line of unpackedLines(scan.repo.root)) console.log(line);
+    if (scan.ok && scan.slow?.slow?.first !== undefined && scan.slow.slow.close === undefined)
+      console.log(
+        'Slow merge: ' + scan.repo.name + ' first seen at ' + scan.slow.slow.first.leaf + ' ' + scan.slow.slow.first.run + ', last ' + Math.round(scan.slow.slow.ms / 60000) + 'm vs normal ' + Math.round(scan.slow.slow.normal_ms / 60000) + 'm',
+      );
   }
   for (const scan of scans) {
     if (!scan.ok) continue;
