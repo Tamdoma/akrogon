@@ -85,7 +85,8 @@ function seedEpisode(f: Fixture, pre: number = 4): string {
 async function mergeCaller(f: Fixture): Promise<{ direct: string; holder: string }> {
   const direct: string = resolve(storeDir(f), 'direct');
   await command(['git', 'worktree', 'add', direct, '-b', 'direct'], f.root);
-  const holder: string = resolve(f.home, 'chart/direct');
+  // Inside issues/chart so command logs resolve through evidence locate.
+  const holder: string = resolve(f.root, 'issues/chart/slow/direct');
   mkdirSync(holder, { recursive: true });
   return { direct, holder };
 }
