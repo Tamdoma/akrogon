@@ -419,17 +419,18 @@ function decideSlow(runs: VerifyRun[], index: number, boot: string): SlowDecisio
         row.slow?.first?.run === first.run &&
         (row.slow!.notice === 'shown' || (row.slow!.notice === 'pending' && row.boot_id === boot && pidAlive(row.pid))),
     );
-  const print: string | undefined = flagged
-    ? 'verify slow: ' +
-      minutes(ms) +
-      'm measured vs ' +
-      minutes(normal) +
-      'm normal; first seen at ' +
-      first!.leaf +
-      ' ' +
-      first!.run +
-      (close === 'accepted' ? '; accepted as new normal' : '')
-    : undefined;
+  const print: string | undefined =
+    flagged || close === 'accepted'
+      ? 'verify slow: ' +
+        minutes(ms) +
+        'm measured vs ' +
+        minutes(normal) +
+        'm normal; first seen at ' +
+        first!.leaf +
+        ' ' +
+        first!.run +
+        (close === 'accepted' ? '; accepted as new normal' : '')
+      : undefined;
   return {
     slow: {
       ms,
