@@ -421,11 +421,14 @@ test.serial(
     greenReceipt(f, (await command(['git', 'rev-parse', 'HEAD'], worktree)).trim(), 'leaf');
     const leafDir: string = resolve(f.root, 'issues/open/issue/gatekill');
     const implDir: string = resolve(leafDir, 'implementation');
-    const cap: RealCap = spawnReal(f, ['run-check', '--name', 'gatekill', '--', 'sleep', '30'], worktree, {
-      RUN_UNITS_OUT: out,
-      AKROGON_RUN_SLICE: slice,
-    });
+    const cap: RealCap = spawnReal(
+      f,
+      ['run-check', '--name', 'gatekill', '--', 'sh', '-c', `trap '' TERM; touch "${out}/ready"; sleep 30`],
+      worktree,
+      { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
+    );
     try {
+      await waitPath(resolve(out, 'ready'));
       const deadline: number = Date.now() + 15000;
       let record: Record<string, unknown> | undefined;
       while (record === undefined) {
@@ -450,23 +453,31 @@ test.serial(
       const live: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
       expect(live.code, `stdout: ${live.stdout} stderr: ${live.stderr}`).toBe(0);
       cap.proc.kill('SIGKILL');
-      const cgroupProcs: string = resolve(unitDir('/sys/fs/cgroup', slice, unit), 'cgroup.procs');
-      const drainDeadline: number = Date.now() + 10000;
-      let drained: boolean = false;
-      while (!drained && Date.now() < drainDeadline) {
-        drained =
-          (await sysctl('is-active', unit)).code !== 0 &&
-          (!existsSync(cgroupProcs) || readFileSync(cgroupProcs, 'utf8').trim() === '');
-        if (!drained) await Bun.sleep(150);
-      }
-      expect(drained, `${unit} did not drain`).toBe(true);
       const result: SpawnResult = await cap.result;
       expect(result.signalCode).toBe('SIGKILL');
+      const cgroupProcs: string = resolve(unitDir('/sys/fs/cgroup', slice, unit), 'cgroup.procs');
+      // The started payload ignores TERM, so it outlives the dead wrapper inside
+      // the real scope until the guard's stop drains the cgroup — the interval
+      // where the pair stays live on the holder's inherited stdout fd alone.
+      const drainDeadline: number = Date.now() + 10000;
+      let held: boolean = false;
+      let refusedResult: SpawnResult | undefined;
+      while (Date.now() < drainDeadline) {
+        const holderLive: boolean = existsSync(cgroupProcs) && readFileSync(cgroupProcs, 'utf8').trim() !== '';
+        const probe: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
+        if (probe.code !== 0) {
+          refusedResult = probe;
+          break;
+        }
+        held ||= holderLive && result.signalCode === 'SIGKILL';
+        await Bun.sleep(100);
+      }
+      expect(held, 'never saw a live holder with the wrapper dead and the move still open').toBe(true);
+      expect(refusedResult, 'the pair never refused after the unit drained').toBeDefined();
       // Wrapper and last fd holder are gone: the pair is abandoned and refuses.
       expect(existsSync(outLog)).toBe(true);
       expect(existsSync(errLog)).toBe(true);
-      const refused: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
-      expect(refused.code).not.toBe(0);
+      const refused: SpawnResult = refusedResult as SpawnResult;
       const refusal: string = refused.stdout + refused.stderr;
       expect(refusal).toContain(outLog);
       expect(refusal).toContain(errLog);
