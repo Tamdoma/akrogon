@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { readGlobal, requireRepo, target, globalHome, type GlobalConfig, type Repo, within } from './config';
 import {
@@ -51,6 +51,7 @@ import { applyTop, buildStack, isAncestor } from './batch';
 import { requireGreenReceipt } from './verify';
 import { enclosingCapture, packFolderLocked } from './pack';
 import { flockHold } from './flock';
+import { abandonedCaptures } from './run-check';
 
 async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string, session: string): Promise<T> {
   try {
@@ -143,6 +144,30 @@ export class MoveCommittedError extends Error {
   }
 }
 
+// An abandoned capture pair refuses until a non-blank cleared-<run>.md
+// stands beside it; the operator clears and retries, so nothing is marked
+// failed. A refusal retires pairs already cleared: their note says the bytes
+// were read and acted on, so the pair drops out of the way like a published
+// one.
+function refuseAbandonedCaptures(folder: string): void {
+  const pairs: { out: string; err: string; cleared: string }[] = abandonedCaptures(folder);
+  if (pairs.length === 0) return;
+  for (const member of new Bun.Glob('**/capture-*-out.log').scanSync({ cwd: folder, dot: true, onlyFiles: false })) {
+    const run: RegExpMatchArray | null = basename(member).match(
+      /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-out\.log$/,
+    );
+    if (run === null) continue;
+    const cleared: string = join(dirname(resolve(folder, member)), `cleared-${run[1]}.md`);
+    if (!existsSync(cleared) || readFileSync(cleared, 'utf8').trim().length === 0) continue;
+    rmSync(resolve(folder, member), { force: true });
+    rmSync(resolve(folder, member.replace(/-out\.log$/, '-err.log')), { force: true });
+  }
+  throw new Error(
+    `Refusing over an abandoned capture pair in ${folder}: read the pair, run the leaf grant's discovery, cleanup and absence read for that run, then write a non-blank cleared-<run>.md beside it.\n` +
+      pairs.map((pair) => `${pair.out} ${pair.err} -> ${pair.cleared}`).join('\n'),
+  );
+}
+
 // A merged move that completes the caller's own run-check capture owner
 // refuses before the merge commits, marking the leaf failed so the next pass
 // leaves it for recovery instead of dispatching the blocked turn; a different
@@ -159,20 +184,22 @@ function refuseEnclosingCompletion(
   if (completing === null) return;
   const owner: string = resolve(repo.root, 'issues/open', completing.name);
   const run: string | undefined = enclosingCapture(owner);
-  if (run === undefined) return;
-  const reason: string = `Refusing to complete ${owner}: inside run-check run ${run}`;
-  saveState(leaf.path, {
-    ...recorded,
-    phase: 'failed',
-    batch,
-    failure: {
-      cause: 'blocked',
-      phase: recorded.phase,
-      slot: slot ?? requiredSlots(recorded.phase, recorded.fix_rounds)[0],
-      reason,
-    },
-  });
-  throw new Error(reason);
+  if (run === undefined) refuseAbandonedCaptures(owner);
+  else {
+    const reason: string = `Refusing to complete ${owner}: inside run-check run ${run}`;
+    saveState(leaf.path, {
+      ...recorded,
+      phase: 'failed',
+      batch,
+      failure: {
+        cause: 'blocked',
+        phase: recorded.phase,
+        slot: slot ?? requiredSlots(recorded.phase, recorded.fix_rounds)[0],
+        reason,
+      },
+    });
+    throw new Error(reason);
+  }
 }
 
 export async function commitMove(
@@ -307,6 +334,7 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   const completed: CompletedOwner | null = completion(repo, scope);
   if (completed !== null && existsSync(completed.destination))
     throw new Error(`Completion destination exists: ${completed.destination}`);
+  if (completed !== null) refuseAbandonedCaptures(owner);
   const issueSources: Set<string> = new Set(issueLeaves.flatMap((item) => item.state.sources ?? []));
   const siblingSources: Set<string> = new Set(
     ownerLeaves.filter((item) => dirname(item.path) !== issue).flatMap((item) => item.state.sources ?? []),
@@ -335,6 +363,9 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   // writer publishes before any of them or never sees the owner go.
   const holder: { release: () => Promise<void> } = await flockHold(resolve(owner, '.lock'), '-x');
   try {
+    // Under the exclusive hold every pair found is abandoned: live writers
+    // still holding the shared lock would have kept this hold waiting.
+    refuseAbandonedCaptures(owner);
     writeFileSync(resolve(owner, '.closing'), '');
     await packFolderLocked(repo, owner, leaf.path);
     mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
@@ -347,6 +378,7 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
 }
 
 export async function moveGuards(repo: Repo, leaf: Leaf, state: State, requested: Phase, from?: string): Promise<void> {
+  if (state.phase !== 'failed') refuseAbandonedCaptures(leaf.path);
   if (state.worktree !== undefined && !(state.phase === 'failed' && state.failure?.cause === 'blocked'))
     await requireClean(state.worktree);
   if (state.worktree !== undefined) await requireNoIssueFiles(repo, state.worktree, leaf.path, from);
