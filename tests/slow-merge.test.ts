@@ -216,6 +216,8 @@ test('only eligible rows enter the normal and checked bounds follow the design',
       checks: { unit: 'sh check.sh' },
       grounding: 'none',
     });
+    // The known-red head must hold check.sh: verify the pushed main tip.
+    await command(['git', 'checkout', '-b', 'kr', 'origin/main'], direct);
     const pendingKr: Promise<Result> = cli(
       f,
       ['verify', '--holder', holder, '--known-red'],
@@ -420,7 +422,7 @@ test('status prints Slow merge only while that repo episode is open', async () =
   try {
     register(f, { repo: f.root, other: g.root });
     const episode: string = seedEpisode(f);
-    const open: Result = await cli(f, ['status'], f.home, fakeHerdr(f).env);
+    const open: Result = await cli(f, ['status'], f.home, mergeEnv(f));
     const line: string | undefined = open.stdout
       .split('\n')
       .find((entry) => entry.startsWith('Slow merge:'));
@@ -435,7 +437,7 @@ test('status prints Slow merge only while that repo episode is open', async () =
         close: 'recovered',
       },
     });
-    const closed: Result = await cli(f, ['status'], f.home, fakeHerdr(f).env);
+    const closed: Result = await cli(f, ['status'], f.home, mergeEnv(f));
     expect(closed.stdout).not.toContain('Slow merge:');
   } finally {
     f.clean();
