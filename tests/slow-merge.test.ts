@@ -394,6 +394,30 @@ test('the last 20 eligible runs inside the episode close it accepted', async () 
   }
 }, 30000);
 
+test('the twentieth eligible episode run closes accepted', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: { unit: 'echo unit' },
+      grounding: 'none',
+    });
+    const { direct, holder } = await mergeCaller(f);
+    const episode: string = seedEpisode(f, 5);
+    for (let i: number = 0; i < 18; i++)
+      seedMerge(f, 500000, {
+        slow: { ms: 500000, normal_ms: 300000, first: { run: episode, leaf: 'firstleaf' } },
+      });
+    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
+    const id: string = await backdate(f, 600000);
+    expect((await pending).code).toBe(0);
+    const row: VerifyRun = records(f).find((run) => run.run === id)!;
+    expect(row.slow).toMatchObject({ first: { run: episode }, close: 'accepted' });
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
 test('status prints Slow merge only while that repo episode is open', async () => {
   const f: Fixture = await fixture();
   const g: Fixture = await fixture();
