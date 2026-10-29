@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { z } from 'zod';
+import { verifyAnchor } from './peer-anchor';
 
 const waitSuccessSchema = z.object({
   result: z.object({
@@ -262,6 +263,7 @@ async function main(): Promise<void> {
     process.stderr.write(`Invalid budget-seconds: ${budgetArg}\n`);
     process.exit(1);
   }
+  verifyAnchor();
   const deadline: number = performance.now() + budgetSeconds * 1000;
   const agent: ListAgent = await readPeerAgent(pane);
   const exchange: Exchange =

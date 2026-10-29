@@ -3,6 +3,7 @@ import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { verifyAnchor } from './peer-anchor';
 
 type Ask = { pane: string; file: string; message: string };
 type Exchange = { kind: string; session: string | null; boundary: number | null; turn: string | null };
@@ -109,6 +110,7 @@ async function main(): Promise<void> {
     );
     process.exit(1);
   }
+  verifyAnchor();
   const seeded: { ask: Ask; exchange: Exchange }[] = [];
   let seedingFailed: boolean = false;
   for (const ask of asks) {
