@@ -25,6 +25,7 @@ type PaneSeed = {
   agent_status: string;
   agent_session?: FakeSession | null;
   screen_detection_skipped?: boolean | null;
+  shell_pid?: number;
 };
 type Setup = {
   dir: string;
@@ -46,6 +47,7 @@ function setup(seed: PaneSeed, dbExtra: Record<string, unknown> = {}): Setup {
   mkdirSync(home);
   const bin: string = resolve(dir, 'bin');
   mkdirSync(bin);
+  mkdirSync(resolve(dir, 'proc'));
   symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
   const db: string = resolve(dir, 'db.json');
   writeFileSync(
@@ -58,6 +60,8 @@ function setup(seed: PaneSeed, dbExtra: Record<string, unknown> = {}): Setup {
           cwd: '/tmp',
           agent: seed.agent,
           agent_status: seed.agent_status,
+          // w8:pX is the door pane the script anchors to: its shell is the test process.
+          shell_pid: seed.shell_pid ?? process.pid,
           ...(seed.agent_session === undefined || seed.agent_session === null
             ? {}
             : { agent_session: seed.agent_session }),
@@ -104,6 +108,8 @@ function setup(seed: PaneSeed, dbExtra: Record<string, unknown> = {}): Setup {
           PATH: `${bin}:${process.env.PATH}`,
           FAKE_HERDR: db,
           HOME: home,
+          AKROGON_PROC_ROOT: resolve(dir, 'proc'),
+          HERDR_PANE_ID: pane,
           DOOR_RESET_INLINE: '1',
           DOOR_RESET_TURN_BOUND_MS: '500',
           DOOR_RESET_CONFIRM_MS: '400',
@@ -790,3 +796,113 @@ test.each<[string, string]>([
     }
   },
 );
+
+// peer-pane-anchor criterion 1: a HERDR_PANE_ID herdr does not have, or whose shell is not an
+// ancestor, refuses before the first agent list read, naming the envs and herdr's answer.
+test('refuses when HERDR_PANE_ID names a pane herdr does not have', async (): Promise<void> => {
+  const s: Setup = setup(claudePane());
+  try {
+    writeTranscript(s.home, session, true);
+    const result: RunResult = await s.run({ HERDR_PANE_ID: 'w8:pZ' }, 'w8:pZ', session, s.log, START);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('w8:pZ');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(result.stderr).toContain('Missing pane');
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', 'w8:pZ']]);
+    expect(existsSync(s.log)).toBe(false);
+  } finally {
+    s.clean();
+  }
+});
+
+test('refuses when the pane shell is not an ancestor of the script', async (): Promise<void> => {
+  const s: Setup = setup({ ...claudePane(), shell_pid: 999999999 });
+  try {
+    writeTranscript(s.home, session, true);
+    const result: RunResult = await s.run({}, pane, session, s.log, START);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(pane);
+    expect(result.stderr).toContain('999999999');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', pane]]);
+    expect(existsSync(s.log)).toBe(false);
+  } finally {
+    s.clean();
+  }
+});
+
+// peer-pane-anchor criterion 2: the pane argument must equal the verified pane or nothing runs.
+test('refuses when the pane argument differs from the verified pane', async (): Promise<void> => {
+  const s: Setup = setup(claudePane());
+  try {
+    writeTranscript(s.home, session, true);
+    const result: RunResult = await s.run({}, 'w8:pZ', session, s.log, START);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(pane);
+    expect(result.stderr).toContain('w8:pZ');
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', pane]]);
+    expect(existsSync(s.log)).toBe(false);
+  } finally {
+    s.clean();
+  }
+});
+
+test('refuses when HERDR_PANE_ID is unset or empty, before any herdr call', async (): Promise<void> => {
+  const s: Setup = setup(claudePane());
+  try {
+    writeTranscript(s.home, session, true);
+    const result: RunResult = await s.run({ HERDR_PANE_ID: '' }, pane, session, s.log, START);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('HERDR_PANE_ID');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(s.calls()).toEqual([]);
+    expect(existsSync(s.log)).toBe(false);
+  } finally {
+    s.clean();
+  }
+});
+
+// peer-pane-anchor criterion 3: the detached child inherits the verified env and does not
+// re-verify — it is reparented off the pane shell's ancestry, so a re-check would refuse.
+test('the detached child finishes its reset after the parent exits without re-checking', async (): Promise<void> => {
+  const s: Setup = setup(claudePane(), {
+    promptScript: [{ session: 'sess-new', status: 'idle' }],
+  });
+  try {
+    writeTranscript(s.home, session, true);
+    // Decoy every process-info after the parent's anchor read: a re-checking child sees a
+    // shell_pid it can never descend from and refuses, so passing proves the skip.
+    const herdr: string = resolve(s.dir, 'bin', 'herdr');
+    rmSync(herdr);
+    writeFileSync(
+      herdr,
+      [
+        '#!/bin/sh',
+        'if [ "$1 $2" = "pane process-info" ]; then',
+        '  echo >> "$FAKE_HERDR.pinfos"',
+        '  [ "$(wc -l < "$FAKE_HERDR.pinfos")" -ge 2 ] && sed -i \'s/"shell_pid":[0-9]*/"shell_pid":999999999/\' "$FAKE_HERDR"',
+        'fi',
+        `exec ${quote(resolve(import.meta.dir, 'fake-herdr.ts'))} "$@"`,
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    const result: RunResult = await s.run({ DOOR_RESET_INLINE: '' }, pane, session, s.log, START);
+    expect(result.code).toBe(0);
+    expect(result.stdout.trim()).toBe('queued');
+    const deadline: number = Date.now() + 20000;
+    let logText: string = '';
+    while (Date.now() < deadline) {
+      logText = existsSync(s.log) ? readFileSync(s.log, 'utf8') : '';
+      if (logText.includes('"send-start-prompt"')) break;
+      await Bun.sleep(200);
+    }
+    expect(logText).toContain('"send-start-prompt"');
+    expect(logText).toContain('"send-reset"');
+    const prompts: string[][] = s.promptCalls();
+    expect(prompts[0][3]).toBe('/clear');
+    expect(prompts[prompts.length - 1][3]).toBe(START);
+  } finally {
+    s.clean();
+  }
+});

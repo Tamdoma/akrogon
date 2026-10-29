@@ -15,6 +15,7 @@ const fakePaneSchema = paneSchema.extend({
   agent_name: z.string().optional(),
   foreground_process_group_id: z.number().optional(),
   agent_pid: z.number().optional(),
+  shell_pid: z.number().optional(),
   exiting: z.boolean().optional(),
   staleSession: z.boolean().optional(),
   foreground_processes: z.array(z.looseObject({ pid: z.number(), argv: z.array(z.string()) })).optional(),
@@ -481,8 +482,9 @@ if (args[0] === 'agent' && args[1] === 'list') {
 }
 if (args[0] === 'pane' && args[1] === 'process-info') {
   const target: FakePane = pane(flag('--pane'));
-  const pid: number = shellPid(target.pane_id);
-  if (!existsSync(procDir(procRoot(), pid))) seedShell(procRoot(), target.pane_id, ownCgroup(target));
+  const pid: number = target.shell_pid ?? shellPid(target.pane_id);
+  if (target.shell_pid === undefined && !existsSync(procDir(procRoot(), pid)))
+    seedShell(procRoot(), target.pane_id, ownCgroup(target));
   result({
     process_info: {
       pane_id: target.pane_id,

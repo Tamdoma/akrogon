@@ -46,25 +46,29 @@ type PaneSeed = {
   live?: boolean;
   staleSession?: boolean;
   agent_session?: { kind: 'id' | 'path'; value: string };
+  shell_pid?: number;
 };
 type ScriptEntry = { code?: string; message?: string; stderr?: string };
-type Extra = { startScript?: ScriptEntry[] };
+type Extra = { startScript?: ScriptEntry[]; dbExtra?: Record<string, unknown> };
 type RunResult = { code: number; stdout: string; stderr: string };
 type SeatLine = { seat: string; pane: string; kind: string | null; state: string; session: string | 'none' };
 type DbShape = { panes: { pane_id: string; agent: string | null }[] };
 type Setup = {
   dir: string;
   root: string;
+  db: string;
   sleepers: Map<string, ChildProcess>;
   calls: () => string[][];
   herdrCalled: () => boolean;
   dbJson: () => DbShape;
   run: (...args: string[]) => Promise<RunResult>;
+  runWith: (env: Record<string, string>, ...args: string[]) => Promise<RunResult>;
   clean: () => void;
 };
 
 const consultants: PaneSeed[] = [
-  { pane_id: paneA, agent: 'pi' },
+  // paneA is the door pane the script anchors to: its shell is the test process.
+  { pane_id: paneA, agent: 'pi', shell_pid: process.pid },
   { pane_id: paneB, agent: 'codex', live: true, foreground: [{ pid: 0, argv: codexArgv }] },
   { pane_id: paneC, agent: 'pi', live: true, foreground: [{ pid: 0, argv: piArgv }] },
   { pane_id: paneX, agent: 'kimi', tab_id: 'w9:t9' },
@@ -115,15 +119,18 @@ function setup(seeds: PaneSeed[], extra: Extra = {}): Setup {
         ...(p.leader === undefined ? {} : { foreground_process_group_id: p.leader }),
         ...(p.live === true && p.leader !== undefined ? { agent_pid: p.leader } : {}),
         ...(p.foreground === undefined ? {} : { foreground_processes: p.foreground }),
+        ...(p.shell_pid === undefined ? {} : { shell_pid: p.shell_pid }),
       })),
       tabs: [],
       serial: 100,
       ...(extra.startScript === undefined ? {} : { startScript: extra.startScript }),
+      ...(extra.dbExtra === undefined ? {} : extra.dbExtra),
     }),
   );
   return {
     dir,
     root,
+    db,
     sleepers,
     calls: (): string[][] =>
       readFileSync(`${db}.calls`, 'utf8')
@@ -134,7 +141,26 @@ function setup(seeds: PaneSeed[], extra: Extra = {}): Setup {
     dbJson: (): DbShape => JSON.parse(readFileSync(db, 'utf8')) as DbShape,
     run: async (...args: string[]): Promise<RunResult> => {
       const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, ...args], {
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db, AKROGON_PROC_ROOT: proc },
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          FAKE_HERDR: db,
+          AKROGON_PROC_ROOT: proc,
+          HERDR_PANE_ID: paneA,
+        },
+      });
+      return { code, stdout, stderr };
+    },
+    runWith: async (env: Record<string, string>, ...args: string[]): Promise<RunResult> => {
+      const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, ...args], {
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          FAKE_HERDR: db,
+          AKROGON_PROC_ROOT: proc,
+          HERDR_PANE_ID: paneA,
+          ...env,
+        },
       });
       return { code, stdout, stderr };
     },
@@ -395,6 +421,72 @@ test('a restart with no session shown prints none', async (): Promise<void> => {
       state: 'restarted',
       session: 'none',
     });
+  } finally {
+    s.clean();
+  }
+});
+
+// peer-pane-anchor criterion 1: a HERDR_PANE_ID herdr does not have, or whose shell is not an
+// ancestor, refuses before any restart read or mutation, naming the envs and herdr's answer.
+test('refuses when HERDR_PANE_ID names a pane herdr does not have', async (): Promise<void> => {
+  const s: Setup = setup(consultants);
+  try {
+    const result: RunResult = await s.runWith({ HERDR_PANE_ID: 'w8:pZ' }, 'w8:pZ', 'B', paneB);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('w8:pZ');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(result.stderr).toContain('Missing pane');
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', 'w8:pZ']]);
+    expect(alive(s, paneB) && alive(s, paneC)).toBe(true);
+  } finally {
+    s.clean();
+  }
+});
+
+test('refuses when the pane shell is not an ancestor of the script', async (): Promise<void> => {
+  const seats: PaneSeed[] = consultants.map((p: PaneSeed): PaneSeed =>
+    p.pane_id === paneA ? { ...p, shell_pid: 999999999 } : p,
+  );
+  const s: Setup = setup(seats);
+  try {
+    const result: RunResult = await s.run(paneA, 'B', paneB);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(paneA);
+    expect(result.stderr).toContain('999999999');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', paneA]]);
+    expect(alive(s, paneB) && alive(s, paneC)).toBe(true);
+  } finally {
+    s.clean();
+  }
+});
+
+// peer-pane-anchor criterion 2: the A-pane argument must equal the verified pane or nothing runs.
+test('refuses when the A-pane argument differs from the verified pane', async (): Promise<void> => {
+  const s: Setup = setup(consultants);
+  try {
+    const result: RunResult = await s.run(paneB, 'B', paneB, 'C', paneC);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(paneA);
+    expect(result.stderr).toContain(paneB);
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', paneA]]);
+    expect(command(s.calls(), 'agent', 'start')).toEqual([]);
+    expect(command(s.calls(), 'agent', 'list')).toEqual([]);
+    expect(alive(s, paneB) && alive(s, paneC)).toBe(true);
+  } finally {
+    s.clean();
+  }
+});
+
+test('refuses when HERDR_PANE_ID is unset or empty, before any herdr call', async (): Promise<void> => {
+  const s: Setup = setup(consultants);
+  try {
+    const result: RunResult = await s.runWith({ HERDR_PANE_ID: '' }, paneA, 'B', paneB);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('HERDR_PANE_ID');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(s.herdrCalled()).toBe(false);
+    expect(alive(s, paneB) && alive(s, paneC)).toBe(true);
   } finally {
     s.clean();
   }

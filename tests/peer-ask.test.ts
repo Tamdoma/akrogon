@@ -6,6 +6,7 @@ import { spawnCaptured, type SpawnResult } from '../src/shell';
 import { registerTemp } from './helpers';
 
 const script: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/peer-ask.ts');
+const paneA: string = 'w8:pA';
 const paneB: string = 'w8:pB';
 const paneC: string = 'w8:pC';
 
@@ -24,15 +25,18 @@ type PaneSeed = {
   agent_status: string;
   agent_session?: { kind: 'id' | 'path'; value: string; source?: string; agent?: string };
   screen_detection_skipped?: boolean | null;
+  shell_pid?: number;
 };
 type Setup = {
   dir: string;
   home: string;
+  db: string;
   fileB: string;
   fileC: string;
   calls: () => string[][];
   herdrCalled: () => boolean;
   run: (...args: string[]) => Promise<RunResult>;
+  runWith: (env: Record<string, string>, ...args: string[]) => Promise<RunResult>;
   clean: () => void;
 };
 
@@ -45,10 +49,12 @@ function setup(
   promptScript: (fileB: string, home: string) => ScriptEntry[],
   waitScript: (fileB: string) => ScriptEntry[],
   panes: PaneSeed[] = defaultPanes,
+  dbExtra: Record<string, unknown> = {},
 ): Setup {
   const dir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'peer-ask-')));
   const home: string = resolve(dir, 'home');
   mkdirSync(home);
+  mkdirSync(resolve(dir, 'proc'));
   const fileB: string = resolve(dir, 'return-B.md');
   const fileC: string = resolve(dir, 'return-C.md');
   const bin: string = resolve(dir, 'bin');
@@ -58,35 +64,67 @@ function setup(
   writeFileSync(
     db,
     JSON.stringify({
-      panes: panes.map((p: PaneSeed) => ({
-        pane_id: p.pane_id,
-        tab_id: 'w8:t1',
-        cwd: '/tmp',
-        agent: p.agent,
-        agent_status: p.agent_status,
-        ...(p.agent_session === undefined ? {} : { agent_session: p.agent_session }),
-        ...(p.screen_detection_skipped === undefined ? {} : { screen_detection_skipped: p.screen_detection_skipped }),
-      })),
+      panes: [
+        ...panes.map((p: PaneSeed) => ({
+          pane_id: p.pane_id,
+          tab_id: 'w8:t1',
+          cwd: '/tmp',
+          agent: p.agent,
+          agent_status: p.agent_status,
+          ...(p.agent_session === undefined ? {} : { agent_session: p.agent_session }),
+          ...(p.screen_detection_skipped === undefined
+            ? {}
+            : { screen_detection_skipped: p.screen_detection_skipped }),
+          ...(p.shell_pid === undefined ? {} : { shell_pid: p.shell_pid }),
+        })),
+        // The caller pane the scripts anchor to: its shell is the test process.
+        { pane_id: paneA, tab_id: 'w8:t1', cwd: '/tmp', agent: null, agent_status: 'unknown', shell_pid: process.pid },
+      ],
       tabs: [],
       serial: 0,
       promptScript: promptScript(fileB, home),
       waitScript: waitScript(fileB),
+      ...dbExtra,
     }),
   );
   return {
     dir,
     home,
+    db,
     fileB,
     fileC,
     calls: (): string[][] =>
-      readFileSync(`${db}.calls`, 'utf8')
-        .trim()
-        .split('\n')
-        .map((line: string) => JSON.parse(line) as string[]),
+      existsSync(`${db}.calls`)
+        ? readFileSync(`${db}.calls`, 'utf8')
+            .trim()
+            .split('\n')
+            .map((line: string) => JSON.parse(line) as string[])
+        : [],
     herdrCalled: (): boolean => existsSync(`${db}.calls`),
     run: async (...args: string[]): Promise<RunResult> => {
       const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, ...args], {
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db, HOME: home },
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          FAKE_HERDR: db,
+          HOME: home,
+          AKROGON_PROC_ROOT: resolve(dir, 'proc'),
+          HERDR_PANE_ID: paneA,
+        },
+      });
+      return { code, stdout, stderr };
+    },
+    runWith: async (env: Record<string, string>, ...args: string[]): Promise<RunResult> => {
+      const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, ...args], {
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          FAKE_HERDR: db,
+          HOME: home,
+          AKROGON_PROC_ROOT: resolve(dir, 'proc'),
+          HERDR_PANE_ID: paneA,
+          ...env,
+        },
       });
       return { code, stdout, stderr };
     },
@@ -120,8 +158,9 @@ test('prompts, then waits for the answer in the same call', async (): Promise<vo
       exchange: { kind: 'fake', session: null, boundary: null, turn: null },
     });
     const order: string[] = verbs(s.calls());
-    expect(order[0]).toBe('agent list');
-    expect(order[1]).toBe(`agent prompt ${paneB}`);
+    expect(order[0]).toBe('pane process-info --pane');
+    expect(order[1]).toBe('agent list');
+    expect(order[2]).toBe(`agent prompt ${paneB}`);
     expect(order).toContain(`agent wait ${paneB}`);
   } finally {
     s.clean();
@@ -160,8 +199,9 @@ test('seeds the codex boundary before prompting', async (): Promise<void> => {
     expect(line.exchange).toEqual({ kind: 'codex', session, boundary: 0, turn: 'turn-A' });
     expect(line.session).toBe(session);
     const order: string[] = verbs(s.calls());
-    expect(order[0]).toBe('agent list');
-    expect(order[1]).toBe(`agent prompt ${paneB}`);
+    expect(order[0]).toBe('pane process-info --pane');
+    expect(order[1]).toBe('agent list');
+    expect(order[2]).toBe(`agent prompt ${paneB}`);
   } finally {
     s.clean();
   }
@@ -261,6 +301,67 @@ test('rejects missing args and a bad budget before prompting', async (): Promise
       expect(result.stdout).toBe('');
     }
     expect(s.herdrCalled()).toBe(false);
+  } finally {
+    s.clean();
+  }
+});
+
+// peer-pane-anchor criterion 1: a HERDR_PANE_ID whose pane shell is not an ancestor refuses
+// before any prompt, naming the env values and herdr's answer.
+test('refuses when the pane shell is not an ancestor of the script', async (): Promise<void> => {
+  const s: Setup = setup(
+    (): ScriptEntry[] => [{}],
+    (fileB: string): ScriptEntry[] => [{ append: fileB }],
+    [...defaultPanes, { pane_id: 'w8:pZ', agent: 'fake', agent_status: 'idle', shell_pid: 999999999 }],
+  );
+  try {
+    const result: RunResult = await s.runWith({ HERDR_PANE_ID: 'w8:pZ' }, '10', paneB, s.fileB, 'read the brief');
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('w8:pZ');
+    expect(result.stderr).toContain('999999999');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', 'w8:pZ']]);
+  } finally {
+    s.clean();
+  }
+});
+
+test('refuses when HERDR_PANE_ID is unset or empty, before any herdr call', async (): Promise<void> => {
+  const s: Setup = setup(
+    (): ScriptEntry[] => [{}],
+    (fileB: string): ScriptEntry[] => [{ append: fileB }],
+  );
+  try {
+    const result: RunResult = await s.runWith({ HERDR_PANE_ID: '' }, '10', paneB, s.fileB, 'read the brief');
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('HERDR_PANE_ID');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(s.herdrCalled()).toBe(false);
+  } finally {
+    s.clean();
+  }
+});
+
+test('refuses when HERDR_SOCKET_PATH names another session without the pane', async (): Promise<void> => {
+  const s: Setup = setup(
+    (): ScriptEntry[] => [{}],
+    (fileB: string): ScriptEntry[] => [{ append: fileB }],
+    defaultPanes,
+    { sessions: [{ name: 'other', running: true, panes: [], tabs: [], serial: 0 }] },
+  );
+  try {
+    const result: RunResult = await s.runWith(
+      { HERDR_SOCKET_PATH: `${s.db}-other.sock` },
+      '10',
+      paneB,
+      s.fileB,
+      'read the brief',
+    );
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(paneA);
+    expect(result.stderr).toContain(`${s.db}-other.sock`);
+    expect(result.stderr).toContain('Missing pane');
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', paneA]]);
   } finally {
     s.clean();
   }

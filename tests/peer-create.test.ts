@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
@@ -16,9 +16,24 @@ const spec: { seat: string; kind: string; argv: string[] }[] = [
 type ScriptEntry = { code?: string };
 type RunResult = { code: number; stdout: string; stderr: string };
 type SeatLine = { seat: string; pane: string | null; kind: string; state: string };
-type Setup = { root: string; calls: () => string[][]; run: (json: string) => Promise<RunResult>; clean: () => void };
+type Setup = {
+  dir: string;
+  root: string;
+  db: string;
+  calls: () => string[][];
+  run: (json: string) => Promise<RunResult>;
+  runWith: (env: Record<string, string>, aPane: string, json: string) => Promise<RunResult>;
+  clean: () => void;
+};
 
-function setup(extra: { startScript?: ScriptEntry[]; failSplitOnce?: boolean } = {}): Setup {
+function setup(
+  extra: {
+    startScript?: ScriptEntry[];
+    failSplitOnce?: boolean;
+    callerShellPid?: number;
+    dbExtra?: Record<string, unknown>;
+  } = {},
+): Setup {
   const dir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'peer-create-')));
   const root: string = resolve(dir, 'root');
   const bin: string = resolve(dir, 'bin');
@@ -31,23 +46,57 @@ function setup(extra: { startScript?: ScriptEntry[]; failSplitOnce?: boolean } =
   writeFileSync(
     db,
     JSON.stringify({
-      panes: [{ pane_id: paneA, tab_id: 'w8:t1', cwd: root, agent: 'claude', agent_status: 'working' }],
+      panes: [
+        {
+          pane_id: paneA,
+          tab_id: 'w8:t1',
+          cwd: root,
+          agent: 'claude',
+          agent_status: 'working',
+          shell_pid: extra.callerShellPid ?? process.pid,
+        },
+      ],
       tabs: [],
       serial: 100,
-      ...extra,
+      ...(extra.startScript === undefined ? {} : { startScript: extra.startScript }),
+      ...(extra.failSplitOnce === undefined ? {} : { failSplitOnce: extra.failSplitOnce }),
+      ...(extra.dbExtra === undefined ? {} : extra.dbExtra),
     }),
   );
+  const env = (extraEnv: Record<string, string>): NodeJS.ProcessEnv => ({
+    ...process.env,
+    PATH: `${bin}:${process.env.PATH}`,
+    FAKE_HERDR: db,
+    AKROGON_PROC_ROOT: proc,
+    HERDR_PANE_ID: paneA,
+    ...extraEnv,
+  });
   return {
+    dir,
     root,
+    db,
     calls: (): string[][] =>
-      readFileSync(`${db}.calls`, 'utf8')
-        .trim()
-        .split('\n')
-        .map((line: string) => JSON.parse(line) as string[]),
+      existsSync(`${db}.calls`)
+        ? readFileSync(`${db}.calls`, 'utf8')
+            .trim()
+            .split('\n')
+            .map((line: string) => JSON.parse(line) as string[])
+        : [],
     run: async (json: string): Promise<RunResult> => {
       const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, root, paneA, json], {
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db, AKROGON_PROC_ROOT: proc },
+        env: env({}),
       });
+      return { code, stdout, stderr };
+    },
+    runWith: async (
+      extraEnv: Record<string, string>,
+      aPane: string,
+      json: string,
+    ): Promise<RunResult> => {
+      const { stdout, stderr, code }: SpawnResult = await spawnCaptured(
+        [process.execPath, script, root, aPane, json],
+        { env: env(extraEnv) },
+      );
       return { code, stdout, stderr };
     },
     clean: (): void => rmSync(dir, { recursive: true, force: true }),
@@ -131,6 +180,64 @@ test('a failed start reports the split seat and stops', async (): Promise<void> 
       { seat: 'C', pane: null, kind: 'pi', state: 'untouched' },
     ]);
     expect(command(s.calls(), 'pane', 'split').length).toBe(1);
+  } finally {
+    s.clean();
+  }
+});
+
+// peer-pane-anchor criterion 1: a HERDR_PANE_ID herdr does not have, or whose shell is not an
+// ancestor, refuses before any split or start, naming the envs and herdr's answer.
+test('refuses when HERDR_PANE_ID names a pane herdr does not have', async (): Promise<void> => {
+  const s: Setup = setup();
+  try {
+    const result: RunResult = await s.runWith({ HERDR_PANE_ID: 'w8:pZ' }, 'w8:pZ', JSON.stringify(spec));
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('w8:pZ');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(result.stderr).toContain('Missing pane');
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', 'w8:pZ']]);
+  } finally {
+    s.clean();
+  }
+});
+
+test('refuses when the pane shell is not an ancestor of the script', async (): Promise<void> => {
+  const s: Setup = setup({ callerShellPid: 999999999 });
+  try {
+    const result: RunResult = await s.run(JSON.stringify(spec));
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(paneA);
+    expect(result.stderr).toContain('999999999');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', paneA]]);
+  } finally {
+    s.clean();
+  }
+});
+
+// peer-pane-anchor criterion 2: the A-pane argument must equal the verified pane or nothing runs.
+test('refuses when the A-pane argument differs from the verified pane', async (): Promise<void> => {
+  const s: Setup = setup();
+  try {
+    const result: RunResult = await s.runWith({}, 'w8:pZ', JSON.stringify(spec));
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(paneA);
+    expect(result.stderr).toContain('w8:pZ');
+    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', paneA]]);
+    expect(command(s.calls(), 'pane', 'split')).toEqual([]);
+  } finally {
+    s.clean();
+  }
+});
+
+test('refuses when HERDR_PANE_ID is unset or empty, before any herdr call', async (): Promise<void> => {
+  const s: Setup = setup();
+  try {
+    const result: RunResult = await s.runWith({ HERDR_PANE_ID: '' }, paneA, JSON.stringify(spec));
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('HERDR_PANE_ID');
+    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
+    expect(s.calls()).toEqual([]);
   } finally {
     s.clean();
   }
