@@ -74,9 +74,7 @@ function setup(
           agent: p.agent,
           agent_status: p.agent_status,
           ...(p.agent_session === undefined || p.agent_session === null ? {} : { agent_session: p.agent_session }),
-          ...(p.screen_detection_skipped === undefined
-            ? {}
-            : { screen_detection_skipped: p.screen_detection_skipped }),
+          ...(p.screen_detection_skipped === undefined ? {} : { screen_detection_skipped: p.screen_detection_skipped }),
           ...(p.shell_pid === undefined ? {} : { shell_pid: p.shell_pid }),
         })),
         // The caller pane the script anchors to: its shell is the test process.

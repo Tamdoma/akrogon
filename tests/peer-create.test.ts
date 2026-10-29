@@ -88,15 +88,10 @@ function setup(
       });
       return { code, stdout, stderr };
     },
-    runWith: async (
-      extraEnv: Record<string, string>,
-      aPane: string,
-      json: string,
-    ): Promise<RunResult> => {
-      const { stdout, stderr, code }: SpawnResult = await spawnCaptured(
-        [process.execPath, script, root, aPane, json],
-        { env: env(extraEnv) },
-      );
+    runWith: async (extraEnv: Record<string, string>, aPane: string, json: string): Promise<RunResult> => {
+      const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, root, aPane, json], {
+        env: env(extraEnv),
+      });
       return { code, stdout, stderr };
     },
     clean: (): void => rmSync(dir, { recursive: true, force: true }),
