@@ -11,6 +11,7 @@ import {
   readPeerAgent,
   type ListAgent,
 } from './peer-wait';
+import { verifyAnchor } from './peer-anchor';
 
 type Args = { pane: string; session: string; log: string; start: string };
 type Config = { turnBoundMs: number; confirmMs: number };
@@ -252,6 +253,13 @@ async function main(): Promise<void> {
   if (process.env.DOOR_RESET_CHILD === '1') {
     if (env.DOOR_RESET_BOUNDARY === undefined) throw new Error('DOOR_RESET_BOUNDARY is required in the child');
     process.exit(await child(args, config, env.DOOR_RESET_BOUNDARY));
+  }
+  // The detached child skips this: it is reparented after the parent exits, so the pane shell
+  // leaves its ancestry and a re-check would always refuse.
+  const verified: string = verifyAnchor();
+  if (pane !== verified) {
+    process.stderr.write(`refused: pane ${pane} differs from the verified pane ${verified}\n`);
+    process.exit(1);
   }
   const live: ListAgent = await readPeerAgent(pane);
   const held: string = live.agent_session?.value ?? 'no session';
