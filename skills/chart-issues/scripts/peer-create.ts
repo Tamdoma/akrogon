@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { z } from 'zod';
+import { verifyAnchor } from './peer-anchor';
 import { agentName, failureText, run, type Herdr } from './peer-restart';
 
 type State = { seat: string; pane: string | null; kind: string; started: boolean };
@@ -55,6 +56,12 @@ function main(): void {
   const aPane: string = process.argv[3];
   const spec: z.infer<typeof specSchema> = specSchema.parse(JSON.parse(process.argv[4]));
   const states: State[] = spec.map((s): State => ({ seat: s.seat, pane: null, kind: s.kind, started: false }));
+  const verified: string = verifyAnchor();
+  if (aPane !== verified) {
+    process.stderr.write(`refusing create, A-pane argument ${aPane} is not the verified pane ${verified}\n`);
+    emit(states);
+    process.exit(1);
+  }
   let source: string = aPane;
   for (const [index, seat] of spec.entries()) {
     const state: State = states[index];

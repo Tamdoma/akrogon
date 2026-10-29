@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { z } from 'zod';
+import { verifyAnchor } from './peer-anchor';
 
 type Seat = { seat: string; pane: string };
 type Launch = { kind: string; group: number; argv: string[] };
@@ -148,6 +149,13 @@ async function main(): Promise<void> {
     restarted: false,
   }));
   const stateOf: Map<string, State> = new Map(states.map((state: State): [string, State] => [state.seat, state]));
+
+  const verified: string = verifyAnchor();
+  if (aPane !== verified) {
+    process.stderr.write(`refusing restart, A-pane argument ${aPane} is not the verified pane ${verified}\n`);
+    finish(states);
+    process.exit(1);
+  }
 
   // Read phase: every kind and launch is collected and every refusal checked before any stop.
   const list: Herdr = run(['agent', 'list']);
