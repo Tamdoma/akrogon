@@ -1,0 +1,41 @@
+slug: verify-pass-service
+phase: merged
+created: 2026-10-27
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#119"
+busy_since:
+  B: 2026-10-27T09:16:32.629Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tF3
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pX5
+  B: w8:pX6
+prompted:
+  B: 01a17c82-8429-7bf2-901f-8e2af04d8653
+prompted_at:
+  B: 2026-10-27T09:16:32.629Z
+delivery_error: {}
+merge_stamp: 2026-10-27T09:15:16.466Z
+broadcast:
+  kind: issue
+  name: verify-lifetime
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/verify-lifetime
+  pushed: 63c20f9859578c179a30dac9c6ab0ac648a6f62b
+  sources:
+    - "Tamdoma/akrogon#119"
+frozen:
+  tests/command-reference.test.ts: 2df929ca45c890fcf80835f79d7bc9a99d22cadc
+  tests/fake-systemd-run.sh: 9f4c33479b2a9e6166812a402d7e65637f45ab22
+  tests/run-units.test.ts: 09704789439eda80ffc57d6c1f4ec6f2cb315b76
+  tests/verify.test.ts: 4a2057ce15e73497d20ee09e0b73f63fc1866334
+frozen_cited: []

@@ -1,0 +1,41 @@
+slug: durable-check-capture
+phase: merged
+created: 2026-10-27
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#120"
+busy_since:
+  B: 2026-10-27T17:31:50.173Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tF4
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pX7
+  B: w8:pX8
+prompted:
+  B: 01a17e4c-a999-7f82-bc96-0c11e660b82e
+prompted_at:
+  B: 2026-10-27T17:31:50.174Z
+delivery_error: {}
+merge_stamp: 2026-10-27T17:30:29.020Z
+broadcast:
+  kind: issue
+  name: killed-check-log
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/killed-check-log
+  pushed: 2cd0ec17e7179055ef1fcc3a255cb0734fb41f9d
+  sources:
+    - "Tamdoma/akrogon#120"
+frozen:
+  tests/check-names.test.ts: d2f200d6e41bec6ebc2d32fa1e6b0f1d54b4743e
+  tests/close-pack.test.ts: 4cfbfa05290daaa27e51127c7253b047e811c93b
+  tests/durable-capture.test.ts: e5aafec2d7ec847ebb2614c1e8aa2ed1d7a4f9c0
+  tests/run-check.test.ts: 6d6e9fff36a918c98e55daa5ee4bbd893a06b11a
+frozen_cited: []

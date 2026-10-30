@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: systemd-run --user transient service outlives its caller's process group
+    command: setsid bash -c "systemd-run --user --quiet --unit=akrogon-probe-verify-lifetime-b -p CollectMode=inactive-or-failed -p TimeoutStopSec=5 -- sleep 60; exec sleep 30" & then kill -KILL -- -<pgid>; systemctl --user is-active; systemctl --user stop; systemctl --user list-units --all 'akrogon-probe-verify-lifetime-b*'
+    identity: user ivan's systemd user manager on host omarchy, no credential
+    target: local systemd user manager
+    version: systemd 262 (262.1-1-arch)
+    date: '2026-10-27'
+    result: caller group SIGKILLed and dead; unit active after the kill
+    cleanup: systemctl --user stop, unit inactive, 0 matching units listed
+    limits: not inside pi's bash tool, a Claude task stop or a herdr pane scope; not with --slice=akrogon.slice or akrogon's env
+    record: issues/chart/verify-lifetime/forks/run-lifetime.md

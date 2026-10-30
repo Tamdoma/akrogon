@@ -1,0 +1,38 @@
+slug: copyfile-installs
+phase: merged
+created: 2026-10-27
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#122"
+busy_since:
+  B: 2026-10-27T19:35:54.423Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tF6
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pXD
+  B: w8:pXE
+prompted:
+  B: 01a17ed9-7033-7602-acce-be503b4e16ae
+prompted_at:
+  B: 2026-10-27T19:35:54.424Z
+delivery_error: {}
+merge_stamp: 2026-10-27T19:34:33.632Z
+broadcast:
+  kind: issue
+  name: bun-copyfile
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/bun-copyfile
+  pushed: 174394dd971a43416872bbc1c8e803180bbbdffd
+  sources:
+    - "Tamdoma/akrogon#122"
+frozen:
+  tests/release-deploy.test.ts: ce8f7a2d941c580dff9532f8f33e863a055a2c57
+frozen_cited: []

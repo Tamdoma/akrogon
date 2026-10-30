@@ -1,0 +1,36 @@
+# Slot B territory map
+
+## Decisions
+
+**D1. Put the flag on each Bun command that writes modules.** Pick `--backend=copyfile` on the actual invocation, including `src/release.ts`'s argument array. Preserve `--frozen-lockfile` where it already exists. The init skill has two independent command examples; change both. Cost: a few literal edits. Reject bunfig or an environment variable: the operator's Bun 1.4.4 guide says neither controls this backend. Reject a wrapper, automatic rewriting of user-provided shell commands, or a new config option: they add machinery, alter arbitrary user commands, and still leave human-facing instructions to maintain.
+
+**D2. Cover the live install surfaces, including missed sites.** Pick the release invocation, both init skill examples, `skills/broadcast-issue/SKILL.md`, `docs/reference/config.md`, `docs/reference/checks.md`, `docs/reference/releases-and-updates.md`, and `docs/start/install.md`. The last says plain `bun install`; add the backend flag without changing its lockfile behavior unless separately decided. Also add the flag to the three actual fixture installs in `tests/deploy-fixture.ts`, `tests/install.test.ts`, and `tests/self-update.test.ts`: they run Bun and the intake says every install akrogon runs. They generate fixture locks, so do not add `--frozen-lockfile` there. Cost: small edits and targeted test runs. Reject limiting to the four reported files: it leaves instructions and real executions flagless. Reject mass-editing historical issues and opaque `tests/config.test.ts` strings: history is not an instruction, and those strings test arbitrary setup wrapping, not a default.
+
+**D3. Treat the repository's own `issues/config.yaml` separately.** It is an active setup command run by akrogon, so the desired end state includes the flag. The guide's Step 4 explicitly requires the user's approval and a separate commit for such a change. The intake's broad scope may itself supply approval, but the chart owner should resolve that authority and preserve the separate-commit condition if applying the guide. Do not rewrite other registered repositories' configs: their contents are user-supplied and outside this repo. Cost: one small separate change and possibly an approval decision. Reject silently treating examples as a migration: existing setups do not update when the skill changes.
+
+**D4. Verify the release behavior at its execution boundary.** Pick one focused regression test for a freshly built release with a real cached package: demonstrate the release file does not share the cache file's device/inode, or mutate the release file and show the cache remains unchanged. Arrange a private temporary cache and fixture, avoiding the user's shared cache; ensure the test fails without the flag on the supported Bun/filesystem combination. Existing release fixture uses a local `file:` dependency, which alone does not establish isolation from the shared registry cache. Run relevant release and fixture tests, and review the small set of prose examples manually. Cost: one behavior test with fixture setup, plus targeted runs. If a deterministic offline registry-cache fixture cannot be built cheaply, use a focused execution-boundary assertion of the actual spawned argument, and explicitly record that this verifies forwarding, not Bun's filesystem behavior. Reject a source-text grep test or exact prose tests: they constrain spelling and formatting without proving execution. Reject an empty-dependency install as proof of isolation.
+
+## Lifetime pitfalls
+
+**P1. Existing releases are reused.** `buildRelease` returns immediately if the target SHA directory exists, so changing the command only affects new builds. Existing releases and already-installed checkouts retain their current files. Do not claim retroactive repair or delete/rebuild releases as part of this change. A separate approved migration can address them if needed.
+
+**P2. Copy-on-write is filesystem-dependent.** The guide's btrfs same-filesystem setting makes copies space-efficient; other filesystems or different mounts can consume full-copy space. `--backend=copyfile` asks Bun for private files, not a universal guarantee of low disk use. Accept the disk tradeoff rather than add filesystem detection or a hardlink fallback that defeats the goal. Validate the supported runtime behavior rather than claiming measurements not made.
+
+**P3. Future commands can omit the flag.** Keep the skill's two examples and docs consistent, and test the real release path. Manual review is still needed for future prose or new commands. A repository-wide exact-string gate would be brittle around examples, historical records, and arbitrary user config, and cannot prove Bun semantics.
+
+**P4. Scope has a boundary.** Akrogon executes arbitrary `setup` strings; changing its examples does not enforce the flag on existing or future user-written commands. Rewriting them automatically could break shell semantics and user choices. State this limitation and migrate a particular config only with its owner's authorization.
+
+**P5. Bun version and cache behavior can change.** The guide is specific to 1.4.4. A real behavior test with a controlled cache catches changes in actual isolation; a flag assertion catches only a missing argument. Test with a registry-sourced package, not a local file dependency, and distinguish cache location from filesystem sharing.
+
+## Evidence
+
+- **E1, primary repository inspection, 2026-10-27:** `git grep` on checkout `2cd0ec17e7179055ef1fcc3a255cb0734fb41f9d` found the live sites in D2, `issues/config.yaml:6`, and three fixture invocations. `tests/config.test.ts` contains setup strings used for wrapping. The search cannot prove absence of dynamically constructed or differently spelled commands.
+- **E2, primary source, 2026-10-27:** `src/release.ts:56-72` builds a staging tree using `process.execPath`, then renames it; an existing target returns before installation. `tests/release-deploy.test.ts` checks a release has `node_modules`, not cache isolation. `tests/deploy-fixture.ts` uses `file:vendor/tiny`.
+- **E3, operator-provided guide, 2026-10-27:** `/home/ivan/Work/BUN-COPYFILE-GUIDE.md`, Rules 1–2 and Steps 0 and 4, specifies the flag, the Bun 1.4.4 configuration limitation, btrfs tradeoff, and setup approval/separate-commit condition. The guide's Rule 2 permits the isolated linker while its Step 0 global instruction says never use it; this issue does not require choosing a linker.
+- **E4, reported observation, unverified independently:** intake cites hardlink propagation and prior #81. This map did not run a live cache mutation experiment; do not present the report as a newly measured result.
+
+## Questions
+
+- **Q1.** Does the operator's explicit intake scope authorize changing this repository's `issues/config.yaml` under Step 4, with its own commit? If not, request approval for that concrete change.
+- **Q2.** Should previously built releases or already initialized consumer configs be migrated? They are not repaired by changing future commands, and migration has separate operational effects.
+- **Q3.** Is a controlled offline registry-cache fixture available for a stable behavior test on supported environments? If not, is the argument-boundary test plus a documented manual isolation check sufficient?

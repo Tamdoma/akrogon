@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr pane process-info --pane <HERDR_PANE_ID> over the inherited env, compared with the caller's process ancestry
+    command: herdr pane process-info --pane "$HERDR_PANE_ID"; and with HERDR_SOCKET_PATH=/home/ivan/.config/herdr/sessions/mdconsultingny/herdr.sock herdr pane process-info --pane w8:pNP
+    identity: local user ivan
+    target: local herdr sessions infra and mdconsultingny
+    version: herdr 0.9.1
+    date: '2026-10-29'
+    result: inherited socket returned shell_pid 8969, an ancestor of the door tool shell; a codex pane shell_pid is an ancestor of its codex processes; the other session's socket returned pane_not_found
+    cleanup: none needed, read-only
+    limits: no pi door observed; herdr server replacement under the same name not covered
+    record: issues/chart/peer-session/forks/peer-anchor.md

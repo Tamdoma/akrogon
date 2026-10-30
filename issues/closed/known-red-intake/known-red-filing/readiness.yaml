@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: seed-issue read-only lookups (gh issue list, own recent reports and keyword search)
+    command: gh issue list -R <repo> --state all --author @me --search "created:>=2026-10-25" --limit 5 --json number,title,state; gh issue list -R <repo> --state all --search "known red base" --limit 3 --json number,state
+    identity: gh account ivanjuras (keyring, github.com), the account every seat on this host inherits
+    target: Tamdoma/akrogon and Tamdoma/tamdoma-framework
+    version: gh 2.103.0 (2026-10-21)
+    date: '2026-10-27'
+    result: both repos returned JSON lists with exit 0 (akrogon #122, #121, #120; framework #446 and others)
+    cleanup: none needed, read-only
+    limits: proves read access and the lookup form only; creation is covered by the next record, not by this call
+    record: issues/chart/known-red-intake/forks/filing-rule.md
+  - operation: seed-issue gh issue create
+    command: gh issue view 121 -R Tamdoma/akrogon --json author,createdAt,state,title; gh issue view 446 -R Tamdoma/tamdoma-framework --json author,createdAt,body
+    identity: gh account ivanjuras (keyring, github.com)
+    target: Tamdoma/akrogon and Tamdoma/tamdoma-framework
+    version: gh 2.103.0 (2026-10-21)
+    date: '2026-10-27'
+    result: '#121 was created by ivanjuras at 2026-10-27T15:10:01Z through seed-issue (body opens with Origin repo and Unverified intake), and Tamdoma/tamdoma-framework#446 by ivanjuras at 2026-10-27T14:33:58Z (body opens with Origin repo), so gh issue create works for this account on both repos'
+    cleanup: none; #121 is real intake, not a fixture
+    limits: the door ran no fresh create; this proves existing creates by the same account on both repos, not a create from a pi or codex seat process specifically
+    record: issues/chart/known-red-intake/forks/filing-rule.md

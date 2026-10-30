@@ -1,0 +1,37 @@
+slug: known-red-filing
+phase: merged
+created: 2026-10-27
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#121"
+busy_since:
+  B: 2026-10-27T16:19:12.610Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tF5
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pXA
+  B: w8:pXB
+prompted:
+  B: 01a17e25-75b4-7650-ba15-e267e2e549b1
+prompted_at:
+  B: 2026-10-27T16:19:12.610Z
+delivery_error: {}
+merge_stamp: 2026-10-27T16:17:50.912Z
+broadcast:
+  kind: issue
+  name: known-red-intake
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/known-red-intake
+  pushed: f85cc67067752ca0e3d3557cee594ec75093d6ed
+  sources:
+    - "Tamdoma/akrogon#121"
+frozen: {}
+frozen_cited: []

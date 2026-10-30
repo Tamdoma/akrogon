@@ -1,0 +1,38 @@
+slug: abandoned-capture-stop
+phase: merged
+created: 2026-10-28
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#124"
+busy_since:
+  B: 2026-10-28T14:32:23.916Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: w8:tFA
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pXK
+  B: w8:pXM
+prompted:
+  B: 01a182c9-27b8-79a0-8ff4-405c0b511191
+prompted_at:
+  B: 2026-10-28T14:32:23.917Z
+delivery_error: {}
+merge_stamp: 2026-10-28T14:30:49.028Z
+broadcast:
+  kind: issue
+  name: killed-run-fixture
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/killed-run-fixture
+  pushed: dedbc3812409b47bac579d4cd0112caed05103b2
+  sources:
+    - "Tamdoma/akrogon#124"
+frozen:
+  tests/abandoned-capture.test.ts: 4f20d1f5c83aa128c3b9ac9c3466c23255ab10d9
+frozen_cited: []

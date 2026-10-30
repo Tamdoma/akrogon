@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr notification for a merge slowdown episode
+    command: 'herdr --session infra notification show "akrogon charting proof: merge-slow-alarm" --body "Test of the merge slow notice call. No action needed." --sound none'
+    identity: operator's local herdr session infra (no credential)
+    target: herdr session infra desktop notification
+    version: herdr 0.9.1
+    date: '2026-10-28'
+    result: 'exit 0, stdout {"id":"cli:notification:show","result":{"reason":"shown","shown":true,"type":"notification_show"}}'
+    cleanup: none, a notification with no stored state
+    limits: does not prove the operator saw it, delivery outside herdr, or behavior when herdr is absent
+    record: issues/chart/merge-slow-alarm/forks/slowdown-alarm.md

@@ -1,0 +1,5 @@
+# Slot B final-shape check 2
+
+**F14. The pathname probe can recreate a normally completed capture and report it abandoned.** Item 2 specifies a pathname-form `flock -n -x` probe. That form creates the named file if it is absent (installed util-linux `flock(1)`). In `src/run-check.ts` `checkedRun`, normal publication unlinks `captureOut` and then `captureErr`. A gate can discover the pair before publication finishes, then run its probe after `captureOut` is unlinked. The probe creates a new empty inode, which has none of the shared-description locks, and succeeds even while the publisher still holds the original description. Its success therefore does not establish abandonment of the discovered pair, and the probe itself leaves a synthetic capture file.
+
+Open the existing capture without creation, probe that descriptor, and revalidate that the candidate pair still exists before refusing. Disappearance during normal publication must not create evidence or become an abandoned-run refusal. The recorded probe covers stable existing files, not this unlink race.

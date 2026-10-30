@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: bun install --frozen-lockfile --backend=copyfile
+    command: git archive HEAD | tar -x -C <dir>; bun install --frozen-lockfile --backend=copyfile (control without the flag)
+    identity: local user ivan, no credential
+    target: /home/ivan/.cache/chart-proof-bun-copyfile on btrfs, same filesystem as the Bun cache
+    version: bun 1.4.4, akrogon 2cd0ec17
+    date: '2026-10-27'
+    result: exit 0, 1540 of 1540 node_modules files at link count 1, bun.lock unchanged; control 1327 files at 13 links and 213 at 8
+    cleanup: directory removed and absence checked
+    limits: proves Bun 1.4.4 on this host only, not other filesystems or Bun versions
+    record: issues/chart/bun-copyfile/forks/flag-sites.md

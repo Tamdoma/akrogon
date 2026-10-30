@@ -1,0 +1,28 @@
+slug: slow-merge-notice
+phase: merged
+created: 2026-10-28
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#123"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tF9
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pXH
+  B: w8:pXJ
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-28T13:37:54.264Z
+frozen:
+  tests/slow-merge.test.ts: c2d59e39b1d83b46c924e8a1aa074ef2da256e02
+frozen_cited: []

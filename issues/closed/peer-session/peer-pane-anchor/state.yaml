@@ -1,0 +1,32 @@
+slug: peer-pane-anchor
+phase: merged
+created: 2026-10-29
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFB
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pXN
+  B: w8:pXP
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-10-29T08:18:14.085Z
+frozen:
+  tests/door-reset.test.ts: 329bf5f54bd171dca94ae1a077a1ea0eed04f530
+  tests/fake-herdr.ts: bd8fcf3b307409fc1c8c6aebd41bee1464f9f911
+  tests/peer-ask.test.ts: d7091c480a8907fb49b2c6be5fcb9a493c53a917
+  tests/peer-create.test.ts: fef631fa327cee2aae519c262a3d52ed06961127
+  tests/peer-restart.test.ts: 86a0d4c7a7778410610889c23e270c8e06c24719
+  tests/peer-wait.test.ts: 12a8ecabc088bbd2264793936ff7123693ad2517
+frozen_cited: []

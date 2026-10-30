@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: flock(1) fd-mode shared lock on a capture file passed to a bun child as stdout, probed with flock -n -x
+    command: "bun wrapper: openSync(cap,'w'); Bun.spawnSync(['flock','-s','3'],{stdio:['ignore','inherit','inherit',fd]}); Bun.spawn(['sh','-c','echo child-start; exec sleep 20'],{stdio:['ignore',fd,'inherit']}); probe flock -n -x cap"
+    identity: local user ivan
+    target: local filesystem scratch directory
+    version: bun 1.4.4, util-linux 2.42.4
+    date: '2026-10-28'
+    result: busy while wrapper and child live; busy after wrapper SIGKILL with child alive; free with both dead and a tail -f reader open; busy with child dead and wrapper alive; free with both dead
+    cleanup: scratch directory removed, no process left
+    limits: not run under systemd-run --scope or the run guard stop; the pathname probe form recreates a missing file, so the leaf probes an fd opened without create
+    record: issues/chart/killed-run-fixture/forks/killed-run-stop.md
