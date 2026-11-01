@@ -197,9 +197,7 @@ function minutes(ms: number): number {
 
 // The newest completed run on the same tree holding {name, command} green lends its entry.
 function reuseSource(runs: VerifyRun[], tree: string, item: NamedCommand): VerifyRun | undefined {
-  return newest(
-    runs.filter((run) => run.tree === tree && completed(run) && greenEntry(run, item) !== undefined),
-  );
+  return newest(runs.filter((run) => run.tree === tree && completed(run) && greenEntry(run, item) !== undefined));
 }
 
 // One eligible head row passes when it holds at least one red entry and every red entry's failed
@@ -277,8 +275,7 @@ async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[]): Promis
   const units: Unit[] = [];
   for (const item of me.commands) {
     if (item.exit === 0 || item.reused !== undefined || item.blocked !== undefined) continue;
-    for (const test of await failedTests(repo, item.log))
-      units.push({ name: item.name, command: item.command, test });
+    for (const test of await failedTests(repo, item.log)) units.push({ name: item.name, command: item.command, test });
   }
   const fresh: string[] = [];
   for (const unit of units) {

@@ -1534,9 +1534,7 @@ test('a merge-only command the leaf row lacks runs at merge verify and the gate 
     expect((await verify(f, [], worktree)).code).toBe(0);
     const leafRow: VerifyRun = records(f)[0];
     expect(leafRow.commands.map((item) => item.name)).toEqual(['unit']);
-    await expect(requireGreenReceipt(repo, head, 'merge')).rejects.toThrow(
-      `No green merge verify receipt for ${head}`,
-    );
+    await expect(requireGreenReceipt(repo, head, 'merge')).rejects.toThrow(`No green merge verify receipt for ${head}`);
     const direct: string = resolve(storeDir(f), 'direct');
     await command(['git', 'worktree', 'add', direct, '-b', 'direct'], worktree);
     const result: Result = await verify(f, ['--holder', directHolder(f)], direct);
