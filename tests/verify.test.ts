@@ -1268,7 +1268,7 @@ test('the receipt schema accepts both old entries and entries carrying a reused 
   }
 });
 
-test('requireGreenReceipt passes when commands turned green across different runs and refuses while one is uncovered', async () => {
+test('requireGreenReceipt refuses rows green only across different runs on one tree', async () => {
   const f: Fixture = await fixture();
   try {
     const { worktree } = await callerWorktree(f);
@@ -1279,29 +1279,37 @@ test('requireGreenReceipt passes when commands turned green across different run
     writeFileSync(log, 'seeded\n');
     config(f, { checks: { c1: 'echo c1' }, merge_checks: { m1: 'echo m1' } });
     const repo: Repo = readRepo('repo', f.root);
-    const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
     seedRun(f, {
       sha,
       tree,
       scope: 'merge',
+      end: '2026-10-24T21:00:00.000Z',
       commands: [
         { name: 'c1', command: 'echo c1', exit: 0, log },
         { name: 'm1', command: 'echo m1', exit: 7, log },
       ],
     });
-    await expect(requireGreenReceipt(repo, sha, 'merge')).rejects.toThrow(`No green merge verify receipt for ${sha}`);
     seedRun(f, {
       sha,
       tree,
       scope: 'merge',
+      end: '2026-10-24T22:00:00.000Z',
       commands: [
         { name: 'c1', command: 'echo c1', exit: 7, log },
         { name: 'm1', command: 'echo m1', exit: 0, log },
       ],
     });
-    await requireGreenReceipt(repo, sha, 'merge');
-    writeFileSync(file, '');
     await expect(requireGreenReceipt(repo, sha, 'merge')).rejects.toThrow(`No green merge verify receipt for ${sha}`);
+    const direct: string = resolve(storeDir(f), 'direct');
+    await command(['git', 'worktree', 'add', direct, '-b', 'direct'], worktree);
+    const result: Result = await cli(f, ['verify', '--holder', directHolder(f)], direct, fakeAkrogon(f).env);
+    expect(result.code).toBe(0);
+    const fresh: VerifyRun = records(f).find((run) => run.sha === sha && run.compares === undefined)!;
+    expect(fresh.commands.map((item) => item.reused)).toEqual([
+      records(f)[0].run,
+      records(f)[1].run,
+    ]);
+    await requireGreenReceipt(repo, sha, 'merge');
   } finally {
     f.clean();
   }
@@ -1484,7 +1492,7 @@ test('packing holder logs preserves same-tree command reuse', async () => {
   }
 });
 
-test('merge verification selects green and red receipts from its own scope', async () => {
+test('merge verification accepts same-tree receipts and links a cross-scope known-red pair', async () => {
   const f: Fixture = await fixture();
   try {
     config(f, { checks: { unit: 'echo unit' } });
@@ -1496,17 +1504,99 @@ test('merge verification selects green and red receipts from its own scope', asy
     mkdirSync(holder, { recursive: true });
     const env: NodeJS.ProcessEnv = { ...noticeEnv(f), ...fakeAkrogon(f).env };
     expect((await cli(f, ['verify'], worktree, env)).code).toBe(0);
-    expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(0);
-    expect(records(f).map((run) => run.scope)).toEqual(['leaf', 'merge']);
+    const leaf: VerifyRun = records(f)[0];
+    const reused: Result = await cli(f, ['verify', '--holder', holder], direct, env);
+    expect(reused.code).toBe(0);
+    const tree: string = await command(['git', 'rev-parse', `${head}^{tree}`], f.root);
+    expect(reused.stdout).toContain(`reuse receipt ${leaf.run} tree=${tree}`);
+    expect(records(f)).toHaveLength(1);
     await requireGreenReceipt(readRepo('repo', f.root), head, 'merge');
 
     config(f, { checks: { unit: 'echo "(fail) alpha"; exit 1' } });
     expect((await cli(f, ['verify'], worktree, env)).code).toBe(1);
-    expect((await cli(f, ['verify', '--holder', holder, '--known-red'], direct, env)).code).toBe(0);
+    const redLeaf: VerifyRun = records(f)[1];
+    const knownRed: Result = await cli(f, ['verify', '--holder', holder, '--known-red'], direct, env);
+    expect(knownRed.code).toBe(0);
+    expect(knownRed.stdout).toContain(`verify known-red ${head}: pass`);
     const runs: VerifyRun[] = records(f);
-    expect(runs.map((run) => run.scope)).toEqual(['leaf', 'merge', 'leaf', 'merge', 'merge']);
-    expect(runs[4].compares).toBe(runs[3].run);
+    expect(runs).toHaveLength(3);
+    expect(runs[2].compares).toBe(redLeaf.run);
+    expect(runs.filter((run) => run.compares === undefined).map((run) => run.run)).toEqual([leaf.run, redLeaf.run]);
     await requireGreenReceipt(readRepo('repo', f.root), head, 'merge');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a merge-only command the leaf row lacks runs at merge verify and the gate needs the resulting row', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const marker: string = resolve(f.home, 'member.ran');
+    config(f, { checks: { unit: 'echo unit' }, merge_checks: { member: `touch ${marker}` } });
+    const { worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const repo: Repo = readRepo('repo', f.root);
+    expect((await verify(f, [], worktree)).code).toBe(0);
+    const leafRow: VerifyRun = records(f)[0];
+    expect(leafRow.commands.map((item) => item.name)).toEqual(['unit']);
+    await expect(requireGreenReceipt(repo, head, 'merge')).rejects.toThrow(
+      `No green merge verify receipt for ${head}`,
+    );
+    const direct: string = resolve(storeDir(f), 'direct');
+    await command(['git', 'worktree', 'add', direct, '-b', 'direct'], worktree);
+    const result: Result = await verify(f, ['--holder', directHolder(f)], direct);
+    expect(result.code).toBe(0);
+    expect(existsSync(marker)).toBe(true);
+    const runs: VerifyRun[] = records(f);
+    expect(runs).toHaveLength(2);
+    const mergeRow: VerifyRun = runs[1];
+    expect(mergeRow.commands.find((item) => item.name === 'member')).toMatchObject({ exit: 0 });
+    expect(mergeRow.commands.find((item) => item.name === 'member')).not.toHaveProperty('reused');
+    expect(mergeRow.commands.find((item) => item.name === 'unit')).toMatchObject({
+      exit: 0,
+      reused: leafRow.run,
+    });
+    await requireGreenReceipt(repo, head, 'merge');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a leaf-scope green on main resolves a merge-scope main-red unit and re-notifies on recurrence', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const { worktree: w1 } = await callerWorktree(f, 'one', {
+      phase: 'merge',
+      batch: { attempt: 'att-1', built_on: 'x', holder: { base: 'x', head: 'x' }, applied: true },
+    });
+    await commitIn(w1, 'a.ts');
+    expect((await cli(f, ['verify', '--attempt', 'att-1', '--known-red'], w1, env)).code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(1);
+
+    // The fix lands on main through a leaf-scope green on the landed commit.
+    const { worktree: wOk } = await callerWorktree(f, 'fixer');
+    writeFileSync(resolve(wOk, 'check.sh'), 'echo ok; exit 0\n');
+    await command(['git', 'add', 'check.sh'], wOk);
+    await command(['git', 'commit', '-m', 'fix the check'], wOk);
+    expect((await cli(f, ['verify'], wOk, env)).code).toBe(0);
+    await command(['git', 'push', 'origin', 'HEAD:main'], wOk);
+    await command(['git', 'merge', '--ff-only', 'origin/main'], f.root);
+    writeFileSync(resolve(f.root, 'check.sh'), 'name=$(cat failure); echo "(fail) $name"; exit 7\n');
+    await command(['git', 'add', 'check.sh'], f.root);
+    await command(['git', 'commit', '-m', 'break alpha again'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+
+    const { worktree: w3 } = await callerWorktree(f, 'after', {
+      phase: 'merge',
+      batch: { attempt: 'att-2', built_on: 'x', holder: { base: 'x', head: 'x' }, applied: true },
+    });
+    const head3: string = await commitIn(w3, 'new.ts');
+    expect((await cli(f, ['verify', '--attempt', 'att-2', '--known-red'], w3, env)).code).toBe(0);
+    expect(noticeCalls(f)).toHaveLength(2);
+    const second: VerifyRun | undefined = records(f).find((run) => run.sha === head3);
+    expect(baseRecord(f, second!).notice).toBe('shown');
   } finally {
     f.clean();
   }
