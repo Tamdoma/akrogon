@@ -549,7 +549,7 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
       );
       ran.push({ ...item, exit: code, log });
       process.stdout.write(`verify ${item.name}: ${code} ${log}\n`);
-      if (code !== 0 && !isFull) blockedBy = { name: item.name, exit: code, log };
+      if (code !== 0 && !isFull) blockedBy ??= { name: item.name, exit: code, log };
     }
     // A red sequential stage blocks the members: each is recorded with the blocker's exit and log.
     const blocker: { name: string; exit: number; log: string } | undefined =
