@@ -40,7 +40,7 @@ test('a move into check.review needs a green leaf receipt for HEAD under the cur
   }
 });
 
-test('a repair move into merge needs a green leaf receipt for HEAD', async () => {
+test('a repair move into merge needs a green leaf receipt for HEAD while check.fix takes none', async () => {
   const f: Fixture = await fixture();
   try {
     const { worktree, head } = await branch(f, 'repaired');
@@ -50,6 +50,11 @@ test('a repair move into merge needs a green leaf receipt for HEAD', async () =>
     expect(missing.code).not.toBe(0);
     expect(missing.stderr).toContain(`No green leaf verify receipt for ${head}`);
     expect(readState(path).phase).toBe('check.repair');
+    const handedWorktree: { worktree: string } = await branch(f, 'handed');
+    const handedPath: string = leaf(f, 'handed', 'check.repair', { worktree: handedWorktree.worktree });
+    const handedMove: string[] = ['phase', 'handed', 'check.fix', '--slot', 'B'];
+    expect((await cli(f, handedMove)).code).toBe(0);
+    expect(readState(handedPath).phase).toBe('check.fix');
     greenReceipt(f, head, 'leaf');
     expect((await cli(f, move)).code).toBe(0);
     expect(readState(path).phase).toBe('merge');
