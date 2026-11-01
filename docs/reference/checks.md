@@ -15,7 +15,7 @@ You set four kinds of command in `issues/config.yaml`:
 | `merge_covers` | Not a command. It names `checks` entries that a merge check already covers, so merge skips them.                                                                      | No.                                      |
 | `advisory`     | Seats run them next to the checks. `akrogon verify` does not run them.                                                                                                | No. Reviewers report a failure as a Nit. |
 
-So a leaf runs every `checks` command. A merge runs every `checks` command not named in `merge_covers`, then, once they are green, the `merge_checks` members all at once. Each stage runs only what lacks a green result for that command on the same tree, marking the receipt entry `reused` and naming the source run; a red `checks` entry leaves every member recorded not run. Source: `verifyCommands` in [src/verify.ts](../../src/verify.ts).
+So a leaf runs every `checks` command. A merge runs every `checks` command not named in `merge_covers`, then, once they are green, the `merge_checks` members all at once. Each stage runs only what lacks a green result for that command on the same tree — whichever scope recorded it — marking the receipt entry `reused` and naming the source run; a red `checks` entry leaves every member recorded not run. Source: `verifyCommands` in [src/verify.ts](../../src/verify.ts).
 
 Checks named in `full` run one at a time within their registered repo: a run waits for every earlier `full` run of the same repo, but never for another repo's run or for checks not on the list. A `full` run that has to wait prints `waiting for <repo>/<leaf> <check>` on stderr, `akrogon status` shows a run line table while one waits, and `akrogon stop-run <id>` cancels a waiting run instead of stopping units. Source: `withAdmission` in [src/admission.ts](../../src/admission.ts).
 
@@ -64,7 +64,7 @@ When to keep output this way, and which commands are exempt, is a seat rule. See
 
 The scope is `leaf` while the leaf is in any phase other than `merge`. It is `merge` for a merge leaf (`--attempt <id>`) or a `--holder` run. While it runs, it prints `verify setup: <exit> <log>`, then `verify <name>: <exit> <log>` for each check, then `verify <scope> <sha>: green` or `red`.
 
-A receipt is reused. When a green receipt already exists for the same tree and the same list of command names and commands, verify prints `reuse receipt <run> tree=<tree>` and exits 0 without running anything. Reuse is also per command: a green entry in a completed run on the same tree is copied into the new receipt with `reused`, so a changed command reruns while its siblings reuse. Changing a check command in config makes old receipts stop counting.
+A receipt is reused. When a green receipt already exists for the same tree and the same list of command names and commands, verify prints `reuse receipt <run> tree=<tree>` and exits 0 without running anything — a merge caller accepts a leaf receipt this way when the command lists match. Reuse is also per command: a green entry in a completed run on the same tree is copied into the new receipt with `reused`, so a changed command reruns while its siblings reuse. Changing a check command in config makes old receipts stop counting.
 
 These phase moves need a green receipt for the current commit:
 
@@ -74,7 +74,7 @@ These phase moves need a green receipt for the current commit:
 | `check.repair` to `merge`                               | `leaf`  |
 | `merged`, including `akrogon land` and `merged --check` | `merge` |
 
-The gate counts a command green when a completed run holds it green on the same tree under the same name and command text, so entries may come from different runs. Without cover, the move fails with `No green <scope> verify receipt for <sha> under the current config; run akrogon verify on this commit`. Source: `requireGreenReceipt` in [src/verify.ts](../../src/verify.ts) and its callers in [src/phase.ts](../../src/phase.ts).
+The gate accepts a receipt only when one completed run on the same tree holds every expected command green under the move's command list; it never reads the run's scope and never stitches entries across runs. Without cover, the move fails with `No green <scope> verify receipt for <sha> under the current config; run akrogon verify on this commit`. Source: `requireGreenReceipt` in [src/verify.ts](../../src/verify.ts) and its callers in [src/phase.ts](../../src/phase.ts).
 
 A completed merge-scope run also compares its wall time (`end − start`) with the median wall time of the last 20 eligible merge runs. An eligible run is a completed merge-scope run with `setup` 0, no `compares` link and no `reused` or `blocked` command entry, and the comparison runs only once 5 eligible runs exist; leaf-scope runs are never checked and `compares` runs are neither checked nor counted. A run more than 1.5× the normal and at least 2 minutes slower is flagged: it prints `verify slow: <ms>m measured vs <normal>m normal; first seen at <leaf> <run>`, records `slow` on its receipt and opens an episode that keeps its pre-jump normal. The episode sends one `<repo> merge slow` herdr notification, retried by the next in-episode run when the send fails, and closes `recovered` when an eligible run comes back under the threshold or `accepted` when the last 20 eligible runs all lie inside it, the accepted close adding `; accepted as new normal` to the line. The verdict and exit code never change.
 
@@ -86,7 +86,7 @@ Sometimes a test is already red on the default branch. `akrogon verify --known-r
 2. It runs the merge-base of the commit and the tracked default branch, reusing each command already green on the base tree under the same name and command text and running only what lacks one, and links that run to the red head run.
 3. It prints `verify known-red <sha>: pass` or `fail`.
 
-A cover is found per red command: a completed run on the head tree holds the command red with named failed tests, and a completed run linked from that head run holds the same command red on the base tree with every one of those names. A base entry with exit 0 never covers a red head command, whatever its log says and whether it ran fresh or was reused, and commands green on the head need no cover. Akrogon reads failed test names from `(fail) <name>` lines in the logs. A red command whose log names no failed test is uncovered.
+A cover is judged per head receipt: one completed run on the head tree matching the caller's command list needs at least one red command, and each red command is covered when a completed run linked from that head run holds the same command red on the base tree with every one of its failed test names. A command recorded `blocked` never ran on the head and needs no cover. A base entry with exit 0 never covers a red head command, whatever its log says and whether it ran fresh or was reused, and commands green on the head need no cover. Akrogon reads failed test names from `(fail) <name>` lines in the logs. A red command whose log names no failed test is uncovered.
 
 A pass counts as a receipt for the phase moves above.
 

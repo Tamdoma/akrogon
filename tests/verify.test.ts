@@ -1279,7 +1279,7 @@ test('requireGreenReceipt refuses rows green only across different runs on one t
     writeFileSync(log, 'seeded\n');
     config(f, { checks: { c1: 'echo c1' }, merge_checks: { m1: 'echo m1' } });
     const repo: Repo = readRepo('repo', f.root);
-    seedRun(f, {
+    const rowA: VerifyRun = seedRun(f, {
       sha,
       tree,
       scope: 'merge',
@@ -1289,7 +1289,7 @@ test('requireGreenReceipt refuses rows green only across different runs on one t
         { name: 'm1', command: 'echo m1', exit: 7, log },
       ],
     });
-    seedRun(f, {
+    const rowB: VerifyRun = seedRun(f, {
       sha,
       tree,
       scope: 'merge',
@@ -1304,11 +1304,8 @@ test('requireGreenReceipt refuses rows green only across different runs on one t
     await command(['git', 'worktree', 'add', direct, '-b', 'direct'], worktree);
     const result: Result = await cli(f, ['verify', '--holder', directHolder(f)], direct, fakeAkrogon(f).env);
     expect(result.code).toBe(0);
-    const fresh: VerifyRun = records(f).find((run) => run.sha === sha && run.compares === undefined)!;
-    expect(fresh.commands.map((item) => item.reused)).toEqual([
-      records(f)[0].run,
-      records(f)[1].run,
-    ]);
+    const fresh: VerifyRun = records(f).find((run) => run.run !== rowA.run && run.run !== rowB.run)!;
+    expect(fresh.commands.map((item) => item.reused)).toEqual([rowA.run, rowB.run]);
     await requireGreenReceipt(repo, sha, 'merge');
   } finally {
     f.clean();
@@ -1437,7 +1434,7 @@ test('known-red refuses when the only base result for a red head command is gree
   }
 });
 
-test('blocked merge members cannot provide known-red cover or flaky observations', async () => {
+test('a blocked merge member needs no known-red cover and gives no flaky observation', async () => {
   const f: Fixture = await fixture();
   try {
     const marker: string = resolve(f.home, 'member.ran');
@@ -1454,10 +1451,8 @@ test('blocked merge members cannot provide known-red cover or flaky observations
     const env: NodeJS.ProcessEnv = { ...noticeEnv(f), ...fakeAkrogon(f).env };
     const result: Result = await cli(f, ['verify', '--attempt', 'att-blocked', '--known-red'], worktree, env);
     expect(existsSync(marker)).toBe(false);
-    expect(result.code).toBe(1);
-    await expect(requireGreenReceipt(readRepo('repo', f.root), head, 'merge')).rejects.toThrow(
-      `No green merge verify receipt for ${head}`,
-    );
+    expect(result.code).toBe(0);
+    await requireGreenReceipt(readRepo('repo', f.root), head, 'merge');
     config(f, { checks: { cheap: 'echo cheap' }, merge_checks: { member } });
     expect((await cli(f, ['verify', '--attempt', 'att-blocked'], worktree, env)).code).toBe(0);
     expect(existsSync(marker)).toBe(true);
