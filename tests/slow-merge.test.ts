@@ -239,10 +239,16 @@ test('an open episode pins the normal, cites its first run, notifies once and re
     const episode: string = seedEpisode(f);
     // The rolling normal is now ~3s while the episode's is 5m.
     for (let i = 0; i < 10; i++) seedMerge(f, 3000);
-    // A green `unit` entry on this tree makes the next run partial (reused entry).
+    // A same-tree row carrying a `reused` entry stays excluded from the
+    // normal and sources nothing: the live run executes `unit` fresh and
+    // writes no `reused` entry.
     const sha: string = await bump(direct, 'reuse.ts');
     const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], direct);
-    seedMerge(f, 2000, { sha, tree });
+    seedMerge(f, 2000, {
+      sha,
+      tree,
+      commands: [{ name: 'unit', command: 'echo unit', exit: 0, log: resolve(f.home, 'seeded.log'), reused: 'source-run' }],
+    });
 
     const aId: string = await (async () => {
       const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
@@ -252,8 +258,10 @@ test('an open episode pins the normal, cites its first run, notifies once and re
       return id;
     })();
     const a: VerifyRun = records(f).find((run) => run.run === aId)!;
-    const reusedEntry = a.commands.find((item) => item.name === 'unit')!;
-    expect(reusedEntry.reused).toBeDefined();
+    const unitEntry = a.commands.find((item) => item.name === 'unit')!;
+    expect(unitEntry.reused).toBeUndefined();
+    expect(unitEntry.exit).toBe(0);
+    for (const item of a.commands) expect(item.reused).toBeUndefined();
     expect(a.slow).toMatchObject({
       normal_ms: 300000,
       first: { run: episode, leaf: 'firstleaf' },
@@ -418,26 +426,27 @@ test('the twentieth eligible episode run closes accepted', async () => {
   }
 }, 30000);
 
-test('an unflagged partial accepted close prints the acceptance', async () => {
+test('an unflagged run whose full check was blocked still closes the episode accepted', async () => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
-      checks: { unit: 'echo unit', extra: 'echo extra' },
+      checks: { unit: 'echo unit', extra: 'exit 4' },
+      full: ['unit'],
       grounding: 'none',
     });
     const { direct, holder } = await mergeCaller(f);
     const episode: string = seedEpisode(f, 5);
-    const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], direct);
     for (let i: number = 0; i < 19; i++)
       seedMerge(f, 500000, {
-        ...(i === 18 ? { tree } : {}),
         slow: { ms: 500000, normal_ms: 300000, first: { run: episode, leaf: 'firstleaf' } },
       });
     const result: Result = await cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
-    expect(result.code).toBe(0);
+    expect(result.code).toBe(1);
     const row: VerifyRun = records(f).at(-1)!;
-    expect(row.commands.find((item) => item.name === 'unit')!.reused).toBeDefined();
+    expect(row.commands.map((item) => item.name)).toEqual(['extra', 'unit']);
+    const unit: VerifyRun['commands'][number] = row.commands.find((item) => item.name === 'unit')!;
+    expect(unit).toMatchObject({ exit: 4, blocked: 'extra' });
     expect(row.slow).toMatchObject({ first: { run: episode }, close: 'accepted' });
     const line: string | undefined = result.stdout.split('\n').find((entry) => entry.startsWith('verify slow:'));
     expect(line).toContain('accepted');

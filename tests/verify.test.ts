@@ -863,8 +863,7 @@ test('a green on the same revision clears only the earlier main-red incident', a
 
     const base: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
     greenReceipt(f, base, 'leaf');
-    // A fresh red base needs a merge-base past the seeded green: on the seed's tree
-    // the green entry is reused per command and the base can never show that red.
+    // A fresh red base needs a merge-base past the seeded green row.
     await commitIn(f.root, 'main2.ts');
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     const { worktree: w2 } = await callerWorktree(f, 'after');
@@ -903,7 +902,7 @@ test('a failed base setup does not send a main-red test notice', async () => {
 });
 
 // Member receipts: merge_checks members run at the same time in one worktree
-// and a green entry on the same tree is reused at command grain.
+// and a red sequential entry records each member blocked without running it.
 
 function directHolder(f: Fixture): string {
   const holder: string = resolve(f.home, 'chart/direct');
@@ -1026,6 +1025,124 @@ test('a red checks command blocks every merge_checks member, which is recorded n
   }
 });
 
+test('a red check outside full blocks every full check, and the fixed tree runs it green past the gate', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const dir: string = resolve(f.home, 'fullskip');
+    mkdirSync(dir);
+    config(f, {
+      checks: {
+        suite: `touch ${dir}/suite.ran`,
+        quick1: `touch ${dir}/quick1.ran`,
+        bad: 'test ! -f broken',
+        quick2: `touch ${dir}/quick2.ran`,
+      },
+      full: ['suite'],
+    });
+    const { worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'broken');
+    const result: Result = await verify(f, [], worktree);
+    expect(result.code).toBe(1);
+    const run: VerifyRun = records(f)[0];
+    expect(run.commands.map((item) => item.name)).toEqual(['quick1', 'bad', 'quick2', 'suite']);
+    expect(run.commands[0]).toMatchObject({ name: 'quick1', exit: 0 });
+    expect(run.commands[1]).toMatchObject({ name: 'bad', exit: 1 });
+    expect(run.commands[2]).toMatchObject({ name: 'quick2', exit: 0 });
+    expect(run.commands[3]).toMatchObject({ name: 'suite', exit: 1, blocked: 'bad' });
+    expect(run.commands[3].log).toBe(run.commands[1].log);
+    expect(existsSync(`${dir}/quick1.ran`)).toBe(true);
+    expect(existsSync(`${dir}/quick2.ran`)).toBe(true);
+    expect(existsSync(`${dir}/suite.ran`)).toBe(false);
+    const repo: Repo = readRepo('repo', f.root);
+    await expect(requireGreenReceipt(repo, head, 'leaf')).rejects.toThrow(`No green leaf verify receipt for ${head}`);
+
+    await command(['git', 'rm', 'broken'], worktree);
+    await command(['git', 'commit', '-m', 'fix'], worktree);
+    const fixed: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    expect((await verify(f, [], worktree)).code).toBe(0);
+    const green: VerifyRun = records(f)[1];
+    expect(green.commands.map((item) => [item.name, item.exit])).toEqual([
+      ['quick1', 0],
+      ['bad', 0],
+      ['quick2', 0],
+      ['suite', 0],
+    ]);
+    for (const item of green.commands) expect(item.blocked).toBeUndefined();
+    expect(existsSync(`${dir}/suite.ran`)).toBe(true);
+    await requireGreenReceipt(repo, fixed, 'leaf');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a failed setup blocks full checks while other checks record the setup result unblocked', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const dir: string = resolve(f.home, 'setupskip');
+    mkdirSync(dir);
+    config(f, {
+      setup: 'exit 9',
+      checks: { quick: 'echo quick', suite: `touch ${dir}/suite.ran` },
+      full: ['suite'],
+    });
+    const { worktree } = await callerWorktree(f);
+    const sha: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    expect((await verify(f, [], worktree)).code).toBe(1);
+    const run: VerifyRun = records(f)[0];
+    expect(run.setup).toBe(9);
+    expect(run.commands).toHaveLength(2);
+    expect(run.commands[0]).toMatchObject({ name: 'quick', exit: 9 });
+    expect(run.commands[0].blocked).toBeUndefined();
+    expect(run.commands[1]).toMatchObject({ name: 'suite', exit: 9, blocked: 'setup' });
+    expect(run.commands[1].log).toBe(run.commands[0].log);
+    expect(existsSync(`${dir}/suite.ran`)).toBe(false);
+    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).rejects.toThrow(
+      `No green leaf verify receipt for ${sha}`,
+    );
+  } finally {
+    f.clean();
+  }
+});
+
+test('a red full check never blocks a later full check, while the merge members stay blocked', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const dir: string = resolve(f.home, 'fullpair');
+    mkdirSync(dir);
+    config(f, {
+      checks: {
+        quick: `touch ${dir}/quick.ran`,
+        suite1: `touch ${dir}/s1.ran; exit 4`,
+        suite2: `touch ${dir}/s2.ran`,
+      },
+      merge_checks: { member: `touch ${dir}/member.ran; echo member` },
+      full: ['suite1', 'suite2'],
+    });
+    const direct: string = resolve(storeDir(f), 'direct');
+    await command(['git', 'worktree', 'add', direct, '-b', 'direct'], f.root);
+    const sha: string = await commitIn(direct, 'code.ts');
+    const result: Result = await verify(f, ['--holder', directHolder(f)], direct);
+    expect(result.code).toBe(1);
+    const run: VerifyRun = records(f)[0];
+    expect(run.commands.map((item) => [item.name, item.exit])).toEqual([
+      ['quick', 0],
+      ['suite1', 4],
+      ['suite2', 0],
+      ['member', 4],
+    ]);
+    expect(run.commands[3]).toMatchObject({ blocked: 'suite1' });
+    expect(run.commands[3].log).toBe(run.commands[1].log);
+    expect(run.commands[2].blocked).toBeUndefined();
+    expect(existsSync(`${dir}/s2.ran`)).toBe(true);
+    expect(existsSync(`${dir}/member.ran`)).toBe(false);
+    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'merge')).rejects.toThrow(
+      `No green merge verify receipt for ${sha}`,
+    );
+  } finally {
+    f.clean();
+  }
+});
+
 test('a thrown member leaves the run incomplete and the worktree stands until every sibling settles', async () => {
   const f: Fixture = await fixture();
   let child: Bun.Subprocess | undefined;
@@ -1081,7 +1198,7 @@ test('a thrown member leaves the run incomplete and the worktree stands until ev
   }
 }, 30000);
 
-test('a same-tree rerun runs only the red command and lists green commands reused from the first run', async () => {
+test('a same-tree retry re-executes every unblocked command and writes no reused entry', async () => {
   const f: Fixture = await fixture();
   try {
     const dir: string = resolve(f.home, 'rerun');
@@ -1095,7 +1212,6 @@ test('a same-tree rerun runs only the red command and lists green commands reuse
     await commitIn(direct, 'code.ts');
     const holder: string = directHolder(f);
     expect((await verify(f, ['--holder', holder], direct)).code).toBe(1);
-    const first: VerifyRun = records(f)[0];
     expect((await verify(f, ['--holder', holder], direct)).code).toBe(1);
     const second: VerifyRun = records(f)[1];
     expect(second.commands.map((item) => [item.name, item.exit])).toEqual([
@@ -1104,22 +1220,18 @@ test('a same-tree rerun runs only the red command and lists green commands reuse
       ['after', 0],
       ['member', 7],
     ]);
-    for (const name of ['first', 'after']) {
-      const item = second.commands.find((entry) => entry.name === name)!;
-      expect(item).toMatchObject({ reused: first.run });
-      expect(item.log).toBe(first.commands.find((entry) => entry.name === name)!.log);
-    }
-    expect(second.commands[1]).not.toHaveProperty('reused');
+    for (const item of second.commands) expect(item).not.toHaveProperty('reused');
+    expect(second.commands[3]).toMatchObject({ blocked: 'bad' });
     expect(second.commands[3].log).toBe(second.commands[1].log);
-    expect(readFileSync(`${dir}/first.count`, 'utf8').trim().split('\n')).toHaveLength(1);
-    expect(readFileSync(`${dir}/after.count`, 'utf8').trim().split('\n')).toHaveLength(1);
+    expect(readFileSync(`${dir}/first.count`, 'utf8').trim().split('\n')).toHaveLength(2);
+    expect(readFileSync(`${dir}/after.count`, 'utf8').trim().split('\n')).toHaveLength(2);
     expect(existsSync(`${dir}/member.ran`)).toBe(false);
   } finally {
     f.clean();
   }
 });
 
-test('a rerun reuses green merge members, runs only the red member, and a green on an incomplete run never sources reuse', async () => {
+test('a same-tree retry re-executes every merge member and writes no reused entry', async () => {
   const f: Fixture = await fixture();
   try {
     const dir: string = resolve(f.home, 'partial');
@@ -1133,41 +1245,22 @@ test('a rerun reuses green merge members, runs only the red member, and a green 
     });
     const direct: string = resolve(storeDir(f), 'direct');
     await command(['git', 'worktree', 'add', direct, '-b', 'direct'], f.root);
-    const sha: string = await commitIn(direct, 'code.ts');
-    const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], direct);
+    await commitIn(direct, 'code.ts');
     const holder: string = directHolder(f);
-    const log: string = resolve(holder, 'check-seed.log');
-    writeFileSync(log, 'seeded\n');
-    seedRun(f, {
-      sha,
-      tree,
-      scope: 'merge',
-      end: undefined,
-      commands: verifyCommands(readRepo('repo', f.root).config, 'merge').map((item) => ({ ...item, exit: 0, log })),
-    });
     expect((await verify(f, ['--holder', holder], direct)).code).toBe(1);
-    const first: VerifyRun = records(f)[1];
-    for (const item of first.commands) expect(item).not.toHaveProperty('reused');
-    expect(readFileSync(`${dir}/unit.count`, 'utf8').trim().split('\n')).toHaveLength(1);
-    expect(readFileSync(`${dir}/m1.count`, 'utf8').trim().split('\n')).toHaveLength(1);
-    expect(readFileSync(`${dir}/m2.count`, 'utf8').trim().split('\n')).toHaveLength(1);
-
     expect((await verify(f, ['--holder', holder], direct)).code).toBe(1);
-    const second: VerifyRun = records(f)[2];
+    const second: VerifyRun = records(f)[1];
     expect(second.commands.map((item) => item.exit)).toEqual([0, 7, 0]);
-    expect(second.commands[0]).toMatchObject({ reused: first.run });
-    expect(second.commands[0].log).toBe(first.commands[0].log);
-    expect(second.commands[1]).not.toHaveProperty('reused');
-    expect(second.commands[2]).toMatchObject({ reused: first.run });
-    expect(readFileSync(`${dir}/unit.count`, 'utf8').trim().split('\n')).toHaveLength(1);
+    for (const item of second.commands) expect(item).not.toHaveProperty('reused');
+    expect(readFileSync(`${dir}/unit.count`, 'utf8').trim().split('\n')).toHaveLength(2);
     expect(readFileSync(`${dir}/m1.count`, 'utf8').trim().split('\n')).toHaveLength(2);
-    expect(readFileSync(`${dir}/m2.count`, 'utf8').trim().split('\n')).toHaveLength(1);
+    expect(readFileSync(`${dir}/m2.count`, 'utf8').trim().split('\n')).toHaveLength(2);
   } finally {
     f.clean();
   }
 });
 
-test('a result is never reused when its run did not complete, while the fresh run still records', async () => {
+test('an incomplete or failed-setup run never satisfies the receipt, which a fresh pass records without reused entries', async () => {
   const f: Fixture = await fixture();
   try {
     const dir: string = resolve(f.home, 'incomplete');
@@ -1213,7 +1306,7 @@ test('a result is never reused when its run did not complete, while the fresh ru
   }
 });
 
-test('changing one command text keeps sibling results reusable while the changed command reruns', async () => {
+test('changing one command text reruns every command in the next pass', async () => {
   const f: Fixture = await fixture();
   try {
     const dir: string = resolve(f.home, 'texts');
@@ -1224,17 +1317,15 @@ test('changing one command text keeps sibling results reusable while the changed
     const { worktree } = await callerWorktree(f);
     await commitIn(worktree, 'code.ts');
     expect((await verify(f, [], worktree)).code).toBe(0);
-    const first: VerifyRun = records(f)[0];
     config(f, {
       checks: { one: `echo changed >> ${dir}/one.count`, two: `echo x >> ${dir}/two.count` },
     });
     expect((await verify(f, [], worktree)).code).toBe(0);
     const second: VerifyRun = records(f)[1];
     expect(second.commands.map((item) => item.exit)).toEqual([0, 0]);
-    expect(second.commands[0]).not.toHaveProperty('reused');
-    expect(second.commands[1]).toMatchObject({ reused: first.run });
+    for (const item of second.commands) expect(item).not.toHaveProperty('reused');
     expect(readFileSync(`${dir}/one.count`, 'utf8').trim().split('\n')).toHaveLength(2);
-    expect(readFileSync(`${dir}/two.count`, 'utf8').trim().split('\n')).toHaveLength(1);
+    expect(readFileSync(`${dir}/two.count`, 'utf8').trim().split('\n')).toHaveLength(2);
   } finally {
     f.clean();
   }
@@ -1305,7 +1396,7 @@ test('requireGreenReceipt refuses rows green only across different runs on one t
     const result: Result = await cli(f, ['verify', '--holder', directHolder(f)], direct, fakeAkrogon(f).env);
     expect(result.code).toBe(0);
     const fresh: VerifyRun = records(f).find((run) => run.run !== rowA.run && run.run !== rowB.run)!;
-    expect(fresh.commands.map((item) => item.reused)).toEqual([rowA.run, rowB.run]);
+    for (const item of fresh.commands) expect(item.reused).toBeUndefined();
     await requireGreenReceipt(repo, sha, 'merge');
   } finally {
     f.clean();
@@ -1338,7 +1429,6 @@ test('known-red passes when the red head member is covered by a fresh base run t
     const head: string = await commitIn(worktree, 'code.ts');
     const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], worktree);
     const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
-    const baseTree: string = await command(['git', 'rev-parse', `${base}^{tree}`], f.root);
     const holderLog: string = resolve(leafPath, 'implementation/seeded.log');
     mkdirSync(dirname(holderLog), { recursive: true });
     writeFileSync(holderLog, '(fail) alpha\n');
@@ -1365,25 +1455,15 @@ test('known-red passes when the red head member is covered by a fresh base run t
         { name: 'member', command: 'sh check.sh', exit: 7, log: holderLog },
       ],
     });
-    const seededBase: VerifyRun = seedRun(f, {
-      sha: base,
-      tree: baseTree,
-      scope: 'merge',
-      commands: [
-        { name: 'unit', command: 'echo unit', exit: 0, log: holderLog },
-        { name: 'member', command: 'sh check.sh', exit: 7, log: holderLog },
-      ],
-    });
     const result: Result = await verify(f, ['--attempt', 'att-kr', '--known-red'], worktree);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain(`verify known-red ${head}: pass`);
     const baseRun: VerifyRun | undefined = records(f).find((run) => run.compares === redHead.run);
     expect(baseRun).toBeDefined();
     expect(baseRun!.sha).toBe(base);
-    expect(baseRun!.commands.find((item) => item.name === 'unit')).toMatchObject({
-      exit: 0,
-      reused: seededBase.run,
-    });
+    const unit: VerifyRun['commands'][number] = baseRun!.commands.find((item) => item.name === 'unit')!;
+    expect(unit).toMatchObject({ exit: 0 });
+    expect(unit).not.toHaveProperty('reused');
     const member: VerifyRun['commands'][number] = baseRun!.commands.find((item) => item.name === 'member')!;
     expect(member).toMatchObject({ exit: 7 });
     expect(member).not.toHaveProperty('reused');
@@ -1394,7 +1474,7 @@ test('known-red passes when the red head member is covered by a fresh base run t
   }
 });
 
-test('known-red refuses when the only base result for a red head command is green, reused or fresh', async () => {
+test('verify --known-red runs no base pass when the base tree holds a whole-green row and refuses the red head', async () => {
   const f: Fixture = await fixture();
   try {
     await memberFailureScript(f);
@@ -1421,13 +1501,32 @@ test('known-red refuses when the only base result for a red head command is gree
     const result: Result = await verify(f, ['--attempt', 'att-kref', '--known-red'], worktree);
     expect(result.code).toBe(1);
     expect(result.stdout).toContain('fail');
-    const baseRun: VerifyRun | undefined = records(f).find((run) => run.compares !== undefined);
-    expect(baseRun).toBeDefined();
-    const member: VerifyRun['commands'][number] = baseRun!.commands.find((item) => item.name === 'member')!;
-    expect(member).toMatchObject({ exit: 0, reused: records(f)[0].run });
-    expect(readFileSync(member.log, 'utf8')).toContain('(fail) alpha');
+    expect(records(f).some((run) => run.compares !== undefined)).toBe(false);
     await expect(requireGreenReceipt(readRepo('repo', f.root), head, 'merge')).rejects.toThrow(
       'No green merge verify receipt',
+    );
+  } finally {
+    f.clean();
+  }
+});
+
+test('verify --known-red runs no base pass on a whole-green base and fails like the gate', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const { worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    greenReceipt(f, base, 'leaf');
+    const result: Result = await verify(f, ['--known-red'], worktree);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain(`verify known-red ${head}: fail`);
+    const runs: VerifyRun[] = records(f);
+    expect(runs).toHaveLength(2);
+    expect(runs.filter((run) => run.compares !== undefined)).toHaveLength(0);
+    expect(runs.find((run) => run.sha === head)?.commands[0].exit).toBe(7);
+    await expect(requireGreenReceipt(readRepo('repo', f.root), head, 'leaf')).rejects.toThrow(
+      `No green leaf verify receipt for ${head}`,
     );
   } finally {
     f.clean();
@@ -1457,31 +1556,6 @@ test('a blocked merge member needs no known-red cover and gives no flaky observa
     expect((await cli(f, ['verify', '--attempt', 'att-blocked'], worktree, env)).code).toBe(0);
     expect(existsSync(marker)).toBe(true);
     expect(await flakyLines(readRepo('repo', f.root), records(f))).toEqual([]);
-  } finally {
-    f.clean();
-  }
-});
-
-test('packing holder logs preserves same-tree command reuse', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const counter: string = resolve(f.home, 'good.count');
-    config(f, { checks: { good: `echo x >> ${counter}`, bad: 'exit 7' } });
-    const direct: string = resolve(storeDir(f), 'direct');
-    await command(['git', 'worktree', 'add', direct, '-b', 'direct'], f.root);
-    const holder: string = resolve(f.root, 'issues/chart/demo/direct');
-    mkdirSync(holder, { recursive: true });
-    const env: NodeJS.ProcessEnv = fakeAkrogon(f).env;
-    expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(1);
-    const first: VerifyRun = records(f)[0];
-    expect((await cli(f, ['pack', 'issues/chart/demo'], f.root, env)).code).toBe(0);
-    expect(existsSync(first.commands[0].log)).toBe(false);
-    expect((await cli(f, ['log', first.commands[0].log], f.root, env)).code).toBe(0);
-    expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(1);
-    const second: VerifyRun = records(f)[1];
-    expect(second.commands[0]).toMatchObject({ reused: first.run, log: first.commands[0].log });
-    expect(second.commands[1]).not.toHaveProperty('reused');
-    expect(readFileSync(counter, 'utf8').trim().split('\n')).toHaveLength(1);
   } finally {
     f.clean();
   }
@@ -1545,10 +1619,9 @@ test('a merge-only command the leaf row lacks runs at merge verify and the gate 
     const mergeRow: VerifyRun = runs[1];
     expect(mergeRow.commands.find((item) => item.name === 'member')).toMatchObject({ exit: 0 });
     expect(mergeRow.commands.find((item) => item.name === 'member')).not.toHaveProperty('reused');
-    expect(mergeRow.commands.find((item) => item.name === 'unit')).toMatchObject({
-      exit: 0,
-      reused: leafRow.run,
-    });
+    const unit: VerifyRun['commands'][number] = mergeRow.commands.find((item) => item.name === 'unit')!;
+    expect(unit).toMatchObject({ exit: 0 });
+    expect(unit).not.toHaveProperty('reused');
     await requireGreenReceipt(repo, head, 'merge');
   } finally {
     f.clean();
