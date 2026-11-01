@@ -114,10 +114,11 @@ export function verifyCommands(config: RepoConfig, scope: VerifyScope): NamedCom
   const checks: [string, string][] = Object.entries(config.checks).filter(
     ([name]) => scope === 'leaf' || !config.merge_covers.includes(name),
   );
-  return [...checks, ...(scope === 'merge' ? Object.entries(config.merge_checks) : [])].map(([name, command]) => ({
-    name,
-    command,
-  }));
+  const nonFull: [string, string][] = checks.filter(([name]) => !config.full.includes(name));
+  const fullChecks: [string, string][] = checks.filter(([name]) => config.full.includes(name));
+  return [...nonFull, ...fullChecks, ...(scope === 'merge' ? Object.entries(config.merge_checks) : [])].map(
+    ([name, command]) => ({ name, command }),
+  );
 }
 
 function treeOf(repo: Repo, sha: string): Promise<string> {
@@ -165,10 +166,6 @@ function greenRun(repo: Repo, tree: string, expected: readonly NamedCommand[]): 
 // A failed test name stands in for "no names" when the log is missing or names none.
 const noTestNames: readonly string[] = ['(no test name)', '(log gone)'];
 
-function greenEntry(run: VerifyRun, item: NamedCommand): VerifyRun['commands'][number] | undefined {
-  return run.commands.find((entry) => entry.name === item.name && entry.command === item.command && entry.exit === 0);
-}
-
 // A completed merge head run is checked against the normal; base comparisons
 // and unfinished passes never are.
 function slowChecked(run: VerifyRun): boolean {
@@ -193,11 +190,6 @@ function median(values: number[]): number {
 
 function minutes(ms: number): number {
   return Math.round(ms / 60000);
-}
-
-// The newest completed run on the same tree holding {name, command} green lends its entry.
-function reuseSource(runs: VerifyRun[], tree: string, item: NamedCommand): VerifyRun | undefined {
-  return newest(runs.filter((run) => run.tree === tree && completed(run) && greenEntry(run, item) !== undefined));
 }
 
 // One eligible head row passes when it holds at least one red entry and every red entry's failed
@@ -529,30 +521,35 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
     const expected: NamedCommand[] = record.commands;
     const members: NamedCommand[] = expected.slice(expected.length - record.member_count);
     const sequential: NamedCommand[] = expected.slice(0, expected.length - members.length);
-    const ledger: VerifyRun[] = readVerifyRuns(repo);
+    // Full checks run only behind a green setup and a green non-full stage;
+    // a red full entry never blocks a later full entry.
+    let blockedBy: { name: string; exit: number; log: string } | undefined;
     for (const item of sequential) {
       if (setup.code !== 0) {
-        ran.push({ ...item, exit: setup.code, log: setup.log });
+        const blocked: boolean = repo.config.full.includes(item.name);
+        ran.push({ ...item, exit: setup.code, log: setup.log, ...(blocked ? { blocked: 'setup' } : {}) });
         process.stdout.write(`verify ${item.name}: ${setup.code} ${setup.log}\n`);
         continue;
       }
-      const source: VerifyRun | undefined = reuseSource(ledger, tree, item);
-      if (source === undefined) {
-        const { code, log }: { code: number; log: string } = await checkedRun(
-          repo,
-          caller,
-          akrogonBase,
-          item.name,
-          ['sh', '-c', item.command],
-          target,
+      const isFull: boolean = repo.config.full.includes(item.name);
+      if (isFull && blockedBy !== undefined) {
+        ran.push({ ...item, exit: blockedBy.exit, log: blockedBy.log, blocked: blockedBy.name });
+        process.stdout.write(
+          `verify ${item.name}: blocked by ${blockedBy.name} (${blockedBy.exit}) ${blockedBy.log}\n`,
         );
-        ran.push({ ...item, exit: code, log });
-        process.stdout.write(`verify ${item.name}: ${code} ${log}\n`);
-      } else {
-        const { log } = greenEntry(source, item)!;
-        ran.push({ ...item, exit: 0, log, reused: source.run });
-        process.stdout.write(`verify ${item.name}: reused ${source.run} ${log}\n`);
+        continue;
       }
+      const { code, log }: { code: number; log: string } = await checkedRun(
+        repo,
+        caller,
+        akrogonBase,
+        item.name,
+        ['sh', '-c', item.command],
+        target,
+      );
+      ran.push({ ...item, exit: code, log });
+      process.stdout.write(`verify ${item.name}: ${code} ${log}\n`);
+      if (code !== 0 && !isFull) blockedBy = { name: item.name, exit: code, log };
     }
     // A red sequential stage blocks the members: each is recorded with the blocker's exit and log.
     const blocker: { name: string; exit: number; log: string } | undefined =
@@ -563,13 +560,8 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
         process.stdout.write(`verify ${item.name}: blocked by ${blocker.name} (${blocker.exit}) ${blocker.log}\n`);
       }
     } else {
-      const settled: PromiseSettledResult<{ code: number; log: string; reused?: string }>[] = await Promise.allSettled(
-        members.map((item) => {
-          const source: VerifyRun | undefined = reuseSource(ledger, tree, item);
-          return source === undefined
-            ? checkedRun(repo, caller, akrogonBase, item.name, ['sh', '-c', item.command], target)
-            : Promise.resolve({ code: 0, log: greenEntry(source, item)!.log, reused: source.run });
-        }),
+      const settled: PromiseSettledResult<{ code: number; log: string }>[] = await Promise.allSettled(
+        members.map((item) => checkedRun(repo, caller, akrogonBase, item.name, ['sh', '-c', item.command], target)),
       );
       let first: unknown;
       for (const [index, result] of settled.entries()) {
@@ -577,13 +569,9 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
           first ??= result.reason;
           continue;
         }
-        const { code, log, reused } = result.value;
-        ran.push({ ...members[index], exit: code, log, ...(reused === undefined ? {} : { reused }) });
-        process.stdout.write(
-          reused === undefined
-            ? `verify ${members[index].name}: ${code} ${log}\n`
-            : `verify ${members[index].name}: reused ${reused} ${log}\n`,
-        );
+        const { code, log } = result.value;
+        ran.push({ ...members[index], exit: code, log });
+        process.stdout.write(`verify ${members[index].name}: ${code} ${log}\n`);
       }
       if (first !== undefined) throw first;
     }
@@ -884,8 +872,11 @@ export async function verify(
     if (head.code !== 1) return head.code;
   } else headId = recorded.run;
   const baseSha: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
-  const compared: { id: string; code: number } = await passOnce(repo, caller, baseSha, scope, baseSha, headId);
-  if (compared.code === 2) return compared.code;
+  const baseTree: string = await treeOf(repo, baseSha);
+  if (greenRun(repo, baseTree, verifyCommands(repo.config, scope)) === undefined) {
+    const compared: { id: string; code: number } = await passOnce(repo, caller, baseSha, scope, baseSha, headId);
+    if (compared.code === 2) return compared.code;
+  }
   const pass: boolean = await knownRedReceipt(repo, sha, scope);
   process.stdout.write(`verify known-red ${sha}: ${pass ? 'pass' : 'fail'}\n`);
   return pass ? 0 : 1;
