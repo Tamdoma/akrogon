@@ -1075,6 +1075,42 @@ test('a red check outside full blocks every full check, and the fixed tree runs 
   }
 });
 
+test('full checks and merge members share the first failing quick check as their blocker', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const dir: string = resolve(f.home, 'first-blocker');
+    mkdirSync(dir);
+    config(f, {
+      checks: {
+        suite: `touch ${dir}/suite.ran`,
+        quick1: 'exit 4',
+        quick2: 'exit 7',
+      },
+      merge_checks: { member: `touch ${dir}/member.ran` },
+      full: ['suite'],
+    });
+    const direct: string = resolve(storeDir(f), 'direct');
+    await command(['git', 'worktree', 'add', direct, '-b', 'direct'], f.root);
+    await commitIn(direct, 'code.ts');
+    expect((await verify(f, ['--holder', directHolder(f)], direct)).code).toBe(1);
+    const run: VerifyRun = records(f)[0];
+    expect(run.commands.map((item) => [item.name, item.exit])).toEqual([
+      ['quick1', 4],
+      ['quick2', 7],
+      ['suite', 4],
+      ['member', 4],
+    ]);
+    for (const item of run.commands.slice(2)) {
+      expect(item.blocked).toBe('quick1');
+      expect(item.log).toBe(run.commands[0].log);
+    }
+    expect(existsSync(`${dir}/suite.ran`)).toBe(false);
+    expect(existsSync(`${dir}/member.ran`)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
 test('a failed setup blocks full checks while other checks record the setup result unblocked', async () => {
   const f: Fixture = await fixture();
   try {
