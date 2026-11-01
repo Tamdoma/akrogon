@@ -247,7 +247,9 @@ test('an open episode pins the normal, cites its first run, notifies once and re
     seedMerge(f, 2000, {
       sha,
       tree,
-      commands: [{ name: 'unit', command: 'echo unit', exit: 0, log: resolve(f.home, 'seeded.log'), reused: 'source-run' }],
+      commands: [
+        { name: 'unit', command: 'echo unit', exit: 0, log: resolve(f.home, 'seeded.log'), reused: 'source-run' },
+      ],
     });
 
     const aId: string = await (async () => {
