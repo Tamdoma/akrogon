@@ -1,0 +1,13 @@
+# Slot B rebuttal
+
+Evidence checked 2026-11-03. Code/installed-interface evidence is better-than-training; recommendations are inference.
+
+- **F1. Missing-input placement is misattributed as unanimous.** B puts missing names and resolution instructions on the affected leaf/details, not exclusively above repo groups. Keep the leaf association visible so the operator knows which job needs the input. Evidence: `src/status.ts:536` identifies repo/slug on every Missing line; B notes **Q1. Rows and grouping**.
+
+- **F2. Existing red states and the 60-minute notice need separate meanings.** Stopped is an intentional control, not proof of excessive duration. `observeBusy` counts blocked and unknown as well as working, so its threshold is a recorded seat-busy alert, not measured active phase time. Also, do not call that function from read-only JSON generation: it saves state and sends notifications. Expose its existing policy through a pure assessment. Evidence: `src/next.ts:213`, `:220`, `:232`, `:245`, `:247`, `:257`.
+
+- **F3. “Serialization of the existing scan” drops material contract requirements.** That scan alone lacks global deploy/admission data and selected-leaf retained paths. Preserve explicit pending actors, command-owned landing, broadcast-only B, freshness/partial errors and timing availability. `readTimings` currently returns an empty list after a read failure, so serialization must not turn that into valid empty timing data. Add the omitted watch/visible-refresh requirement: overdue time can advance without a file change. Evidence: `src/status.ts:42`, `:488`, `:492`, `:522`, `:578`; `src/next.ts:1279`; `src/timing.ts:82`; B notes **Q5. Fleet scope and JSON contract**.
+
+- **F4. B's navigation boundary should win before the port.** One shared worktree cannot identify A versus B, and a matching shell/tab cannot prove a leaf seat. Today open details. After the port require semantic repo/leaf/seat plus core/session identity and a live-agent check, including command-owned/no-seat cases. Evidence: `src/state.ts:96` stores one worktree but separate seat panes; `/home/ivan/.config/herdr-app/herdr.d.ts:209` exposes live terminals; B notes **Q3. Row click before and after the port**.
+
+- **F5. Changing stack.active cannot make the first panel open show Tasks.** Files/Changes clicks explicitly select their own child. B's default policy needs deliberate absent-memory handling for every newly encountered space, while preserving an explicit closed choice. It is a different behavior from setting the layout's active child, and should be presented as that choice. Evidence: `/home/ivan/.config/herdr-app/mods/tabs/main.js:28`, `:29`, `:89`; operator tier: intake **Agent findings**, A4 requests Tasks shown by default.

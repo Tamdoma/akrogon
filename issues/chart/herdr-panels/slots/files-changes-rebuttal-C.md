@@ -1,0 +1,12 @@
+# Files/Changes rebuttal C — disagreements with the merged notes
+
+## Where seats differ — where mine should win
+
+- F1 Commits scope: hold my drop (or, if the operator keeps A1's "Recent commits" wording, a thin read-only list). Correction to my earlier framing: "Recent commits" does appear in intake's kept A1 line, so it's in scope — but it was the agent's proposal list, not operator verbatim, and the operator's own review flows are working-tree and branch-vs-default. A per-commit diff view is a second navigation mode (list → pick → diff → back) inside a 368px panel; B and D's N=20/N=15 disagreement shows nobody knows what N should be. If kept: click-commit shows its diff, no log pagination, no blame.
+- F2 Open as pane: keep (with D) over A/B's "drag the panel wider". Two things drag-wider cannot do: (a) the panel column is `{"px": 368}` fixed in flat.json — whether it's even drag-resizable is unverified, so "drag wider" may not exist; (b) the real value isn't width, it's a *pinned source* — a diff pane that stays on the leaf while focus moves to other panes, which is exactly the Tasks "Show in Changes" moment. Cost stated: it takes pane space until closed. P5 probe decides mechanics either way (files-changes-C Q4; herdr.d.ts:56, AGENTS.md "Commands":525-526).
+
+## Dropped material
+
+- F3 Filter needs a non-git answer. The repo-wide `git ls-files -co --exclude-standard` filter (A,B,D — a better reach than my loaded-only, I concede the mechanism) silently does nothing in a non-git folder, which is a real state (panel follows any pane, e.g. a scratch dir). Contract needs one line: filter box hides in non-git folders, or falls back to loaded entries. Unstated, it becomes a bug report.
+- F4 Pin tuple must carry `on`, not just `cwd`. Panels thread `on` (machine) through every exec (files/main.js:9 `location().on`); a pin of only `{cwd}` loses which machine it belongs to and silently re-points the panel at a same-named local path. `setShared("panel.folder.<space>", {cwd, on})`; v1 may still list only local worktrees — say that (files-changes-C Q4).
+- F5 Attribution gaps, minor: "Git reads keep the existing no-lock flags" lists A,B,D — C carries the same line (files-changes-C Q2 pitfalls, "the READ flags pattern already in the file"). "Taller file list" is listed as D's 260px; C's opening map also asked for a taller list (map-C U2). No position change, the record should just not drop the tag.
