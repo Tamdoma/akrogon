@@ -228,7 +228,14 @@ test("a leaf's second line shows its last move, never the raw log line", () => {
   const repo = derived.repos.find((r) => r.leaves.length > 0)!;
   const leaf = repo.leaves[0];
   leaf.history = [
-    JSON.stringify({ ts: '2026-11-03T16:35:52.734Z', repo: repo.name, slug: leaf.slug, from: 'implement', to: 'failed', slot: 'A' }),
+    JSON.stringify({
+      ts: '2026-11-03T16:35:52.734Z',
+      repo: repo.name,
+      slug: leaf.slug,
+      from: 'implement',
+      to: 'failed',
+      slot: 'A',
+    }),
   ];
   const row: RowModel = leafRows(board(derived, akrogonSpace)).find((r) => r.slug === leaf.slug)!;
   expect(row.line2).not.toContain('{');
