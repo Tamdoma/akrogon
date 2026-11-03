@@ -269,11 +269,7 @@ test('a leaf waits on parked, missing and unreadable deps while merged and live 
     const waiter = leafOf(env, 'repo', 'waiter');
     const quiet = leafOf(env, 'repo', 'quiet');
     expect([waiter.attention, quiet.attention]).toEqual([
-      [
-        'waiting on resting (parked)',
-        'waiting on dep-dead (unreadable)',
-        'waiting on ghost (missing)',
-      ],
+      ['waiting on resting (parked)', 'waiting on dep-dead (unreadable)', 'waiting on ghost (missing)'],
       [],
     ]);
     expect([waiter.red, quiet.red]).toEqual([true, false]);
@@ -300,10 +296,7 @@ test('a stopped command-owned land job is an attention fact only while unrecorde
     leaf(f, 'land-live', 'merge', { batch: batch('livejob') });
     leaf(f, 'land-pushed', 'merge', { batch: batch('pushedjob', { recorded: true }) });
     leaf(f, 'land-seat', 'merge', { batch: batch('seatjob', { owner: 'seat' }) });
-    writeFileSync(
-      systemctl.db,
-      JSON.stringify({ units: [{ unit: 'akrogon-land-livejob.service', sub: 'running' }] }),
-    );
+    writeFileSync(systemctl.db, JSON.stringify({ units: [{ unit: 'akrogon-land-livejob.service', sub: 'running' }] }));
     const env: Envelope = envelope(
       await cli(f, ['status', '--json'], f.root, {
         ...systemctl.env,
@@ -311,9 +304,7 @@ test('a stopped command-owned land job is an attention fact only while unrecorde
       }),
     );
     expect(
-      ['land-dead', 'land-live', 'land-pushed', 'land-seat'].map(
-        (slug) => leafOf(env, 'repo', slug).attention,
-      ),
+      ['land-dead', 'land-live', 'land-pushed', 'land-seat'].map((slug) => leafOf(env, 'repo', slug).attention),
     ).toEqual([['merge job stopped'], [], [], []]);
     expect(leafOf(env, 'repo', 'land-dead').red).toBe(true);
     expect(env.red).toBe(1);
@@ -353,18 +344,8 @@ test('a leaf carries failed, missing and prompt facts and a clean leaf carries n
       ['failed-rec', 'failed-bare', 'needy', 'undeliv', 'undeliv-busy', 'clean'].map(
         (slug) => leafOf(env, 'repo', slug).attention,
       ),
-    ).toEqual([
-      ['failed: blocked: no key'],
-      ['failed'],
-      ['missing env FOO'],
-      ['A prompt timeout'],
-      [],
-      [],
-    ]);
-    expect([leafOf(env, 'repo', 'undeliv-busy').red, leafOf(env, 'repo', 'clean').red]).toEqual([
-      false,
-      false,
-    ]);
+    ).toEqual([['failed: blocked: no key'], ['failed'], ['missing env FOO'], ['A prompt timeout'], [], []]);
+    expect([leafOf(env, 'repo', 'undeliv-busy').red, leafOf(env, 'repo', 'clean').red]).toEqual([false, false]);
   } finally {
     f.clean();
   }

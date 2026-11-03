@@ -582,9 +582,7 @@ function leafAttention(
   const state: State = leaf.state;
   const facts: string[] = [];
   if (state.phase === 'failed')
-    facts.push(
-      state.failure === undefined ? 'failed' : `failed: ${state.failure.cause}: ${state.failure.reason}`,
-    );
+    facts.push(state.failure === undefined ? 'failed' : `failed: ${state.failure.cause}: ${state.failure.reason}`);
   for (const gap of leaf.missing) facts.push(`missing ${gap.kind} ${gap.name}`);
   for (const seat of ['A', 'B'] as const) {
     const err: DeliveryError | undefined = state.delivery_error[seat];
