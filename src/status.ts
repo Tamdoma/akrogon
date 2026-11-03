@@ -740,7 +740,7 @@ export async function statusCommand(
       .filter((scan): scan is Scan & { ok: true } => scan.ok)
       .flatMap((scan) => {
         const started: Map<string, number> = starts(scan.timings);
-        return scan.closed
+        return [...scan.leaves, ...scan.closed]
           .filter((leaf) => leaf.state.phase === 'merged')
           .map((leaf) => {
             const record: LogRecord | undefined = scan.log.findLast(
