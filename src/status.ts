@@ -39,6 +39,7 @@ import { readStopped } from './stop';
 import { readHostKept, readKept, type KeptEntry } from './reconcile';
 import { currentLink, currentReleaseCommit, deployRecordPath, readDeployRecord } from './release';
 import { landAlive, landUnit } from './land';
+import { requiredSlots } from './routing';
 import { lineRuns, type RunRecord } from './admission';
 import { readVerifyRuns, type VerifyRun } from './verify';
 
@@ -507,6 +508,8 @@ type JsonLeaf = {
   delivery_errors: { a: DeliveryError | null; b: DeliveryError | null };
   failure: State['failure'] | null;
   missing: Gap[];
+  attention: string[];
+  waits_on: ('A' | 'B')[];
   worktree: string;
   plan: string;
   red: boolean;
@@ -566,15 +569,32 @@ function blockedBy(repo: Repo, state: State, leaves: Leaf[]): JsonLeaf['blocked_
   });
 }
 
-// The note() prompt condition: a recorded delivery error whose seat is not busy.
-function undelivered(state: State): boolean {
-  return (['A', 'B'] as const).some(
-    (seat) => state.delivery_error[seat] !== undefined && state.busy_since[seat] === undefined,
-  );
-}
-
-function leafRed(leaf: ScannedLeaf): boolean {
-  return leaf.state.phase === 'failed' || leaf.missing.length > 0 || undelivered(leaf.state);
+// The recorded facts that make this leaf need the operator; leaf.red is
+// attention.length > 0 so the envelope, the panel dot and the board share one
+// predicate. The prompt entries keep the note() condition: a recorded delivery
+// error whose seat is not busy.
+function leafAttention(
+  leaf: ScannedLeaf,
+  deps: JsonLeaf['blocked_by'],
+  attempt: string | undefined,
+  alive: boolean,
+): string[] {
+  const state: State = leaf.state;
+  const facts: string[] = [];
+  if (state.phase === 'failed')
+    facts.push(
+      state.failure === undefined ? 'failed' : `failed: ${state.failure.cause}: ${state.failure.reason}`,
+    );
+  for (const gap of leaf.missing) facts.push(`missing ${gap.kind} ${gap.name}`);
+  for (const seat of ['A', 'B'] as const) {
+    const err: DeliveryError | undefined = state.delivery_error[seat];
+    if (err !== undefined && state.busy_since[seat] === undefined) facts.push(`${seat} prompt ${err.code}`);
+  }
+  for (const dep of deps)
+    if (dep.label === 'parked' || dep.label === 'missing' || dep.label === 'unreadable')
+      facts.push(`waiting on ${dep.slug} (${dep.label})`);
+  if (attempt !== undefined && !alive && state.batch?.recorded !== true) facts.push('merge job stopped');
+  return facts;
 }
 
 async function leafJson(
@@ -588,6 +608,9 @@ async function leafJson(
   const state: State = leaf.state;
   const entry: LogRecord | undefined = phaseEntry(scan.log, state);
   const attempt: string | undefined = landAttempt(state);
+  const alive: boolean = attempt !== undefined && (await landAlive(attempt));
+  const deps: JsonLeaf['blocked_by'] = blockedBy(scan.repo, state, [...scan.leaves, ...scan.closed]);
+  const attention: string[] = leafAttention(leaf, deps, attempt, alive);
   return {
     slug: state.slug,
     group: relative(resolve(scan.repo.root, 'issues/open'), leaf.path).split(sep).slice(0, -1),
@@ -595,9 +618,13 @@ async function leafJson(
     phase_since: entry === undefined ? null : Date.parse(entry.record.ts),
     first_prompt: started.get(state.slug) ?? null,
     stopped: stopped.has(`${scan.repo.name}/${state.slug}`),
-    blocked_by: blockedBy(scan.repo, state, [...scan.leaves, ...scan.closed]),
+    blocked_by: deps,
+    attention,
+    waits_on: requiredSlots(state.phase, state.fix_rounds).filter(
+      (seat) => !state.done.includes(seat) && state.busy_since[seat] === undefined,
+    ),
     broadcast_pending: broadcastPending(state),
-    land: attempt === undefined ? null : { alive: await landAlive(attempt), unit: landUnit(attempt) },
+    land: attempt === undefined ? null : { alive, unit: landUnit(attempt) },
     busy_since: {
       a: state.busy_since.A === undefined ? null : Date.parse(state.busy_since.A),
       b: state.busy_since.B === undefined ? null : Date.parse(state.busy_since.B),
@@ -611,7 +638,7 @@ async function leafJson(
     missing: leaf.missing,
     worktree,
     plan: resolve(leaf.path, 'plan.md'),
-    red: leafRed(leaf),
+    red: attention.length > 0,
     seats: {
       a: seatJson(global, leaf.resolved.a, leaf.seatSources.a),
       b: seatJson(global, leaf.resolved.b, leaf.seatSources.b),
