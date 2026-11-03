@@ -54,21 +54,21 @@ const akrogonSpace: BoardContext = {
   spaceFolder: '/home/ivan',
 };
 
-test('board orders the current space repo first, then alphabetical, and folds empty repos to one line', () => {
+test('board orders the current space repo first, then alphabetical, and folds every empty repo into one quiet line', () => {
   const withSpace: Board = board(envelope, akrogonSpace);
-  expect(withSpace.repos[0].name).toBe('akrogon');
-  const rest: string[] = withSpace.repos.slice(1).map((repo) => repo.name);
-  expect(rest).toEqual([...rest].sort((a, b) => a.localeCompare(b)));
-  const empty = withSpace.repos.filter((repo) => repo.folded);
   const named = envelope.repos
     .filter((repo) => repo.leaves.length === 0 && repo.error === null && repo.unreadable.length === 0)
     .map((repo) => repo.name);
-  expect(empty.map((repo) => repo.name).sort()).toEqual(named.sort());
-  for (const repo of empty) expect(repo.foldedLine).toContain('no open leaves');
+  expect(named.length).toBeGreaterThan(0);
+  expect(withSpace.repos.some((repo) => named.includes(repo.name))).toBe(false);
+  expect(withSpace.quiet).toEqual([...named].sort((a, b) => a.localeCompare(b)));
+  expect(withSpace.quietLine).toBe(`No open tasks: ${withSpace.quiet.join(', ')}`);
+  const shown = envelope.repos.filter((repo) => !named.includes(repo.name)).map((repo) => repo.name);
+  if (shown.includes('akrogon')) expect(withSpace.repos[0].name).toBe('akrogon');
+  const rest: string[] = withSpace.repos.filter((repo) => repo.name !== 'akrogon').map((repo) => repo.name);
+  expect(rest).toEqual([...rest].sort((a, b) => a.localeCompare(b)));
   const withoutMatch: Board = board(envelope, noSpace);
-  expect(withoutMatch.repos.map((repo) => repo.name)).toEqual(
-    [...envelope.repos.map((repo) => repo.name)].sort((a, b) => a.localeCompare(b)),
-  );
+  expect(withoutMatch.repos.map((repo) => repo.name)).toEqual([...shown].sort((a, b) => a.localeCompare(b)));
 });
 
 test('a space folder inside the repo root or its worktree store counts as that repo', () => {
@@ -207,4 +207,30 @@ test('paused repository rows use grey pills and merged rows retain no pill', () 
   repo.paused = true;
   const rows: RowModel[] = leafRows(board(paused, akrogonSpace)).filter((row) => row.repo === repo.name);
   for (const row of rows) expect(row.pill).toEqual(row.phase === 'merged' ? null : { slot: 'muted' });
+});
+
+test('housekeeping lines fold under one count, apart from the alerts', () => {
+  const derived: Envelope = JSON.parse(JSON.stringify(envelope));
+  derived.repos[0].unpacked = [
+    { path: 'issues/closed/a', command: 'akrogon pack issues/closed/a' },
+    { path: 'issues/closed/b', command: 'akrogon pack issues/closed/b' },
+  ];
+  derived.kept = [{ path: '/x/verify-passes/1', reason: 'verify pass younger than 60m' }];
+  const others = derived.repos.slice(1).reduce((sum, repo) => sum + repo.unpacked.length, 0);
+  const out: Board = board(derived, akrogonSpace);
+  expect(out.alerts.some((line) => line.text.startsWith('Unpacked:') || line.text.startsWith('Kept:'))).toBe(false);
+  expect(out.housekeeping.length).toBe(2 + others + 1);
+  expect(out.housekeepingFolded).toBe(`Housekeeping (${2 + others + 1})`);
+});
+
+test("a leaf's second line shows its last move, never the raw log line", () => {
+  const derived: Envelope = JSON.parse(JSON.stringify(envelope));
+  const repo = derived.repos.find((r) => r.leaves.length > 0)!;
+  const leaf = repo.leaves[0];
+  leaf.history = [
+    JSON.stringify({ ts: '2026-11-03T16:35:52.734Z', repo: repo.name, slug: leaf.slug, from: 'implement', to: 'failed', slot: 'A' }),
+  ];
+  const row: RowModel = leafRows(board(derived, akrogonSpace)).find((r) => r.slug === leaf.slug)!;
+  expect(row.line2).not.toContain('{');
+  expect(row.line2).toContain('implement → failed');
 });
