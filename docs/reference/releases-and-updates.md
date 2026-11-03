@@ -9,7 +9,7 @@ Akrogon runs from an installed release, not from your source checkout. Landed wo
 The state home is `~/.akrogon`, or the folder in `AKROGON_HOME`. It holds three release paths:
 
 - `releases/<commit>` is one built release per deployed commit. A release is the tracked tree from `git archive` plus `bun install --frozen-lockfile --backend=copyfile`. It is not a Git checkout.
-- `current` is a link to the active release. The `akrogon` command, the skills, the systemd slice and the Herdr plugin all link through `current`. `~/.local/bin/akrogon` points at `current/src/akrogon.ts`.
+- `current` is a link to the active release. The `akrogon` command, the skills, the `herdr-app/` mods linked into `~/.config/herdr-app/mods`, the systemd slice and the Herdr plugin all link through `current`. `~/.local/bin/akrogon` points at `current/src/akrogon.ts`.
 - `deploy.yaml` records the active commit, the previous commit and the result of the last deploy.
 
 The previous release is the one that was active before the last deploy. It is kept so `akrogon rollback` has a target. Other releases are removed about a day after they stop being active or previous.

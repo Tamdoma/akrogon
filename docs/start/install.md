@@ -69,6 +69,7 @@ Install creates these links:
 
 - `~/.local/bin/akrogon`, the command.
 - Each skill folder into `~/.claude/skills`, `~/.agents/skills`, `~/.codex/skills` and `~/.pi/agent/skills`, so every supported agent CLI finds the same skills.
+- Each `herdr-app/<name>` mod folder into `~/.config/herdr-app/mods`, so herdr-app sessions see the shipped Tasks board.
 - `~/.config/systemd/user/akrogon.slice`, the systemd slice that holds everything Akrogon runs. Install then reloads the systemd user manager.
 - The Herdr plugin, which tells Akrogon when a seat finishes, so it can prompt the next one.
 

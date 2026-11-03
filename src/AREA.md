@@ -9,6 +9,7 @@
 ## Key files
 
 - `src/akrogon.ts` validates CLI arguments and dispatches commands.
+- `src/install.ts` plans and applies `akrogon install` links: the binary, the slice, every `skills/<name>` into each agent root and every `herdr-app/<name>` mod into `~/.config/herdr-app/mods`, pruning stale links into owned or release trees; `src/self-update.ts`'s `deployStage` replays the same plan against the new release so a deploy refreshes every link.
 - `src/state-home.ts` moves the state home out of the tool root to `~/.akrogon` (or `AKROGON_HOME`) on the first command after deploy, gated on live run records and foreign processes and committed last via the rewritten `config.yaml`.
 - `src/release.ts` owns the deploy filesystem: it builds a release (`git archive`, `tar`, `bun install`) into `releases/<sha>`, flips the `current` symlink atomically, and writes the deploy record, hold and prune state; `src/rollback.ts` runs `akrogon rollback` — flip to the recorded previous release, hold the rolled-away commit and restore links through `install()`, under the same install lock deployStage takes. `src/self-update.ts` pushes record commits and fast-forwards the workspace checkout, then deploys the remote tip for the akrogon repo: deploy builds releases behind `current`, re-links through it and records failures in `deploy.yaml`, all under the install lock.
 - `src/preflight.ts` verifies the configured base remote branch and local tracking ref; `src/config.ts` defines config schemas, resolves registered repositories and merges per-repo seat overrides (`seats`). `src/init.ts` initializes repositories and refuses a declared index that is not a readable non-empty file; `src/readiness.ts` owns the readiness contract schema and gap computation.
@@ -23,6 +24,7 @@
 
 ## Non-obvious patterns
 
+- `herdr-app/tasks/` is the Tasks board herdr-app mod shipped by the repo: `main.js` holds the host calls (`exec("akrogon", ["status", "--json"])`, `watchFolder` per envelope `watch.folders` plus `watch.files` content polling, `cx.timer.every` redraws), while `model.js`/`schedule.js` are pure modules tested from `tests/` through sibling `.d.ts` boundaries — herdr-app loads `.js`, akrogon's `tsc` types the tests, so a hand-written `.d.ts` sits beside each pure module.
 - Repository identity comes from registration and the shared Git directory.
 - A phase move can be committed even when later log collection fails. Phase moves reject a dirty worktree and branch changes under `issues/`; a stop into `failed` skips both, a `cause: blocked` restart skips only the dirty check, and the empty-branch refusal applies only at review handoff.
 - External command retries warn once, then preserve the last failure context.

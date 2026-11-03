@@ -46,7 +46,9 @@ test('board orders the current space repo first, then alphabetical, and folds em
   expect(empty.map((repo) => repo.name).sort()).toEqual(named.sort());
   for (const repo of empty) expect(repo.foldedLine).toContain('no open leaves');
   const withoutMatch: Board = board(envelope, noSpace);
-  expect(withoutMatch.repos.map((repo) => repo.name)).toEqual([...envelope.repos.map((repo) => repo.name)].sort());
+  expect(withoutMatch.repos.map((repo) => repo.name)).toEqual(
+    [...envelope.repos.map((repo) => repo.name)].sort((a, b) => a.localeCompare(b)),
+  );
 });
 
 test('a space folder inside the repo root or its worktree store counts as that repo', () => {
@@ -69,8 +71,7 @@ test('leaf rows carry seat logo choices, red flag, uncolored time and tags; red 
   expect(tasksMod!.pill?.slot).toBe('ansi4');
   expect(tasksMod!.groupPath).toBe('tasks-board');
   expect(typeof tasksMod!.time).toBe('string');
-  expect(tasksMod!.time).not.toContain('ansi');
-  expect('color' in tasksMod!.time === false);
+  expect(tasksMod!.time).not.toMatch(/ansi|\x1b/);
   const redRows: RowModel[] = rows.filter((row) => row.red);
   const flagged: string[] = envelope.repos.flatMap((repo) => repo.leaves.filter((leaf) => leaf.red).map((leaf) => leaf.slug));
   expect(redRows.map((row) => row.slug).sort()).toEqual(flagged.sort());
