@@ -234,3 +234,14 @@ test("a leaf's second line shows its last move, never the raw log line", () => {
   expect(row.line2).not.toContain('{');
   expect(row.line2).toContain('implement → failed');
 });
+
+test('quiet repos keep their charts reachable under one fold', () => {
+  const out: Board = board(envelope, akrogonSpace);
+  const expected = envelope.repos
+    .filter((repo) => out.quiet.includes(repo.name) && repo.charts.length > 0)
+    .map((repo) => ({ repo: repo.name, charts: repo.charts }))
+    .sort((a, b) => a.repo.localeCompare(b.repo));
+  expect(expected.length).toBeGreaterThan(0);
+  expect(out.quietCharts).toEqual(expected);
+  expect(out.quietChartsFolded).toBe(`Charts (${expected.reduce((sum, entry) => sum + entry.charts.length, 0)})`);
+});
