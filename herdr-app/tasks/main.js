@@ -36,7 +36,7 @@ function logo(cell, letter, t) {
       : image(cell.logo).size(16).flex_none() : null;
   return h_flex().w(28).flex_none().items_center().gap(4)
     .when(icon !== null, (el) => el.child(icon))
-    .child(div().text_size(11).text_color(t.muted).child(letter));
+    .child(div().text_size(11).text_color(t.dim).child(letter));
 }
 
 // A folded section's header: chevron and its "<name> (<count>)" label; Charts,
@@ -81,8 +81,7 @@ export default class Tasks extends View {
         const [slug, view] = arg.split(" ");
         if (name === "expand") {
           const { repo, leaf } = this.findLeaf(arg);
-          this.toggle(`${repo}/${leaf.slug}`);
-          cx.notify();
+          this.toggle(`${repo}/${leaf.slug}`, cx);
         }
         else if (name === "pin") { this.pin(slug, view === "changes" ? "changes" : "files"); cx.notify(); }
       }
@@ -194,9 +193,11 @@ export default class Tasks extends View {
     cx.spawn(async (cx) => { await this.diffFiles(cx); cx.notify(); });
   }
 
-  toggle(slug) {
+  // A click redraws at once; the 30 s tick only refreshes times.
+  toggle(slug, cx) {
     if (this.expanded.has(slug)) this.expanded.delete(slug);
     else this.expanded.add(slug);
+    cx.notify();
   }
 
   pin(slug, view) {
@@ -228,16 +229,16 @@ export default class Tasks extends View {
       .child(div().flex_1().min_w(0).text_color(t.foreground).child(line.text));
   }
 
-  // The stage word in t.foreground on its own t.background base with a ~12%
-  // stage tint and a 6 px stage-colored dot (look.md recipe); merged rows
-  // carry no pill.
+  // The stage word as herdr-app's Agents list draws a status (mods/agents/main.js
+  // status()): stage-colored semibold text on a ~12% stage tint, composited over
+  // the pill's own opaque t.background so a hovered or selected row keeps its
+  // color (look.md); merged rows carry no pill.
   pillFor(row, t) {
     if (row.pill === null) return null;
-    const color = row.pill.slot === "muted" ? t.dim : t[row.pill.slot];
-    return div().flex_none().rounded(4).overflow_hidden().bg(t.background).child(
-      h_flex().px(6).h(20).items_center().gap(4).bg(withAlpha(color, 0.12))
-        .child(div().size(6).rounded_full().bg(color).flex_none())
-        .child(div().text_size(11).text_color(row.pill.slot === "muted" ? t.muted : t.foreground).child(row.phase.split(".")[0]))
+    const color = row.pill.slot === "muted" ? t.muted : t[row.pill.slot];
+    return div().flex_none().rounded(5).overflow_hidden().bg(t.background).child(
+      h_flex().px(6).h(18).items_center().bg(withAlpha(color, 0.12))
+        .child(div().text_size(10.5).font_semibold().text_color(color).child(row.phase.split(".")[0]))
     );
   }
 
@@ -254,7 +255,7 @@ export default class Tasks extends View {
       .when(open, (el) => el.bg(t.selected))
       .when(fill === "hover" && !open, (el) => el.bg(t.hover))
       .when(fill === "selected" && !open, (el) => el.bg(t.selected))
-      .on_click(() => this.toggle(key))
+      .on_click((_e, cx) => this.toggle(key, cx))
       .child(
         h_flex().h(20).items_center().gap(8).min_w(0)
           .child(h_flex().w(SEATS_W).flex_none().items_center().gap(8)
@@ -263,11 +264,11 @@ export default class Tasks extends View {
           .child(div().flex_1().min_w(0).truncate().text_size(13).font_medium()
             .text_color(row.red ? t.ansi1 : row.pill === null ? t.muted : t.foreground).child(row.slug))
           .when(row.pill !== null, (el) => el.child(this.pillFor(row, t)))
-          .child(div().w(44).flex_none().text_right().text_size(11).text_color(t.dim).child(row.time))
+          .child(div().w(44).flex_none().text_right().text_size(11).text_color(t.dim).child(row.time === "-" ? "" : row.time))
       )
-      .child(
+      .when(second !== "", (el) => el.child(
         div().h(16).pl(ROW_INSET).min_w(0).truncate().text_size(11).text_color(t.muted).child(second)
-      );
+      ));
     if (!open) return head;
     const d = row.detail;
     const detail = v_flex().pl(ROW_INSET).pt(4).pb(4).gap(4).text_size(11).text_color(t.muted);
@@ -288,9 +289,9 @@ export default class Tasks extends View {
     detail.child(
       h_flex().gap(8).pt(4).children(
         ["files", "changes"].map((view) =>
-          div().id(`task-${key}-${view}`).px(8).h(24).rounded(6).cursor_pointer().flex().items_center()
-            .bg(t.background).border_1().border_color(t.border).hover((s) => s.bg(t.hover))
-            .text_size(12).text_color(t.foreground)
+          div().id(`task-${key}-${view}`).px(8).h(26).rounded(6).cursor_pointer().flex().items_center()
+            .bg(t.hover).hover((s) => s.text_color(t.foreground))
+            .text_size(12).text_color(t.muted)
             .on_click((e, cx) => { cx.stop_propagation(); this.pin(key, view); })
             .child(view === "files" ? "Files" : "Changes")
         )
@@ -309,7 +310,7 @@ export default class Tasks extends View {
     for (const row of repo.rows) {
       if (row.kind === "group")
         out.child(div().h(24).flex().items_center().pl(8 + row.depth * 12).pr(8)
-          .text_size(11).font_medium().text_color(t.dim).child(row.name));
+          .text_size(11.5).font_medium().text_color(t.dim).child(row.name));
       else out.child(this.row(row, t));
     }
     if (repo.queue.length > 0) out.child(this.note("merge queue", repo.queue.join("  "), t));
@@ -328,7 +329,7 @@ export default class Tasks extends View {
     const key = `charts-${repo.name}`;
     const open = this.expanded.has(key);
     const el = v_flex().flex_none()
-      .child(foldHeader(key, open, `Charts (${repo.charts.length})`, () => this.toggle(key), t));
+      .child(foldHeader(key, open, `Charts (${repo.charts.length})`, (_e, cx) => this.toggle(key, cx), t));
     if (open) el.children(repo.charts.map((chart) => this.chartRow(chart, t)));
     return el;
   }
@@ -344,7 +345,7 @@ export default class Tasks extends View {
   quietCharts(t) {
     const open = this.expanded.has("quiet-charts");
     const el = v_flex().flex_none().w_full()
-      .child(foldHeader("quiet-charts", open, this.model.quietChartsFolded, () => this.toggle("quiet-charts"), t));
+      .child(foldHeader("quiet-charts", open, this.model.quietChartsFolded, (_e, cx) => this.toggle("quiet-charts", cx), t));
     if (open)
       for (const entry of this.model.quietCharts)
         el.child(div().h(24).flex().items_center().pl(26).pr(8).text_size(11).font_medium().text_color(t.muted).child(entry.repo))
@@ -355,7 +356,7 @@ export default class Tasks extends View {
   merges(t) {
     const open = this.showMerges;
     const el = v_flex().flex_none().w_full()
-      .child(foldHeader("merges", open, this.model.mergesFolded, () => { this.showMerges = !this.showMerges; }, t));
+      .child(foldHeader("merges", open, this.model.mergesFolded, (_e, cx) => { this.showMerges = !this.showMerges; cx.notify(); }, t));
     if (open)
       for (const m of this.model.merges)
         el.child(
@@ -370,7 +371,7 @@ export default class Tasks extends View {
   housekeeping(t) {
     const open = this.expanded.has("housekeeping");
     const el = v_flex().flex_none().w_full()
-      .child(foldHeader("housekeeping", open, this.model.housekeepingFolded, () => this.toggle("housekeeping"), t));
+      .child(foldHeader("housekeeping", open, this.model.housekeepingFolded, (_e, cx) => this.toggle("housekeeping", cx), t));
     if (open)
       for (const line of this.model.housekeeping)
         el.child(div().pl(26).pr(8).py(2).text_size(11).text_color(t.muted).child(line));

@@ -89,12 +89,31 @@ test('expanding a leaf shows the recorded repository kept paths and reasons', as
       host +
         `
 const row = leafRows(view.model).find(row => row.slug === 'tasks-mod');
-view.row(row, t).handlers.click();
+view.row(row, t).handlers.click({}, cx);
 const rendered = text(view.row(row, t)).join(' ');
 for (const kept of env.repos.find(repo => repo.name === row.repo).kept) {
   assert(rendered.includes(kept.path));
   assert(rendered.includes(kept.reason));
 }
+`,
+    ],
+    root,
+  );
+});
+
+test('a click on a row or a fold redraws at once instead of on the next tick', async () => {
+  await command(
+    [
+      process.execPath,
+      '-e',
+      host +
+        `
+let drawn = 0;
+const counting = { ...cx, notify() { drawn += 1; } };
+const row = leafRows(view.model).find(row => row.slug === 'tasks-mod');
+view.row(row, t).handlers.click({}, counting);
+assert.equal(drawn, 1);
+assert(view.expanded.has(row.repo + '/' + row.slug));
 `,
     ],
     root,
@@ -116,7 +135,7 @@ const rows = leafRows(view.model).filter(row => row.slug === first.slug);
 const firstRow = view.row(rows[0], t);
 const secondRow = view.row(rows[1], t);
 assert.notEqual(firstRow.attrs.id, secondRow.attrs.id);
-secondRow.handlers.click();
+secondRow.handlers.click({}, cx);
 assert(!text(view.row(rows[0], t)).includes('Files'));
 const expanded = view.row(rows[1], t);
 const buttons = nodes(expanded).filter(node => node.handlers.click && text(node).length === 1 && ['Files', 'Changes'].includes(text(node)[0]));

@@ -98,7 +98,7 @@ function leafRow(repo, leaf, ctx) {
       b: { busy: leaf.busy_since.b !== null, logo: b?.icon ?? null, tint: b?.tint === true },
     },
     tags: tags(leaf),
-    line2: [leaf.group.join("/"), ...leaf.history.slice(-1).map(move)].filter((part) => part !== "").join("  ·  "),
+    line2: leaf.history.slice(-1).map(move).filter((part) => part !== "").join("  ·  "),
     detail: {
       history: leaf.history.map((line) => historyLine(line, ctx.now)),
       failure: leaf.failure === null ? null : `${leaf.failure.cause}: ${leaf.failure.reason}`,

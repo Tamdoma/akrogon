@@ -242,6 +242,15 @@ test("a leaf's second line shows its last move, never the raw log line", () => {
   expect(row.line2).toContain('implement → failed');
 });
 
+test('a leaf row under its group heading does not repeat the group on its second line', () => {
+  const derived: Envelope = JSON.parse(JSON.stringify(envelope));
+  const repo = derived.repos.find((r) => r.leaves.some((l) => l.group.length > 0))!;
+  const leaf = repo.leaves.find((l) => l.group.length > 0)!;
+  leaf.history = [];
+  const row: RowModel = leafRows(board(derived, akrogonSpace)).find((r) => r.slug === leaf.slug)!;
+  expect(row.line2).not.toContain(leaf.group.join('/'));
+});
+
 test('quiet repos keep their charts reachable under one fold', () => {
   const out: Board = board(envelope, akrogonSpace);
   const expected = envelope.repos
