@@ -67,6 +67,19 @@ function tags(leaf) {
   return out;
 }
 
+// A history entry as a move: JSON log lines read "<from> → <to>", any other
+// line shows as written.
+function move(line) {
+  if (!line.startsWith("{")) return line;
+  const entry = JSON.parse(line);
+  return `${entry.from} → ${entry.to}`;
+}
+
+// The expand view's history line: the move prefixed with how long ago it was.
+function historyLine(line, now) {
+  return line.startsWith("{") ? `${since(now - Date.parse(JSON.parse(line).ts))} ago  ${move(line)}` : line;
+}
+
 function leafRow(repo, leaf, ctx) {
   const programOf = (seat) => seatProgram(seat, ctx.agents);
   const a = programOf(leaf.seats.a);
@@ -85,9 +98,10 @@ function leafRow(repo, leaf, ctx) {
       b: { busy: leaf.busy_since.b !== null, logo: b?.icon ?? null, tint: b?.tint === true },
     },
     tags: tags(leaf),
-    line2: [leaf.group.join("/"), ...leaf.history.slice(-1)].filter((part) => part !== "").join("  ·  "),
+    line2: [leaf.group.join("/"), ...leaf.history.slice(-1).map(move)].filter((part) => part !== "").join("  ·  "),
     detail: {
-      history: leaf.history,
+      history: leaf.history.map((line) => historyLine(line, ctx.now)),
+      failure: leaf.failure === null ? null : `${leaf.failure.cause}: ${leaf.failure.reason}`,
       seats: [
         `A ${leaf.seats.a.harness} ${leaf.seats.a.command} — ${leaf.seats.a.source}`,
         `B ${leaf.seats.b.harness} ${leaf.seats.b.command} — ${leaf.seats.b.source}`,
@@ -143,18 +157,24 @@ function alerts(env) {
         text: `Slow merge: ${repo.name} first seen at ${repo.slow.leaf} ${repo.slow.run}, last ${Math.round(repo.slow.ms / 60000)}m vs normal ${Math.round(repo.slow.normal_ms / 60000)}m`,
         color: "ansi3",
       });
-    for (const entry of repo.unpacked)
-      lines.push({ text: `Unpacked: ${repo.name} ${entry.path}: run ${entry.command}`, color: "muted" });
   }
-  for (const kept of env.kept) lines.push({ text: `Kept: ${kept.path} — ${kept.reason}`, color: "muted" });
   return lines;
+}
+
+// Lines nobody has to act on now: unpacked closed issues and kept paths.
+function housekeeping(env) {
+  return [
+    ...env.repos.flatMap((repo) => repo.unpacked.map((entry) => `Unpacked: ${repo.name} ${entry.path}: run ${entry.command}`)),
+    ...env.kept.map((kept) => `Kept: ${kept.path} — ${kept.reason}`),
+  ];
 }
 
 export function leafRows(board) {
   return board.repos.flatMap((repo) => repo.rows.filter((row) => row.slug !== undefined));
 }
 
-// The whole board: alert lines, ordered repo sections, folded merges.
+// The whole board: alert lines, ordered repo sections with open work, one
+// quiet line for the rest, folded housekeeping and merges.
 export function board(env, ctx) {
   const first = currentRepoName(ctx, env.repos);
   const ordered = [...env.repos].sort((a, b) => {
@@ -162,27 +182,35 @@ export function board(env, ctx) {
     if (b.name === first) return 1;
     return a.name.localeCompare(b.name);
   });
-  const repos = ordered.map((repo) => {
-    const folded = repo.leaves.length === 0 && repo.error === null && repo.unreadable.length === 0;
-    return {
-      name: repo.name,
-      paused: repo.paused,
-      folded,
-      foldedLine: `${repo.name}${repo.paused ? " (paused)" : ""} — no open leaves`,
-      rows: folded ? [] : repoRows(repo, ctx),
-      queue: repo.queue.map((entry) => `${entry.slug} ${entry.place === 1 ? "holder" : entry.place}${entry.no_record ? " no merge record" : ""}`),
-      charts: repo.charts,
-      parked: repo.parked,
-      kept: repo.kept,
-    };
-  });
+  const isQuiet = (repo) => repo.leaves.length === 0 && repo.error === null && repo.unreadable.length === 0;
+  const quiet = env.repos.filter(isQuiet).map((repo) => repo.name).sort((a, b) => a.localeCompare(b));
+  const repos = ordered.filter((repo) => !isQuiet(repo)).map((repo) => ({
+    name: repo.name,
+    paused: repo.paused,
+    folded: false,
+    rows: repoRows(repo, ctx),
+    queue: repo.queue.map((entry) => `${entry.slug} ${entry.place === 1 ? "holder" : entry.place}${entry.no_record ? " no merge record" : ""}`),
+    charts: repo.charts,
+    parked: repo.parked,
+    kept: repo.kept,
+  }));
   const merges = env.merges.slice(0, 5).map((merge) => ({
     repo: merge.repo,
     slug: merge.slug,
     age: merge.merged === null ? "-" : since(ctx.now - merge.merged),
     total: merge.total_ms === null ? "-" : clock(merge.total_ms),
   }));
-  return { alerts: alerts(env), repos, merges, mergesFolded: `Last merges (${merges.length})` };
+  const chores = housekeeping(env);
+  return {
+    alerts: alerts(env),
+    housekeeping: chores,
+    housekeepingFolded: `Housekeeping (${chores.length})`,
+    repos,
+    quiet,
+    quietLine: `No open tasks: ${quiet.join(", ")}`,
+    merges,
+    mergesFolded: `Last merges (${merges.length})`,
+  };
 }
 
 // The Files/Changes button press: merge the space's pin into the pin map and

@@ -98,6 +98,7 @@ export interface SeatCell {
 
 export interface LeafDetail {
   history: string[];
+  failure: string | null;
   seats: string[];
   plan: string;
   worktree: string;
@@ -133,8 +134,7 @@ export interface GroupModel {
 export interface RepoModel {
   name: string;
   paused: boolean;
-  folded: boolean;
-  foldedLine: string;
+  folded: false;
   rows: (GroupModel | RowModel)[];
   queue: string[];
   charts: string[][];
@@ -144,7 +144,7 @@ export interface RepoModel {
 
 export interface AlertLine {
   text: string;
-  color: "ansi1" | "ansi3" | "muted";
+  color: "ansi1" | "ansi3";
 }
 
 export interface MergeModel {
@@ -156,7 +156,11 @@ export interface MergeModel {
 
 export interface Board {
   alerts: AlertLine[];
+  housekeeping: string[];
+  housekeepingFolded: string;
   repos: RepoModel[];
+  quiet: string[];
+  quietLine: string;
   merges: MergeModel[];
   mergesFolded: string;
 }
