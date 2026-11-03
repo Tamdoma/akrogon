@@ -1,0 +1,39 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-03'
+      answer: "approved, let's go (handoff review: up to four short test agents per task in a throwaway herdr window)"
+    principal: the leaf's implement and check seats on the operator's machine
+    account: the operator's existing Claude Code, Codex, Pi and Antigravity logins
+    credential:
+      name: existing harness logins (no API key)
+      holder: host
+    targets: [throwaway herdr-app session created by the leaf]
+    fixtures:
+      - account: operator's local user
+        purpose: real blocked and finished agents to show and answer
+        marker: session name starting with the leaf slug
+        naming: "<leaf slug>-<n>"
+        count: 4
+        cleanup:
+          - step: hc kill each test agent, then herdrapp session stop and delete
+            identity: the leaf seat
+        absence_check: herdrapp session list --json shows no session named with the leaf slug
+    operations: ["hc run --bg --no-parent claude --model haiku <one sample question>", "hc run --bg --no-parent codex|pi|agy -i <one sample question>", hc send, hc read, hc get, hc keys]
+    effects: a few short paid model turns on the operator's subscriptions; a throwaway window on the operator's display
+    bounds: at most four agent launches per leaf, one sample question each, plus one reply each
+    stop_line: never touch the operator's own sessions, terminals or Omarchy theme
+retained: []
+proofs:
+  - operation: "hc send, hc send --force, hc read, hc get from a mod and the CLI"
+    command: "hc([\"send\", ...]) in a mod; hc send [--force] <t> <text>; hc read <t> --lines 0; hc get <t> --json"
+    identity: "local user ivan"
+    target: "throwaway session probe2 with claude, codex, pi, agy agents"
+    version: "hc 0.1.17, Claude Code 2.1.317, Codex 0.166.0, Pi 1.5.0, Antigravity 1.4.12"
+    date: '2026-11-03'
+    result: "mod send typed; force answers Claude, misanswers Antigravity; Codex question reported working"
+    cleanup: "agents killed, session deleted"
+    limits: "one question shape per harness; default models"
+    record: issues/chart/herdr-panels/forks/needs-you.md
