@@ -249,6 +249,23 @@ test('envelope carries row and section facts', async () => {
   }
 });
 
+test('blocked_by resolves a merged dependency in a closed owner', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'done-dep', 'merged', {}, 'finished');
+    mkdirSync(resolve(f.root, 'issues/closed/finished'), { recursive: true });
+    renameSync(path, resolve(f.root, 'issues/closed/finished/done-dep'));
+    leaf(f, 'waiter', 'implement', { 'blocked-by': ['done-dep'] });
+
+    const result: Result = await cli(f, ['status', '--json']);
+    expect(result.code).toBe(0);
+    const env: Envelope = envelope(result);
+    expect(leafOf(env, 'repo', 'waiter').blocked_by).toEqual([{ slug: 'done-dep', label: 'merged' }]);
+  } finally {
+    f.clean();
+  }
+});
+
 test('one unreadable repo exits 1 and still prints the full envelope', async () => {
   const f: Fixture = await fixture();
   const g: Fixture = await fixture();
