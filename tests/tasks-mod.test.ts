@@ -200,3 +200,11 @@ test('last merges fold across repos with age and total time', () => {
   expect(out.merges[0]).toMatchObject({ repo: 'akrogon', slug: 'status-json' });
   expect(out.merges[0].age).toMatch(/\d+[mhd]/);
 });
+
+test('paused repository rows use grey pills and merged rows retain no pill', () => {
+  const paused: Envelope = structuredClone(envelope);
+  const repo = paused.repos.find((repo) => repo.name === 'akrogon')!;
+  repo.paused = true;
+  const rows: RowModel[] = leafRows(board(paused, akrogonSpace)).filter((row) => row.repo === repo.name);
+  for (const row of rows) expect(row.pill).toEqual(row.phase === 'merged' ? null : { slot: 'muted' });
+});
