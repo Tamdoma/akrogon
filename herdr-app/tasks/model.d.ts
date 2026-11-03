@@ -101,6 +101,7 @@ export interface LeafDetail {
   seats: string[];
   plan: string;
   worktree: string;
+  kept: { path: string; reason: string }[];
   blockedBy: string[];
   done: string[];
   attempts: string;

@@ -242,6 +242,8 @@ export default class Tasks extends View {
     for (const seat of d.seats) detail.child(div().truncate().child(seat));
     detail.child(div().truncate().child(`plan ${d.plan}`));
     detail.child(div().truncate().child(`worktree ${d.worktree}`));
+    for (const kept of d.kept)
+      detail.child(div().truncate().child(`kept ${kept.path} — ${kept.reason}`));
     if (d.blockedBy.length > 0) detail.child(div().truncate().child(`blocked by ${d.blockedBy.join(", ")}`));
     for (const gap of d.missing) detail.child(div().truncate().text_color(t.ansi1).child(`Missing: ${gap}`));
     if (d.history.length > 0) {

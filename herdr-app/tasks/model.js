@@ -94,6 +94,7 @@ function leafRow(repo, leaf, ctx) {
       ],
       plan: leaf.plan,
       worktree: leaf.worktree,
+      kept: repo.kept,
       blockedBy: leaf.blocked_by.map((dep) => `${dep.slug} ${dep.label}`),
       done: leaf.done,
       attempts: `A:${leaf.attempts.A} B:${leaf.attempts.B}`,
