@@ -110,8 +110,12 @@ test('install creates all four absent harness roots and repeats without changing
     const env: NodeJS.ProcessEnv = installEnv(f);
     for (const root of roots) expect(existsSync(resolve(f.home, root))).toBe(false);
     expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0, stderr: '' });
+    const modLink: string = resolve(f.home, '.config/herdr-app/mods/tasks');
+    expect(lstatSync(modLink).isSymbolicLink()).toBe(true);
+    expect(realpathSync(modLink)).toBe(resolve(toolRoot, 'herdr-app/tasks'));
     const destinations: string[] = [
       resolve(f.home, '.local/bin/akrogon'),
+      modLink,
       ...roots.flatMap((root) => skills.map((skill) => resolve(f.home, root, skill))),
     ];
     const targets: string[] = destinations.map((destination) => readlinkSync(destination));
@@ -302,9 +306,12 @@ describe('self-update', () => {
     const clone: string = resolve(home, 'clone');
     mkdirSync(resolve(seed, 'skills/skill-one'), { recursive: true });
     mkdirSync(resolve(seed, 'skills/skill-two'), { recursive: true });
+    mkdirSync(resolve(seed, 'herdr-app/tasks'), { recursive: true });
     mkdirSync(resolve(seed, 'vendor/tiny'), { recursive: true });
     writeFileSync(resolve(seed, 'skills/skill-one/SKILL.md'), 'one\n');
     writeFileSync(resolve(seed, 'skills/skill-two/SKILL.md'), 'two\n');
+    writeFileSync(resolve(seed, 'herdr-app/tasks/mod.json'), '{ "place": "none" }\n');
+    writeFileSync(resolve(seed, 'herdr-app/tasks/main.js'), 'export default {}\n');
     mkdirSync(resolve(seed, 'src'));
     writeFileSync(resolve(seed, 'src/akrogon.ts'), 'x\n');
     writeFileSync(resolve(seed, 'file'), 'initial\n');
@@ -593,6 +600,9 @@ describe('self-update', () => {
       expect(logs).toHaveLength(1);
       expect(logs[0]).toContain(`deployed ${newSha.slice(0, 12)}`);
       expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(newSha);
+      const modLink: string = resolve(f.home, '.config/herdr-app/mods/tasks');
+      expect(lstatSync(modLink).isSymbolicLink()).toBe(true);
+      expect(realpathSync(modLink)).toBe(resolve(f.home, 'releases', newSha, 'herdr-app/tasks'));
       for (const root of roots) {
         const directory: string = resolve(f.home, root);
         expect(lstatSync(resolve(directory, 'skill-two'), { throwIfNoEntry: false })).toBeUndefined();
