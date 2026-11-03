@@ -53,16 +53,20 @@ export default class Tasks extends View {
     cx.spawn(async (cx) => {
       for (;;) {
         const c = await nextCommand();
-        const [name, ...rest] = c.split(" ");
-        if (name === "expand") { this.toggle(rest.join(" ")); cx.notify(); }
-        else if (name === "pin") { this.pin(rest[0], rest[1] ?? "files"); cx.notify(); }
+        const i = c.indexOf(":");
+
+        const name = i === -1 ? c : c.slice(0, i);
+        const arg = i === -1 ? "" : c.slice(i + 1);
+        const [slug, view] = arg.split(" ");
+        if (name === "expand") { this.toggle(arg); cx.notify(); }
+        else if (name === "pin") { this.pin(slug, view === "changes" ? "changes" : "files"); cx.notify(); }
       }
     });
     this.start(cx);
   }
 
   propsEnvelope() {
-    const p = props().envelope;
+    const p = props()?.envelope;
     if (typeof p === "string" && p.trim().startsWith("{")) return JSON.parse(p);
     return null;
   }
@@ -84,7 +88,7 @@ export default class Tasks extends View {
   }
 
   async loadEnvelope() {
-    const p = props().envelope;
+    const p = props()?.envelope;
     if (typeof p === "string" && !p.trim().startsWith("{")) {
       const text = await readTextFile(p);
       if (text !== null) return { env: JSON.parse(text), error: null };
@@ -198,11 +202,16 @@ export default class Tasks extends View {
   }
 
   row(row, t) {
-    const open = this.expanded.has(row.slug);
+    // props().fill "hover"|"selected" forces that row fill on every row and
+    // props().expand expands all rows: screenshot proofs without a pointer.
+    const fill = props()?.fill;
+    const open = props()?.expand === true || this.expanded.has(row.slug);
     const head = v_flex().id(`task-${row.slug}`).flex_none().w_full().px(6).py(4).gap(2)
       .rounded(6).cursor_pointer()
       .hover((s) => s.bg(t.hover))
       .when(open, (el) => el.bg(t.selected))
+      .when(fill === "hover" && !open, (el) => el.bg(t.hover))
+      .when(fill === "selected" && !open, (el) => el.bg(t.selected))
       .on_click(() => this.toggle(row.slug))
       .child(
         h_flex().items_center().gap(6).min_w(0)
