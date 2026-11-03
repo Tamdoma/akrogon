@@ -199,10 +199,11 @@ export default class Tasks extends View {
   pillFor(row, t) {
     if (row.pill === null) return null;
     const color = row.pill.slot === "muted" ? t.muted : t[row.pill.slot];
-    return h_flex().flex_none().rounded(4).overflow_hidden().px(5).h(16).items_center().gap(4)
-      .bg(withAlpha(color, 0.12))
-      .child(div().w(6).h(6).rounded_full().bg(color).flex_none())
-      .child(div().text_size(10).text_color(t.foreground).child(row.phase.split(".")[0]));
+    return div().flex_none().rounded(4).overflow_hidden().bg(t.background).child(
+      h_flex().px(5).h(16).items_center().gap(4).bg(withAlpha(color, 0.12))
+        .child(div().w(6).h(6).rounded_full().bg(color).flex_none())
+        .child(div().text_size(10).text_color(t.foreground).child(row.phase.split(".")[0]))
+    );
   }
 
   row(row, t) {
