@@ -54,7 +54,7 @@ const akrogonSpace: BoardContext = {
   spaceFolder: '/home/ivan',
 };
 
-test('board orders the current space repo first, then alphabetical, and folds every empty repo into one quiet line', () => {
+test('board orders the current space repo first, then alphabetical, and leaves every empty repo out', () => {
   const withSpace: Board = board(envelope, akrogonSpace);
   const named = envelope.repos
     .filter((repo) => repo.leaves.length === 0 && repo.error === null && repo.unreadable.length === 0)
@@ -62,7 +62,6 @@ test('board orders the current space repo first, then alphabetical, and folds ev
   expect(named.length).toBeGreaterThan(0);
   expect(withSpace.repos.some((repo) => named.includes(repo.name))).toBe(false);
   expect(withSpace.quiet).toEqual([...named].sort((a, b) => a.localeCompare(b)));
-  expect(withSpace.quietLine).toBe(`No open tasks: ${withSpace.quiet.join(', ')}`);
   const shown = envelope.repos.filter((repo) => !named.includes(repo.name)).map((repo) => repo.name);
   if (shown.includes('akrogon')) expect(withSpace.repos[0].name).toBe('akrogon');
   const rest: string[] = withSpace.repos.filter((repo) => repo.name !== 'akrogon').map((repo) => repo.name);
@@ -193,14 +192,6 @@ test('a folder hit or file diff rescans only when no scan runs', () => {
   expect(next('tick', true)).toEqual({ rescan: false });
 });
 
-test('last merges fold across repos with age and total time', () => {
-  const out: Board = board(envelope, { ...noSpace, now: envelope.generated + 3_600_000 });
-  expect(out.mergesFolded).toBeTruthy();
-  expect(out.merges.length).toBeLessThanOrEqual(5);
-  expect(out.merges[0]).toMatchObject({ repo: 'akrogon', slug: 'status-json' });
-  expect(out.merges[0].age).toMatch(/\d+[mhd]/);
-});
-
 test('paused repository rows use grey pills and merged rows retain no pill', () => {
   const paused: Envelope = structuredClone(envelope);
   const repo = paused.repos.find((repo) => repo.name === 'akrogon')!;
@@ -209,18 +200,14 @@ test('paused repository rows use grey pills and merged rows retain no pill', () 
   for (const row of rows) expect(row.pill).toEqual(row.phase === 'merged' ? null : { slot: 'muted' });
 });
 
-test('housekeeping lines fold under one count, apart from the alerts', () => {
+test('the board carries no quiet line, charts, merges or housekeeping, and kept or unpacked lines never become alerts', () => {
   const derived: Envelope = JSON.parse(JSON.stringify(envelope));
-  derived.repos[0].unpacked = [
-    { path: 'issues/closed/a', command: 'akrogon pack issues/closed/a' },
-    { path: 'issues/closed/b', command: 'akrogon pack issues/closed/b' },
-  ];
+  derived.repos[0].unpacked = [{ path: 'issues/closed/a', command: 'akrogon pack issues/closed/a' }];
   derived.kept = [{ path: '/x/verify-passes/1', reason: 'verify pass younger than 60m' }];
-  const others = derived.repos.slice(1).reduce((sum, repo) => sum + repo.unpacked.length, 0);
   const out: Board = board(derived, akrogonSpace);
+  expect(Object.keys(out).sort()).toEqual(['alerts', 'quiet', 'repos']);
+  for (const repo of out.repos) expect('charts' in repo).toBe(false);
   expect(out.alerts.some((line) => line.text.startsWith('Unpacked:') || line.text.startsWith('Kept:'))).toBe(false);
-  expect(out.housekeeping.length).toBe(2 + others + 1);
-  expect(out.housekeepingFolded).toBe(`Housekeeping (${2 + others + 1})`);
 });
 
 test("a leaf's second line shows its last move, never the raw log line", () => {
@@ -249,15 +236,4 @@ test('a leaf row under its group heading does not repeat the group on its second
   leaf.history = [];
   const row: RowModel = leafRows(board(derived, akrogonSpace)).find((r) => r.slug === leaf.slug)!;
   expect(row.line2).not.toContain(leaf.group.join('/'));
-});
-
-test('quiet repos keep their charts reachable under one fold', () => {
-  const out: Board = board(envelope, akrogonSpace);
-  const expected = envelope.repos
-    .filter((repo) => out.quiet.includes(repo.name) && repo.charts.length > 0)
-    .map((repo) => ({ repo: repo.name, charts: repo.charts }))
-    .sort((a, b) => a.repo.localeCompare(b.repo));
-  expect(expected.length).toBeGreaterThan(0);
-  expect(out.quietCharts).toEqual(expected);
-  expect(out.quietChartsFolded).toBe(`Charts (${expected.reduce((sum, entry) => sum + entry.charts.length, 0)})`);
 });

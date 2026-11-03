@@ -137,7 +137,6 @@ export interface RepoModel {
   folded: false;
   rows: (GroupModel | RowModel)[];
   queue: string[];
-  charts: string[][];
   parked: string[];
   kept: { path: string; reason: string }[];
 }
@@ -147,24 +146,10 @@ export interface AlertLine {
   color: "ansi1" | "ansi3";
 }
 
-export interface MergeModel {
-  repo: string;
-  slug: string;
-  age: string;
-  total: string;
-}
-
 export interface Board {
   alerts: AlertLine[];
-  housekeeping: string[];
-  housekeepingFolded: string;
   repos: RepoModel[];
   quiet: string[];
-  quietLine: string;
-  quietCharts: { repo: string; charts: string[][] }[];
-  quietChartsFolded: string;
-  merges: MergeModel[];
-  mergesFolded: string;
 }
 
 export interface PinEntry {

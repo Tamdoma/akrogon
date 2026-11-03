@@ -21,7 +21,6 @@ function withAlpha(color, frac) {
   return `#${m[1]}${Math.round(frac * 255).toString(16).padStart(2, "0")}`;
 }
 
-const CHEVRON = (open) => `mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`;
 // Sizes follow the terminal text (settings().font_size; operator 2026-11-03:
 // "Increase it to what we have by default here in normal terminals"): every
 // size below is written at a 13 px base and scaled by S().
@@ -31,7 +30,6 @@ const S = (n) => Math.round(n * K * 2) / 2;
 const SEAT = 18;       // one seat icon, sized to the slug line
 const SEATS_W = SEAT * 2 + 6; // two seat icons and their gap: the slug column starts here
 const ROW_INSET = SEATS_W + 8;
-const CHART_CELLS = [36, 20, 72, 32]; // widths of a chart row's leaves, open, state and age cells
 
 // Both seats as herdr-app's own program icons, no letters; a working seat's
 // icon is the Agents-list spinner; a seat with no matching program keeps its
@@ -49,16 +47,6 @@ function seatIcons(seats, t) {
     .child(seatIcon(seats.a, t)).child(seatIcon(seats.b, t));
 }
 
-// A folded section's header: chevron and its "<name> (<count>)" label; Charts,
-// Last merges and Housekeeping all draw through it.
-function foldHeader(id, open, label, onClick, t) {
-  return h_flex().id(id).h(S(28)).flex_none().px(8).gap(6).items_center().rounded(6).cursor_pointer()
-    .hover((s) => s.bg(t.hover))
-    .on_click(onClick)
-    .child(svg(CHEVRON(open)).size(S(12)).flex_none().text_color(t.dim))
-    .child(div().text_size(S(12)).text_color(t.muted).child(label));
-}
-
 // A key/value line of the expanded row: dim label column, value beside it.
 function field(label, value, t) {
   return h_flex().items_start().gap(8).min_w(0)
@@ -72,7 +60,6 @@ export default class Tasks extends View {
     this.model = null;        // last board() result
     this.error = null;        // exec/parse failure text, shown instead of env data
     this.expanded = new Set();
-    this.showMerges = false;
     this.seq = Date.now();
     this.scanning = false;
     this.wanted = false;
@@ -323,7 +310,6 @@ export default class Tasks extends View {
     }
     if (repo.queue.length > 0) out.child(this.note("merge queue", repo.queue.join("  "), t));
     if (repo.parked.length > 0) out.child(this.note("parked", repo.parked.join("  "), t));
-    if (repo.charts.length > 0) out.child(this.charts(repo, t));
     return out;
   }
 
@@ -331,59 +317,6 @@ export default class Tasks extends View {
     return h_flex().h(S(24)).px(8).gap(8).items_center().text_size(S(11)).min_w(0)
       .child(div().flex_none().text_color(t.dim).child(label))
       .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(value));
-  }
-
-  charts(repo, t) {
-    const key = `charts-${repo.name}`;
-    const open = this.expanded.has(key);
-    const el = v_flex().flex_none()
-      .child(foldHeader(key, open, `Charts (${repo.charts.length})`, (_e, cx) => this.toggle(key, cx), t));
-    if (open) el.children(repo.charts.map((chart) => this.chartRow(chart, t)));
-    return el;
-  }
-
-  // One --charts row: the chart name, then its cells in fixed right-aligned columns.
-  chartRow([name, ...cells], t) {
-    return h_flex().h(S(22)).pl(S(26)).pr(8).gap(12).items_center().text_size(S(11)).min_w(0)
-      .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(name.trim()))
-      .children(cells.map((cell, i) => div().w(S(CHART_CELLS[i])).flex_none().text_right().text_color(t.dim).child(cell)));
-  }
-
-  // Charts of the repos in the quiet line: one fold, each repo's name over its charts.
-  quietCharts(t) {
-    const open = this.expanded.has("quiet-charts");
-    const el = v_flex().flex_none().w_full()
-      .child(foldHeader("quiet-charts", open, this.model.quietChartsFolded, (_e, cx) => this.toggle("quiet-charts", cx), t));
-    if (open)
-      for (const entry of this.model.quietCharts)
-        el.child(div().h(S(24)).flex().items_center().pl(S(26)).pr(8).text_size(S(11)).font_medium().text_color(t.muted).child(entry.repo))
-          .children(entry.charts.map((chart) => this.chartRow(chart, t)));
-    return el;
-  }
-
-  merges(t) {
-    const open = this.showMerges;
-    const el = v_flex().flex_none().w_full()
-      .child(foldHeader("merges", open, this.model.mergesFolded, (_e, cx) => { this.showMerges = !this.showMerges; cx.notify(); }, t));
-    if (open)
-      for (const m of this.model.merges)
-        el.child(
-          h_flex().h(S(22)).pl(S(26)).pr(8).gap(12).items_center().text_size(S(11)).min_w(0)
-            .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(`${m.repo}/${m.slug}`))
-            .child(div().flex_none().text_color(t.dim).child(`${m.age} ago`))
-            .child(div().w(S(72)).flex_none().text_right().text_color(t.dim).child(`total ${m.total}`))
-        );
-    return el;
-  }
-
-  housekeeping(t) {
-    const open = this.expanded.has("housekeeping");
-    const el = v_flex().flex_none().w_full()
-      .child(foldHeader("housekeeping", open, this.model.housekeepingFolded, (_e, cx) => this.toggle("housekeeping", cx), t));
-    if (open)
-      for (const line of this.model.housekeeping)
-        el.child(div().pl(S(26)).pr(8).py(2).text_size(S(11)).text_color(t.muted).child(line));
-    return el;
   }
 
   render(cx) {
@@ -411,13 +344,8 @@ export default class Tasks extends View {
     for (const [i, line] of this.model.alerts.entries()) list.child(this.alertLine(line, i, t));
     for (const repo of this.model.repos) list.child(this.repoSection(repo, t));
     const tail = v_flex().flex_none().w_full().pt(8);
-    if (this.model.quiet.length > 0)
-      tail.child(div().px(8).py(4).text_size(S(12)).text_color(t.dim).child(this.model.quietLine));
-    if (this.model.quietCharts.length > 0) tail.child(this.quietCharts(t));
     if (this.model.quiet.length === 0 && this.model.repos.length === 0)
       tail.child(div().px(8).py(4).text_size(S(12)).text_color(t.dim).child("No registered repos"));
-    if (this.model.merges.length > 0) tail.child(this.merges(t));
-    if (this.model.housekeeping.length > 0) tail.child(this.housekeeping(t));
     return root.child(v_flex().id("tasks-list").flex_1().min_h(0).w_full().overflow_y_scrollbar().p(8).child(list.child(tail)));
   }
 }

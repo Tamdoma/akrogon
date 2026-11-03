@@ -161,20 +161,13 @@ function alerts(env) {
   return lines;
 }
 
-// Lines nobody has to act on now: unpacked closed issues and kept paths.
-function housekeeping(env) {
-  return [
-    ...env.repos.flatMap((repo) => repo.unpacked.map((entry) => `Unpacked: ${repo.name} ${entry.path}: run ${entry.command}`)),
-    ...env.kept.map((kept) => `Kept: ${kept.path} — ${kept.reason}`),
-  ];
-}
-
 export function leafRows(board) {
   return board.repos.flatMap((repo) => repo.rows.filter((row) => row.slug !== undefined));
 }
 
-// The whole board: alert lines, ordered repo sections with open work, one
-// quiet line for the rest, folded housekeeping and merges.
+// The whole board: alert lines and ordered repo sections with open work; repos
+// with none are left out (operator 2026-11-03: the quiet line, charts, merges and
+// housekeeping removed as clutter).
 export function board(env, ctx) {
   const first = currentRepoName(ctx, env.repos);
   const ordered = [...env.repos].sort((a, b) => {
@@ -190,31 +183,13 @@ export function board(env, ctx) {
     folded: false,
     rows: repoRows(repo, ctx),
     queue: repo.queue.map((entry) => `${entry.slug} ${entry.place === 1 ? "holder" : entry.place}${entry.no_record ? " no merge record" : ""}`),
-    charts: repo.charts,
     parked: repo.parked,
     kept: repo.kept,
   }));
-  const merges = env.merges.slice(0, 5).map((merge) => ({
-    repo: merge.repo,
-    slug: merge.slug,
-    age: merge.merged === null ? "-" : since(ctx.now - merge.merged),
-    total: merge.total_ms === null ? "-" : clock(merge.total_ms),
-  }));
-  const quietCharts = env.repos.filter((repo) => isQuiet(repo) && repo.charts.length > 0)
-    .map((repo) => ({ repo: repo.name, charts: repo.charts }))
-    .sort((a, b) => a.repo.localeCompare(b.repo));
-  const chores = housekeeping(env);
   return {
     alerts: alerts(env),
-    housekeeping: chores,
-    housekeepingFolded: `Housekeeping (${chores.length})`,
     repos,
     quiet,
-    quietLine: `No open tasks: ${quiet.join(", ")}`,
-    quietCharts,
-    quietChartsFolded: `Charts (${quietCharts.reduce((sum, entry) => sum + entry.charts.length, 0)})`,
-    merges,
-    mergesFolded: `Last merges (${merges.length})`,
   };
 }
 
