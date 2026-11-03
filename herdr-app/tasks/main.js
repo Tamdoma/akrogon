@@ -1,5 +1,7 @@
-// Tasks board: the akrogon status --json envelope as a read-only repo/leaf
-// list. All host calls live here; model.js/schedule.js stay pure for tests.
+// Tasks board: the akrogon status --json envelope as a read-only sectioned
+// list — Needs you, Working, Waiting, Paused — with non-task problems in one
+// machine block. All host calls live here; model.js/schedule.js stay pure for
+// tests.
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -7,59 +9,52 @@ import {
   exec, readTextFile, watchFolder, knownAgents, spaces, theme,
   shared, setShared, nextCommand, props, settings,
 } from "herdr";
-import { board, pinIntent, filesChanged } from "./model.js";
+import { board, pinIntent, filesChanged, since } from "./model.js";
 import { next } from "./schedule.js";
 
 const TICK_MS = 30000; // times re-render every 30 s; the command never reruns on it
 const SPINNER = "mods/workspace-chrome/spinner.svg";
+const TONE = "#ffffffb3"; // the sidebar's translucent white for one-color icons
 
-// tint a 6- or 8-digit hex with alpha, so the pill base carries the ~12%
-// stage tint without element opacity reaching the word.
-function withAlpha(color, frac) {
-  const m = /^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/.exec(color ?? "");
-  if (!m) return color;
-  return `#${m[1]}${Math.round(frac * 255).toString(16).padStart(2, "0")}`;
-}
-
-// Sizes follow the terminal text (settings().font_size; operator 2026-11-03:
-// "Increase it to what we have by default here in normal terminals"): every
-// size below is written at a 13 px base and scaled by S().
+// Sizes follow the terminal text (settings().font_size) for row text, line 2,
+// expansion text and seat icons only; chrome stays fixed (S() written at a
+// 13 px base).
 let K = 1;
 const S = (n) => Math.round(n * K * 2) / 2;
 
-const SEAT = 18;       // one seat icon, sized to the slug line
-const SEATS_W = SEAT * 2 + 6; // two seat icons and their gap: the slug column starts here
-const ROW_INSET = SEATS_W + 8;
+const SEAT = 18; // one seat icon, sized to the slug line
 
-// Both seats as herdr-app's own program icons, no letters; a working seat's
-// icon is the Agents-list spinner; a seat with no matching program keeps its
-// place empty (operator 2026-11-03: "the same ones that herdr-app is using ...
-// Icons no letters, but here they need to be big to fit the design").
+// Both seats as the sidebar's one-color program icons: a tinted program draws
+// as a mask in translucent white, a colored one uses its mono/ copy from the
+// app home; a working seat is the spinner; no program keeps the cell empty.
 function seatIcon(cell, t) {
   const size = S(SEAT);
-  if (cell.busy) return svg(SPINNER).size(size).flex_none().text_color(t.working).spin(900);
+  if (cell.busy) return svg(SPINNER).size(size).flex_none().text_color(t.muted).spin(900);
   if (cell.logo === null) return div().size(size).flex_none();
-  return cell.tint ? svg(cell.logo).size(size).flex_none().text_color(t.foreground) : image(cell.logo).size(size).flex_none();
+  return cell.tint
+    ? svg(cell.logo).size(size).flex_none().text_color(TONE)
+    : image(`mono/${cell.logo.split("/").pop().replace(/\.svg$/, ".png")}`).w(size).h(size).flex_none();
 }
 
 function seatIcons(seats, t) {
-  return h_flex().w(S(SEATS_W)).flex_none().items_center().gap(S(6))
+  return h_flex().flex_none().items_center().gap(4)
     .child(seatIcon(seats.a, t)).child(seatIcon(seats.b, t));
 }
 
-// A key/value line of the expanded row: dim label column, value beside it.
+// A key/value line of the expanded row: dim label column, full value beside it.
 function field(label, value, t) {
   return h_flex().items_start().gap(8).min_w(0)
-    .child(div().w(S(64)).flex_none().text_color(t.dim).child(label))
-    .child(div().flex_1().min_w(0).truncate().child(value));
+    .child(div().w(64).flex_none().text_color(t.dim).child(label))
+    .child(div().flex_1().min_w(0).child(value));
 }
 
 export default class Tasks extends View {
   init(_props, cx) {
     this.env = null;          // last parsed envelope
     this.model = null;        // last board() result
-    this.error = null;        // exec/parse failure text, shown instead of env data
+    this.error = null;        // exec/parse failure text, shown as a machine line
     this.expanded = new Set();
+    this.runOpen = false;     // the dim run-waiting line's full text
     this.seq = Date.now();
     this.scanning = false;
     this.wanted = false;
@@ -190,23 +185,30 @@ export default class Tasks extends View {
     cx.spawn(async (cx) => { await this.diffFiles(cx); cx.notify(); });
   }
 
-  // A click redraws at once; the 30 s tick only refreshes times.
+  // A chevron click redraws at once; the 30 s tick only refreshes times.
   toggle(slug, cx) {
     if (this.expanded.has(slug)) this.expanded.delete(slug);
     else this.expanded.add(slug);
     cx.notify();
   }
 
-  pin(slug, view) {
-    if (this.env === null || (view !== "files" && view !== "changes")) return;
-    const { leaf } = this.findLeaf(slug);
+  // The shared pin for one folder plus the open request; Files and Changes
+  // both root at it until a later pin.
+  pinFolder(folder, view) {
+    if (folder === null) return;
     const space = spaces().find((s) => s.active);
     if (space === undefined) return;
     const pin = shared("worktree.pin") ?? {};
-    const intents = pinIntent(space.id, leaf, view, pin, Math.max(this.seq, shared("panel.request")?.seq ?? 0));
+    const intents = pinIntent(space.id, folder, view, pin, Math.max(this.seq, shared("panel.request")?.seq ?? 0));
     this.seq = intents.request.seq;
     setShared("worktree.pin", intents.pin);
     setShared("panel.request", intents.request);
+  }
+
+  pin(slug, view) {
+    if (this.env === null || (view !== "files" && view !== "changes")) return;
+    const { leaf } = this.findLeaf(slug);
+    this.pinFolder(leaf.worktree, view);
   }
 
   findLeaf(key) {
@@ -219,75 +221,68 @@ export default class Tasks extends View {
     return matches[0];
   }
 
-  // An actionable line: a 6 px dot in its color, the text in the foreground.
-  alertLine(line, i, t) {
-    return h_flex().id(`alert-${i}`).px(8).py(4).gap(8).items_start().text_size(S(12))
-      .child(div().mt(S(5)).size(S(6)).flex_none().rounded_full().bg(t[line.color]))
-      .child(div().flex_1().min_w(0).text_color(t.foreground).child(line.text));
+  // The machine block above Needs you: a scan failure first, then the
+  // envelope's deploy/repo lines and the dim run-waiting line.
+  machineLine(line, i, t) {
+    const color = line.tone === "red" ? t.ansi1 : t.muted;
+    const el = v_flex().id(`machine-${i}`).flex_none().w_full();
+    const row = div().px(8).py(4).min_w(0).text_size(11).text_color(color).child(line.text);
+    if (line.detail !== null)
+      row.cursor_pointer().on_click((_e, cx) => { this.runOpen = !this.runOpen; cx.notify(); });
+    el.child(row);
+    if (line.detail !== null && this.runOpen)
+      el.child(div().px(8).pb(4).min_w(0).text_size(11).text_color(t.dim).child(line.detail));
+    return el;
   }
 
-  // The stage word as herdr-app's Agents list draws a status (mods/agents/main.js
-  // status()): stage-colored semibold text on a ~12% stage tint, composited over
-  // the pill's own opaque t.background so a hovered or selected row keeps its
-  // color (look.md); merged rows carry no pill.
-  pillFor(row, t) {
-    if (row.pill === null) return null;
-    const color = row.pill.slot === "muted" ? t.muted : t[row.pill.slot];
-    return div().flex_none().rounded(5).overflow_hidden().bg(t.background).child(
-      h_flex().px(6).h(S(18)).items_center().bg(withAlpha(color, 0.12))
-        .child(div().text_size(S(10.5)).font_semibold().text_color(color).child(row.phase.split(".")[0]))
-    );
-  }
-
+  // One task row: grey repo prefix and slug on line 1 with seat icons and the
+  // disclosure chevron at the right; phase, reason, time and blocks on line 2.
+  // The body pins the leaf's issue folder to Files; the chevron only expands.
   row(row, t) {
-    // props().fill "hover"|"selected" forces that row fill on every row and
-    // props().expand expands all rows: screenshot proofs without a pointer.
+    // props().fill "hover" forces that row fill on every row and props().expand
+    // expands all rows: screenshot proofs without a pointer.
     const fill = props()?.fill;
     const key = `${row.repo}/${row.slug}`;
     const open = props()?.expand === true || this.expanded.has(key);
-    const second = [...row.tags, row.line2].filter((part) => part !== "").join("  ·  ");
     const head = v_flex().id(`task-${key}`).flex_none().w_full().px(8).py(4).gap(4)
-      .rounded(6).cursor_pointer()
+      .rounded(6)
+      .when(!row.parked, (el) => el.cursor_pointer().on_click((_e, cx) => this.pinFolder(row.folder, "files")))
       .hover((s) => s.bg(t.hover))
-      .when(open, (el) => el.bg(t.selected))
       .when(fill === "hover" && !open, (el) => el.bg(t.hover))
-      .when(fill === "selected" && !open, (el) => el.bg(t.selected))
-      .on_click((_e, cx) => this.toggle(key, cx))
       .child(
-        h_flex().h(S(20)).items_center().gap(S(8)).min_w(0)
+        h_flex().h(S(20)).items_center().gap(8).min_w(0)
+          .child(div().flex_none().text_size(S(13)).text_color(t.dim).child(row.repo))
+          .child(div().flex_1().min_w(0).truncate().text_size(S(13)).text_color(t.foreground).child(row.slug))
           .child(seatIcons(row.seats, t))
-          .child(div().flex_1().min_w(0).truncate().text_size(S(13)).font_medium()
-            .text_color(row.red ? t.ansi1 : row.pill === null ? t.muted : t.foreground).child(row.slug))
-          .when(row.pill !== null, (el) => el.child(this.pillFor(row, t)))
-          .child(div().w(S(44)).flex_none().text_right().text_size(S(11)).text_color(t.dim).child(row.time === "-" ? "" : row.time))
+          .when(!row.parked, (el) => el.child(
+            div().id(`chev-${key}`).w(24).h(S(20)).flex_none().cursor_pointer().flex().items_center().justify_center()
+              .on_click((_e, cx) => { cx.stop_propagation(); this.toggle(key, cx); })
+              .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none().text_color(t.dim))
+          ))
       )
-      .when(second !== "", (el) => el.child(
-        div().h(S(16)).pl(S(ROW_INSET)).min_w(0).truncate().text_size(S(11)).text_color(t.muted).child(second)
-      ));
-    if (!open) return head;
+      .child(
+        h_flex().items_center().gap(8).min_w(0)
+          .when(row.phase !== "", (el) => el.child(div().flex_none().text_size(S(11)).text_color(t.dim).child(row.phase)))
+          .when(row.reason !== "", (el) => el.child(div().min_w(0).truncate().text_size(S(11)).text_color(row.reasonRed ? t.ansi1 : t.muted).child(row.reason)))
+          .when(row.time !== "", (el) => el.child(div().flex_none().text_size(S(11)).text_color(t.dim).child(`· ${row.time}`)))
+          .when(row.blocks > 0, (el) => el.child(div().flex_none().text_size(S(11)).text_color(t.dim).child(`· blocks ${row.blocks}`)))
+      );
+    if (!open || row.parked) return head;
     const d = row.detail;
-    const detail = v_flex().pl(S(ROW_INSET)).pt(4).pb(4).gap(4).text_size(S(11)).text_color(t.muted);
-    if (d.failure !== null)
-      detail.child(h_flex().items_start().gap(8).min_w(0)
-        .child(div().w(S(64)).flex_none().text_color(t.dim).child("failed"))
-        .child(div().flex_1().min_w(0).text_color(t.foreground).child(d.failure)));
-    for (const [i, seat] of d.seats.entries()) detail.child(field(i === 0 ? "seats" : "", seat, t));
-    detail.child(field("plan", d.plan, t));
-    detail.child(field("worktree", d.worktree, t));
+    const detail = v_flex().pt(2).pb(4).gap(4).text_size(S(11)).text_color(t.muted).min_w(0);
+    for (const why of d.reasons)
+      detail.child(div().min_w(0).text_color(row.reasonRed ? t.ansi1 : t.muted).child(why));
     if (d.blockedBy.length > 0) detail.child(field("blocked by", d.blockedBy.join(", "), t));
-    for (const gap of d.missing)
-      detail.child(h_flex().gap(8).min_w(0)
-        .child(div().w(S(64)).flex_none().text_color(t.dim).child("missing"))
-        .child(div().flex_1().min_w(0).truncate().text_color(t.ansi1).child(gap)));
+    for (const gap of d.missing) detail.child(field("missing", gap, t));
+    for (const [i, line] of d.moves.entries()) detail.child(field(i === 0 ? "moves" : "", line, t));
     for (const [i, kept] of d.kept.entries()) detail.child(field(i === 0 ? "kept" : "", `${kept.path} — ${kept.reason}`, t));
-    for (const [i, line] of d.history.slice(-10).entries()) detail.child(field(i === 0 ? "history" : "", line, t));
     detail.child(
       h_flex().gap(8).pt(4).children(
         ["files", "changes"].map((view) =>
           div().id(`task-${key}-${view}`).px(8).h(S(26)).rounded(6).cursor_pointer().flex().items_center()
             .bg(t.hover).hover((s) => s.text_color(t.foreground))
             .text_size(S(12)).text_color(t.muted)
-            .on_click((e, cx) => { cx.stop_propagation(); this.pin(key, view); })
+            .on_click((_e, cx) => { cx.stop_propagation(); this.pinFolder(row.worktree, view); })
             .child(view === "files" ? "Files" : "Changes")
         )
       )
@@ -295,28 +290,14 @@ export default class Tasks extends View {
     return head.child(detail);
   }
 
-  repoSection(repo, t) {
-    const out = v_flex().flex_none().w_full().pt(8)
+  section(section, t) {
+    const out = v_flex().id(`section-${section.name}`).flex_none().w_full().pt(8)
       .child(
-        h_flex().id(`repo-${repo.name}`).h(S(28)).px(8).items_center().gap(8)
-          .child(div().text_size(S(13)).font_semibold().text_color(t.foreground).child(repo.name))
-          .when(repo.paused, (el) => el.child(div().text_size(S(11)).text_color(t.muted).child("paused")))
+        div().h(20).px(8).flex().items_center().min_w(0)
+          .text_size(11).text_color(section.name === "Needs you" ? t.ansi1 : t.dim).child(section.name)
       );
-    for (const row of repo.rows) {
-      if (row.kind === "group")
-        out.child(div().h(S(24)).flex().items_center().pl(8 + row.depth * 12).pr(8)
-          .text_size(S(11.5)).font_medium().text_color(t.dim).child(row.name));
-      else out.child(this.row(row, t));
-    }
-    if (repo.queue.length > 0) out.child(this.note("merge queue", repo.queue.join("  "), t));
-    if (repo.parked.length > 0) out.child(this.note("parked", repo.parked.join("  "), t));
+    for (const row of section.rows) out.child(this.row(row, t));
     return out;
-  }
-
-  note(label, value, t) {
-    return h_flex().h(S(24)).px(8).gap(8).items_center().text_size(S(11)).min_w(0)
-      .child(div().flex_none().text_color(t.dim).child(label))
-      .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(value));
   }
 
   render(cx) {
@@ -324,28 +305,29 @@ export default class Tasks extends View {
     const size = settings().font_size;
     K = (typeof size === "number" ? size : 14) / 13;
     const t = theme();
-    const open = this.model === null ? 0 : this.model.repos.reduce((sum, repo) => sum + repo.rows.filter((row) => row.slug !== undefined && row.pill !== null).length, 0);
-    const root = v_flex().id("tasks").size_full().min_h(0).bg(t.background).text_color(t.foreground).text_size(S(13))
-      .child(h_flex().h(S(42)).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
-        .child(div().font_semibold().child("Tasks"))
-        .child(div().flex_1().min_w(0).truncate().text_right().text_size(S(12)).text_color(t.dim)
-          .child(this.model === null ? "" : `${open} open`)));
-    if (this.error !== null && this.env === null)
-      return root.child(v_flex().p(8).gap(4)
-        .child(div().px(8).text_size(S(12)).text_color(t.ansi1).child(this.error))
-        .child(div().px(8).text_size(S(12)).text_color(t.dim).child("Board unavailable; retrying on the next tick")));
-    if (this.model === null)
-      return root.child(div().p(16).text_size(S(12)).text_color(t.dim).child("Loading tasks…"));
-    // At full width the rows stop at a readable measure so the pill and time
-    // stay near the slug instead of at the far window edge.
-    const list = v_flex().w_full().max_w(S(880));
-    if (this.error !== null)
-      list.child(this.alertLine({ text: this.error, color: "ansi1" }, "scan", t));
-    for (const [i, line] of this.model.alerts.entries()) list.child(this.alertLine(line, i, t));
-    for (const repo of this.model.repos) list.child(this.repoSection(repo, t));
-    const tail = v_flex().flex_none().w_full().pt(8);
-    if (this.model.quiet.length === 0 && this.model.repos.length === 0)
-      tail.child(div().px(8).py(4).text_size(S(12)).text_color(t.dim).child("No registered repos"));
-    return root.child(v_flex().id("tasks-list").flex_1().min_h(0).w_full().overflow_y_scrollbar().p(8).child(list.child(tail)));
+    const problems = this.model === null ? 0 : this.model.problems;
+    const root = v_flex().id("tasks").size_full().min_h(0).bg(t.background).text_color(t.foreground)
+      .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
+        .child(div().font_semibold().text_size(13).child("Tasks"))
+        .when(problems > 0, (el) => el.child(
+          div().flex_1().min_w(0).truncate().text_right().text_size(11).text_color(t.ansi1)
+            .child(`${problems} ${problems === 1 ? "problem" : "problems"}`)
+        )));
+    const machine = [];
+    if (this.error !== null) {
+      machine.push(this.env === null
+        ? { text: `Tasks unavailable — ${this.error.split("\n")[0]}`, tone: "red", detail: null }
+        : { text: `refresh failed · rows from ${since(Date.now() - this.stamp)} ago`, tone: "red", detail: null });
+    }
+    if (this.model !== null) machine.push(...this.model.machine);
+    const list = v_flex().w_full().p(6);
+    for (const [i, line] of machine.entries()) list.child(this.machineLine(line, i, t));
+    if (this.model === null && this.error === null)
+      list.child(div().px(8).py(4).text_size(11).text_color(t.dim).child("Loading tasks…"));
+    if (this.model !== null)
+      for (const section of this.model.sections) list.child(this.section(section, t));
+    if (this.model !== null && this.model.sections.length === 0 && machine.length === 0)
+      list.child(div().px(8).py(4).text_size(11).text_color(t.dim).child("No open tasks"));
+    return root.child(v_flex().id("tasks-list").flex_1().min_h(0).w_full().overflow_y_scrollbar().child(list));
   }
 }
