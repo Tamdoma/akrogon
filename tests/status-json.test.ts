@@ -567,7 +567,8 @@ test('red counts real blocks once and never counts amber or time', async () => {
       slow: { ms: 600000, normal_ms: 300000, first: { run: 'fr', leaf: 'fl' } },
     });
     writeFileSync(resolve(f.root, 'issues/verify-runs.jsonl'), slowLine + '\n');
-    leaf(f, 'quiet', 'implement', { 'blocked-by': ['absent-dep'] });
+    leaf(f, 'live-dep', 'implement');
+    leaf(f, 'quiet', 'implement', { 'blocked-by': ['live-dep'] });
     const busyPath: string = leaf(f, 'busy-err', 'implement', { busy_since: { A: new Date().toISOString() } });
     saveState(busyPath, {
       ...readState(busyPath),
