@@ -79,7 +79,7 @@ function leafRow(repo, leaf, ctx) {
     depth: leaf.group.length,
     red: leaf.red,
     time: leaf.phase_since === null ? "-" : clock(ctx.now - leaf.phase_since),
-    pill: leaf.stopped ? { slot: "muted" } : pill(leaf.phase),
+    pill: leaf.phase === "merged" ? null : leaf.stopped || repo.paused ? { slot: "muted" } : pill(leaf.phase),
     seats: {
       a: { busy: leaf.busy_since.a !== null, logo: a?.icon ?? null, tint: a?.tint === true },
       b: { busy: leaf.busy_since.b !== null, logo: b?.icon ?? null, tint: b?.tint === true },
