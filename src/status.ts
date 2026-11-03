@@ -595,7 +595,7 @@ async function leafJson(
     phase_since: entry === undefined ? null : Date.parse(entry.record.ts),
     first_prompt: started.get(state.slug) ?? null,
     stopped: stopped.has(`${scan.repo.name}/${state.slug}`),
-    blocked_by: blockedBy(scan.repo, state, scan.leaves),
+    blocked_by: blockedBy(scan.repo, state, [...scan.leaves, ...scan.closed]),
     broadcast_pending: broadcastPending(state),
     land: attempt === undefined ? null : { alive: await landAlive(attempt), unit: landUnit(attempt) },
     busy_since: {
