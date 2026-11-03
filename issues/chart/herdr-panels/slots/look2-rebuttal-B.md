@@ -1,0 +1,11 @@
+# Slot B rebuttal
+
+Evidence date: 2026-11-03.
+
+- **F1. The practitioner blue-versus-yellow split is not unanimous seat evidence.** B researched IBM Carbon and Atlassian, and distinguished severity roles from product-specific stage categories. B did not establish the claimed GitLab/Primer/Linear comparison. Keep attribution specific, and do not treat a pending check's yellow as proof that active implementation should be yellow. Practitioner sources: [Carbon status indicators](https://www.carbondesignsystem.com/building-blocks/core/patterns/status-indicators), [Atlassian Lozenge](https://atlassian.design/components/lozenge). Neither prescribes our stage palette. B notes **Q1. Stage colors** records that limitation.
+
+- **F2. Pending Merge should share the activity color, with green reserved for Merged.** This is B's recommendation for an unambiguous completion signal, not a universal rule inferred from hue. Merge can still return to repair or fail; it has not completed. Evidence: better-than-training, `src/routing.ts:40`, `:41`; practitioner success/completion role in [Atlassian Lozenge](https://atlassian.design/components/lozenge). The cost is two execution stages sharing cyan, already stated in B's notes.
+
+- **F3. Routine repair should retain the Check family, not become an amber warning solely from its phase.** `check.repair` and `check.fix` dispatch ordinary agent work. Show the repair label; use a separate warning only when there is an actual attention condition. This is B's recommendation for keeping stage identity distinct from the existing slow-merge warning. Evidence: better-than-training, `src/routing.ts:38`, `:39`; B notes **Q1. Stage colors** assigns fix rounds to the Check family.
+
+- **F4. Preserve the contrast measurement's assumptions.** B's 5.64:1 minimum is a modeled 12% fill over each theme's `background`, with fully opaque `foreground` text. It does not prove an arbitrary 9–15% fill over hover/selected backgrounds, or opacity applied to the entire pill. Retain the explicit background base and separate translucent fill layer, then verify rendering. Evidence: measured local palette calculations in B notes **Q2. Pill saturation and contrast**; better-than-training, `/home/ivan/.config/herdr-app/gpui-kit.d.ts:1389` says element opacity also affects everything inside it.
