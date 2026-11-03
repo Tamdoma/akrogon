@@ -75,3 +75,18 @@ assert(nodes(rendered).some(node => node.attrs.bg === '#0000ff1f'));
     root,
   );
 });
+
+test('expanding a leaf shows the recorded repository kept paths and reasons', async () => {
+  await command(
+    [process.execPath, '-e', host + `
+const row = leafRows(view.model).find(row => row.slug === 'tasks-mod');
+view.row(row, t).handlers.click();
+const rendered = text(view.row(row, t)).join(' ');
+for (const kept of env.repos.find(repo => repo.name === row.repo).kept) {
+  assert(rendered.includes(kept.path));
+  assert(rendered.includes(kept.reason));
+}
+`],
+    root,
+  );
+});
