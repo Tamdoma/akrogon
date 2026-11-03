@@ -61,7 +61,7 @@ function tags(leaf) {
     const err = leaf.delivery_errors[seat];
     if (err !== null) out.push(`${seat} prompt ${err.code ?? "error"}`);
   }
-  if (leaf.failure) out.push(`failed ${leaf.failure.cause} ${leaf.failure.reason}`);
+  if (leaf.failure) out.push(`${leaf.failure.cause}: ${leaf.failure.reason}`);
   for (const gap of leaf.missing) out.push(`missing ${gap.kind} ${gap.name}`);
   if (leaf.fix_rounds > 0) out.push(`fix rounds ${leaf.fix_rounds}`);
   return out;

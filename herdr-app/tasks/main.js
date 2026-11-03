@@ -21,19 +21,40 @@ function withAlpha(color, frac) {
   return `#${m[1]}${Math.round(frac * 255).toString(16).padStart(2, "0")}`;
 }
 
+const CHEVRON = (open) => `mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`;
+const SEATS_W = 64;    // two seat cells of 28 px and an 8 px gap: the slug column starts here
+const ROW_INSET = SEATS_W + 8;
+const CHART_CELLS = [36, 20, 72, 32]; // widths of a chart row's leaves, open, state and age cells
+
+// One seat: its 16 px program logo (the spinner while the seat works), then
+// its letter; a seat with no matching program shows the letter alone.
 function logo(cell, letter, t) {
   const icon = cell.busy
     ? svg(SPINNER).size(12).mx(2).flex_none().text_color(t.working).spin(900)
     : cell.logo ? cell.tint
       ? svg(cell.logo).size(16).flex_none().text_color(t.foreground)
       : image(cell.logo).size(16).flex_none() : null;
-  return h_flex().flex_none().items_center().gap(2)
+  return h_flex().w(28).flex_none().items_center().gap(4)
     .when(icon !== null, (el) => el.child(icon))
-    .child(div().text_color(t.muted).child(letter));
+    .child(div().text_size(11).text_color(t.muted).child(letter));
 }
 
-function alertColor(t, name) {
-  return name === "muted" ? t.muted : t[name];
+// A folded section's header: chevron, label, count; Charts, Last merges and
+// Housekeeping all draw through it.
+function foldHeader(id, open, label, count, onClick, t) {
+  return h_flex().id(id).h(28).flex_none().px(8).gap(6).items_center().rounded(6).cursor_pointer()
+    .hover((s) => s.bg(t.hover))
+    .on_click(onClick)
+    .child(svg(CHEVRON(open)).size(12).flex_none().text_color(t.dim))
+    .child(div().text_size(12).text_color(t.muted).child(label))
+    .child(div().text_size(12).text_color(t.dim).child(String(count)));
+}
+
+// A key/value line of the expanded row: dim label column, value beside it.
+function field(label, value, t) {
+  return h_flex().items_start().gap(8).min_w(0)
+    .child(div().w(64).flex_none().text_color(t.dim).child(label))
+    .child(div().flex_1().min_w(0).truncate().child(value));
 }
 
 export default class Tasks extends View {
@@ -201,8 +222,11 @@ export default class Tasks extends View {
     return matches[0];
   }
 
+  // An actionable line: a 6 px dot in its color, the text in the foreground.
   alertLine(line, i, t) {
-    return div().id(`alert-${i}`).px(10).py(1).text_size(11).text_color(alertColor(t, line.color)).child(line.text);
+    return h_flex().id(`alert-${i}`).px(8).py(4).gap(8).items_start().text_size(12)
+      .child(div().mt(5).size(6).flex_none().rounded_full().bg(t[line.color]))
+      .child(div().flex_1().min_w(0).text_color(t.foreground).child(line.text));
   }
 
   // The stage word in t.foreground on its own t.background base with a ~12%
@@ -210,11 +234,11 @@ export default class Tasks extends View {
   // carry no pill.
   pillFor(row, t) {
     if (row.pill === null) return null;
-    const color = row.pill.slot === "muted" ? t.muted : t[row.pill.slot];
+    const color = row.pill.slot === "muted" ? t.dim : t[row.pill.slot];
     return div().flex_none().rounded(4).overflow_hidden().bg(t.background).child(
-      h_flex().px(5).h(16).items_center().gap(4).bg(withAlpha(color, 0.12))
-        .child(div().w(6).h(6).rounded_full().bg(color).flex_none())
-        .child(div().text_size(10).text_color(t.foreground).child(row.phase.split(".")[0]))
+      h_flex().px(6).h(20).items_center().gap(4).bg(withAlpha(color, 0.12))
+        .child(div().size(6).rounded_full().bg(color).flex_none())
+        .child(div().text_size(11).text_color(row.pill.slot === "muted" ? t.muted : t.foreground).child(row.phase.split(".")[0]))
     );
   }
 
@@ -224,7 +248,8 @@ export default class Tasks extends View {
     const fill = props()?.fill;
     const key = `${row.repo}/${row.slug}`;
     const open = props()?.expand === true || this.expanded.has(key);
-    const head = v_flex().id(`task-${key}`).flex_none().w_full().px(6).py(4).gap(2)
+    const second = [...row.tags, row.line2].filter((part) => part !== "").join("  ·  ");
+    const head = v_flex().id(`task-${key}`).flex_none().w_full().px(8).py(4).gap(4)
       .rounded(6).cursor_pointer()
       .hover((s) => s.bg(t.hover))
       .when(open, (el) => el.bg(t.selected))
@@ -232,43 +257,41 @@ export default class Tasks extends View {
       .when(fill === "selected" && !open, (el) => el.bg(t.selected))
       .on_click(() => this.toggle(key))
       .child(
-        h_flex().items_center().gap(6).min_w(0)
-          .child(h_flex().flex_none().items_center()
+        h_flex().h(20).items_center().gap(8).min_w(0)
+          .child(h_flex().w(SEATS_W).flex_none().items_center().gap(8)
             .child(logo(row.seats.a, "A", t))
             .child(logo(row.seats.b, "B", t)))
-          .child(div().flex_none().text_size(12).font_semibold().text_color(row.red ? t.ansi1 : t.foreground).child(row.slug))
+          .child(div().flex_1().min_w(0).truncate().text_size(13).font_medium()
+            .text_color(row.red ? t.ansi1 : row.pill === null ? t.muted : t.foreground).child(row.slug))
           .when(row.pill !== null, (el) => el.child(this.pillFor(row, t)))
-          .child(div().flex_1().min_w(0))
-          .child(div().flex_none().text_size(10).text_color(t.dim).child(row.time))
+          .child(div().w(44).flex_none().text_right().text_size(11).text_color(t.dim).child(row.time))
       )
       .child(
-        h_flex().items_center().gap(6).pl(38).min_w(0)
-          .child(div().flex_1().min_w(0).truncate().text_size(10).text_color(t.muted).child(row.line2))
-      );
-    if (row.tags.length > 0)
-      head.child(
-        div().pl(38).truncate().text_size(10).text_color(t.dim).child(row.tags.join("  ·  "))
+        div().h(16).pl(ROW_INSET).min_w(0).truncate().text_size(11).text_color(t.muted).child(second)
       );
     if (!open) return head;
     const d = row.detail;
-    const detail = v_flex().pl(38).pr(6).gap(1).text_size(10).text_color(t.muted);
-    for (const seat of d.seats) detail.child(div().truncate().child(seat));
-    detail.child(div().truncate().child(`plan ${d.plan}`));
-    detail.child(div().truncate().child(`worktree ${d.worktree}`));
-    for (const kept of d.kept)
-      detail.child(div().truncate().child(`kept ${kept.path} — ${kept.reason}`));
-    if (d.blockedBy.length > 0) detail.child(div().truncate().child(`blocked by ${d.blockedBy.join(", ")}`));
-    for (const gap of d.missing) detail.child(div().truncate().text_color(t.ansi1).child(`Missing: ${gap}`));
-    if (d.history.length > 0) {
-      detail.child(div().pt(4).text_color(t.dim).child("history"));
-      for (const line of d.history.slice(-10)) detail.child(div().truncate().child(line));
-    }
+    const detail = v_flex().pl(ROW_INSET).pt(4).pb(4).gap(4).text_size(11).text_color(t.muted);
+    if (d.failure !== null)
+      detail.child(h_flex().items_start().gap(8).min_w(0)
+        .child(div().w(64).flex_none().text_color(t.dim).child("failed"))
+        .child(div().flex_1().min_w(0).text_color(t.foreground).child(d.failure)));
+    for (const [i, seat] of d.seats.entries()) detail.child(field(i === 0 ? "seats" : "", seat, t));
+    detail.child(field("plan", d.plan, t));
+    detail.child(field("worktree", d.worktree, t));
+    if (d.blockedBy.length > 0) detail.child(field("blocked by", d.blockedBy.join(", "), t));
+    for (const gap of d.missing)
+      detail.child(h_flex().gap(8).min_w(0)
+        .child(div().w(64).flex_none().text_color(t.dim).child("missing"))
+        .child(div().flex_1().min_w(0).truncate().text_color(t.ansi1).child(gap)));
+    for (const [i, kept] of d.kept.entries()) detail.child(field(i === 0 ? "kept" : "", `${kept.path} — ${kept.reason}`, t));
+    for (const [i, line] of d.history.slice(-10).entries()) detail.child(field(i === 0 ? "history" : "", line, t));
     detail.child(
-      h_flex().gap(6).pt(4).pb(2).children(
+      h_flex().gap(8).pt(4).children(
         ["files", "changes"].map((view) =>
-          div().id(`task-${key}-${view}`).px(8).h(20).rounded(4).cursor_pointer().flex().items_center()
-            .bg(t.raised).hover((s) => s.bg(t.hover))
-            .text_size(10).text_color(t.foreground)
+          div().id(`task-${key}-${view}`).px(8).h(24).rounded(6).cursor_pointer().flex().items_center()
+            .bg(t.background).border_1().border_color(t.border).hover((s) => s.bg(t.hover))
+            .text_size(12).text_color(t.foreground)
             .on_click((e, cx) => { cx.stop_propagation(); this.pin(key, view); })
             .child(view === "files" ? "Files" : "Changes")
         )
@@ -278,91 +301,98 @@ export default class Tasks extends View {
   }
 
   repoSection(repo, t) {
-    if (repo.folded) {
-      const key = `fold-${repo.name}`;
-      const open = this.expanded.has(key);
-      const marks = [repo.paused ? "paused" : "", repo.charts.length > 0 ? `Charts (${repo.charts.length})` : ""].filter((m) => m !== "").join(" · ");
-      const el = v_flex().flex_none().w_full().child(
-        div().id(`repo-${repo.name}`).w_full().px(10).py(4).cursor_pointer()
-          .hover((s) => s.bg(t.hover))
-          .on_click(() => this.toggle(key))
-          .text_size(11).text_color(t.foreground)
-          .child(`${repo.name} — no open leaves${marks === "" ? "" : ` · ${marks}`}`)
-      );
-      if (open)
-        for (const row of repo.charts)
-          el.child(div().pl(20).pr(10).text_size(10).text_color(t.dim).truncate().child(row.join("  ")));
-      return el;
-    }
-    const out = v_flex().flex_none().w_full()
+    const out = v_flex().flex_none().w_full().pt(8)
       .child(
-        h_flex().id(`repo-${repo.name}`).w_full().px(10).pt(8).pb(2).items_center().gap(6)
-          .child(div().text_size(11).font_semibold().text_color(t.foreground).child(repo.name))
-          .when(repo.paused, (el) => el.child(div().text_size(10).text_color(t.muted).child("paused")))
+        h_flex().id(`repo-${repo.name}`).h(28).px(8).items_center().gap(8)
+          .child(div().text_size(13).font_semibold().text_color(t.foreground).child(repo.name))
+          .when(repo.paused, (el) => el.child(div().text_size(11).text_color(t.muted).child("paused")))
       );
     for (const row of repo.rows) {
       if (row.kind === "group")
-        out.child(div().pl(10 + row.depth * 14).pt(4).pr(10).text_size(10).text_color(t.muted).child(row.name));
+        out.child(div().h(24).flex().items_center().pl(8 + row.depth * 12).pr(8)
+          .text_size(11).font_medium().text_color(t.dim).child(row.name));
       else out.child(this.row(row, t));
     }
-    if (repo.queue.length > 0)
-      out.child(div().px(10).pt(2).text_size(10).text_color(t.dim).child(`merge queue: ${repo.queue.join("  ")}`));
+    if (repo.queue.length > 0) out.child(this.note("merge queue", repo.queue.join("  "), t));
+    if (repo.parked.length > 0) out.child(this.note("parked", repo.parked.join("  "), t));
     if (repo.charts.length > 0) out.child(this.charts(repo, t));
-    if (repo.parked.length > 0)
-      out.child(div().px(10).pt(2).text_size(10).text_color(t.dim).child(`parked: ${repo.parked.join("  ")}`));
     return out;
   }
 
+  note(label, value, t) {
+    return h_flex().h(24).px(8).gap(8).items_center().text_size(11).min_w(0)
+      .child(div().flex_none().text_color(t.dim).child(label))
+      .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(value));
+  }
+
   charts(repo, t) {
-    const open = this.expanded.has(`charts-${repo.name}`);
-    const el = v_flex().flex_none().child(
-      h_flex().id(`charts-${repo.name}`).px(10).pt(4).gap(4).cursor_pointer().items_center()
-        .on_click(() => this.toggle(`charts-${repo.name}`))
-        .child(div().text_size(10).text_color(t.muted).child(`${open ? "▾" : "▸"} Charts (${repo.charts.length})`))
-    );
+    const key = `charts-${repo.name}`;
+    const open = this.expanded.has(key);
+    const el = v_flex().flex_none()
+      .child(foldHeader(key, open, "Charts", repo.charts.length, () => this.toggle(key), t));
     if (open)
-      for (const row of repo.charts)
-        el.child(div().pl(20).pr(10).text_size(10).text_color(t.dim).truncate().child(row.join("  ")));
+      for (const [name, ...cells] of repo.charts)
+        el.child(
+          h_flex().h(22).pl(26).pr(8).gap(12).items_center().text_size(11).min_w(0)
+            .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(name.trim()))
+            .children(cells.map((cell, i) => div().w(CHART_CELLS[i]).flex_none().text_right().text_color(t.dim).child(cell)))
+        );
     return el;
   }
 
   merges(t) {
     const open = this.showMerges;
-    const el = v_flex().flex_none().w_full().border_t(1).border_color(t.border)
-      .child(
-        h_flex().id("merges").px(10).py(4).gap(4).cursor_pointer().items_center()
-          .on_click(() => { this.showMerges = !this.showMerges; })
-          .child(div().text_size(10).text_color(t.muted).child(`${open ? "▾" : "▸"} ${this.model.mergesFolded}`))
-      );
+    const el = v_flex().flex_none().w_full()
+      .child(foldHeader("merges", open, "Last merges", this.model.merges.length, () => { this.showMerges = !this.showMerges; }, t));
     if (open)
       for (const m of this.model.merges)
         el.child(
-          h_flex().px(10).gap(6).items_center().text_size(10)
-            .child(div().text_color(t.foreground).child(`${m.repo}/${m.slug}`))
-            .child(div().flex_1().min_w(0))
-            .child(div().text_color(t.muted).child(`${m.age} · total ${m.total}`))
+          h_flex().h(22).pl(26).pr(8).gap(12).items_center().text_size(11).min_w(0)
+            .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(`${m.repo}/${m.slug}`))
+            .child(div().flex_none().text_color(t.dim).child(`${m.age} ago`))
+            .child(div().w(72).flex_none().text_right().text_color(t.dim).child(`total ${m.total}`))
         );
+    return el;
+  }
+
+  housekeeping(t) {
+    const open = this.expanded.has("housekeeping");
+    const el = v_flex().flex_none().w_full()
+      .child(foldHeader("housekeeping", open, "Housekeeping", this.model.housekeeping.length, () => this.toggle("housekeeping"), t));
+    if (open)
+      for (const line of this.model.housekeeping)
+        el.child(div().pl(26).pr(8).py(2).text_size(11).text_color(t.muted).child(line));
     return el;
   }
 
   render(cx) {
     const t = theme();
-    const root = v_flex().id("tasks").size_full().min_h(0).bg(t.background).text_color(t.foreground).text_size(12);
+    const open = this.model === null ? 0 : this.model.repos.reduce((sum, repo) => sum + repo.rows.filter((row) => row.slug !== undefined && row.pill !== null).length, 0);
+    const root = v_flex().id("tasks").size_full().min_h(0).bg(t.background).text_color(t.foreground).text_size(13)
+      .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
+        .child(div().font_semibold().child("Tasks"))
+        .child(div().flex_1().min_w(0).truncate().text_right().text_size(12).text_color(t.dim)
+          .child(this.model === null ? "" : `${open} open`)));
     if (this.error !== null && this.env === null)
-      return root
-        .child(div().p(10).text_color(t.ansi1).child(this.error))
-        .child(div().px(10).text_color(t.muted).child("board unavailable"));
+      return root.child(v_flex().p(8).gap(4)
+        .child(div().px(8).text_size(12).text_color(t.ansi1).child(this.error))
+        .child(div().px(8).text_size(12).text_color(t.dim).child("Board unavailable; retrying on the next tick")));
     if (this.model === null)
-      return root.child(div().p(10).text_color(t.muted).child("loading…"));
-    const list = v_flex().id("tasks-list").flex_1().min_h(0).w_full().overflow_y_scrollbar().py(4);
+      return root.child(div().p(16).text_size(12).text_color(t.dim).child("Loading tasks…"));
+    // At full width the rows stop at a readable measure so the pill and time
+    // stay near the slug instead of at the far window edge.
+    const list = v_flex().w_full().max_w(880);
     if (this.error !== null)
-      list.child(div().px(10).py(2).text_size(11).text_color(t.ansi1).child(this.error));
+      list.child(this.alertLine({ text: this.error, color: "ansi1" }, "scan", t));
     for (const [i, line] of this.model.alerts.entries()) list.child(this.alertLine(line, i, t));
     for (const repo of this.model.repos) list.child(this.repoSection(repo, t));
-    if (this.model.repos.length === 0)
-      list.child(div().p(10).text_color(t.muted).child("no registered repos"));
-    root.child(list);
-    if (this.model.merges.length > 0) root.child(this.merges(t));
-    return root;
+    const tail = v_flex().flex_none().w_full().pt(8);
+    if (this.model.quiet.length > 0)
+      tail.child(div().px(8).py(4).text_size(12).text_color(t.dim).child(this.model.quietLine));
+    else if (this.model.repos.length === 0)
+      tail.child(div().px(8).py(4).text_size(12).text_color(t.dim).child("No registered repos"));
+    if (this.model.merges.length > 0) tail.child(this.merges(t));
+    if (this.model.housekeeping.length > 0) tail.child(this.housekeeping(t));
+    return root.child(v_flex().id("tasks-list").flex_1().min_h(0).w_full().overflow_y_scrollbar().p(8).child(list.child(tail)));
   }
 }
