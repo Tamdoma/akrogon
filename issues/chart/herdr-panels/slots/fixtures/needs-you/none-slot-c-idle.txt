@@ -1,0 +1,10 @@
+   plausible behaviors (switch vs
+   close); the "one open/close
+   routine" doesn't name the
+   branch.
+
+ Parent Idle a:idle t:<hc  40s/0s
+──────────────────────────────────
+
+──────────────────────────────────
+ PI │ 63.6% │ $0.000 │ swe-2-ma...

@@ -1,0 +1,49 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-03'
+      answer: "approved, let's go (handoff review: up to four short test agents per task in a throwaway herdr window)"
+    principal: the leaf's implement and check seats on the operator's machine
+    account: the operator's existing Claude Code, Codex, Pi and Antigravity logins
+    credential:
+      name: existing harness logins (no API key)
+      holder: host
+    targets: [throwaway herdr-app session created by the leaf]
+    fixtures:
+      - account: operator's local user
+        purpose: real blocked and finished agents to show and answer
+        marker: session name starting with the leaf slug
+        naming: "<leaf slug>-<n>"
+        count: 4
+        cleanup:
+          - step: hc kill each test agent, then herdrapp session stop and delete
+            identity: the leaf seat
+        absence_check: herdrapp session list --json shows no session named with the leaf slug
+    operations: ["hc run --bg --no-parent claude --model haiku <one sample question>", "hc run --bg --no-parent codex|pi|agy -i <one sample question>", hc send, hc read, hc get, hc keys]
+    effects: a few short paid model turns on the operator's subscriptions; a throwaway window on the operator's display
+    bounds: at most four agent launches per leaf, one sample question each, plus one reply each
+    stop_line: never touch the operator's own sessions, terminals or Omarchy theme
+retained: []
+proofs:
+  - operation: "herdr-app layout commands, shot and throwaway sessions"
+    command: "herdr-app do layout.select|show|hide|resize|switch; herdr-app shot; herdrapp --session p6probe; herdrapp session stop|attach|delete"
+    identity: "local user ivan"
+    target: "throwaway herdr-app session p6probe"
+    version: "herdr-app 0.1.12, hc 0.1.17"
+    date: '2026-11-03'
+    result: "all ok; full width fills without max 900; terminal kept running; state persists across window restart"
+    cleanup: "session stopped and deleted"
+    limits: "shots go stale when the window is covered; restore checked via state file and hc read"
+    record: issues/chart/herdr-panels/forks/panel-width.md
+  - operation: "knownAgents() from a mod"
+    command: "knownAgents()"
+    identity: "local user ivan"
+    target: "throwaway session probe4"
+    version: "herdr-app 0.1.12"
+    date: '2026-11-03'
+    result: "claude, codex, pi, antigravity (run agy) returned with icons"
+    cleanup: "session deleted"
+    limits: "setShared cross-mod read and TextView.markdown render not observed"
+    record: issues/chart/herdr-panels/forks/look.md

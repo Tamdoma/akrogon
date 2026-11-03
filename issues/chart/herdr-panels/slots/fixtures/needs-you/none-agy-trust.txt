@@ -1,0 +1,13 @@
+Accessing workspace:
+
+/home/ivan/Work/infra/akrogon/issues/chart/herdr-panels/slots/fixtures/needs-you/cwd
+
+Do you trust the contents of this project?
+
+Antigravity CLI requires permission to read, edit, and execute files here.
+
+> Yes, I trust this folder
+  No, exit
+
+  ↑/↓ Navigate · enter Confirm
+                                                                                                                                                                                   Gemini 4 Argon · high

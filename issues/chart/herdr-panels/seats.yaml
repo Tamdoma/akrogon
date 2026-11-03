@@ -1,0 +1,21 @@
+opened: '2026-11-03T08:09:53Z'
+seats:
+  - seat: A
+    pane: t15
+    harness: claude
+    session: bf6c9fb4-e5fd-4d8c-883f-af2eb97eb7ab
+  - seat: B
+    pane: t2s
+    harness: codex
+    session: none
+  - seat: C
+    pane: t2t
+    harness: pi
+    session: none
+  - seat: D
+    pane: t2v
+    harness: antigravity
+    session: none
+spans:
+  - from: '2026-11-03T08:09:53Z'
+    to: '2026-11-03T15:45:22Z'

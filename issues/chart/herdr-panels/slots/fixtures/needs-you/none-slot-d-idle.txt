@@ -1,0 +1,9 @@
+
+  Wrote seat D's focused check
+  to look-final-check-D.md and
+  notified t15.
+
+──────────────────────────────────
+>
+──────────────────────────────────
+? for shortcuts
