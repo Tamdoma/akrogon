@@ -10,6 +10,7 @@ import {
   requireRepo,
   seats,
   SeatIndexError,
+  worktreeStore,
   type GlobalConfig,
   type Repo,
   type SlotConfig,
@@ -17,6 +18,8 @@ import {
 import {
   broadcastPending,
   findLeaf,
+  hasLeafFolder,
+  isParked,
   readInventory,
   repoInventory,
   RepoMismatchError,
@@ -33,18 +36,23 @@ import { issueFolders } from './park';
 import { gaps, readReadiness, type Gap, type Readiness } from './readiness';
 import { readPaused } from './pause';
 import { readStopped } from './stop';
-import { readHostKept, readKept } from './reconcile';
-import { currentReleaseCommit, readDeployRecord } from './release';
+import { readHostKept, readKept, type KeptEntry } from './reconcile';
+import { currentLink, currentReleaseCommit, deployRecordPath, readDeployRecord } from './release';
 import { landAlive, landUnit } from './land';
 import { lineRuns, type RunRecord } from './admission';
 import { readVerifyRuns, type VerifyRun } from './verify';
 
-type ScannedLeaf = Leaf & { missing: Gap[]; seatSources: { a: string; b: string } };
+type ScannedLeaf = Leaf & {
+  missing: Gap[];
+  seatSources: { a: string; b: string };
+  resolved: { a: SlotConfig; b: SlotConfig };
+};
 type Scan =
   | {
       ok: true;
       repo: Repo;
       leaves: ScannedLeaf[];
+      closed: Leaf[];
       parked: string[];
       log: LogRecord[];
       timings: TimingEvent[];
@@ -52,7 +60,7 @@ type Scan =
       failures: LeafFailure[];
       slow: VerifyRun | undefined;
     }
-  | { ok: false; repo: string; path: string; error: string };
+  | { ok: false; repo: string; path: string; root: string; error: string };
 
 class ReadinessError extends Error {}
 
@@ -73,11 +81,18 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     const repo: Repo = readRepo(name, registeredPath);
     const open: string = resolve(repo.root, 'issues/open');
     const inventory: Inventory = repoInventory(repo);
+    const closed: Leaf[] = inventory.leaves.filter((leaf) => !leaf.path.startsWith(open + sep));
     const leaves: ScannedLeaf[] = inventory.leaves
       .filter((leaf) => leaf.path.startsWith(open + sep))
       .map((leaf) => {
         path = resolve(leaf.path, 'readiness.yaml');
-        return { ...leaf, missing: leafGaps(global, leaf), seatSources: seats(global, repo, leaf.path).source };
+        const seat = seats(global, repo, leaf.path);
+        return {
+          ...leaf,
+          missing: leafGaps(global, leaf),
+          seatSources: seat.source,
+          resolved: { a: seat.a, b: seat.b },
+        };
       });
     const failures: LeafFailure[] = [
       ...inventory.unreadable.map((failure) => ({
@@ -100,6 +115,7 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
       ok: true,
       repo,
       leaves,
+      closed,
       parked: issueFolders(repo.root, 'issues/parked'),
       log,
       timings,
@@ -117,7 +133,7 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
       error instanceof SyntaxError ||
       (error instanceof Error && 'code' in error && typeof error.code === 'string' && /^E[A-Z]+$/.test(error.code))
     ) {
-      return { ok: false, repo: name, path, error: error.message };
+      return { ok: false, repo: name, path, root: expandPath(registeredPath, globalHome()), error: error.message };
     }
     throw error;
   }
@@ -183,6 +199,16 @@ function note(state: State, now: number, seatSources: { a: string; b: string }):
   ].join(' · ');
 }
 
+// The moment the leaf entered its current phase, from the last record into it.
+function phaseEntry(log: LogRecord[], state: State): LogRecord | undefined {
+  return log.findLast(({ record }) => record.slug === state.slug && record.to === state.phase);
+}
+
+// The command-owned land attempt when the leaf is in one.
+function landAttempt(state: State): string | undefined {
+  return state.phase === 'merge' && state.batch?.owner === 'command' ? state.batch.attempt : undefined;
+}
+
 function cells(
   leaf: ScannedLeaf,
   log: LogRecord[],
@@ -193,9 +219,7 @@ function cells(
   stopped: boolean,
 ): string[] {
   const state: State = leaf.state;
-  const last: LogRecord | undefined = log.findLast(
-    ({ record }) => record.slug === state.slug && record.to === state.phase,
-  );
+  const last: LogRecord | undefined = phaseEntry(log, state);
   const end: number | undefined =
     state.phase !== 'merged' && state.phase !== 'failed'
       ? now
@@ -386,14 +410,16 @@ function chartFolders(root: string): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
+export type Unpacked = { path: string; command: string };
+
 // Folders a person must finish packing: closed owners and ended charts still
 // holding plain logs, any .closing a failed pack or close left, and open-owner
 // .closing markers naming the completion retry.
-function unpackedLines(root: string): string[] {
-  const lines: string[] = [];
-  const packLine = (folder: string): string => {
+function unpackedEntries(root: string): Unpacked[] {
+  const entries: Unpacked[] = [];
+  const packLine = (folder: string): Unpacked => {
     const rel: string = relative(root, folder);
-    return `Unpacked: ${rel}: run akrogon pack ${rel}`;
+    return { path: rel, command: `akrogon pack ${rel}` };
   };
   const hasLog = (dir: string): boolean =>
     existsSync(dir) &&
@@ -403,14 +429,14 @@ function unpackedLines(root: string): string[] {
   const closing = (folder: string): boolean => existsSync(resolve(folder, '.closing'));
   for (const owner of issueFolders(root, 'issues/closed')) {
     const folder: string = resolve(root, 'issues/closed', owner);
-    if (hasLog(folder) || closing(folder)) lines.push(packLine(folder));
+    if (hasLog(folder) || closing(folder)) entries.push(packLine(folder));
   }
   for (const folder of chartFolders(root)) {
     // The single-chart layout's direct/ logs are unpackable: locate resolves
     // only issues/chart/<chart>/direct/*, so pack cannot verify its members.
     if (folder === resolve(root, 'issues/chart')) continue;
     const ended: boolean = lastStage(readFileSync(resolve(folder, 'CHART.md'), 'utf8')) !== undefined;
-    if ((ended && hasLog(resolve(folder, 'direct'))) || closing(folder)) lines.push(packLine(folder));
+    if ((ended && hasLog(resolve(folder, 'direct'))) || closing(folder)) entries.push(packLine(folder));
   }
   const open: string = resolve(root, 'issues/open');
   const owners: string[] =
@@ -421,9 +447,9 @@ function unpackedLines(root: string): string[] {
     const leaves: Leaf[] = readInventory(folder, open).leaves;
     const slug: string | undefined =
       leaves.find((leaf) => leaf.state.phase === 'merged')?.state.slug ?? leaves[0]?.state.slug;
-    if (slug !== undefined) lines.push(`Unpacked: ${relative(root, folder)}: run akrogon next ${slug}`);
+    if (slug !== undefined) entries.push({ path: relative(root, folder), command: `akrogon next ${slug}` });
   }
-  return lines;
+  return entries;
 }
 
 function since(ms: number): string {
@@ -463,7 +489,201 @@ function chartRows(root: string, now: number): string[][] {
   return chartFolders(root).map((folder) => chartRow(folder, folder === store ? 'chart' : basename(folder), now));
 }
 
-export async function statusCommand(slug: string | undefined, charts: boolean = false): Promise<void> {
+type JsonLeaf = {
+  slug: string;
+  group: string[];
+  phase: string;
+  phase_since: number | null;
+  first_prompt: number | null;
+  stopped: boolean;
+  blocked_by: { slug: string; label: string }[];
+  broadcast_pending: boolean;
+  land: { alive: boolean; unit: string } | null;
+  busy_since: { a: number | null; b: number | null };
+  done: State['done'];
+  attempts: State['attempts'];
+  fix_rounds: number;
+  verdict: State['verdict'];
+  delivery_errors: { a: DeliveryError | null; b: DeliveryError | null };
+  failure: State['failure'] | null;
+  missing: Gap[];
+  worktree: string;
+  plan: string;
+  red: boolean;
+  seats: {
+    a: { harness: string; command: string; source: string };
+    b: { harness: string; command: string; source: string };
+  };
+  history: string[];
+};
+
+type JsonRepo = {
+  name: string;
+  root: string;
+  paused: boolean;
+  error: string | null;
+  unreadable: LeafFailure[];
+  slow: { leaf: string; run: string; ms: number; normal_ms: number } | null;
+  unpacked: Unpacked[];
+  queue: { slug: string; place: number; no_record: boolean }[];
+  kept: { path: string; reason: string }[];
+  charts: string[][];
+  parked: string[];
+  leaves: JsonLeaf[];
+};
+
+type JsonEnvelope = {
+  schema: 1;
+  generated: number;
+  red: number;
+  watch: { folders: string[]; files: string[] };
+  deploy: {
+    failed: boolean;
+    attempted: string | null;
+    active: string | null;
+    step: string | null;
+    error: string | null;
+  } | null;
+  run: string | null;
+  kept: { path: string; reason: string }[];
+  merges: { repo: string; slug: string; merged: number | null; total_ms: number | null }[];
+  repos: JsonRepo[];
+};
+
+function seatJson(global: GlobalConfig, seat: SlotConfig, source: string): JsonLeaf['seats']['a'] {
+  return { harness: seat.harness, command: global.harnesses[seat.harness].split(' ')[0], source };
+}
+
+// Every raw blocked-by slug labelled the way unmergedDeps labels its blockers,
+// plus 'merged' for an already satisfied dependency.
+function blockedBy(repo: Repo, state: State, leaves: Leaf[]): JsonLeaf['blocked_by'] {
+  return state['blocked-by'].map((slug) => {
+    const dependency: Leaf | undefined = leaves.find((leaf) => leaf.state.slug === slug);
+    if (dependency !== undefined) return { slug, label: dependency.state.phase };
+    if (isParked(repo, slug)) return { slug, label: 'parked' };
+    if (hasLeafFolder(repo, slug)) return { slug, label: 'unreadable' };
+    return { slug, label: 'missing' };
+  });
+}
+
+// The note() prompt condition: a recorded delivery error whose seat is not busy.
+function undelivered(state: State): boolean {
+  return (['A', 'B'] as const).some(
+    (seat) => state.delivery_error[seat] !== undefined && state.busy_since[seat] === undefined,
+  );
+}
+
+function leafRed(leaf: ScannedLeaf): boolean {
+  return leaf.state.phase === 'failed' || leaf.missing.length > 0 || undelivered(leaf.state);
+}
+
+async function leafJson(
+  global: GlobalConfig,
+  scan: Scan & { ok: true },
+  leaf: ScannedLeaf,
+  started: Map<string, number>,
+  stopped: Set<string>,
+  worktree: string,
+): Promise<JsonLeaf> {
+  const state: State = leaf.state;
+  const entry: LogRecord | undefined = phaseEntry(scan.log, state);
+  const attempt: string | undefined = landAttempt(state);
+  return {
+    slug: state.slug,
+    group: relative(resolve(scan.repo.root, 'issues/open'), leaf.path).split(sep).slice(0, -1),
+    phase: state.phase,
+    phase_since: entry === undefined ? null : Date.parse(entry.record.ts),
+    first_prompt: started.get(state.slug) ?? null,
+    stopped: stopped.has(`${scan.repo.name}/${state.slug}`),
+    blocked_by: blockedBy(scan.repo, state, scan.leaves),
+    broadcast_pending: broadcastPending(state),
+    land: attempt === undefined ? null : { alive: await landAlive(attempt), unit: landUnit(attempt) },
+    busy_since: {
+      a: state.busy_since.A === undefined ? null : Date.parse(state.busy_since.A),
+      b: state.busy_since.B === undefined ? null : Date.parse(state.busy_since.B),
+    },
+    done: state.done,
+    attempts: state.attempts,
+    fix_rounds: state.fix_rounds,
+    verdict: state.verdict,
+    delivery_errors: { a: state.delivery_error.A ?? null, b: state.delivery_error.B ?? null },
+    failure: state.failure ?? null,
+    missing: leaf.missing,
+    worktree,
+    plan: resolve(leaf.path, 'plan.md'),
+    red: leafRed(leaf),
+    seats: {
+      a: seatJson(global, leaf.resolved.a, leaf.seatSources.a),
+      b: seatJson(global, leaf.resolved.b, leaf.seatSources.b),
+    },
+    history: scan.log
+      .filter(({ record }) => record.slug === state.slug)
+      .slice(-10)
+      .map((record) => record.text),
+  };
+}
+
+async function jsonRepo(
+  global: GlobalConfig,
+  scan: Scan,
+  paused: Set<string>,
+  stopped: Set<string>,
+  now: number,
+): Promise<JsonRepo> {
+  if (!scan.ok) {
+    return {
+      name: scan.repo,
+      root: scan.root,
+      paused: paused.has(scan.repo),
+      error: scan.error,
+      unreadable: [{ path: scan.path, error: scan.error }],
+      slow: null,
+      unpacked: [],
+      queue: [],
+      kept: [],
+      charts: [],
+      parked: [],
+      leaves: [],
+    };
+  }
+  const store: string = worktreeStore(scan.repo);
+  const started: Map<string, number> = starts(scan.timings);
+  const slow: JsonRepo['slow'] =
+    scan.slow?.slow?.first !== undefined && scan.slow.slow.close === undefined
+      ? {
+          leaf: scan.slow.slow.first.leaf,
+          run: scan.slow.slow.first.run,
+          ms: scan.slow.slow.ms,
+          normal_ms: scan.slow.slow.normal_ms,
+        }
+      : null;
+  return {
+    name: scan.repo.name,
+    root: scan.repo.root,
+    paused: paused.has(scan.repo.name),
+    error: null,
+    unreadable: scan.failures,
+    slow,
+    unpacked: unpackedEntries(scan.repo.root),
+    queue: scan.queue.map((entry) => ({
+      slug: entry.leaf.state.slug,
+      place: entry.place,
+      no_record: entry.noRecord,
+    })),
+    kept: readKept(scan.repo).map((entry: KeptEntry) => ({ path: entry.path, reason: entry.reason })),
+    charts: chartRows(scan.repo.root, now),
+    parked: scan.parked,
+    leaves: await Promise.all(
+      scan.leaves.map((leaf) => leafJson(global, scan, leaf, started, stopped, resolve(store, leaf.state.slug))),
+    ),
+  };
+}
+
+export async function statusCommand(
+  slug: string | undefined,
+  charts: boolean = false,
+  json: boolean = false,
+): Promise<void> {
   const global: GlobalConfig = readGlobal();
   const paused: Set<string> = readPaused();
   const stopped: Set<string> = readStopped();
@@ -484,10 +704,9 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     console.log(Bun.YAML.stringify(leaf.state, null, 2).trimEnd());
     if (paused.has(repo.name)) console.log(`paused: ${repo.name}`);
     if (stopped.has(`${repo.name}/${slug}`)) console.log(`stopped: ${repo.name}/${slug}`);
-    if (leaf.state.phase === 'merge' && leaf.state.batch?.owner === 'command')
-      console.log(
-        `land ${(await landAlive(leaf.state.batch.attempt)) ? 'alive' : 'dead'}: ${landUnit(leaf.state.batch.attempt)}`,
-      );
+    const attempt: string | undefined = landAttempt(leaf.state);
+    if (attempt !== undefined)
+      console.log(`land ${(await landAlive(attempt)) ? 'alive' : 'dead'}: ${landUnit(attempt)}`);
     if (broadcastPending(leaf.state)) console.log(`broadcast pending: ${repo.name}/${slug}`);
     for (const entry of readKept(repo)) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     for (const entry of readHostKept()) console.log(`Kept: ${entry.path} — ${entry.reason}`);
@@ -508,11 +727,85 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     return;
   }
   const now: number = Date.now();
-  const current: Repo | null = await currentRepo(global, process.cwd());
+  const current: Repo | null = json ? null : await currentRepo(global, process.cwd());
   const scans: Scan[] = Object.entries(global.repos)
     .filter(([name]) => current === null || name === current.name)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, path]) => scanRepo(name, path, global));
+  if (json) {
+    const home: string = globalHome();
+    const deploy: ReturnType<typeof readDeployRecord> = readDeployRecord();
+    const repos: JsonRepo[] = await Promise.all(scans.map((scan) => jsonRepo(global, scan, paused, stopped, now)));
+    const merges: JsonEnvelope['merges'] = scans
+      .filter((scan): scan is Scan & { ok: true } => scan.ok)
+      .flatMap((scan) => {
+        const started: Map<string, number> = starts(scan.timings);
+        return scan.closed
+          .filter((leaf) => leaf.state.phase === 'merged')
+          .map((leaf) => {
+            const record: LogRecord | undefined = scan.log.findLast(
+              ({ record }) => record.slug === leaf.state.slug && record.to === 'merged',
+            );
+            const merged: number | null = record === undefined ? null : Date.parse(record.record.ts);
+            const first: number | undefined = started.get(leaf.state.slug);
+            return {
+              repo: scan.repo.name,
+              slug: leaf.state.slug,
+              merged,
+              total_ms: merged === null || first === undefined ? null : merged - first,
+            };
+          });
+      })
+      .sort((a, b) => (b.merged ?? 0) - (a.merged ?? 0))
+      .slice(0, 5);
+    const runs: RunRecord[] = lineRuns();
+    const run: string | null = runs.some((record) => record.state === 'waiting')
+      ? [
+          'run line (one per repo)',
+          ...render(lineHeader, [['  REPO', ...lineHeader.slice(1)], ...lineRows(runs, now)]),
+        ].join('\n')
+      : null;
+    const leafReds: number = repos.reduce((sum, repo) => sum + repo.leaves.filter((leaf) => leaf.red).length, 0);
+    const unreadables: number = repos.reduce((sum, repo) => sum + repo.unreadable.length, 0);
+    const envelope: JsonEnvelope = {
+      schema: 1,
+      generated: now,
+      red: leafReds + unreadables + (deploy !== null && !deploy.ok ? 1 : 0),
+      watch: {
+        folders: [
+          ...Object.keys(global.repos)
+            .sort((a, b) => a.localeCompare(b))
+            .map((name) => resolve(expandPath(global.repos[name], home), 'issues')),
+          resolve(home, 'runs'),
+        ],
+        files: [
+          resolve(home, 'config.yaml'),
+          resolve(home, 'paused.yaml'),
+          resolve(home, 'stopped.yaml'),
+          resolve(home, 'reconcile-host.json'),
+          deployRecordPath(),
+          currentLink(),
+        ],
+      },
+      deploy:
+        deploy === null
+          ? null
+          : {
+              failed: !deploy.ok,
+              attempted: deploy.attempted ?? null,
+              active: currentReleaseCommit(),
+              step: deploy.step ?? null,
+              error: deploy.error ?? null,
+            },
+      run,
+      kept: readHostKept().map((entry: KeptEntry) => ({ path: entry.path, reason: entry.reason })),
+      merges,
+      repos,
+    };
+    console.log(JSON.stringify(envelope));
+    if (scans.some((scan) => !scan.ok || scan.failures.length > 0)) process.exitCode = 1;
+    return;
+  }
   for (const scan of scans) {
     if (!scan.ok) console.log(JSON.stringify({ unreadable: scan.repo, path: scan.path, error: scan.error }));
     else
@@ -542,7 +835,8 @@ export async function statusCommand(slug: string | undefined, charts: boolean = 
     }
   }
   for (const scan of scans) {
-    if (scan.ok) for (const line of unpackedLines(scan.repo.root)) console.log(line);
+    if (scan.ok)
+      for (const entry of unpackedEntries(scan.repo.root)) console.log(`Unpacked: ${entry.path}: run ${entry.command}`);
     if (scan.ok && scan.slow?.slow?.first !== undefined && scan.slow.slow.close === undefined)
       console.log(
         'Slow merge: ' +

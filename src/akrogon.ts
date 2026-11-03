@@ -44,7 +44,7 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
                       'known-red': { type: 'boolean' },
                     }
                   : verb === 'status'
-                    ? { charts: { type: 'boolean' } }
+                    ? { charts: { type: 'boolean' }, json: { type: 'boolean' } }
                     : verb === 'timing'
                       ? { cohort: { type: 'boolean' }, flow: { type: 'boolean' }, since: { type: 'string' } }
                       : {};
@@ -162,8 +162,10 @@ switch (verb) {
   }
   case 'status':
     if (values.charts === true && positionals.length !== 0) throw new Error('Use a slug or --charts, not both');
+    if (values.json === true && (positionals.length !== 0 || values.charts === true))
+      throw new Error('Use --json alone: akrogon status --json');
     z.array(z.string()).max(1).parse(positionals);
-    await (await import('./status')).statusCommand(positionals[0], values.charts === true);
+    await (await import('./status')).statusCommand(positionals[0], values.charts === true, values.json === true);
     break;
   case 'leftovers':
     z.tuple([]).parse(positionals);

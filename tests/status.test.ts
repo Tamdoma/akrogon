@@ -11,17 +11,7 @@ import {
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixture, cli, leaf, yaml, fakeHerdr, registerTemp, type Fixture } from './helpers';
-import {
-  event,
-  log,
-  mergeRecord,
-  needs,
-  prompt,
-  register,
-  seedRunRecord,
-  snapshot,
-  timings,
-} from './status-fixture';
+import { event, log, mergeRecord, needs, prompt, register, seedRunRecord, snapshot, timings } from './status-fixture';
 import { command, type Result } from '../src/shell';
 import { z } from 'zod';
 import { readState, saveState, stateSchema, type State } from '../src/state';
@@ -40,7 +30,6 @@ function cell(output: string, row: string, name: string): string {
 function leafRow(output: string, slug: string): string {
   return output.split('\n').find((line) => new RegExp(`^\\s*${slug}\\s`).test(line))!;
 }
-
 
 test('overview reads multiple repos outside git, retains hierarchy and recorded fields without writes', async () => {
   const f: Fixture = await fixture();
