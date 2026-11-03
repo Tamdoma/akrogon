@@ -59,7 +59,11 @@ export default class Tasks extends View {
         const name = i === -1 ? c : c.slice(0, i);
         const arg = i === -1 ? "" : c.slice(i + 1);
         const [slug, view] = arg.split(" ");
-        if (name === "expand") { this.toggle(arg); cx.notify(); }
+        if (name === "expand") {
+          const { repo, leaf } = this.findLeaf(arg);
+          this.toggle(`${repo}/${leaf.slug}`);
+          cx.notify();
+        }
         else if (name === "pin") { this.pin(slug, view === "changes" ? "changes" : "files"); cx.notify(); }
       }
     });
@@ -178,8 +182,7 @@ export default class Tasks extends View {
 
   pin(slug, view) {
     if (this.env === null || (view !== "files" && view !== "changes")) return;
-    const leaf = this.env.repos.flatMap((r) => r.leaves).find((l) => l.slug === slug);
-    if (leaf === undefined) return;
+    const { leaf } = this.findLeaf(slug);
     const space = spaces().find((s) => s.active);
     if (space === undefined) return;
     const pin = shared("worktree.pin") ?? {};
@@ -187,6 +190,16 @@ export default class Tasks extends View {
     this.seq = intents.request.seq;
     setShared("worktree.pin", intents.pin);
     setShared("panel.request", intents.request);
+  }
+
+  findLeaf(key) {
+    if (this.env === null) throw new Error("Tasks board has not loaded");
+    const matches = this.env.repos.flatMap((repo) => repo.leaves
+      .filter((leaf) => leaf.slug === key || `${repo.name}/${leaf.slug}` === key)
+      .map((leaf) => ({ repo: repo.name, leaf })));
+    if (matches.length !== 1)
+      throw new Error(`Expected one Tasks leaf for ${key}, found ${matches.length}; use repo/slug`);
+    return matches[0];
   }
 
   alertLine(line, i, t) {
@@ -210,14 +223,15 @@ export default class Tasks extends View {
     // props().fill "hover"|"selected" forces that row fill on every row and
     // props().expand expands all rows: screenshot proofs without a pointer.
     const fill = props()?.fill;
-    const open = props()?.expand === true || this.expanded.has(row.slug);
-    const head = v_flex().id(`task-${row.slug}`).flex_none().w_full().px(6).py(4).gap(2)
+    const key = `${row.repo}/${row.slug}`;
+    const open = props()?.expand === true || this.expanded.has(key);
+    const head = v_flex().id(`task-${key}`).flex_none().w_full().px(6).py(4).gap(2)
       .rounded(6).cursor_pointer()
       .hover((s) => s.bg(t.hover))
       .when(open, (el) => el.bg(t.selected))
       .when(fill === "hover" && !open, (el) => el.bg(t.hover))
       .when(fill === "selected" && !open, (el) => el.bg(t.selected))
-      .on_click(() => this.toggle(row.slug))
+      .on_click(() => this.toggle(key))
       .child(
         h_flex().items_center().gap(6).min_w(0)
           .child(h_flex().flex_none().items_center()
@@ -253,10 +267,10 @@ export default class Tasks extends View {
     detail.child(
       h_flex().gap(6).pt(4).pb(2).children(
         ["files", "changes"].map((view) =>
-          div().id(`task-${row.slug}-${view}`).px(8).h(20).rounded(4).cursor_pointer().flex().items_center()
+          div().id(`task-${key}-${view}`).px(8).h(20).rounded(4).cursor_pointer().flex().items_center()
             .bg(t.raised).hover((s) => s.bg(t.hover))
             .text_size(10).text_color(t.foreground)
-            .on_click((e, cx) => { cx.stop_propagation(); this.pin(row.slug, view); })
+            .on_click((e, cx) => { cx.stop_propagation(); this.pin(key, view); })
             .child(view === "files" ? "Files" : "Changes")
         )
       )
