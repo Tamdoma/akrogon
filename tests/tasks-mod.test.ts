@@ -14,17 +14,37 @@ import {
 } from '../herdr-app/tasks/model';
 import { next, type ScanEvent } from '../herdr-app/tasks/schedule';
 
-const envelope: Envelope = JSON.parse(
-  readFileSync(resolve(import.meta.dir, 'fixtures/status-envelope.json'), 'utf8'),
-);
+const envelope: Envelope = JSON.parse(readFileSync(resolve(import.meta.dir, 'fixtures/status-envelope.json'), 'utf8'));
 
 const noSpace: BoardContext = {
   now: envelope.generated + 90_000,
   spaceName: 'unmatched-space',
   spaceFolder: '/nonexistent/folder',
   agents: [
-    { key: 'pi', run: ['pi'], icon: 'icons/pi.svg', tint: true, tile: null, color: '#fff', name: 'Pi', shell: false, agent: true, installed: true },
-    { key: 'codex', run: ['codex'], icon: 'icons/codex.png', tint: false, tile: null, color: null, name: 'Codex', shell: false, agent: true, installed: true },
+    {
+      key: 'pi',
+      run: ['pi'],
+      icon: 'icons/pi.svg',
+      tint: true,
+      tile: null,
+      color: '#fff',
+      name: 'Pi',
+      shell: false,
+      agent: true,
+      installed: true,
+    },
+    {
+      key: 'codex',
+      run: ['codex'],
+      icon: 'icons/codex.png',
+      tint: false,
+      tile: null,
+      color: null,
+      name: 'Codex',
+      shell: false,
+      agent: true,
+      installed: true,
+    },
   ],
 };
 
@@ -54,7 +74,10 @@ test('board orders the current space repo first, then alphabetical, and folds em
 test('a space folder inside the repo root or its worktree store counts as that repo', () => {
   const inRoot: Board = board(envelope, { ...noSpace, spaceFolder: '/home/ivan/Work/infra/herdr-setup/docs' });
   expect(inRoot.repos[0].name).toBe('herdr-setup');
-  const inStore: Board = board(envelope, { ...noSpace, spaceFolder: '/home/ivan/.akrogon/worktrees/framework/about-identity-title' });
+  const inStore: Board = board(envelope, {
+    ...noSpace,
+    spaceFolder: '/home/ivan/.akrogon/worktrees/framework/about-identity-title',
+  });
   expect(inStore.repos[0].name).toBe('framework');
 });
 
@@ -73,7 +96,9 @@ test('leaf rows carry seat logo choices, red flag, uncolored time and tags; red 
   expect(typeof tasksMod!.time).toBe('string');
   expect(tasksMod!.time).not.toMatch(/ansi|\x1b/);
   const redRows: RowModel[] = rows.filter((row) => row.red);
-  const flagged: string[] = envelope.repos.flatMap((repo) => repo.leaves.filter((leaf) => leaf.red).map((leaf) => leaf.slug));
+  const flagged: string[] = envelope.repos.flatMap((repo) =>
+    repo.leaves.filter((leaf) => leaf.red).map((leaf) => leaf.slug),
+  );
   expect(redRows.map((row) => row.slug).sort()).toEqual(flagged.sort());
   expect(tasksMod!.tags).toContain('blocked-by status-json (merged)');
   const merged: RowModel | undefined = rows.find((row) => row.slug === 'status-json');
@@ -109,7 +134,13 @@ test('an error envelope keeps healthy repos and yields alert lines, never blank'
   const broken = derived.repos.find((repo) => repo.name === 'blepsis')!;
   broken.error = 'zod: state.yaml missing slug';
   broken.unreadable = [{ path: '/x/state.yaml', error: 'zod: state.yaml missing slug' }];
-  derived.deploy = { failed: true, attempted: 'abcd1234efgh', active: '9999', step: 'links', error: 'conflict at /home/x' };
+  derived.deploy = {
+    failed: true,
+    attempted: 'abcd1234efgh',
+    active: '9999',
+    step: 'links',
+    error: 'conflict at /home/x',
+  };
   derived.repos.find((repo) => repo.name === 'framework')!.slow = {
     leaf: 'fixture-weave-recorder',
     run: 'r1',

@@ -65,9 +65,7 @@ export function planSkillLinks(
       const target: string = resolve(dirname(path), readlinkSync(path));
       // Links into sourceRoot's tree are probed under listRoot so an entry
       // absent from the new tree is unlinked before current flips onto it.
-      const probe: string = within(target, source)
-        ? resolve(listSource, relative(source, target))
-        : target;
+      const probe: string = within(target, source) ? resolve(listSource, relative(source, target)) : target;
       if (
         (within(target, releases) || (!existsSync(probe) && owned.some((root) => within(target, root)))) &&
         !plannedDestinations.has(path)
@@ -75,14 +73,8 @@ export function planSkillLinks(
         stale.push(path);
     }
   };
-  for (const root of roots)
-    staleIn(resolve(home, root), sourceSkills, resolve(listRoot, 'skills'), skillRoots);
-  staleIn(
-    resolve(home, '.config/herdr-app/mods'),
-    sourceMods,
-    resolve(listRoot, 'herdr-app'),
-    modRoots,
-  );
+  for (const root of roots) staleIn(resolve(home, root), sourceSkills, resolve(listRoot, 'skills'), skillRoots);
+  staleIn(resolve(home, '.config/herdr-app/mods'), sourceMods, resolve(listRoot, 'herdr-app'), modRoots);
   const links: Link[] = [];
   const conflicts: Link[] = [];
   for (const link of planned) {
