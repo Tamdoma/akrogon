@@ -149,7 +149,6 @@ export default class Tasks extends View {
       }
       cx.notify();
       if (this.wanted) { this.wanted = false; this.start(cx); }
-      else if (error !== null && this.env === null) this.requestScan("scan-failed", cx);
     });
   }
 
@@ -169,7 +168,7 @@ export default class Tasks extends View {
   }
 
   tick(cx) {
-    if (this.env === null) { cx.notify(); return; }
+    if (this.env === null) { this.start(cx); cx.notify(); return; }
     this.rebuild();
     cx.notify();
     cx.spawn(async (cx) => { await this.diffFiles(cx); cx.notify(); });
