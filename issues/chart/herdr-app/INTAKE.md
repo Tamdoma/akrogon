@@ -13,26 +13,28 @@ Values: simplicity, removing over adding, function over form, systems thinking, 
 
 ## Where akrogon touches herdr today
 Engine (`src/`):
-- `src/shell.ts:227-239`: every call goes through `herdr()` / `herdrArgv()`, with `--session` per repo. `resolveSession` finds the repo's herdr session by workspace label (`shell.ts:397-412`).
+- `src/shell.ts:226-239`: every call goes through `herdr()` / `herdrArgv()`, with `--session` per repo. `resolveSession` (`shell.ts:379`) finds the repo's herdr session by workspace label (`:404-406`).
 - `src/next.ts`: leaf slots. Tab per leaf (`tab create`, `:585`), slot B split right (`pane split`, `:604`), `pane swap` repair (`:644-649`), `tab focus` (`:641`), `agent start --kind` (`:789-800`), `agent prompt --wait --until working` (`:826-828`), `pane close` (`:547`), `pane get` (`:268`), `notification show` for merge and busy notices (`:249-252`, `:1030-1075`).
 - `src/next.ts:1603-1620`: `akrogon next` runs from herdr plugin events and reads `HERDR_PLUGIN_EVENT_JSON` and `HERDR_SOCKET_PATH`.
 - `plugin/herdr-plugin.toml`, `plugin/next.sh`, `plugin/pull.sh`: the trigger for the whole engine. `pull.sh --all` and `next.sh --resume` at startup, and `next.sh` on `pane.agent_status_changed`, `pane.exited`, `pane.closed`, `tab.closed`.
 - `src/state.ts:26,99`: leaf state stores herdr pane ids for A and B.
-- `src/reconcile.ts:402-429` plus keep reasons through `:688-1401`: tab list and close in the repo session.
+- `src/reconcile.ts:402-429` plus keep reasons through `:688-1397`: tab list and close in the repo session.
 - `src/scope.ts:123-124`: `pane process-info`.
-- `src/log.ts:36-51`, `src/verify.ts:33,342`, `src/phase.ts:33-70`: pane lookup, notices, retry on herdr failure.
+- `src/log.ts:36-51`, `src/verify.ts:33,328`, `src/phase.ts:33-70`: pane lookup, notices, retry on herdr failure.
 - `src/install.ts:136-137`: `herdr integration install <kind>` per harness and `herdr plugin link`. `src/self-update.ts:283-288`: `herdr plugin link`.
 - `src/AREA.md:15-33`: the session model.
 
 Skills:
-- `skills/chart-issues/`: `SKILL.md:27` (`HERDR_ENV=1`), `assets/questions.md:46,50` (peer panes and the peer exchange), `assets/shapes.md`, and the scripts `peer-create.ts`, `peer-ask.ts`, `peer-wait.ts`, `peer-anchor.ts`, `peer-restart.ts`, `door-reset.ts`.
-- `skills/watch-issues/`: `SKILL.md:24-44` (`--session`, `agent read`, `notification show`, `agent send-keys esc`, `agent wait`, `agent prompt`), `scripts/observe.ts`, and the fixtures `herdr-agent-list.json`, `herdr-session-list.json`, `herdr-workspace-list.json`.
+- `skills/chart-issues/`: `SKILL.md:27` (`HERDR_ENV=1`), `assets/questions.md:46,50` (peer panes and the peer exchange), `assets/shapes.md:57,217`, and the scripts `peer-create.ts`, `peer-ask.ts`, `peer-wait.ts`, `peer-anchor.ts`, `peer-restart.ts`, `door-reset.ts`.
+- `skills/watch-issues/`: `SKILL.md:22-44` (`--session`, `agent read`, `notification show`, `agent send-keys esc`, `agent wait`, `agent prompt`), `scripts/observe.ts`, and the fixtures `herdr-agent-list.json`, `herdr-session-list.json`, `herdr-workspace-list.json`.
 
-Tests: `tests/fake-herdr.ts` (fake binary driven by `FAKE_HERDR`), `tests/isolation.ts:64-78`, `tests/helpers.ts:132-146`, about 435 matching lines across 43 test files, `HERDR_PANE_ID: ''` in many setups, and `skills/watch-issues/scripts/observe.test.ts` (`OBSERVE_HERDR`).
+Tests: `tests/fake-herdr.ts` (fake binary driven by `FAKE_HERDR`), `tests/isolation.ts:64-78`, `tests/helpers.ts:132-146`, 703 matching lines across 48 files in `tests/` (887 lines in 62 files counting `skills/*/scripts`; recounted 2026-11-03 at dbd22640), `HERDR_PANE_ID: ''` in many setups, and `skills/watch-issues/scripts/observe.test.ts` (`OBSERVE_HERDR`).
 
-Docs: `README.md:3,13` (Herdr as a prerequisite), `docs/start/install.md`, `docs/start/what-it-is.md`, `docs/reference/state-and-phases.md`, `docs/reference/releases-and-updates.md`, `docs/reference-index.md`, and single mentions in `checks.md`, `commands.md`, `run-work.md`, `watch-while-away.md`, `plan-work.md`, `autopilot.md`, `one-change.md`. `learnings/` has about 21 lines.
+Docs: `README.md:3,13` (Herdr as a prerequisite), `docs/start/install.md`, `docs/start/what-it-is.md`, `docs/reference/state-and-phases.md`, `docs/reference/releases-and-updates.md`, `docs/reference-index.md`, and single mentions in `checks.md`, `commands.md`, `run-work.md`, `watch-while-away.md`, `plan-work.md`, `autopilot.md`, `one-change.md`. `learnings/` has 21 lines: 2 in `LESSONS.md` (`:11`, `:21`) and 19 across 13 `learnings/history/` files.
 
-Outside the repo: `~/.claude/skills/herdr` is the old Herdr skill. It is not akrogon's, but agents load it and reach for the old `herdr`. It should go too.
+Also mentioning herdr, found 2026-11-03 at dbd22640 and not listed above: `src/land.ts:16` (`HERDR_PANE_ID` comment), `tests/AREA.md`, `tests/fake-proc.ts`, `tests/deploy-fixture.ts`, `skills/watch-issues/scripts/observe-log-tail.test.ts`, the fixtures `skills/watch-issues/scripts/fixtures/claude-session.jsonl` and `codex-session.jsonl`, `skills/implement-issue/brief-template.md`, `docs/pictures/machine-parts.svg` (`:2`, `:49`, `:60`).
+
+Outside the repo: `~/.claude/skills/herdr` is the old Herdr skill. It is not akrogon's, but agents load it and reach for the old `herdr`. It should go too. Also: the installed chart-issues skill (`~/.claude/skills/chart-issues/SKILL.md`) differs from the repo's `skills/chart-issues/SKILL.md` (repo copy 4 minutes newer, 2026-11-01); which one doors load matters for the port.
 
 ## What I already tested (2026-10-30, by hand, nothing in the repo changed)
 Slot A was a Claude session in herdr-app. Consultants ran as `hc` children with no panes.
@@ -109,6 +111,20 @@ How akrogon works today (agent reading, 2026-11-03):
 What the operator wants instead: no temporary paths. The door creates `issues/chart/<chart-slug>/` at open (CHART.md with a pending Destination, INTAKE.md, seats.yaml, slots/) before the opening map. Every brief, return and `done` report names a path under `<chart>/slots/`. This removes the temporary-path rule and the move-into-slots step.
 
 Applied by hand 2026-11-03 for `herdr-panels`: the opening map had already gone to /tmp, so its brief and returned maps were copied into a chart folder. The operator then had that folder filed in akrogon as intake only (`issues/chart/herdr-panels/`, not charted yet).
+
+## Test run: chart door on herdr-panels in herdr-app (2026-11-03)
+Operator words, 2026-11-03: "We are using the current chart to test and make improvements so that the issue intake.md file gets filled out with all the details. So when we actually chart out both the herder app and herder panels, we already have it all prepared." and "Prepare everything here inside of this repo as an issue."
+
+Door A = Claude in t15 (herdr-app session infra). Consultants: codex (`codex --no-daemon -a never -s danger-full-access`), pi (`pi -a --exclude-tools request_user_input`), agy (`agy --dangerously-skip-permissions -i "<task>"`), each on its default model. Agent findings:
+- First task in the start command worked for all three, agy included (`-i` keeps agy interactive after the first prompt). agy reports status to hc (`working`, `done`) like the other three harnesses.
+- Each brief ended with `hc send t15 "done <letter>: <path>"`. All `done` reports arrived. In Claude Code they show up mid-turn as user input wrapped `<hc from="t2k chart-b">...</hc>`. A foreground `hc wait --children all` was moved to the background by Claude Code when a message arrived. The `done` message is the real signal, the wait only a net.
+- The opening map took about 6 minutes (pi), 10 (codex), 13 (agy). Map sizes: B 163 lines, C 101, D 300.
+- A cheap readiness check works: start a seat with the task "only run: hc send t15 'ready <letter>'". All three answered.
+- Late messages: seats killed right after their `ready` still delivered it afterwards. A door must ignore reports from a seat it already replaced.
+- Placing panes: `terminal.keep --place right` for a codex seat started a second earlier failed silently the first time (pending, then no pane). The next `pane.focus` on it then failed, so the following `keep --place down` calls landed under A instead of under B. Retrying keep until `herdr-app ls` shows the pane fixed it.
+- Heights: keeping C below B and D below C (or D below B) always gives B weight 1 (unset), C 0.5, D 0.5 in the stored tab tree, so 50% / 25% / 25%. No command sets weights, so the operator's 33% each cannot be reached without a drag. This needs a herdr-app feature (a weight or ratio on `terminal.keep` / `pane.split`) or a tab-tree write.
+- Every seat restart lost its pane placement and needed the full park/keep sequence again.
+- Later tasks by `hc send`: `hc send --if idle` refused two seats that had finished their last brief ("t2t is done, not idle", nothing typed). `done` means finished while nobody looked. A seat waiting for its next brief is `idle` or `done`; plain `hc send` (no `--if`) started both. Never `--force`: that is only for `blocked`.
 
 ## Open questions
 - What triggers `akrogon next` without the herdr plugin? `hc events` (follows status, turn and exit changes), a herdr-app mod, or something else? Startup `pull` and `--resume` need a home too.

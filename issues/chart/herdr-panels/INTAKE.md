@@ -51,3 +51,35 @@ Proposed items the operator kept (A7 cost meter dropped by the operator):
 - A6 Decision buttons: thin strip under the terminal, only when the focused agent's last reply offers coded options; clicks build "1a | 2a" and send it.
 - A8 Spaces block smaller, Agents gets the rest. Operator addition: Spaces must scroll vertically.
 Placement sketch A gave the operator (not yet an operator decision): A4 right panel stack first tab; A5 left sidebar above Agents; A6 strip under the terminal; A8 sidebar.
+
+## Round 1 (2026-11-03): where the code lives, where Tasks gets its data
+
+Round text and seat positions: `slots/map-merged.md`, `slots/map-rebuttal-B.md`, `-C.md`, `-D.md`. A presented 1a (panels in akrogon), 1b (register omarchy-customizations), 1c (split), and 2a (`akrogon status --json`) vs 2b (mod reads akrogon files).
+
+Operator, verbatim, in order:
+- "1 - So those new panels would not show up if I click on a different workspace in Herder. How does that work? | 2 - Does that mean we don't even need to have the "akrogon status" terminal CLI command anymore? Can we actually turn it into a UI feature here that we're building right now, along with the new additions we're building?"
+- "1 - but this code If it lives inside of the Acrogon repo, it still impacts everything else, am I correct? All the other spaces as well?"
+- "But does it make sense to have the actual Herder code inside of Akron? To me it doesn't make any sense."
+- "What's the actual herdr-app way and recommended way to do it?"
+- "so if we put it into ~/Work/infra it's still according to herdr-app rules?"
+- "Yes, and it needs to be turned into a repo. I've created the remote repo so it needs to be connected to it: https://github.com/Tamdoma/herdr-setup.git. Also, we need to make sure that all of the customizations I've done so far on herdr-app for myself are also there, not just the layout itself. Is that doable and according to herdr-app conventions, and if not, what's the best architecture?"
+- "go, but consult with consultants first. | 2 - 2a"
+
+Settled:
+- Q1: the operator's herdr-app setup gets its own repo, `/home/ivan/Work/infra/herdr-setup` (remote https://github.com/Tamdoma/herdr-setup.git), holding every personal herdr-app customization, not only the layout. General panels (Files, Changes, Spaces, Needs-you, decision buttons) live there. Only the Tasks board is akrogon's and ships from akrogon as a herdr mod, as akrogon ships its old-herdr plugin today (`plugin/herdr-plugin.toml`). Reason: herdr UI code does not belong in akrogon; herdr-app's manual ("Layouts and mods other people made") treats a layout and its mods as one shareable folder, and a mod as its own folder.
+- Q2: 2a. akrogon gains `akrogon status --json`; the Tasks board reads only that and shows everything `akrogon status` shows (paused, stopped, blocked-by, Missing:, deploy failed, broadcast pending, slow merge, merge queue), so the operator never needs to run the command. The text command stays: agents read it (23 files, e.g. `skills/watch-issues/SKILL.md:22`, `Missing:` lines in plan/implement seats).
+- Answered along the way: panels are part of the layout, so they show in every space of every herdr-app window; a window sees only its own session's terminals, so Tasks rows from another session have no jump target.
+
+### Round 1 follow-through: herdr-setup repo built (2026-11-03)
+
+Seats B, C and D each ran one focused check of the move plan (`slots/setup-repo-brief.md`, returns `slots/setup-repo-check-B.md`, `-C.md`, `-D.md`). Their fixes were folded in before anything was changed. A built it:
+
+- `/home/ivan/Work/infra/herdr-setup` (branch `main`, remote origin https://github.com/Tamdoma/herdr-setup.git, not pushed). It carries the 13 earlier commits from omarchy-customizations' `herdr-app/` (`git subtree split`), then `51a23a6`. Shape: `layouts/`, `mods/` (agents-by-tab, board, prefix, session-status, tab-left, tab-right), `keys.json`, `settings.json` (herdr-app's own shape), `bin/herdrapp`, `omarchy/apply-herdr-app-theme`, `install`, `README.md`, `.gitignore` (jsconfig.json, *.d.ts, *.error, *.reset-*, *.old-*).
+- `./install` links keys.json, settings.json, each mod and each layout into `~/.config/herdr-app` (`ln -sfn`; anything already there moves to `~/.local/state/herdr-setup/backup-<time>/`), links `~/.local/bin/herdrapp`, runs the new `herdrapp session link` (links personal files into every existing session home), and installs a one-line Omarchy theme hook that runs the repo's copy (`omarchy hook install` copies files, finding C). A second run moved nothing and left the repo clean.
+- omarchy-customizations `6e6ff59` (not pushed): `herdr-app/` removed; `install.sh` clones herdr-setup if missing, runs its `install`, then writes the font into `settings.json` through the link. README and GUIDE point at herdr-setup. Hyprland files (`hypr/terminal-opacity.lua`, `hypr/bindings.lua`) stay there.
+- Push order when the operator approves: herdr-setup first, then omarchy-customizations, so a fresh install never clones an empty repo (finding B).
+
+Findings that matter for building the panels:
+- herdr-app writes through a linked `settings.json` without replacing the link: `app.zoom_in` then `app.zoom_reset` in the infra window changed the main settings file's mtime while the session's link stayed a link (probe 2026-11-03). This settled B/C/D's disagreement: zoom lives in settings.json (D), and linking settings is safe (C's alternative).
+- Layout edits in the repo reload live in a running session window: breaking `layouts/flat.json` showed "layouts/flat.json was not applied" in `herdr-app status` within 3 s, and restoring it cleared the error.
+- Mod edits do not hot-reload in a session window. They don't through the new links, and they didn't with the old setup either (control test: real folder in `~/.config/herdr-app/mods`, linked into the session). A session window loads personal mods through links and does not watch them. Switching layouts (`layout.switch` board, then flat) or reopening the window loads the edit. A panel leaf's done-criteria must reload this way before judging a change in a session window.
