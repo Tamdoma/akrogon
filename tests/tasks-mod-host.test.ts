@@ -63,3 +63,15 @@ assert(text(rendered).includes('B'));
     root,
   );
 });
+
+test('stage tint is composited over the pills own opaque theme background', async () => {
+  await command(
+    [process.execPath, '-e', host + `
+const row = leafRows(view.model).find(row => row.slug === 'tasks-mod');
+const rendered = view.pillFor(row, t);
+assert.equal(rendered.attrs.bg, t.background);
+assert(nodes(rendered).some(node => node.attrs.bg === '#0000ff1f'));
+`],
+    root,
+  );
+});
