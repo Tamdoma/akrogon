@@ -47,7 +47,7 @@ function nodes(node) { return typeof node === 'string' ? [] : [node, ...node.nod
 function text(node) { return typeof node === 'string' ? [node] : node.nodes.flatMap(text); }
 `;
 
-test('only a working seat shows on the row: its spinner and letter', async () => {
+test('a row shows both seats as program icons without letters; a working seat spins', async () => {
   await command(
     [
       process.execPath,
@@ -56,9 +56,10 @@ test('only a working seat shows on the row: its spinner and letter', async () =>
         `
 const row = leafRows(view.model).find(row => row.slug === 'tasks-mod');
 const rendered = view.row(row, t);
-assert(text(rendered).includes('A'));
+assert(!text(rendered).includes('A'));
 assert(!text(rendered).includes('B'));
 assert(nodes(rendered).some(node => node.source === 'mods/workspace-chrome/spinner.svg'));
+assert(nodes(rendered).some(node => node.source === 'codex.png'));
 `,
     ],
     root,

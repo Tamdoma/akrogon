@@ -1,7 +1,7 @@
 // Tasks board: the akrogon status --json envelope as a read-only repo/leaf
 // list. All host calls live here; model.js/schedule.js stay pure for tests.
 
-import { View, div, svg } from "gpui-kit";
+import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import {
   exec, readTextFile, watchFolder, knownAgents, spaces, theme,
@@ -28,18 +28,25 @@ const CHEVRON = (open) => `mods/workspace-chrome/chevron-${open ? "down" : "righ
 let K = 1;
 const S = (n) => Math.round(n * K * 2) / 2;
 
-const SEATS_W = 28;    // the working seat's spinner and letter: the slug column starts here
+const SEAT = 18;       // one seat icon, sized to the slug line
+const SEATS_W = SEAT * 2 + 6; // two seat icons and their gap: the slug column starts here
 const ROW_INSET = SEATS_W + 8;
 const CHART_CELLS = [36, 20, 72, 32]; // widths of a chart row's leaves, open, state and age cells
 
-// Only a working seat shows: the Agents-list spinner and its letter; every
-// seat is listed in the expanded row (operator 2026-11-03, Q2 O1).
-function working(seats, t) {
-  const busy = [["A", seats.a], ["B", seats.b]].filter(([, cell]) => cell.busy);
-  return h_flex().w(S(SEATS_W)).flex_none().items_center().gap(S(4))
-    .when(busy.length > 0, (el) => el
-      .child(svg(SPINNER).size(S(12)).flex_none().text_color(t.working).spin(900))
-      .child(div().text_size(S(11)).text_color(t.dim).child(busy.map(([letter]) => letter).join(""))));
+// Both seats as herdr-app's own program icons, no letters; a working seat's
+// icon is the Agents-list spinner; a seat with no matching program keeps its
+// place empty (operator 2026-11-03: "the same ones that herdr-app is using ...
+// Icons no letters, but here they need to be big to fit the design").
+function seatIcon(cell, t) {
+  const size = S(SEAT);
+  if (cell.busy) return svg(SPINNER).size(size).flex_none().text_color(t.working).spin(900);
+  if (cell.logo === null) return div().size(size).flex_none();
+  return cell.tint ? svg(cell.logo).size(size).flex_none().text_color(t.foreground) : image(cell.logo).size(size).flex_none();
+}
+
+function seatIcons(seats, t) {
+  return h_flex().w(S(SEATS_W)).flex_none().items_center().gap(S(6))
+    .child(seatIcon(seats.a, t)).child(seatIcon(seats.b, t));
 }
 
 // A folded section's header: chevron and its "<name> (<count>)" label; Charts,
@@ -260,8 +267,8 @@ export default class Tasks extends View {
       .when(fill === "selected" && !open, (el) => el.bg(t.selected))
       .on_click((_e, cx) => this.toggle(key, cx))
       .child(
-        h_flex().h(S(20)).items_center().gap(8).min_w(0)
-          .child(working(row.seats, t))
+        h_flex().h(S(20)).items_center().gap(S(8)).min_w(0)
+          .child(seatIcons(row.seats, t))
           .child(div().flex_1().min_w(0).truncate().text_size(S(13)).font_medium()
             .text_color(row.red ? t.ansi1 : row.pill === null ? t.muted : t.foreground).child(row.slug))
           .when(row.pill !== null, (el) => el.child(this.pillFor(row, t)))
