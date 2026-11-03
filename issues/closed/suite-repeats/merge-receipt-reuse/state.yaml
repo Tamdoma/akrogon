@@ -1,0 +1,27 @@
+slug: merge-receipt-reuse
+phase: merged
+created: 2026-11-01
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFE
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pXW
+  B: w8:pXX
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-01T13:26:27.152Z
+frozen:
+  tests/verify.test.ts: 4ce126d8dd513037b125a8a001972144bb8e43b3
+frozen_cited: []

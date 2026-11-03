@@ -1,0 +1,37 @@
+slug: quick-red-skip
+phase: merged
+created: 2026-11-01
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since:
+  B: 2026-11-01T13:45:51.797Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFF
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pXY
+  B: w8:pXZ
+prompted:
+  B: 01a19752-f525-7f32-a3af-12c1b1a20dc4
+prompted_at:
+  B: 2026-11-01T13:45:51.797Z
+delivery_error: {}
+merge_stamp: 2026-11-01T13:45:26.508Z
+broadcast:
+  kind: issue
+  name: suite-repeats
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/suite-repeats
+  pushed: 516759cf09df9d1c53215fe73796af0eebd15b2e
+  sources: []
+frozen:
+  tests/slow-merge.test.ts: bf2fe33d305e1f4632a5cbe43637fa19f97d9f65
+  tests/verify.test.ts: 420a970c7a0c7dd89bd5b87b0172ac850bd54d65
+frozen_cited: []

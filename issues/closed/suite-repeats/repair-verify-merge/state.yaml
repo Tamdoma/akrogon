@@ -1,0 +1,27 @@
+slug: repair-verify-merge
+phase: merged
+created: 2026-11-01
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFG
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pX0
+  B: w8:pY1
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-01T13:22:32.463Z
+frozen:
+  tests/receipt-gates.test.ts: 95e4c7ef8cdb17ab8e7e432e4e7f5aa3bffe673b
+frozen_cited: []

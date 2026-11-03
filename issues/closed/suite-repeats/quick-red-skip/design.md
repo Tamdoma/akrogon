@@ -1,0 +1,31 @@
+# Design: quick-red-skip
+
+## Binding decisions, verbatim
+
+From `issues/chart/suite-repeats/forks/quick-red.md` `## Taken`:
+
+A's pick under autopilot, 2026-11-01 (not operator words). It reopens the operator's 2026-10-24 answer "keep every member running after a red" on the re-measure that answer asked for, and verify-waste Q1 (A's autopilot pick 2026-10-24) for per-command reuse.
+
+1. Q1: a check named in `full` is recorded `blocked` (existing field, the blocker's exit and log, as merge members are) when setup or any non-`full` check in the pass is red. A red `full` check never blocks another `full` check; merge members keep their current stage rule. `verifyCommands` lists non-`full` checks first, then `full` checks, each in config order, then `merge_checks`; no config edit on main. Each red-disposition copy in the seat skills says a blocked check did not run and its blocker is fixed first. Recorded limitation, beside the member one: a blocked entry is never known-red cover. Reason: the slow suite on a tree that must change proves nothing; every quick failure still shows, so the "a failing run shows every failure" lock narrows only across the quick/full boundary. Rejected: stop at first red (hides the other quick check); keep (measured waste); a name or duration rule; reordering config on main (voids receipts before the skip exists); blocking full after full. Dissent: B (keep runner order and reorder config).
+2. Q2: delete `reuseSource` and its two `runOnce` branches; keep the `reused` schema field and every consumer guard so old rows parse and stay excluded. In `verify --known-red`, when the merge-base tree already holds a whole-green row (the merge-reuse green predicate), run no base pass and return the existing `knownRedReceipt` judgment, the same judge the gate uses; that is today's outcome without copying entries and keeps framework's base-side saving. Skill text promising per-command reuse is amended. verify-waste's pending framework member split keeps parallel members and one setup, but a head retry repays green siblings. Reason: reuse saved six 2-second commands in akrogon and nothing on framework heads. Rejected: keep it; keep it for full checks or base passes only; delete the schema field. Dissent: C (delete the base shortcut too and let framework re-raise with data).
+3. Q3: one verify case (a quick check red, the other quick check runs, the `full` command's marker absent and its entry blocked, the gate refuses; after the fix on a new tree the full check runs and the gate accepts); a red `full` check does not block a second `full` check; the known-red case with an already-green base runs no base pass and returns the judge's answer; reuse tests converted to "a same-tree retry re-executes and writes no `reused`" or deleted; the schema-compat and all-members-finish tests kept. Focused files plus the leaf's normal verify.
+
+From `issues/chart/suite-repeats/forks/merge-reuse.md` `## Taken`, the parts this leaf consumes: Q2 "one row rule ... Green means every entry exit 0; verify's fast path and `requireGreenReceipt` both use that one predicate (`greenRun` minus scope)". This leaf's known-red base shortcut uses the existing `greenRun` predicate as it is on this leaf's base, so its criterion holds whichever leaf lands first (A,C; dissent D: make this leaf blocked-by `merge-receipt-reuse`, not taken because the leaves only share files, and file overlap is not a dependency); the scope removal itself is owned by leaf `merge-receipt-reuse`, which also drops scope from `reuseSource` only if `reuseSource` still exists on its base.
+
+Excluded here: scope in receipt lookups, `requireGreenReceipt`'s stitch and `knownRedReceipt`'s per-row judging (leaf `merge-receipt-reuse`); B's check.repair verify (leaf `repair-verify-merge`).
+
+`/home/ivan/.claude/skills/chart-issues/assets/standing-design.md` applies as follows: no vanity tests; each criterion is proven at the `akrogon verify` CLI boundary with the existing fixture helpers and marker-file commands (an absent marker proves a command did not execute); tests whose only subject was per-command reuse are deleted as outdated expectations with this decision as the reason, judged as a batch, while the schema-compat test for old `reused` rows and the all-members-finish test stay; no timing assertions; no machinery.
+
+## Leaf architecture
+
+Owned surfaces: `src/verify.ts` (`verifyCommands` order, the `runOnce` sequential loop and its blocker, `reuseSource` and its two call sites, the `--known-red` branch of the verify entry), `tests/verify.test.ts`, `tests/slow-merge.test.ts` (the two cases that produce `reused` entries by running a partial verify become seeded rows, as the seeded form already used in that file) (A,B,C), the red-disposition and reuse sentences in `skills/implement-issue/SKILL.md` (`## Shared context`), `skills/check-issue/SKILL.md` (`## check.review`), `skills/merge-issue/SKILL.md` (shared endings), `skills/chart-issues/SKILL.md` (`## Direct route` step 3 known-red wording) and `docs/reference/checks.md` (`## What runs where`, `## Prove a commit with akrogon verify`, `## Known red`) (A,D). `skills/check-issue/SKILL.md` `## check.repair` belongs to leaf `repair-verify-merge`.
+
+State changes and their consumers:
+
+- `verifyCommands` order becomes non-`full` checks, then `full` checks, each in config order, then `merge_checks`. Consumers: `sameCommands` (rows written before this leaf stop matching once, at landing), the PassKey/live-pass joining (uses the same list), `akrogon config` printing if it prints the verify list (Open for the plan).
+- A `full` entry can be `blocked` in the sequential stage. Consumers already skip blocked entries: `knownRedReceipt` head and base, `newRedUnits`, `slowEligible`, `src/flaky.ts`. A blocked entry is never known-red cover (recorded limitation).
+- No new row carries `reused`. The `reused` schema field and every consumer guard stay for old rows.
+- `--known-red` may skip its base pass. Consumer: `knownRedReceipt`, the same judge the gate uses, so CLI and gate stay in agreement.
+- Framework declares no `full`, so its passes are unchanged; its pending member split (verify-waste `## Pending steps`) loses partial-retry reuse on head retries.
+
+Open for the plan: whether `akrogon config` prints the verify command order. (A,D)

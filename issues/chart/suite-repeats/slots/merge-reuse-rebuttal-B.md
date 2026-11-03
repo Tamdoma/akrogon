@@ -1,0 +1,6 @@
+# B rebuttal: merge-reuse
+
+1. **Q2: revise the recorded B position and complete the red proposal.** I withdraw my blanket requirement to keep red evidence scope-bound. The head tree, required command identities, linked comparison against the actual merge-base, and matching failed names carry the proof. Scope adds no necessary evidence to those checks. However, dropping scope only from redRun and knownRedReceipt's heads leaves the base-run scope filter at src/verify.ts:232. An existing qualifying leaf head/base pair would still fail the merge gate. Either remove that filter too while retaining compares, exact base SHA, completion, nonzero exits, blocked exclusions and failed-name matching, or explicitly state that reuse stops at the red head and requires another base comparison. Sources: src/verify.ts:143, :214–242.
+
+2. **Q1: remove the unsupported freshness claim.** The assumption is not newly widened “from minutes to the leaf-to-merge gap.” Current same-scope greenRun and reuseSource already have no age limit. Scope never guaranteed fresh environment, setup or AKROGON_BASE inputs. State that the existing untracked-input assumption remains, without assigning it an unsupported time window. Sources: src/verify.ts:157–167 and :203–208.
+

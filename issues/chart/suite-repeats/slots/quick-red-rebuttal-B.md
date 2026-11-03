@@ -1,0 +1,6 @@
+# B rebuttal: quick-red
+
+1. **A's pick 1 broadens the skip trigger.** “Any earlier red” also skips a second full check after the first full check fails. That is fail-fast inside the full stage, beyond the agreed quick-red barrier. Block full checks after setup failure or an earlier non-full failure, while preserving execution of other full checks after a full failure. The current sequential loop continues after a red; its existing blocker is applied only across the boundary into merge members (src/verify.ts:543, :567).
+
+2. **D's base guard is not necessarily cost-only and can recreate CLI/gate disagreement.** Suppose a qualifying linked red head/base pair already exists, plus another whole-green row on that base tree. An unconditional “green base means known-red fails” guard rejects, but knownRedReceipt still accepts the existing linked red pair: its base search does not invalidate red evidence when another base row is green (src/verify.ts:231, :238). requireGreenReceipt uses that judge (src/verify.ts:466). Either skip the new base execution and return the existing judge's result, or explicitly change both CLI and gate eligibility. Do not claim rejection is always what today's base pass would produce: after executing the base, verify calls the same historical-evidence judge (src/verify.ts:895, :897).
+

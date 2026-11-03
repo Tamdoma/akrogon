@@ -1,0 +1,3 @@
+none
+
+Checked: O-whole predicate is the existing fast path (`src/verify.ts:157-167`) minus scope, so verify and `requireGreenReceipt` (`src/verify.ts:459-470`) cannot diverge the way they did on 2026-10-25; every non-fast-path passing verify leaves a whole row through `runOnce`, and the known-red fallback is the same function on both sides (`src/verify.ts:466`, `src/verify.ts:897`). Red and base filters stay keyed by `compares` and merge-base sha (`src/verify.ts:232`). `Unit` is in-memory only (`src/verify.ts:254`, `src/verify.ts:280`); stored rows carry no unit scope (`src/verify.ts:60-99`), so item 5 needs no record migration. No other test that calls `requireGreenReceipt` depends on stitching besides the one marked for removal (`tests/verify.test.ts:1271`).
