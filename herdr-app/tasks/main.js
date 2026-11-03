@@ -22,13 +22,14 @@ function withAlpha(color, frac) {
 }
 
 function logo(cell, letter, t) {
-  if (cell.busy)
-    return svg(SPINNER).size(12).mx(2).flex_none().text_color(t.working).spin(900);
-  if (cell.logo)
-    return cell.tint
+  const icon = cell.busy
+    ? svg(SPINNER).size(12).mx(2).flex_none().text_color(t.working).spin(900)
+    : cell.logo ? cell.tint
       ? svg(cell.logo).size(16).flex_none().text_color(t.foreground)
-      : image(cell.logo).size(16).flex_none();
-  return div().w(16).text_center().text_color(t.muted).child(letter);
+      : image(cell.logo).size(16).flex_none() : null;
+  return h_flex().flex_none().items_center().gap(2)
+    .when(icon !== null, (el) => el.child(icon))
+    .child(div().text_color(t.muted).child(letter));
 }
 
 function alertColor(t, name) {
