@@ -241,9 +241,7 @@ test('rows with more unmerged same-repo dependents come first, ties oldest first
   // Tie on blocks: oldest phase age first, then stable input order.
   expect(names.indexOf('unmerged-then-merged')).toBeLessThan(names.indexOf('second-dependent'));
   const zero: RowModel[] = waiting.filter((r) => r.repo === 'framework' && r.blocks === 0);
-  const ages: (number | null)[] = zero.map(
-    (r) => repo.leaves.find((l) => l.slug === r.slug)!.phase_since,
-  );
+  const ages: (number | null)[] = zero.map((r) => repo.leaves.find((l) => l.slug === r.slug)!.phase_since);
   expect(ages).toEqual([...ages].sort((a, b) => (a ?? Infinity) - (b ?? Infinity)));
 });
 
