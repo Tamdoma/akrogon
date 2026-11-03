@@ -43,7 +43,7 @@ export default class Tasks extends View {
     this.error = null;        // exec/parse failure text, shown instead of env data
     this.expanded = new Set();
     this.showMerges = false;
-    this.seq = 0;
+    this.seq = Date.now();
     this.scanning = false;
     this.wanted = false;
     this.watching = new Set();
@@ -186,7 +186,7 @@ export default class Tasks extends View {
     const space = spaces().find((s) => s.active);
     if (space === undefined) return;
     const pin = shared("worktree.pin") ?? {};
-    const intents = pinIntent(space.id, leaf, view, pin, this.seq);
+    const intents = pinIntent(space.id, leaf, view, pin, Math.max(this.seq, shared("panel.request")?.seq ?? 0));
     this.seq = intents.request.seq;
     setShared("worktree.pin", intents.pin);
     setShared("panel.request", intents.request);
