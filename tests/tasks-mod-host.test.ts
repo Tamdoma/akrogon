@@ -66,19 +66,28 @@ assert(text(rendered).includes('B'));
 
 test('stage tint is composited over the pills own opaque theme background', async () => {
   await command(
-    [process.execPath, '-e', host + `
+    [
+      process.execPath,
+      '-e',
+      host +
+        `
 const row = leafRows(view.model).find(row => row.slug === 'tasks-mod');
 const rendered = view.pillFor(row, t);
 assert.equal(rendered.attrs.bg, t.background);
 assert(nodes(rendered).some(node => node.attrs.bg === '#0000ff1f'));
-`],
+`,
+    ],
     root,
   );
 });
 
 test('expanding a leaf shows the recorded repository kept paths and reasons', async () => {
   await command(
-    [process.execPath, '-e', host + `
+    [
+      process.execPath,
+      '-e',
+      host +
+        `
 const row = leafRows(view.model).find(row => row.slug === 'tasks-mod');
 view.row(row, t).handlers.click();
 const rendered = text(view.row(row, t)).join(' ');
@@ -86,14 +95,19 @@ for (const kept of env.repos.find(repo => repo.name === row.repo).kept) {
   assert(rendered.includes(kept.path));
   assert(rendered.includes(kept.reason));
 }
-`],
+`,
+    ],
     root,
   );
 });
 
 test('same slugs in different repositories expand and pin independently', async () => {
   await command(
-    [process.execPath, '-e', host + `
+    [
+      process.execPath,
+      '-e',
+      host +
+        `
 const first = env.repos.find(repo => repo.name === 'akrogon').leaves.find(leaf => leaf.slug === 'tasks-mod');
 const second = env.repos.find(repo => repo.name === 'framework').leaves[0];
 second.slug = first.slug;
@@ -111,14 +125,19 @@ for (const button of buttons) {
   assert.equal(sharedState.get('worktree.pin').space.folder, second.worktree);
 }
 assert.equal(buttons.length, 2);
-`],
+`,
+    ],
     root,
   );
 });
 
 test('panel request sequences advance after remounts and other writers', async () => {
   await command(
-    [process.execPath, '-e', host + `
+    [
+      process.execPath,
+      '-e',
+      host +
+        `
 Date.now = () => 1000;
 view.init(null, cx);
 view.env = env;
@@ -132,14 +151,19 @@ const other = sharedState.get('panel.request').seq + 100;
 sharedState.set('panel.request', { op: 'open', view: 'changes', seq: other });
 view.pin('tasks-mod', 'files');
 assert(sharedState.get('panel.request').seq > other);
-`],
+`,
+    ],
     root,
   );
 });
 
 test('a failed initial scan waits for the timer before retrying', async () => {
   await command(
-    [process.execPath, '-e', host + `
+    [
+      process.execPath,
+      '-e',
+      host +
+        `
 tasks.length = 0;
 view.init(null, cx);
 const scan = tasks.pop();
@@ -150,7 +174,8 @@ assert.equal(tasks.length, 1);
 view.tick(cx);
 assert.equal(tasks.length, 2);
 assert.equal(view.scanning, true);
-`],
+`,
+    ],
     root,
   );
 });
