@@ -115,3 +115,24 @@ assert.equal(buttons.length, 2);
     root,
   );
 });
+
+test('panel request sequences advance after remounts and other writers', async () => {
+  await command(
+    [process.execPath, '-e', host + `
+Date.now = () => 1000;
+view.init(null, cx);
+view.env = env;
+view.pin('tasks-mod', 'files');
+const first = sharedState.get('panel.request').seq;
+view.init(null, cx);
+view.env = env;
+view.pin('tasks-mod', 'files');
+assert(sharedState.get('panel.request').seq > first);
+const other = sharedState.get('panel.request').seq + 100;
+sharedState.set('panel.request', { op: 'open', view: 'changes', seq: other });
+view.pin('tasks-mod', 'files');
+assert(sharedState.get('panel.request').seq > other);
+`],
+    root,
+  );
+});
