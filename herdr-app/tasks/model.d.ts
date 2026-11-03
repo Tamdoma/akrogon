@@ -29,6 +29,8 @@ export interface LeafJson {
   first_prompt: number | null;
   stopped: boolean;
   blocked_by: { slug: string; label: string }[];
+  attention: string[];
+  waits_on: ("A" | "B")[];
   broadcast_pending: boolean;
   land: { alive: boolean; unit: string } | null;
   busy_since: { a: number | null; b: number | null };
@@ -86,70 +88,53 @@ export interface BoardContext {
   agents: ProgramLite[];
 }
 
-export interface Pill {
-  slot: "ansi1" | "ansi2" | "ansi4" | "ansi5" | "ansi6" | "muted";
-}
-
 export interface SeatCell {
   busy: boolean;
   logo: string | null;
   tint: boolean;
 }
 
-export interface LeafDetail {
-  history: string[];
-  failure: string | null;
-  seats: string[];
-  plan: string;
-  worktree: string;
-  kept: { path: string; reason: string }[];
+export type SectionName = "Needs you" | "Working" | "Waiting" | "Paused";
+
+export interface RowDetail {
+  reasons: string[];
   blockedBy: string[];
-  done: string[];
-  attempts: string;
-  verdict: Record<string, string>;
   missing: string[];
+  moves: string[];
+  kept: { path: string; reason: string }[];
 }
 
 export interface RowModel {
   repo: string;
   slug: string;
   phase: string;
-  groupPath: string;
-  depth: number;
-  red: boolean;
+  section: SectionName;
   time: string;
-  pill: Pill | null;
+  reason: string;
+  reasonRed: boolean;
+  blocks: number;
   seats: { a: SeatCell; b: SeatCell };
-  tags: string[];
-  line2: string;
-  detail: LeafDetail;
+  folder: string | null;
+  worktree: string | null;
+  parked: boolean;
+  detail: RowDetail;
 }
 
-export interface GroupModel {
-  kind: "group";
-  name: string;
-  depth: number;
+export interface SectionModel {
+  name: SectionName;
+  rows: RowModel[];
 }
 
-export interface RepoModel {
-  name: string;
-  paused: boolean;
-  folded: false;
-  rows: (GroupModel | RowModel)[];
-  queue: string[];
-  parked: string[];
-  kept: { path: string; reason: string }[];
-}
-
-export interface AlertLine {
+export interface MachineLine {
   text: string;
-  color: "ansi1" | "ansi3";
+  tone: "red" | "dim";
+  detail: string | null;
 }
 
 export interface Board {
-  alerts: AlertLine[];
-  repos: RepoModel[];
-  quiet: string[];
+  problems: number;
+  machine: MachineLine[];
+  sections: SectionModel[];
 }
 
 export interface PinEntry {
@@ -157,14 +142,12 @@ export interface PinEntry {
   folder: string;
 }
 
-export declare function pill(phase: string): Pill | null;
-export declare function clock(ms: number): string;
 export declare function since(ms: number): string;
 export declare function board(env: Envelope, ctx: BoardContext): Board;
 export declare function leafRows(b: Board): RowModel[];
 export declare function pinIntent(
   spaceId: string,
-  leaf: LeafJson,
+  folder: string,
   view: "files" | "changes",
   existingPin: Record<string, PinEntry>,
   seq: number,
