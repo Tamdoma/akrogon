@@ -110,7 +110,10 @@ export default class Tasks extends View {
 
   async snapFiles(files) {
     const snap = {};
-    for (const path of files) snap[path] = await readTextFile(path);
+    for (const path of files)
+      // current is a symlinked directory and a removed file is null: neither
+      // counts as content, but a flip still shows through deploy.yaml.
+      try { snap[path] = await readTextFile(path); } catch { snap[path] = null; }
     return snap;
   }
 
