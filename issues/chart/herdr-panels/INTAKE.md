@@ -194,3 +194,9 @@ Settled:
   - Pi: its question tool prints the question with a reply key ("1-A") and ends the turn (`done`). Plain `hc send t3 "1-B"` answered it ("Blue").
 - Open question from these probes, for the next charting: how Needs you finds a Codex question while hc says `working`. Candidates: hc learns to report Codex questions as `blocked` (herdr-core's change), or Needs you reads the "Action Required" title (fragile).
 - Left for the build, as done-criteria rather than probes: L1 pill screenshots across themes, L3 key toggles and focus, L4 straight edges, P1 status parity fixtures, the reply parser fixtures.
+
+### Codex questions in Needs you (2026-11-03)
+
+A asked how Needs you should find a Codex question while hc reports `working` (a: herdr-core reports it as `blocked`, `kind: question`; b: Needs you reads the "Action Required" window title; c: b now, a later) and recommended a after the operator asked "what's the best and most elegant option?". Operator, verbatim: "ok, do a | push"
+
+Settled: a. The fix belongs in herdr-core's Codex status reporting, so every client (Needs you, the Agents list, `hc wait`) sees the question. Needs you adds no title parsing. Until herdr-core ships it, a Codex question shows only in its own terminal. Reported through `herdr-app feedback` (a draft the operator reviews and sends).
