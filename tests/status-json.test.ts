@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, leaf, yaml, storeDir, type Fixture } from './helpers';
+import { fakeSystemctl, fixture, cli, leaf, yaml, storeDir, type Fixture, type SystemctlFixture } from './helpers';
 import { event, log, mergeRecord, needs, prompt, register, seedRunRecord, snapshot, timings } from './status-fixture';
 import type { Result } from '../src/shell';
 import { z } from 'zod';
@@ -30,6 +30,8 @@ const leafSchema = z.strictObject({
   }),
   failure: z.record(z.string(), z.unknown()).nullable(),
   missing: z.array(gapSchema),
+  attention: z.array(z.string()),
+  waits_on: z.array(z.enum(['A', 'B'])),
   worktree: z.string(),
   plan: z.string(),
   red: z.boolean(),
@@ -244,6 +246,146 @@ test('envelope carries row and section facts', async () => {
     expect(repo.parked).toEqual(['dormant']);
     expect(repo.charts).toHaveLength(1);
     expect(repo.charts[0][0].trim()).toBe('alpha');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a leaf waits on parked, missing and unreadable deps while merged and live ones stay calm', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const parked: string = resolve(f.root, 'issues/parked/dormant');
+    mkdirSync(resolve(parked, 'resting'), { recursive: true });
+    writeFileSync(resolve(parked, 'resting/state.yaml'), 'slug: resting\n');
+    leaf(f, 'dep-live', 'implement');
+    leaf(f, 'dep-done', 'merged');
+    const depDead: string = leaf(f, 'dep-dead', 'implement');
+    writeFileSync(resolve(depDead, 'state.yaml'), 'slug: [');
+    leaf(f, 'waiter', 'implement', {
+      'blocked-by': ['dep-live', 'dep-done', 'resting', 'dep-dead', 'ghost'],
+    });
+    leaf(f, 'quiet', 'implement', { 'blocked-by': ['dep-live', 'dep-done'] });
+    const env: Envelope = envelope(await cli(f, ['status', '--json']));
+    const waiter = leafOf(env, 'repo', 'waiter');
+    const quiet = leafOf(env, 'repo', 'quiet');
+    expect([waiter.attention, quiet.attention]).toEqual([
+      [
+        'waiting on resting (parked)',
+        'waiting on dep-dead (unreadable)',
+        'waiting on ghost (missing)',
+      ],
+      [],
+    ]);
+    expect([waiter.red, quiet.red]).toEqual([true, false]);
+    // env.red = 1 red leaf + 1 unreadable dep leaf.
+    expect(env.red).toBe(2);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a stopped command-owned land job is an attention fact only while unrecorded and dead', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const systemctl: SystemctlFixture = fakeSystemctl(f);
+    const batch = (attempt: string, extra: object = {}): object => ({
+      attempt,
+      built_on: 'main',
+      holder: { base: 'a', head: 'b' },
+      applied: true,
+      owner: 'command',
+      ...extra,
+    });
+    leaf(f, 'land-dead', 'merge', { batch: batch('deadjob') });
+    leaf(f, 'land-live', 'merge', { batch: batch('livejob') });
+    leaf(f, 'land-pushed', 'merge', { batch: batch('pushedjob', { recorded: true }) });
+    leaf(f, 'land-seat', 'merge', { batch: batch('seatjob', { owner: 'seat' }) });
+    writeFileSync(
+      systemctl.db,
+      JSON.stringify({ units: [{ unit: 'akrogon-land-livejob.service', sub: 'running' }] }),
+    );
+    const env: Envelope = envelope(
+      await cli(f, ['status', '--json'], f.root, {
+        ...systemctl.env,
+        PATH: `${resolve(f.home, 'bin')}:${process.env.PATH}`,
+      }),
+    );
+    expect(
+      ['land-dead', 'land-live', 'land-pushed', 'land-seat'].map(
+        (slug) => leafOf(env, 'repo', slug).attention,
+      ),
+    ).toEqual([['merge job stopped'], [], [], []]);
+    expect(leafOf(env, 'repo', 'land-dead').red).toBe(true);
+    expect(env.red).toBe(1);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a leaf carries failed, missing and prompt facts and a clean leaf carries none', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'failed-rec', 'failed', {
+      failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'no key' },
+    });
+    leaf(f, 'failed-bare', 'failed');
+    const needy: string = leaf(f, 'needy', 'implement');
+    yaml(resolve(needy, 'readiness.yaml'), needs('needy'));
+    const undeliv: string = leaf(f, 'undeliv', 'implement');
+    saveState(undeliv, {
+      ...readState(undeliv),
+      delivery_error: {
+        A: { command: ['x'], code: 'timeout', message: 'm', pane: 'p', session: null, at: new Date().toISOString() },
+      },
+    });
+    const undelivBusy: string = leaf(f, 'undeliv-busy', 'implement', {
+      busy_since: { B: new Date().toISOString() },
+    });
+    saveState(undelivBusy, {
+      ...readState(undelivBusy),
+      delivery_error: {
+        B: { command: ['x'], code: 'gone', message: 'm', pane: 'p', session: null, at: new Date().toISOString() },
+      },
+    });
+    leaf(f, 'clean', 'implement');
+    const env: Envelope = envelope(await cli(f, ['status', '--json']));
+    expect(
+      ['failed-rec', 'failed-bare', 'needy', 'undeliv', 'undeliv-busy', 'clean'].map(
+        (slug) => leafOf(env, 'repo', slug).attention,
+      ),
+    ).toEqual([
+      ['failed: blocked: no key'],
+      ['failed'],
+      ['missing env FOO'],
+      ['A prompt timeout'],
+      [],
+      [],
+    ]);
+    expect([leafOf(env, 'repo', 'undeliv-busy').red, leafOf(env, 'repo', 'clean').red]).toEqual([
+      false,
+      false,
+    ]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('waits_on names the unfinished idle required seats of the phase', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'both-idle', 'check.review');
+    leaf(f, 'after-fix', 'check.review', { fix_rounds: 1 });
+    leaf(f, 'a-done', 'check.review', { done: ['A'] });
+    leaf(f, 'a-busy', 'check.review', { busy_since: { A: new Date().toISOString() } });
+    leaf(f, 'single', 'implement');
+    leaf(f, 'over', 'merged');
+    leaf(f, 'dead', 'failed');
+    const env: Envelope = envelope(await cli(f, ['status', '--json']));
+    expect(
+      ['both-idle', 'after-fix', 'a-done', 'a-busy', 'single', 'over', 'dead'].map(
+        (slug) => leafOf(env, 'repo', slug).waits_on,
+      ),
+    ).toEqual([['A', 'B'], ['B'], ['B'], ['B'], ['A'], [], []]);
   } finally {
     f.clean();
   }
