@@ -382,6 +382,30 @@ test('merges hold the 5 most recent across repos and charts match --charts rows'
   }
 });
 
+test('recent merges include merged leaves in unfinished owners', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'older', 'merged', {}, 'finished');
+    mkdirSync(resolve(f.root, 'issues/closed/finished'), { recursive: true });
+    renameSync(path, resolve(f.root, 'issues/closed/finished/older'));
+    leaf(f, 'latest', 'merged');
+    leaf(f, 'unfinished', 'implement');
+    const at: number = Date.now();
+    log(f, [event('older', 'merged', 20, '', at), event('latest', 'merged', 5, '', at)]);
+    timings(f, [prompt('older', 60, 'delivered', at), prompt('latest', 15, 'delivered', at)]);
+
+    const result: Result = await cli(f, ['status', '--json']);
+    expect(result.code).toBe(0);
+    const env: Envelope = envelope(result);
+    expect(env.merges).toEqual([
+      { repo: 'repo', slug: 'latest', merged: at - 5 * 60000, total_ms: 10 * 60000 },
+      { repo: 'repo', slug: 'older', merged: at - 20 * 60000, total_ms: 40 * 60000 },
+    ]);
+  } finally {
+    f.clean();
+  }
+});
+
 test('red counts real blocks once and never counts amber or time', async () => {
   const f: Fixture = await fixture();
   try {
