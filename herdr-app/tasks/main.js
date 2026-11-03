@@ -1,11 +1,11 @@
 // Tasks board: the akrogon status --json envelope as a read-only repo/leaf
 // list. All host calls live here; model.js/schedule.js stay pure for tests.
 
-import { View, div, svg, image } from "gpui-kit";
+import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import {
   exec, readTextFile, watchFolder, knownAgents, spaces, theme,
-  shared, setShared, nextCommand, props,
+  shared, setShared, nextCommand, props, settings,
 } from "herdr";
 import { board, pinIntent, filesChanged } from "./model.js";
 import { next } from "./schedule.js";
@@ -22,37 +22,40 @@ function withAlpha(color, frac) {
 }
 
 const CHEVRON = (open) => `mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`;
-const SEATS_W = 64;    // two seat cells of 28 px and an 8 px gap: the slug column starts here
+// Sizes follow the terminal text (settings().font_size; operator 2026-11-03:
+// "Increase it to what we have by default here in normal terminals"): every
+// size below is written at a 13 px base and scaled by S().
+let K = 1;
+const S = (n) => Math.round(n * K * 2) / 2;
+
+const SEATS_W = 28;    // the working seat's spinner and letter: the slug column starts here
 const ROW_INSET = SEATS_W + 8;
 const CHART_CELLS = [36, 20, 72, 32]; // widths of a chart row's leaves, open, state and age cells
 
-// One seat: its 16 px program logo (the spinner while the seat works), then
-// its letter; a seat with no matching program shows the letter alone.
-function logo(cell, letter, t) {
-  const icon = cell.busy
-    ? svg(SPINNER).size(12).mx(2).flex_none().text_color(t.working).spin(900)
-    : cell.logo ? cell.tint
-      ? svg(cell.logo).size(16).flex_none().text_color(t.foreground)
-      : image(cell.logo).size(16).flex_none() : null;
-  return h_flex().w(28).flex_none().items_center().gap(4)
-    .when(icon !== null, (el) => el.child(icon))
-    .child(div().text_size(11).text_color(t.dim).child(letter));
+// Only a working seat shows: the Agents-list spinner and its letter; every
+// seat is listed in the expanded row (operator 2026-11-03, Q2 O1).
+function working(seats, t) {
+  const busy = [["A", seats.a], ["B", seats.b]].filter(([, cell]) => cell.busy);
+  return h_flex().w(S(SEATS_W)).flex_none().items_center().gap(S(4))
+    .when(busy.length > 0, (el) => el
+      .child(svg(SPINNER).size(S(12)).flex_none().text_color(t.working).spin(900))
+      .child(div().text_size(S(11)).text_color(t.dim).child(busy.map(([letter]) => letter).join(""))));
 }
 
 // A folded section's header: chevron and its "<name> (<count>)" label; Charts,
 // Last merges and Housekeeping all draw through it.
 function foldHeader(id, open, label, onClick, t) {
-  return h_flex().id(id).h(28).flex_none().px(8).gap(6).items_center().rounded(6).cursor_pointer()
+  return h_flex().id(id).h(S(28)).flex_none().px(8).gap(6).items_center().rounded(6).cursor_pointer()
     .hover((s) => s.bg(t.hover))
     .on_click(onClick)
-    .child(svg(CHEVRON(open)).size(12).flex_none().text_color(t.dim))
-    .child(div().text_size(12).text_color(t.muted).child(label));
+    .child(svg(CHEVRON(open)).size(S(12)).flex_none().text_color(t.dim))
+    .child(div().text_size(S(12)).text_color(t.muted).child(label));
 }
 
 // A key/value line of the expanded row: dim label column, value beside it.
 function field(label, value, t) {
   return h_flex().items_start().gap(8).min_w(0)
-    .child(div().w(64).flex_none().text_color(t.dim).child(label))
+    .child(div().w(S(64)).flex_none().text_color(t.dim).child(label))
     .child(div().flex_1().min_w(0).truncate().child(value));
 }
 
@@ -224,8 +227,8 @@ export default class Tasks extends View {
 
   // An actionable line: a 6 px dot in its color, the text in the foreground.
   alertLine(line, i, t) {
-    return h_flex().id(`alert-${i}`).px(8).py(4).gap(8).items_start().text_size(12)
-      .child(div().mt(5).size(6).flex_none().rounded_full().bg(t[line.color]))
+    return h_flex().id(`alert-${i}`).px(8).py(4).gap(8).items_start().text_size(S(12))
+      .child(div().mt(S(5)).size(S(6)).flex_none().rounded_full().bg(t[line.color]))
       .child(div().flex_1().min_w(0).text_color(t.foreground).child(line.text));
   }
 
@@ -237,8 +240,8 @@ export default class Tasks extends View {
     if (row.pill === null) return null;
     const color = row.pill.slot === "muted" ? t.muted : t[row.pill.slot];
     return div().flex_none().rounded(5).overflow_hidden().bg(t.background).child(
-      h_flex().px(6).h(18).items_center().bg(withAlpha(color, 0.12))
-        .child(div().text_size(10.5).font_semibold().text_color(color).child(row.phase.split(".")[0]))
+      h_flex().px(6).h(S(18)).items_center().bg(withAlpha(color, 0.12))
+        .child(div().text_size(S(10.5)).font_semibold().text_color(color).child(row.phase.split(".")[0]))
     );
   }
 
@@ -257,24 +260,22 @@ export default class Tasks extends View {
       .when(fill === "selected" && !open, (el) => el.bg(t.selected))
       .on_click((_e, cx) => this.toggle(key, cx))
       .child(
-        h_flex().h(20).items_center().gap(8).min_w(0)
-          .child(h_flex().w(SEATS_W).flex_none().items_center().gap(8)
-            .child(logo(row.seats.a, "A", t))
-            .child(logo(row.seats.b, "B", t)))
-          .child(div().flex_1().min_w(0).truncate().text_size(13).font_medium()
+        h_flex().h(S(20)).items_center().gap(8).min_w(0)
+          .child(working(row.seats, t))
+          .child(div().flex_1().min_w(0).truncate().text_size(S(13)).font_medium()
             .text_color(row.red ? t.ansi1 : row.pill === null ? t.muted : t.foreground).child(row.slug))
           .when(row.pill !== null, (el) => el.child(this.pillFor(row, t)))
-          .child(div().w(44).flex_none().text_right().text_size(11).text_color(t.dim).child(row.time === "-" ? "" : row.time))
+          .child(div().w(S(44)).flex_none().text_right().text_size(S(11)).text_color(t.dim).child(row.time === "-" ? "" : row.time))
       )
       .when(second !== "", (el) => el.child(
-        div().h(16).pl(ROW_INSET).min_w(0).truncate().text_size(11).text_color(t.muted).child(second)
+        div().h(S(16)).pl(S(ROW_INSET)).min_w(0).truncate().text_size(S(11)).text_color(t.muted).child(second)
       ));
     if (!open) return head;
     const d = row.detail;
-    const detail = v_flex().pl(ROW_INSET).pt(4).pb(4).gap(4).text_size(11).text_color(t.muted);
+    const detail = v_flex().pl(S(ROW_INSET)).pt(4).pb(4).gap(4).text_size(S(11)).text_color(t.muted);
     if (d.failure !== null)
       detail.child(h_flex().items_start().gap(8).min_w(0)
-        .child(div().w(64).flex_none().text_color(t.dim).child("failed"))
+        .child(div().w(S(64)).flex_none().text_color(t.dim).child("failed"))
         .child(div().flex_1().min_w(0).text_color(t.foreground).child(d.failure)));
     for (const [i, seat] of d.seats.entries()) detail.child(field(i === 0 ? "seats" : "", seat, t));
     detail.child(field("plan", d.plan, t));
@@ -282,16 +283,16 @@ export default class Tasks extends View {
     if (d.blockedBy.length > 0) detail.child(field("blocked by", d.blockedBy.join(", "), t));
     for (const gap of d.missing)
       detail.child(h_flex().gap(8).min_w(0)
-        .child(div().w(64).flex_none().text_color(t.dim).child("missing"))
+        .child(div().w(S(64)).flex_none().text_color(t.dim).child("missing"))
         .child(div().flex_1().min_w(0).truncate().text_color(t.ansi1).child(gap)));
     for (const [i, kept] of d.kept.entries()) detail.child(field(i === 0 ? "kept" : "", `${kept.path} — ${kept.reason}`, t));
     for (const [i, line] of d.history.slice(-10).entries()) detail.child(field(i === 0 ? "history" : "", line, t));
     detail.child(
       h_flex().gap(8).pt(4).children(
         ["files", "changes"].map((view) =>
-          div().id(`task-${key}-${view}`).px(8).h(26).rounded(6).cursor_pointer().flex().items_center()
+          div().id(`task-${key}-${view}`).px(8).h(S(26)).rounded(6).cursor_pointer().flex().items_center()
             .bg(t.hover).hover((s) => s.text_color(t.foreground))
-            .text_size(12).text_color(t.muted)
+            .text_size(S(12)).text_color(t.muted)
             .on_click((e, cx) => { cx.stop_propagation(); this.pin(key, view); })
             .child(view === "files" ? "Files" : "Changes")
         )
@@ -303,14 +304,14 @@ export default class Tasks extends View {
   repoSection(repo, t) {
     const out = v_flex().flex_none().w_full().pt(8)
       .child(
-        h_flex().id(`repo-${repo.name}`).h(28).px(8).items_center().gap(8)
-          .child(div().text_size(13).font_semibold().text_color(t.foreground).child(repo.name))
-          .when(repo.paused, (el) => el.child(div().text_size(11).text_color(t.muted).child("paused")))
+        h_flex().id(`repo-${repo.name}`).h(S(28)).px(8).items_center().gap(8)
+          .child(div().text_size(S(13)).font_semibold().text_color(t.foreground).child(repo.name))
+          .when(repo.paused, (el) => el.child(div().text_size(S(11)).text_color(t.muted).child("paused")))
       );
     for (const row of repo.rows) {
       if (row.kind === "group")
-        out.child(div().h(24).flex().items_center().pl(8 + row.depth * 12).pr(8)
-          .text_size(11.5).font_medium().text_color(t.dim).child(row.name));
+        out.child(div().h(S(24)).flex().items_center().pl(8 + row.depth * 12).pr(8)
+          .text_size(S(11.5)).font_medium().text_color(t.dim).child(row.name));
       else out.child(this.row(row, t));
     }
     if (repo.queue.length > 0) out.child(this.note("merge queue", repo.queue.join("  "), t));
@@ -320,7 +321,7 @@ export default class Tasks extends View {
   }
 
   note(label, value, t) {
-    return h_flex().h(24).px(8).gap(8).items_center().text_size(11).min_w(0)
+    return h_flex().h(S(24)).px(8).gap(8).items_center().text_size(S(11)).min_w(0)
       .child(div().flex_none().text_color(t.dim).child(label))
       .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(value));
   }
@@ -336,9 +337,9 @@ export default class Tasks extends View {
 
   // One --charts row: the chart name, then its cells in fixed right-aligned columns.
   chartRow([name, ...cells], t) {
-    return h_flex().h(22).pl(26).pr(8).gap(12).items_center().text_size(11).min_w(0)
+    return h_flex().h(S(22)).pl(S(26)).pr(8).gap(12).items_center().text_size(S(11)).min_w(0)
       .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(name.trim()))
-      .children(cells.map((cell, i) => div().w(CHART_CELLS[i]).flex_none().text_right().text_color(t.dim).child(cell)));
+      .children(cells.map((cell, i) => div().w(S(CHART_CELLS[i])).flex_none().text_right().text_color(t.dim).child(cell)));
   }
 
   // Charts of the repos in the quiet line: one fold, each repo's name over its charts.
@@ -348,7 +349,7 @@ export default class Tasks extends View {
       .child(foldHeader("quiet-charts", open, this.model.quietChartsFolded, (_e, cx) => this.toggle("quiet-charts", cx), t));
     if (open)
       for (const entry of this.model.quietCharts)
-        el.child(div().h(24).flex().items_center().pl(26).pr(8).text_size(11).font_medium().text_color(t.muted).child(entry.repo))
+        el.child(div().h(S(24)).flex().items_center().pl(S(26)).pr(8).text_size(S(11)).font_medium().text_color(t.muted).child(entry.repo))
           .children(entry.charts.map((chart) => this.chartRow(chart, t)));
     return el;
   }
@@ -360,10 +361,10 @@ export default class Tasks extends View {
     if (open)
       for (const m of this.model.merges)
         el.child(
-          h_flex().h(22).pl(26).pr(8).gap(12).items_center().text_size(11).min_w(0)
+          h_flex().h(S(22)).pl(S(26)).pr(8).gap(12).items_center().text_size(S(11)).min_w(0)
             .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(`${m.repo}/${m.slug}`))
             .child(div().flex_none().text_color(t.dim).child(`${m.age} ago`))
-            .child(div().w(72).flex_none().text_right().text_color(t.dim).child(`total ${m.total}`))
+            .child(div().w(S(72)).flex_none().text_right().text_color(t.dim).child(`total ${m.total}`))
         );
     return el;
   }
@@ -374,37 +375,40 @@ export default class Tasks extends View {
       .child(foldHeader("housekeeping", open, this.model.housekeepingFolded, (_e, cx) => this.toggle("housekeeping", cx), t));
     if (open)
       for (const line of this.model.housekeeping)
-        el.child(div().pl(26).pr(8).py(2).text_size(11).text_color(t.muted).child(line));
+        el.child(div().pl(S(26)).pr(8).py(2).text_size(S(11)).text_color(t.muted).child(line));
     return el;
   }
 
   render(cx) {
+    // settings.json's font_size, else Herdr's terminal default of 14 (AGENTS.md, Fonts).
+    const size = settings().font_size;
+    K = (typeof size === "number" ? size : 14) / 13;
     const t = theme();
     const open = this.model === null ? 0 : this.model.repos.reduce((sum, repo) => sum + repo.rows.filter((row) => row.slug !== undefined && row.pill !== null).length, 0);
-    const root = v_flex().id("tasks").size_full().min_h(0).bg(t.background).text_color(t.foreground).text_size(13)
-      .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
+    const root = v_flex().id("tasks").size_full().min_h(0).bg(t.background).text_color(t.foreground).text_size(S(13))
+      .child(h_flex().h(S(42)).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .child(div().font_semibold().child("Tasks"))
-        .child(div().flex_1().min_w(0).truncate().text_right().text_size(12).text_color(t.dim)
+        .child(div().flex_1().min_w(0).truncate().text_right().text_size(S(12)).text_color(t.dim)
           .child(this.model === null ? "" : `${open} open`)));
     if (this.error !== null && this.env === null)
       return root.child(v_flex().p(8).gap(4)
-        .child(div().px(8).text_size(12).text_color(t.ansi1).child(this.error))
-        .child(div().px(8).text_size(12).text_color(t.dim).child("Board unavailable; retrying on the next tick")));
+        .child(div().px(8).text_size(S(12)).text_color(t.ansi1).child(this.error))
+        .child(div().px(8).text_size(S(12)).text_color(t.dim).child("Board unavailable; retrying on the next tick")));
     if (this.model === null)
-      return root.child(div().p(16).text_size(12).text_color(t.dim).child("Loading tasks…"));
+      return root.child(div().p(16).text_size(S(12)).text_color(t.dim).child("Loading tasks…"));
     // At full width the rows stop at a readable measure so the pill and time
     // stay near the slug instead of at the far window edge.
-    const list = v_flex().w_full().max_w(880);
+    const list = v_flex().w_full().max_w(S(880));
     if (this.error !== null)
       list.child(this.alertLine({ text: this.error, color: "ansi1" }, "scan", t));
     for (const [i, line] of this.model.alerts.entries()) list.child(this.alertLine(line, i, t));
     for (const repo of this.model.repos) list.child(this.repoSection(repo, t));
     const tail = v_flex().flex_none().w_full().pt(8);
     if (this.model.quiet.length > 0)
-      tail.child(div().px(8).py(4).text_size(12).text_color(t.dim).child(this.model.quietLine));
+      tail.child(div().px(8).py(4).text_size(S(12)).text_color(t.dim).child(this.model.quietLine));
     if (this.model.quietCharts.length > 0) tail.child(this.quietCharts(t));
     if (this.model.quiet.length === 0 && this.model.repos.length === 0)
-      tail.child(div().px(8).py(4).text_size(12).text_color(t.dim).child("No registered repos"));
+      tail.child(div().px(8).py(4).text_size(S(12)).text_color(t.dim).child("No registered repos"));
     if (this.model.merges.length > 0) tail.child(this.merges(t));
     if (this.model.housekeeping.length > 0) tail.child(this.housekeeping(t));
     return root.child(v_flex().id("tasks-list").flex_1().min_h(0).w_full().overflow_y_scrollbar().p(8).child(list.child(tail)));

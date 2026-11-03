@@ -33,7 +33,7 @@ mock.module('herdr', () => ({
   watchFolder: async () => [], knownAgents: async () => [],
   spaces: () => [{ id: 'space', active: true, name: 'akrogon', folder: '' }],
   theme: () => t, shared: key => sharedState.get(key), setShared: (key, value) => sharedState.set(key, value),
-  nextCommand: () => new Promise(() => {}), props: () => null,
+  nextCommand: () => new Promise(() => {}), props: () => null, settings: () => ({ font_size: 13 }),
 }));
 const { default: Tasks } = await import('./herdr-app/tasks/main.js');
 const { board, leafRows } = await import('./herdr-app/tasks/model.js');
@@ -47,7 +47,7 @@ function nodes(node) { return typeof node === 'string' ? [] : [node, ...node.nod
 function text(node) { return typeof node === 'string' ? [node] : node.nodes.flatMap(text); }
 `;
 
-test('seat letters remain visible beside matched logos and working spinners', async () => {
+test('only a working seat shows on the row: its spinner and letter', async () => {
   await command(
     [
       process.execPath,
@@ -57,7 +57,8 @@ test('seat letters remain visible beside matched logos and working spinners', as
 const row = leafRows(view.model).find(row => row.slug === 'tasks-mod');
 const rendered = view.row(row, t);
 assert(text(rendered).includes('A'));
-assert(text(rendered).includes('B'));
+assert(!text(rendered).includes('B'));
+assert(nodes(rendered).some(node => node.source === 'mods/workspace-chrome/spinner.svg'));
 `,
     ],
     root,
