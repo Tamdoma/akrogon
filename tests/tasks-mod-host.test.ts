@@ -136,3 +136,21 @@ assert(sharedState.get('panel.request').seq > other);
     root,
   );
 });
+
+test('a failed initial scan waits for the timer before retrying', async () => {
+  await command(
+    [process.execPath, '-e', host + `
+tasks.length = 0;
+view.init(null, cx);
+const scan = tasks.pop();
+await scan(cx);
+assert.equal(view.env, null);
+assert(view.error.includes('akrogon unavailable'));
+assert.equal(tasks.length, 1);
+view.tick(cx);
+assert.equal(tasks.length, 2);
+assert.equal(view.scanning, true);
+`],
+    root,
+  );
+});
