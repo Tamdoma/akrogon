@@ -90,3 +90,28 @@ for (const kept of env.repos.find(repo => repo.name === row.repo).kept) {
     root,
   );
 });
+
+test('same slugs in different repositories expand and pin independently', async () => {
+  await command(
+    [process.execPath, '-e', host + `
+const first = env.repos.find(repo => repo.name === 'akrogon').leaves.find(leaf => leaf.slug === 'tasks-mod');
+const second = env.repos.find(repo => repo.name === 'framework').leaves[0];
+second.slug = first.slug;
+view.rebuild();
+const rows = leafRows(view.model).filter(row => row.slug === first.slug);
+const firstRow = view.row(rows[0], t);
+const secondRow = view.row(rows[1], t);
+assert.notEqual(firstRow.attrs.id, secondRow.attrs.id);
+secondRow.handlers.click();
+assert(!text(view.row(rows[0], t)).includes('Files'));
+const expanded = view.row(rows[1], t);
+const buttons = nodes(expanded).filter(node => node.handlers.click && text(node).length === 1 && ['Files', 'Changes'].includes(text(node)[0]));
+for (const button of buttons) {
+  button.handlers.click({}, cx);
+  assert.equal(sharedState.get('worktree.pin').space.folder, second.worktree);
+}
+assert.equal(buttons.length, 2);
+`],
+    root,
+  );
+});
