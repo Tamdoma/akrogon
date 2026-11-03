@@ -126,6 +126,8 @@ Door A = Claude in t15 (herdr-app session infra). Consultants: codex (`codex --n
 - Every seat restart lost its pane placement and needed the full park/keep sequence again.
 - Later tasks by `hc send`: `hc send --if idle` refused two seats that had finished their last brief ("t2t is done, not idle", nothing typed). `done` means finished while nobody looked. A seat waiting for its next brief is `idle` or `done`; plain `hc send` (no `--if`) started both. Never `--force`: that is only for `blocked`.
 
+- Visual probes: `herdr-app shot` saves the window's last drawn frame. A session window behind another fullscreen window stops drawing, so its shots go stale after layout commands. `herdrapp session stop <name>` then `herdrapp session attach <name>` draws a fresh frame (P6, herdr-panels, 2026-11-03).
+
 ## Open questions
 - What triggers `akrogon next` without the herdr plugin? `hc events` (follows status, turn and exit changes), a herdr-app mod, or something else? Startup `pull` and `--resume` need a home too.
 - How does the per-repo herdr session map: one herdr-app space per repo, a label, or a separate `HC_SESSION`?
