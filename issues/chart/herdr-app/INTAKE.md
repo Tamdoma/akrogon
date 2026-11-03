@@ -128,6 +128,11 @@ Door A = Claude in t15 (herdr-app session infra). Consultants: codex (`codex --n
 
 - Visual probes: `herdr-app shot` saves the window's last drawn frame. A session window behind another fullscreen window stops drawing, so its shots go stale after layout commands. `herdrapp session stop <name>` then `herdrapp session attach <name>` draws a fresh frame (P6, herdr-panels, 2026-11-03).
 
+## Found 2026-11-03 while probing herdr-panels
+- hc reports Codex as `working`, with no `kind`, while Codex waits on its question tool (Codex 0.166.0). Claude Code and Antigravity report `blocked` with `kind: question`; Pi prints its question and ends the turn (`done`). akrogon's port must not read a Codex seat's long `working` as busy work, and its stall notice (`src/next.ts` STALL_MS) would fire on a Codex question. Reported to herdr through `herdr-app feedback` (operator to send). Details: `issues/chart/herdr-panels/INTAKE.md` "Probes".
+- `hc send --force` on a `blocked` question: Claude Code takes the text as the answer; Antigravity's menu takes Enter on the highlighted first option, so "2" picked option 1. A port that answers questions must open Antigravity's agent instead of forcing.
+- Live probes run cleanly in a throwaway session: `herdrapp --session <name>` opens it; set `HERDR_APP_HOME=~/.config/herdr-app-sessions/<name>` and `HC_SESSION=<name>`, and unset `HC_TERMINAL_SOCKET`, `HC_TERMINAL_ID`, `HC_SCOPE` so `hc` and `herdr-app do` target it and not the door's session; a throwaway mod or layout goes in that session's own `mods/` and `layouts/` (real files, not the links); `herdrapp session stop` then `delete` removes everything.
+
 ## Open questions
 - What triggers `akrogon next` without the herdr plugin? `hc events` (follows status, turn and exit changes), a herdr-app mod, or something else? Startup `pull` and `--resume` need a home too.
 - How does the per-repo herdr session map: one herdr-app space per repo, a label, or a separate `HC_SESSION`?
