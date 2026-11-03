@@ -200,6 +200,9 @@ export function board(env, ctx) {
     age: merge.merged === null ? "-" : since(ctx.now - merge.merged),
     total: merge.total_ms === null ? "-" : clock(merge.total_ms),
   }));
+  const quietCharts = env.repos.filter((repo) => isQuiet(repo) && repo.charts.length > 0)
+    .map((repo) => ({ repo: repo.name, charts: repo.charts }))
+    .sort((a, b) => a.repo.localeCompare(b.repo));
   const chores = housekeeping(env);
   return {
     alerts: alerts(env),
@@ -208,6 +211,8 @@ export function board(env, ctx) {
     repos,
     quiet,
     quietLine: `No open tasks: ${quiet.join(", ")}`,
+    quietCharts,
+    quietChartsFolded: `Charts (${quietCharts.reduce((sum, entry) => sum + entry.charts.length, 0)})`,
     merges,
     mergesFolded: `Last merges (${merges.length})`,
   };

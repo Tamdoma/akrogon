@@ -39,15 +39,14 @@ function logo(cell, letter, t) {
     .child(div().text_size(11).text_color(t.muted).child(letter));
 }
 
-// A folded section's header: chevron, label, count; Charts, Last merges and
-// Housekeeping all draw through it.
-function foldHeader(id, open, label, count, onClick, t) {
+// A folded section's header: chevron and its "<name> (<count>)" label; Charts,
+// Last merges and Housekeeping all draw through it.
+function foldHeader(id, open, label, onClick, t) {
   return h_flex().id(id).h(28).flex_none().px(8).gap(6).items_center().rounded(6).cursor_pointer()
     .hover((s) => s.bg(t.hover))
     .on_click(onClick)
     .child(svg(CHEVRON(open)).size(12).flex_none().text_color(t.dim))
-    .child(div().text_size(12).text_color(t.muted).child(label))
-    .child(div().text_size(12).text_color(t.dim).child(String(count)));
+    .child(div().text_size(12).text_color(t.muted).child(label));
 }
 
 // A key/value line of the expanded row: dim label column, value beside it.
@@ -329,21 +328,34 @@ export default class Tasks extends View {
     const key = `charts-${repo.name}`;
     const open = this.expanded.has(key);
     const el = v_flex().flex_none()
-      .child(foldHeader(key, open, "Charts", repo.charts.length, () => this.toggle(key), t));
+      .child(foldHeader(key, open, `Charts (${repo.charts.length})`, () => this.toggle(key), t));
+    if (open) el.children(repo.charts.map((chart) => this.chartRow(chart, t)));
+    return el;
+  }
+
+  // One --charts row: the chart name, then its cells in fixed right-aligned columns.
+  chartRow([name, ...cells], t) {
+    return h_flex().h(22).pl(26).pr(8).gap(12).items_center().text_size(11).min_w(0)
+      .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(name.trim()))
+      .children(cells.map((cell, i) => div().w(CHART_CELLS[i]).flex_none().text_right().text_color(t.dim).child(cell)));
+  }
+
+  // Charts of the repos in the quiet line: one fold, each repo's name over its charts.
+  quietCharts(t) {
+    const open = this.expanded.has("quiet-charts");
+    const el = v_flex().flex_none().w_full()
+      .child(foldHeader("quiet-charts", open, this.model.quietChartsFolded, () => this.toggle("quiet-charts"), t));
     if (open)
-      for (const [name, ...cells] of repo.charts)
-        el.child(
-          h_flex().h(22).pl(26).pr(8).gap(12).items_center().text_size(11).min_w(0)
-            .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(name.trim()))
-            .children(cells.map((cell, i) => div().w(CHART_CELLS[i]).flex_none().text_right().text_color(t.dim).child(cell)))
-        );
+      for (const entry of this.model.quietCharts)
+        el.child(div().h(24).flex().items_center().pl(26).pr(8).text_size(11).font_medium().text_color(t.muted).child(entry.repo))
+          .children(entry.charts.map((chart) => this.chartRow(chart, t)));
     return el;
   }
 
   merges(t) {
     const open = this.showMerges;
     const el = v_flex().flex_none().w_full()
-      .child(foldHeader("merges", open, "Last merges", this.model.merges.length, () => { this.showMerges = !this.showMerges; }, t));
+      .child(foldHeader("merges", open, this.model.mergesFolded, () => { this.showMerges = !this.showMerges; }, t));
     if (open)
       for (const m of this.model.merges)
         el.child(
@@ -358,7 +370,7 @@ export default class Tasks extends View {
   housekeeping(t) {
     const open = this.expanded.has("housekeeping");
     const el = v_flex().flex_none().w_full()
-      .child(foldHeader("housekeeping", open, "Housekeeping", this.model.housekeeping.length, () => this.toggle("housekeeping"), t));
+      .child(foldHeader("housekeeping", open, this.model.housekeepingFolded, () => this.toggle("housekeeping"), t));
     if (open)
       for (const line of this.model.housekeeping)
         el.child(div().pl(26).pr(8).py(2).text_size(11).text_color(t.muted).child(line));
@@ -389,7 +401,8 @@ export default class Tasks extends View {
     const tail = v_flex().flex_none().w_full().pt(8);
     if (this.model.quiet.length > 0)
       tail.child(div().px(8).py(4).text_size(12).text_color(t.dim).child(this.model.quietLine));
-    else if (this.model.repos.length === 0)
+    if (this.model.quietCharts.length > 0) tail.child(this.quietCharts(t));
+    if (this.model.quiet.length === 0 && this.model.repos.length === 0)
       tail.child(div().px(8).py(4).text_size(12).text_color(t.dim).child("No registered repos"));
     if (this.model.merges.length > 0) tail.child(this.merges(t));
     if (this.model.housekeeping.length > 0) tail.child(this.housekeeping(t));

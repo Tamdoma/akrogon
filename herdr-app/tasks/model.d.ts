@@ -161,6 +161,8 @@ export interface Board {
   repos: RepoModel[];
   quiet: string[];
   quietLine: string;
+  quietCharts: { repo: string; charts: string[][] }[];
+  quietChartsFolded: string;
   merges: MergeModel[];
   mergesFolded: string;
 }
