@@ -35,7 +35,7 @@ Who answers them depends on the mode. In the default manual mode you answer the 
 
 ## Read the territory map
 
-Before asking anything, the door shows a map of the ground: the code it touches, the open choices, the risks and pitfalls. It inspects the live code, so the map can remove work you thought you needed or show that the job is really two jobs.
+Before the fork rounds, the door shows a map of the ground: the code it touches, the open choices, the risks and pitfalls. It inspects the live code, so the map can remove work you thought you needed or show that the job is really two jobs.
 
 ## Answer one fork per round
 
