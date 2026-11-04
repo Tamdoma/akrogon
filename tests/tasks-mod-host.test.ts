@@ -258,7 +258,10 @@ assert(all.includes('status-json merged'));
 assert(all.includes('add TOKEN to config env'));
 assert(all.includes('ago'));
 assert(all.includes('Files') && all.includes('Changes'));
-for (const kept of env.repos.find(r => r.name === 'akrogon').kept) assert(all.includes(kept.path));
+for (const kept of env.repos.find(r => r.name === 'akrogon').kept) {
+  assert(all.includes(kept.path));
+  assert(all.includes(kept.reason));
+}
 assert(!all.includes('/home/ivan/.akrogon/config.yaml'));
 assert(!all.includes(target.plan));
 assert(!all.includes('A:0'));
