@@ -1,0 +1,38 @@
+slug: signposts-step
+phase: merged
+created: 2026-11-04
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#128"
+busy_since:
+  B: 2026-11-04T00:27:22.871Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFN
+worktree: /home/ivan/.akrogon/worktrees/akrogon/signposts-step
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pYA
+  B: w8:pYB
+prompted:
+  B: 01a1a3ec-c346-70b0-b47b-049a2a1b41de
+prompted_at:
+  B: 2026-11-04T00:27:22.871Z
+delivery_error: {}
+merge_stamp: 2026-11-04T00:27:16.403Z
+broadcast:
+  kind: issue
+  name: signposts
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/signposts
+  pushed: 9ee76bf68893076a541de83626390e65d07bc2bf
+  sources:
+    - "Tamdoma/akrogon#128"
+frozen: {}
+frozen_cited: []

@@ -1,0 +1,39 @@
+slug: tasks-mod
+phase: merged
+created: 2026-11-03
+repo: akrogon
+blocked-by:
+  - status-json
+sources: []
+busy_since:
+  B: 2026-11-03T17:58:25.237Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 3
+verdict: {}
+tab: w8:tFJ
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pY4
+  B: w8:pY5
+prompted:
+  B: 01a1a24b-aa6b-78d2-a9af-400f5f6f26d9
+prompted_at:
+  B: 2026-11-03T17:58:25.237Z
+delivery_error: {}
+merge_stamp: 2026-11-03T17:58:18.102Z
+broadcast:
+  kind: issue
+  name: tasks-board
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/tasks-board
+  pushed: 44482211fff2190ac8fed39fa14a49fce40b9ab7
+  sources: []
+frozen:
+  tests/fixtures/status-envelope.json: 3bfe90268d05d7ef212944ee4d6b2e45fb733231
+  tests/install.test.ts: 81d46e85e99b3fea0e7b68d11d5e5ba90c35a566
+  tests/tasks-mod.test.ts: 3a0ad91a10cc632039c1090a456dd83abf7dae9a
+frozen_cited: []

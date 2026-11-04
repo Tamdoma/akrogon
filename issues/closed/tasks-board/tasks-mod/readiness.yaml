@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: "exec(akrogon, [status]) from a herdr-app mod"
+    command: "exec(\"akrogon\", [\"status\"]) with cwd home and /"
+    identity: "local user ivan"
+    target: "throwaway herdr-app session probe2"
+    version: "herdr-app 0.1.12, akrogon release 49ff7389"
+    date: '2026-11-03'
+    result: "exit 0, ~370 ms, every registered repo listed, 1 KB output"
+    cleanup: "session deleted"
+    limits: "--json did not exist yet; output size grows with leaves"
+    record: issues/chart/herdr-panels/forks/needs-you.md
+  - operation: "knownAgents() from a mod"
+    command: "knownAgents()"
+    identity: "local user ivan"
+    target: "throwaway session probe4"
+    version: "herdr-app 0.1.12"
+    date: '2026-11-03'
+    result: "claude, codex, pi, antigravity (run agy) returned with icons"
+    cleanup: "session deleted"
+    limits: "setShared cross-mod read and TextView.markdown render not observed"
+    record: issues/chart/herdr-panels/forks/look.md

@@ -1,0 +1,2 @@
+#!/bin/bash
+sleep 1; printf '\033]7501;state=idle\033\\'; exec sleep 100000

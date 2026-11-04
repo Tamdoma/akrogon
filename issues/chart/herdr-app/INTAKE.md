@@ -91,6 +91,18 @@ Agent findings from doing it by hand in herdr-app, 2026-11-03 (chart door t15, c
 - Starting consultants without the labels (as plain `hc` children) and then placing each with `terminal.keep` in order avoids the park step.
 - A sub-agent that gets its own pane was listed twice in the Agents sidebar: once on its own and once under its parent. Fixed 2026-11-03 in the operator's `agents-by-tab` mod (omarchy-customizations), which now drops a row whose parent is also listed.
 
+Agent finding, 2026-11-03 (framework chart door t5, herdr-app session infra): the rule above did not say when the panes appear. That door started `fw-slot-b` (codex) and `fw-slot-c` (pi) as plain `hc` children and left them without panes for the whole autopilot pass, so the operator could not watch them. Placing them later worked: `pane.focus --terminal t5`, `terminal.keep --terminal t3b --place right`, wait until `herdr-app ls` shows it, `pane.focus --terminal t3b`, `terminal.keep --terminal t3c --place down`, wait again, then focus A.
+
+Operator words, 2026-11-03, framework door pane t5, after asking for this placement: "if this wasn't clear from the akrogon issue, update that intake.md (herdr-app) so it contains this layout for charting (visible agent panes)."
+
+The rule, added to the layout rule above: the door gives every consultant its pane as soon as it starts it, and again after a restart, so the operator can see every agent pane from the first exchange to the end of the chart. A consultant never runs headless during charting.
+
+Recurrence, 2026-11-03 (akrogon chart door t15, chart `tasks-hierarchy`): the door restarted its consultants as plain `hc` children (`slot-b` t3m codex, `slot-c` t3n claude Fable 5.1) with their first task in `hc run --bg`, and gave them no panes. The operator asked "where are those agents? I don't see them anywhere here in the UI." Placing them afterwards worked as above: `terminal.keep --terminal t3m --place right`, then `terminal.keep --terminal t3n --place down` (focus had moved to t3m, so C stacked under B).
+
+Operator words, 2026-11-03, akrogon door pane t15: "They should never be without their own panes. Make sure to update the herdr-app issue (intake.md file) if this hasn't been already mentioned."
+
+The rule, widened: every agent terminal akrogon starts in herdr-app (chart consultants, direct-route reviewers, leaf slots, any `hc run` of an agent) gets its own visible pane in the same step that starts it, and again after any restart. No agent runs without a pane at any time, in charting or outside it. The start helper owns this, so it cannot be skipped by a door that forgets.
+
 ## Consultant names (added 2026-11-03)
 Operator words, 2026-11-03: "Also, the names for those consultants should be "slot-b", "slot-c" and "slot-d" for the charting process. Just put it into the intake, so we don't forget that, and apply immediately."
 
@@ -99,6 +111,16 @@ The rule: chart consultants run under the `hc` names `slot-b`, `slot-c`, `slot-d
 Agent finding, 2026-11-03: the stored tab tree (`~/.local/state/herdr-core/<session>/docs.json`, `herdr-app` document) keeps a column's children as one n-ary list with `size.weight` per pane. After a hand drag the three consultants read 0.68 / 0.68 / 0.64, so equal shares are representable. No command sets them.
 
 Agent finding, 2026-11-03: `hc` has no rename. A live terminal's name is fixed at `hc run --name`, so changing it means kill and restart (`hc label` sets labels only).
+
+Agent finding, 2026-11-03 (framework chart door t5, herdr-app session infra): `hc` names are unique across one hc session, not per parent. With the akrogon door t15 holding `slot-b` and `slot-c` live, `hc run --name slot-b` from the framework door failed `name_taken: a live terminal is already named "slot-b"`. That door ran its consultants as `fw-slot-b` and `fw-slot-c` instead.
+
+Operator words, 2026-11-03, framework door pane t5: "OK, Make sure to create that pattern inside of the intake.md file after we chart out the entire process. Having those two initial repo letters is a good pattern. Put it in there for later charting"
+
+The rule, replacing the bare `slot-<letter>` names above: chart consultants run under `<repo prefix>-slot-<letter>`, where the prefix is two lowercase letters for the door's repo (`fw-slot-b` for framework). Two doors in one hc session then never collide. A restart reuses the same name.
+
+Operator words, 2026-11-03, akrogon door pane t15, after the door restarted its consultants as bare `slot-b` and `slot-c` for chart `tasks-hierarchy`: "also, that file should mention that the names for the charting process have the initials of the name of the repo. like ak-slot-b, ak-slot-c because they can't be duplicate names if we're doing multiple charts across different spaces (repos) in the same session."
+
+So for akrogon the consultants are `ak-slot-b`, `ak-slot-c`, `ak-slot-d`; for framework `fw-slot-b`, and so on. The start helper builds the name from the door's repo, so a door cannot start a bare `slot-<letter>`.
 
 ## Chart work lives in the chart folder from the start (added 2026-11-03)
 Operator words, 2026-11-03, after a consultant's report arrived as `<hc from="t2k chart-b">done B: /tmp/claude-1000/-home-ivan-Work-infra-akrogon/<session>/scratchpad/map/map-B.md</hc>`: "the work needs to be written in a proper folder, according to the current akrogon rules, not randomly like this into the tmp folder. As I'm giving you these instructions, keep looking at how akrogon works today, and then fill out and update the intake.md file so we have the file up to date for later charting."
@@ -143,3 +165,7 @@ Door A = Claude in t15 (herdr-app session infra). Consultants: codex (`codex --n
 - Should consultants and slots survive their parent's terminal closing (`--outlive-parent`)?
 - What happens to install and self-update: what replaces `herdr integration install` and `herdr plugin link`? Does akrogon need to check that herdr-app and hc are installed?
 - How do tests fake `hc` and `herdr-app` once `tests/fake-herdr.ts` is gone?
+
+## Carry from tasks-hierarchy (2026-11-04)
+
+The Tasks board's row click should jump to the agent's pane (operator direction 1b in issues/chart/tasks-hierarchy/forks/direction.md: "a click jumps to the agent's pane or log"). Today akrogon records old herdr pane ids (`wA:p1WA`), which herdr-app cannot focus, so the board opens the leaf folder in Files instead. When seats run as herdr-app terminals, the producer reports the seat's herdr-app terminal and the board runs `pane.focus` (problem seat first on a Needs you row).

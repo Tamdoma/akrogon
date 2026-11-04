@@ -1,0 +1,565 @@
+{
+  "schema": 1,
+  "generated": 1793722661129,
+  "red": 0,
+  "watch": {
+    "folders": [],
+    "files": []
+  },
+  "deploy": {
+    "failed": false,
+    "attempted": null,
+    "active": "ada0dab9faca8227e320626f6f2821f9b3ee7e39",
+    "step": null,
+    "error": null
+  },
+  "run": null,
+  "kept": [],
+  "merges": [
+    {
+      "repo": "akrogon",
+      "slug": "status-json",
+      "merged": 1793722355284,
+      "total_ms": 1538385
+    },
+    {
+      "repo": "framework",
+      "slug": "unit-inventory-reconcile",
+      "merged": 1793718749581,
+      "total_ms": 4076478
+    },
+    {
+      "repo": "framework",
+      "slug": "forked-final-reply",
+      "merged": 1793718474001,
+      "total_ms": 6285220
+    },
+    {
+      "repo": "framework",
+      "slug": "dead-session-close",
+      "merged": 1793717999193,
+      "total_ms": 5804863
+    },
+    {
+      "repo": "framework",
+      "slug": "copy-decision-replay",
+      "merged": 1793717719460,
+      "total_ms": 5519525
+    }
+  ],
+  "repos": [
+    {
+      "name": "akrogon",
+      "root": "/home/ivan/Work/infra/akrogon",
+      "paused": false,
+      "error": null,
+      "unreadable": [],
+      "slow": null,
+      "unpacked": [],
+      "queue": [],
+      "kept": [
+        {
+          "path": "/proof/retained-path",
+          "reason": "proof kept reason"
+        }
+      ],
+      "charts": [],
+      "parked": [],
+      "leaves": [
+        {
+          "slug": "demo-plan",
+          "group": [
+            "pill-probe"
+          ],
+          "phase": "plan.synthesis",
+          "phase_since": null,
+          "first_prompt": 1793722361564,
+          "stopped": false,
+          "blocked_by": [],
+          "broadcast_pending": false,
+          "land": null,
+          "busy_since": {
+            "a": 1793722661129,
+            "b": null
+          },
+          "done": [],
+          "attempts": {
+            "A": 0,
+            "B": 0
+          },
+          "fix_rounds": 0,
+          "verdict": {},
+          "delivery_errors": {
+            "a": null,
+            "b": null
+          },
+          "failure": null,
+          "missing": [],
+          "worktree": "/home/ivan/.akrogon/worktrees/akrogon/tasks-mod",
+          "plan": "/home/ivan/Work/infra/akrogon/issues/open/tasks-board/tasks-mod/plan.md",
+          "red": false,
+          "seats": {
+            "a": {
+              "harness": "pi",
+              "command": "pi",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            },
+            "b": {
+              "harness": "codex",
+              "command": "codex",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            }
+          },
+          "history": [
+            "plan.synthesis"
+          ]
+        },
+        {
+          "slug": "demo-implement",
+          "group": [
+            "pill-probe"
+          ],
+          "phase": "implement",
+          "phase_since": null,
+          "first_prompt": 1793722361564,
+          "stopped": false,
+          "blocked_by": [],
+          "broadcast_pending": false,
+          "land": null,
+          "busy_since": {
+            "a": null,
+            "b": null
+          },
+          "done": [],
+          "attempts": {
+            "A": 0,
+            "B": 0
+          },
+          "fix_rounds": 0,
+          "verdict": {},
+          "delivery_errors": {
+            "a": null,
+            "b": null
+          },
+          "failure": null,
+          "missing": [],
+          "worktree": "/home/ivan/.akrogon/worktrees/akrogon/tasks-mod",
+          "plan": "/home/ivan/Work/infra/akrogon/issues/open/tasks-board/tasks-mod/plan.md",
+          "red": false,
+          "seats": {
+            "a": {
+              "harness": "pi",
+              "command": "pi",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            },
+            "b": {
+              "harness": "codex",
+              "command": "codex",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            }
+          },
+          "history": [
+            "implement"
+          ]
+        },
+        {
+          "slug": "demo-check",
+          "group": [
+            "pill-probe"
+          ],
+          "phase": "check.review",
+          "phase_since": null,
+          "first_prompt": 1793722361564,
+          "stopped": false,
+          "blocked_by": [],
+          "broadcast_pending": false,
+          "land": null,
+          "busy_since": {
+            "a": 1793722661129,
+            "b": null
+          },
+          "done": [],
+          "attempts": {
+            "A": 0,
+            "B": 0
+          },
+          "fix_rounds": 0,
+          "verdict": {},
+          "delivery_errors": {
+            "a": null,
+            "b": null
+          },
+          "failure": null,
+          "missing": [],
+          "worktree": "/home/ivan/.akrogon/worktrees/akrogon/tasks-mod",
+          "plan": "/home/ivan/Work/infra/akrogon/issues/open/tasks-board/tasks-mod/plan.md",
+          "red": false,
+          "seats": {
+            "a": {
+              "harness": "pi",
+              "command": "pi",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            },
+            "b": {
+              "harness": "codex",
+              "command": "codex",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            }
+          },
+          "history": [
+            "check.review"
+          ]
+        },
+        {
+          "slug": "demo-merge",
+          "group": [
+            "pill-probe"
+          ],
+          "phase": "merge",
+          "phase_since": null,
+          "first_prompt": 1793722361564,
+          "stopped": false,
+          "blocked_by": [],
+          "broadcast_pending": false,
+          "land": null,
+          "busy_since": {
+            "a": null,
+            "b": null
+          },
+          "done": [],
+          "attempts": {
+            "A": 0,
+            "B": 0
+          },
+          "fix_rounds": 0,
+          "verdict": {},
+          "delivery_errors": {
+            "a": null,
+            "b": null
+          },
+          "failure": null,
+          "missing": [],
+          "worktree": "/home/ivan/.akrogon/worktrees/akrogon/tasks-mod",
+          "plan": "/home/ivan/Work/infra/akrogon/issues/open/tasks-board/tasks-mod/plan.md",
+          "red": false,
+          "seats": {
+            "a": {
+              "harness": "pi",
+              "command": "pi",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            },
+            "b": {
+              "harness": "codex",
+              "command": "codex",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            }
+          },
+          "history": [
+            "merge"
+          ]
+        },
+        {
+          "slug": "demo-failed",
+          "group": [
+            "pill-probe"
+          ],
+          "phase": "failed",
+          "phase_since": null,
+          "first_prompt": 1793722361564,
+          "stopped": false,
+          "blocked_by": [],
+          "broadcast_pending": false,
+          "land": null,
+          "busy_since": {
+            "a": 1793722661129,
+            "b": null
+          },
+          "done": [],
+          "attempts": {
+            "A": 0,
+            "B": 0
+          },
+          "fix_rounds": 0,
+          "verdict": {},
+          "delivery_errors": {
+            "a": null,
+            "b": null
+          },
+          "failure": null,
+          "missing": [],
+          "worktree": "/home/ivan/.akrogon/worktrees/akrogon/tasks-mod",
+          "plan": "/home/ivan/Work/infra/akrogon/issues/open/tasks-board/tasks-mod/plan.md",
+          "red": true,
+          "seats": {
+            "a": {
+              "harness": "pi",
+              "command": "pi",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            },
+            "b": {
+              "harness": "codex",
+              "command": "codex",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            }
+          },
+          "history": [
+            "failed"
+          ]
+        },
+        {
+          "slug": "demo-parked",
+          "group": [
+            "pill-probe"
+          ],
+          "phase": "parked",
+          "phase_since": null,
+          "first_prompt": 1793722361564,
+          "stopped": false,
+          "blocked_by": [],
+          "broadcast_pending": false,
+          "land": null,
+          "busy_since": {
+            "a": null,
+            "b": null
+          },
+          "done": [],
+          "attempts": {
+            "A": 0,
+            "B": 0
+          },
+          "fix_rounds": 0,
+          "verdict": {},
+          "delivery_errors": {
+            "a": null,
+            "b": null
+          },
+          "failure": null,
+          "missing": [],
+          "worktree": "/home/ivan/.akrogon/worktrees/akrogon/tasks-mod",
+          "plan": "/home/ivan/Work/infra/akrogon/issues/open/tasks-board/tasks-mod/plan.md",
+          "red": false,
+          "seats": {
+            "a": {
+              "harness": "pi",
+              "command": "pi",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            },
+            "b": {
+              "harness": "codex",
+              "command": "codex",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            }
+          },
+          "history": [
+            "parked"
+          ]
+        },
+        {
+          "slug": "demo-stopped",
+          "group": [
+            "pill-probe"
+          ],
+          "phase": "stopped",
+          "phase_since": null,
+          "first_prompt": 1793722361564,
+          "stopped": true,
+          "blocked_by": [],
+          "broadcast_pending": false,
+          "land": null,
+          "busy_since": {
+            "a": 1793722661129,
+            "b": null
+          },
+          "done": [],
+          "attempts": {
+            "A": 0,
+            "B": 0
+          },
+          "fix_rounds": 0,
+          "verdict": {},
+          "delivery_errors": {
+            "a": null,
+            "b": null
+          },
+          "failure": null,
+          "missing": [],
+          "worktree": "/home/ivan/.akrogon/worktrees/akrogon/tasks-mod",
+          "plan": "/home/ivan/Work/infra/akrogon/issues/open/tasks-board/tasks-mod/plan.md",
+          "red": false,
+          "seats": {
+            "a": {
+              "harness": "pi",
+              "command": "pi",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            },
+            "b": {
+              "harness": "codex",
+              "command": "codex",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            }
+          },
+          "history": [
+            "stopped"
+          ]
+        },
+        {
+          "slug": "demo-paused",
+          "group": [
+            "pill-probe"
+          ],
+          "phase": "paused",
+          "phase_since": null,
+          "first_prompt": 1793722361564,
+          "stopped": false,
+          "blocked_by": [],
+          "broadcast_pending": false,
+          "land": null,
+          "busy_since": {
+            "a": null,
+            "b": null
+          },
+          "done": [],
+          "attempts": {
+            "A": 0,
+            "B": 0
+          },
+          "fix_rounds": 0,
+          "verdict": {},
+          "delivery_errors": {
+            "a": null,
+            "b": null
+          },
+          "failure": null,
+          "missing": [],
+          "worktree": "/home/ivan/.akrogon/worktrees/akrogon/tasks-mod",
+          "plan": "/home/ivan/Work/infra/akrogon/issues/open/tasks-board/tasks-mod/plan.md",
+          "red": false,
+          "seats": {
+            "a": {
+              "harness": "pi",
+              "command": "pi",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            },
+            "b": {
+              "harness": "codex",
+              "command": "codex",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            }
+          },
+          "history": [
+            "paused"
+          ]
+        },
+        {
+          "slug": "demo-merged",
+          "group": [
+            "pill-probe"
+          ],
+          "phase": "merged",
+          "phase_since": null,
+          "first_prompt": 1793722361564,
+          "stopped": false,
+          "blocked_by": [],
+          "broadcast_pending": false,
+          "land": null,
+          "busy_since": {
+            "a": 1793722661129,
+            "b": null
+          },
+          "done": [],
+          "attempts": {
+            "A": 0,
+            "B": 0
+          },
+          "fix_rounds": 0,
+          "verdict": {},
+          "delivery_errors": {
+            "a": null,
+            "b": null
+          },
+          "failure": null,
+          "missing": [],
+          "worktree": "/home/ivan/.akrogon/worktrees/akrogon/tasks-mod",
+          "plan": "/home/ivan/Work/infra/akrogon/issues/open/tasks-board/tasks-mod/plan.md",
+          "red": false,
+          "seats": {
+            "a": {
+              "harness": "pi",
+              "command": "pi",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            },
+            "b": {
+              "harness": "codex",
+              "command": "codex",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            }
+          },
+          "history": [
+            "merged"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "paused-repo",
+      "root": "/home/ivan/Work/infra/akrogon",
+      "paused": true,
+      "error": null,
+      "unreadable": [],
+      "slow": null,
+      "unpacked": [],
+      "queue": [],
+      "kept": [],
+      "charts": [],
+      "parked": [],
+      "leaves": [
+        {
+          "slug": "paused-repo-leaf",
+          "group": [
+            "tasks-board"
+          ],
+          "phase": "plan.synthesis",
+          "phase_since": null,
+          "first_prompt": 1793722361564,
+          "stopped": false,
+          "blocked_by": [],
+          "broadcast_pending": false,
+          "land": null,
+          "busy_since": {
+            "a": 1793722361559,
+            "b": null
+          },
+          "done": [],
+          "attempts": {
+            "A": 0,
+            "B": 0
+          },
+          "fix_rounds": 0,
+          "verdict": {},
+          "delivery_errors": {
+            "a": null,
+            "b": null
+          },
+          "failure": null,
+          "missing": [],
+          "worktree": "/home/ivan/.akrogon/worktrees/akrogon/tasks-mod",
+          "plan": "/home/ivan/Work/infra/akrogon/issues/open/tasks-board/tasks-mod/plan.md",
+          "red": false,
+          "seats": {
+            "a": {
+              "harness": "pi",
+              "command": "pi",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            },
+            "b": {
+              "harness": "codex",
+              "command": "codex",
+              "source": "/home/ivan/.akrogon/config.yaml"
+            }
+          },
+          "history": []
+        }
+      ]
+    }
+  ]
+}

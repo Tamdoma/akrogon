@@ -1,0 +1,36 @@
+mode = "dark"
+
+# Sage and warm beige are the anchors; terracotta is the secondary accent.
+accent = "#A3B18A"
+selection = "#3C4839"
+muted = "#687061"
+
+background = "#1F241E"
+dark_background = "#191D18"
+darker_background = "#121510"
+lighter_background = "#2A3028"
+
+foreground = "#E8DFC9"
+dark_foreground = "#737A6B"
+light_foreground = "#C9C3AF"
+bright_foreground = "#F4EBD8"
+
+red = "#D47C61"
+yellow = "#D6AE64"
+orange = "#C97A4F"
+green = "#A3B18A"
+cyan = "#8FB9A8"
+blue = "#7F9AA8"
+magenta = "#B98E91"
+brown = "#9B6B4F"
+
+bright_red = "#E09176"
+bright_yellow = "#E2C17D"
+bright_green = "#BAC6A4"
+bright_cyan = "#A7CCBC"
+bright_blue = "#9AB2BE"
+bright_magenta = "#CDA5A7"
+
+# Used by Hyprland, shell cards, launcher, lock screen and notifications.
+hyprland_active_border = "#C3D1A8 #E58B64 45deg"
+hyprland_inactive_border = "#3E463B"

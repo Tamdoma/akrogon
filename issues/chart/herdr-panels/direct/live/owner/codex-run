@@ -1,0 +1,2 @@
+#!/bin/bash
+printf "\033]7501;state=idle\033\\"; exec /home/ivan/Work/infra/akrogon/issues/chart/herdr-panels/direct/live/owner/bin/codex 100000

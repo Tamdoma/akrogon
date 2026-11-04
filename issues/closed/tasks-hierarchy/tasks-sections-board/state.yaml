@@ -1,0 +1,40 @@
+slug: tasks-sections-board
+phase: merged
+created: 2026-11-04
+repo: akrogon
+blocked-by:
+  - status-attention-facts
+sources: []
+busy_since:
+  B: 2026-11-04T00:04:58.668Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tFM
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pY8
+  B: w8:pY9
+prompted:
+  B: 01a1a3d7-61be-7c63-bce5-6d146284d619
+prompted_at:
+  B: 2026-11-04T00:04:58.668Z
+delivery_error: {}
+merge_stamp: 2026-11-04T00:04:54.156Z
+broadcast:
+  kind: issue
+  name: tasks-hierarchy
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/tasks-hierarchy
+  pushed: 19998b35d786dd01181a730e47cb1ca56d17b06e
+  sources: []
+frozen:
+  herdr-app/tasks/model.d.ts: 8ef81f450199b0f15f5d2e995734b37ed6443afb
+  tests/fixtures/status-envelope.json: acd2c6951aa3e1aeeb763215c0b2ecafecbee94a
+  tests/tasks-mod-host.test.ts: f9b4dbe8f85d278786db7ffec9646193feb7d31c
+  tests/tasks-mod.test.ts: 26c5a9e23ea299d2a1c10e90d960de6a7015f46e
+frozen_cited: []

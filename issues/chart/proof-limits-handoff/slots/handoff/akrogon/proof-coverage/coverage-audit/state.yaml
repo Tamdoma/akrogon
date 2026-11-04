@@ -1,0 +1,7 @@
+slug: coverage-audit
+phase: plan.synthesis
+created: '2026-11-04'
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#127"

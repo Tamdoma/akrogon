@@ -1,0 +1,27 @@
+slug: status-attention-facts
+phase: merged
+created: 2026-11-04
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFK
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pY6
+  B: w8:pY7
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-03T23:42:21.917Z
+frozen:
+  tests/status-json.test.ts: 46bcca7f946ef17076335337034c54149adef1b8
+frozen_cited: []

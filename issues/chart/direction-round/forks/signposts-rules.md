@@ -1,0 +1,33 @@
+# Fork: signposts-rules
+
+## Question
+
+How the signposts step works in the door: what a session is, where the record lives and how corrections reach it, how the mode is read, what happens to unanswered questions, conflicts, A's signposts under full autopilot, the round's shape and position, usage, tests and docs.
+
+## Findings
+
+Notes: slots/map-A.md, map-B.md, map-C.md; merged slots/map-merged.md; rebuttals slots/map-rebuttal-B.md, map-rebuttal-C.md; direction answers and operator corrections in forks/direction.md.
+- better-than-training · `skills/chart-issues/SKILL.md` Open, Drain ("a presented round or handoff review is not such a wait"), Take, Autopilot (mode stays on across pass end; "The door never ... extends the handed list"), Handover (instructions carried verbatim), read 2026-11-04 (A,B,C).
+- better-than-training · `assets/questions.md` ("Every round uses this shape", omitted material answers stay open, corrections vs conflicts), read 2026-11-04 (A,B,C).
+- better-than-training · `tests/docs-links.test.ts` (link and presence checks), `tests/chart-shapes.test.ts` (readiness example), `scripts/chart-usage.ts` (operator turns in spans) (B,C).
+- precedent · `issues/closed/fork-rounds/fork-per-round/brief.md`: skill-text leaves name the sentences changed and prove with `bun test` (A).
+
+## Taken
+
+A's pick under autopilot (2026-11-04), not operator words. Steered by the operator's main intent and corrections (forks/direction.md).
+
+1. Position: the signposts round runs at Open after intake import and the consultant restart, before any map; consultants add missed angles in one exchange first; every map brief carries the answers (A,B,C). Under autopilot (operator answers the signposts) it is a presented round, not a wait: no chart parks on it and no chart work starts before it is answered (C).
+2. Session: the logical door session, from the operator's first message until the operator starts a new door run; it survives pass end while autopilot waits, replies, compaction and same-session or fresh-A handovers; none of these asks again (B, A, C). A chart resumed in a later door run gets that run's signposts; reusing a chart folder never selects another run's (B).
+3. Mode from the operator's words with their scope, judged, recorded verbatim in the mode line: manual, autopilot, or full autopilot ("autopilot signposts"). Words that delegate only the signposts while the operator keeps the forks match none of the three modes; the door asks which mode is meant (B F3, C leaf review 6). No fixed phrase (A,B,C).
+4. Record: `forks/signposts.md` in the chart where the round ran is the original and authoritative; every other chart of the session gets a verbatim copy at folder creation naming the original, including folders old A creates at a handover (an exception to the handover rule that old A creates only CHART.md, B and C leaf reviews). Every copy keeps the fork shape with the reply under `## Taken`, so `akrogon status --charts` (src/status.ts chartRow) counts it taken (C leaf review 4). A correction is appended to the original with its date and then copied to every open chart of the session; map briefs name the original (B F2 correction behavior, C copy). Rejected: links only (B): the fork-answer refusal, resume and pack would need a new path. Standing dissent: B prefers one record with links.
+5. Unanswered: in manual mode a material signposts question stays open until the operator answers it or removes it as immaterial, and is asked again before the first fork round (B F4). In autopilot the operator answers the signposts once (operator: "I do them only once"): an unanswered question is recorded as unanswered and the built-in values fill that gap; it is not asked again (C leaf review 1). Under full autopilot A answers it.
+6. Corrections and conflicts: an explicit operator correction is recorded with its scope without re-asking (B F6). An unresolved conflict between operator statements about the signposts is shown in one line and asked, in every mode, because the signposts are the operator's in manual and autopilot (C leaf review 2); under full autopilot A resolves it and labels it. An unresolved conflict about a fork becomes a fork answered per mode. Approvals stay operator-only.
+7. Full autopilot: A's signposts are echoed in the first reply and the run continues; recorded as `signposts: A` in `## Autopilot`, never as operator values (B,C). They may order the handed charts but never drop one; a drop A would make is recorded only, for the operator (C, SKILL.md Autopilot).
+8. Content: ranked priorities, hard limits, order or drop of the session's charts (the order feeds Drain's selection as the operator-named order; a dropped chart or seed is not charted this session and is listed as dropped in the original `forks/signposts.md`, seeds staying seeds, C leaf review 5); 4–7 questions, each one changing several picks across the session's charts where evidence cannot settle it; drawn from the intakes; no seed list in the skill (A,C; direction 1a revised).
+9. Shape: questions.md names the signposts round as the light exception to the round shape: question, 2–3 options, recommendation, what it steers; reply key and challenge check kept; no research line (B,C). After the answers, one short account of what the session will prioritize and give up (direction B-G4).
+10. Autopilot pick rule: "by the evidence, the session's signposts, and where they are silent the operator's values: simplicity, function over form, removing over adding, systems thinking, speed and price"; a recommendation names the signpost when it decides the pick (A,B,C).
+11. Previous signposts: at Open the latest earlier signposts on the same repo are offered as proposed answers; "same" or change (A's pick of C-G5).
+12. Direct single item first in a session pays the round (A,C). The rule applies to door sessions opened after it lands (C).
+13. Usage: `chart-usage.ts` unchanged; the first chart's first span covers the round (B,C).
+14. Tests: no new prose-string test (B F5; function over form); `bun test` including `tests/docs-links.test.ts` passes; a shapes example is parsed only if one is added (B,C). Rejected: string-presence test for "signposts" in SKILL.md sections (C): it cannot show the step works.
+15. Docs: `skills/AREA.md` if it describes the door's order, and the `docs/` pages that describe the door's order or autopilot: `docs/use/plan-work.md`, `docs/use/autopilot.md`, `docs/reference/words.md` (Autopilot entry and a new Signposts entry), `docs/start/what-it-is.md`, `docs/use/a-working-day.md` (B, C leaf reviews; README has no chart-issues row).

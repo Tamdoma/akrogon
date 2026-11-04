@@ -1,0 +1,29 @@
+slug: status-json
+phase: merged
+created: 2026-11-03
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFH
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pY2
+  B: w8:pY3
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-03T16:12:32.109Z
+frozen:
+  tests/status-fixture.ts: cffc696f2fcac6969fd7f590d2187f456b303a93
+  tests/status-json.test.ts: 25fdcaab6ba8345a045ab16109211ebd7662981b
+  tests/status.test.ts: a1d53b760093735381b36ff0eb8b5fd76c677a65
+frozen_cited: []
