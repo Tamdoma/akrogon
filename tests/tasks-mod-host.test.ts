@@ -201,6 +201,41 @@ assert.equal(view.row(parked, t).handlers.click, undefined);
   );
 });
 
+test('the chevron hit area spans both row lines at each font size without pinning', async () => {
+  await command(
+    [
+      process.execPath,
+      '-e',
+      host +
+        `
+for (const size of [13, 26]) {
+  fontSize = size;
+  view.render(cx);
+  view.expanded.clear();
+  sharedState.clear();
+  const row = leafRows(view.model).find(r => r.repo === 'akrogon' && r.slug === 'tasks-mod');
+  const rendered = view.row(row, t);
+  const chevron = rendered.nodes.find(n => n.attrs.id === 'chev-akrogon/tasks-mod');
+  assert(chevron, 'the disclosure target must span the row rather than sit inside line 1');
+  assert('relative' in rendered.attrs);
+  assert('absolute' in chevron.attrs);
+  assert.equal(chevron.attrs.top, 0);
+  assert.equal(chevron.attrs.bottom, 0);
+  assert.equal(chevron.attrs.w, 24);
+  assert.equal(chevron.attrs.h, undefined);
+  let stopped = 0;
+  chevron.handlers.click({}, { ...cx, stop_propagation() { stopped += 1; } });
+  assert.equal(stopped, 1);
+  assert(view.expanded.has('akrogon/tasks-mod'));
+  assert.equal(sharedState.get('worktree.pin'), undefined);
+  assert.equal(sharedState.get('panel.request'), undefined);
+}
+`,
+    ],
+    root,
+  );
+});
+
 test('the expansion shows the reason whole, blockers, missing steps, last 3 moves, Files and Changes buttons and kept, and nothing else', async () => {
   await command(
     [
