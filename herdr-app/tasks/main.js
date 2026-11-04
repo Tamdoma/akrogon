@@ -244,29 +244,30 @@ export default class Tasks extends View {
     const fill = props()?.fill;
     const key = `${row.repo}/${row.slug}`;
     const open = props()?.expand === true || this.expanded.has(key);
-    const head = v_flex().id(`task-${key}`).flex_none().w_full().px(8).py(4).gap(4)
+    const head = v_flex().id(`task-${key}`).relative().flex_none().w_full().px(8).py(4).gap(4)
       .rounded(6)
       .when(!row.parked, (el) => el.cursor_pointer().on_click((_e, cx) => this.pinFolder(row.folder, "files")))
       .hover((s) => s.bg(t.hover))
       .when(fill === "hover" && !open, (el) => el.bg(t.hover))
       .child(
-        h_flex().h(S(20)).items_center().gap(8).min_w(0)
+        h_flex().h(S(20)).items_center().gap(8).min_w(0).when(!row.parked, (el) => el.pr(32))
           .child(div().flex_none().text_size(S(13)).text_color(t.dim).child(row.repo))
           .child(div().flex_1().min_w(0).truncate().text_size(S(13)).text_color(t.foreground).child(row.slug))
           .child(seatIcons(row.seats, t))
-          .when(!row.parked, (el) => el.child(
-            div().id(`chev-${key}`).w(24).h(S(20)).flex_none().cursor_pointer().flex().items_center().justify_center()
-              .on_click((_e, cx) => { cx.stop_propagation(); this.toggle(key, cx); })
-              .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none().text_color(t.dim))
-          ))
       )
       .child(
-        h_flex().items_center().gap(8).min_w(0)
+        h_flex().items_center().gap(8).min_w(0).when(!row.parked, (el) => el.pr(32))
           .when(row.phase !== "", (el) => el.child(div().flex_none().text_size(S(11)).text_color(t.dim).child(row.phase)))
           .when(row.reason !== "", (el) => el.child(div().min_w(0).truncate().text_size(S(11)).text_color(row.reasonRed ? t.ansi1 : t.muted).child(row.reason)))
           .when(row.time !== "", (el) => el.child(div().flex_none().text_size(S(11)).text_color(t.dim).child(`· ${row.time}`)))
           .when(row.blocks > 0, (el) => el.child(div().flex_none().text_size(S(11)).text_color(t.dim).child(`· blocks ${row.blocks}`)))
-      );
+      )
+      .when(!row.parked, (el) => el.child(
+        div().id(`chev-${key}`).absolute().right(8).top(0).bottom(0).w(24).pt(4).cursor_pointer().flex().items_start().justify_center()
+          .on_click((_e, cx) => { cx.stop_propagation(); this.toggle(key, cx); })
+          .child(div().h(S(20)).flex().items_center()
+            .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none().text_color(t.dim)))
+      ));
     if (!open || row.parked) return head;
     const d = row.detail;
     const detail = v_flex().pt(2).pb(4).gap(4).text_size(S(11)).text_color(t.muted).min_w(0);
