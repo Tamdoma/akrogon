@@ -13,7 +13,7 @@ Chart consultants are different from seats A and B. A consultant is a peer pane 
 
 ## chart-issues
 
-- **Result:** charts of open questions (forks) turned into settled leaf contracts in a registered repository. A small settled chart can instead take the direct route: the door builds it in a worktree, seat B reviews, and the door lands it without leaf files.
+- **Result:** charts of open questions (forks) turned into settled leaf contracts in a registered repository. One signposts round opens the session and sets its direction, then three modes — manual, autopilot and full autopilot — set who answers the signposts and the forks. A small settled chart can instead take the direct route: the door builds it in a worktree, seat B reviews, and the door lands it without leaf files.
 - **When to use:** you have notes, reports or seeds and need to decide what to build before any code is written.
 - **Who starts it:** you. It is operator-invoked only. It asks you questions in chat. Autopilot runs only when you switch it on in words.
 - **Source:** [`skills/chart-issues/SKILL.md`](../../skills/chart-issues/SKILL.md)

@@ -14,12 +14,12 @@ This page lists what Akrogon does not do for you, and the work that stays yours.
 - It does not dispatch a leaf with a missing input. `akrogon next` refuses it until the need is supplied.
 - It does not dispatch in a paused repository on automatic passes. A manual `akrogon next` still works there. See [src/pause.ts](../../src/pause.ts).
 - It does not park an issue that has a running leaf, or a set of issues that would leave an open leaf waiting on a leaf that is no longer reachable. See [src/park.ts](../../src/park.ts).
-- It does not decide product questions or approve anything for you. Seats record an action only you can take and stop the leaf on it, instead of guessing. See [check-issue](../../skills/check-issue/SKILL.md).
+- It does not approve anything for you, and outside a chart door running autopilot it does not decide product questions: seats record an action only you can take and stop the leaf on it, instead of guessing. Under autopilot the door's seat A answers its own forks — see [Autopilot](../use/autopilot.md). See [check-issue](../../skills/check-issue/SKILL.md).
 - It does not run the operator-only skills by itself. [chart-issues](../../skills/chart-issues/SKILL.md), [learn-issues](../../skills/learn-issues/SKILL.md) and [watch-issues](../../skills/watch-issues/SKILL.md) start only when you start them.
 
 ## What stays your job
 
-- Choose the work. You open the chart door, answer each fork and approve the handoff. A recommendation cannot stand in for your answer. See [chart-issues](../../skills/chart-issues/SKILL.md).
+- Choose the work. You open the chart door and approve the handoff. [Who answers each fork depends on the mode](../use/autopilot.md), and approvals stay yours in every mode; a recommendation cannot stand in for your approval. See [chart-issues](../../skills/chart-issues/SKILL.md).
 - Keep contracts correct. Review checks the diff against the contract. It cannot add a requirement the contract left out. If you approve the wrong columns for a CSV export, a correct build of those columns is still wrong.
 - Supply needs and credentials. The chart door lists every key, file and approval a leaf needs. You create missing outside-account keys and give approvals, including grant and secret-save approvals.
 - Do the operator actions a review names. When a fix needs a permission, token scope or live change that only you can grant, the review seat writes the exact action under `Operator actions` in its review file. The leaf stops as failed once the other fixes are done.
