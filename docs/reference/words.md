@@ -2,7 +2,7 @@
 
 One line per term. Each term links to the page that explains it.
 
-- **[Autopilot](../use/autopilot.md)**: a chart door mode where seat A answers its own forks for a fixed list of work, then hands off. It starts no execution.
+- **[Autopilot](../use/autopilot.md)**: a chart door mode where you answer the session's signposts once and seat A answers its own forks for a fixed list of work, then hands off. Under full autopilot ("autopilot signposts") A answers the signposts too. It starts no execution.
 - **[Chart](../use/plan-work.md#open-a-chart)**: a folder under `issues/chart/` where the door and you settle a request, one fork per open question.
 - **[Chart door](../use/plan-work.md#open-a-chart)**: the agent pane where you run `/chart-issues`. It is called A, asks you one fork per round and writes the leaves.
 - **[Check](checks.md)**: a named command under `checks` in `issues/config.yaml`, such as `test: npm test`. A red check stops a leaf from moving to review and from landing.
@@ -26,6 +26,7 @@ One line per term. Each term links to the page that explains it.
 - **[Seat A and seat B](../start/why-it-works.md#build-and-review-are-separate-seats)**: the two agent roles that work a leaf. A plans and builds, both review, and B repairs most findings and takes over landing when it needs a seat.
 - **[Seed](../use/report-an-observation.md#bring-reports-into-your-checkout)**: an imported GitHub issue in `issues/seeds/`, written by `akrogon pull`. It is unverified and not ready to run.
 - **[Slot](config.md)**: the name the settings and commands use for a seat, as in the `slots` key and `akrogon phase --slot A`.
+- **[Signposts](../use/plan-work.md#set-the-signposts)**: the one round that opens a chart door session and sets its direction — ranked priorities, hard limits and the order or drop of the session's charts — steering every map and later pick. Answered per the mode: by you in manual and autopilot, by A under full autopilot.
 - **[Stop](../use/park-pause-stop.md#stop-a-leaf)**: mark a leaf stopped and end every process its seats started. `akrogon start` clears the mark.
 - **[Sync](../use/save-records.md)**: `akrogon sync` commits the records under `issues/`, rebases and pushes them on the default branch.
 - **[Verify](checks.md#prove-a-commit-with-akrogon-verify)**: `akrogon verify` runs every check on a fresh checkout of a commit and writes a receipt. Moves into review and landing need a green one.

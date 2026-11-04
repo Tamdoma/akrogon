@@ -27,6 +27,12 @@ Chart consultants are helper panes (B, C, D and so on) that give A independent v
 
 Charts live in `issues/chart/<slug>/`. `CHART.md` lists what is settled, the open forks in the order they will be taken, the fog and what is off route. `INTAKE.md` keeps your original words apart from the agent's findings. Each fork has its own file under `forks/`. `akrogon status --charts` lists your charts.
 
+## Set the signposts
+
+The door's first questions are the signposts: one round, once per door session, covering every chart in it. They set the session's direction — the priorities in order, hard limits, and the order or drop of its charts. Your answers steer the territory map and every later pick, and the door records them in `forks/signposts.md`. If an earlier session on the same repo left signposts, the door offers them as the proposed answers: reply "same" or change them.
+
+Who answers them depends on the mode. In the default manual mode you answer the signposts and every fork. Under autopilot you answer the signposts once and A answers every fork after. Under full autopilot — "autopilot signposts" — A answers both. A material signposts question you leave unanswered in manual mode is asked again before the first fork.
+
 ## Read the territory map
 
 Before asking anything, the door shows a map of the ground: the code it touches, the open choices, the risks and pitfalls. It inspects the live code, so the map can remove work you thought you needed or show that the job is really two jobs.
@@ -34,6 +40,8 @@ Before asking anything, the door shows a map of the ground: the code it touches,
 ## Answer one fork per round
 
 ![The chart door: A and each consultant write blind notes, A merges them, consultants rebut, then you answer one fork per round until the handoff review.](../pictures/chart-door.svg)
+
+The picture shows the per-chart exchange; the signposts round above runs once before any map.
 
 A fork is a question sharp enough to answer, for example "all rows or only the filtered rows?". Each round brings one fork with its options, a recommendation and its reason, and the research behind it. Pick an option or answer in your own words. Your answer and reason go into the fork file.
 

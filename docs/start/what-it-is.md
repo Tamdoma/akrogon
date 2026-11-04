@@ -9,7 +9,7 @@ You decide what to build and when to start it. Akrogon keeps track of where each
 ## From request to merged
 
 1. You start with a request. It can be a note you type, or a GitHub issue you copy into your project with `akrogon pull`.
-2. You open the chart door by running `/chart-issues` in an agent. The door asks you one open question per round until nothing is left to guess.
+2. You open the chart door by running `/chart-issues` in an agent. One signposts round sets the session's direction before the door maps the territory, then the door asks you one open question per round until nothing is left to guess.
 3. The door writes the settled work as one or more leaves under `issues/open/`. Each leaf is a written contract: what to build, why, and how to tell it is done.
 4. You run `akrogon next`. It gives the leaf its own worktree and starts two agent seats, A and B, side by side in Herdr.
 5. The seats plan the work. Seat A builds it.

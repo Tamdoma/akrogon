@@ -8,6 +8,8 @@ It is one of the ways to run work shown in [Plan work](plan-work.md). The full m
 
 Autopilot needs Herdr. Outside Herdr the door says it cannot start.
 
+Three modes exist. In the default manual mode you answer the signposts and every fork. Under autopilot you answer the signposts once, for the whole session, and A answers every fork after. Under full autopilot — "autopilot signposts" — A answers the signposts and every fork. If your words hand over only the signposts while you keep the forks, that matches no mode, so the door asks which you meant.
+
 In the chart door's own pane, say it in plain words. Name autopilot, the work you are handing it, and the chart consultants to use, or none:
 
 ```text
@@ -20,7 +22,9 @@ The door's first reply repeats the mode, the handed work and the consultants. Af
 
 ## What the door does
 
-The door runs every normal charting step. Where it would ask you, seat A writes the full question in its pane and answers it itself. It picks by your standing values: simplicity, function over form, removing over adding, systems thinking, speed and price. Each pick is recorded as A's, with its reason and the rejected options, never as your words.
+The door runs every normal charting step. Under autopilot the signposts round is shown to you and waits for your one answer; under full autopilot A answers it, echoes its picks in the first reply, and records them as A's — it may order the charts you handed it but never drop one.
+
+Where it would ask you a fork, seat A writes the full question in its pane and answers it itself. It picks by the evidence, the session's signposts, and where they are silent your standing values: simplicity, function over form, removing over adding, systems thinking, speed and price. A recommendation names the signpost that decided it. Each pick is recorded as A's, with its reason and the rejected options, never as your words.
 
 Chart consultants are the helper panes (B, C, D and so on) that give A a second view while it charts. They are not the seats A and B that later work on a leaf. A consultant that fails or stops answering is dropped for the rest of the session.
 
@@ -44,11 +48,11 @@ The mode ends on its own when every handed chart is handed off or closed. Only y
 
 Handed-off leaves do not start by themselves. They start when you run `akrogon next`. See [Run work](run-work.md). Optional: to keep them moving while you are away, see [Watch while away](watch-while-away.md).
 
-On a long run, the door can hand itself to a fresh conversation in the same pane after a chart, so its context stays small. This works for claude, codex and pi. Other agents stay in the same conversation.
+On a long run, the door can hand itself to a fresh conversation in the same pane after a chart, so its context stays small. The fresh conversation gets the session's signposts and continues with them. This works for claude, codex and pi. Other agents stay in the same conversation.
 
 ## Read the record
 
-Each chart's `CHART.md` has an `## Autopilot` section. It lists boundary breaches first, then the switch-on words, consultants and any losses, the route, handed-off leaves, waits, new-chart proposals, and picks that went against the recommendation. The door also prints one line per chart at the end of each pass.
+Each chart's `CHART.md` has an `## Autopilot` section. It lists boundary breaches first, then the switch-on words, consultants and any losses, who answered the signposts, the route, handed-off leaves, waits, new-chart proposals, and picks that went against the recommendation. The door also prints one line per chart at the end of each pass.
 
 Read the record before you run the handed-off leaves. A wrong pick can reach main once those leaves run and merge. Do not hand the same work to two doors at the same moment.
 
