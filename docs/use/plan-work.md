@@ -43,7 +43,7 @@ Before the fork rounds, the door shows a map of the ground: the code it touches,
 
 The picture shows the per-chart exchange; the signposts round above runs once before any map.
 
-A fork is a question sharp enough to answer, for example "all rows or only the filtered rows?". Each round brings one fork with its options, a recommendation and its reason, and the research behind it. Pick an option or answer in your own words. Your answer and reason go into the fork file.
+A fork is a question sharp enough to answer, for example "all rows or only the filtered rows?". Each round brings one fork with its options, a recommendation and its reason, and the research behind it. A question whose options look different comes with a small drawing of each when the drawings make the choice much easier. Pick an option or answer in your own words. Your answer and reason go into the fork file.
 
 With consultants, each one researches the same question blind, without seeing A's or another consultant's notes. A merges the notes with tags that show who agreed, like `(A,B)`. Each consultant then names only where it disagrees, and you see that before you answer.
 
