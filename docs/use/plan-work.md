@@ -51,7 +51,7 @@ Fog is ground whose question is not clear yet, such as "exports are slow on larg
 
 ## Review the handoff
 
-Handoff waits until no fork or fog would leave an implementer guessing. Then the door shows one handoff review: the leaf tree, scope, the destination repository, your choices and each leaf's seats.
+Handoff waits until no fork or fog would leave an implementer guessing. Then the door shows one handoff review: the leaf tree, scope, the destination repository, your choices and each leaf's seats. One line per leaf lists what it relies on that already exists — an outside system's acceptance, an existing checker's verdict, existing data or recordings — with the proof that reached each, plus anything cut and where it landed.
 
 When you approve, the door writes each leaf's `brief.md`, `design.md` and `state.yaml` under `issues/open/` and marks the chart `Handed off`. With consultants, each one reviews the draft contracts as an implementer before they are written. Read each brief and check that it says clearly when the job is done.
 
