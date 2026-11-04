@@ -323,8 +323,8 @@ grants:
         absence_check: <how absence is confirmed>
     operations: [<allowed operation>]
     effects: <what the operations touch>
-    bounds: <limits on use>
-    stop_line: <never-cross condition>
+    bounds: <limits on use; each repeat bound names its unit and what consumes one in plain words, e.g. "at most 2 recorder invocations, counting every invocation that reaches a paid session, whatever its outcome"; a nested unit is its own bound>
+    stop_line: <never-cross condition; never a repeat count>
 retained:
   - resources: [<kept resource>]
     purpose: <why it is kept>
