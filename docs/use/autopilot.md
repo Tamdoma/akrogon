@@ -16,13 +16,13 @@ In the chart door's own pane, say it in plain words. Name autopilot, the work yo
 /chart-issues run autopilot on these two bug reports, consultants B
 ```
 
-You can also switch it on later in the same door, naming a chart. Answers you already gave in that chart stay yours.
+You can also switch it on later in the same door, naming a chart. Answers you already gave in that chart stay yours. If the session has no signposts yet, the signposts round runs first, before A answers anything.
 
 The door's first reply repeats the mode, the handed work and the consultants. After it reads the work, it shows a best-guess list of things to supply, such as logins, API keys or files. Each item says what it is for and where it goes.
 
 ## What the door does
 
-The door runs every normal charting step. Under autopilot the signposts round is shown to you and waits for your one answer; under full autopilot A answers it, echoes its picks in the first reply, and records them as A's — it may order the charts you handed it but never drop one.
+The door runs every normal charting step. Under autopilot the signposts round is presented and answered once — a presented round, not a chart wait, so no chart parks on it; under full autopilot A answers it, echoes its picks in the first reply, and records them as A's — it may order the charts you handed it but never drop one, and a drop it would make is recorded for you.
 
 Where it would ask you a fork, seat A writes the full question in its pane and answers it itself. It picks by the evidence, the session's signposts, and where they are silent your standing values: simplicity, function over form, removing over adding, systems thinking, speed and price. A recommendation names the signpost that decided it. Each pick is recorded as A's, with its reason and the rejected options, never as your words.
 
@@ -32,7 +32,7 @@ Every handed chart takes the lifecycle route. The direct route is not offered. T
 
 ## What still waits for you
 
-These make a chart wait while the door moves on to the next chart on the list:
+These make a chart wait while the door moves on to the next chart not waiting, in the signposts order:
 
 - Every approval, such as a live-account grant, fixture retention or saving a secret.
 - A needed new chart: when the chart finds work it cannot hand off without and that work needs its own destination, the door writes a `proposal:` line asking "chart <X> on its own (yes) or bring it into <waiting chart> (no)?". Yes adds that chart to the list you handed it; no brings the work into the waiting chart.
@@ -52,7 +52,7 @@ On a long run, the door can hand itself to a fresh conversation in the same pane
 
 ## Read the record
 
-Each chart's `CHART.md` has an `## Autopilot` section. It lists boundary breaches first, then the switch-on words, consultants and any losses, who answered the signposts, the route, handed-off leaves, waits, new-chart proposals, and picks that went against the recommendation. The door also prints one line per chart at the end of each pass.
+Each chart's `CHART.md` has an `## Autopilot` section. It lists boundary breaches first, then the switch-on words, consultants and any losses, the `signposts:` line naming who answered and the chart holding the original, the route, handed-off leaves, waits, new-chart proposals, and picks that went against the recommendation. The door also prints one line per chart at the end of each pass.
 
 Read the record before you run the handed-off leaves. A wrong pick can reach main once those leaves run and merge. Do not hand the same work to two doors at the same moment.
 

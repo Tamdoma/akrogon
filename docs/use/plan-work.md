@@ -21,17 +21,19 @@ Open an agent in your registered repository and run:
 /chart-issues Add CSV export to widgets
 ```
 
-The pane you run it in is the chart door, called A. Its first reply names the chart consultants you gave it, or says A works alone.
+The pane you run it in is the chart door, called A. Its first reply names the chart consultants you gave it, or says A works alone — and it names the mode and who answers the signposts.
 
 Chart consultants are helper panes (B, C, D and so on) that give A independent views while it charts. They are not the seats A and B that later work on a leaf. To add consultants, name their panes in your request. Inside Herdr you can ask for consultants without naming panes, and the door creates them.
 
-Charts live in `issues/chart/<slug>/`. `CHART.md` lists what is settled, the open forks in the order they will be taken, the fog and what is off route. `INTAKE.md` keeps your original words apart from the agent's findings. Each fork has its own file under `forks/`. `akrogon status --charts` lists your charts.
+Charts live in `issues/chart/<slug>/`. `CHART.md` lists what is settled, the open forks in the order they will be taken, the fog and what is off route. `INTAKE.md` keeps your original words apart from the agent's findings. Each fork has its own file under `forks/`; `forks/signposts.md` is the session's signposts record, not one of the chart's own questions. `akrogon status --charts` lists your charts.
 
 ## Set the signposts
 
-The door's first questions are the signposts: one round, once per door session, covering every chart in it. They set the session's direction — the priorities in order, hard limits, and the order or drop of its charts. Your answers steer the territory map and every later pick, and the door records them in `forks/signposts.md`. If an earlier session on the same repo left signposts, the door offers them as the proposed answers: reply "same" or change them.
+The door's first questions are the signposts: one round, once per door session, covering every chart in it. They set the session's direction — the priorities in order, hard limits, and the order or drop of its charts. Before the round, one consultant exchange adds missed angles. The round itself is light: four to seven questions, each with two or three choices, a recommendation and what it steers — which later picks across the session's charts it reshapes — and no research line. After the answers, one short account states what the session will prioritize and give up. Your answers steer the territory map and every later pick, and the door records them in `forks/signposts.md`. If an earlier session on the same repo left signposts, the door offers them as the proposed answers: reply "same" or change them.
 
-Who answers them depends on the mode. In the default manual mode you answer the signposts and every fork. Under autopilot you answer the signposts once and A answers every fork after. Under full autopilot — "autopilot signposts" — A answers both. A material signposts question you leave unanswered in manual mode is asked again before the first fork.
+A door session lasts until you start a new door run — it survives waits, compaction and handovers — and a chart resumed in a later run takes that run's signposts, never an earlier session's. The record's original sits in the chart where the round ran; every other chart of the session holds a verbatim copy naming the original. A correction is recorded on the original with its date and copied to the open charts; an unresolved conflict between your statements is shown in one line and asked. The chart order, and any drop, comes from the signposts.
+
+Who answers them depends on the mode. In the default manual mode you answer the signposts and every fork. Under autopilot you answer the signposts once and A answers every fork after. Under full autopilot — "autopilot signposts" — A answers both. A material signposts question you leave unanswered in manual mode is asked again before the first fork; under autopilot it is recorded as unanswered and not asked again, and under full autopilot A answers it. The [chart-issues](../../skills/chart-issues/SKILL.md) skill holds the rest.
 
 ## Read the territory map
 

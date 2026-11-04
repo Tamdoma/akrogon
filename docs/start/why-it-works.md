@@ -22,7 +22,7 @@ Both seats can use the same agent CLI and model. Two seats give two separate pas
 
 ## A contract comes before code
 
-A leaf starts from `brief.md` and `design.md`, which the chart door writes after you have answered every open question. The brief says what to build, why, and the done-criteria: the results that show the work is finished. The design holds the settled decisions the build must follow.
+A leaf starts from `brief.md` and `design.md`, which the chart door writes after every open question is answered — by you or, under autopilot, by seat A; see [Autopilot](../use/autopilot.md). The brief says what to build, why, and the done-criteria: the results that show the work is finished. The design holds the settled decisions the build must follow.
 
 Seats do not stop to ask you questions. Everything they need is in the contract. When a seat hits something only a person can do, such as a missing key, it stops the leaf as `failed` with the reason, and you fix it. See [When work fails](../use/when-work-fails.md).
 

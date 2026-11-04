@@ -28,7 +28,7 @@
   <text class="muted" x="160" y="130" text-anchor="middle">operator answers</text>
   <rect class="door" x="360" y="84" width="240" height="60" rx="8"/>
   <text class="name" x="480" y="109" text-anchor="middle">Autopilot chart</text>
-  <text class="muted" x="480" y="130" text-anchor="middle">door answers itself</text>
+  <text class="muted" x="480" y="130" text-anchor="middle">A answers the forks</text>
 
   <!-- Routes -->
   <rect class="side" x="40" y="234" width="240" height="60" rx="8"/>
