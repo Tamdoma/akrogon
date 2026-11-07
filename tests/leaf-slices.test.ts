@@ -502,6 +502,10 @@ test('a reconcile pass running inside a leaf slice does not stop that slice', as
     const slug: string = unique('self-leaf');
     const path: string = await dispatchLeaf(f, slug);
     sliceName = leafSlice({ name: 'repo' }, slug);
+    // A real sleeper keeps the slice occupied once the seat ends: a concurrent case's real host slice
+    // step stops an empty unknown leaf slice, which would refuse the scope started below. The pass
+    // reads the fake cgroup root, so the sleeper hides nothing from it.
+    await sleeper(f, sliceName);
     await closeTab(f, z.string().parse(readState(path).tab));
     saveState(path, { ...readState(path), phase: 'merged' });
     // Fake systemctl marks the leaf slice a stop candidate (loaded, no live tab)
