@@ -62,6 +62,9 @@ test('a phase run during the turn and the turn-end pass prompt the next idle tur
     expect(core.tasks(seat.address)).toHaveLength(1);
     writeFileSync(gate, 'go\n');
     await core.waitFor(seat.address, idleAfter(1));
+    // The implement turn is held working as well: a turn the stand-in ends without reporting is a silent
+    // stop that D13 re-prompts, so the second pass must run while the prompted turn is still open.
+    Bun.spawnSync(['mkfifo', gate]);
     // C4.1: two passes over the same idle turn send one task.
     expect((await cli(f, ['next', 'hd-turn'], f.root, core.env)).code).toBe(0);
     expect((await cli(f, ['next', 'hd-turn'], f.root, core.env)).code).toBe(0);
@@ -70,6 +73,7 @@ test('a phase run during the turn and the turn-end pass prompt the next idle tur
       `implement-issue hd-turn slot=A phase=implement leaf=${path}`,
     ]);
     expect(readState(path).prompted.A).toMatchObject({ address: seat.address });
+    writeFileSync(gate, 'go\n');
   } finally {
     await teardown(f, core, 'hd-turn');
   }
