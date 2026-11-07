@@ -3,42 +3,29 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFil
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import {
-  cli,
-  entry,
-  fixture,
-  leaf,
-  fakeHerdr,
-  holding,
-  leafTempRoot,
-  procRoot,
-  storeDir,
-  yaml,
-  type Fixture,
-} from './helpers';
+import { cli, entry, fixture, leaf, holding, leafTempRoot, procRoot, storeDir, yaml, type Fixture } from './helpers';
+import { hcCore, hcFixture, setPrefixes, type HcCore, type HcFixture } from './hc-fixture';
 import { finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import { leafSlice } from '../src/scope';
 import { globalSchema, readRepo, leafTemp, type GlobalConfig } from '../src/config';
 import { readState, saveState, type State } from '../src/state';
-import type { Database } from './fake-herdr';
 
-type SliceFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
+type SliceFixture = HcFixture;
 type Cap = { proc: Bun.Subprocess; result: Promise<SpawnResult> };
 
 test('a repo-local pass preserves another registered repo slice with a live tab', async () => {
   const f: SliceFixture = await slicesFixture();
   const other: Fixture = await fixture();
+  const otherCore: HcCore = await hcCore(other, { repo: 'other' });
   try {
     const config: GlobalConfig = globalSchema.parse(
       Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')),
     );
     yaml(resolve(f.home, 'config.yaml'), { ...config, repos: { repo: f.root, other: other.root } });
-    leaf(other, 'other-finished', 'merged', { repo: 'other', tab: 'w1:t8' });
-    saveDatabase(f, {
-      ...database(f),
-      tabs: [{ tab_id: 'w1:t8', label: 'other-finished', focused: false }],
-      panes: [{ pane_id: 'w1:p8', tab_id: 'w1:t8', cwd: null, agent: null, agent_status: 'idle' }],
-    });
+    setPrefixes(f, { repo: 'rp', other: 'ot' });
+    f.core.link(otherCore);
+    leaf(other, 'other-finished', 'merged', { repo: 'other', tab: 'akotherfinished8' });
+    await tabTerminal(otherCore, 'akotherfinished8');
     const slice: string = leafSlice({ name: 'other' }, 'other-finished');
     const cgRoot: string = resolve(f.home, 'cgroups');
     mkdirSync(resolve(cgRoot, 'other'), { recursive: true });
@@ -56,7 +43,8 @@ test('a repo-local pass preserves another registered repo slice with a live tab'
     expect(result.code, result.stderr).toBe(0);
     expect(readFileSync(log, 'utf8')).not.toContain(`stop ${slice}`);
   } finally {
-    f.clean();
+    await otherCore.stop();
+    await f.clean();
     other.clean();
   }
 });
@@ -66,7 +54,7 @@ const uid: number = process.getuid!();
 test('bad leaf ownership keeps uncertain slices without aborting failed-unit cleanup', async () => {
   const f: SliceFixture = await slicesFixture();
   try {
-    leaf(f, 'bad-state', 'merged', { repo: 'old-repo-name', tab: 'w1:t9' });
+    leaf(f, 'bad-state', 'merged', { repo: 'old-repo-name', tab: 'akbadstate9' });
     const slice: string = leafSlice({ name: 'repo' }, 'bad-state');
     const cgRoot: string = resolve(f.home, 'cgroups');
     mkdirSync(resolve(cgRoot, 'bad-state'), { recursive: true });
@@ -98,7 +86,7 @@ test('bad leaf ownership keeps uncertain slices without aborting failed-unit cle
       .parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile-host.json'), 'utf8')));
     expect(report.kept.some((entry) => entry.path === slice && entry.reason.includes('old-repo-name'))).toBe(true);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -180,50 +168,61 @@ test('a shell run admitted while another slice stops protects its own slice', as
       await pass;
     }
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 25000);
 
-async function slicesFixture(): Promise<SliceFixture> {
-  const f: Fixture = await fixture();
-  return { ...f, ...fakeHerdr(f) };
+async function slicesFixture(window: 'open' | 'closed' = 'closed'): Promise<SliceFixture> {
+  const f: HcFixture = await hcFixture({ window });
+  // The fake /proc root the fake herdr env used to set: reconcile sees no process inside a worktree or temp.
+  return { ...f, env: { ...f.env, AKROGON_PROC_ROOT: procRoot(f) } };
 }
 
-function database(f: SliceFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
+// A live terminal holding a leaf tab, as a seat of that tab would.
+async function tabTerminal(core: HcCore, tab: string): Promise<string> {
+  const run: SpawnResult = await core.hc([
+    'run',
+    '--bg',
+    '--json',
+    '--no-parent',
+    '--label',
+    `herdr.tab=${tab}`,
+    '--',
+    'cat',
+  ]);
+  expect(run.code, run.stderr).toBe(0);
+  return z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
 }
 
-function saveDatabase(f: SliceFixture, db: Database): void {
-  writeFileSync(f.db, JSON.stringify(db));
+// A tab is gone once no terminal holds it: each one is killed and removed.
+async function closeTab(f: SliceFixture, tab: string): Promise<void> {
+  for (const t of await f.core.terminals({ 'herdr.tab': tab }, true)) {
+    expect((await f.core.hc(['kill', t.address])).code).toBe(0);
+    expect((await f.core.hc(['rm', t.address])).code).toBe(0);
+  }
 }
 
-function closeTab(f: SliceFixture, tab: string): void {
-  const db: Database = database(f);
-  saveDatabase(f, {
-    ...db,
-    tabs: db.tabs.filter((item) => item.tab_id !== tab),
-    panes: db.panes.filter((pane) => pane.tab_id !== tab),
-  });
-}
-
-// Real systemd calls: the leaf slice code pins DBUS_SESSION_BUS_ADDRESS to the
-// real user bus; herdr and systemd-run resolve through the fixture bin dir.
+// Real systemd calls: the leaf slice code pins DBUS_SESSION_BUS_ADDRESS to the real user bus, and the
+// fixture's runtime dir links the real systemd socket, so hc discovery still sees only the fixture core.
 function realEnv(f: SliceFixture, env: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
     ...process.env,
+    ...f.env,
     AKROGON_HOME: f.home,
     HERDR_PANE_ID: '',
     HOME: f.home,
     AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
     AKROGON_RUN: '',
-    AKROGON_PROC_ROOT: f.env.AKROGON_PROC_ROOT,
-    FAKE_HERDR: f.env.FAKE_HERDR,
-    FAKE_BUSCTL_HOME: f.env.FAKE_BUSCTL_HOME,
-    XDG_RUNTIME_DIR: realRuntime,
     DBUS_SESSION_BUS_ADDRESS: realBus,
-    PATH: `${resolve(f.home, 'bin')}:${process.env.PATH}`,
     ...env,
   };
+}
+
+// Shell assignments that export env to one command line.
+function assignments(env: NodeJS.ProcessEnv): string {
+  return Object.entries(env)
+    .flatMap(([key, value]) => (value === undefined ? [] : [`${key}='${value.replaceAll("'", "'\\''")}'`]))
+    .join(' ');
 }
 
 function spawnReal(f: SliceFixture, args: string[], cwd: string, env: NodeJS.ProcessEnv = {}): Cap {
@@ -340,8 +339,8 @@ test('merged and failed leaf slices with gone tabs are stopped and their process
     const mergedPid: number = await sleeper(f, mergedSlice);
     const failedPid: number = await sleeper(f, failedSlice);
     units.push(mergedSlice, failedSlice);
-    closeTab(f, z.string().parse(readState(mergedPath).tab));
-    closeTab(f, z.string().parse(readState(failedPath).tab));
+    await closeTab(f, z.string().parse(readState(mergedPath).tab));
+    await closeTab(f, z.string().parse(readState(failedPath).tab));
     saveState(mergedPath, { ...readState(mergedPath), phase: 'merged' });
     saveState(failedPath, {
       ...readState(failedPath),
@@ -354,36 +353,31 @@ test('merged and failed leaf slices with gone tabs are stopped and their process
     await waitFor(async () => !pidAlive(mergedPid) && !pidAlive(failedPid));
   } finally {
     for (const unit of units) await cleanupUnit(unit);
-    f.clean();
+    await f.clean();
   }
 }, 25000);
 
 test('a finished leaf with a live tab keeps its slice, and the pass fetched the pane list', async () => {
-  const f: SliceFixture = await slicesFixture();
+  const f: SliceFixture = await slicesFixture('open');
   const slug: string = unique('tabbed-merged');
   const sliceName: string = leafSlice({ name: 'repo' }, slug);
   const units: string[] = [sliceName];
   try {
-    const path: string = leaf(f, slug, 'merged', { tab: 'w1:t9' });
+    const tab: string = 'aktabbedmerged9';
+    const path: string = leaf(f, slug, 'merged', { tab });
     expect(readState(path).worktree).toBeUndefined();
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      tabs: [...db.tabs, { tab_id: 'w1:t9', label: slug, focused: false }],
-      panes: [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' }],
-    });
+    await tabTerminal(f.core, tab);
     const pid: number = await sleeper(f, sliceName);
     const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
     expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
     expect(await isActive(sliceName)).toBe(true);
     expect(pidAlive(pid)).toBe(true);
-    const callLog: string = f.db + '.calls';
-    const calls: string[] = existsSync(callLog) ? readFileSync(callLog, 'utf8').trim().split('\n') : [];
-    // The leaf has no worktree and no temp, so only the slice rule can trigger the fetch.
-    expect(calls.filter((line) => line.includes('pane')).length).toBeGreaterThan(0);
+    // The leaf has no worktree and no temp, so only the slice rule can trigger the fetch; the merged
+    // tab's close request is made only for a tab the fetched terminal list shows live.
+    expect(f.core.appCalls().map((call) => call.argv)).toContainEqual(['do', 'tab.close', '--id', tab]);
   } finally {
     for (const unit of units) await cleanupUnit(unit);
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -407,8 +401,8 @@ test('a finished leaf slice named by a live run record is not stopped', async ()
     try {
       await waitFor(async () => existsSync(resolve(f.home, 'runs')) && readdirSync(resolve(f.home, 'runs')).length > 0);
       await waitFor(async () => await isActive(z.string().parse(sliceName)));
-      closeTab(f, z.string().parse(readState(path).tab));
-      closeTab(f, z.string().parse(readState(controlPath).tab));
+      await closeTab(f, z.string().parse(readState(path).tab));
+      await closeTab(f, z.string().parse(readState(controlPath).tab));
       saveState(path, { ...readState(path), phase: 'merged' });
       saveState(controlPath, { ...readState(controlPath), phase: 'merged' });
       const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
@@ -424,14 +418,14 @@ test('a finished leaf slice named by a live run record is not stopped', async ()
       await cleanupUnit(control);
     }
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 90000);
 
 test('a pass with the pane list unavailable stops no slice of a leaf that has a recorded tab', async () => {
   const f: SliceFixture = await slicesFixture();
   try {
-    const path: string = leaf(f, 'no-panes', 'merged', { tab: 'w1:t7' });
+    leaf(f, 'no-panes', 'merged', { tab: 'aknopanes7' });
     const sliceName: string = leafSlice({ name: 'repo' }, 'no-panes');
     const cgroup: string = `/user.slice/user-${uid}.slice/user@${uid}.service/akrogon.slice/${sliceName}`;
     const cgRoot: string = resolve(f.home, 'cgroups');
@@ -441,7 +435,8 @@ test('a pass with the pane list unavailable stops no slice of a leaf that has a 
     const sysDb: string = resolve(f.home, 'systemctl.json');
     writeFileSync(sysDb, JSON.stringify({ units: [{ unit: sliceName, sub: 'active', cgroup }] }));
     const log: string = resolve(f.home, 'systemctl.log');
-    saveDatabase(f, { ...database(f), paneListStdout: 'unavailable' });
+    // The terminal list is unavailable: the repo's core no longer answers.
+    await f.core.stop();
     const result: Result = await cli(f, ['next', '--all'], f.root, {
       ...f.env,
       FAKE_SYSTEMCTL_DB: sysDb,
@@ -455,7 +450,7 @@ test('a pass with the pane list unavailable stops no slice of a leaf that has a 
     expect(calls.some((line) => line.includes('list-units'))).toBe(true);
     expect(calls.some((line) => line.includes('stop') && line.includes(sliceName))).toBe(false);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -494,7 +489,7 @@ test('a loaded slice matching no leaf record is stopped only when it holds no pr
     expect(calls.some((line) => line.includes(`stop ${empty}`))).toBe(true);
     expect(calls.some((line) => line.includes(`stop ${busy}`))).toBe(false);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -505,7 +500,7 @@ test('a reconcile pass running inside a leaf slice does not stop that slice', as
     const slug: string = unique('self-leaf');
     const path: string = await dispatchLeaf(f, slug);
     sliceName = leafSlice({ name: 'repo' }, slug);
-    closeTab(f, z.string().parse(readState(path).tab));
+    await closeTab(f, z.string().parse(readState(path).tab));
     saveState(path, { ...readState(path), phase: 'merged' });
     // Fake systemctl marks the leaf slice a stop candidate (loaded, no live tab)
     // while the pass runs inside the real slice: only the own-slice guard saves it.
@@ -521,20 +516,19 @@ test('a reconcile pass running inside a leaf slice does not stop that slice', as
     // Assignments prefix the bun invocation so they are exported to it alone.
     const inner: string = [
       `cd ${f.root};`,
-      `AKROGON_HOME=${f.home}`,
-      `HOME=${f.home}`,
-      `AKROGON_LEAF_TEMP_ROOT=${leafTempRoot(f)}`,
-      `HERDR_PANE_ID=`,
-      `AKROGON_RUN=`,
-      `AKROGON_PROC_ROOT=/proc`,
-      `AKROGON_CGROUP_ROOT=${cgRoot}`,
-      `FAKE_SYSTEMCTL_DB=${sysDb}`,
-      `FAKE_SYSTEMCTL_LOG=${log}`,
-      `FAKE_HERDR=${f.db}`,
-      `FAKE_BUSCTL_HOME=${f.home}`,
-      `XDG_RUNTIME_DIR=${realRuntime}`,
-      `DBUS_SESSION_BUS_ADDRESS=${realBus}`,
-      `PATH=${resolve(f.home, 'bin')}:${process.env.PATH}`,
+      assignments({
+        ...f.env,
+        AKROGON_HOME: f.home,
+        HOME: f.home,
+        AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+        HERDR_PANE_ID: '',
+        AKROGON_RUN: '',
+        AKROGON_PROC_ROOT: '/proc',
+        AKROGON_CGROUP_ROOT: cgRoot,
+        FAKE_SYSTEMCTL_DB: sysDb,
+        FAKE_SYSTEMCTL_LOG: log,
+        DBUS_SESSION_BUS_ADDRESS: realBus,
+      }),
       `${process.execPath} ${entry} next --all;`,
       `echo $? > ${marker}`,
     ].join(' ');
@@ -550,7 +544,7 @@ test('a reconcile pass running inside a leaf slice does not stop that slice', as
     expect(await isActive(guarded)).toBe(true);
   } finally {
     if (sliceName !== undefined) await cleanupUnit(sliceName);
-    f.clean();
+    await f.clean();
   }
 }, 40000);
 
@@ -565,16 +559,15 @@ test('akrogon phase merged inside the leaf slice stops no slice', async () => {
     const marker: string = resolve(f.home, 'phase.exit');
     const inner: string = [
       `cd ${f.root};`,
-      `AKROGON_HOME=${f.home}`,
-      `HOME=${f.home}`,
-      `AKROGON_LEAF_TEMP_ROOT=${leafTempRoot(f)}`,
-      `HERDR_PANE_ID=`,
-      `AKROGON_RUN=`,
-      `FAKE_HERDR=${f.db}`,
-      `FAKE_BUSCTL_HOME=${f.home}`,
-      `XDG_RUNTIME_DIR=${realRuntime}`,
-      `DBUS_SESSION_BUS_ADDRESS=${realBus}`,
-      `PATH=${resolve(f.home, 'bin')}:${process.env.PATH}`,
+      assignments({
+        ...f.env,
+        AKROGON_HOME: f.home,
+        HOME: f.home,
+        AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+        HERDR_PANE_ID: '',
+        AKROGON_RUN: '',
+        DBUS_SESSION_BUS_ADDRESS: realBus,
+      }),
       `${process.execPath} ${entry} phase ${slug} merged 2> ${marker}.err;`,
       `echo $? > ${marker}`,
     ].join(' ');
@@ -591,7 +584,7 @@ test('akrogon phase merged inside the leaf slice stops no slice', async () => {
     expect(moved.phase).toBe('merged');
   } finally {
     if (sliceName !== undefined) await cleanupUnit(sliceName);
-    f.clean();
+    await f.clean();
   }
 }, 40000);
 
@@ -611,7 +604,7 @@ test('the run guard unit is submitted with CollectMode=inactive-or-failed', asyn
     expect(guard).toBeDefined();
     expect(guard).toContain('CollectMode=inactive-or-failed');
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -704,7 +697,7 @@ test('the host step removes retired leftovers and keeps unprovable items', async
   } finally {
     child.kill('SIGKILL');
     await child.exited;
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -713,13 +706,8 @@ test('the host step removes retired leftovers and keeps unprovable items', async
 test('a finished leaf temp stays while its slice holds a running unit', async () => {
   const f: SliceFixture = await slicesFixture();
   try {
-    leaf(f, 'busy-temp', 'merged', { tab: 'w1:t9' });
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      tabs: [...db.tabs, { tab_id: 'w1:t9', label: 'busy-temp', focused: false }],
-      panes: [...db.panes, { pane_id: 'w1:p9', tab_id: 'w1:t9', cwd: null, agent: null, agent_status: 'idle' }],
-    });
+    leaf(f, 'busy-temp', 'merged', { tab: 'akbusytemp9' });
+    await tabTerminal(f.core, 'akbusytemp9');
     // Resolve under the child process's AKROGON_LEAF_TEMP_ROOT (leafTempRoot(f)),
     // not the suite's own env root.
     const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
@@ -743,12 +731,12 @@ test('a finished leaf temp stays while its slice holds a running unit', async ()
     // The slice stays because the tab is live; the temp stays because the slice
     // still holds a running unit.
     expect(existsSync(temp)).toBe(true);
-    closeTab(f, 'w1:t9');
+    await closeTab(f, 'akbusytemp9');
     writeFileSync(resolve(cgRoot, 'busy', 'cgroup.procs'), '');
     expect((await cli(f, ['next', '--all'], f.root, env)).code).toBe(0);
     expect(existsSync(temp)).toBe(false);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -813,7 +801,7 @@ test('a finished leaf temp stays while its retained slice holds a running unit w
   } finally {
     child.kill('SIGKILL');
     await child.exited;
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -875,7 +863,7 @@ test('a finished leaf temp stays while its slice is named by a waiting run recor
   } finally {
     child.kill('SIGKILL');
     await child.exited;
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -893,6 +881,6 @@ test('a loaded failed akrogon-run unit is cleared by a reconcile pass', async ()
     expect(await listed('akrogon-run-flp-*')).not.toContain(`${unit}.service`);
   } finally {
     await cleanupUnit(unit);
-    f.clean();
+    await f.clean();
   }
 });
