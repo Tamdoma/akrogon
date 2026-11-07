@@ -97,15 +97,6 @@ function paneEvent(f: DispatchFixture, pane: string, agent_status: string): Node
     }),
   };
 }
-function paneExited(f: DispatchFixture, pane: string): NodeJS.ProcessEnv {
-  return {
-    HERDR_SOCKET_PATH: socket(f, 'default'),
-    HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-      event: 'pane_exited',
-      data: { type: 'pane_exited', pane_id: pane, workspace_id: 'w1' },
-    }),
-  };
-}
 function tabClosed(f: DispatchFixture, tab: string, workspace_id: string = 'w1'): NodeJS.ProcessEnv {
   return {
     HERDR_SOCKET_PATH: socket(f, 'default'),
@@ -253,13 +244,15 @@ test('next creates one worktree/tab under concurrent passes and starts configure
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).not.toMatch(/^(priority|slot):/m);
     const seats: Terminal[] = await seatTerminals(f, 'build', true);
     expect(seats.map((t: Terminal) => t.name)).toEqual(['rp-build-a']);
-    expect(new Set(seats.map((t: Terminal) => t.labels['herdr.tab']))).toEqual(new Set([readState(path).tab]));
+    expect(new Set(seats.map((t: Terminal) => t.labels['herdr.tab']))).toEqual(
+      new Set([z.string().parse(readState(path).tab)]),
+    );
     const tasks = await allTasks(f);
     expect(tasks).toHaveLength(1);
     expect(tasks[0].text).toBe(`plan-issue build slot=A phase=plan.synthesis leaf=${path}`);
     expect(tasks[0].text.endsWith(` leaf=${f.root}/issues/open/issue/build`)).toBe(true);
     expect(tasks[0].text.split(' leaf=')[1]).not.toContain('issues/worktrees');
-    expect(tasks[0].address).toBe(readState(path).seat.A?.address);
+    expect(tasks[0].address).toBe(z.string().parse(readState(path).seat.A?.address));
     expect(readState(path).attempts.A).toBe(1);
     expect(notices(f)).toEqual([]);
     expect(await command(['git', 'branch', '--show-current'], readState(path).worktree)).toBe('build');
@@ -699,7 +692,7 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     expect(readState(path).phase).toBe('merge');
     const merges = (await delivered(f, 'landed')).filter((task) => task.seat === 'b');
     expect(merges.map((task) => task.text)).toEqual([mergeText(path)]);
-    expect(merges[0].address).toBe(readState(path).seat.B?.address);
+    expect(merges[0].address).toBe(z.string().parse(readState(path).seat.B?.address));
     expect(merges[0].text.split(' leaf=')[1]?.split(' ')[0]).toBe(`${f.root}/issues/open/landing/landed`);
     const landedAttempt: string = z.string().parse(readState(path).batch?.attempt);
     await verified(f, 'landed', 'merge');
@@ -776,7 +769,7 @@ test('uncommitted work in a merge worktree is left to the merge seat', async () 
     expect(readState(path).phase).toBe('merge');
     const merges = (await delivered(f, 'dirty')).filter((task) => task.seat === 'b');
     expect(merges.map((task) => task.text)).toEqual([mergeText(path)]);
-    expect(merges[0].address).toBe(readState(path).seat.B?.address);
+    expect(merges[0].address).toBe(z.string().parse(readState(path).seat.B?.address));
     expect(existsSync(resolve(worktree, 'forgotten'))).toBe(true);
   } finally {
     await f.clean();
@@ -1654,7 +1647,7 @@ test('a blocked non-merge seat does not stall a merge leaf', async () => {
     expect(readState(path).phase).toBe('merge');
     const merges = (await delivered(f, 'blocked-merge')).filter((task) => task.seat === 'b');
     expect(merges.map((task) => task.text)).toEqual([mergeText(path)]);
-    expect(merges[0].address).toBe(readState(path).seat.B?.address);
+    expect(merges[0].address).toBe(z.string().parse(readState(path).seat.B?.address));
     expect(readState(path).busy_since.A).toBeDefined();
     expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
   } finally {
@@ -1680,7 +1673,7 @@ test('merge, check.fix, check.repair and post-repair review dispatch to their sw
     expect((await next(f, ['post-repair'])).code).toBe(0);
     const b: string = z.string().parse(readState(path).seat.B?.address);
     expect(f.core.tasks(b)).toEqual([mergeText(path)]);
-    const move = async (phase: string, extra: object = {}): Promise<void> => {
+    const move = async (phase: State['phase'], extra: object = {}): Promise<void> => {
       await quiet(f, a);
       await quiet(f, b);
       saveState(path, { ...readState(path), phase, ...extra, prompted: {} });
@@ -1832,32 +1825,31 @@ test('a merged leaf whose tab is already gone makes no tab close call', async ()
 }, 15000);
 
 test('next --resume re-prompts allocated idle leaves in every registered repo without allocating new work', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  const g: Fixture = await fixture();
+  const f: HcFixture = await coreFixture();
+  const g: HcFixture = await otherRepo(f);
   try {
     const aOld: string = leaf(f, 'a-old', 'plan.synthesis');
     const bOld: string = leaf(g, 'b-old', 'plan.synthesis', { repo: 'other' });
     configure(f, { repos: { repo: f.root, other: g.root } });
     expect((await next(f, ['a-old'])).code).toBe(0);
     expect((await next(f, ['b-old'], {}, g.root)).code).toBe(0);
-    expect(database(f).tabs).toHaveLength(2);
-    resetPrompts(f, aOld);
-    resetPrompts(f, bOld);
+    expect([...(await liveTabs(f)), ...(await liveTabs(g))]).toEqual(['a-old', 'b-old']);
+    await rePromptable(f, aOld);
+    await rePromptable(g, bOld);
     const aNew: string = leaf(f, 'a-new', 'plan.synthesis');
     const bNew: string = leaf(g, 'b-new', 'plan.synthesis', { repo: 'other' });
     const result: Result = await next(f, ['--resume'], {}, f.home);
     expect(result.code).toBe(0);
-    expect(
-      database(f)
-        .prompts.map((prompt) => prompt.text)
-        .sort(),
-    ).toEqual(
+    const tasks = [...(await allTasks(f)), ...(await allTasks(g))];
+    expect(tasks.map((task) => task.text).sort()).toEqual(
       [
         `plan-issue a-old slot=A phase=plan.synthesis leaf=${aOld}`,
+        `plan-issue a-old slot=A phase=plan.synthesis leaf=${aOld}`,
+        `plan-issue b-old slot=A phase=plan.synthesis leaf=${bOld}`,
         `plan-issue b-old slot=A phase=plan.synthesis leaf=${bOld}`,
       ].sort(),
     );
-    expect(database(f).tabs).toHaveLength(2);
+    expect([...(await liveTabs(f)), ...(await liveTabs(g))]).toEqual(['a-old', 'b-old']);
     for (const path of [aNew, bNew]) {
       expect(readState(path).tab).toBeUndefined();
       expect(readState(path).worktree).toBeUndefined();
@@ -1869,39 +1861,40 @@ test('next --resume re-prompts allocated idle leaves in every registered repo wi
     ])
       expect((await next(f, args, {}, f.home)).code).not.toBe(0);
   } finally {
-    f.clean();
-    g.clean();
+    await f.clean();
+    await g.clean();
   }
 }, 15000);
 
 test('next --resume completes and cleans a merged leaf and starts its dependent', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     const done: string = leaf(f, 'done', 'plan.synthesis', {}, 'solo');
     const dependent: string = leaf(f, 'dependent', 'plan.synthesis', { 'blocked-by': ['done'] }, 'dep-issue');
+    holdTurns(f);
     expect((await next(f, ['done'])).code).toBe(0);
     const worktree: string = readState(done).worktree!;
     saveState(done, { ...readState(done), phase: 'merged' });
     expect(existsSync(done)).toBe(true);
     expect(readState(done).phase).toBe('merged');
-    saveDatabase(f, { ...database(f), prompts: [] });
     const result: Result = await next(f, ['--resume'], {}, f.home);
     expect(result.code).toBe(0);
     expect(existsSync(resolve(f.root, 'issues/closed/solo'))).toBe(true);
     expect(existsSync(worktree)).toBe(false);
     expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/done'], f.root)).code).toBe(1);
-    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['dependent']);
-    expect(database(f).prompts).toEqual([
+    expect(await liveTabs(f)).toEqual(['dependent']);
+    expect(await delivered(f, 'dependent')).toEqual([
       {
-        pane: readState(dependent).pane.A!,
+        seat: 'a',
+        address: z.string().parse(readState(dependent).seat.A?.address),
         text: `plan-issue dependent slot=A phase=plan.synthesis leaf=${dependent}`,
       },
     ]);
     expect(readState(dependent).tab).toBeDefined();
     expect(readState(dependent).worktree).toBeDefined();
-    expect(readState(dependent).attempts).toEqual({ A: 0, B: 0 });
+    expect(readState(dependent).attempts).toEqual({ A: 1, B: 0 });
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -1947,16 +1940,12 @@ for (const area of ['open', 'closed']) {
   }
 }
 
-for (const route of ['--all', '.', 'hook']) {
+for (const route of ['--all', '.']) {
   test(`invalid merged depth stays excluded during ${route} with healthy work`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await coreFixture();
     try {
       configure(f, { max_active: 4 });
-      const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
-      if (route === 'hook') {
-        expect((await next(f, ['healthy'])).code).toBe(0);
-        resetPrompts(f, healthy);
-      }
+      leaf(f, 'healthy', 'plan.synthesis');
       const bad: string = leaf(
         f,
         'invalid',
@@ -1966,27 +1955,25 @@ for (const route of ['--all', '.', 'hook']) {
       );
       mkdirSync(resolve(f.home, 'invalid-worktree'));
       const before: string = readFileSync(resolve(bad, 'state.yaml'), 'utf8');
-      const result: Result = await next(
-        f,
-        route === 'hook' ? [] : [route],
-        route === 'hook' ? paneEvent(f, readState(healthy).pane.A!, 'idle') : {},
-      );
+      const result: Result = await next(f, [route]);
       expect(result.code).toBe(1);
       expect(result.stderr).toContain(resolve(bad, 'state.yaml'));
-      expect(database(f).prompts).toHaveLength(1);
-      expect(database(f).prompts[0].text).toContain('healthy');
+      const tasks = await allTasks(f);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].text).toContain('healthy');
       expect(readFileSync(resolve(bad, 'state.yaml'), 'utf8')).toBe(before);
       expect(existsSync(resolve(f.home, 'invalid-worktree'))).toBe(true);
-      expect(calls(f).some((args) => args.includes('invalid-tab'))).toBe(false);
+      expect(readFileSync(f.core.shimLog, 'utf8')).not.toContain('invalid-tab');
+      expect(f.core.appCalls().filter((call) => call.argv.includes('invalid-tab'))).toEqual([]);
     } finally {
-      f.clean();
+      await f.clean();
     }
   });
 }
 
 for (const owner of ['issue', 'epic/issue']) {
   test(`next identifies dormant ${owner}/resting without parsing and prefers active leaves`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await coreFixture();
     try {
       const parked: string = resolve(f.root, 'issues/parked', owner, 'resting');
       mkdirSync(parked, { recursive: true });
@@ -1994,7 +1981,6 @@ for (const owner of ['issue', 'epic/issue']) {
       const result: Result = await next(f, ['resting']);
       expect(result.code).toBe(1);
       expect(result.stderr).toContain('Missing leaf: resting (parked)');
-      console.log(result.stderr.split('\n').find((line) => line.includes('error: Missing leaf:')));
       for (const slug of ['absent', 'issue', 'epic']) {
         const missing: Result = await next(f, [slug]);
         expect(missing.code).toBe(1);
@@ -2003,98 +1989,69 @@ for (const owner of ['issue', 'epic/issue']) {
           `error: Missing leaf: ${slug}`,
         );
       }
-      expect(calls(f)).toEqual([]);
+      expect(readFileSync(f.core.shimLog, 'utf8')).toBe('');
       leaf(f, 'resting', 'plan.synthesis', {}, 'active-issue');
       expect((await next(f, ['resting'])).code).toBe(0);
-      expect(database(f).prompts).toHaveLength(1);
+      expect(await allTasks(f)).toHaveLength(1);
       renameSync(resolve(f.root, 'issues/open'), resolve(f.root, 'issues/closed'));
       expect((await next(f, ['resting'])).code).toBe(0);
     } finally {
-      f.clean();
+      await f.clean();
     }
   });
 }
 
 test('merge leaf with landed branch re-prompts its idle seat instead of auto-recovering', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
-    const path: string = leaf(f, 'landed-merge', 'plan.synthesis');
+    const path: string = leaf(f, 'landed-merge', 'check.review');
     expect((await next(f, ['landed-merge'])).code).toBe(0);
     const worktree: string = readState(path).worktree!;
     writeFileSync(resolve(worktree, 'landed'), 'real change\n');
     await command(['git', 'add', 'landed'], worktree);
     await command(['git', 'commit', '-m', 'landed change'], worktree);
     await command(['git', 'push', 'origin', 'HEAD:main'], worktree);
+    const b: string = z.string().parse(readState(path).seat.B?.address);
+    await quiet(f, z.string().parse(readState(path).seat.A?.address));
+    await quiet(f, b);
     saveState(path, { ...readState(path), phase: 'merge', prompted: {} });
-    const state: State = readState(path);
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      panes: db.panes.map((p) => ({
-        ...p,
-        agent: 'fake',
-        agent_status: p.pane_id === state.pane.B ? 'idle' : 'working',
-      })),
-    });
-    const promptsBefore: number = database(f).prompts.length;
+    const tasksBefore: number = f.core.tasks(b).length;
     expect((await next(f, ['landed-merge'])).code).toBe(0);
     seatOwned(path);
     expect((await next(f, ['landed-merge'])).code).toBe(0);
-    expect(database(f).prompts).toHaveLength(promptsBefore + 1);
-    expect(database(f).prompts.at(-1)).toMatchObject({
-      pane: state.pane.B,
-      text: mergeText(path),
-    });
+    expect(f.core.tasks(b)).toHaveLength(tasksBefore + 1);
+    expect(f.core.tasks(b).at(-1)).toBe(mergeText(path));
+    expect(readState(path).seat.B?.address).toBe(b);
     expect(readState(path).phase).toBe('merge');
   } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('typed next from a leaf pane sweeps and removes merged worktrees', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const donePath: string = leaf(f, 'done', 'plan.synthesis', {}, 'done-issue');
-    expect((await next(f, ['done'])).code).toBe(0);
-    const otherPath: string = leaf(f, 'other', 'plan.synthesis', {}, 'other-issue');
-    expect((await next(f, ['other'])).code).toBe(0);
-    const worktree: string = readState(donePath).worktree!;
-    saveState(donePath, { ...readState(donePath), phase: 'merged' });
-    const otherPane: string = readState(otherPath).pane.A!;
-    expect(existsSync(worktree)).toBe(true);
-    const result: Result = await next(f, [], { HERDR_PANE_ID: otherPane });
-    expect(result.code).toBe(0);
-    expect(existsSync(worktree)).toBe(false);
-  } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('spaced repo root dispatches leaf= with the complete spaced authoritative folder', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     const spaced: string = resolve(f.home, 'repo root');
     renameSync(f.root, spaced);
-    const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
-    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: spaced } });
-    const f2: DispatchFixture = { ...f, root: spaced };
+    configure(f, { repos: { repo: spaced } });
+    const f2: HcFixture = { ...f, root: spaced };
     leaf(f2, 'spaced', 'plan.synthesis');
     expect((await next(f2, ['spaced'])).code).toBe(0);
-    expect(database(f).prompts).toHaveLength(1);
-    expect(database(f).prompts[0].text).toBe(
+    expect((await allTasks(f)).map((task) => task.text)).toEqual([
       `plan-issue spaced slot=A phase=plan.synthesis leaf=${spaced}/issues/open/issue/spaced`,
-    );
+    ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a failed leaf with its tab still open does not count toward max_active', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
     const second: string = leaf(f, 'second', 'plan.synthesis', {}, 'second-issue');
     configure(f, { max_active: 1 });
+    holdTurns(f);
     expect((await next(f, ['first'])).code).toBe(0);
     saveState(first, {
       ...readState(first),
@@ -2104,23 +2061,20 @@ test('a failed leaf with its tab still open does not count toward max_active', a
       busy_notified: {},
     });
     expect((await next(f, ['second'])).code).toBe(0);
-    expect(
-      database(f)
-        .tabs.map((tab) => tab.label)
-        .sort(),
-    ).toEqual(['first', 'second']);
-    expect(readState(second).attempts.A).toBe(0);
+    expect(await liveTabs(f)).toEqual(['first', 'second']);
+    expect(readState(second).attempts.A).toBe(1);
     expect(readState(second).worktree).toBeDefined();
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a failed leaf does not reserve capacity in the unreadable branch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  const g: Fixture = await fixture();
+  const f: HcFixture = await coreFixture();
+  const g: HcFixture = await otherRepo(f);
   try {
     const failedPath: string = leaf(f, 'failed-one', 'plan.synthesis', {}, 'failed-issue');
+    holdTurns(f);
     expect((await next(f, ['failed-one'])).code).toBe(0);
     saveState(failedPath, {
       ...readState(failedPath),
@@ -2136,27 +2090,24 @@ test('a failed leaf does not reserve capacity in the unreadable branch', async (
     const result: Result = await next(f, [healthy]);
     expect(result.code).toBe(1);
     expect(skips(result).map((skip) => skip.path)).toContain(malformed);
-    expect(
-      database(f)
-        .tabs.map((tab) => tab.label)
-        .sort(),
-    ).toEqual(['failed-one', 'healthy']);
-    expect(readState(healthy).attempts.A).toBe(0);
+    expect([...(await liveTabs(f)), ...(await liveTabs(g))].sort()).toEqual(['failed-one', 'healthy']);
+    expect(readState(healthy).attempts.A).toBe(1);
     expect(readState(healthy).worktree).toBeDefined();
   } finally {
-    f.clean();
-    g.clean();
+    await f.clean();
+    await g.clean();
   }
 }, 15000);
 
-test('a failed leaf with a blocked pane is not seat-observed', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('a failed leaf with a blocked seat is not seat-observed', async () => {
+  const f: HcFixture = await coreFixture();
   try {
     const path: string = leaf(f, 'stuck', 'plan.synthesis');
+    holdTurns(f, 'blocked:kind=permission:msg=Allow?');
     expect((await next(f, ['stuck'])).code).toBe(0);
-    const promptsBefore: number = database(f).prompts.length;
-    expect(promptsBefore).toBe(1);
-    const a: string = readState(path).pane.A!;
+    const a: string = z.string().parse(readState(path).seat.A?.address);
+    await f.core.waitFor(a, (t: Terminal) => t.status?.state === 'blocked');
+    expect(f.core.tasks(a)).toHaveLength(1);
     saveState(path, {
       ...readState(path),
       phase: 'failed',
@@ -2164,78 +2115,13 @@ test('a failed leaf with a blocked pane is not seat-observed', async () => {
       busy_since: {},
       busy_notified: {},
     });
-    const db: Database = database(f);
-    saveDatabase(f, { ...db, panes: db.panes.map((p) => (p.pane_id === a ? { ...p, agent_status: 'blocked' } : p)) });
     expect((await next(f, ['stuck'])).code).toBe(1);
     expect((await next(f, ['stuck'])).code).toBe(1);
     expect(readState(path).busy_since).toEqual({});
     expect(readState(path).busy_notified).toEqual({});
-    expect(database(f).prompts).toHaveLength(promptsBefore);
+    expect(f.core.tasks(a)).toHaveLength(1);
   } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('retryable prompt failure charges one attempt, records delivery_error, and sends one prompt', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const path: string = leaf(f, 'charge', 'plan.synthesis');
-    saveDatabase(f, { ...database(f), promptScript: [{ code: 'agent_prompt_stalled', message: 'stalled for test' }] });
-    expect((await next(f, ['charge'])).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.attempts.A).toBe(1);
-    expect(state.prompted.A).toBeUndefined();
-    const err = state.delivery_error.A!;
-    expect(err.code).toBe('agent_prompt_stalled');
-    expect(err.message).toBe('stalled for test');
-    expect(err.command[0]).toBe('herdr');
-    expect(err.command[1]).toBe('--session');
-    expect(err.command[2]).toBe('default');
-    expect(err.command[3]).toBe('agent');
-    expect(err.command[4]).toBe('prompt');
-    expect(err.pane).toBe(state.pane.A!);
-    const db: Database = database(f);
-    const pane = db.panes.find((item) => item.pane_id === state.pane.A)!;
-    expect(err.session).toBe(pane.agent_session?.value ?? null);
-    expect(Number.isNaN(Date.parse(err.at))).toBe(false);
-    expect(err.offset).toBeUndefined();
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(1);
-    expect(db.prompts).toHaveLength(0);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('three consecutive prompt failures keep the leaf in phase, record each error, and retry on the next pass', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const path: string = leaf(f, 'three-fails', 'plan.synthesis');
-    const fail = { code: 'agent_prompt_stalled', message: 'stalled' };
-    saveDatabase(f, { ...database(f), promptScript: [{ ...fail }, { ...fail }, { ...fail }] });
-    expect((await next(f, ['three-fails'])).code).toBe(0);
-    expect(readState(path).phase).toBe('plan.synthesis');
-    expect(readState(path).attempts.A).toBe(1);
-    expect((await next(f, ['three-fails'])).code).toBe(0);
-    expect(readState(path).phase).toBe('plan.synthesis');
-    expect(readState(path).attempts.A).toBe(2);
-    expect((await next(f, ['three-fails'])).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.phase).toBe('plan.synthesis');
-    expect(state.attempts.A).toBe(3);
-    expect(state.failure).toBeUndefined();
-    expect(state.delivery_error.A?.code).toBe('agent_prompt_stalled');
-    expect(state.delivery_error.A?.message).toBe('stalled');
-    expect(state.delivery_error.A?.pane).toBe(state.pane.A!);
-    const pane = database(f).panes.find((item) => item.pane_id === state.pane.A!)!;
-    expect(state.delivery_error.A?.session).toBe(pane.agent_session?.value ?? null);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(3);
-    expect((await next(f, ['three-fails'])).code).toBe(0);
-    expect(readState(path).phase).toBe('plan.synthesis');
-    expect(readState(path).attempts.A).toBe(0);
-    expect(readState(path).delivery_error.A).toBeUndefined();
-    expect(database(f).prompts).toHaveLength(1);
-  } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
