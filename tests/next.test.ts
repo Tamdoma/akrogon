@@ -83,41 +83,6 @@ async function next(
 ): Promise<Result> {
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
-function socket(f: DispatchFixture, name: string): string {
-  return `${f.db}-${name}.sock`;
-}
-// Hook events act only through the emitting socket and workspace: every
-// event invocation carries HERDR_SOCKET_PATH for `default` and a payload
-// workspace_id matching the fixture's resolved workspace w1.
-function paneEvent(f: DispatchFixture, pane: string, agent_status: string): NodeJS.ProcessEnv {
-  return {
-    HERDR_SOCKET_PATH: socket(f, 'default'),
-    HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-      event: 'pane_agent_status_changed',
-      data: { type: 'pane_agent_status_changed', pane_id: pane, workspace_id: 'w1', agent_status },
-    }),
-  };
-}
-function tabClosed(f: DispatchFixture, tab: string, workspace_id: string = 'w1'): NodeJS.ProcessEnv {
-  return {
-    HERDR_SOCKET_PATH: socket(f, 'default'),
-    HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-      event: 'tab_closed',
-      data: { type: 'tab_closed', tab_id: tab, workspace_id },
-    }),
-  };
-}
-function tmpdirsOf(args: string[]): string[] {
-  const found: string[] = [];
-  for (let i: number = 0; i + 1 < args.length; i++)
-    if (args[i] === '--env' && args[i + 1].startsWith('TMPDIR=')) found.push(args[i + 1].slice('TMPDIR='.length));
-  return found;
-}
-function tmpdirOf(args: string[]): string {
-  const found: string[] = tmpdirsOf(args);
-  expect(found).toHaveLength(1);
-  return found[0];
-}
 
 // Port helpers (plan D26): the fixture core's seat terminals stand in for fake herdr panes, tabs and prompts.
 async function seatTerminals(f: HcFixture, slug: string, all: boolean = false): Promise<Terminal[]> {
@@ -1044,11 +1009,6 @@ function waits(result: Result): string[] {
 function configure(f: Fixture, extra: object): void {
   const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
   yaml(resolve(f.home, 'config.yaml'), { ...global, ...extra });
-}
-function resetPrompts(f: DispatchFixture, path: string): void {
-  saveState(path, { ...readState(path), prompted: {} });
-  const db: Database = database(f);
-  saveDatabase(f, { ...db, prompts: [], panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) });
 }
 
 // Lets an allocated seat finish its turn and clears the delivery record, so the next pass prompts it again.
@@ -2261,7 +2221,7 @@ test('next inherits non-overridden seat from global slots', async () => {
 }, 15000);
 
 test('next refuses unknown harness override before allocation', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
       grounding: 'none',
@@ -2273,12 +2233,12 @@ test('next refuses unknown harness override before allocation', async () => {
     expect(skips(result)[0].error).toContain('ghost');
     expect(skips(result)[0].error).toContain('repo');
     expect(skips(result)[0].error).toContain('b');
-    expect(database(f).tabs).toHaveLength(0);
-    expect(database(f).panes).toHaveLength(0);
+    expect(allStarts(f)).toHaveLength(0);
+    expect(await f.core.terminals({ akrogon: '1' }, true)).toHaveLength(0);
     expect(readState(path).worktree).toBeUndefined();
     expect(existsSync(storeDir(f))).toBe(false);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -2357,7 +2317,7 @@ const malformedIndex: [string, string][] = [
 
 for (const [name, content] of malformedIndex) {
   test(`next refuses an ISSUE.md index with ${name} before any allocation`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       leaf(f, 'malformed', 'plan.synthesis');
       const index: string = resolve(f.root, 'issues/open/issue/ISSUE.md');
@@ -2366,18 +2326,17 @@ for (const [name, content] of malformedIndex) {
       expect(result.code).not.toBe(0);
       expect(result.stderr).toContain(index);
       expect(result.stderr).toContain('Invalid slots front matter');
-      expect(database(f).tabs).toHaveLength(0);
-      expect(database(f).panes).toHaveLength(0);
-      expect(database(f).starts).toHaveLength(0);
+      expect(allStarts(f)).toHaveLength(0);
+      expect(await f.core.terminals({ akrogon: '1' }, true)).toHaveLength(0);
       expect(existsSync(storeDir(f))).toBe(false);
     } finally {
-      f.clean();
+      await f.clean();
     }
   }, 15000);
 }
 
 test('next refuses an ISSUE.md index whose harness has no template before any allocation', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'ghost', 'plan.synthesis');
     const index: string = resolve(f.root, 'issues/open/issue/ISSUE.md');
@@ -2387,25 +2346,23 @@ test('next refuses an ISSUE.md index whose harness has no template before any al
     expect(result.stderr).toContain(index);
     expect(result.stderr).toContain('ghost');
     expect(result.stderr).toContain('a');
-    expect(database(f).tabs).toHaveLength(0);
-    expect(database(f).panes).toHaveLength(0);
-    expect(database(f).starts).toHaveLength(0);
+    expect(allStarts(f)).toHaveLength(0);
+    expect(await f.core.terminals({ akrogon: '1' }, true)).toHaveLength(0);
     expect(existsSync(storeDir(f))).toBe(false);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 type Refusal = z.infer<typeof skipSchema>;
-async function refusal(f: DispatchFixture, slug: string, path: string): Promise<Refusal> {
+async function refusal(f: HcFixture, slug: string, path: string): Promise<Refusal> {
   const result: Result = await next(f, [slug]);
   expect(result.code).toBe(1);
   const lines: Refusal[] = skips(result);
   expect(lines).toHaveLength(1);
   expect(lines[0]).toMatchObject({ repo: 'repo', slug, path });
-  expect(calls(f)).toEqual([]);
-  expect(database(f).tabs).toHaveLength(0);
-  expect(database(f).panes).toHaveLength(0);
+  expect(allStarts(f)).toHaveLength(0);
+  expect(await f.core.terminals({ akrogon: '1' }, true)).toHaveLength(0);
   return lines[0];
 }
 
@@ -2413,12 +2370,12 @@ for (const { code, remedy, sabotage } of [
   {
     code: 'C1',
     remedy: 'git remote add origin',
-    sabotage: (f: DispatchFixture) => command(['git', 'remote', 'remove', 'origin'], f.root),
+    sabotage: (f: HcFixture) => command(['git', 'remote', 'remove', 'origin'], f.root),
   },
   {
     code: 'C2',
     remedy: 'push',
-    sabotage: async (f: DispatchFixture) => {
+    sabotage: async (f: HcFixture) => {
       await command(['git', 'init', '--bare', resolve(f.home, 'empty.git')]);
       await command(['git', 'remote', 'set-url', 'origin', resolve(f.home, 'empty.git')], f.root);
     },
@@ -2426,11 +2383,11 @@ for (const { code, remedy, sabotage } of [
   {
     code: 'C3',
     remedy: 'git fetch origin main',
-    sabotage: (f: DispatchFixture) => command(['git', 'update-ref', '-d', 'refs/remotes/origin/main'], f.root),
+    sabotage: (f: HcFixture) => command(['git', 'update-ref', '-d', 'refs/remotes/origin/main'], f.root),
   },
 ]) {
   test(`next refuses a new leaf with a missing base (${code}) before worktree creation`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const path: string = leaf(f, 'fresh', 'plan.synthesis');
       await sabotage(f);
@@ -2440,13 +2397,13 @@ for (const { code, remedy, sabotage } of [
       expect(existsSync(resolve(storeDir(f), 'fresh'))).toBe(false);
       expect(readState(path).worktree).toBeUndefined();
     } finally {
-      f.clean();
+      await f.clean();
     }
   });
 }
 
 test('next refuses a leaf branch without a worktree when the remote branch is gone', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     await command(['git', 'branch', 'stale'], f.root);
     const path: string = leaf(f, 'stale', 'plan.synthesis');
@@ -2457,12 +2414,12 @@ test('next refuses a leaf branch without a worktree when the remote branch is go
     expect(existsSync(resolve(storeDir(f), 'stale'))).toBe(false);
     expect(readState(path).worktree).toBeUndefined();
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('next refuses an existing worktree whose tracking ref is deleted while the remote branch lives', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const worktree: string = resolve(storeDir(f), 'resident');
     await command(['git', 'worktree', 'add', '-b', 'resident', worktree], f.root);
@@ -2474,12 +2431,12 @@ test('next refuses an existing worktree whose tracking ref is deleted while the 
     expect(existsSync(worktree)).toBe(true);
     expect(readState(path).worktree).toBe(worktree);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('next refuses an existing worktree whose tracking ref is deleted when the remote branch is gone', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const worktree: string = resolve(storeDir(f), 'resident');
     await command(['git', 'worktree', 'add', '-b', 'resident', worktree], f.root);
@@ -2492,7 +2449,7 @@ test('next refuses an existing worktree whose tracking ref is deleted when the r
     expect(existsSync(worktree)).toBe(true);
     expect(readState(path).worktree).toBe(worktree);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -2511,7 +2468,7 @@ test('next dispatches an existing worktree without querying an unreachable remot
 });
 
 test('next refuses to create a worktree while the remote is unreachable', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'fresh', 'plan.synthesis');
     await command(['git', 'remote', 'set-url', 'origin', resolve(f.home, 'gone.git')], f.root);
@@ -2521,7 +2478,7 @@ test('next refuses to create a worktree while the remote is unreachable', async 
     expect(existsSync(resolve(storeDir(f), 'fresh'))).toBe(false);
     expect(readState(path).worktree).toBeUndefined();
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -4439,15 +4396,16 @@ import { appendFileSync } from 'node:fs';
 mock.module(SELF_UPDATE_MODULE, () => ({
   selfUpdate: async (repo: { root: string }) => {
     if (process.env.SELF_UPDATE_THROW === '1') throw new Error('self-update sentinel');
-    appendFileSync(process.env.FAKE_HERDR + '.calls', JSON.stringify(['self-update', repo.root]) + '\\n');
+    appendFileSync(process.env.HC_SHIM_LOG, ['self-update', repo.root].join('\\t') + '\\n');
     appendFileSync(process.env.SELF_UPDATE_LOG, repo.root + '\\n');
   },
 }));
 await import(ENTRY);
 `;
 
+// The self-update mock also writes into the hc shim log, so its order against the hc calls shows.
 async function selfUpdateCli(
-  f: DispatchFixture,
+  f: HcFixture,
   args: string[],
   env: NodeJS.ProcessEnv = {},
   cwd: string = f.root,
@@ -4467,20 +4425,20 @@ async function selfUpdateCli(
       AKROGON_HOME: f.home,
       HOME: f.home,
       HERDR_PANE_ID: '',
-      SELF_UPDATE_LOG: f.db + '.self-update',
+      SELF_UPDATE_LOG: resolve(f.home, 'self-update.log'),
       ...env,
     },
   });
   return { code, stdout: stdout.trim(), stderr: stderr.trim() };
 }
 
-function selfUpdateCalls(f: DispatchFixture): string[] {
-  const path: string = f.db + '.self-update';
+function selfUpdateCalls(f: HcFixture): string[] {
+  const path: string = resolve(f.home, 'self-update.log');
   return existsSync(path) ? readFileSync(path, 'utf8').trim().split('\n') : [];
 }
 
 test('phase merged records one self-update call for the repo', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'landed', 'merge', holding(f));
     const result: Result = await selfUpdateCli(f, ['phase', 'landed', 'merged']);
@@ -4488,12 +4446,12 @@ test('phase merged records one self-update call for the repo', async () => {
     expect(result.stdout).toContain('moved merged');
     expect(selfUpdateCalls(f)).toEqual([f.root]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('phase failed commits without a self-update call', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'landed', 'merge', holding(f));
     const result: Result = await selfUpdateCli(f, ['phase', 'landed', 'failed', '--reason', 'merge broke']);
@@ -4501,12 +4459,12 @@ test('phase failed commits without a self-update call', async () => {
     expect(result.stdout).toContain('moved failed');
     expect(selfUpdateCalls(f)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('a throwing self-update still lets phase merged commit and next dispatch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'landed', 'merge', holding(f));
     leaf(f, 'queued', 'plan.synthesis', {}, 'other-issue');
@@ -4516,58 +4474,53 @@ test('a throwing self-update still lets phase merged commit and next dispatch', 
     expect(merged.stdout).toContain('moved merged');
     const dispatched: Result = await selfUpdateCli(f, ['next', 'queued'], env);
     expect(dispatched.code).toBe(0);
-    expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
+    expect((await allTasks(f)).map((prompt) => prompt.text)).toEqual([
       `plan-issue queued slot=A phase=plan.synthesis leaf=${resolve(f.root, 'issues/open/other-issue/queued')}`,
     ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('next --all, --resume and manual next record the registered or selected repos before dispatch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   const g: Fixture = await fixture();
   try {
     configure(f, { repos: { repo: f.root, other: g.root } });
     const picked: string = leaf(f, 'picked', 'plan.synthesis');
     leaf(f, 'sweep', 'implement', {}, 'other-issue');
-    const before: number = calls(f).length;
+    const before: number = hcCalls(f).length;
     expect((await selfUpdateCli(f, ['next', '--all'])).code).toBe(0);
     expect(selfUpdateCalls(f)).toEqual([f.root, g.root]);
-    expect(calls(f).slice(before)[0]).toEqual(['self-update', f.root]);
-    expect(calls(f).slice(before)[1]).toEqual(['self-update', g.root]);
+    expect(hcCalls(f).slice(before)[0]).toEqual(['self-update', f.root]);
+    expect(hcCalls(f).slice(before)[1]).toEqual(['self-update', g.root]);
     expect(
-      calls(f)
+      hcCalls(f)
         .slice(before)
-        .some((args) => args[0] === 'tab' || args[0] === 'agent'),
+        .some((args) => args[0] === 'run'),
     ).toBe(true);
-    resetPrompts(f, picked);
-    const resumed: number = calls(f).length;
+    await rePromptable(f, picked);
+    const resumed: number = hcCalls(f).length;
     expect((await selfUpdateCli(f, ['next', '--resume'])).code).toBe(0);
     expect(selfUpdateCalls(f)).toEqual([f.root, g.root, f.root, g.root]);
-    expect(calls(f).slice(resumed)[0]).toEqual(['self-update', f.root]);
+    expect(hcCalls(f).slice(resumed)[0]).toEqual(['self-update', f.root]);
     expect(
-      calls(f)
+      hcCalls(f)
         .slice(resumed)
-        .some((args) => args[0] === 'agent' && args[1] === 'prompt'),
+        .some((args) => args[0] === 'send'),
     ).toBe(true);
-    resetPrompts(f, picked);
-    const manual: number = calls(f).length;
+    await rePromptable(f, picked);
+    const manual: number = hcCalls(f).length;
     expect((await selfUpdateCli(f, ['next', 'picked'])).code).toBe(0);
     expect(selfUpdateCalls(f)).toEqual([f.root, g.root, f.root, g.root, f.root]);
-    expect(calls(f).slice(manual)[0]).toEqual(['self-update', f.root]);
+    expect(hcCalls(f).slice(manual)[0]).toEqual(['self-update', f.root]);
     expect(
-      calls(f)
+      hcCalls(f)
         .slice(manual)
-        .some((args) => args[0] === 'agent' && args[1] === 'prompt'),
+        .some((args) => args[0] === 'send'),
     ).toBe(true);
-    const tabbed: number = calls(f).length;
-    const closed: Result = await selfUpdateCli(f, ['next'], tabClosed(f, 'w1:t999'));
-    expect(closed.code).toBe(0);
-    expect(selfUpdateCalls(f)).toHaveLength(5);
-    expect(calls(f)).toHaveLength(tabbed);
   } finally {
-    f.clean();
+    await f.clean();
     g.clean();
   }
 });
