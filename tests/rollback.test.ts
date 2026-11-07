@@ -256,3 +256,44 @@ test.serial(
     }
   },
 );
+
+// Criterion 12 (D22): a previous release that still ships plugin/ runs on old herdr; rollback refuses
+// before flip, under the install lock, and changes nothing.
+test.serial('rollback refuses a previous release that ships plugin/, before flip, and changes nothing', async () => {
+  const d: DeployFixture = await deployFixture();
+  try {
+    const { previous } = await deployedPair(d);
+    expect(existsSync(resolve(releases(d), previous, 'plugin'))).toBe(true);
+    const before: string = realpathSync(resolve(d.home, 'current'));
+    const result: Result = await cli(d.f, ['rollback'], d.f.root, d.env);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('previous release runs on old herdr; fix forward');
+    expect(realpathSync(resolve(d.home, 'current'))).toBe(before);
+    expect(existsSync(resolve(d.home, 'release-hold.yaml'))).toBe(false);
+  } finally {
+    d.f.clean();
+  }
+});
+
+// Criterion 12: an hc-to-hc rollback works as today with no herdr binary anywhere on PATH.
+test.serial('an hc-to-hc rollback flips and holds with no herdr on PATH', async () => {
+  const d: DeployFixture = await deployFixture();
+  try {
+    await pushSeed(d, () => {
+      rmSync(resolve(d.seed, 'plugin'), { recursive: true, force: true });
+      writeFileSync(resolve(d.seed, 'systemd/akrogon-listener.service'), '[Service]\n');
+    });
+    const { previous, current } = await deployedPair(d);
+    expect(existsSync(resolve(releases(d), previous, 'plugin'))).toBe(false);
+    const bin: string = resolve(d.home, 'no-herdr-bin');
+    mkdirSync(bin);
+    for (const tool of ['git', 'flock', 'sh', 'cat'])
+      await command(['ln', '-s', (await command(['sh', '-c', `command -v ${tool}`])).trim(), resolve(bin, tool)]);
+    await command(['ln', '-s', resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(bin, 'systemctl')]);
+    const result: Result = await cli(d.f, ['rollback'], d.f.root, { ...d.env, PATH: `${unitBin(d.f)}:${bin}` });
+    expect(result.code).toBe(0);
+    expectRolledBack(d, previous, current, { line: result });
+  } finally {
+    d.f.clean();
+  }
+});

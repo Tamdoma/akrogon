@@ -1,0 +1,23 @@
+{
+  "spaces": [
+    {
+      "folder": "/home/ivan",
+      "id": "sp72c28213d49c5b8687e0770a7d9bcb86",
+      "name": "",
+      "tabs": [
+        {
+          "id": "tba6c7b39b9247aad9ef1dba461020dead",
+          "name": "",
+          "root": {
+            "children": [
+              { "content": { "terminal": "t90" }, "id": "p5bf3080b11f0a084271a50e80ddf095a", "type": "block" }
+            ],
+            "id": "tba6c7b39b9247aad9ef1dba461020dead",
+            "type": "row"
+          }
+        }
+      ]
+    },
+    { "folder": "/home/ivan/Work/infra/akrogon", "id": "SPACE", "name": "repo", "tabs": [] }
+  ]
+}
