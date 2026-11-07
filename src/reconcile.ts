@@ -31,31 +31,19 @@ import { passLive, readPassRecord } from './verify-pass';
 import {
   broadcastPending,
   inventoryUnder,
+  predatesHc,
   readState,
   repoInventory,
   saveState,
   type Inventory,
   type Leaf,
+  type SeatRef,
   type State,
 } from './state';
 import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
 import { liveRuns, liveStartTime, withAdmissionLock } from './admission';
-import {
-  CommandError,
-  command,
-  herdrArgv,
-  herdrError,
-  panes,
-  repoSession,
-  run,
-  spawnCaptured,
-  tabs,
-  type Pane,
-  type Result,
-  type SessionPane,
-  type SessionResolution,
-  type Tab,
-} from './shell';
+import { CommandError, command, run, spawnCaptured, type Result } from './shell';
+import { closeTab, end, HcError, repoSpace, terminals, windowOpen, type Seen, type SpaceResolution } from './hc';
 
 export type Reconciled = { removed: string[]; kept: { path: string; reason: string; clears?: string }[] };
 
@@ -196,14 +184,14 @@ async function sliceHasProcess(slice: string): Promise<boolean> {
   return subtreeHasProcess(join(cgroupRoot(), group));
 }
 
-function broadcastInProgress(state: State, live: Pane[] | null): boolean {
+function broadcastInProgress(state: State, live: Seen[] | null): boolean {
   return (
     broadcastPending(state) ||
     (state.phase === 'merged' &&
       state.broadcast !== undefined &&
       (live === null ||
         live.some(
-          (pane) => pane.pane_id === state.pane.B && pane.agent_status !== 'idle' && pane.agent_status !== 'done',
+          (t: Seen) => t.address === state.seat.B?.address && t.status?.state !== 'idle' && t.status?.state !== 'done',
         )))
   );
 }
@@ -212,7 +200,7 @@ function broadcastInProgress(state: State, live: Pane[] | null): boolean {
 function sliceKeepReason(
   slice: string,
   leaf: Leaf,
-  live: Pane[] | null,
+  live: Seen[] | null,
   own: Set<string>,
   runs: Set<string>,
 ): string | null {
@@ -220,6 +208,8 @@ function sliceKeepReason(
   if (runs.has(slice)) return 'live run record';
   if (broadcastInProgress(leaf.state, live)) return 'broadcast in progress';
   if (leaf.state.tab === undefined && !finished(leaf)) return 'unfinished leaf';
+  // An old herdr tab cannot be seen from hc, so a pre-hc leaf's seat may still run in its slice.
+  if (predatesHc(leaf.state)) return 'state predates hc';
   if (leaf.state.tab !== undefined) {
     if (live === null) return 'pane list unavailable';
     if (tabLive(live, leaf.state.tab)) return 'live tab';
@@ -258,21 +248,22 @@ async function worktreeRemovable(repo: Repo, path: string): Promise<{ ok: true }
   return { ok: true };
 }
 
-function livePaneInside(live: Pane[], path: string): boolean {
-  return live.some((pane) => pane.cwd !== null && within(pane.cwd, path));
+function livePaneInside(live: Seen[], path: string): boolean {
+  return live.some((t: Seen) => within(t.cwd, path));
 }
 
-// A pane parked at the worktree root in the leaf's own tab is the leaf's
-// session being torn down, not a squatter; anything else inside blocks removal.
-function foreignPaneInside(live: Pane[], foreign: Pane[], path: string, tab: string | undefined): boolean {
+// A terminal parked at the worktree root in the leaf's own tab is the leaf's
+// seat being torn down, not a squatter; anything else inside blocks removal.
+function foreignPaneInside(live: Seen[], foreign: Seen[], path: string, tab: string | undefined): boolean {
   return (
     livePaneInside(foreign, path) ||
-    live.some((pane) => pane.cwd !== null && within(pane.cwd, path) && (pane.cwd !== path || pane.tab_id !== tab))
+    live.some((t: Seen) => within(t.cwd, path) && (t.cwd !== path || t.labels['herdr.tab'] !== tab))
   );
 }
 
-function tabLive(live: Pane[], tab: string | undefined): boolean {
-  return tab !== undefined && live.some((pane) => pane.tab_id === tab);
+// A live tab is a live terminal labelled with it (plan D20).
+function tabLive(live: Seen[], tab: string | undefined): boolean {
+  return tab !== undefined && live.some((t: Seen) => t.labels['herdr.tab'] === tab);
 }
 
 // Mirrors completeOwner: would the leaf's owner move to issues/closed this
@@ -399,42 +390,53 @@ export function processesInside(paths: string[]): Set<string> {
   return new Set(paths.filter((path) => pidsInside(targets, path).length > 0));
 }
 
-// The tab list and close run only in the session holding the repo workspace;
-// a refused, missing or stopped-at-call session means nothing is touched.
-export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Pane[] | null): Promise<boolean> {
-  if (leaf.state.tab === undefined || live === null || broadcastPending(leaf.state)) return false;
-  const resolved: SessionResolution = await repoSession(repo);
-  if (!resolved.ok) return false;
-  const session: string = resolved.session.name;
-  let seated: { panes: Pane[]; tabs: Tab[] };
-  try {
-    seated = {
-      panes: await panes(session),
-      tabs: await tabs(session),
-    };
-  } catch (error) {
-    if (error instanceof CommandError && herdrError(error.result).code === 'server_not_running') return false;
-    throw error;
-  }
-  const workspaceTabs: Set<string> = new Set(
-    seated.tabs.filter((item) => item.workspace_id === resolved.workspace.workspace_id).map((item) => item.tab_id),
+export type Seats = { A: Seen | undefined; B: Seen | undefined };
+
+// A terminal is the leaf's seat only when its labels name the repo, leaf and seat and its address is
+// the one state recorded (plan D4); finished seats are listed too.
+export async function leafSeats(session: string, repo: Repo, state: State): Promise<Seats> {
+  if (state.seat.A === undefined && state.seat.B === undefined) return { A: undefined, B: undefined };
+  const listed: Seen[] = await terminals(
+    session,
+    { akrogon: '1', 'akrogon.repo': repo.name, 'akrogon.leaf': state.slug },
+    true,
   );
-  const seatedPanes: Pane[] = seated.panes.filter((pane) => workspaceTabs.has(pane.tab_id));
-  const tab: string = leaf.state.tab;
-  if (!workspaceTabs.has(tab) || broadcastInProgress(leaf.state, seatedPanes)) return false;
-  // The recorded pane closes only inside the leaf's own seat tab: a member
-  // pane whose cwd is inside the leaf worktree.
-  const expected: string = leaf.state.worktree ?? resolve(worktreeStore(repo), leaf.state.slug);
-  if (!seatedPanes.some((pane) => pane.tab_id === tab && pane.cwd !== null && within(pane.cwd, expected))) return false;
-  await command(herdrArgv(['tab', 'close', tab], { session }));
+  const owned = (slot: 'A' | 'B'): Seen | undefined => {
+    const ref: SeatRef | undefined = state.seat[slot];
+    return ref === undefined || ref.session !== session
+      ? undefined
+      : listed.find((t: Seen) => t.address === ref.address && t.labels['akrogon.seat'] === slot.toLowerCase());
+  };
+  return { A: owned('A'), B: owned('B') };
+}
+
+// Teardown (plan D19): each recorded seat terminal is killed and removed.
+export async function endSeats(session: string, repo: Repo, state: State): Promise<void> {
+  const found: Seats = await leafSeats(session, repo, state);
+  for (const t of [found.A, found.B]) if (t !== undefined) await end(session, t.address);
+}
+
+// A finished leaf's close: its seats end, then its tab closes when a window shows it.
+async function closeLeaf(session: string, repo: Repo, state: State, tab: string): Promise<void> {
+  await endSeats(session, repo, state);
+  if (await windowOpen(session)) await closeTab(session, tab);
+}
+
+// The close runs only in the session holding the repo space, for a tab a live terminal still holds.
+export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Seen[] | null): Promise<boolean> {
+  const tab: string | undefined = leaf.state.tab;
+  if (tab === undefined || live === null || broadcastInProgress(leaf.state, live) || !tabLive(live, tab)) return false;
+  const resolved: SpaceResolution = await repoSpace(repo);
+  if (!resolved.ok) return false;
+  await closeLeaf(resolved.session, repo, leaf.state, tab);
   return true;
 }
 
-// A pass only needs herdr when a pane-dependent candidate exists: a leaf
-// worktree that is not plainly active under the store, a finished-leaf scratch
-// dir, a finished leaf whose recorded tab or loaded slice must be checked
-// against live panes, or anything else whose keep/remove choice needs live pane
-// state.
+// A pass only lists hc terminals when a terminal-dependent candidate exists: a
+// leaf worktree that is not plainly active under the store, a finished-leaf
+// scratch dir, a finished leaf whose recorded tab or loaded slice must be
+// checked against live terminals, or anything else whose keep/remove choice
+// needs live terminal state.
 export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<boolean> {
   const store: string = worktreeStore(repo);
   const oldRoot: string = resolve(repo.root, 'issues/worktrees');
@@ -496,8 +498,8 @@ export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<b
 export async function reconcile(
   repo: Repo,
   leaves: Leaf[],
-  live: Pane[] | null,
-  union?: SessionPane[] | null,
+  live: Seen[] | null,
+  union?: Seen[] | null,
   failures?: { ownedNames: ReadonlySet<string>; incomplete: boolean },
 ): Promise<Reconciled> {
   const removed: string[] = [];
@@ -710,69 +712,30 @@ export async function reconcile(
     return true;
   }
 
-  // The repo's seat context for this pass: resolved session plus the tab ids
-  // of the resolved workspace. Fetched once, lazily, and only when a close is
-  // actually decided — a refused or dead session yields null, so nothing is
-  // closed in a session that cannot be proven the repo's.
-  let seat: { session: string; tabs: Set<string> } | null | undefined;
-  const seatTabs = async (): Promise<{ session: string; tabs: Set<string> } | null> => {
-    if (seat === undefined) {
-      const resolved: SessionResolution = await repoSession(repo);
-      if (!resolved.ok) {
-        seat = null;
-      } else {
-        try {
-          const listed: Tab[] = await tabs(resolved.session.name);
-          seat = {
-            session: resolved.session.name,
-            tabs: new Set(
-              listed.filter((item) => item.workspace_id === resolved.workspace.workspace_id).map((item) => item.tab_id),
-            ),
-          };
-        } catch (error) {
-          if (!(error instanceof CommandError) || herdrError(error.result).code !== 'server_not_running') throw error;
-          seat = null;
-        }
-      }
-    }
-    return seat;
-  };
-
-  async function closeTab(worktree: string, tab: string, leaf: Leaf): Promise<boolean> {
-    const seated: { session: string; tabs: Set<string> } | null = await seatTabs();
-    if (seated === null) {
+  // A recorded tab closes only in the session holding the repo space; a refused session closes nothing.
+  async function closeTabOf(worktree: string, tab: string, leaf: Leaf): Promise<boolean> {
+    const resolved: SpaceResolution = await repoSpace(repo);
+    if (!resolved.ok) {
       keep(worktree, 'repo session unavailable', 'resolve the repo session refusal and retry cleanup');
       return false;
     }
-    // A recorded tab closes only in the repo's workspace with a member pane
-    // sitting in the leaf worktree; anything else is not this leaf's seat.
-    if (!seated.tabs.has(tab)) return true;
-    const expected: string = resolve(store, leaf.state.slug);
-    if (!panes.some((pane) => pane.tab_id === tab && pane.cwd !== null && within(pane.cwd, expected))) return true;
-    const closed: Result = await run(herdrArgv(['tab', 'close', tab], { session: seated.session }));
-    if (closed.code === 0) return true;
-    const detail: { code: string; message: string } = herdrError(closed);
-    keep(
-      worktree,
-      detail.message === '' ? detail.code : detail.message,
-      'resolve the Herdr tab-close error and retry cleanup',
-    );
-    return false;
+    try {
+      await closeLeaf(resolved.session, repo, leaf.state, tab);
+    } catch (error) {
+      if (!(error instanceof HcError || error instanceof CommandError)) throw error;
+      keep(worktree, error.message, 'resolve the seat teardown error and retry cleanup');
+      return false;
+    }
+    return true;
   }
 
   const handled: Set<string> = new Set();
-  const panes: Pane[] = live ?? [];
-  const panesUnion: Pane[] = union === undefined ? panes : (union ?? []).map((entry) => entry.pane);
-  const resolution: SessionResolution | null = union === undefined || union === null ? null : await repoSession(repo);
-  const ownPanes: Pane[] =
-    union === undefined
-      ? panes
-      : (union ?? [])
-          .filter((entry) => resolution !== null && resolution.ok && entry.session === resolution.session.name)
-          .map((entry) => entry.pane);
-  const foreignPanes: Pane[] = (union ?? [])
-    .filter((entry) => resolution === null || !resolution.ok || entry.session !== resolution.session.name)
-    .map((entry) => entry.pane);
+  const panes: Seen[] = live ?? [];
+  const panesUnion: Seen[] = union === undefined ? panes : (union ?? []);
+  const resolution: SpaceResolution | null = union === undefined || union === null ? null : await repoSpace(repo);
+  const own = (t: Seen): boolean => resolution !== null && resolution.ok && t.session === resolution.session;
+  const ownPanes: Seen[] = union === undefined ? panes : (union ?? []).filter(own);
+  const foreignPanes: Seen[] = (union ?? []).filter((t: Seen) => !own(t));
   // One /proc scan per pass, run only when a candidate reaches removal.
   let scanned: Map<number, string[]> | undefined;
   const targets = (): Map<number, string[]> => scanned ?? (scanned = procTargets());
@@ -792,7 +755,7 @@ export async function reconcile(
       return;
     }
     if (tabLive(panes, tab)) {
-      const closed: boolean = await closeTab(worktree, z.string().parse(tab), leaf);
+      const closed: boolean = await closeTabOf(worktree, z.string().parse(tab), leaf);
       if (open || !closed) {
         if (closed) keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
         return;
@@ -820,7 +783,7 @@ export async function reconcile(
         tabLive(panes, state.tab) &&
         !(within(leaf.path, openRoot) && ownerCompletes(repo, leaf))
       )
-        await closeTab(leaf.path, z.string().parse(state.tab), leaf);
+        await closeTabOf(leaf.path, z.string().parse(state.tab), leaf);
       continue;
     }
     handled.add(worktree);
@@ -1273,17 +1236,17 @@ export async function reconcile(
 export async function reconcileHost(
   repos: Repo[],
   acting: ReadonlySet<string>,
-  live: Pane[] | null,
-  panesOnce: () => Promise<Pane[] | null>,
-  panesForRepo: (repo: Repo) => Promise<Pane[] | null>,
+  live: Seen[] | null,
+  panesOnce: () => Promise<Seen[] | null>,
+  panesForRepo: (repo: Repo) => Promise<Seen[] | null>,
 ): Promise<void> {
   const kept: KeptEntry[] = [];
   const keep = (unit: string, reason: string, clears: string): void => {
     kept.push({ path: unit, reason, clears });
   };
-  let panes: Pane[] | null = live;
+  let panes: Seen[] | null = live;
   let fetched: boolean = live !== null;
-  const livePanes = async (): Promise<Pane[] | null> => {
+  const livePanes = async (): Promise<Seen[] | null> => {
     if (!fetched) {
       panes = await panesOnce();
       fetched = true;
@@ -1291,11 +1254,11 @@ export async function reconcileHost(
     return panes;
   };
   // Per-repo pane views, fetched lazily and memoized so one session is read once.
-  const repoPanes: Map<string, Promise<Pane[] | null>> = new Map();
-  const repoView = (repo: Repo): Promise<Pane[] | null> => {
-    const cached: Promise<Pane[] | null> | undefined = repoPanes.get(repo.name);
+  const repoPanes: Map<string, Promise<Seen[] | null>> = new Map();
+  const repoView = (repo: Repo): Promise<Seen[] | null> => {
+    const cached: Promise<Seen[] | null> | undefined = repoPanes.get(repo.name);
     if (cached !== undefined) return cached;
-    const fetchedRepo: Promise<Pane[] | null> = panesForRepo(repo);
+    const fetchedRepo: Promise<Seen[] | null> = panesForRepo(repo);
     repoPanes.set(repo.name, fetchedRepo);
     return fetchedRepo;
   };
@@ -1330,14 +1293,14 @@ export async function reconcileHost(
     for (const slice of [...loaded].sort()) {
       const match: { repo: Repo; leaf: Leaf } | undefined = leafOf.get(slice);
       if (match !== undefined) {
-        const view: Pane[] | null = match.leaf.state.tab === undefined ? panes : await repoView(match.repo);
+        const view: Seen[] | null = match.leaf.state.tab === undefined ? panes : await repoView(match.repo);
         const reason: string | null = sliceKeepReason(slice, match.leaf, view, own, runs);
         if (reason !== null) {
           keep(slice, reason, 'removed once the pass, recorded run or live tab ends and pane inventory is available');
           continue;
         }
         if (!acting.has(match.repo.name)) {
-          keep(slice, 'repo not reconciled by this pass', 'removed by a pass for that repo from its own herdr session');
+          keep(slice, 'repo not reconciled by this pass', 'removed by a pass for that repo from its own hc session');
           continue;
         }
         const error: string | null = await stopSlice(slice);
@@ -1392,7 +1355,7 @@ export async function reconcileHost(
   // files and retired global locks. Every deletion needs panes available and
   // no pane cwd or process inside; dead-pid tmp files need neither.
   const dropPath = async (path: string, isDir: boolean): Promise<void> => {
-    const view: Pane[] | null = await livePanes();
+    const view: Seen[] | null = await livePanes();
     if (view === null) {
       keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
       return;

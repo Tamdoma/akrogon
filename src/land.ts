@@ -28,6 +28,7 @@ export async function launchLand(repo: Repo, slug: string, attempt: string): Pro
     `--working-directory=${repo.root}`,
     `--setenv=PATH=${process.env.PATH ?? ''}`,
     `--setenv=HOME=${process.env.HOME ?? ''}`,
+    `--setenv=XDG_RUNTIME_DIR=${process.env.XDG_RUNTIME_DIR ?? ''}`,
     `--setenv=DBUS_SESSION_BUS_ADDRESS=${sessionBusAddress()}`,
     ...(process.env.AKROGON_HOME === undefined ? [] : [`--setenv=AKROGON_HOME=${process.env.AKROGON_HOME}`]),
     '--',

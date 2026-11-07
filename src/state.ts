@@ -137,6 +137,20 @@ export const stateSchema = z
 
 export type State = z.infer<typeof stateSchema>;
 
+// State written on herdr panes (plan D17): a recorded pane, a string agent session or an old tab id
+// holding `:`. No hc or herdr-app call carries its ids.
+export function predatesHc(state: State): boolean {
+  return (
+    Object.values(state.pane).some((pane: string | undefined) => pane !== undefined) ||
+    Object.values(state.prompted).some((entry: Prompted | string | undefined) => typeof entry === 'string') ||
+    state.tab?.includes(':') === true
+  );
+}
+
+export function refusePredatesHc(state: State): void {
+  if (predatesHc(state)) throw new Error(`state predates hc: ${state.slug} records old herdr pane ids`);
+}
+
 // commitMove clears `prompted`, so on a merged leaf only the broadcast dispatch sets prompted.B.
 export function broadcastPending(state: State): boolean {
   return state.phase === 'merged' && state.broadcast !== undefined && state.prompted.B === undefined;

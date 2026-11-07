@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { z } from 'zod';
 import { globalHome, readGlobal, requireRepo, type Repo } from './config';
+import { HcError, repoSpace, type SpaceResolution } from './hc';
+import { endSeats } from './reconcile';
 import { leafSlice } from './scope';
 import { command, CommandError, writeYaml } from './shell';
 import { findLeaf, repoInventory, withLock, type Inventory, type Leaf, type LeafFailure } from './state';
@@ -48,9 +50,13 @@ function writeStopped(keys: Set<string>): void {
   writeYaml(stopFile(), Object.fromEntries([...keys].map((key: string): [string, true] => [key, true])));
 }
 
-async function stopSlice(repo: Repo, slug: string): Promise<void> {
-  await command(['systemctl', '--user', 'stop', leafSlice(repo, slug)]);
-  console.log(`stopped: ${repo.name}/${slug}`);
+// The leaf's seat terminals end before its slice stops (plan D19). A refused session is never called
+// (L2); the slice stop still ends the seat processes, which run inside it.
+async function stopLeaf(repo: Repo, leaf: Leaf): Promise<void> {
+  const space: SpaceResolution = await repoSpace(repo);
+  if (space.ok) await endSeats(space.session, repo, leaf.state);
+  await command(['systemctl', '--user', 'stop', leafSlice(repo, leaf.state.slug)]);
+  console.log(`stopped: ${repo.name}/${leaf.state.slug}`);
 }
 
 export async function stopCommand(target: string | undefined, all: boolean, cwd: string): Promise<void> {
@@ -70,25 +76,23 @@ export async function stopCommand(target: string | undefined, all: boolean, cwd:
       process.exitCode = 1;
     }
   }
-  const slugs: string[] =
+  const leaves: Leaf[] =
     inv !== null
-      ? inv.leaves
-          .filter(
-            (leaf: Leaf) =>
-              (leaf.state.tab !== undefined || leaf.state.batch?.owner === 'command') && leaf.state.phase !== 'merged',
-          )
-          .map((leaf: Leaf) => leaf.state.slug)
-      : [findLeaf(repo, z.string().parse(target)).state.slug];
+      ? inv.leaves.filter(
+          (leaf: Leaf) =>
+            (leaf.state.tab !== undefined || leaf.state.batch?.owner === 'command') && leaf.state.phase !== 'merged',
+        )
+      : [findLeaf(repo, z.string().parse(target))];
   await withLock(resolve(globalHome(), '.lock'), async () => {
-    writeStopped(new Set<string>([...readStopped(), ...slugs.map((slug: string) => `${repo.name}/${slug}`)]));
+    writeStopped(new Set<string>([...readStopped(), ...leaves.map((leaf: Leaf) => `${repo.name}/${leaf.state.slug}`)]));
   });
-  if (!all) return stopSlice(repo, slugs[0]);
-  for (const slug of slugs) {
+  if (!all) return stopLeaf(repo, leaves[0]);
+  for (const leaf of leaves) {
     try {
-      await stopSlice(repo, slug);
+      await stopLeaf(repo, leaf);
     } catch (error) {
-      if (!(error instanceof CommandError)) throw error;
-      console.error(`failed: ${repo.name}/${slug} ${error.message}`);
+      if (!(error instanceof CommandError || error instanceof HcError)) throw error;
+      console.error(`failed: ${repo.name}/${leaf.state.slug} ${error.message}`);
       process.exitCode = 1;
     }
   }

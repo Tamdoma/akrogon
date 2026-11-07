@@ -11,6 +11,7 @@ import {
   inventoryUnder,
   withLock,
   failureSchema,
+  predatesHc,
   type Batch,
   type Failure,
   type State,
@@ -32,13 +33,13 @@ import {
   run,
   herdr,
   herdrArgv,
-  herdrError,
   repoSession,
   retryable,
   CommandError,
   type Result,
   type SessionResolution,
 } from './shell';
+import { renameTab as renameAppTab, repoSpace, wakeWatcher, windowOpen, type SpaceResolution } from './hc';
 import { logMove, readLog } from './log';
 import { appendTiming, currentVisit } from './timing';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
@@ -71,26 +72,19 @@ async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string, 
   }
 }
 
-async function renameTab(repo: Repo, tab: string, label: string, slug: string): Promise<void> {
-  const args: string[] = ['tab', 'rename', tab, label];
-  const resolved: SessionResolution = await repoSession(repo);
-  const argv: string[] = resolved.ok ? herdrArgv(args, { session: resolved.session.name }) : args;
+// The leaf tab is renamed only while a window shows it; a closed window leaves the name to the next
+// pass that finds it open (plan D11). Pre-hc state carries an old tab id and is skipped.
+async function renameTab(repo: Repo, state: State, name: string): Promise<void> {
+  if (state.tab === undefined || predatesHc(state)) return;
+  const space: SpaceResolution = await repoSpace(repo);
+  if (!space.ok) throw new Error(space.reason);
+  if (!(await windowOpen(space.session))) return;
   try {
-    if (!resolved.ok) throw new Error(resolved.reason);
-    await herdrCall(args, z.object({ tab: z.object({ label: z.string() }) }), slug, resolved.session.name);
+    await renameAppTab(space.session, state.tab, name);
   } catch (error) {
     if (!(error instanceof CommandError)) throw error;
-    const parsed: { code: string; message: string } = herdrError(error.result);
-    if (parsed.code !== 'tab_not_found') throw error;
     console.warn(
-      JSON.stringify({
-        warning: 'tab missing, skipping rename',
-        slug,
-        command: argv,
-        code: parsed.code,
-        message: parsed.message,
-        stderr: error.result.stderr,
-      }),
+      JSON.stringify({ warning: 'tab rename failed', slug: state.slug, tab: state.tab, name, error: error.message }),
     );
   }
 }
@@ -124,7 +118,7 @@ async function announceFailed(repo: Repo, leaf: Leaf, state: State): Promise<Sta
   saveState(leaf.path, announced);
   if (state.tab !== undefined) {
     try {
-      await renameTab(repo, state.tab, `${state.slug} failed`, state.slug);
+      await renameTab(repo, state, `${state.slug} failed`);
     } catch (error) {
       lastError = error;
     }
@@ -226,9 +220,11 @@ export async function commitMove(
   // The transition is committed even if diagnostic collection or append fails.
   let announced: State = after;
   try {
-    if (to === 'failed') announced = await announceFailed(repo, leaf, after);
-    else if (recorded.phase === 'failed' && after.tab !== undefined)
-      await renameTab(repo, after.tab, after.slug, after.slug);
+    if (to === 'failed') {
+      // The wake goes first: a failed notice must not cost the watcher its wake.
+      await wakeWatcher(repo, `failed ${after.slug}`);
+      announced = await announceFailed(repo, leaf, after);
+    } else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(repo, after, after.slug);
     if (to === 'merged') await completeOwner(repo, leaf, true);
   } catch (error) {
     if (error instanceof MoveCommittedError) throw error;

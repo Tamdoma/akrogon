@@ -153,6 +153,7 @@ export function writeYaml(path: string, content: object): void {
   renameSync(temporary, path);
 }
 
+// The pane and tab shapes stay only for the test suite's fake pane server, which imports them.
 export const paneSchema = z.object({
   pane_id: z.string(),
   tab_id: z.string(),
@@ -165,17 +166,12 @@ export const paneSchema = z.object({
     .optional(),
 });
 
-export type Pane = z.infer<typeof paneSchema>;
-export type SessionPane = { session: string; pane: Pane };
-
 export const tabSchema = z.object({
   tab_id: z.string(),
   label: z.string(),
   focused: z.boolean().optional(),
   workspace_id: z.string().optional(),
 });
-
-export type Tab = z.infer<typeof tabSchema>;
 
 export const workspaceSchema = z.object({ workspace_id: z.string(), label: z.string() });
 
@@ -194,8 +190,8 @@ export type Session = z.infer<typeof sessionSchema>;
 export type SessionResolution =
   { ok: true; session: Session; workspace: Workspace } | { ok: false; reason: string; scope?: 'repo' | 'invocation' };
 
-// Discovery reads (session list, per-session workspace list, the second-seat
-// guard's pane/tab lists) get a fixed deadline; a hit counts as unreadable.
+// Discovery reads (session lists, per-session workspace and terminal lists) get
+// a fixed deadline; a hit counts as unreadable.
 export const DISCOVERY_DEADLINE_MS = 10_000;
 
 const herdrErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
@@ -243,31 +239,6 @@ export async function herdr<T>(
   }
 }
 
-export async function panes(session?: string, exe?: string): Promise<Pane[]> {
-  return (
-    await herdr(['pane', 'list'], z.object({ panes: z.array(paneSchema) }), {
-      session,
-      exe,
-      deadlineMs: DISCOVERY_DEADLINE_MS,
-    })
-  ).panes;
-}
-
-export async function tabs(session?: string, exe?: string): Promise<Tab[]> {
-  return (
-    await herdr(['tab', 'list'], z.object({ tabs: z.array(tabSchema) }), {
-      session,
-      exe,
-      deadlineMs: DISCOVERY_DEADLINE_MS,
-    })
-  ).tabs;
-}
-
-export async function workspaces(session?: string, exe?: string): Promise<Workspace[]> {
-  return (await herdr(['workspace', 'list'], z.object({ workspaces: z.array(workspaceSchema) }), { session, exe }))
-    .workspaces;
-}
-
 // One session list per process per executable; the parsed reply or the failure is cached.
 type SessionList = { ok: true; sessions: Session[] } | { ok: false; error: string };
 const sessionLists: Map<string, Promise<SessionList>> = new Map();
@@ -298,39 +269,6 @@ function sessionList(exe: string): Promise<SessionList> {
   const fetched: Promise<SessionList> = fetchSessionList(exe);
   sessionLists.set(exe, fetched);
   return fetched;
-}
-
-// The sessions from the cached list, for the second-seat guard's cross-session reads.
-export async function listSessions(exe: string = 'herdr'): Promise<Session[] | null> {
-  const list: SessionList = await sessionList(exe);
-  return list.ok ? list.sessions : null;
-}
-
-// Every running session's panes tagged with its name, re-fetched on each call.
-// A session listed running whose pane read dies server_not_running is skipped
-// as stopped, like resolution's workspace probe; any other per-session read
-// error or a failed session list makes the whole union null.
-export async function sessionPanes(exe: string = 'herdr'): Promise<SessionPane[] | null> {
-  const sessions: Session[] | null = await listSessions(exe);
-  if (sessions === null) return null;
-  const tagged: SessionPane[] = [];
-  for (const session of sessions) {
-    if (!session.running) continue;
-    try {
-      // Liveness first on the cheapest read, like resolution's workspace
-      // probe: a dead-but-listed session is skipped without a pane call.
-      await herdr(['workspace', 'list'], z.object({}), {
-        session: session.name,
-        exe,
-        deadlineMs: DISCOVERY_DEADLINE_MS,
-      });
-      for (const pane of await panes(session.name, exe)) tagged.push({ session: session.name, pane });
-    } catch (error) {
-      if (error instanceof CommandError && herdrError(error.result).code === 'server_not_running') continue;
-      return null;
-    }
-  }
-  return tagged;
 }
 
 export function repoSession(repo: Repo, opts: { exe?: string } = {}): Promise<SessionResolution> {
