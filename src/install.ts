@@ -12,9 +12,11 @@ import { dirname, relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { expandPath, globalHome, readGlobal, toolRoot, within, type GlobalConfig } from './config';
 import { currentLink, ensureCurrent, releasesDir } from './release';
-import { command, quote } from './shell';
+import { CommandError, quote, spawnCaptured, type SpawnResult } from './shell';
 
 export type Link = { source: string; destination: string; repoint?: boolean };
+
+const listenerUnit: string = 'akrogon-listener.service';
 
 export function planSkillLinks(
   home: string,
@@ -47,6 +49,14 @@ export function planSkillLinks(
       source: resolve(sourceRoot, 'herdr-app', mod),
       destination: resolve(home, '.config/herdr-app/mods', mod),
     })),
+    ...(existsSync(resolve(listRoot, 'systemd', listenerUnit))
+      ? [
+          {
+            source: resolve(sourceRoot, 'systemd', listenerUnit),
+            destination: resolve(home, '.config/systemd/user', listenerUnit),
+          },
+        ]
+      : []),
   ];
   const releases: string = releasesDir();
   const skillRoots: string[] = ownedRoots.map((root) => resolve(root, 'skills'));
@@ -118,6 +128,42 @@ export function applySkillLinks(links: Link[]): void {
   }
 }
 
+function shipsPlugin(): boolean {
+  return existsSync(resolve(currentLink(), 'plugin'));
+}
+
+function shipsListener(): boolean {
+  return existsSync(resolve(currentLink(), 'systemd', listenerUnit));
+}
+
+async function call(argv: string[]): Promise<void> {
+  // env: process.env is load-bearing: Bun.spawn with env undefined forks the
+  // startup environment, so in-process callers that mutate PATH or fake-env
+  // vars (every test fixture) would silently hit real systemctl/herdr.
+  const result: SpawnResult = await spawnCaptured(argv, { env: process.env });
+  if (result.code !== 0) throw new CommandError(argv, process.cwd(), result);
+}
+
+export async function linkServices(kinds: string[]): Promise<void> {
+  await call(['systemctl', '--user', 'daemon-reload']);
+  if (shipsPlugin()) {
+    for (const kind of kinds) await call(['herdr', 'integration', 'install', kind]);
+    await call(['herdr', 'plugin', 'link', resolve(currentLink(), 'plugin')]);
+  }
+  if (shipsListener()) await call(['systemctl', '--user', 'enable', listenerUnit]);
+}
+
+export async function restartListener(): Promise<void> {
+  // --no-block returns once the job is queued, so a caller inside the unit is
+  // not stopped while systemctl waits.
+  if (shipsListener()) await call(['systemctl', '--user', 'restart', '--no-block', listenerUnit]);
+}
+
+export async function unlinkPlugin(): Promise<void> {
+  if (!shipsPlugin() && Bun.which('herdr', { PATH: process.env.PATH }) !== null)
+    await call(['herdr', 'plugin', 'unlink', 'akrogon']);
+}
+
 export async function install(): Promise<void> {
   const global: GlobalConfig = readGlobal();
   ensureCurrent();
@@ -142,7 +188,7 @@ export async function install(): Promise<void> {
     throw new Error('Install destinations conflict. Remove the listed paths before installing.');
   }
   applySkillLinks(links);
-  await command(['systemctl', '--user', 'daemon-reload']);
-  for (const kind of Object.keys(global.harnesses)) await command(['herdr', 'integration', 'install', kind]);
-  await command(['herdr', 'plugin', 'link', resolve(currentLink(), 'plugin')]);
+  await linkServices(Object.keys(global.harnesses));
+  await restartListener();
+  await unlinkPlugin();
 }

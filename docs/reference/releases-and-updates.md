@@ -39,7 +39,7 @@ Self-update runs on these triggers:
 - `akrogon next` with a target, or run by hand from a leaf or worktree folder.
 - `akrogon next --all` and `akrogon next --resume`, which cover every registered checkout.
 
-For the Akrogon repository only, self-update then deploys the tip of the remote default branch. It does nothing when that commit is already active and recorded as a success. Otherwise it builds the release, updates the links, flips `current` to the new release, reloads systemd user units and relinks the Herdr plugin, then writes `deploy.yaml`. The deploy reads the remote tip, not your checkout, so an uncommitted edit never goes live and never blocks a deploy.
+For the Akrogon repository only, self-update then deploys the tip of the remote default branch. It does nothing when that commit is already active and recorded as a success. Otherwise it builds the release, updates the links, flips `current` to the new release and reloads systemd user units. It relinks the Herdr plugin only when the release has `plugin/`, and enables the listener unit when the release ships it. Then it writes `deploy.yaml` and restarts the listener. Last, when the release has no `plugin/` and `herdr` is installed, it unlinks akrogon's plugin from Herdr. The deploy reads the remote tip, not your checkout, so an uncommitted edit never goes live and never blocks a deploy.
 
 A commit held by `akrogon rollback` is not deployed. The step prints `deploy held` instead. The hold ends once a different commit deploys.
 
@@ -47,9 +47,9 @@ Sources: [src/next.ts](../../src/next.ts) (`nextCommand`, `mergeWake`, `landedWa
 
 ## When an update fails
 
-A failed deploy prints `deploy failed: <step>: <error>; retried at the next trigger`. The step is one of `fetch`, `resolve`, `hold`, `archive`, `install`, `links`, `flip`, `reload` or `record`. The same failure is written to `deploy.yaml` with `ok: false`, the attempted commit, the step and the error.
+A failed deploy prints `deploy failed: <step>: <error>; retried at the next trigger`. The step is one of `fetch`, `resolve`, `hold`, `archive`, `install`, `links`, `flip`, `reload`, `record`, `restart` or `unlink`. The same failure is written to `deploy.yaml` with `ok: false`, the attempted commit, the step and the error.
 
-A failure at or before `flip` leaves `current` on the active release. Link conflicts are rejected before any link changes. A failure in `reload` or `record` happens after `current` already points at the new release.
+A failure at or before `flip` leaves `current` on the active release. Link conflicts are rejected before any link changes. A failure in `reload`, `record`, `restart` or `unlink` happens after `current` already points at the new release.
 
 `akrogon status` keeps showing `deploy failed: attempted <commit>, active <commit>, step <step>: <error>` until a later deploy succeeds.
 

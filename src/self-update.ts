@@ -2,7 +2,7 @@ import { lstatSync, realpathSync, rmSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { ensureLeafTemp, expandPath, leafTemp, toolRoot, worktreeStore, type Repo } from './config';
-import { applySkillLinks, planSkillLinks, type Link } from './install';
+import { applySkillLinks, linkServices, planSkillLinks, restartListener, unlinkPlugin, type Link } from './install';
 import {
   buildRelease,
   clearReleaseHold,
@@ -17,7 +17,7 @@ import {
   writeDeploySuccess,
 } from './release';
 import { eligibleRecord, integrate } from './sync';
-import { command, run, spawnCaptured, CommandError, type Result, type SpawnResult } from './shell';
+import { command, run, CommandError, type Result } from './shell';
 import { withLock } from './state';
 
 function errorLine(result: Result): string {
@@ -271,22 +271,7 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
       for (const path of planned.stale) if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) unlinkSync(path);
     });
     await step('flip', () => flip(sha));
-    await step('reload', async () => {
-      // env: process.env is load-bearing: Bun.spawn with env undefined forks the
-      // startup environment, so in-process callers that mutate PATH or fake-env
-      // vars (every test fixture) would silently hit real systemctl/herdr.
-      const reloaded: SpawnResult = await spawnCaptured(['systemctl', '--user', 'daemon-reload'], {
-        cwd: root,
-        env: process.env,
-      });
-      if (reloaded.code !== 0) throw new CommandError(['systemctl', '--user', 'daemon-reload'], root, reloaded);
-      const linked: SpawnResult = await spawnCaptured(['herdr', 'plugin', 'link', resolve(currentLink(), 'plugin')], {
-        cwd: root,
-        env: process.env,
-      });
-      if (linked.code !== 0)
-        throw new CommandError(['herdr', 'plugin', 'link', resolve(currentLink(), 'plugin')], root, linked);
-    });
+    await step('reload', () => linkServices([]));
     await step('record', () => {
       writeDeploySuccess(
         sha,
@@ -295,6 +280,8 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
       clearReleaseHold();
       pruneReleases();
     });
+    await step('restart', () => restartListener());
+    await step('unlink', () => unlinkPlugin());
     return `deployed ${sha.slice(0, 12)}${previous === null ? '; switched from checkout to release' : ''}`;
   } catch (error) {
     const failed: string =
