@@ -14,7 +14,7 @@ const contracts: Record<string, string> = {
   preflight: '',
   phase: '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>]',
   land: '<slug> --attempt <id>',
-  next: '[<slug>|<path>|--all|--resume]',
+  next: '[<slug>|<path>|--all|--resume|--wake]',
   pull: '[--all]',
   close: '<owner/repo#n> --by <text>',
   sync: '',
@@ -36,6 +36,7 @@ const contracts: Record<string, string> = {
   pack: '<folder>...',
   guard: '<ancestors|own-modules>',
   rollback: '',
+  listen: '',
   seat: '<slug> <A|B> [--task <text>] | --slot <letter> --harness <name> --model <model> --effort <effort> [--task <text>]',
 };
 
@@ -129,7 +130,7 @@ test('escaped alternatives and reordered rows preserve argument semantics', () =
         Object.entries({
           ...contracts,
           park: '--all | <issue>...',
-          next: '[--all | <path> | <slug> | --resume]',
+          next: '[--all | <path> | <slug> | --resume | --wake]',
         }).reverse(),
       ),
     ),
