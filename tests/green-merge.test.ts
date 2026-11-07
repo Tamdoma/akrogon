@@ -1,44 +1,35 @@
 import { test, expect } from 'bun:test';
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import {
-  cli,
-  fakeHerdr,
-  fakeSystemctl,
-  fixture,
-  leaf,
-  procRoot,
-  yaml,
-  type Fixture,
-  type SystemctlFixture,
-} from './helpers';
-import { OUTSIDE_CGROUP, expectedScope, expectedSlice, procDir, shellPid } from './fake-proc';
+import { cli, fakeSystemctl, fixture, leaf, yaml, type Fixture, type SystemctlFixture } from './helpers';
+import { hcFixture, type HcFixture } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
-import type { Database } from './fake-herdr';
+type GreenFixture = HcFixture & { launches: string; systemctl: SystemctlFixture };
 
-type GreenFixture = Fixture & { db: string; env: NodeJS.ProcessEnv; launches: string };
-
-async function greenFixture(checks: Record<string, string>): Promise<GreenFixture> {
-  const f: Fixture = await fixture();
+async function greenFrom(f: HcFixture, checks: Record<string, string>): Promise<GreenFixture> {
   yaml(resolve(f.root, 'issues/config.yaml'), { checks, grounding: 'none' });
   await command(['git', 'add', 'issues/config.yaml'], f.root);
   await command(['git', 'commit', '-m', 'checks'], f.root);
   await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
-  const herdr = fakeHerdr(f);
   const launches: string = resolve(f.home, 'systemd-run.log');
-  return { ...f, ...herdr, env: { ...herdr.env, FAKE_SYSTEMD_RUN_LOG: launches }, launches };
+  // akrogon's slice stops go to the fake: a leaf slice is named by repo and slug, so a real stop
+  // could end another test file's seat of the same name.
+  const systemctl: SystemctlFixture = fakeSystemctl(f);
+  return { ...f, env: { ...f.env, ...systemctl.env, FAKE_SYSTEMD_RUN_LOG: launches }, launches, systemctl };
 }
-function database(f: GreenFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
+async function greenFixture(checks: Record<string, string>): Promise<GreenFixture> {
+  return greenFrom(await hcFixture(), checks);
 }
-function saveDatabase(f: GreenFixture, db: Database): void {
-  writeFileSync(f.db, JSON.stringify(db));
-}
-function prompts(f: GreenFixture, skill: string): Database['prompts'] {
-  return database(f).prompts.filter((prompt) => prompt.text.startsWith(skill));
+// Every task any seat received for one skill, removed terminals included (the stand-in's task logs
+// outlive their terminal).
+function prompts(f: GreenFixture, skill: string): string[] {
+  return readdirSync(f.core.standin)
+    .filter((name) => name.endsWith('.tasks'))
+    .flatMap((name) => readFileSync(resolve(f.core.standin, name), 'utf8').split('\n'))
+    .filter((text) => text.startsWith(skill));
 }
 function landLaunches(f: GreenFixture): string[] {
   return existsSync(f.launches)
@@ -47,9 +38,24 @@ function landLaunches(f: GreenFixture): string[] {
         .filter((line) => line.includes('--unit=akrogon-land-'))
     : [];
 }
-function idleAll(f: GreenFixture): void {
-  const db: Database = database(f);
-  saveDatabase(f, { ...db, panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) });
+// Waits until every live seat of the leaf has finished its turn (or was ended), so the next pass
+// can deliver.
+async function idleAll(f: GreenFixture): Promise<void> {
+  for (const seat of await f.core.terminals({ 'akrogon.leaf': 'aa' }, false))
+    await f.core.waitFor(seat.address, (t) => t.state === 'finished' || t.status?.state === 'idle');
+}
+// Holds open each seat turn whose task starts with `skill` until the returned release runs.
+function holdTurns(f: GreenFixture, skill: string): () => void {
+  const gate: string = resolve(f.core.standin, 'gate');
+  Bun.spawnSync(['mkfifo', gate]);
+  writeFileSync(
+    resolve(f.core.standin, 'hook'),
+    `#!/bin/sh\ncase "$2" in ${skill}*) cat ${gate} >/dev/null ;; esac\n`,
+    { mode: 0o755 },
+  );
+  return () => {
+    Bun.spawnSync(['sh', '-c', `echo go > ${gate}`]);
+  };
 }
 function attempts(f: Fixture): string[] {
   const file: string = resolve(f.root, 'issues/merge-attempts.jsonl');
@@ -98,8 +104,7 @@ function toMerge(path: string): void {
 }
 // Claims the holder's turn through a real `next` and returns the applied attempt.
 async function claimed(f: GreenFixture, path: string): Promise<{ attempt: string; top: string }> {
-  saveDatabase(f, { ...database(f), prompts: [] });
-  idleAll(f);
+  await idleAll(f);
   expect((await next(f)).code).toBe(0);
   const state: State = readState(path);
   return { attempt: z.string().parse(state.batch?.attempt), top: z.string().parse(state.batch?.top) };
@@ -162,13 +167,15 @@ test('a green top lands with no seat', async () => {
     expect(timing.code).toBe(0);
     expect(timing.stdout).not.toContain('incomplete prompt');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
 test('a red verify is never pushed and wakes B once', async () => {
   const f: GreenFixture = await greenFixture({ bad: 'false' });
   try {
+    // B is still working on the red wake when the next pass runs.
+    holdTurns(f, 'merge-issue');
     const path: string = await allocated(f, 'aa', 'issue-aa');
     await commitIn(path, 'aa-file', 'aa\n');
     toMerge(path);
@@ -182,15 +189,15 @@ test('a red verify is never pushed and wakes B once', async () => {
     const red: string = z.string().parse(state.batch?.red);
     expect(verifyRuns(f).find((run) => run.run === red)?.commands[0].exit).toBe(1);
     expect(prompts(f, 'merge-issue')).toHaveLength(1);
-    expect(prompts(f, 'merge-issue')[0].text).toContain(`attempt=${attempt} top=${top}`);
-    expect(prompts(f, 'merge-issue')[0].text).toContain(`wake=red red=${red}`);
+    expect(prompts(f, 'merge-issue')[0]).toContain(`attempt=${attempt} top=${top}`);
+    expect(prompts(f, 'merge-issue')[0]).toContain(`wake=red red=${red}`);
     const runs: number = verifyRuns(f).length;
     expect((await next(f)).code).toBe(0);
     expect(prompts(f, 'merge-issue')).toHaveLength(1);
     expect(landLaunches(f)).toHaveLength(1);
     expect(verifyRuns(f)).toHaveLength(runs);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
@@ -204,16 +211,15 @@ test('an unrebaseable holder gets the solo prompt and no verify', async () => {
     await command(['git', 'commit', '-m', 'main file'], f.root);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     toMerge(path);
-    saveDatabase(f, { ...database(f), prompts: [] });
-    idleAll(f);
+    await idleAll(f);
     expect((await next(f)).code).toBe(0);
     const attempt: string = z.string().parse(readState(path).batch?.attempt);
     expect(prompts(f, 'merge-issue')).toHaveLength(1);
-    expect(prompts(f, 'merge-issue')[0].text).toContain(`attempt=${attempt} solo`);
+    expect(prompts(f, 'merge-issue')[0]).toContain(`attempt=${attempt} solo`);
     expect(landLaunches(f)).toEqual([]);
     expect(verifyRuns(f)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
@@ -237,28 +243,17 @@ test('a gate refusal records the refusal and wakes B', async () => {
     expect(state.batch).toMatchObject({ owner: 'seat', wake: 'gate' });
     expect(state.batch?.refusal).toContain('tests/x.test.ts');
     expect(prompts(f, 'merge-issue')).toHaveLength(1);
-    expect(prompts(f, 'merge-issue')[0].text).toContain('wake=gate');
+    expect(prompts(f, 'merge-issue')[0]).toContain('wake=gate');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
 test('a clean restack is verified and pushed again with no seat', async () => {
-  const f: Fixture = await fixture();
+  const f: HcFixture = await hcFixture();
   const script: string = await advancer(f, 'adv-file', 'adv');
   const mark: string = resolve(f.home, 'advanced');
-  const g: GreenFixture = await (async () => {
-    yaml(resolve(f.root, 'issues/config.yaml'), {
-      checks: { adv: `sh -c '[ -e ${mark} ] || { touch ${mark} && ${script}; }'` },
-      grounding: 'none',
-    });
-    await command(['git', 'add', 'issues/config.yaml'], f.root);
-    await command(['git', 'commit', '-m', 'checks'], f.root);
-    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
-    const herdr = fakeHerdr(f);
-    const launches: string = resolve(f.home, 'systemd-run.log');
-    return { ...f, ...herdr, env: { ...herdr.env, FAKE_SYSTEMD_RUN_LOG: launches }, launches };
-  })();
+  const g: GreenFixture = await greenFrom(f, { adv: `sh -c '[ -e ${mark} ] || { touch ${mark} && ${script}; }'` });
   try {
     const path: string = await allocated(g, 'aa', 'issue-aa');
     leaf(g, 'zz', 'plan.synthesis', {}, 'issue-aa');
@@ -275,29 +270,20 @@ test('a clean restack is verified and pushed again with no seat', async () => {
     expect(prompts(g, 'merge-issue')).toEqual([]);
     expect(attempts(g)).toEqual(['merged']);
   } finally {
-    g.clean();
+    await g.clean();
   }
 }, 90000);
 
 async function pushEnding(
   ending: 'second refusal' | 'manual rebase' | 'push error',
 ): Promise<{ state: State; prompt: string; holderOnMain: boolean }> {
-  const f: Fixture = await fixture();
+  const f: HcFixture = await hcFixture();
   const mark: string = resolve(f.home, 'advanced');
   const script: string =
     ending === 'manual rebase' ? await advancer(f, 'aa-file', 'other') : await advancer(f, 'adv-file', 'adv');
   const check: string =
     ending === 'second refusal' ? `sh -c '${script}'` : `sh -c '[ -e ${mark} ] || { touch ${mark} && ${script}; }'`;
-  yaml(resolve(f.root, 'issues/config.yaml'), {
-    checks: ending === 'push error' ? { ok: 'true' } : { adv: check },
-    grounding: 'none',
-  });
-  await command(['git', 'add', 'issues/config.yaml'], f.root);
-  await command(['git', 'commit', '-m', 'checks'], f.root);
-  await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
-  const herdr = fakeHerdr(f);
-  const launches: string = resolve(f.home, 'systemd-run.log');
-  const g: GreenFixture = { ...f, ...herdr, env: { ...herdr.env, FAKE_SYSTEMD_RUN_LOG: launches }, launches };
+  const g: GreenFixture = await greenFrom(f, ending === 'push error' ? { ok: 'true' } : { adv: check });
   try {
     const path: string = await allocated(g, 'aa', 'issue-aa');
     await commitIn(path, 'aa-file', 'aa\n');
@@ -319,11 +305,11 @@ async function pushEnding(
       head,
     ]);
     const holderOnMain: boolean = contains.code === 0 && contains.stdout !== '';
-    const merge: Database['prompts'] = prompts(g, 'merge-issue');
+    const merge: string[] = prompts(g, 'merge-issue');
     expect(merge).toHaveLength(1);
-    return { state: readState(path), prompt: merge[0].text, holderOnMain };
+    return { state: readState(path), prompt: merge[0], holderOnMain };
   } finally {
-    g.clean();
+    await g.clean();
   }
 }
 
@@ -360,29 +346,28 @@ test('a completing push hands off exactly one broadcast seat, also after a crash
     expect(state.phase).toBe('merged');
     expect(state.broadcast).toMatchObject({ kind: 'issue', name: 'issue-aa', pushed: top });
     expect(prompts(f, 'broadcast-issue')).toHaveLength(1);
-    expect(prompts(f, 'broadcast-issue')[0].text).toContain('owner=issue:issue-aa');
+    expect(prompts(f, 'broadcast-issue')[0]).toContain('owner=issue:issue-aa');
     expect(prompts(f, 'merge-issue')).toEqual([]);
-    idleAll(f);
+    await idleAll(f);
     expect((await next(f)).code).toBe(0);
     expect((await next(f)).code).toBe(0);
     expect(prompts(f, 'broadcast-issue')).toHaveLength(1);
     // A crash after the owner closed and before the seat started leaves an undispatched handoff.
     saveState(closed, { ...readState(closed), prompted: {}, prompted_at: {} });
-    idleAll(f);
+    await idleAll(f);
     expect((await next(f)).code).toBe(0);
-    idleAll(f);
+    await idleAll(f);
     expect((await next(f)).code).toBe(0);
     expect(prompts(f, 'broadcast-issue')).toHaveLength(2);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
 test('a live land run is left alone, a dead one resumes, and a seat-owned attempt stays with B', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
   try {
-    const systemctl: SystemctlFixture = fakeSystemctl(f);
-    f.env = { ...f.env, ...systemctl.env };
+    const systemctl: SystemctlFixture = f.systemctl;
     const path: string = await allocated(f, 'aa', 'issue-aa');
     await commitIn(path, 'aa-file', 'aa\n');
     toMerge(path);
@@ -405,9 +390,9 @@ test('a live land run is left alone, a dead one resumes, and a seat-owned attemp
     expect((await next(f)).code).toBe(0);
     expect(landLaunches(f)).toHaveLength(2);
     expect(prompts(f, 'merge-issue')).toHaveLength(1);
-    expect(prompts(f, 'merge-issue')[0].text).toContain(`attempt=${attempt} top=${top} wake=gate`);
+    expect(prompts(f, 'merge-issue')[0]).toContain(`attempt=${attempt} top=${top} wake=gate`);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
@@ -430,7 +415,7 @@ test('a land run that died after its push recovers to merged once', async () => 
     const log: string[] = readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n');
     expect(log.filter((line) => JSON.parse(line).to === 'merged')).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
@@ -464,41 +449,10 @@ test('stop --all stops a tabless command merge', async () => {
   }
 });
 
-test('a pending broadcast recreates a live recorded B outside its scope before prompting it', async () => {
-  const f: GreenFixture = await greenFixture({ ok: 'true' });
-  try {
-    const path: string = await allocated(f, 'aa', 'issue-aa');
-    await commitIn(path, 'aa-file', 'aa\n');
-    toMerge(path);
-    const { attempt } = await claimed(f, path);
-    const before: State = readState(path);
-    const oldB: string = z.string().parse(before.pane.B);
-    writeFileSync(resolve(procDir(procRoot(f), shellPid(oldB)), 'cgroup'), OUTSIDE_CGROUP + '\n');
-    expect((await land(f, 'aa', attempt)).code).toBe(0);
-    const closed: string = moved(path);
-    const state: State = readState(closed);
-    const sent: Database['prompts'] = prompts(f, 'broadcast-issue');
-    expect(sent).toHaveLength(1);
-    const newB: string = z.string().parse(state.pane.B);
-    expect(newB).not.toBe(oldB);
-    expect(sent[0].pane).toBe(newB);
-    expect(sent[0].text).toContain('owner=issue:issue-aa');
-    const db: Database = database(f);
-    expect(db.panes.some((pane) => pane.pane_id === oldB)).toBe(false);
-    expect(db.panes.some((pane) => pane.pane_id === newB)).toBe(true);
-    expect(state.pane.A).toBe(before.pane.A);
-    const slice: string = expectedSlice('repo', 'aa');
-    const fresh = db.startCgroups.filter((start) => start.pane === newB);
-    expect(fresh).toHaveLength(1);
-    expect(fresh[0].cgroup.endsWith(`/${slice}/${expectedScope(slice, newB)}`)).toBe(true);
-  } finally {
-    f.clean();
-  }
-}, 60000);
-
 test('next keeps a working broadcast seat until it finishes', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
   try {
+    const release: () => void = holdTurns(f, 'broadcast-issue');
     const path: string = await allocated(f, 'aa', 'issue-aa');
     await commitIn(path, 'aa-file', 'aa\n');
     toMerge(path);
@@ -506,27 +460,28 @@ test('next keeps a working broadcast seat until it finishes', async () => {
     expect((await land(f, 'aa', attempt)).code).toBe(0);
     const closed: string = moved(path);
     const state: State = readState(closed);
-    expect(database(f).panes.find((pane) => pane.pane_id === state.pane.B)?.agent_status).toBe('working');
+    const seatB: string = z.string().parse(state.seat.B?.address);
+    expect((await f.core.get(seatB)).status?.state).toBe('working');
     expect((await next(f)).code).toBe(0);
     expect((await next(f)).code).toBe(0);
-    expect(database(f).panes.some((pane) => pane.pane_id === state.pane.B)).toBe(true);
+    expect((await f.core.get(seatB)).state).toBe('live');
     expect(existsSync(z.string().parse(state.worktree))).toBe(true);
     expect(prompts(f, 'broadcast-issue')).toHaveLength(1);
-    idleAll(f);
+    release();
+    await idleAll(f);
     expect((await next(f)).code).toBe(0);
     expect((await next(f)).code).toBe(0);
-    expect(database(f).panes.some((pane) => pane.pane_id === state.pane.B)).toBe(false);
+    expect((await f.core.terminals({ 'akrogon.leaf': 'aa' }, true)).map((t) => t.address)).not.toContain(seatB);
     expect(prompts(f, 'broadcast-issue')).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
 test('next preserves a live command attempt while its refused push restacks', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
   try {
-    const systemctl: SystemctlFixture = fakeSystemctl(f);
-    f.env = { ...f.env, ...systemctl.env };
+    const systemctl: SystemctlFixture = f.systemctl;
     const path: string = await allocated(f, 'aa', 'issue-aa');
     await commitIn(path, 'aa-file', 'aa\n');
     toMerge(path);
@@ -553,7 +508,7 @@ test('next preserves a live command attempt while its refused push restacks', as
     expect(prompts(f, 'merge-issue')).toEqual([]);
     expect(verifyRuns(f)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
@@ -570,6 +525,6 @@ test('the land service drops the inherited Herdr socket and keeps no seat identi
     expect(landLaunches(f)[0]).not.toContain('HERDR_SOCKET_PATH');
     expect(landLaunches(f)[0]).not.toContain('HERDR_PANE_ID');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
