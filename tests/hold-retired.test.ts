@@ -2,8 +2,8 @@ import { test, expect, afterEach } from 'bun:test';
 import { z } from 'zod';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { cli, fakeHerdr, fixture, leaf, leafTempRoot, storeDir, yaml, type Fixture } from './helpers';
-import type { Database } from './fake-herdr';
+import { cli, fixture, leaf, leafTempRoot, storeDir, yaml, type Fixture } from './helpers';
+import { delivered, hcFixture, type HcFixture } from './hc-fixture';
 import { readState } from '../src/state';
 import { attemptRecordSchema } from '../src/attempts';
 import { command, type Result } from '../src/shell';
@@ -18,10 +18,6 @@ afterEach(() => {
 });
 
 const POINTER: string = 'skills/merge-issue/SKILL.md';
-
-function database(db: string): Database {
-  return JSON.parse(readFileSync(db, 'utf8')) as Database;
-}
 
 function legacyHeld(f: Fixture): string {
   const file: string = resolve(f.home, 'held.yaml');
@@ -57,7 +53,7 @@ for (const verb of ['unhold', 'hold-fix']) {
 }
 
 test.serial('a nonempty legacy held.yaml is inert for status, pause, unpause and the merge turn', async () => {
-  const f: Fixture = await fixture();
+  const f: HcFixture = await hcFixture();
   try {
     process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
     process.env.HOME = f.home;
@@ -73,23 +69,21 @@ test.serial('a nonempty legacy held.yaml is inert for status, pause, unpause and
       worktree,
       merge_stamp: '2026-10-05T00:00:00.000Z',
     });
-    const herdr = fakeHerdr(f);
-    const board: Result = await cli(f, ['status'], f.root, herdr.env);
+    const board: Result = await cli(f, ['status'], f.root, f.env);
     expect(board.code).toBe(0);
     expect(board.stdout).not.toContain('held');
-    const targeted: Result = await cli(f, ['status', 'hold'], f.root, herdr.env);
+    const targeted: Result = await cli(f, ['status', 'hold'], f.root, f.env);
     expect(targeted.code).toBe(0);
     expect(targeted.stdout).not.toContain('held:');
-    expect((await cli(f, ['pause'], f.root, herdr.env)).code).toBe(0);
-    const unpause: Result = await cli(f, ['unpause'], f.root, herdr.env);
+    expect((await cli(f, ['pause'], f.root, f.env)).code).toBe(0);
+    const unpause: Result = await cli(f, ['unpause'], f.root, f.env);
     expect(unpause.code).toBe(0);
     expect(unpause.stdout).not.toContain('held');
-    const db: Database = database(herdr.db);
-    expect(db.prompts.some((prompt) => prompt.text.includes('merge-issue hold slot=B'))).toBe(false);
+    expect((await delivered(f, 'hold')).some((task) => task.text.includes('merge-issue hold slot=B'))).toBe(false);
     expect(readState(holderPath).batch?.owner).toBe('command');
     expect(readFileSync(file, 'utf8')).toBe(before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
