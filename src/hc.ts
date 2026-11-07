@@ -546,8 +546,9 @@ export function leafTab(repo: string, slug: string): string {
   return 'ak' + sha256(`${repo}/${slug}`).slice(0, 30);
 }
 
+// Resolved fresh, not memoized: the long-running listener calls this, and a repo's space can move or come up later.
 export async function wakeWatcher(repo: Repo, reason: string): Promise<void> {
-  const space: SpaceResolution = await repoSpace(repo);
+  const space: SpaceResolution = await resolveSpace(repo);
   if (!space.ok) return;
   const watchers: Seen[] = (await terminals(space.session, { 'akrogon.watch': repo.name })).filter(
     (t: Seen) => t.status !== null,
