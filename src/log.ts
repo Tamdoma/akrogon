@@ -2,7 +2,9 @@ import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { base, type Repo } from './config';
-import { command, panes, repoSession, CommandError, type Pane, type SessionResolution } from './shell';
+import { command } from './shell';
+import { transcriptFor } from './transcript';
+import { HcError } from './hc';
 import { type State } from './state';
 import { historicalPhaseSchema, slotSchema, verdictSchema, type Slot } from './routing';
 
@@ -33,22 +35,16 @@ export async function logMove(repo: Repo, before: State, after: State, slot: Slo
   const cwd: string = after.worktree ?? repo.root;
   const head: string = await command(['git', 'rev-parse', 'HEAD'], cwd);
   const diff: string = await command(['git', 'diff', '--shortstat', await base(repo, cwd)], cwd);
-  const paneId: string | undefined = slot === null ? undefined : before.pane[slot];
-  let pane: Pane | undefined;
-  if (paneId !== undefined) {
-    // The pane lookup runs in the leaf's resolved session; a refused or
-    // stopped session yields no pane, same as an unreachable herdr.
-    const resolved: SessionResolution = await repoSession(repo);
-    if (resolved.ok)
-      try {
-        pane = (await panes(resolved.session.name)).find((item) => item.pane_id === paneId);
-      } catch (error) {
-        // The session field is diagnostic only; an unreachable herdr must not
-        // fail a move that already committed.
-        if (!(error instanceof CommandError)) throw error;
-      }
-  }
-  const session: string | null = pane?.agent_session?.value ?? null;
+  const seat: { session: string; address: string } | undefined = slot === null ? undefined : before.seat[slot];
+  // The session field is diagnostic only: an hc failure must not fail a move that already committed.
+  const session: string | null =
+    seat === undefined
+      ? null
+      : await transcriptFor(seat).catch((error: unknown) => {
+          if (!(error instanceof HcError)) throw error;
+          console.warn(JSON.stringify({ warning: 'transcript lookup failed', slug: after.slug, error: error.message }));
+          return null;
+        });
   appendFileSync(
     resolve(repo.root, 'issues/log.jsonl'),
     JSON.stringify({

@@ -1,11 +1,21 @@
 #!/usr/bin/env bun
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
-import { currentRepo, effectiveConfig, readGlobal, requireRepo, type GlobalConfig, type Repo } from './config';
+import {
+  currentRepo,
+  effectiveConfig,
+  readGlobal,
+  requireRepo,
+  type GlobalConfig,
+  type Repo,
+  type SlotConfig,
+} from './config';
 import { initialize } from './init';
 import { sourcePattern } from './state';
-import { type Phase } from './routing';
+import { slotSchema, type Phase } from './routing';
 import { migrateStateHome } from './state-home';
+import type { SpaceResolution } from './hc';
+import type { Started } from './seat';
 
 await migrateStateHome();
 
@@ -30,24 +40,32 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
         ? { attempt: { type: 'string' } }
         : verb === 'next'
           ? { all: { type: 'boolean' }, resume: { type: 'boolean' } }
-          : verb === 'pull' || verb === 'park' || verb === 'unpark' || verb === 'stop'
-            ? { all: { type: 'boolean' } }
-            : verb === 'close'
-              ? { by: { type: 'string' } }
-              : verb === 'run-check'
-                ? { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } }
-                : verb === 'verify'
-                  ? {
-                      sha: { type: 'string' },
-                      attempt: { type: 'string' },
-                      holder: { type: 'string' },
-                      'known-red': { type: 'boolean' },
-                    }
-                  : verb === 'status'
-                    ? { charts: { type: 'boolean' }, json: { type: 'boolean' } }
-                    : verb === 'timing'
-                      ? { cohort: { type: 'boolean' }, flow: { type: 'boolean' }, since: { type: 'string' } }
-                      : {};
+          : verb === 'seat'
+            ? {
+                task: { type: 'string' },
+                slot: { type: 'string' },
+                harness: { type: 'string' },
+                model: { type: 'string' },
+                effort: { type: 'string' },
+              }
+            : verb === 'pull' || verb === 'park' || verb === 'unpark' || verb === 'stop'
+              ? { all: { type: 'boolean' } }
+              : verb === 'close'
+                ? { by: { type: 'string' } }
+                : verb === 'run-check'
+                  ? { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } }
+                  : verb === 'verify'
+                    ? {
+                        sha: { type: 'string' },
+                        attempt: { type: 'string' },
+                        holder: { type: 'string' },
+                        'known-red': { type: 'boolean' },
+                      }
+                    : verb === 'status'
+                      ? { charts: { type: 'boolean' }, json: { type: 'boolean' } }
+                      : verb === 'timing'
+                        ? { cohort: { type: 'boolean' }, flow: { type: 'boolean' }, since: { type: 'string' } }
+                        : {};
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(3),
@@ -76,7 +94,7 @@ switch (verb) {
   case 'phase': {
     const [slug, phase]: [string, string] = z.tuple([z.string(), z.string()]).parse(positionals);
     const { phaseCommand, MoveCommittedError } = await import('./phase');
-    const { mergeWake } = await import('./next');
+    const { mergeWake, phaseWake } = await import('./next');
     let committed: { repo: Repo; to?: Phase } | undefined;
     try {
       const result: { repo: Repo; committed: boolean; to?: Phase } = await phaseCommand(
@@ -93,7 +111,10 @@ switch (verb) {
       if (error instanceof MoveCommittedError) committed = error;
       throw error;
     } finally {
-      if (committed !== undefined) await mergeWake(readGlobal(), committed.repo, committed.to);
+      if (committed !== undefined) {
+        await mergeWake(readGlobal(), committed.repo, committed.to);
+        await phaseWake(readGlobal(), committed.repo, slug);
+      }
     }
     break;
   }
@@ -109,6 +130,38 @@ switch (verb) {
       await import('./next')
     ).nextCommand(values.resume === true ? '--resume' : values.all === true ? '--all' : positionals[0]);
     break;
+  case 'seat': {
+    const task: string | undefined = z.string().trim().min(1).optional().parse(values.task);
+    if (positionals.length > 0) {
+      const [slug, slot]: [string, 'A' | 'B'] = z.tuple([z.string(), slotSchema]).parse(positionals);
+      if (values.slot !== undefined || values.harness !== undefined || values.model !== undefined)
+        throw new Error('Use <slug> <A|B> or --slot with --harness, --model and --effort, not both');
+      await (await import('./next')).seatCommand(slug, slot, task);
+      break;
+    }
+    const caller: string | undefined = process.env.HC_TERMINAL_ID;
+    if (caller === undefined || caller === '')
+      throw new Error('akrogon seat --slot runs only inside an hc terminal: HC_TERMINAL_ID is not set');
+    const letter: string = z
+      .string()
+      .regex(/^[a-z]$/i, 'slot must be one letter')
+      .parse(values.slot)
+      .toLowerCase();
+    const config: SlotConfig = {
+      harness: z.string().min(1).parse(values.harness),
+      model: z.string().min(1).parse(values.model),
+      effort: z.string().min(1).parse(values.effort),
+    };
+    const global: GlobalConfig = readGlobal();
+    const repo: Repo = await requireRepo(global, process.cwd());
+    const space: SpaceResolution = await (await import('./hc')).repoSpace(repo);
+    if (!space.ok) throw new Error(space.reason);
+    const started: Started | null = await (
+      await import('./seat')
+    ).startConsultant(global, repo, { session: space.session, space: space.space.id }, caller, letter, config, task);
+    if (started?.outcome === 'failed') process.exitCode = 1;
+    break;
+  }
   case 'pull':
     z.tuple([]).parse(positionals);
     await (await import('./pull')).pullCommand(values.all === true);
@@ -253,6 +306,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|land|next|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|rollback>',
+      'Usage: akrogon <install|init|config|preflight|phase|land|next|seat|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|rollback>',
     );
 }

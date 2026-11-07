@@ -19,7 +19,8 @@ export const failureSchema = z.strictObject({
 
 export type Failure = z.infer<typeof failureSchema>;
 
-export const deliveryErrorSchema = z.strictObject({
+// The herdr-pane shape, still read from state written before hc seats.
+const paneDeliveryErrorSchema = z.strictObject({
   command: z.array(z.string()),
   code: z.string(),
   message: z.string(),
@@ -29,7 +30,31 @@ export const deliveryErrorSchema = z.strictObject({
   offset: z.number().int().nonnegative().optional(),
 });
 
+export const seatDeliveryErrorSchema = z.strictObject({
+  code: z.enum(['not_confirmed', 'not_started']),
+  address: text,
+  turn: z.number().int().nonnegative(),
+  screen: z.string().optional(),
+  status: z.string().nullable().optional(),
+  at: z.string(),
+});
+
+export type SeatDeliveryError = z.infer<typeof seatDeliveryErrorSchema>;
+
+const deliveryErrorSchema = z.union([seatDeliveryErrorSchema, paneDeliveryErrorSchema]);
+
 export type DeliveryError = z.infer<typeof deliveryErrorSchema>;
+
+export const seatRefSchema = z.strictObject({ session: text, address: text });
+
+export type SeatRef = z.infer<typeof seatRefSchema>;
+
+export const promptedSchema = z.strictObject({ turn: z.number().int().nonnegative(), address: text });
+
+export type Prompted = z.infer<typeof promptedSchema>;
+
+// A string is the herdr agent session recorded before hc seats.
+const promptedEntrySchema = z.union([promptedSchema, z.string().min(1)]);
 
 export const sourcePattern = /^([a-zA-Z0-9-]+\/(?!\.{1,2}#)[a-zA-Z0-9._-]+)#([1-9][0-9]*)$/;
 
@@ -97,7 +122,8 @@ export const stateSchema = z
     env_names: z.array(z.string()).default([]),
     env_generation: z.number().int().nonnegative().default(0),
     pane: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
-    prompted: z.object({ A: z.string().min(1).optional(), B: z.string().min(1).optional() }).default({}),
+    seat: z.object({ A: seatRefSchema.optional(), B: seatRefSchema.optional() }).default({}),
+    prompted: z.object({ A: promptedEntrySchema.optional(), B: promptedEntrySchema.optional() }).default({}),
     prompted_at: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     delivery_error: z.object({ A: deliveryErrorSchema.optional(), B: deliveryErrorSchema.optional() }).default({}),
     failure: failureSchema.optional(),

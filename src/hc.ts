@@ -324,9 +324,11 @@ export async function end(session: string, address: string): Promise<void> {
   await hc(session, ['rm', address]);
 }
 
+// Document changes carry no terminal and reach only unfiltered subscriptions.
 export type HcLine =
   | { terminals: Seen[] }
-  | { method: 'event'; params: { type: string; terminal: string; seq: number; data: Record<string, unknown> } };
+  | { method: 'event'; params: { type: string; terminal: string; seq: number; data: Record<string, unknown> } }
+  | { method: 'event'; params: { type: 'doc'; seq: number; data: { name: string; version: number } } };
 
 const lineSchema = z.union([
   z.object({ terminals: z.array(terminalSchema) }),
@@ -337,6 +339,14 @@ const lineSchema = z.union([
       terminal: z.string(),
       seq: z.number().int(),
       data: z.record(z.string(), z.unknown()),
+    }),
+  }),
+  z.object({
+    method: z.literal('event'),
+    params: z.object({
+      type: z.literal('doc'),
+      seq: z.number().int(),
+      data: z.object({ name: z.string(), version: z.number().int() }),
     }),
   }),
 ]);
@@ -427,8 +437,8 @@ export function waitFor(
       current =
         'terminals' in line
           ? (line.terminals.find((t: Seen) => t.address === address) ?? null)
-          : current === null
-            ? null
+          : current === null || !('terminal' in line.params)
+            ? current
             : merged(current, line.params.type, line.params.data);
       const reached: Seen | null = current;
       if (reached !== null && until(reached)) settle(() => done(reached));
@@ -437,6 +447,43 @@ export function waitFor(
     stream.ended.then(
       () =>
         settle(() => fail(new Error(JSON.stringify({ session, address, error: 'event stream ended', last: current })))),
+      (error: unknown) => settle(() => fail(error)),
+    );
+  });
+}
+
+// Follows the session's events and reads the herdr-app document at subscription and on each of its
+// changes; resolves the first document that passes, null at the bound.
+export function waitForDoc(
+  session: string,
+  until: (doc: { version: number; spaces: Space[] }) => boolean,
+  ms: number,
+): Promise<{ version: number; spaces: Space[] } | null> {
+  return new Promise<{ version: number; spaces: Space[] } | null>((done, fail) => {
+    let settled: boolean = false;
+    let reads: Promise<void> = Promise.resolve();
+    const settle = (outcome: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      stream.stop();
+      outcome();
+    };
+    const check = (): void => {
+      reads = reads
+        .then(async (): Promise<void> => {
+          if (settled) return;
+          const doc: { version: number; spaces: Space[] } = await docGet(session);
+          if (until(doc)) settle(() => done(doc));
+        })
+        .catch((error: unknown) => settle(() => fail(error)));
+    };
+    const stream = follow(session, [], (line: HcLine) => {
+      if ('terminals' in line || !('terminal' in line.params)) check();
+    });
+    const timer = setTimeout(() => settle(() => done(null)), ms);
+    stream.ended.then(
+      () => settle(() => fail(new Error(JSON.stringify({ session, error: 'event stream ended' })))),
       (error: unknown) => settle(() => fail(error)),
     );
   });
