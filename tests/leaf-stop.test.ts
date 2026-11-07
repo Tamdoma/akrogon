@@ -1,20 +1,22 @@
 import { test, expect } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { command, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
 import { readState, saveState, type State } from '../src/state';
-import type { Database } from './fake-herdr';
-import { cli, fakeHerdr, fixture, leaf, yaml, type Fixture } from './helpers';
+import { cli, leaf, yaml } from './helpers';
+import { delivered, hcFixture, type HcFixture, type Terminal } from './hc-fixture';
 
-type StopFixture = Fixture & { db: string; env: NodeJS.ProcessEnv; systemctlLog: string };
+type StopFixture = HcFixture & { systemctlLog: string };
 
 // Logs argv one line per call; exits 1 with a message when an argument equals $FAKE_SYSTEMCTL_FAIL.
+// A regular file in the fixture's bin/, ahead of hcFixture's fake: removed first so the write never
+// goes through a link.
 async function stopFixture(): Promise<StopFixture> {
-  const f: Fixture = await fixture();
-  const herdr: { db: string; env: NodeJS.ProcessEnv } = fakeHerdr(f);
+  const f: HcFixture = await hcFixture();
   const script: string = resolve(f.home, 'bin', 'systemctl');
+  rmSync(script, { force: true });
   writeFileSync(
     script,
     [
@@ -31,15 +33,13 @@ async function stopFixture(): Promise<StopFixture> {
   );
   chmodSync(script, 0o755);
   const systemctlLog: string = resolve(f.home, 'systemctl.log');
-  return { ...f, ...herdr, env: { ...herdr.env, FAKE_SYSTEMCTL_LOG: systemctlLog }, systemctlLog };
+  return { ...f, env: { ...f.env, FAKE_SYSTEMCTL_LOG: systemctlLog }, systemctlLog };
 }
 
-function database(f: StopFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
-}
-
-function saveDatabase(f: StopFixture, db: Database): void {
-  writeFileSync(f.db, JSON.stringify(db));
+// Every task any seat terminal received, finished terminals included: the old fake herdr prompts.
+async function prompts(f: StopFixture): Promise<string[]> {
+  const seats: Terminal[] = await f.core.terminals({ akrogon: '1' }, true);
+  return seats.flatMap((t: Terminal) => f.core.tasks(t.address));
 }
 
 function systemctlCalls(f: StopFixture): string[] {
@@ -72,27 +72,26 @@ function slice(path: string): string {
   return leafSlice({ name: state.repo }, state.slug);
 }
 
-/** Allocate a leaf, then leave its seats idle with expired grace so any later pass would prompt again. */
+/** Allocate a leaf, then wait until its seats ended their turn, so any later pass would prompt again (D13). */
 async function allocatedIdle(f: StopFixture, slug: string): Promise<string> {
   const path: string = leaf(f, slug, 'plan.synthesis');
   expect((await run(f, ['next', slug])).code).toBe(0);
-  expect(database(f).prompts.length).toBeGreaterThan(0);
-  idle(f, path);
+  expect((await delivered(f, slug)).length).toBeGreaterThan(0);
+  await idle(f, path);
   return path;
 }
 
-function idle(f: StopFixture, path: string): void {
-  const db: Database = database(f);
-  saveDatabase(f, { ...db, prompts: [], panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) });
+// Waits until every recorded live seat is idle at a turn past its prompt: a re-promptable seat. A seat
+// that stop already ended and removed is skipped; the next pass starts a new one.
+async function idle(f: StopFixture, path: string): Promise<void> {
   const state: State = readState(path);
-  saveState(path, { ...state, prompted_at: { ...state.prompted_at, A: '2020-01-01T00:00:00.000Z' } });
-}
-
-function paneEvent(pane: string): string {
-  return JSON.stringify({
-    event: 'pane_agent_status_changed',
-    data: { type: 'pane_agent_status_changed', pane_id: pane, workspace_id: 'w1', agent_status: 'idle' },
-  });
+  const live: string[] = (await f.core.terminals({ akrogon: '1' }, false)).map((t: Terminal) => t.address);
+  for (const slot of ['A', 'B'] as const) {
+    const seat = state.seat[slot];
+    const prompted = state.prompted[slot];
+    if (seat === undefined || typeof prompted !== 'object' || !live.includes(seat.address)) continue;
+    await f.core.waitFor(seat.address, (t: Terminal) => t.status?.state === 'idle' && t.turn > prompted.turn);
+  }
 }
 
 test('stop records the leaf, then stops its leaf slice and keeps the worktree', async () => {
@@ -107,7 +106,7 @@ test('stop records the leaf, then stops its leaf slice and keeps the worktree', 
     expect(existsSync(worktree)).toBe(true);
     expect(readState(path).phase).toBe('plan.synthesis');
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -115,26 +114,22 @@ test('a stopped leaf is not dispatched by an automatic pass, and a picked manual
   const f: StopFixture = await stopFixture();
   try {
     const path: string = await allocatedIdle(f, 'build');
-    const pane: string = z.string().parse(readState(path).pane.A);
     expect((await run(f, ['stop', 'build'])).code).toBe(0);
-    idle(f, path);
-    const hooked: Result = await run(f, ['next'], {
-      HERDR_PANE_ID: pane,
-      HERDR_PLUGIN_EVENT_JSON: paneEvent(pane),
-      HERDR_SOCKET_PATH: `${f.db}-default.sock`,
-    });
-    expect(hooked.code).toBe(0);
-    expect(database(f).prompts).toEqual([]);
+    await idle(f, path);
+    const before: string[] = await prompts(f);
+    const woken: Result = await run(f, ['next', '--wake']);
+    expect(woken.code).toBe(0);
+    expect(await prompts(f)).toEqual(before);
     const bare: Result = await run(f, ['next']);
     expect(bare.code).not.toBe(0);
     expect(bare.stderr).toContain('akrogon start build');
-    expect(database(f).prompts).toEqual([]);
+    expect(await prompts(f)).toEqual(before);
     const targeted: Result = await run(f, ['next', 'build']);
     expect(targeted.code).not.toBe(0);
     expect(targeted.stderr).toContain('akrogon start build');
-    expect(database(f).prompts).toEqual([]);
+    expect(await prompts(f)).toEqual(before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -155,15 +150,14 @@ test('the merge path builds no stack and starts no merge seat for a stopped leaf
     saveState(aa, { ...readState(aa), phase: 'merge', merge_stamp: '2026-09-11T00:00:00.000Z' });
     saveState(bb, { ...readState(bb), phase: 'merge', merge_stamp: '2026-09-12T00:00:00.000Z' });
     expect((await run(f, ['stop', 'aa'])).code).toBe(0);
-    saveDatabase(f, { ...database(f), prompts: [] });
     await run(f, ['next']);
     expect(readState(aa).batch).toBeUndefined();
     const holder: State = readState(bb);
     expect(holder.batch).toBeDefined();
-    expect(database(f).prompts.filter((prompt) => prompt.text.startsWith('merge-issue aa'))).toEqual([]);
+    expect((await prompts(f)).filter((text) => text.startsWith('merge-issue aa'))).toEqual([]);
     expect(holder.batch?.owner).toBe('command');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -181,7 +175,7 @@ test('a failed slice stop keeps the record, prints the error, exits non-zero and
     expect(systemctlCalls(f)).toEqual([`--user stop ${slice(path)}`, `--user stop ${slice(path)}`]);
     expect(stoppedKeys(f)).toEqual(['repo/build']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -198,7 +192,7 @@ test('stop --all stops every allocated leaf, reports each, and one failure does 
     expect(systemctlCalls(f).sort()).toEqual([`--user stop ${slice(aa)}`, `--user stop ${slice(bb)}`].sort());
     expect(stoppedKeys(f)).toEqual(['repo/aa', 'repo/bb']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -207,15 +201,16 @@ test('start removes the stopped record and runs the targeted pass, and refuses a
   try {
     const path: string = await allocatedIdle(f, 'build');
     expect((await run(f, ['stop', 'build'])).code).toBe(0);
-    idle(f, path);
+    await idle(f, path);
+    const before: number = (await delivered(f, 'build')).length;
     const started: Result = await run(f, ['start', 'build']);
     expect(started.code).toBe(0);
     expect(stoppedKeys(f)).toEqual([]);
-    expect(database(f).prompts.length).toBeGreaterThan(0);
+    expect((await delivered(f, 'build')).length).toBeGreaterThan(before);
     const again: Result = await run(f, ['start', 'build']);
     expect(again.code).not.toBe(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -234,7 +229,7 @@ test('status marks a stopped leaf on the board and in its leaf view', async () =
     const view: Result = await run(f, ['status', 'build']);
     expect(view.stdout).toContain('stopped');
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -243,16 +238,17 @@ test('start runs the targeted pass for a leaf whose issue shares its name', asyn
   try {
     const path: string = leaf(f, 'build', 'plan.synthesis', {}, 'build');
     expect((await run(f, ['next', 'issues/open/build/build'])).code).toBe(0);
-    idle(f, path);
+    await idle(f, path);
     expect((await run(f, ['stop', 'build'])).code).toBe(0);
-    idle(f, path);
+    await idle(f, path);
+    const before: number = (await delivered(f, 'build')).length;
     const started: Result = await run(f, ['start', 'build']);
     expect(started.stderr).not.toContain('Ambiguous');
     expect(started.code).toBe(0);
     expect(stoppedKeys(f)).toEqual([]);
-    expect(database(f).prompts.length).toBeGreaterThan(0);
+    expect((await delivered(f, 'build')).length).toBeGreaterThan(before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -276,13 +272,13 @@ test('stopping the holder of an applied batch builds no second batch and prompts
     const applied: State['batch'] = readState(aa).batch;
     expect(applied?.applied).toBe(true);
     expect((await run(f, ['stop', 'aa'])).code).toBe(0);
-    saveDatabase(f, { ...database(f), prompts: [] });
+    const before: number = (await prompts(f)).filter((text) => text.startsWith('merge-issue')).length;
     await run(f, ['next']);
     expect(readState(bb).batch).toBeUndefined();
     expect(readState(aa).batch?.attempt).toBe(applied?.attempt);
-    expect(database(f).prompts.filter((prompt) => prompt.text.startsWith('merge-issue'))).toEqual([]);
+    expect((await prompts(f)).filter((text) => text.startsWith('merge-issue'))).toHaveLength(before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -290,7 +286,7 @@ test('stop --all skips merged and closed leaves that keep their tab', async () =
   const f: StopFixture = await stopFixture();
   try {
     const live: string = await allocatedIdle(f, 'live');
-    leaf(f, 'landed', 'merged', { tab: 'w1:t9' });
+    leaf(f, 'landed', 'merged', { tab: 'aklandedtab' });
     const closed: string = resolve(f.root, 'issues/closed/old/done');
     mkdirSync(closed, { recursive: true });
     yaml(resolve(closed, 'state.yaml'), {
@@ -299,13 +295,13 @@ test('stop --all skips merged and closed leaves that keep their tab', async () =
       created: '2026-09-10',
       repo: 'repo',
       'blocked-by': [],
-      tab: 'w1:t8',
+      tab: 'akclosedtab',
     });
     const all: Result = await run(f, ['stop', '--all']);
     expect(all.code).toBe(0);
     expect(stoppedKeys(f)).toEqual(['repo/live']);
     expect(systemctlCalls(f)).toEqual([`--user stop ${slice(live)}`]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
