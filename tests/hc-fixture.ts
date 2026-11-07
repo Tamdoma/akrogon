@@ -10,7 +10,7 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
 import { fakeHerdr, type Fixture } from './helpers';
-import { suiteRoot } from './isolation';
+import './isolation';
 
 const uid: number = process.getuid!();
 const realRuntime: string = `/run/user/${uid}`;
@@ -56,6 +56,11 @@ async function sweepAbandoned(): Promise<void> {
       });
     for (const left of readdirSync(dir))
       if (left === name || left.startsWith(`${session}.holder.`)) rmSync(resolve(dir, left), { force: true });
+  }
+  for (const name of readdirSync(realRuntime)) {
+    const owner: RegExpExecArray | null = /^akt([0-9a-z]+)-\d+$/.exec(name);
+    if (owner !== null && !alive(parseInt(owner[1], 36)))
+      rmSync(resolve(realRuntime, name), { recursive: true, force: true });
   }
 }
 
@@ -180,7 +185,9 @@ export async function hcCore(
   const state: string = resolve(f.home, `hc-state-${serial}`);
   const standin: string = resolve(f.home, `standin-${serial}`);
   const standinBin: string = resolve(f.home, `standin-bin-${serial}`);
-  const runtime: string = resolve(suiteRoot, `r${serial}`);
+  // Under the real runtime dir, not TMPDIR: hc refuses a socket path its own limit finds too long, and
+  // run-check's longer TMPDIR pushed the scratch link past it (115 bytes reported).
+  const runtime: string = resolve(realRuntime, session);
   const linked: string = resolve(runtime, 'herdr-core', `${session}.sock`);
   if (Buffer.byteLength(linked) >= 107) throw new Error(`fixture socket path too long (${linked.length}): ${linked}`);
   for (const dir of [state, standin, standinBin, resolve(runtime, 'herdr-core')]) mkdirSync(dir, { recursive: true });
