@@ -42,6 +42,10 @@ import { landAlive, landUnit } from './land';
 import { requiredSlots } from './routing';
 import { lineRuns, type RunRecord } from './admission';
 import { readVerifyRuns, type VerifyRun } from './verify';
+import { docGet, repoSpace, terminals, type Seen, type SpaceResolution } from './hc';
+import { expectedTabName } from './seat';
+import { sessionBusAddress } from './scope';
+import { spawnCaptured, type SpawnResult } from './shell';
 
 type ScannedLeaf = Leaf & {
   missing: Gap[];
@@ -218,6 +222,7 @@ function cells(
   indent: string,
   queue: Map<string, QueueEntry>,
   stopped: boolean,
+  unnamed: boolean,
 ): string[] {
   const state: State = leaf.state;
   const last: LogRecord | undefined = phaseEntry(log, state);
@@ -229,7 +234,9 @@ function cells(
         : Date.parse(last.record.ts);
   const time: string = start === undefined || end === undefined || end < start ? '-' : clock(end - start);
   const entry: QueueEntry | undefined = queue.get(state.slug);
-  const detail: string = note(state, now, leaf.seatSources);
+  const detail: string = [note(state, now, leaf.seatSources), ...(unnamed ? ['tab unnamed'] : [])]
+    .filter((part: string) => part !== '')
+    .join(' · ');
   const turn: string =
     entry === undefined
       ? ''
@@ -244,7 +251,7 @@ function cells(
   ];
 }
 
-function rows(scan: Scan & { ok: true }, now: number, stopped: Set<string>): string[][] {
+function rows(scan: Scan & { ok: true }, now: number, stopped: Set<string>, unnamed: Set<string>): string[][] {
   const queue: Map<string, QueueEntry> = new Map(scan.queue.map((entry) => [entry.leaf.state.slug, entry]));
   const started: Map<string, number> = starts(scan.timings);
   let previous: string[] = [];
@@ -265,6 +272,7 @@ function rows(scan: Scan & { ok: true }, now: number, stopped: Set<string>): str
         indent(groups.length),
         queue,
         stopped.has(`${scan.repo.name}/${leaf.state.slug}`),
+        unnamed.has(leaf.state.slug),
       ),
     ];
   });
@@ -704,6 +712,39 @@ async function jsonRepo(
   };
 }
 
+// Slugs of leaves whose recorded tab is in the herdr-app document under another name than expected.
+async function unnamedTabs(repo: Repo, leaves: Leaf[]): Promise<Set<string>> {
+  const space: SpaceResolution = await repoSpace(repo);
+  if (!space.ok) return new Set();
+  const names: Map<string, string> = new Map(
+    (await docGet(space.session)).spaces.flatMap((s) => s.tabs.map((tab): [string, string] => [tab.id, tab.name])),
+  );
+  return new Set(
+    leaves
+      .filter((leaf: Leaf) => {
+        const name: string | undefined = leaf.state.tab === undefined ? undefined : names.get(leaf.state.tab);
+        return name !== undefined && name !== expectedTabName(leaf.state);
+      })
+      .map((leaf: Leaf) => leaf.state.slug),
+  );
+}
+
+async function listenerLine(): Promise<string> {
+  const result: SpawnResult = await spawnCaptured(['systemctl', '--user', 'is-active', 'akrogon-listener.service'], {
+    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+  });
+  return `Listener: ${result.code === 0 ? 'live' : 'down'}`;
+}
+
+// The watcher lookup of plan D16: live terminals labelled akrogon.watch=<repo> in the repo's session.
+async function watcherLine(repo: Repo): Promise<string> {
+  const space: SpaceResolution = await repoSpace(repo);
+  const live: Seen[] = space.ok
+    ? (await terminals(space.session, { 'akrogon.watch': repo.name })).filter((t: Seen) => t.status !== null)
+    : [];
+  return `Watcher: ${repo.name} ${live.length === 0 ? 'none' : `live ${live.map((t: Seen) => t.address).join(' ')}`}`;
+}
+
 export async function statusCommand(
   slug: string | undefined,
   charts: boolean = false,
@@ -733,6 +774,7 @@ export async function statusCommand(
     if (attempt !== undefined)
       console.log(`land ${(await landAlive(attempt)) ? 'alive' : 'dead'}: ${landUnit(attempt)}`);
     if (broadcastPending(leaf.state)) console.log(`broadcast pending: ${repo.name}/${slug}`);
+    if ((await unnamedTabs(repo, [leaf])).size > 0) console.log(`tab unnamed: ${leaf.state.tab}`);
     for (const entry of readKept(repo)) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     for (const entry of readHostKept()) console.log(`Kept: ${entry.path} — ${entry.reason}`);
     for (const gap of missing)
@@ -877,6 +919,8 @@ export async function statusCommand(
           'm',
       );
   }
+  console.log(await listenerLine());
+  for (const scan of scans) if (scan.ok) console.log(await watcherLine(scan.repo));
   for (const scan of scans) {
     if (!scan.ok) continue;
     const marks: string[] = [paused.has(scan.repo.name) ? 'paused' : ''].filter((mark) => mark !== '');
@@ -890,7 +934,11 @@ export async function statusCommand(
     }
     const parked: string[][] = scan.parked.map((name) => [`${indent(0)}${name}`, 'parked', '', '', '', '']);
     const separator: string[][] = scan.leaves.length > 0 && parked.length > 0 ? [['', '', '', '', '', '']] : [];
-    const lines: string[][] = [...rows(scan, now, stopped), ...separator, ...parked];
+    const lines: string[][] = [
+      ...rows(scan, now, stopped, await unnamedTabs(scan.repo, scan.leaves)),
+      ...separator,
+      ...parked,
+    ];
     if (lines.length > 0) console.log(render(header, [['  LEAF', ...header.slice(1)], ...lines]).join('\n'));
     else if (scan.failures.length === 0) console.log('  no open leaves');
   }

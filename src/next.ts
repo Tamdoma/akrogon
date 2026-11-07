@@ -1275,13 +1275,17 @@ export async function nextCommand(input: string | undefined, pressureDir: string
   const global: GlobalConfig = readGlobal();
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
   const selection: Selection | undefined =
-    input !== '--all' && input !== '--resume' ? await selectLeaves(global, invocation, input) : undefined;
+    input !== '--all' && input !== '--resume' && input !== '--wake'
+      ? await selectLeaves(global, invocation, input)
+      : undefined;
   const updating: Repo[] =
-    input === '--all' || input === '--resume'
-      ? registeredRepos(global, invocation).repos
-      : selection === undefined
-        ? []
-        : [selection.repo];
+    input === '--wake'
+      ? []
+      : input === '--all' || input === '--resume'
+        ? registeredRepos(global, invocation).repos
+        : selection === undefined
+          ? []
+          : [selection.repo];
   for (const repo of updating) {
     try {
       await selfUpdate(repo);
@@ -1327,7 +1331,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
           touched.set(current.name, { repo: current, isAutomatic: false });
           await reconcileRepos([current], invocation, false);
         }
-      } else if (input === '--resume') {
+      } else if (input === '--resume' || input === '--wake') {
         const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
         const active: Repo[] = registered.repos.filter((repo) => !isPaused(repo.name));
         for (const repo of active)

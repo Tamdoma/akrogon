@@ -39,7 +39,7 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
       : verb === 'land'
         ? { attempt: { type: 'string' } }
         : verb === 'next'
-          ? { all: { type: 'boolean' }, resume: { type: 'boolean' } }
+          ? { all: { type: 'boolean' }, resume: { type: 'boolean' }, wake: { type: 'boolean' } }
           : verb === 'seat'
             ? {
                 task: { type: 'string' },
@@ -124,11 +124,22 @@ switch (verb) {
     break;
   }
   case 'next':
-    if (positionals.length + Number(values.all === true) + Number(values.resume === true) > 1)
-      throw new Error('Use a target, --all or --resume, not combined');
+    if (
+      positionals.length + Number(values.all === true) + Number(values.resume === true) + Number(values.wake === true) >
+      1
+    )
+      throw new Error('Use a target, --all, --resume or --wake, not combined');
     await (
       await import('./next')
-    ).nextCommand(values.resume === true ? '--resume' : values.all === true ? '--all' : positionals[0]);
+    ).nextCommand(
+      values.wake === true
+        ? '--wake'
+        : values.resume === true
+          ? '--resume'
+          : values.all === true
+            ? '--all'
+            : positionals[0],
+    );
     break;
   case 'seat': {
     const task: string | undefined = z.string().trim().min(1).optional().parse(values.task);
@@ -224,6 +235,10 @@ switch (verb) {
     z.tuple([]).parse(positionals);
     await (await import('./leftovers')).leftoversCommand(process.cwd());
     break;
+  case 'listen':
+    z.tuple([]).parse(positionals);
+    await (await import('./listen')).listenCommand();
+    break;
   case 'install':
     z.tuple([]).parse(positionals);
     await (await import('./install')).install();
@@ -306,6 +321,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|init|config|preflight|phase|land|next|seat|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|rollback>',
+      'Usage: akrogon <install|listen|init|config|preflight|phase|land|next|seat|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|rollback>',
     );
 }

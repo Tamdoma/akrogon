@@ -1,0 +1,9 @@
+[Unit]
+Description=akrogon listener
+
+[Service]
+ExecStart=%h/.local/bin/akrogon listen
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

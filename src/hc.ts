@@ -351,6 +351,9 @@ const lineSchema = z.union([
   }),
 ]);
 
+// An idle stream carries heartbeat lines; they hold no fact.
+const heartbeatSchema = z.object({ method: z.literal('heartbeat') });
+
 export function follow(
   session: string,
   args: string[],
@@ -367,7 +370,9 @@ export function follow(
       const lines: string[] = buffer.split('\n');
       buffer = lines.pop() ?? '';
       for (const line of lines.filter((l: string) => l.trim() !== '')) {
-        const parsed = lineSchema.parse(JSON.parse(line));
+        const message: unknown = JSON.parse(line);
+        if (heartbeatSchema.safeParse(message).success) continue;
+        const parsed = lineSchema.parse(message);
         onEvent(
           'terminals' in parsed ? { terminals: parsed.terminals.map((t: Terminal) => seen(session, t)) } : parsed,
         );
