@@ -94,7 +94,7 @@ test('no session, several sessions and an unreadable session refuse with todayâ€
 });
 
 test('dispatch refuses a repo without a prefix and init refuses a duplicate prefix, both naming prefixes', async () => {
-  const f: Fixture = await setup(undefined);
+  const f: Fixture = await setup({});
   const core: HcCore = await hcCore(f);
   try {
     leaf(f, 'hi-prefix', 'plan.synthesis');
