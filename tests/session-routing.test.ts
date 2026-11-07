@@ -1,11 +1,13 @@
 import { test, expect } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
 import { resolve } from 'node:path';
 import { fixture, cli, entry, leaf, fakeHerdr, storeDir, yaml, type Fixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, spawnCaptured, type Result } from '../src/shell';
 import { z } from 'zod';
 import type { Database, DatabaseInput, SessionInput } from './fake-herdr';
+import { hcCore, hcFixture, setPrefixes, setSeat, type HcCore, type HcFixture, type Terminal } from './hc-fixture';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 type PaneSeed = {
@@ -76,103 +78,126 @@ async function next(
 ): Promise<Result> {
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
-async function nextAt(f: DispatchFixture, slug: string, now: number, env: NodeJS.ProcessEnv = {}): Promise<Result> {
-  const { stdout, stderr, code }: { stdout: string; stderr: string; code: number } = await spawnCaptured(
-    [
-      process.execPath,
-      '--eval',
-      `Date.now = () => ${now}; process.argv = ['bun', ${JSON.stringify(entry)}, 'next', ${JSON.stringify(slug)}]; await import(${JSON.stringify(entry)});`,
-    ],
+
+// hc cases: the repo's session is the one whose herdr-app document holds a space named after the repo.
+async function hcSetup(): Promise<Fixture> {
+  const f: Fixture = await fixture();
+  setPrefixes(f, { repo: 'rp' });
+  setSeat(f, 'a', 'fake', 'work');
+  return f;
+}
+// A core killed without cleanup: its socket stays, so discovery lists it as stopped.
+async function stoppedCore(f: Fixture, repo?: string): Promise<HcCore> {
+  const core: HcCore = await hcCore(f, { repo });
+  const status = await core.hc(['server', 'status', '--json']);
+  process.kill(z.object({ pid: z.number() }).parse(JSON.parse(status.stdout)).pid, 'SIGKILL');
+  for (let tries: number = 0; (await listening(core.socket)) && tries < 50; tries += 1) await Bun.sleep(20);
+  return core;
+}
+// A running core whose herdr-app document cannot be parsed: its space list is unreadable.
+async function unreadableCore(f: Fixture): Promise<HcCore> {
+  const core: HcCore = await hcCore(f, { doc: false });
+  await core.rpc('doc.set', { name: 'herdr-app', value: { spaces: 'junk' }, version: 0 });
+  return core;
+}
+function listening(path: string): Promise<boolean> {
+  return new Promise<boolean>((done) => {
+    const probe = connect(path);
+    probe.once('connect', () => {
+      probe.destroy();
+      done(true);
+    });
+    probe.once('error', () => done(false));
+  });
+}
+// An hc in front of the fixture shim that holds `hc connect` past akrogon's 10 s discovery deadline
+// when the call targets `session` (or any session) and its request names `method`.
+function stallingHc(f: Fixture, core: HcCore, method: string, session: string | null): string {
+  const dir: string = resolve(f.home, 'stall-bin');
+  mkdirSync(dir);
+  const shim: string = resolve(z.string().parse(core.env.PATH).split(':')[0], 'hc');
+  writeFileSync(
+    resolve(dir, 'hc'),
+    `#!/bin/sh
+if [ "$1" = connect ]; then
+  input=$(cat)
+  case "$input" in *'"${method}"'*) ${session === null ? '' : `[ "$HC_SESSION" = '${session}' ] &&`} exec sleep 12 ;; esac
+  printf '%s\\n' "$input" | exec '${shim}' "$@"
+fi
+exec '${shim}' "$@"
+`,
+  );
+  chmodSync(resolve(dir, 'hc'), 0o755);
+  return `${dir}:${core.env.PATH}`;
+}
+function appCloses(core: HcCore): { argv: string[]; home: string | null; planned: boolean }[] {
+  return core.appCalls().filter((call) => call.argv[1] === 'tab.close');
+}
+function herdrCalls(f: Fixture, name: string): string[][] {
+  const path: string = resolve(f.home, 'herdr.json.calls-raw');
+  return existsSync(path)
+    ? readFileSync(path, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
+        .filter((args) => args[0] === '--session' && args[1] === name)
+    : [];
+}
+// The fixture core's fake herdr (notices only) gains a running session `other` with no repo workspace.
+function herdrOther(f: Fixture): string {
+  const db: string = resolve(f.home, 'herdr.json');
+  saveDatabase(
+    { ...f, db, env: {} },
     {
-      cwd: f.root,
-      env: { ...process.env, AKROGON_HOME: f.home, HOME: f.home, HERDR_PANE_ID: '', ...f.env, ...env },
+      ...(JSON.parse(readFileSync(db, 'utf8')) as Database),
+      sessions: [session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] })],
     },
   );
-  return { stdout, stderr, code };
+  return `${db}-other.sock`;
 }
 
-test('routes seats into the session holding the repo workspace', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('refuses missing and duplicate repo spaces while naming searched and skipped sessions', async () => {
+  const f: Fixture = await hcSetup();
+  const other: HcCore = await hcCore(f, { repo: 'misc' });
+  const resting: HcCore = await stoppedCore(f);
+  const cores: HcCore[] = [other];
   try {
-    const worktree: string = resolve(storeDir(f), 'routed');
-    saveDatabase(f, {
-      ...database(f),
-      // Clear the flat default store's `repo` workspace so `main` holds the
-      // label uniquely; seed a free idle pane there so allocation takes the
-      // `pane split` path and the seated pane carries the worktree cwd.
-      workspaces: [],
-      panes: [],
-      sessions: [
-        session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] }),
-        session('main', {
-          workspaces: [{ workspace_id: 'w5', label: 'repo' }],
-          tabs: [{ tab_id: 'w5:t1', label: 'host', workspace_id: 'w5' }],
-          panes: [{ ...seatedPane('w5:p1', 'w5:t1', '/var/elsewhere'), agent_status: 'idle' }],
-        }),
-      ],
-    });
-    const path: string = leaf(f, 'routed', 'plan.synthesis');
-    const result: Result = await next(f, ['routed'], { HERDR_SOCKET_PATH: socket(f, 'other') });
-    expect(result.code).toBe(0);
-    const state: State = readState(path);
-    const main = toSession(f, 'main');
-    expect(main.some((args) => args[2] === 'tab' && args[3] === 'create')).toBe(true);
-    expect(main.some((args) => args[2] === 'agent' && args[3] === 'prompt')).toBe(true);
-    const other = toSession(f, 'other');
-    for (const verb of ['create', 'split', 'start', 'prompt', 'close', 'rename', 'show']) {
-      expect(other.some((args) => args.includes(verb))).toBe(false);
-    }
-    expect(z.string().parse(state.worktree)).toBe(worktree);
-    const store = database(f).sessions!.find((s) => s.name === 'main')!;
-    const pane = store.panes.find((p) => p.pane_id === state.pane.A)!;
-    expect(pane.cwd).toBe(worktree);
-  } finally {
-    f.clean();
-  }
-});
-
-test('refuses missing and duplicate repo workspaces while naming searched and skipped sessions', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [],
-      sessions: [
-        session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] }),
-        session('resting', { running: false, workspaces: [{ workspace_id: 'w4', label: 'repo' }] }),
-      ],
-    });
+    other.link(resting);
     const path: string = leaf(f, 'unmatched', 'plan.synthesis');
-    const result: Result = await next(f, ['unmatched'], { HERDR_SOCKET_PATH: socket(f, 'other') });
+    const result: Result = await cli(f, ['next', 'unmatched'], f.root, other.env);
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('repo');
-    expect(result.stderr).toContain('other');
-    expect(result.stderr).toContain('resting');
-    expect(database(f).tabs).toHaveLength(0);
-    expect(readState(path).pane.A).toBeUndefined();
-    expect(toSession(f, 'resting')).toHaveLength(0);
+    expect(result.stderr).toContain(other.session);
+    expect(result.stderr).toContain(resting.session);
+    expect(await other.terminals({ akrogon: '1' })).toEqual([]);
+    expect(readState(path).seat.A).toBeUndefined();
+    // Discovery never contacts a stopped session, so it starts no core there.
+    expect(await listening(resting.socket)).toBe(false);
 
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [
-        session('main', { workspaces: [{ workspace_id: 'w5', label: 'repo' }] }),
-        session('extra', { workspaces: [{ workspace_id: 'w6', label: 'repo' }] }),
-      ],
-    });
-    const dup: Result = await next(f, ['unmatched']);
+    const main: HcCore = await hcCore(f);
+    const extra: HcCore = await hcCore(f);
+    cores.push(main, extra);
+    main.link(extra);
+    const dup: Result = await cli(f, ['next', 'unmatched'], f.root, main.env);
     expect(dup.code).toBe(1);
-    expect(dup.stderr).toContain('main');
-    expect(dup.stderr).toContain('w5');
-    expect(dup.stderr).toContain('extra');
-    expect(dup.stderr).toContain('w6');
-    expect(database(f).tabs).toHaveLength(0);
+    expect(dup.stderr).toContain(main.session);
+    expect(dup.stderr).toContain(`sp-${main.session}`);
+    expect(dup.stderr).toContain(extra.session);
+    expect(dup.stderr).toContain(`sp-${extra.session}`);
+    expect(await main.terminals({ akrogon: '1' })).toEqual([]);
+    expect(await extra.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
+    for (const core of cores) await core.stop();
+    resting.discard();
     f.clean();
   }
-});
+}, 30000);
 
 test('a refused repo reports once in --all while a healthy repo still dispatches', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: Fixture = await hcSetup();
+  setPrefixes(f, { repo: 'rp', second: 'sc' });
+  // Only `second` has a space; `repo` has none anywhere.
+  const core: HcCore = await hcCore(f, { repo: 'second' });
   try {
     const second: string = resolve(f.home, 'second');
     mkdirSync(resolve(second, 'issues/open'), { recursive: true });
@@ -197,252 +222,141 @@ test('a refused repo reports once in --all while a healthy repo still dispatches
     });
     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as Record<string, unknown>;
     yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, second } });
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [],
-      sessions: [
-        session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] }),
-        session('main', { workspaces: [{ workspace_id: 'w5', label: 'second' }] }),
-      ],
-    });
     leaf(f, 'blocked-repo', 'plan.synthesis');
     // --all sweeps only the current checkout's repo when run inside one; run
     // from f.home so both registered repos are swept.
-    const result: Result = await next(f, ['--all'], { HERDR_SOCKET_PATH: socket(f, 'other') }, f.home);
+    const result: Result = await cli(f, ['next', '--all'], f.home, core.env);
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('repo');
     const refused: number = result.stderr.split('\n').filter((line) => line.includes('workspace')).length;
-    expect(refused).toBeGreaterThan(0);
-    expect(toSession(f, 'main').some((args) => args[2] === 'agent' && args[3] === 'prompt')).toBe(true);
+    expect(refused).toBe(1);
+    const seats: Terminal[] = await core.terminals({ 'akrogon.leaf': 'leaf2' });
+    expect(seats.map((t: Terminal) => t.name)).toEqual(['sc-leaf2-a']);
+    expect(core.tasks(seats[0].address).some((task: string) => task.startsWith('plan-issue leaf2'))).toBe(true);
   } finally {
+    await core.stop();
     f.clean();
   }
-}, 20000);
+}, 30000);
 
-test('skips a listed-stopped session and a dead running session, and a read error refuses', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('skips a stopped session and a dead socket, and an unreadable session refuses', async () => {
+  const f: Fixture = await hcSetup();
+  // A stopped session holding the only repo space: skipped, refused.
+  const down: HcCore = await stoppedCore(f);
+  const host: HcCore = await hcCore(f, { repo: 'misc' });
+  const cores: HcCore[] = [host];
   try {
+    host.link(down);
     leaf(f, 'skipped', 'plan.synthesis');
-    // Listed stopped holding the only repo workspace: skipped, refused.
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [],
-      sessions: [session('down', { running: false, workspaces: [{ workspace_id: 'w4', label: 'repo' }] })],
-    });
-    const down: Result = await next(f, ['skipped']);
-    expect(down.code).toBe(1);
-    expect(down.stderr).toContain('down');
-    expect(toSession(f, 'down')).toHaveLength(0);
+    const refused: Result = await cli(f, ['next', 'skipped'], f.root, host.env);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain(down.session);
 
-    // Listed running but answering server_not_running: skipped as stopped.
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [],
-      sessions: [
-        session('ghost', { deadRead: true, workspaces: [{ workspace_id: 'w4', label: 'repo' }] }),
-        session('live', { workspaces: [{ workspace_id: 'w4', label: 'repo' }] }),
-      ],
-    });
-    const ghost: Result = await next(f, ['skipped']);
-    expect(ghost.code).toBe(0);
-    expect(toSession(f, 'ghost').filter((args) => args[2] !== 'workspace')).toHaveLength(0);
+    // The dead socket stays listed beside a live session holding the space: skipped as stopped.
+    const live: HcCore = await hcCore(f);
+    cores.push(live);
+    live.link(down);
+    const dispatched: Result = await cli(f, ['next', 'skipped'], f.root, live.env);
+    expect(dispatched.code).toBe(0);
+    expect((await live.terminals({ 'akrogon.leaf': 'skipped' })).map((t: Terminal) => t.name)).toEqual([
+      'rp-skipped-a',
+    ]);
+    expect(await listening(down.socket)).toBe(false);
 
-    // Any other error refuses as unreadable.
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [],
-      sessions: [session('broken', { readError: 'exploded', workspaces: [] })],
-    });
-    const broken: Result = await next(f, ['skipped']);
-    expect(broken.code).toBe(1);
-    expect(broken.stderr).toContain('broken');
-    expect(database(f).tabs).toHaveLength(0);
+    // A running session whose space list cannot be read refuses as unreadable.
+    const broken: HcCore = await unreadableCore(f);
+    cores.push(broken);
+    live.link(broken);
+    leaf(f, 'held-back', 'plan.synthesis');
+    const unreadable: Result = await cli(f, ['next', 'held-back'], f.root, live.env);
+    expect(unreadable.code).toBe(1);
+    expect(unreadable.stderr).toContain(broken.session);
+    expect(await live.terminals({ 'akrogon.leaf': 'held-back' })).toEqual([]);
   } finally {
+    for (const core of cores) await core.stop();
+    down.discard();
     f.clean();
   }
-}, 20000);
+}, 30000);
 
 test('a discovery read past the deadline refuses the repo', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
+  const slow: HcCore = await hcCore(f, { repo: 'misc' });
   try {
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [],
-      sessions: [session('slow', { workspaces: [], delayMs: 30000 })],
-    });
+    f.core.link(slow);
     leaf(f, 'deadline', 'plan.synthesis');
-    const result: Result = await next(f, ['deadline']);
+    const result: Result = await cli(f, ['next', 'deadline'], f.root, {
+      ...f.env,
+      PATH: stallingHc(f, f.core, 'doc.get', slow.session),
+    });
     expect(result.code).toBe(1);
-    expect(result.stderr).toContain('slow');
-    expect(database(f).tabs).toHaveLength(0);
+    expect(result.stderr).toContain(slow.session);
+    expect(await f.core.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
-    f.clean();
+    await slow.stop();
+    await f.clean();
   }
 }, 45000);
 
 test('a failed session list is reported once per invocation', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
+  const sessions: string = resolve(z.string().parse(f.env.XDG_RUNTIME_DIR), 'herdr-core');
   try {
-    saveDatabase(f, { ...database(f), sessionListError: 'fixture_session_list' });
     leaf(f, 'one', 'plan.synthesis');
     leaf(f, 'two', 'plan.synthesis');
-    const result: Result = await next(f, ['--all']);
+    renameSync(sessions, `${sessions}.off`);
+    const result: Result = await cli(f, ['next', '--all'], f.root, f.env);
+    renameSync(`${sessions}.off`, sessions);
     expect(result.code).toBe(1);
-    const lines: number = result.stderr.split('\n').filter((line) => line.includes('fixture_session_list')).length;
+    const lines: number = result.stderr.split('\n').filter((line) => line.includes('session list failed')).length;
     expect(lines).toBe(1);
-    expect(database(f).tabs).toHaveLength(0);
+    expect(await f.core.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
-test('agent start, prompt and the busy notice carry the resolved session', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('the busy notice goes to the herdr session holding the repo workspace', async () => {
+  // `trust` reports blocked and waits: a busy seat.
+  const f: HcFixture = await hcFixture({ mode: 'trust' });
   try {
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] })],
-    });
+    const stale: string = herdrOther(f);
     const path: string = leaf(f, 'routed2', 'plan.synthesis');
-    expect((await next(f, ['routed2'], { HERDR_SOCKET_PATH: socket(f, 'other') })).code).toBe(0);
-    const routed = toSession(f, 'default');
-    expect(routed.some((args) => args[2] === 'agent' && args[3] === 'start')).toBe(true);
-    expect(routed.some((args) => args[2] === 'agent' && args[3] === 'prompt')).toBe(true);
-    expect(toSession(f, 'other').filter((args) => args[2] === 'agent')).toHaveLength(0);
-
-    // A failed prompt records the routed argv in delivery_error.command.
-    const second: string = leaf(f, 'failprompt', 'plan.synthesis');
-    saveDatabase(f, { ...database(f), promptScript: [{ code: 'agent_prompt_stalled' }] });
-    expect((await next(f, ['failprompt'], { HERDR_SOCKET_PATH: socket(f, 'other') })).code).toBe(0);
-    const err = readState(second).delivery_error.A!;
-    expect(err.command.slice(0, 4)).toEqual(['herdr', '--session', 'default', 'agent']);
-    expect(err.command).toContain('prompt');
-
-    // The busy notice is routed too.
-    const started: State = readState(path);
-    const now: number = Date.parse('2026-09-11T12:00:00Z');
-    saveState(path, {
-      ...readState(path),
-      busy_since: { A: new Date(now - 61 * 60000).toISOString() },
-    });
-    saveDatabase(f, {
-      ...database(f),
-      panes: database(f).panes.map((p) =>
-        p.pane_id === started.pane.A ? { ...p, agent_status: 'blocked' as const } : p,
-      ),
-    });
-    expect((await nextAt(f, 'routed2', now, { HERDR_SOCKET_PATH: socket(f, 'other') })).code).toBe(0);
-    const notices = toSession(f, 'default').filter((args) => args[2] === 'notification' && args[3] === 'show');
+    expect((await cli(f, ['next', 'routed2'], f.root, { ...f.env, HERDR_SOCKET_PATH: stale })).code).toBe(0);
+    saveState(path, { ...readState(path), busy_since: { A: new Date(Date.now() - 61 * 60000).toISOString() } });
+    expect((await cli(f, ['next', 'routed2'], f.root, { ...f.env, HERDR_SOCKET_PATH: stale })).code).toBe(0);
+    const notices = herdrCalls(f, 'default').filter((args) => args[2] === 'notification' && args[3] === 'show');
     expect(notices).toHaveLength(1);
-    expect(toSession(f, 'other').filter((args) => args[2] === 'notification')).toHaveLength(0);
+    expect(herdrCalls(f, 'other').filter((args) => args[2] === 'notification')).toHaveLength(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
-}, 20000);
+}, 30000);
 
-test('the reconcile tab close carries the resolved session', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('the reconcile tab close goes to the session holding the repo space', async () => {
+  const f: HcFixture = await hcFixture();
+  const decoy: HcCore = await hcCore(f, { repo: 'misc' });
   try {
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] })],
-    });
+    f.core.link(decoy);
     const path: string = leaf(f, 'closing', 'plan.synthesis', {}, 'closed-owner');
-    expect((await next(f, ['closing'], { HERDR_SOCKET_PATH: socket(f, 'other') })).code).toBe(0);
+    expect((await cli(f, ['next', 'closing'], f.root, f.env)).code).toBe(0);
+    // Opened after the start, which would otherwise wait for herdr-app to show the seat.
+    f.core.setWindow('open');
     const state: State = readState(path);
     mkdirSync(resolve(f.root, 'issues/closed/closed-owner'), { recursive: true });
     const moved: string = resolve(f.root, 'issues/closed/closed-owner/closing');
     await command(['mv', path, moved], f.root);
     saveState(moved, { ...readState(moved), phase: 'merged', tab: state.tab });
-    const before: number = toSession(f, 'default').length;
-    expect((await next(f, [moved], { HERDR_SOCKET_PATH: socket(f, 'other') })).code).toBe(0);
-    const closes = toSession(f, 'default')
-      .slice(before)
-      .filter((args) => args[2] === 'tab' && args[3] === 'close');
-    expect(closes).toHaveLength(1);
-    expect(closes[0]).toContain(z.string().parse(state.tab));
-    expect(toSession(f, 'other').filter((args) => args[2] === 'tab' && args[3] === 'close')).toHaveLength(0);
+    expect((await cli(f, ['next', moved], f.root, f.env)).code).toBe(0);
+    expect(appCloses(f.core)).toEqual([
+      { argv: ['do', 'tab.close', '--id', z.string().parse(state.tab)], home: f.core.appHome, planned: true },
+    ]);
+    expect(await decoy.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
-    f.clean();
+    await decoy.stop();
+    await f.clean();
   }
 }, 20000);
-
-test('second-seat guard refuses a foreign-session or foreign-workspace pane in the worktree', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const worktree: string = resolve(storeDir(f), 'guarded');
-    leaf(f, 'guarded', 'plan.synthesis');
-    // Same session, another workspace.
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [
-        { workspace_id: 'w1', label: 'repo' },
-        { workspace_id: 'w9', label: 'misc' },
-      ],
-      tabs: [{ tab_id: 'w9:t1', label: 'x', workspace_id: 'w9' }],
-      panes: [seatedPane('w9:p1', 'w9:t1', worktree)],
-    });
-    const sameSession: Result = await next(f, ['guarded']);
-    expect(sameSession.code).toBe(1);
-    expect(sameSession.stderr).toContain('w9:p1');
-    expect(database(f).tabs.filter((t) => t.label === 'guarded')).toHaveLength(0);
-
-    // Another session.
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [{ workspace_id: 'w1', label: 'repo' }],
-      tabs: [],
-      panes: [],
-      sessions: [
-        session('other', {
-          workspaces: [{ workspace_id: 'w9', label: 'misc' }],
-          tabs: [{ tab_id: 'w9:t1', label: 'x', workspace_id: 'w9' }],
-          panes: [seatedPane('w9:p1', 'w9:t1', worktree)],
-        }),
-      ],
-    });
-    const foreign: Result = await next(f, ['guarded'], { HERDR_SOCKET_PATH: socket(f, 'other') });
-    expect(foreign.code).toBe(1);
-    expect(foreign.stderr).toContain('other');
-    expect(foreign.stderr).toContain('w9:p1');
-    expect(database(f).tabs.filter((t) => t.label === 'guarded')).toHaveLength(0);
-  } finally {
-    f.clean();
-  }
-}, 20000);
-
-test('tab reuse, pane close and liveness stay inside the resolved session', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const worktree: string = resolve(storeDir(f), 'reuse');
-    await command(['git', 'worktree', 'add', '-b', 'reuse', worktree], f.root);
-    // A same-id tab lives only in `other`; it must not be reused or closed.
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [
-        session('other', {
-          workspaces: [{ workspace_id: 'w9', label: 'misc' }],
-          tabs: [{ tab_id: 'w1:tDup', label: 'reuse', workspace_id: 'w9' }],
-          // The foreign pane's cwd stays outside the leaf worktree: a pane in
-          // the worktree would trip the second-seat guard, which is not the
-          // behavior under test here.
-          panes: [{ ...seatedPane('w9:p9', 'w1:tDup', '/var/elsewhere'), agent_status: 'idle' as const }],
-        }),
-      ],
-    });
-    const path: string = leaf(f, 'reuse', 'plan.synthesis', { tab: 'w1:tDup', worktree });
-    const result: Result = await next(f, ['reuse'], { HERDR_SOCKET_PATH: socket(f, 'other') });
-    expect(result.code).toBe(0);
-    expect(toSession(f, 'default').some((args) => args[2] === 'tab' && args[3] === 'create')).toBe(true);
-    expect(toSession(f, 'other').some((args) => args.includes('close'))).toBe(false);
-    expect(database(f).sessions![0].tabs[0].tab_id).toBe('w1:tDup');
-    // The leaf's recorded tab is the one created in default.
-    const state: State = readState(path);
-    expect(state.tab).not.toBe('w1:tDup');
-  } finally {
-    f.clean();
-  }
-});
 
 test('the land unit carries no HERDR_SOCKET_PATH and its calls route to the resolved session', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -471,83 +385,83 @@ test('the land unit carries no HERDR_SOCKET_PATH and its calls route to the reso
   }
 }, 30000);
 
-test('land wake calls reach the resolved session under a stale parent socket', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('land wake calls reach the resolved session under a stale parent session', async () => {
+  const f: HcFixture = await hcFixture();
+  const decoy: HcCore = await hcCore(f, { repo: 'misc' });
   try {
-    // A green check lets land push; the repo workspace lives in `main` while
-    // every call inherits `other`'s stale socket, like the land unit does.
+    f.core.link(decoy);
+    // A green check lets land push; the repo space lives in the fixture core while every call
+    // inherits the decoy's session and terminal socket, like a seat's own environment.
     yaml(resolve(f.root, 'issues/config.yaml'), { checks: { ok: 'true' }, grounding: 'none' });
     await command(['git', 'add', 'issues/config.yaml'], f.root);
     await command(['git', 'commit', '-m', 'checks'], f.root);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [],
-      sessions: [
-        session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] }),
-        session('main', {
-          workspaces: [{ workspace_id: 'w5', label: 'repo' }],
-          tabs: [{ tab_id: 'w5:t1', label: 'host', workspace_id: 'w5' }],
-          panes: [{ ...seatedPane('w5:p1', 'w5:t1', '/var/elsewhere'), agent_status: 'idle' }],
-        }),
-      ],
-    });
     const env: NodeJS.ProcessEnv = {
       ...f.env,
-      HERDR_SOCKET_PATH: socket(f, 'other'),
+      HC_SESSION: decoy.session,
+      HC_TERMINAL_SOCKET: decoy.socket,
+      HC_TERMINAL_ID: 't1',
+      HERDR_SOCKET_PATH: herdrOther(f),
       FAKE_SYSTEMD_RUN_LOG: resolve(f.home, 'systemd-run.log'),
     };
     // A sibling leaf keeps the issue owner incomplete so the merged leaf's
     // broadcast is unset and the wake may close its tab.
     const path: string = leaf(f, 'landing', 'plan.synthesis', {}, 'issue-x');
     leaf(f, 'zz', 'plan.synthesis', {}, 'issue-x');
-    expect((await next(f, ['landing'], env)).code).toBe(0);
+    expect((await cli(f, ['next', 'landing'], f.root, env)).code).toBe(0);
+    f.core.setWindow('open');
     const worktree: string = z.string().parse(readState(path).worktree);
+    const tab: string = z.string().parse(readState(path).tab);
     writeFileSync(resolve(worktree, 'landed-file'), 'x\n');
     await command(['git', 'add', 'landed-file'], worktree);
     await command(['git', 'commit', '-m', 'work'], worktree);
     saveState(path, { ...readState(path), phase: 'merge', merge_stamp: '2026-10-19T00:00:00.000Z' });
-    expect((await next(f, ['landing'], env)).code).toBe(0);
+    expect((await cli(f, ['next', 'landing'], f.root, env)).code).toBe(0);
     const attempt: string = z.string().parse(readState(path).batch?.attempt);
     const landed: Result = await cli(f, ['land', 'landing', '--attempt', attempt], f.root, env);
-    expect(landed.code).toBe(0);
-    // The wake's merged-tab close lands in `main`; `other` sees no mutations.
-    expect(toSession(f, 'main').some((args) => args[2] === 'tab' && args[3] === 'close')).toBe(true);
+    expect(landed.code, landed.stderr).toBe(0);
+    // The wake's merged-tab close goes to the fixture core's app home; the decoy sees nothing.
+    expect(appCloses(f.core)).toEqual([
+      { argv: ['do', 'tab.close', '--id', tab], home: f.core.appHome, planned: true },
+    ]);
+    expect(await decoy.terminals({ akrogon: '1' })).toEqual([]);
     expect(
-      toSession(f, 'other').filter(
+      herdrCalls(f, 'other').filter(
         (args) =>
           (args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? '')) || args[2] === 'notification',
       ),
     ).toHaveLength(0);
   } finally {
-    f.clean();
+    await decoy.stop();
+    await f.clean();
   }
 }, 60000);
 
 test('phase renames and the failed notice carry the resolved session', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] })],
-    });
+    const stale: string = herdrOther(f);
     const path: string = leaf(f, 'renamed', 'plan.synthesis');
-    expect((await next(f, ['renamed'], { HERDR_SOCKET_PATH: socket(f, 'other') })).code).toBe(0);
+    expect((await cli(f, ['next', 'renamed'], f.root, { ...f.env, HERDR_SOCKET_PATH: stale })).code).toBe(0);
+    f.core.setWindow('open');
     const worktree: string = z.string().parse(readState(path).worktree);
+    const tab: string = z.string().parse(readState(path).tab);
+    const renames = (name: string) =>
+      f.core
+        .appCalls()
+        .filter((call) => call.argv[1] === 'tab.rename' && call.argv[3] === tab && call.argv[5] === name)
+        .map((call) => call.home);
     const moved: Result = await cli(
       f,
       ['phase', 'renamed', 'failed', '--slot', 'A', '--reason', 'blocked for test'],
       worktree,
-      { ...f.env, HERDR_SOCKET_PATH: socket(f, 'other') },
+      { ...f.env, HERDR_SOCKET_PATH: stale },
     );
     expect(moved.code).toBe(0);
-    const routed = toSession(f, 'default');
-    expect(routed.some((args) => args[2] === 'notification' && args[3] === 'show')).toBe(true);
-    expect(routed.some((args) => args[2] === 'tab' && args[3] === 'rename' && args[5] === 'renamed failed')).toBe(true);
-    // Only mutations count: the second-seat guard legitimately reads pane/tab
-    // lists in every running session, including `other`.
+    expect(herdrCalls(f, 'default').some((args) => args[2] === 'notification' && args[3] === 'show')).toBe(true);
+    expect(renames('renamed failed')).toEqual([f.core.appHome]);
     expect(
-      toSession(f, 'other').filter(
+      herdrCalls(f, 'other').filter(
         (args) =>
           (args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? '')) || args[2] === 'notification',
       ),
@@ -555,14 +469,13 @@ test('phase renames and the failed notice carry the resolved session', async () 
     // Recovery renames back in the same session.
     const back: Result = await cli(f, ['phase', 'renamed', 'plan.synthesis'], worktree, {
       ...f.env,
-      HERDR_SOCKET_PATH: socket(f, 'other'),
+      HERDR_SOCKET_PATH: stale,
     });
     expect(back.code).toBe(0);
-    expect(
-      toSession(f, 'default').some((args) => args[2] === 'tab' && args[3] === 'rename' && args[5] === 'renamed'),
-    ).toBe(true);
+    expect(renames('renamed').length).toBeGreaterThan(0);
+    expect(new Set(renames('renamed'))).toEqual(new Set([f.core.appHome]));
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 20000);
 
@@ -689,75 +602,18 @@ test('a stopped repo session suppresses the main-red notice but keeps the receip
   }
 }, 60000);
 
-test('second-seat guard rejects equal workspace IDs in different sessions', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const worktree: string = resolve(storeDir(f), 'collision');
-    leaf(f, 'collision', 'plan.synthesis');
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [
-        session('other', {
-          workspaces: [{ workspace_id: 'w1', label: 'misc' }],
-          tabs: [{ tab_id: 'w1:t90', label: 'collision', workspace_id: 'w1' }],
-          panes: [seatedPane('w1:p90', 'w1:t90', worktree)],
-        }),
-      ],
-    });
-    const result: Result = await next(f, ['collision']);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain('other');
-    expect(result.stderr).toContain('w1:p90');
-    expect(toSession(f, 'default').some((args) => args[2] === 'tab' && args[3] === 'create')).toBe(false);
-  } finally {
-    f.clean();
-  }
-});
-
-test('recorded tab without a worktree member is neither closed nor reused', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const worktree: string = resolve(storeDir(f), 'foreign-cwd');
-    await command(['git', 'worktree', 'add', '-b', 'foreign-cwd', worktree], f.root);
-    leaf(f, 'foreign-cwd', 'plan.synthesis', { tab: 'w1:t90', pane: { A: 'w1:p90' }, worktree });
-    saveDatabase(f, {
-      ...database(f),
-      serial: 100,
-      tabs: [{ tab_id: 'w1:t90', label: 'unrelated', workspace_id: 'w1' }],
-      panes: [seatedPane('w1:p90', 'w1:t90', '/var/elsewhere')],
-    });
-    const result: Result = await next(f, ['foreign-cwd']);
-    expect(result.code).toBe(0);
-    const calls: string[][] = toSession(f, 'default');
-    expect(calls.some((args) => args[2] === 'pane' && args[3] === 'close' && args[4] === 'w1:p90')).toBe(false);
-    expect(calls.some((args) => args[2] === 'agent' && args.includes('w1:p90'))).toBe(false);
-    expect(database(f).panes.some((pane) => pane.pane_id === 'w1:p90')).toBe(true);
-    expect(readState(resolve(f.root, 'issues/open/issue/foreign-cwd')).tab).not.toBe('w1:t90');
-  } finally {
-    f.clean();
-  }
-});
-
-test('resolved-session pane discovery refuses at the ten-second deadline', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('terminal discovery in the resolved session refuses at the ten-second deadline', async () => {
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'pane-deadline', 'plan.synthesis');
-    const wrapper: string = resolve(f.home, 'slow-bin');
-    mkdirSync(wrapper);
-    const herdr: string = resolve(wrapper, 'herdr');
-    writeFileSync(
-      herdr,
-      `#!/bin/sh
-if [ "$3" = pane ] && [ "$4" = list ]; then exec sleep 12; fi
-exec '${resolve(f.home, 'bin/herdr')}' "$@"
-`,
-    );
-    chmodSync(herdr, 0o755);
-    const result: Result = await next(f, ['pane-deadline'], { PATH: `${wrapper}:${f.env.PATH}` });
+    const result: Result = await cli(f, ['next', 'pane-deadline'], f.root, {
+      ...f.env,
+      PATH: stallingHc(f, f.core, 'terminal.list', null),
+    });
     expect(result.code).toBe(1);
-    expect(result.stderr).toContain('deadline 10000ms exceeded');
-    expect(database(f).tabs).toHaveLength(0);
+    expect(result.stderr).toContain('terminal.list');
+    expect(await f.core.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
