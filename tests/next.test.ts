@@ -119,12 +119,6 @@ function tmpdirOf(args: string[]): string {
 }
 
 // Port helpers (plan D26): the fixture core's seat terminals stand in for fake herdr panes, tabs and prompts.
-// A real leaf slice is shared by every concurrent test using the same repo and slug, so akrogon's own
-// systemctl calls (reconcile's slice stops of merged leaves) go to the fake systemctl here.
-async function coreFixture(opts: { mode?: string; window?: 'open' | 'closed' } = {}): Promise<HcFixture> {
-  const f: HcFixture = await hcFixture(opts);
-  return { ...f, env: { ...f.env, ...fakeSystemctl(f).env } };
-}
 async function seatTerminals(f: HcFixture, slug: string, all: boolean = false): Promise<Terminal[]> {
   return f.core.terminals({ akrogon: '1', 'akrogon.leaf': slug }, all);
 }
@@ -184,6 +178,7 @@ async function otherRepo(f: HcFixture, name: string = 'other', prefix: string = 
   return {
     ...g,
     core,
+    systemctl: fakeSystemctl(g),
     env: core.env,
     clean: async (): Promise<void> => {
       await core.stop();
@@ -219,7 +214,7 @@ for (const kind of ['relative file', 'absolute file', 'file symlink']) {
 
 for (const kind of ['leaf folder', 'worktree path']) {
   test(`next dispatches an explicit ${kind}`, async () => {
-    const f: HcFixture = await coreFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const worktree: string = resolve(storeDir(f), 'build');
       if (kind === 'worktree path') await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
@@ -234,7 +229,7 @@ for (const kind of ['leaf folder', 'worktree path']) {
 }
 
 test('next creates one worktree/tab under concurrent passes and starts configured A with the leaf task', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'build', 'plan.synthesis');
     // The seat works on its task through both passes, as an agent would.
@@ -262,7 +257,7 @@ test('next creates one worktree/tab under concurrent passes and starts configure
 }, 15000);
 
 test('bare next from the repo dispatches by cwd instead of returning silently', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'shell', 'plan.synthesis');
     expect((await next(f, [])).code).toBe(0);
@@ -274,7 +269,7 @@ test('bare next from the repo dispatches by cwd instead of returning silently', 
 }, 15000);
 
 test('next re-prompts an idle seat whose turn ended while the phase never moved, and never a working one', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'stalled', 'plan.synthesis');
     const release: () => void = holdTurns(f);
@@ -294,7 +289,7 @@ test('next re-prompts an idle seat whose turn ended while the phase never moved,
 }, 15000);
 
 test('an ended turn never re-prompts a busy or done seat', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'misses', 'plan.synthesis');
     const release: () => void = holdTurns(f);
@@ -317,7 +312,7 @@ test('an ended turn never re-prompts a busy or done seat', async () => {
 }, 15000);
 
 test('next waits on a blocked agent instead of counting attempts or flipping seats', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'dialog', 'plan.synthesis');
     holdTurns(f, 'blocked:kind=permission:msg=Allow?');
@@ -380,7 +375,7 @@ function failNotices(f: Fixture, failNotification: boolean): void {
 }
 
 test('busy seats persist, warn strictly after an hour, retry a failed notice and clear on an idle turn', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'busy', 'check.review');
     const now: number = Date.parse('2026-09-11T12:00:00Z');
@@ -429,7 +424,7 @@ test('busy seats persist, warn strictly after an hour, retry a failed notice and
 }, 30000);
 
 test('next refuses unmerged dependencies, respects capacity, and waits on a busy seat', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis');
     const dependent: string = leaf(f, 'dependent', 'plan.synthesis', { 'blocked-by': ['first'] });
@@ -456,7 +451,7 @@ test('next refuses unmerged dependencies, respects capacity, and waits on a busy
 }, 15000);
 
 test('a merged leaf with its tab still open does not count toward max_active', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
     const dependent: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
@@ -476,7 +471,7 @@ test('a merged leaf with its tab still open does not count toward max_active', a
 }, 15000);
 
 test('merged phase closes tab on typed next and starts the dependent', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
     const dependent: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
@@ -497,7 +492,7 @@ test('merged phase closes tab on typed next and starts the dependent', async () 
 }, 15000);
 
 test('completing a leaf via targeted next starts only same-repo dependents', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   const g: Fixture = await fixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
@@ -525,7 +520,7 @@ test('completing a leaf via targeted next starts only same-repo dependents', asy
 }, 15000);
 
 test('a dependent still blocked by an unmerged leaf stays unallocated after its first blocker merges', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
     leaf(f, 'other', 'plan.synthesis', {}, 'other-issue');
@@ -545,7 +540,7 @@ test('a dependent still blocked by an unmerged leaf stays unallocated after its 
 }, 15000);
 
 test('next --all inside a checkout sweeps only that repo', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   const g: Fixture = await fixture();
   try {
     leaf(f, 'a-one', 'plan.synthesis');
@@ -560,7 +555,7 @@ test('next --all inside a checkout sweeps only that repo', async () => {
 }, 15000);
 
 test('unreadable state reserves its capacity and reports its path', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
     writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
@@ -583,7 +578,7 @@ test('unreadable state reserves its capacity and reports its path', async () => 
 }, 15000);
 
 test('one unreadable leaf blocks all capacity at max_active 1', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
     writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
@@ -601,7 +596,7 @@ test('one unreadable leaf blocks all capacity at max_active 1', async () => {
 }, 15000);
 
 test('machine-wide capacity includes another registered repo and folder selection respects it', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   const g: HcFixture = await otherRepo(f);
   try {
     leaf(f, 'first', 'plan.synthesis');
@@ -619,7 +614,7 @@ test('machine-wide capacity includes another registered repo and folder selectio
 }, 15000);
 
 test('merged leaves do not reserve capacity for other waiting leaves', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   const g: HcFixture = await otherRepo(f);
   try {
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
@@ -648,7 +643,7 @@ test('merged leaves do not reserve capacity for other waiting leaves', async () 
 }, 15000);
 
 test('next recovers only merge-phase work by ancestry against a non-default remote target', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const remote: string = resolve(f.home, 'remote.git');
     await command(['git', 'init', '--bare', remote]);
@@ -733,7 +728,7 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
 }, 20000);
 
 test('a finished seat restarts with its task and the surviving slot keeps its terminal', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'exited', 'check.review');
     holdTurns(f);
@@ -756,7 +751,7 @@ test('a finished seat restarts with its task and the surviving slot keeps its te
 }, 15000);
 
 test('uncommitted work in a merge worktree is left to the merge seat', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'dirty', 'plan.synthesis');
     holdTurns(f);
@@ -777,7 +772,7 @@ test('uncommitted work in a merge worktree is left to the merge seat', async () 
 }, 15000);
 
 test('a worktree parked mid-rebase is still dispatched', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'conflict', 'plan.synthesis');
     expect((await next(f, ['conflict'])).code).toBe(0);
@@ -804,7 +799,7 @@ test('a worktree parked mid-rebase is still dispatched', async () => {
 }, 15000);
 
 test('a live merge retains its completion call after pushing, including a peer retry', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'active-merge', 'check.review');
     holdTurns(f);
@@ -854,7 +849,7 @@ test('a live merge retains its completion call after pushing, including a peer r
 }, 15000);
 
 test('seat names support identical repo-local slugs and long numeric-leading slugs', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   const g: HcFixture = await otherRepo(f);
   try {
     const slug: string = '123-this-is-a-valid-leaf-slug-longer-than-thirty-characters';
@@ -881,7 +876,7 @@ test('seat names support identical repo-local slugs and long numeric-leading slu
 }, 15000);
 
 test('next awaits sourced completion after a failed rename before removing the worktree', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'rename', 'plan.synthesis');
     expect((await next(f, ['rename'])).code).toBe(0);
@@ -998,7 +993,7 @@ async function rePromptable(f: HcFixture, path: string): Promise<void> {
 
 for (const mode of ['startup', 'cwd'] as const) {
   test(`missing registration is isolated during ${mode}`, async () => {
-    const f: HcFixture = await coreFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
       expect((await next(f, ['healthy'])).code).toBe(0);
@@ -1023,7 +1018,7 @@ for (const mode of ['startup', 'cwd'] as const) {
 }
 
 test('missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'broken', 'plan.synthesis', { 'blocked-by': ['nonexistent'] });
     leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['healthy'] });
@@ -1043,7 +1038,7 @@ test('missing dependencies skip their leaf while readable unmet dependencies wai
 
 for (const capacity of [3, 4]) {
   test(`bad YAML and invalid states reserve occupancy at capacity ${capacity}`, async () => {
-    const f: HcFixture = await coreFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
       expect((await next(f, ['healthy'])).code).toBe(0);
@@ -1074,7 +1069,7 @@ for (const capacity of [3, 4]) {
 }
 
 test('dirty merged worktree is kept after its tab closes, then removed once clean', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const dirty: string = leaf(f, 'dirty', 'plan.synthesis', {}, 'dirty-issue');
     expect((await next(f, ['dirty'])).code).toBe(0);
@@ -1099,7 +1094,7 @@ test('dirty merged worktree is kept after its tab closes, then removed once clea
 }, 15000);
 
 test('bare next from inside the repo cleans up its merged leaves', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const done: string = leaf(f, 'done', 'plan.synthesis', {}, 'done-issue');
     expect((await next(f, ['done'])).code).toBe(0);
@@ -1134,7 +1129,7 @@ for (const scope of ['global'] as const) {
 }
 
 test('lock finalization failures remain fatal', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'healthy', 'plan.synthesis');
     const flock: string = resolve(f.home, 'bin/flock');
@@ -1153,7 +1148,7 @@ test('lock finalization failures remain fatal', async () => {
 
 for (const invalid of ['duplicate', 'mismatch']) {
   test(`${invalid} leaf identity never dispatches an arbitrary leaf`, async () => {
-    const f: HcFixture = await coreFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const path: string = leaf(f, 'ambiguous', 'plan.synthesis', invalid === 'mismatch' ? { repo: 'wrong' } : {});
       if (invalid === 'duplicate') leaf(f, 'ambiguous', 'plan.synthesis', {}, 'second');
@@ -1181,7 +1176,7 @@ for (const invalid of ['duplicate', 'mismatch']) {
 }
 
 test('next selection and sweep report both repo keys without dispatching or changing the mismatched leaf', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'wrong-key', 'plan.synthesis', { repo: 'other' });
     const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
@@ -1231,7 +1226,7 @@ test('foreign leaves summarize once per repo with count and paths', async () => 
 }, 15000);
 
 test('foreign leaves do not consume capacity while healthy leaves in both repos dispatch', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   const g: HcFixture = await otherRepo(f);
   try {
     const foreign: string[] = [];
@@ -1287,7 +1282,7 @@ test('foreign slugs are missing for lookup and dispatch', async () => {
 }, 15000);
 
 test('unreadable leaves reserve capacity while foreign leaves summarize separately', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
@@ -1314,7 +1309,7 @@ test('unreadable leaves reserve capacity while foreign leaves summarize separate
 }, 15000);
 
 test('merged foreign leaves survive cleanup with worktree branch and tab intact', async () => {
-  const f: HcFixture = await coreFixture({ window: 'open' });
+  const f: HcFixture = await hcFixture({ window: 'open' });
   const stopAdopt: () => void = adopt(f.core);
   try {
     const open: string = leaf(f, 'survivor', 'plan.synthesis');
@@ -1358,7 +1353,7 @@ test('a sweep leaves closed merged leaves untouched', async () => {
 }, 15000);
 
 test('next --resume starts an open dependent of an already closed leaf', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'done', 'merged', {}, 'done-owner');
     mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
@@ -1397,7 +1392,7 @@ test('two repos summarize once per repo on every invocation', async () => {
 
 for (const moved of ['worktree root', 'repo root'] as const) {
   test(`changed ${moved} reports recorded and expected worktrees without creating or prompting`, async () => {
-    const f: HcFixture = await coreFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const recorded: string = resolve(f.root, 'issues/worktrees/relocated');
       await command(['git', 'worktree', 'add', '-b', 'relocated', recorded], f.root);
@@ -1443,7 +1438,7 @@ for (const moved of ['worktree root', 'repo root'] as const) {
 }
 
 test('moving a repo with the same registered key supports status, phase and dispatch without a recorded worktree', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'movable', 'plan.synthesis');
     const root: string = resolve(f.home, 'moved-repo');
@@ -1469,7 +1464,7 @@ test('moving a repo with the same registered key supports status, phase and disp
 });
 
 test('unknown directory population reserves all new capacity but allows existing tabs', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
     expect((await next(f, ['healthy'])).code).toBe(0);
@@ -1561,7 +1556,7 @@ async function quiet(f: HcFixture, address: string): Promise<Terminal> {
 }
 
 test('blocked merge seat B prevents fetch and clean checks in a dirty worktree', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
     expect((await next(f, ['blocked-merge'])).code).toBe(0);
@@ -1605,7 +1600,7 @@ test('blocked merge seat B prevents fetch and clean checks in a dirty worktree',
 });
 
 test('one pass reads the registered root common dir and remote url once each', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const paths: string[] = ['aa', 'bb'].map((slug: string) => leaf(f, slug, 'plan.synthesis'));
     holdTurns(f);
@@ -1633,7 +1628,7 @@ test('one pass reads the registered root common dir and remote url once each', a
 }, 20000);
 
 test('a blocked non-merge seat does not stall a merge leaf', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
     holdTurns(f, 'blocked:kind=permission:msg=Allow?');
@@ -1656,7 +1651,7 @@ test('a blocked non-merge seat does not stall a merge leaf', async () => {
 }, 15000);
 
 test('merge, check.fix, check.repair and post-repair review dispatch to their swapped seats', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'post-repair', 'plan.synthesis');
     expect((await next(f, ['post-repair'])).code).toBe(0);
@@ -1702,7 +1697,7 @@ function tabCloses(f: HcFixture): string[][] {
 }
 
 test('startup retries closure before cleanup and retains failed owners with their worktree and branch while the tab closes', async () => {
-  const f: HcFixture = await coreFixture({ window: 'open' });
+  const f: HcFixture = await hcFixture({ window: 'open' });
   const stopAdopt: () => void = adopt(f.core);
   try {
     const path: string = leaf(f, 'retry', 'plan.synthesis');
@@ -1753,7 +1748,7 @@ test('startup retries closure before cleanup and retains failed owners with thei
 
 for (const mode of ['--resume', '--all'] as const) {
   test(`startup retains a merged leaf's worktree and branch while closing its tab as an epic sibling stays unfinished (${mode})`, async () => {
-    const f: HcFixture = await coreFixture({ window: 'open' });
+    const f: HcFixture = await hcFixture({ window: 'open' });
     const stopAdopt: () => void = adopt(f.core);
     try {
       const path: string = leaf(f, 'done', 'plan.synthesis', {}, 'epic/first');
@@ -1777,7 +1772,7 @@ for (const mode of ['--resume', '--all'] as const) {
 }
 
 test('a merged leaf whose tab is already gone makes no tab close call', async () => {
-  const f: HcFixture = await coreFixture({ window: 'open' });
+  const f: HcFixture = await hcFixture({ window: 'open' });
   const stopAdopt: () => void = adopt(f.core);
   try {
     const path: string = leaf(f, 'gone', 'plan.synthesis', {});
@@ -1825,7 +1820,7 @@ test('a merged leaf whose tab is already gone makes no tab close call', async ()
 }, 15000);
 
 test('next --resume re-prompts allocated idle leaves in every registered repo without allocating new work', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   const g: HcFixture = await otherRepo(f);
   try {
     const aOld: string = leaf(f, 'a-old', 'plan.synthesis');
@@ -1867,7 +1862,7 @@ test('next --resume re-prompts allocated idle leaves in every registered repo wi
 }, 15000);
 
 test('next --resume completes and cleans a merged leaf and starts its dependent', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const done: string = leaf(f, 'done', 'plan.synthesis', {}, 'solo');
     const dependent: string = leaf(f, 'dependent', 'plan.synthesis', { 'blocked-by': ['done'] }, 'dep-issue');
@@ -1942,7 +1937,7 @@ for (const area of ['open', 'closed']) {
 
 for (const route of ['--all', '.']) {
   test(`invalid merged depth stays excluded during ${route} with healthy work`, async () => {
-    const f: HcFixture = await coreFixture();
+    const f: HcFixture = await hcFixture();
     try {
       configure(f, { max_active: 4 });
       leaf(f, 'healthy', 'plan.synthesis');
@@ -1973,7 +1968,7 @@ for (const route of ['--all', '.']) {
 
 for (const owner of ['issue', 'epic/issue']) {
   test(`next identifies dormant ${owner}/resting without parsing and prefers active leaves`, async () => {
-    const f: HcFixture = await coreFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const parked: string = resolve(f.root, 'issues/parked', owner, 'resting');
       mkdirSync(parked, { recursive: true });
@@ -2002,7 +1997,7 @@ for (const owner of ['issue', 'epic/issue']) {
 }
 
 test('merge leaf with landed branch re-prompts its idle seat instead of auto-recovering', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'landed-merge', 'check.review');
     expect((await next(f, ['landed-merge'])).code).toBe(0);
@@ -2029,7 +2024,7 @@ test('merge leaf with landed branch re-prompts its idle seat instead of auto-rec
 }, 15000);
 
 test('spaced repo root dispatches leaf= with the complete spaced authoritative folder', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const spaced: string = resolve(f.home, 'repo root');
     renameSync(f.root, spaced);
@@ -2046,7 +2041,7 @@ test('spaced repo root dispatches leaf= with the complete spaced authoritative f
 }, 15000);
 
 test('a failed leaf with its tab still open does not count toward max_active', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
     const second: string = leaf(f, 'second', 'plan.synthesis', {}, 'second-issue');
@@ -2070,7 +2065,7 @@ test('a failed leaf with its tab still open does not count toward max_active', a
 }, 15000);
 
 test('a failed leaf does not reserve capacity in the unreadable branch', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   const g: HcFixture = await otherRepo(f);
   try {
     const failedPath: string = leaf(f, 'failed-one', 'plan.synthesis', {}, 'failed-issue');
@@ -2100,7 +2095,7 @@ test('a failed leaf does not reserve capacity in the unreadable branch', async (
 }, 15000);
 
 test('a failed leaf with a blocked seat is not seat-observed', async () => {
-  const f: HcFixture = await coreFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'stuck', 'plan.synthesis');
     holdTurns(f, 'blocked:kind=permission:msg=Allow?');
