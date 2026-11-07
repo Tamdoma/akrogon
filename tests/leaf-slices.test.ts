@@ -208,6 +208,8 @@ function realEnv(f: SliceFixture, env: NodeJS.ProcessEnv = {}): NodeJS.ProcessEn
   return {
     ...process.env,
     ...f.env,
+    // The real systemctl: these cases use unique slugs, so their real slices collide with no other case.
+    PATH: f.core.env.PATH,
     AKROGON_HOME: f.home,
     HERDR_PANE_ID: '',
     HOME: f.home,
