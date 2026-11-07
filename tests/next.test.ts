@@ -46,6 +46,7 @@ import {
   hcCore,
   hcFixture,
   setPrefixes,
+  setSeat,
   type HcCore,
   type HcFixture,
   type Terminal,
@@ -185,6 +186,44 @@ async function otherRepo(f: HcFixture, name: string = 'other', prefix: string = 
       g.clean();
     },
   };
+}
+
+// The hc calls akrogon made, one argv per call, from the fixture's recording shim.
+function hcCalls(f: HcFixture): string[][] {
+  return readFileSync(f.core.shimLog, 'utf8')
+    .split('\n')
+    .filter((line: string) => line !== '')
+    .map((line: string) => line.split('\t'));
+}
+// The argv after `--` of every seat start of a leaf seat, in start order.
+function seatStarts(f: HcFixture, slug: string, seat: 'a' | 'b'): string[][] {
+  return hcCalls(f)
+    .filter(
+      (args: string[]) =>
+        args[0] === 'run' && args.includes(`akrogon.leaf=${slug}`) && args.includes(`akrogon.seat=${seat}`),
+    )
+    .map((args: string[]) => args.slice(args.indexOf('--') + 1));
+}
+function lastStart(f: HcFixture, slug: string, seat: 'a' | 'b'): string[] {
+  const starts: string[][] = seatStarts(f, slug, seat);
+  if (starts.length === 0) throw new Error(`Missing start for ${slug} seat ${seat}`);
+  return starts[starts.length - 1];
+}
+// The harness argv inside a seat start (`<harness> --model <m> --effort <e> [task]`), after the scope and env wrappers.
+function harnessOf(start: string[]): string[] {
+  return start.slice(start.indexOf('--model') - 1);
+}
+// Sets one global seat with its own effort; the stand-in runs an unknown mode as `work`.
+function globalSlot(f: Fixture, slot: 'a' | 'b', model: string, effort: string): void {
+  const path: string = resolve(f.home, 'config.yaml');
+  const global = z
+    .object({ slots: z.record(z.string(), z.unknown()) })
+    .passthrough()
+    .parse(Bun.YAML.parse(readFileSync(path, 'utf8')));
+  writeFileSync(
+    path,
+    Bun.YAML.stringify({ ...global, slots: { ...global.slots, [slot]: { harness: 'fake', model, effort } } }),
+  );
 }
 
 for (const kind of ['relative file', 'absolute file', 'file symlink']) {
@@ -2120,537 +2159,38 @@ test('a failed leaf with a blocked seat is not seat-observed', async () => {
   }
 }, 15000);
 
-test('a successful prompt between failures resets attempts', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const path: string = leaf(f, 'reset', 'plan.synthesis');
-    saveDatabase(f, { ...database(f), promptScript: [{ code: 'agent_prompt_stalled', message: 'first' }] });
-    expect((await next(f, ['reset'])).code).toBe(0);
-    expect(readState(path).attempts.A).toBe(1);
-    expect(readState(path).delivery_error.A?.code).toBe('agent_prompt_stalled');
-    expect((await next(f, ['reset'])).code).toBe(0);
-    expect(readState(path).attempts.A).toBe(0);
-    expect(readState(path).delivery_error.A).toBeUndefined();
-    expect(readState(path).prompted.A).toBeDefined();
-    const current: State = readState(path);
-    saveState(path, { ...current, prompted_at: { A: new Date(Date.now() - 3 * 60 * 1000).toISOString() } });
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      panes: db.panes.map((item) => ({ ...item, agent_status: 'idle' })),
-      promptScript: [{ code: 'agent_prompt_stalled', message: 'second' }],
-    });
-    expect((await next(f, ['reset'])).code).toBe(0);
-    expect(readState(path).attempts.A).toBe(1);
-    expect(readState(path).phase).toBe('plan.synthesis');
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('a pass that starts the agent then observes it not idle charges nothing', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const path: string = leaf(f, 'start-blocked', 'plan.synthesis');
-    saveDatabase(f, { ...database(f), blockOnStart: true });
-    expect((await next(f, ['start-blocked'])).code).toBe(0);
-    expect(readState(path).attempts.A).toBe(0);
-    expect(readState(path).delivery_error.A).toBeUndefined();
-    expect(readState(path).prompted.A).toBeUndefined();
-    expect(database(f).prompts).toHaveLength(0);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(0);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'start')).toHaveLength(1);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('timeout settlement records delivery when exact user text lands after the offset', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const slug: string = 'timeout-found';
-    const path: string = leaf(f, slug, 'plan.synthesis');
-    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
-    saveDatabase(f, { ...database(f), blockOnStart: true });
-    expect((await next(f, [slug])).code).toBe(0);
-    const a: string = readState(path).pane.A!;
-    const fakeHome: string = resolve(f.home, 'fake-home-found');
-    mkdirSync(fakeHome, { recursive: true });
-    const sessFile: string = resolve(f.home, 'sess-found.jsonl');
-    writeFileSync(sessFile, '');
-    const prompt: string = `plan-issue ${slug} slot=A phase=plan.synthesis leaf=${path}`;
-    const line: string =
-      JSON.stringify({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: prompt }] } }) + '\n';
-    const db0: Database = database(f);
-    saveDatabase(f, {
-      ...db0,
-      blockOnStart: false,
-      panes: db0.panes.map((item) =>
-        item.pane_id === a ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile } } : item,
-      ),
-      promptScript: [{ code: 'timeout', message: 'wait timed out', append: line }],
-    });
-    expect(existsSync(resolve(fakeHome, '.pi'))).toBe(false);
-    expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.prompted.A).toBe(sessFile);
-    expect(state.delivery_error.A).toBeUndefined();
-    expect(state.attempts.A).toBe(0);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(1);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('timeout settlement ignores the same text before the offset', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const slug: string = 'timeout-before';
-    const path: string = leaf(f, slug, 'plan.synthesis');
-    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
-    saveDatabase(f, { ...database(f), blockOnStart: true });
-    expect((await next(f, [slug])).code).toBe(0);
-    const a: string = readState(path).pane.A!;
-    const fakeHome: string = resolve(f.home, 'fake-home-before');
-    mkdirSync(fakeHome, { recursive: true });
-    const prompt: string = `plan-issue ${slug} slot=A phase=plan.synthesis leaf=${path}`;
-    const line: string =
-      JSON.stringify({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: prompt }] } }) + '\n';
-    const sessFile: string = resolve(f.home, 'sess-before.jsonl');
-    writeFileSync(sessFile, line);
-    const beforeSize: number = statSync(sessFile).size;
-    const db0: Database = database(f);
-    saveDatabase(f, {
-      ...db0,
-      blockOnStart: false,
-      panes: db0.panes.map((item) =>
-        item.pane_id === a ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile } } : item,
-      ),
-      promptScript: [{ code: 'timeout', message: 'wait timed out' }],
-    });
-    expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.prompted.A).toBeUndefined();
-    expect(state.attempts.A).toBe(1);
-    expect(state.delivery_error.A?.code).toBe('timeout');
-    expect(state.delivery_error.A?.offset).toBe(beforeSize);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('timeout settlement ignores prompt text inside assistant and tool records', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const slug: string = 'timeout-role';
-    const path: string = leaf(f, slug, 'plan.synthesis');
-    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
-    saveDatabase(f, { ...database(f), blockOnStart: true });
-    expect((await next(f, [slug])).code).toBe(0);
-    const a: string = readState(path).pane.A!;
-    const fakeHome: string = resolve(f.home, 'fake-home-role');
-    mkdirSync(fakeHome, { recursive: true });
-    const prompt: string = `plan-issue ${slug} slot=A phase=plan.synthesis leaf=${path}`;
-    const assistant: string =
-      JSON.stringify({ type: 'message', message: { role: 'assistant', content: [{ type: 'text', text: prompt }] } }) +
-      '\n';
-    const tool: string =
-      JSON.stringify({ type: 'message', message: { role: 'tool', content: [{ type: 'text', text: prompt }] } }) + '\n';
-    const sessFile: string = resolve(f.home, 'sess-role.jsonl');
-    writeFileSync(sessFile, '');
-    const db0: Database = database(f);
-    saveDatabase(f, {
-      ...db0,
-      blockOnStart: false,
-      panes: db0.panes.map((item) =>
-        item.pane_id === a ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile } } : item,
-      ),
-      promptScript: [{ code: 'timeout', message: 'wait timed out', append: assistant + tool }],
-    });
-    expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.prompted.A).toBeUndefined();
-    expect(state.attempts.A).toBe(1);
-    expect(state.delivery_error.A?.code).toBe('timeout');
-    expect(state.delivery_error.A?.offset).toBe(0);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('timeout settlement ignores a trailing partial line but keeps earlier records', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const slug: string = 'timeout-partial';
-    const path: string = leaf(f, slug, 'plan.synthesis');
-    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
-    saveDatabase(f, { ...database(f), blockOnStart: true });
-    expect((await next(f, [slug])).code).toBe(0);
-    const a: string = readState(path).pane.A!;
-    const fakeHome: string = resolve(f.home, 'fake-home-partial');
-    mkdirSync(fakeHome, { recursive: true });
-    const prompt: string = `plan-issue ${slug} slot=A phase=plan.synthesis leaf=${path}`;
-    const line: string =
-      JSON.stringify({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: prompt }] } }) + '\n';
-    const sessFile: string = resolve(f.home, 'sess-partial.jsonl');
-    writeFileSync(sessFile, '');
-    const db0: Database = database(f);
-    saveDatabase(f, {
-      ...db0,
-      blockOnStart: false,
-      panes: db0.panes.map((item) =>
-        item.pane_id === a ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile } } : item,
-      ),
-      promptScript: [
-        { code: 'timeout', message: 'wait timed out', append: line + '{"type":"message","message":{"role":"user"' },
-      ],
-    });
-    expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.prompted.A).toBe(sessFile);
-    expect(state.delivery_error.A).toBeUndefined();
-    expect(state.attempts.A).toBe(0);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('a record appended after a timeout is recognized by the next pass without resending', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const slug: string = 'timeout-late';
-    const path: string = leaf(f, slug, 'plan.synthesis');
-    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
-    saveDatabase(f, { ...database(f), blockOnStart: true });
-    expect((await next(f, [slug])).code).toBe(0);
-    const a: string = readState(path).pane.A!;
-    const fakeHome: string = resolve(f.home, 'fake-home-late');
-    mkdirSync(fakeHome, { recursive: true });
-    const sessFile: string = resolve(f.home, 'sess-late.jsonl');
-    writeFileSync(sessFile, '');
-    const db0: Database = database(f);
-    saveDatabase(f, {
-      ...db0,
-      blockOnStart: false,
-      panes: db0.panes.map((item) =>
-        item.pane_id === a ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile } } : item,
-      ),
-      promptScript: [{ code: 'timeout', message: 'wait timed out' }],
-    });
-    expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
-    expect(readState(path).attempts.A).toBe(1);
-    expect(readState(path).delivery_error.A?.offset).toBe(0);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(1);
-    const prompt: string = `plan-issue ${slug} slot=A phase=plan.synthesis leaf=${path}`;
-    const line: string =
-      JSON.stringify({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: prompt }] } }) + '\n';
-    appendFileSync(sessFile, line);
-    const db1: Database = database(f);
-    saveDatabase(f, { ...db1, panes: db1.panes.map((item) => ({ ...item, agent_status: 'idle' })) });
-    expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.prompted.A).toBe(sessFile);
-    expect(state.delivery_error.A).toBeUndefined();
-    expect(state.attempts.A).toBe(0);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(1);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('timeout with a missing session file records a plain error without offset', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const slug: string = 'timeout-missing';
-    const path: string = leaf(f, slug, 'plan.synthesis');
-    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
-    saveDatabase(f, { ...database(f), blockOnStart: true });
-    expect((await next(f, [slug])).code).toBe(0);
-    const a: string = readState(path).pane.A!;
-    const fakeHome: string = resolve(f.home, 'fake-home-missing');
-    mkdirSync(fakeHome, { recursive: true });
-    const sessFile: string = resolve(f.home, 'sess-does-not-exist.jsonl');
-    expect(existsSync(sessFile)).toBe(false);
-    const db0: Database = database(f);
-    saveDatabase(f, {
-      ...db0,
-      blockOnStart: false,
-      panes: db0.panes.map((item) =>
-        item.pane_id === a ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile } } : item,
-      ),
-      promptScript: [{ code: 'timeout', message: 'wait timed out' }],
-    });
-    expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.attempts.A).toBe(1);
-    expect(state.delivery_error.A?.code).toBe('timeout');
-    expect(state.delivery_error.A?.offset).toBeUndefined();
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('timeout settlement resolves id-kind references under HOME', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const slug: string = 'timeout-id';
-    const path: string = leaf(f, slug, 'plan.synthesis');
-    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
-    saveDatabase(f, { ...database(f), blockOnStart: true });
-    expect((await next(f, [slug])).code).toBe(0);
-    const a: string = readState(path).pane.A!;
-    const sessionId: string = database(f).panes.find((item) => item.pane_id === a)!.agent_session!.value;
-    const fakeHome: string = resolve(f.home, 'fake-home-id');
-    const sessDir: string = resolve(fakeHome, '.pi/agent/sessions/abc');
-    mkdirSync(sessDir, { recursive: true });
-    writeFileSync(resolve(sessDir, `2026-01-01_${sessionId}.jsonl`), '');
-    const db0: Database = database(f);
-    saveDatabase(f, {
-      ...db0,
-      blockOnStart: false,
-      panes: db0.panes.map((item) => (item.pane_id === a ? { ...item, agent_status: 'idle' } : item)),
-      promptScript: [{ code: 'timeout', message: 'wait timed out' }],
-    });
-    expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.attempts.A).toBe(1);
-    expect(state.delivery_error.A?.code).toBe('timeout');
-    expect(state.delivery_error.A?.offset).toBe(0);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('timeout with an unresolvable id records a plain error without offset', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const slug: string = 'timeout-id-missing';
-    const path: string = leaf(f, slug, 'plan.synthesis');
-    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
-    saveDatabase(f, { ...database(f), blockOnStart: true });
-    expect((await next(f, [slug])).code).toBe(0);
-    const a: string = readState(path).pane.A!;
-    const fakeHome: string = resolve(f.home, 'fake-home-id-missing');
-    mkdirSync(fakeHome, { recursive: true });
-    const db0: Database = database(f);
-    saveDatabase(f, {
-      ...db0,
-      blockOnStart: false,
-      panes: db0.panes.map((item) => (item.pane_id === a ? { ...item, agent_status: 'idle' } : item)),
-      promptScript: [{ code: 'timeout', message: 'wait timed out' }],
-    });
-    expect((await next(f, [slug], { HOME: fakeHome })).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.attempts.A).toBe(1);
-    expect(state.delivery_error.A?.code).toBe('timeout');
-    expect(state.delivery_error.A?.offset).toBeUndefined();
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('a retryable agent start failure charges once without prompting, then recovers', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const path: string = leaf(f, 'start-fail', 'plan.synthesis');
-    saveDatabase(f, { ...database(f), startScript: [{ code: 'agent_not_ready', message: 'not ready yet' }] });
-    expect((await next(f, ['start-fail'])).code).toBe(0);
-    const first: State = readState(path);
-    expect(first.attempts.A).toBe(1);
-    expect(first.delivery_error.A?.code).toBe('agent_not_ready');
-    expect(first.delivery_error.A?.offset).toBeUndefined();
-    expect(first.prompted.A).toBeUndefined();
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(0);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'start')).toHaveLength(1);
-    expect((await next(f, ['start-fail'])).code).toBe(0);
-    const second: State = readState(path);
-    expect(second.attempts.A).toBe(0);
-    expect(second.delivery_error.A).toBeUndefined();
-    expect(second.prompted.A).toBeDefined();
-    expect(database(f).prompts).toHaveLength(1);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('retryable agent start failures keep the leaf in phase until a start succeeds', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('failed seat starts keep the leaf in phase, uncharged, until a start succeeds', async () => {
+  const f: HcFixture = await hcFixture({ mode: 'exit' });
   try {
     const path: string = leaf(f, 'start-fails', 'plan.synthesis');
-    const fail = { code: 'agent_not_ready', message: 'not ready' };
-    saveDatabase(f, { ...database(f), startScript: [{ ...fail }, { ...fail }, { ...fail }] });
-    for (const n of [1, 2, 3]) {
-      expect((await next(f, ['start-fails'])).code).toBe(0);
+    for (let pass: number = 0; pass < 3; pass++) {
+      const failed: Result = await next(f, ['start-fails']);
+      // A seat that exits fails its start with its address (plan D8); the pass charges no prompt.
+      expect(failed.code).not.toBe(0);
+      const seats: Terminal[] = await seatTerminals(f, 'start-fails', true);
+      expect(failed.stderr).toContain(`failed ${seats[seats.length - 1].address}`);
       const state: State = readState(path);
       expect(state.phase).toBe('plan.synthesis');
-      expect(state.attempts.A).toBe(n);
-      expect(state.delivery_error.A?.code).toBe('agent_not_ready');
+      expect(state.attempts.A).toBe(0);
+      expect(state.prompted.A).toBeUndefined();
       expect(state.failure).toBeUndefined();
-      expect(database(f).prompts).toHaveLength(0);
+      expect(await allTasks(f)).toEqual([]);
     }
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'start')).toHaveLength(3);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(0);
+    setSeat(f, 'a', 'fake', 'work');
     expect((await next(f, ['start-fails'])).code).toBe(0);
     const fourth: State = readState(path);
     expect(fourth.phase).toBe('plan.synthesis');
-    expect(fourth.attempts.A).toBe(0);
     expect(fourth.delivery_error.A).toBeUndefined();
     expect(fourth.prompted.A).toBeDefined();
-    expect(database(f).prompts).toHaveLength(1);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'start')).toHaveLength(4);
+    expect(fourth.attempts.A).toBe(1);
+    expect(await allTasks(f)).toHaveLength(1);
   } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('a session replacement after a timeout resends the prompt instead of settling from the old offset', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const slug: string = 'timeout-replaced';
-    const path: string = leaf(f, slug, 'plan.synthesis');
-    yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: storeDir(f), grounding: 'none' });
-    saveDatabase(f, { ...database(f), blockOnStart: true });
-    expect((await next(f, [slug])).code).toBe(0);
-    const a: string = readState(path).pane.A!;
-    const sessFile1: string = resolve(f.home, 'sess-old.jsonl');
-    writeFileSync(sessFile1, '');
-    const db0: Database = database(f);
-    saveDatabase(f, {
-      ...db0,
-      blockOnStart: false,
-      panes: db0.panes.map((item) =>
-        item.pane_id === a
-          ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile1 } }
-          : item,
-      ),
-      promptScript: [{ code: 'timeout', message: 'wait timed out' }],
-    });
-    expect((await next(f, [slug])).code).toBe(0);
-    expect(readState(path).delivery_error.A?.session).toBe(sessFile1);
-    expect(readState(path).delivery_error.A?.offset).toBe(0);
-    const prompt: string = `plan-issue ${slug} slot=A phase=plan.synthesis leaf=${path}`;
-    const line: string =
-      JSON.stringify({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: prompt }] } }) + '\n';
-    const sessFile2: string = resolve(f.home, 'sess-new.jsonl');
-    writeFileSync(sessFile2, line);
-    const db1: Database = database(f);
-    saveDatabase(f, {
-      ...db1,
-      panes: db1.panes.map((item) =>
-        item.pane_id === a
-          ? { ...item, agent_status: 'idle', agent_session: { kind: 'path', value: sessFile2 } }
-          : item,
-      ),
-      promptScript: [{ code: 'timeout', message: 'wait timed out' }],
-    });
-    expect((await next(f, [slug])).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.phase).toBe('plan.synthesis');
-    expect(state.attempts.A).toBe(2);
-    expect(state.delivery_error.A?.session).toBe(sessFile2);
-    expect(state.delivery_error.A?.code).toBe('timeout');
-    expect(state.failure).toBeUndefined();
-    expect(state.prompted.A).toBeUndefined();
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(2);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('a non-retryable prompt code records the error without failing, the leaf retries, and siblings still dispatch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const aPath: string = leaf(f, 'unreach-a', 'plan.synthesis');
-    const bPath: string = leaf(f, 'unreach-b', 'plan.synthesis');
-    saveDatabase(f, { ...database(f), promptScript: [{ code: 'boom', message: 'bad thing' }] });
-    const result: Result = await next(f, ['--all']);
-    expect(result.code).toBe(0);
-    const states: State[] = [readState(aPath), readState(bPath)];
-    expect(states.every((item) => item.phase === 'plan.synthesis' && item.failure === undefined)).toBe(true);
-    const recorded: State[] = states.filter((item) => item.delivery_error.A !== undefined);
-    const ok: State[] = states.filter((item) => item.delivery_error.A === undefined);
-    expect(recorded).toHaveLength(1);
-    expect(ok).toHaveLength(1);
-    expect(recorded[0].delivery_error.A?.code).toBe('boom');
-    expect(recorded[0].delivery_error.A?.message).toBe('bad thing');
-    expect(recorded[0].attempts.A).toBe(1);
-    expect(database(f).prompts).toHaveLength(1);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(2);
-    const faulted: string = [aPath, bPath][states.indexOf(recorded[0])];
-    saveDatabase(f, { ...database(f), promptScript: [{ code: 'boom', message: 'bad thing' }] });
-    expect((await next(f, [faulted])).code).toBe(0);
-    expect(readState(faulted).attempts.A).toBe(2);
-    expect(readState(faulted).phase).toBe('plan.synthesis');
-    expect(readState(faulted).failure).toBeUndefined();
-    expect(database(f).prompts).toHaveLength(1);
-    expect(calls(f).filter((args) => args[0] === 'agent' && args[1] === 'prompt')).toHaveLength(3);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('non-JSON prompt stderr records a delivery error with exit code and trimmed message', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const aPath: string = leaf(f, 'raw-a', 'plan.synthesis');
-    const bPath: string = leaf(f, 'raw-b', 'plan.synthesis');
-    saveDatabase(f, { ...database(f), promptScript: [{ stderr: '  oops not json  \n' }] });
-    const result: Result = await next(f, ['--all']);
-    expect(result.code).toBe(0);
-    const states: State[] = [readState(aPath), readState(bPath)];
-    expect(states.every((item) => item.phase === 'plan.synthesis' && item.failure === undefined)).toBe(true);
-    const recorded: State[] = states.filter((item) => item.delivery_error.A !== undefined);
-    expect(recorded).toHaveLength(1);
-    expect(recorded[0].delivery_error.A?.code).toBe('exit 1');
-    expect(recorded[0].delivery_error.A?.message).toBe('oops not json');
-    expect(recorded[0].attempts.A).toBe(1);
-    expect(database(f).prompts).toHaveLength(1);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('malformed prompt error JSON records a delivery error with exit code', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const aPath: string = leaf(f, 'mal-a', 'plan.synthesis');
-    const bPath: string = leaf(f, 'mal-b', 'plan.synthesis');
-    saveDatabase(f, { ...database(f), promptScript: [{ stderr: '{"error":{"code":123}}' }] });
-    const result: Result = await next(f, ['--all']);
-    expect(result.code).toBe(0);
-    const states: State[] = [readState(aPath), readState(bPath)];
-    expect(states.every((item) => item.phase === 'plan.synthesis' && item.failure === undefined)).toBe(true);
-    const recorded: State[] = states.filter((item) => item.delivery_error.A !== undefined);
-    expect(recorded).toHaveLength(1);
-    expect(recorded[0].delivery_error.A?.code).toBe('exit 1');
-    expect(recorded[0].delivery_error.A?.message).toBe('{"error":{"code":123}}');
-    expect(recorded[0].attempts.A).toBe(1);
-    expect(database(f).prompts).toHaveLength(1);
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('a successful prompt clears delivery_error and resets attempts', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const path: string = leaf(f, 'clear', 'plan.synthesis');
-    saveDatabase(f, { ...database(f), promptScript: [{ code: 'agent_prompt_stalled', message: 'first' }] });
-    expect((await next(f, ['clear'])).code).toBe(0);
-    expect(readState(path).attempts.A).toBe(1);
-    expect(readState(path).delivery_error.A?.code).toBe('agent_prompt_stalled');
-    expect((await next(f, ['clear'])).code).toBe(0);
-    const state: State = readState(path);
-    expect(state.attempts.A).toBe(0);
-    expect(state.delivery_error.A).toBeUndefined();
-    expect(state.prompted.A).toBeDefined();
-  } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('next uses repo seat overrides for both seats with spaced model as one argv element', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
       grounding: 'none',
@@ -2659,50 +2199,37 @@ test('next uses repo seat overrides for both seats with spaced model as one argv
         b: { harness: 'fake', model: 'repo-b', effort: 'low' },
       },
     });
-    const path: string = leaf(f, 'override', 'check.review');
+    leaf(f, 'override', 'check.review');
     expect((await next(f, ['override'])).code).toBe(0);
-    const state: State = readState(path);
-    const db: Database = database(f);
-    const byPane = (pane: string): string[] => {
-      const found: string[] | undefined = db.starts.find((args) => args[args.indexOf('--pane') + 1] === pane);
-      if (found === undefined) throw new Error(`Missing start for pane ${pane}`);
-      return found;
-    };
-    const startA: string[] = byPane(z.string().parse(state.pane.A));
-    const startB: string[] = byPane(z.string().parse(state.pane.B));
+    const startA: string[] = harnessOf(lastStart(f, 'override', 'a'));
+    const startB: string[] = harnessOf(lastStart(f, 'override', 'b'));
     expect(startA).toContain('repo model a');
     expect(startA.filter((x) => x === 'repo model a')).toHaveLength(1);
-    expect(startA[startA.indexOf('--kind') + 1]).toBe('fake');
+    expect(startA[0]).toBe('fake');
     expect(startB).toContain('repo-b');
-    expect(startB[startB.indexOf('--kind') + 1]).toBe('fake');
+    expect(startB[0]).toBe('fake');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('next inherits non-overridden seat from global slots', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
+    globalSlot(f, 'b', 'strong-b', 'medium');
     yaml(resolve(f.root, 'issues/config.yaml'), {
       grounding: 'none',
       slots: { a: { harness: 'fake', model: 'only-a', effort: 'low' } },
     });
-    const path: string = leaf(f, 'inherit', 'check.review');
+    leaf(f, 'inherit', 'check.review');
     expect((await next(f, ['inherit'])).code).toBe(0);
-    const state: State = readState(path);
-    const db: Database = database(f);
-    const byPane = (pane: string): string[] => {
-      const found: string[] | undefined = db.starts.find((args) => args[args.indexOf('--pane') + 1] === pane);
-      if (found === undefined) throw new Error(`Missing start for pane ${pane}`);
-      return found;
-    };
-    const startA: string[] = byPane(z.string().parse(state.pane.A));
-    const startB: string[] = byPane(z.string().parse(state.pane.B));
+    const startA: string[] = harnessOf(lastStart(f, 'inherit', 'a'));
+    const startB: string[] = harnessOf(lastStart(f, 'inherit', 'b'));
     expect(startA).toContain('only-a');
     expect(startB).toContain('strong-b');
-    expect(startB[startB.indexOf('--kind') + 1]).toBe('fake');
+    expect(startB[0]).toBe('fake');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -2728,40 +2255,35 @@ test('next refuses unknown harness override before allocation', async () => {
   }
 }, 15000);
 
-const seatByPane = (db: Database, state: State, slot: 'A' | 'B'): string[] => {
-  const found: string[] | undefined = db.starts.find((args) => args[args.indexOf('--pane') + 1] === state.pane[slot]);
-  if (found === undefined) throw new Error(`Missing start for seat ${slot}`);
-  return found;
-};
-
 test('next resolves seats from EPIC.md front matter and falls back per seat', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
-    const path: string = leaf(f, 'epic-seats', 'check.review', {}, 'epic/issue');
+    globalSlot(f, 'a', 'strong-a', 'high');
+    globalSlot(f, 'b', 'strong-b', 'medium');
+    leaf(f, 'epic-seats', 'check.review', {}, 'epic/issue');
     writeFileSync(
       resolve(f.root, 'issues/open/epic/EPIC.md'),
       '---\nslots:\n  a:\n    harness: fake\n    model: epic-a\n    effort: low\n---\n# Epic\n',
     );
     expect((await next(f, ['epic-seats'])).code).toBe(0);
-    const state: State = readState(path);
-    const db: Database = database(f);
-    expect(db.starts).toHaveLength(2);
-    const startA: string[] = seatByPane(db, state, 'A');
-    const startB: string[] = seatByPane(db, state, 'B');
+    expect([...seatStarts(f, 'epic-seats', 'a'), ...seatStarts(f, 'epic-seats', 'b')]).toHaveLength(2);
+    const startA: string[] = harnessOf(lastStart(f, 'epic-seats', 'a'));
+    const startB: string[] = harnessOf(lastStart(f, 'epic-seats', 'b'));
     expect(startA).toContain('epic-a');
     expect(startA).toContain('low');
     expect(startA).not.toContain('strong-a');
     expect(startB).toContain('strong-b');
     expect(startB).toContain('medium');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('next prefers ISSUE.md seats over EPIC.md and applies a standalone issue block', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
-    const path: string = leaf(f, 'nested', 'check.review', {}, 'epic/issue');
+    globalSlot(f, 'a', 'strong-a', 'high');
+    leaf(f, 'nested', 'check.review', {}, 'epic/issue');
     writeFileSync(
       resolve(f.root, 'issues/open/epic/EPIC.md'),
       '---\nslots:\n  b:\n    harness: fake\n    model: epic-b\n    effort: low\n---\n# Epic\n',
@@ -2775,28 +2297,25 @@ test('next prefers ISSUE.md seats over EPIC.md and applies a standalone issue bl
       slots: { b: { harness: 'fake', model: 'repo-b', effort: 'low' } },
     });
     expect((await next(f, ['nested'])).code).toBe(0);
-    const state: State = readState(path);
-    const db: Database = database(f);
-    const startA: string[] = seatByPane(db, state, 'A');
-    const startB: string[] = seatByPane(db, state, 'B');
+    const startA: string[] = harnessOf(lastStart(f, 'nested', 'a'));
+    const startB: string[] = harnessOf(lastStart(f, 'nested', 'b'));
     expect(startA).toContain('strong-a');
     expect(startB).toContain('issue-b');
     expect(startB).toContain('medium');
     expect(startB).not.toContain('epic-b');
     expect(startB).not.toContain('repo-b');
 
-    const alone: string = leaf(f, 'standalone', 'check.review');
+    leaf(f, 'standalone', 'check.review');
     writeFileSync(
       resolve(f.root, 'issues/open/issue/ISSUE.md'),
       '---\nslots:\n  a:\n    harness: fake\n    model: issue-a\n    effort: low\n---\n# Issue\n',
     );
     expect((await next(f, ['standalone'])).code).toBe(0);
-    const standalone: State = readState(alone);
-    const startAlone: string[] = seatByPane(database(f), standalone, 'A');
+    const startAlone: string[] = harnessOf(lastStart(f, 'standalone', 'a'));
     expect(startAlone).toContain('issue-a');
     expect(startAlone).toContain('low');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
