@@ -285,6 +285,81 @@ test('install still refuses an executable destination conflict before linking or
   }
 });
 
+// Points current at a release folder with or without plugin/ and the listener unit.
+function currentRelease(f: Fixture, shape: { plugin: boolean; listener: boolean }): void {
+  const release: string = resolve(f.home, 'release');
+  mkdirSync(resolve(release, 'skills/skill-one'), { recursive: true });
+  writeFileSync(resolve(release, 'skills/skill-one/SKILL.md'), 'one\n');
+  mkdirSync(resolve(release, 'src'));
+  writeFileSync(resolve(release, 'src/akrogon.ts'), 'x\n');
+  mkdirSync(resolve(release, 'systemd'));
+  writeFileSync(resolve(release, 'systemd/akrogon.slice'), '[Slice]\n');
+  if (shape.plugin) {
+    mkdirSync(resolve(release, 'plugin'));
+    writeFileSync(resolve(release, 'plugin/herdr-plugin.toml'), 'id = "akrogon"\n');
+  }
+  if (shape.listener) writeFileSync(resolve(release, 'systemd/akrogon-listener.service'), '[Service]\n');
+  symlinkSync(release, resolve(f.home, 'current'));
+}
+
+// systemctl and herdr append to one file, so the calls read back in the order they ran.
+function sequenceEnv(f: Fixture): NodeJS.ProcessEnv {
+  return { ...installEnv(f), FAKE_SYSTEMCTL_LOG: resolve(f.home, 'herdr.json.calls') };
+}
+
+function sequence(f: Fixture): string[] {
+  return readFileSync(resolve(f.home, 'herdr.json.calls'), 'utf8').trim().split('\n');
+}
+
+const listenerCalls: string[] = [
+  '--user daemon-reload linked=yes',
+  '--user enable akrogon-listener.service linked=yes',
+  '--user restart --no-block akrogon-listener.service linked=yes',
+];
+
+test('install from a plugin release makes only the reload, integration and plugin link calls, in that order', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const env: NodeJS.ProcessEnv = sequenceEnv(f);
+    currentRelease(f, { plugin: true, listener: false });
+    expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0 });
+    expect(sequence(f)).toEqual([
+      '--user daemon-reload linked=yes',
+      ...expectedCalls(f).map((call) => JSON.stringify(call)),
+    ]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('install from a listener release links, enables and restarts the unit, then unlinks the plugin', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const env: NodeJS.ProcessEnv = sequenceEnv(f);
+    currentRelease(f, { plugin: false, listener: true });
+    expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0 });
+    const unit: string = resolve(f.home, '.config/systemd/user/akrogon-listener.service');
+    expect(readlinkSync(unit)).toBe(resolve(f.home, 'current', 'systemd/akrogon-listener.service'));
+    expect(sequence(f)).toEqual([...listenerCalls, JSON.stringify(['plugin', 'unlink', 'akrogon'])]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('install from a listener release succeeds with no herdr binary on PATH', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const env: NodeJS.ProcessEnv = sequenceEnv(f);
+    const bin: string = resolve(f.home, 'bin');
+    rmSync(resolve(bin, 'herdr'));
+    currentRelease(f, { plugin: false, listener: true });
+    expect(await cli(f, ['install'], f.root, { ...env, PATH: bin })).toMatchObject({ code: 0 });
+    expect(sequence(f)).toEqual(listenerCalls);
+  } finally {
+    f.clean();
+  }
+});
+
 describe('self-update', () => {
   type SelfUpdateFixture = {
     home: string;

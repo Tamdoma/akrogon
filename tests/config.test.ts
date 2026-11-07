@@ -889,3 +889,31 @@ test('leafTemp defaults to a per-user /var/tmp root with hashed repo and leaf fo
     else process.env.AKROGON_LEAF_TEMP_ROOT = previous;
   }
 });
+
+test('machine config accepts a prefixes map without changing commands and refuses a bad prefix naming its key', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const file: string = resolve(f.home, 'config.yaml');
+    const global: object = Bun.YAML.parse(readFileSync(file, 'utf8')) as object;
+    const before: Result = await cli(f, ['config']);
+    expect(before.code).toBe(0);
+    yaml(file, { ...global, prefixes: { repo: 'rp' } });
+    const after: Result = await cli(f, ['config']);
+    expect(after.code).toBe(0);
+    expect(Bun.YAML.parse(after.stdout)).toEqual({
+      ...(Bun.YAML.parse(before.stdout) as object),
+      prefixes: { repo: 'rp' },
+    });
+    expect((await cli(f, ['init'])).code).toBe(0);
+    expect(Bun.YAML.parse(readFileSync(file, 'utf8'))).toMatchObject({ prefixes: { repo: 'rp' } });
+    for (const bad of ['RP', 'r', 'rpx', 'r1']) {
+      yaml(file, { ...global, prefixes: { repo: 'rp', framework: bad } });
+      const refused: Result = await cli(f, ['config']);
+      expect(refused.code).not.toBe(0);
+      expect(refused.stderr).toContain('prefixes');
+      expect(refused.stderr).toContain('framework');
+    }
+  } finally {
+    f.clean();
+  }
+});

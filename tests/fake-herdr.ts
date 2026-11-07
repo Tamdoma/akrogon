@@ -252,6 +252,10 @@ if (args[0] === 'plugin' && args[1] === 'link') {
   z.tuple([z.literal('plugin'), z.literal('link'), z.string().min(1)]).parse(args);
   result({});
 }
+if (args[0] === 'plugin' && args[1] === 'unlink') {
+  z.tuple([z.literal('plugin'), z.literal('unlink'), z.literal('akrogon')]).parse(args);
+  result({ removed: true });
+}
 if (args[0] === 'pane' && args[1] === 'list') {
   if (dbS.delayMs !== undefined) Bun.sleepSync(dbS.delayMs);
   if (dbS.paneListStdout !== undefined) {
