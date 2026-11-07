@@ -2,28 +2,22 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { fixture, cli, leaf, yaml, fakeHerdr, storeDir, holding, type Fixture } from './helpers';
+import { fixture, cli, leaf, yaml, storeDir, holding, type Fixture } from './helpers';
+import { hcFixture, type HcFixture, type Terminal } from './hc-fixture';
 import { command, type Result } from '../src/shell';
 import { readState } from '../src/state';
-import type { Database } from './fake-herdr';
 
-type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
-async function dispatchFixture(): Promise<DispatchFixture> {
-  const f: Fixture = await fixture();
-  return { ...f, ...fakeHerdr(f) };
+// Every task a seat terminal of the fixture core received, finished terminals included.
+async function prompts(f: HcFixture): Promise<string[]> {
+  const seats: Terminal[] = await f.core.terminals({ akrogon: '1' }, true);
+  return seats.flatMap((t: Terminal) => f.core.tasks(t.address));
 }
-function database(f: DispatchFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
+// The leaf tabs some live seat terminal holds.
+async function liveTabs(f: HcFixture): Promise<string[]> {
+  const live: Terminal[] = await f.core.terminals({ akrogon: '1' }, false);
+  return [...new Set(live.map((t: Terminal) => t.labels['herdr.tab']))];
 }
-function saveDatabase(f: DispatchFixture, db: Database): void {
-  writeFileSync(f.db, JSON.stringify(db));
-}
-async function next(
-  f: DispatchFixture,
-  args: string[],
-  env: NodeJS.ProcessEnv = {},
-  cwd: string = f.root,
-): Promise<Result> {
+async function next(f: HcFixture, args: string[], env: NodeJS.ProcessEnv = {}, cwd: string = f.root): Promise<Result> {
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
 const skipSchema = z.object({
@@ -37,7 +31,7 @@ const skipSchema = z.object({
 function skips(result: Result): z.infer<typeof skipSchema>[] {
   return result.stderr.split('\n').map((line) => skipSchema.parse(JSON.parse(line)));
 }
-function configure(f: DispatchFixture, extra: object): void {
+function configure(f: HcFixture, extra: object): void {
   const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
   yaml(resolve(f.home, 'config.yaml'), { ...global, ...extra });
 }
@@ -58,7 +52,7 @@ function makeBad(f: Fixture, slug: string, body: string, container: string = 'is
 }
 
 test('one bad leaf stops only itself: next, phase, config, run-check and status all serve a healthy sibling', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const bad: string = makeBad(f, 'bad-leaf', 'slug: bad-leaf\nnotes: stray\nphase: plan.synthesis\n');
     const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
@@ -67,9 +61,7 @@ test('one bad leaf stops only itself: next, phase, config, run-check and status 
     expect(dispatched.code).toBe(1); // the bad leaf is reported, exit nonzero
     expect(skips(dispatched)).toHaveLength(1);
     expect(skips(dispatched)[0]).toMatchObject({ path: bad });
-    expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
-      `plan-issue healthy slot=A phase=plan.synthesis leaf=${healthy}`,
-    ]);
+    expect(await prompts(f)).toEqual([`plan-issue healthy slot=A phase=plan.synthesis leaf=${healthy}`]);
     const worktree: string = readState(healthy).worktree!;
     expect(worktree.startsWith(storeDir(f))).toBe(true);
 
@@ -100,7 +92,7 @@ test('one bad leaf stops only itself: next, phase, config, run-check and status 
     expect(failures).toHaveLength(1);
     expect(failures[0].path).toBe(resolve(bad, 'state.yaml'));
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
 
@@ -113,14 +105,14 @@ for (const variant of [
   { name: 'malformed YAML', body: 'slug: [' },
 ]) {
   test(`isolation holds when the bad leaf has ${variant.name}`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const bad: string = makeBad(f, 'bad-leaf', variant.body);
       leaf(f, 'healthy', 'plan.synthesis');
       const result: Result = await next(f, ['healthy']);
       expect(result.code).toBe(1);
       expect(skips(result).some((skip) => skip.path === bad)).toBe(true);
-      expect(database(f).prompts).toHaveLength(1);
+      expect(await prompts(f)).toHaveLength(1);
       const status: Result = await cli(f, ['status'], f.root, f.env);
       expect(status.code).toBe(1);
       expect(status.stdout).toContain('healthy');
@@ -128,13 +120,13 @@ for (const variant of [
       expect(failures).toHaveLength(1);
       expect(failures[0].path).toBe(resolve(bad, 'state.yaml'));
     } finally {
-      f.clean();
+      await f.clean();
     }
   }, 15000);
 }
 
 test('isolation holds when the bad leaf sits under issues/closed', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const bad: string = makeBad(f, 'bad-leaf', 'slug: [');
     mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
@@ -146,19 +138,19 @@ test('isolation holds when the bad leaf sits under issues/closed', async () => {
     const result: Result = await next(f, ['healthy']);
     expect(result.code).toBe(1);
     expect(skips(result).some((skip) => skip.path === closed)).toBe(true);
-    expect(database(f).prompts).toHaveLength(1);
+    expect(await prompts(f)).toHaveLength(1);
     const status: Result = await cli(f, ['status'], f.root, f.env);
     expect(status.code).toBe(1);
     const failures: z.infer<typeof statusSchema>[] = unreadable(status);
     expect(failures).toHaveLength(1);
     expect(failures[0].path).toBe(resolve(closed, 'state.yaml'));
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('naming the bad leaf returns its own error naming its file', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const bad: string = makeBad(f, 'bad-leaf', 'slug: [');
     const file: string = resolve(bad, 'state.yaml');
@@ -174,12 +166,12 @@ test('naming the bad leaf returns its own error naming its file', async () => {
     expect(detail.code).not.toBe(0);
     expect(detail.stderr).toContain(file);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a bad leaf is never dispatched or queued but stays owned: reconcile keeps its worktree and tab, dependents stay blocked, another owner completes', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     // Dispatch the leaf while healthy, then corrupt it: its worktree and tab
     // are now owned by a folder whose state can no longer be read.
@@ -193,7 +185,7 @@ test('a bad leaf is never dispatched or queued but stays owned: reconcile keeps 
     configure(f, { max_active: 1 });
     const waiting: Result = await next(f, ['--all']);
     expect(waiting.code).toBe(1);
-    expect(database(f).tabs).toHaveLength(1);
+    expect(await liveTabs(f)).toHaveLength(1);
     configure(f, { max_active: 24 });
 
     // A dependency on the bad leaf stays unmet and is labelled unreadable.
@@ -223,7 +215,7 @@ test('a bad leaf is never dispatched or queued but stays owned: reconcile keeps 
     const pass: Result = await next(f, ['--all']);
     expect(pass.code).toBe(1);
     expect(existsSync(badWorktree)).toBe(true);
-    expect(database(f).tabs.some((tab) => tab.tab_id === badTab)).toBe(true);
+    expect(await liveTabs(f)).toContain(badTab);
     const keptReport: { kept: { path: string; reason: string }[] } = JSON.parse(
       readFileSync(resolve(f.home, 'reconcile', 'repo.json'), 'utf8'),
     );
@@ -231,7 +223,7 @@ test('a bad leaf is never dispatched or queued but stays owned: reconcile keeps 
       true,
     );
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
 
@@ -261,7 +253,7 @@ test('no module outside src/state.ts walks issue areas for state.yaml or parses 
 
 test('owner completion retains duplicate and foreign leaf failures while an independent owner completes', async () => {
   for (const failure of ['foreign', 'duplicate']) {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const healthy: string = leaf(
         f,
@@ -287,7 +279,7 @@ test('owner completion retains duplicate and foreign leaf failures while an inde
       expect(independent.code, independent.stderr).toBe(0);
       expect(existsSync(resolve(f.root, 'issues/closed/calm/independent/state.yaml'))).toBe(true);
     } finally {
-      f.clean();
+      await f.clean();
     }
   }
 }, 30000);
@@ -306,7 +298,7 @@ test('status for a missing leaf does not report a bad sibling', async () => {
 });
 
 test('reconcile preserves unregistered store entries owned by a foreign leaf', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'foreign-leaf', 'implement', { repo: 'other' });
     const entries: string[] = ['foreign-leaf', 'foreign-leaf-old'].map((name) => resolve(storeDir(f), name));
@@ -321,6 +313,6 @@ test('reconcile preserves unregistered store entries owned by a foreign leaf', a
       expect(readFileSync(resolve(entry, 'work'), 'utf8')).toBe('unsaved work');
     }
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
