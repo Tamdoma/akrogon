@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dlopen, FFIType } from 'bun:ffi';
@@ -58,6 +58,12 @@ setEnv('HOME', join(suiteRoot, 'home'));
 setEnv('AKROGON_LEAF_TEMP_ROOT', join(suiteRoot, 'leaf-temp'));
 setEnv('AKROGON_RETIRED_TEMP_ROOT', join(suiteRoot, 'retired-temp'));
 setEnv('TMPDIR', suiteRoot);
+// akrogon discovers hc sessions under XDG_RUNTIME_DIR: a test sees only the sessions it links in
+// (tests/hc-fixture.ts), never the operator's. bus and systemd stay reachable for systemctl --user.
+const suiteRuntime: string = join(suiteRoot, 'run');
+mkdirSync(join(suiteRuntime, 'herdr-core'), { recursive: true });
+for (const name of ['bus', 'systemd']) symlinkSync(`/run/user/${process.getuid!()}/${name}`, join(suiteRuntime, name));
+setEnv('XDG_RUNTIME_DIR', suiteRuntime);
 mkdirSync(process.env.HOME!, { recursive: true });
 mkdirSync(process.env.AKROGON_LEAF_TEMP_ROOT!, { recursive: true });
 
