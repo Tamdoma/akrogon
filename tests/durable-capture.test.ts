@@ -13,6 +13,7 @@ import { join, resolve } from 'node:path';
 import { command, spawnFiles, finishCaptured, type Result, type SpawnResult } from '../src/shell';
 import { fixture, cli, entry, leaf, yaml, fakeHerdr, leafTempRoot, holding, type Fixture } from './helpers';
 import type { Captured } from '../src/shell';
+import { hcFixture, type HcFixture } from './hc-fixture';
 
 type Live = { proc: Bun.Subprocess; captured: Captured; result: Promise<SpawnResult> };
 
@@ -75,7 +76,7 @@ function readErr(captured: Captured): string {
 }
 
 test('a SIGKILLed run-check leaves both streams in holder capture files after reconcile', async () => {
-  const f: Fixture = await fixture();
+  const f: HcFixture = await hcFixture();
   try {
     const leafPath: string = leaf(f, 'durable', 'implement');
     const impl: string = resolve(leafPath, 'implementation');
@@ -99,7 +100,7 @@ test('a SIGKILLed run-check leaves both streams in holder capture files after re
       cap.proc.kill('SIGKILL');
       const result: SpawnResult = await cap.result;
       expect(result.signalCode).toBe('SIGKILL');
-      expect((await cli(f, ['next'], f.root, fakeHerdr(f).env)).code).toBe(0);
+      expect((await cli(f, ['next'], f.root, f.env)).code).toBe(0);
       expect(readFileSync(live[0].out, 'utf8')).toContain('MARKER-durable-OUT');
       expect(readFileSync(live[0].err, 'utf8')).toContain('MARKER-durable-ERR');
       // Criterion 6: no completed artifacts, and akrogon log reads the capture.
@@ -119,7 +120,7 @@ test('a SIGKILLed run-check leaves both streams in holder capture files after re
       void cap.result;
     }
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 45000);
 
