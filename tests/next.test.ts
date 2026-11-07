@@ -23,7 +23,6 @@ import {
   leaf,
   yaml,
   fakeGh,
-  fakeHerdr,
   fakeSystemctl,
   leafTempRoot,
   storeDir,
@@ -53,27 +52,15 @@ import {
 } from './hc-fixture';
 import { z } from 'zod';
 
-type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
-async function dispatchFixture(): Promise<DispatchFixture> {
-  const f: Fixture = await fixture();
-  return { ...f, ...fakeHerdr(f) };
+// Fake herdr still takes notice sends; its database is the fixture's herdr.json.
+function herdrDb(f: Fixture): string {
+  return resolve(f.home, 'herdr.json');
 }
-function database(f: DispatchFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
+function database(f: Fixture): Database {
+  return JSON.parse(readFileSync(herdrDb(f), 'utf8')) as Database;
 }
-function saveDatabase(f: DispatchFixture, db: Database): void {
-  writeFileSync(f.db, JSON.stringify(db));
-}
-function calls(f: DispatchFixture): string[][] {
-  const path: string = f.db + '.calls';
-  return existsSync(path)
-    ? readFileSync(path, 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
-        // Session routing adds discovery calls; strip them so assertions see work calls.
-        .filter((args) => args[0] !== 'session' && args[0] !== 'workspace')
-    : [];
+function saveDatabase(f: Fixture, db: Database): void {
+  writeFileSync(herdrDb(f), JSON.stringify(db));
 }
 async function next(
   f: Fixture & { env: NodeJS.ProcessEnv },
@@ -220,7 +207,7 @@ function globalSlot(f: Fixture, slot: 'a' | 'b', model: string, effort: string):
 
 for (const kind of ['relative file', 'absolute file', 'file symlink']) {
   test(`next rejects ${kind} before dispatch or leaf mutation`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const path: string = leaf(f, 'build', 'plan.synthesis');
       const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
@@ -235,10 +222,11 @@ for (const kind of ['relative file', 'absolute file', 'file symlink']) {
       expect(result.stderr).toContain('worktree path');
       expect(result.stderr).not.toContain('ENOTDIR');
       expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
-      expect(calls(f)).toEqual([]);
+      expect(hcCalls(f)).toEqual([]);
+      expect(notices(f)).toEqual([]);
       expect(existsSync(storeDir(f))).toBe(false);
     } finally {
-      f.clean();
+      await f.clean();
     }
   });
 }
@@ -363,7 +351,7 @@ test('next waits on a blocked agent instead of counting attempts or flipping sea
 }, 15000);
 
 test('failed leaves never notify on dispatch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'broken', 'failed', {
       failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'x' },
@@ -372,16 +360,16 @@ test('failed leaves never notify on dispatch', async () => {
     saveDatabase(f, { ...database(f), failNotification: true });
     const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
     for (let sweep: number = 0; sweep < 3; sweep++) expect((await next(f, ['broken'])).code).toBe(1);
-    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(0);
-    expect(database(f)).toMatchObject({ prompts: [], starts: [], tabs: [], panes: [] });
+    expect(notices(f)).toEqual([]);
+    expect(await f.core.terminals({ akrogon: '1' }, true)).toEqual([]);
     expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
     saveDatabase(f, { ...database(f), failNotification: false });
     expect((await next(f, ['broken'])).code).toBe(1);
-    expect(calls(f).filter((args) => args[0] === 'notification')).toHaveLength(0);
+    expect(notices(f)).toEqual([]);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -959,7 +947,7 @@ test('next awaits sourced completion after a failed rename before removing the w
 }, 15000);
 
 test('a merged sourced leaf with no recorded worktree completes on next', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'stuck', 'merged', { sources: ['team/project#1'] });
     const gh: GhFixture = fakeGh(f);
@@ -988,7 +976,7 @@ test('a merged sourced leaf with no recorded worktree completes on next', async 
     expect(existsSync(resolve(f.root, 'issues/open/issue'))).toBe(false);
     expect(readState(resolve(f.root, 'issues/closed/issue/stuck')).phase).toBe('merged');
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -1138,7 +1126,7 @@ test('bare next from inside the repo cleans up its merged leaves', async () => {
 
 for (const scope of ['global'] as const) {
   test(`${scope} lock acquisition failure is fatal`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const path: string = leaf(f, 'locked', 'plan.synthesis');
       leaf(f, 'zhealthy', 'plan.synthesis');
@@ -1147,9 +1135,9 @@ for (const scope of ['global'] as const) {
       expect(result.code).not.toBe(0);
       expect(result.stderr).toContain('lock');
       expect(result.stderr).not.toContain('"repo":"repo"');
-      expect(database(f).prompts).toHaveLength(0);
+      expect(await allTasks(f)).toEqual([]);
     } finally {
-      f.clean();
+      await f.clean();
     }
   });
 }
@@ -1230,7 +1218,7 @@ test('next selection and sweep report both repo keys without dispatching or chan
 });
 
 test('foreign leaves summarize once per repo with count and paths', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const a: string = leaf(f, 'foreign-a', 'plan.synthesis', { repo: 'other' });
     const b: string = leaf(f, 'foreign-b', 'plan.synthesis', { repo: 'other' });
@@ -1245,9 +1233,9 @@ test('foreign leaves summarize once per repo with count and paths', async () => 
     expect(summary.paths).toContainEqual({ path: a, stored: 'other' });
     expect(summary.paths).toContainEqual({ path: b, stored: 'other' });
     expect(summary.paths).toContainEqual({ path: c, stored: 'third' });
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await allTasks(f)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -1282,7 +1270,7 @@ test('foreign leaves do not consume capacity while healthy leaves in both repos 
 }, 15000);
 
 test('foreign slugs are missing for lookup and dispatch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const foreign: string = leaf(f, 'foreign-dep', 'plan.synthesis', { repo: 'other' });
     const before: string = readFileSync(resolve(foreign, 'state.yaml'), 'utf8');
@@ -1294,16 +1282,16 @@ test('foreign slugs are missing for lookup and dispatch', async () => {
     expect(perLeaf).toBeDefined();
     expect(perLeaf!.path).toBe(blocked);
     expect(perLeaf!.error).toContain('foreign-dep');
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await allTasks(f)).toEqual([]);
     const direct: Result = await next(f, ['foreign-dep']);
     expect(direct.code).not.toBe(0);
     expect(skips(direct)).toHaveLength(1);
     expect(skips(direct)[0].count).toBe(1);
     expect(skips(direct)[0].paths).toContainEqual({ path: foreign, stored: 'other' });
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await allTasks(f)).toEqual([]);
     expect(readFileSync(resolve(foreign, 'state.yaml'), 'utf8')).toBe(before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -1364,7 +1352,7 @@ test('merged foreign leaves survive cleanup with worktree branch and tab intact'
 }, 15000);
 
 test('a sweep leaves closed merged leaves untouched', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const open: string = leaf(f, 'archived', 'merged');
     mkdirSync(resolve(f.root, 'issues/closed/issue'), { recursive: true });
@@ -1374,7 +1362,7 @@ test('a sweep leaves closed merged leaves untouched', async () => {
     const events: string = existsSync(timings) ? readFileSync(timings, 'utf8') : '';
     expect(events).not.toContain('"slug":"archived"');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -1393,7 +1381,7 @@ test('next --resume starts an open dependent of an already closed leaf', async (
 }, 15000);
 
 test('two repos summarize once per repo on every invocation', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   const g: Fixture = await fixture();
   try {
     const fa: string = leaf(f, 'foreign-in-repo', 'plan.synthesis', { repo: 'other' });
@@ -1409,9 +1397,9 @@ test('two repos summarize once per repo on every invocation', async () => {
       expect(byRepo.get('repo')?.paths).toContainEqual({ path: fa, stored: 'other' });
       expect(byRepo.get('other')?.paths).toContainEqual({ path: fb, stored: 'repo' });
     }
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await allTasks(f)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
     g.clean();
   }
 }, 15000);
@@ -1511,7 +1499,7 @@ test('unknown directory population reserves all new capacity but allows existing
 });
 
 test('non-Error throws cross the scoped discovery boundary unchanged', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const script: string = resolve(f.home, 'non-error.ts');
     writeFileSync(
@@ -1529,12 +1517,12 @@ try { await nextCommand('--all'); process.exit(2); } catch (error) { if (error !
     expect(code).toBe(9);
     expect(stderr.trim()).toBe('non-error-sentinel');
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('explicit unreadable targets retain the original error without a missing-target stack', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
     writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
@@ -1550,12 +1538,12 @@ test('explicit unreadable targets retain the original error without a missing-ta
     expect(missing.code).not.toBe(0);
     expect(missing.stderr).toContain('Missing leaf');
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('a selected leaf removed before its global lock is reported as skipped', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const gone: string = leaf(f, 'gone', 'plan.synthesis');
     writeFileSync(
@@ -1570,9 +1558,9 @@ test('a selected leaf removed before its global lock is reported as skipped', as
     expect(result.code).toBe(1);
     expect(skips(result)).toHaveLength(1);
     expect(skips(result)[0]).toMatchObject({ slug: 'gone', path: gone });
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await allTasks(f)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -1922,7 +1910,7 @@ test('next --resume completes and cleans a merged leaf and starts its dependent'
 for (const area of ['open', 'closed']) {
   for (const nesting of ['', 'invalid', 'epic/issue/extra/invalid']) {
     test(`explicit next rejects ${area}/${nesting} before any flock`, async () => {
-      const f: DispatchFixture = await dispatchFixture();
+      const f: HcFixture = await hcFixture();
       try {
         const source: string = leaf(f, 'invalid', area === 'closed' ? 'merged' : 'plan.synthesis');
         const path: string = resolve(f.root, 'issues', area, nesting);
@@ -1930,7 +1918,7 @@ for (const area of ['open', 'closed']) {
         renameSync(resolve(source, 'state.yaml'), resolve(path, 'state.yaml'));
         rmSync(source, { recursive: true });
         const state: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
-        const db: string = readFileSync(f.db, 'utf8');
+        const db: string = readFileSync(herdrDb(f), 'utf8');
         writeFileSync(resolve(f.home, 'bin/flock'), '#!/bin/sh\nprintf invoked > "$FLOCK_CALLS"\nexit 91\n', {
           mode: 0o755,
         });
@@ -1947,15 +1935,16 @@ for (const area of ['open', 'closed']) {
           expect(result.stderr).toContain('Invalid leaf depth');
           expect(existsSync(resolve(f.home, 'flock-calls'))).toBe(false);
           expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(state);
-          expect(readFileSync(f.db, 'utf8')).toBe(db);
-          expect(calls(f)).toEqual([]);
+          expect(readFileSync(herdrDb(f), 'utf8')).toBe(db);
+          expect(hcCalls(f)).toEqual([]);
+          expect(notices(f)).toEqual([]);
           expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
           expect(existsSync(storeDir(f))).toBe(false);
           expect(existsSync(resolve(f.home, '.lock'))).toBe(false);
           console.log(result.stderr);
         }
       } finally {
-        f.clean();
+        await f.clean();
       }
     }, 10000);
   }
