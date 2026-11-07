@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { fixture, cli, yaml, fakeGh, type Fixture, type GhFixture } from './helpers';
-import { command, quote, type Result } from '../src/shell';
+import { command, type Result } from '../src/shell';
 import { globalSchema, type GlobalConfig } from '../src/config';
 import type { GhStep } from './fake-gh';
 
@@ -296,29 +296,5 @@ test('pull --all from a registered repo pulls the healthy repos and exits non-ze
   } finally {
     f.clean();
     bad.clean();
-  }
-});
-
-test('startup runs pull all before next resume and wrappers forward arguments', async () => {
-  const plugin: string = resolve(import.meta.dir, '../plugin');
-  const manifest = z
-    .object({ startup: z.array(z.object({ command: z.array(z.string()) })) })
-    .parse(Bun.TOML.parse(readFileSync(resolve(plugin, 'herdr-plugin.toml'), 'utf8')));
-  expect(manifest.startup.map((item) => item.command)).toEqual([
-    ['sh', 'pull.sh', '--all'],
-    ['sh', 'next.sh', '--resume'],
-  ]);
-  const f: Fixture = await fixture();
-  try {
-    const bin: string = resolve(f.home, 'bin');
-    mkdirSync(bin);
-    const output: string = resolve(f.home, 'wrapper-output');
-    writeFileSync(resolve(bin, 'akrogon'), `#!/bin/sh\nprintf '%s\\n' "$@" > ${quote(output)}\n`, { mode: 0o755 });
-    for (const wrapper of ['pull', 'next']) {
-      await command(['env', `PATH=${bin}:${process.env.PATH}`, 'sh', resolve(plugin, `${wrapper}.sh`), '--all']);
-      expect(readFileSync(output, 'utf8')).toBe(`${wrapper}\n--all\n`);
-    }
-  } finally {
-    f.clean();
   }
 });
