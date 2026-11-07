@@ -28,6 +28,7 @@ import { readState, saveState, type Batch, type Failure } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import { z } from 'zod';
+import { hcFixture, type HcFixture } from './hc-fixture';
 
 function bytes(path: string): string {
   return readFileSync(resolve(path, 'state.yaml'), 'utf8');
@@ -42,6 +43,33 @@ function herdrCalls(db: string): string[][] {
         // Session routing adds discovery calls; strip them so assertions see work calls.
         .filter((args) => args[0] !== 'session' && args[0] !== 'workspace')
     : [];
+}
+// The fixture core's fake herdr database (notices only).
+function herdrDb(f: HcFixture): string {
+  return resolve(f.home, 'herdr.json');
+}
+// Each herdr-app tab rename akrogon asked for, as [tab, name], all through the fixture core's app home.
+function renames(f: HcFixture): string[][] {
+  const calls = f.core.appCalls().filter((call) => call.argv[1] === 'tab.rename');
+  for (const call of calls) expect(call.home).toBe(f.core.appHome);
+  return calls.map((call) => [call.argv[3], call.argv[5]]);
+}
+function renameWarnings(result: Result): { warning: string; slug: string; tab: string; name: string; error: string }[] {
+  return result.stderr
+    .split('\n')
+    .filter((line) => line.startsWith('{'))
+    .map((line) =>
+      z
+        .object({ warning: z.string(), slug: z.string(), tab: z.string(), name: z.string(), error: z.string() })
+        .parse(JSON.parse(line)),
+    )
+    .filter((line) => line.warning === 'tab rename failed');
+}
+// A leaf held by an open blocker: the move's own-leaf pass (plan D14) starts no seat for it, so the
+// case sees only the move's own rename.
+function parked(f: HcFixture, slug: string, phase: string, extra: object): string {
+  leaf(f, `${slug}-blocker`, 'plan.synthesis', {}, `${slug}-blocker-issue`);
+  return leaf(f, slug, phase, { ...extra, 'blocked-by': [`${slug}-blocker`] });
 }
 const seatRefusal: string =
   'Leaf is failed. A seat cannot resume it. Operator recovery omits --slot after the blocker is resolved.';
@@ -1023,24 +1051,23 @@ test('planning synthesis with empty branch moves to implement', async () => {
 });
 
 test('stop from implement on dirty worktree records blocked failure and clears busy fields', async () => {
-  const f: Fixture = await fixture();
+  const f: HcFixture = await hcFixture({ window: 'open' });
   try {
     const worktree: string = resolve(f.home, 'wt-stop');
     await command(['git', 'worktree', 'add', '-b', 'stop', worktree], f.root);
     const stamp: string = '2026-09-11T12:00:00.000Z';
+    const seat = { session: f.core.session, address: 't99' };
     const path: string = leaf(f, 'stop', 'implement', {
       worktree,
-      tab: 'tab-1',
-      pane: { B: 'pane-b' },
+      tab: 'aktab1',
+      seat: { B: seat },
       busy_since: { B: stamp },
       busy_notified: { B: stamp },
-      prompted: { B: 'sess' },
+      prompted: { B: { turn: 1, address: 't99' } },
       prompted_at: { B: stamp },
     });
-    const herdr = fakeHerdr(f);
-    writeFileSync(herdr.db, JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'stop' }], serial: 0 }));
     writeFileSync(resolve(worktree, 'dirty'), 'x\n');
-    const result: Result = await cli(f, ['phase', 'stop', 'failed', '--reason', 'x'], f.root, herdr.env);
+    const result: Result = await cli(f, ['phase', 'stop', 'failed', '--reason', 'x'], f.root, f.env);
     expect(result.code).toBe(0);
     expect(result.stdout).toBe('moved failed');
     expect(readState(path)).toMatchObject({
@@ -1050,19 +1077,19 @@ test('stop from implement on dirty worktree records blocked failure and clears b
       busy_notified: {},
       prompted: {},
       prompted_at: {},
-      tab: 'tab-1',
+      tab: 'aktab1',
       worktree,
-      pane: { B: 'pane-b' },
+      seat: { B: seat },
     });
     expect(readState(path).failure?.delivery).toBe('shown');
-    const recorded: string[][] = herdrCalls(herdr.db);
+    const recorded: string[][] = herdrCalls(herdrDb(f));
     expect(recorded.filter((c) => c[0] === 'notification')).toEqual([
       ['notification', 'show', 'repo/stop failed', '--body', 'blocked: x', '--sound', 'request'],
     ]);
-    expect(recorded.filter((c) => c[1] === 'rename')).toEqual([['tab', 'rename', 'tab-1', 'stop failed']]);
+    expect(renames(f)).toEqual([['aktab1', 'stop failed']]);
     expect(existsSync(resolve(worktree, 'dirty'))).toBe(true);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -1288,134 +1315,112 @@ for (const [mode, delivery] of [
 
 test('failed announce renames tabs, tolerates missing tabs, and retries herdr calls', async () => {
   {
-    const f: Fixture = await fixture();
+    const f: HcFixture = await hcFixture({ window: 'open' });
     try {
-      const herdr = fakeHerdr(f);
-      writeFileSync(
-        herdr.db,
-        JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'back failed' }], serial: 0 }),
-      );
-      const path: string = leaf(f, 'back', 'failed', { tab: 'tab-1' });
-      const result: Result = await cli(f, ['phase', 'back', 'implement'], f.root, herdr.env);
+      const path: string = parked(f, 'back', 'failed', { tab: 'aktab1' });
+      const result: Result = await cli(f, ['phase', 'back', 'implement'], f.root, f.env);
       expect(result.code).toBe(0);
-      expect(herdrCalls(herdr.db)).toEqual([['tab', 'rename', 'tab-1', 'back']]);
+      expect(renames(f)).toEqual([['aktab1', 'back']]);
       expect(readState(path).phase).toBe('implement');
     } finally {
-      f.clean();
+      await f.clean();
     }
   }
   {
-    const f: Fixture = await fixture();
+    // A failed herdr-app rename is not retried: it warns, and the move completes (plan D11).
+    const f: HcFixture = await hcFixture({ window: 'open' });
     try {
-      const herdr = fakeHerdr(f);
-      writeFileSync(
-        herdr.db,
-        JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'back failed' }], serial: 0, failRename: true }),
-      );
-      const path: string = leaf(f, 'back', 'failed', { tab: 'tab-1' });
-      const result: Result = await cli(f, ['phase', 'back', 'implement'], f.root, herdr.env);
-      expect(result.code).not.toBe(0);
-      expect(result.stderr).toContain('timeout');
+      f.core.setWindow('open', 'fail');
+      const path: string = parked(f, 'back', 'failed', { tab: 'aktab1' });
+      const result: Result = await cli(f, ['phase', 'back', 'implement'], f.root, f.env);
+      expect(result.code).toBe(0);
+      expect(renameWarnings(result)).toHaveLength(1);
       expect(readState(path).phase).toBe('implement');
-      expect(herdrCalls(herdr.db)).toEqual([
-        ['tab', 'rename', 'tab-1', 'back'],
-        ['tab', 'rename', 'tab-1', 'back'],
-      ]);
+      expect(renames(f)).toEqual([['aktab1', 'back']]);
     } finally {
-      f.clean();
+      await f.clean();
     }
   }
   {
-    const f: Fixture = await fixture();
+    const f: HcFixture = await hcFixture({ window: 'open' });
     try {
-      const herdr = fakeHerdr(f);
       const path: string = leaf(f, 'notab', 'implement');
-      const result: Result = await cli(f, ['phase', 'notab', 'failed', '--reason', 'x'], f.root, herdr.env);
+      const result: Result = await cli(f, ['phase', 'notab', 'failed', '--reason', 'x'], f.root, f.env);
       expect(result.code).toBe(0);
-      expect(herdrCalls(herdr.db)).toEqual([
+      expect(herdrCalls(herdrDb(f))).toEqual([
         ['notification', 'show', 'repo/notab failed', '--body', 'blocked: x', '--sound', 'request'],
       ]);
+      expect(renames(f)).toEqual([]);
       expect(readState(path).failure?.delivery).toBe('shown');
     } finally {
-      f.clean();
+      await f.clean();
     }
   }
   {
-    const f: Fixture = await fixture();
+    const f: HcFixture = await hcFixture({ window: 'open' });
     try {
-      const herdr = fakeHerdr(f);
-      writeFileSync(
-        herdr.db,
-        JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'oops' }], serial: 0, failNotification: true }),
-      );
-      const path: string = leaf(f, 'oops', 'implement', { tab: 'tab-1' });
-      const result: Result = await cli(f, ['phase', 'oops', 'failed', '--reason', 'x'], f.root, herdr.env);
+      writeFileSync(herdrDb(f), JSON.stringify({ panes: [], tabs: [], serial: 0, failNotification: true }));
+      const path: string = leaf(f, 'oops', 'implement', { tab: 'aktab1' });
+      const result: Result = await cli(f, ['phase', 'oops', 'failed', '--reason', 'x'], f.root, f.env);
       expect(result.code).not.toBe(0);
-      const recorded: string[][] = herdrCalls(herdr.db);
+      const recorded: string[][] = herdrCalls(herdrDb(f));
       expect(recorded.filter((c) => c[0] === 'notification')).toHaveLength(1);
-      expect(recorded).toContainEqual(['tab', 'rename', 'tab-1', 'oops failed']);
+      expect(renames(f)).toEqual([['aktab1', 'oops failed']]);
       expect(readState(path)).toMatchObject({ phase: 'failed', failure: { delivery: 'error' } });
-      const db: { tabs: { label: string }[] } = JSON.parse(readFileSync(herdr.db, 'utf8'));
-      expect(db.tabs[0].label).toBe('oops failed');
     } finally {
-      f.clean();
+      await f.clean();
     }
   }
   {
-    const f: Fixture = await fixture();
+    const f: HcFixture = await hcFixture({ window: 'open' });
     try {
-      const herdr = fakeHerdr(f);
-      writeFileSync(
-        herdr.db,
-        JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'oops' }], serial: 0, failRename: true }),
-      );
-      const path: string = leaf(f, 'oops', 'implement', { tab: 'tab-1' });
-      const result: Result = await cli(f, ['phase', 'oops', 'failed', '--reason', 'x'], f.root, herdr.env);
-      expect(result.code).not.toBe(0);
-      expect(readState(path)).toMatchObject({ phase: 'failed', failure: { delivery: 'shown' } });
-      const recorded: string[][] = herdrCalls(herdr.db);
-      expect(recorded.filter((c) => c[0] === 'notification')).toHaveLength(1);
-      expect(recorded.filter((c) => c[1] === 'rename')).toHaveLength(2);
-    } finally {
-      f.clean();
-    }
-  }
-  {
-    const f: Fixture = await fixture();
-    try {
-      const herdr = fakeHerdr(f);
-      writeFileSync(herdr.db, JSON.stringify({ panes: [], tabs: [], serial: 0, failNotificationOnce: true }));
-      const path: string = leaf(f, 'flaky', 'implement');
-      const result: Result = await cli(f, ['phase', 'flaky', 'failed', '--reason', 'x'], f.root, herdr.env);
+      f.core.setWindow('open', 'fail');
+      const path: string = leaf(f, 'oops', 'implement', { tab: 'aktab1' });
+      const result: Result = await cli(f, ['phase', 'oops', 'failed', '--reason', 'x'], f.root, f.env);
       expect(result.code).toBe(0);
-      expect(herdrCalls(herdr.db)).toEqual([
+      expect(readState(path)).toMatchObject({ phase: 'failed', failure: { delivery: 'shown' } });
+      const recorded: string[][] = herdrCalls(herdrDb(f));
+      expect(recorded.filter((c) => c[0] === 'notification')).toHaveLength(1);
+      expect(renames(f)).toEqual([['aktab1', 'oops failed']]);
+      expect(renameWarnings(result)).toHaveLength(1);
+    } finally {
+      await f.clean();
+    }
+  }
+  {
+    const f: HcFixture = await hcFixture({ window: 'open' });
+    try {
+      writeFileSync(herdrDb(f), JSON.stringify({ panes: [], tabs: [], serial: 0, failNotificationOnce: true }));
+      const path: string = leaf(f, 'flaky', 'implement');
+      const result: Result = await cli(f, ['phase', 'flaky', 'failed', '--reason', 'x'], f.root, f.env);
+      expect(result.code).toBe(0);
+      expect(herdrCalls(herdrDb(f))).toEqual([
         ['notification', 'show', 'repo/flaky failed', '--body', 'blocked: x', '--sound', 'request'],
         ['notification', 'show', 'repo/flaky failed', '--body', 'blocked: x', '--sound', 'request'],
       ]);
       expect(readState(path).failure?.delivery).toBe('shown');
     } finally {
-      f.clean();
+      await f.clean();
     }
   }
-});
+}, 60000);
 
-for (const { slug, phase, args, failNotification, code, calls, delivery } of [
+for (const { slug, phase, args, failNotification, code, notices, name, delivery } of [
   {
     slug: 'stale-resume',
     phase: 'failed',
     args: ['phase', 'stale-resume', 'implement'],
     code: 0,
-    calls: [['tab', 'rename', 'tab-1', 'stale-resume']],
+    notices: [],
+    name: 'stale-resume',
   },
   {
     slug: 'stale-fail',
     phase: 'implement',
     args: ['phase', 'stale-fail', 'failed', '--slot', 'A', '--reason', 'x'],
     code: 0,
-    calls: [
-      ['notification', 'show', 'repo/stale-fail failed', '--body', 'blocked: x', '--sound', 'request'],
-      ['tab', 'rename', 'tab-1', 'stale-fail failed'],
-    ],
+    notices: [['notification', 'show', 'repo/stale-fail failed', '--body', 'blocked: x', '--sound', 'request']],
+    name: 'stale-fail failed',
     delivery: 'shown',
   },
   {
@@ -1424,10 +1429,8 @@ for (const { slug, phase, args, failNotification, code, calls, delivery } of [
     args: ['phase', 'stale-fail', 'failed', '--slot', 'A', '--reason', 'x'],
     failNotification: true,
     code: 1,
-    calls: [
-      ['notification', 'show', 'repo/stale-fail failed', '--body', 'blocked: x', '--sound', 'request'],
-      ['tab', 'rename', 'tab-1', 'stale-fail failed'],
-    ],
+    notices: [['notification', 'show', 'repo/stale-fail failed', '--body', 'blocked: x', '--sound', 'request']],
+    name: 'stale-fail failed',
     delivery: 'error',
   },
 ] as {
@@ -1436,74 +1439,39 @@ for (const { slug, phase, args, failNotification, code, calls, delivery } of [
   args: string[];
   failNotification?: boolean;
   code: number;
-  calls: string[][];
+  notices: string[][];
+  name: string;
   delivery?: string;
 }[]) {
   test(`rename on a missing tab warns once and continues (${slug} ${failNotification === true ? 'notification error' : 'clean'})`, async () => {
-    const f: Fixture = await fixture();
+    // The fake herdr-app answers this rename with herdr-app's "tab ... not found" failure.
+    const f: HcFixture = await hcFixture({ window: 'open' });
     try {
-      const herdr: HerdrFixture = fakeHerdr(f);
+      f.core.setWindow('open', 'fail');
       writeFileSync(
-        herdr.db,
+        herdrDb(f),
         JSON.stringify({ panes: [], tabs: [], serial: 0, failNotification: failNotification === true }),
       );
-      const path: string = leaf(f, slug, phase, { tab: 'tab-1' });
-      const result: Result = await cli(f, [...args], f.root, herdr.env);
+      const path: string = parked(f, slug, phase, { tab: 'aktab1' });
+      const result: Result = await cli(f, [...args], f.root, f.env);
       expect(result.code).toBe(code);
       if (failNotification === true) expect(result.stderr).toContain('fixture_notification_failed');
-      const warnings: {
-        warning: string;
-        slug: string;
-        command: string[];
-        code: string;
-        message: string;
-        stderr: string;
-      }[] = result.stderr
-        .split('\n')
-        .filter((line) => line.startsWith('{'))
-        .map((line) => JSON.parse(line));
+      const warnings = renameWarnings(result);
       expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toMatchObject({
-        slug,
-        command: ['herdr', '--session', 'default', ...calls[calls.length - 1]],
-        code: 'tab_not_found',
-        message: 'fixture failure',
-      });
-      expect(warnings[0].stderr).toContain('tab_not_found');
-      expect(herdrCalls(herdr.db)).toEqual(calls);
+      expect(warnings[0]).toMatchObject({ slug, tab: 'aktab1', name });
+      expect(warnings[0].error).toContain('not found');
+      expect(herdrCalls(herdrDb(f))).toEqual(notices);
+      expect(renames(f)).toEqual([['aktab1', name]]);
       const state: { phase: string; tab?: string; failure?: { delivery?: string } } = readState(path);
       expect(state.phase).toBe(args[2]);
-      expect(state.tab).toBe('tab-1');
+      expect(state.tab).toBe('aktab1');
       if (delivery !== undefined) expect(state.failure?.delivery).toBe(delivery);
       expect(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1);
     } finally {
-      f.clean();
+      await f.clean();
     }
   });
 }
-
-test('rename failure other than tab_not_found keeps existing handling', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const herdr: HerdrFixture = fakeHerdr(f);
-    writeFileSync(
-      herdr.db,
-      JSON.stringify({
-        panes: [],
-        tabs: [{ tab_id: 'tab-1', label: 'back failed' }],
-        serial: 0,
-        renameScript: [{ code: 'fixture_rename_denied', message: 'denied' }],
-      }),
-    );
-    leaf(f, 'denied', 'failed', { tab: 'tab-1' });
-    const result: Result = await cli(f, ['phase', 'denied', 'implement'], f.root, herdr.env);
-    expect(result.code).not.toBe(0);
-    expect(result.stderr).toContain('fixture_rename_denied');
-    expect(herdrCalls(herdr.db)).toEqual([['tab', 'rename', 'tab-1', 'denied']]);
-  } finally {
-    f.clean();
-  }
-});
 
 test('phase move clears delivery_error', async () => {
   const f: Fixture = await fixture();
