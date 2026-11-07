@@ -1,166 +1,96 @@
 import { test, expect } from 'bun:test';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, leaf, fakeHerdr, storeDir, yaml, holding, type Fixture } from './helpers';
-import { readState, saveState, type State } from '../src/state';
-import { command } from '../src/shell';
+import { cli, leaf, procRoot, storeDir, yaml } from './helpers';
+import { readState, type State } from '../src/state';
+import { command, type SpawnResult } from '../src/shell';
 import type { Result } from '../src/shell';
 import { z } from 'zod';
-import type { Database, DatabaseInput, SessionInput } from './fake-herdr';
+import { delivered, hcCore, hcFixture, type HcCore, type HcFixture, type Terminal } from './hc-fixture';
 
-type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
-type PaneSeed = {
-  pane_id: string;
-  tab_id: string;
-  cwd: string;
-  agent: string | null;
-  agent_status: 'idle' | 'done' | 'working' | 'blocked' | 'unknown';
-};
-function seatedPane(pane_id: string, tab_id: string, cwd: string): PaneSeed {
-  return { pane_id, tab_id, cwd, agent: null, agent_status: 'unknown' };
+async function dispatchFixture(opts: { mode?: string; window?: 'open' | 'closed' } = {}): Promise<HcFixture> {
+  const f: HcFixture = await hcFixture(opts);
+  // A fake /proc root: reconcile sees only the terminals a case plants, not host processes.
+  return { ...f, env: { ...f.env, AKROGON_PROC_ROOT: procRoot(f) } };
 }
-type TabSeed = { tab_id: string; label: string; workspace_id: string };
-type SessionSeed = {
-  name: string;
-  running?: boolean;
-  deadRead?: boolean;
-  readError?: string;
-  delayMs?: number;
-  paneListStdout?: string;
-  panes?: PaneSeed[];
-  tabs?: TabSeed[];
-  workspaces?: { workspace_id: string; label: string }[];
-  serial?: number;
-};
-function session(name: string, over: Omit<SessionSeed, 'name'> = {}): SessionInput {
-  return {
-    name,
-    running: true,
-    panes: [],
-    tabs: [],
-    workspaces: [],
-    serial: 0,
-    ...over,
-  };
-}
-async function dispatchFixture(): Promise<DispatchFixture> {
-  const f: Fixture = await fixture();
-  return { ...f, ...fakeHerdr(f) };
-}
-function database(f: DispatchFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
-}
-function saveDatabase(f: DispatchFixture, db: DatabaseInput): void {
-  writeFileSync(f.db, JSON.stringify(db));
-}
-function rawCalls(f: DispatchFixture): string[][] {
-  const path: string = f.db + '.calls-raw';
-  return existsSync(path)
-    ? readFileSync(path, 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
-    : [];
-}
-function toSession(f: DispatchFixture, name: string): string[][] {
-  return rawCalls(f).filter((args) => args[0] === '--session' && args[1] === name);
-}
-function socket(f: DispatchFixture, name: string): string {
-  return `${f.db}-${name}.sock`;
-}
-async function next(
-  f: DispatchFixture,
-  args: string[],
-  env: NodeJS.ProcessEnv = {},
-  cwd: string = f.root,
-): Promise<Result> {
+async function next(f: HcFixture, args: string[], env: NodeJS.ProcessEnv = {}, cwd: string = f.root): Promise<Result> {
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
-function maxActive(f: DispatchFixture, value: number): void {
+function maxActive(f: HcFixture, value: number): void {
   const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
   yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: value });
 }
-function tabClosed(tab: string, workspace_id: string): NodeJS.ProcessEnv {
-  return {
-    HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-      event: 'tab_closed',
-      data: { type: 'tab_closed', tab_id: tab, workspace_id },
-    }),
-  };
+// A live terminal outside every leaf seat in `core`, with its cwd at dir and the given labels.
+async function paneAt(core: HcCore, dir: string, labels: Record<string, string> = {}): Promise<string> {
+  mkdirSync(dir, { recursive: true });
+  const started: SpawnResult = await core.hc([
+    'run',
+    '--bg',
+    '--json',
+    '--no-parent',
+    '--cwd',
+    dir,
+    ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]),
+    '--',
+    'cat',
+  ]);
+  expect(started.code, started.stderr).toBe(0);
+  return z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
+}
+// An hc in front of the fixture shim that holds `hc connect` past akrogon's 10 s discovery deadline
+// when the call targets `session` and its request names `method`.
+function stallingHc(f: HcFixture, method: string, session: string): string {
+  const dir: string = resolve(f.home, 'stall-bin');
+  mkdirSync(dir, { recursive: true });
+  const shim: string = resolve(z.string().parse(f.core.env.PATH).split(':')[0], 'hc');
+  writeFileSync(
+    resolve(dir, 'hc'),
+    `#!/bin/sh
+if [ "$1" = connect ]; then
+  input=$(cat)
+  case "$input" in *'"${method}"'*) [ "$HC_SESSION" = '${session}' ] && exec sleep 12 ;; esac
+  printf '%s\\n' "$input" | exec '${shim}' "$@"
+fi
+exec '${shim}' "$@"
+`,
+  );
+  chmodSync(resolve(dir, 'hc'), 0o755);
+  return `${dir}:${f.env.PATH}`;
 }
 
-// Criterion 1: a seat whose pane lives in another session still counts, and an
-// unreadable running session blocks every launch.
-test('capacity counts a seat living in another session and an unreadable session blocks launches', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    maxActive(f, 1);
-    const worktree: string = resolve(storeDir(f), 'held');
-    await command(['git', 'worktree', 'add', '-b', 'held', worktree], f.root);
-    leaf(f, 'held', 'implement', { tab: 'w9:tA', pane: { A: 'w9:pA' }, worktree });
-    leaf(f, 'waiting', 'plan.synthesis');
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [
-        session('held', {
-          workspaces: [{ workspace_id: 'w9', label: 'misc' }],
-          tabs: [{ tab_id: 'w9:tA', label: 'held', workspace_id: 'w9' }],
-          panes: [{ ...seatedPane('w9:pA', 'w9:tA', worktree), agent: 'fake', agent_status: 'working' }],
-        }),
-      ],
-    });
-    const result: Result = await next(f, ['waiting']);
-    expect(result.code).toBe(0);
-    expect(readState(resolve(f.root, 'issues/open/issue/waiting')).tab).toBeUndefined();
-    expect(database(f).tabs).toHaveLength(0);
-
-    // A running session whose pane list cannot be read leaves capacity unknown.
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [
-        session('held', {
-          workspaces: [{ workspace_id: 'w9', label: 'misc' }],
-          paneListStdout: 'this is not json',
-        }),
-      ],
-    });
-    const blocked: Result = await next(f, ['waiting']);
-    expect(blocked.code).toBe(0);
-    expect(readState(resolve(f.root, 'issues/open/issue/waiting')).tab).toBeUndefined();
-    expect(database(f).tabs).toHaveLength(0);
-  } finally {
-    f.clean();
-  }
-}, 20000);
-
+// Criterion 1: a running session whose herdr-app document cannot be read refuses the repo before
+// any leaf has a seat, so nothing launches.
 test('capacity counts an unreadable session before any leaf has a seat', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await dispatchFixture();
+  const opaque: HcCore = await hcCore(f, { doc: false });
   try {
+    await opaque.rpc('doc.set', { name: 'herdr-app', value: { spaces: 'junk' }, version: 0 });
+    f.core.link(opaque);
     const path: string = leaf(f, 'waiting', 'plan.synthesis');
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [session('opaque', { paneListStdout: 'not json' })],
-    });
     const result: Result = await next(f, ['waiting']);
-    expect(result.code).toBe(0);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(opaque.session);
     expect(readState(path).tab).toBeUndefined();
     expect(readState(path).worktree).toBeUndefined();
-    expect(database(f).tabs).toHaveLength(0);
+    expect(await f.core.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
-    f.clean();
+    await opaque.stop();
+    await f.clean();
   }
-}, 20000);
+}, 30000);
 
-// Criterion 2: the cross-session pane union vetoes worktree removal; a same-id
-// tab in a foreign session is no veto; an unreadable session keeps everything
-// its liveness could decide.
+// Criterion 2: the cross-session terminal union vetoes worktree removal; a same-id tab in a foreign
+// session is no veto; a session whose terminal list cannot be read keeps everything its liveness
+// could decide.
 test('foreign-session panes and unreadable sessions veto reconcile removal', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await dispatchFixture({ window: 'open' });
+  const other: HcCore = await hcCore(f, { repo: 'misc' });
   try {
+    f.core.link(other);
     // `sibling` is failed with a dead recorded tab: it never dispatches, so
     // the merged leaves' owner never completes and their worktrees reach the
     // removal path.
-    leaf(f, 'sibling', 'failed', { tab: 'w1:tS' });
+    leaf(f, 'sibling', 'failed', { tab: 'akdeadsibling' });
     const keptByPane: string = resolve(storeDir(f), 'kept-by-pane');
     const keptByUnreadable: string = resolve(storeDir(f), 'kept-by-unreadable');
     const droppedSameId: string = resolve(storeDir(f), 'dropped-same-id');
@@ -171,31 +101,16 @@ test('foreign-session panes and unreadable sessions veto reconcile removal', asy
     ] as const) {
       await command(['git', 'worktree', 'add', '-b', slug, path], f.root);
     }
-    leaf(f, 'kept-by-pane', 'merged', { tab: 'w1:tK', worktree: keptByPane });
-    leaf(f, 'kept-by-unreadable', 'merged', { tab: 'w1:tU', worktree: keptByUnreadable });
-    leaf(f, 'dropped-same-id', 'merged', { tab: 'w9:tD', worktree: droppedSameId });
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [
-        // `other` is readable: its panes inside the kept-* worktrees veto
-        // removal, and its same-id tab for dropped-same-id is no keep.
-        session('other', {
-          workspaces: [{ workspace_id: 'w9', label: 'misc' }],
-          tabs: [
-            { tab_id: 'w9:tF', label: 'foreign', workspace_id: 'w9' },
-            { tab_id: 'w9:tU', label: 'foreign2', workspace_id: 'w9' },
-            { tab_id: 'w9:tD', label: 'same-id', workspace_id: 'w9' },
-          ],
-          panes: [
-            seatedPane('w9:pF', 'w9:tF', keptByPane),
-            seatedPane('w9:pU', 'w9:tU', keptByUnreadable),
-            { ...seatedPane('w9:pD', 'w9:tD', '/var/elsewhere'), agent_status: 'idle' },
-          ],
-        }),
-      ],
-    });
+    leaf(f, 'kept-by-pane', 'merged', { tab: 'akkeptbypane', worktree: keptByPane });
+    leaf(f, 'kept-by-unreadable', 'merged', { tab: 'akkeptbyunreadable', worktree: keptByUnreadable });
+    leaf(f, 'dropped-same-id', 'merged', { tab: 'akdroppedsameid', worktree: droppedSameId });
+    // `other` is readable: its terminals inside the kept-* worktrees veto
+    // removal, and its terminal holding dropped-same-id's tab id is no keep.
+    await paneAt(other, keptByPane, { 'herdr.tab': 'akforeign' });
+    await paneAt(other, keptByUnreadable, { 'herdr.tab': 'akforeign2' });
+    await paneAt(other, resolve(f.home, 'elsewhere'), { 'herdr.tab': 'akdroppedsameid' });
     const openLeaf = (slug: string): string => resolve(f.root, 'issues/open/issue', slug);
-    const first: Result = await next(f, ['--all'], { HERDR_SOCKET_PATH: socket(f, 'default') });
+    const first: Result = await next(f, ['--all']);
     expect(first.code).toBe(0);
     expect(existsSync(keptByPane)).toBe(true);
     expect(existsSync(keptByUnreadable)).toBe(true);
@@ -204,286 +119,149 @@ test('foreign-session panes and unreadable sessions veto reconcile removal', asy
     expect(readState(openLeaf('dropped-same-id')).worktree).toBeUndefined();
     expect(readState(openLeaf('kept-by-pane')).worktree).toBe(keptByPane);
 
-    // Now `opaque` answers every pane read with garbage while kept-by-
-    // unreadable holds a live tab in the resolved session: the pass may close
-    // and drop nothing.
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      tabs: [...db.tabs, { tab_id: 'w1:tU', label: 'kept', workspace_id: 'w1' }],
-      panes: [...db.panes, { ...seatedPane('w1:pU', 'w1:tU', keptByUnreadable), agent_status: 'idle' }],
-      sessions: [
-        ...(db.sessions ?? []),
-        session('opaque', { workspaces: [{ workspace_id: 'w8', label: 'alt' }], paneListStdout: 'junk' }),
-      ],
-    });
-    const second: Result = await next(f, ['--all'], { HERDR_SOCKET_PATH: socket(f, 'default') });
+    // Now `other` answers no terminal list in time while kept-by-unreadable
+    // holds a live tab in the resolved session: the pass may close and drop nothing.
+    await paneAt(f.core, keptByUnreadable, { 'herdr.tab': 'akkeptbyunreadable' });
+    const second: Result = await next(f, ['--all'], { PATH: stallingHc(f, 'terminal.list', other.session) });
     expect(second.code).toBe(0);
     expect(existsSync(keptByUnreadable)).toBe(true);
-    // Its recorded tab was live in the resolved session but could not be
-    // closed while `opaque` stayed unreadable.
-    expect(database(f).tabs.some((tab) => tab.tab_id === 'w1:tU')).toBe(true);
+    // Its recorded tab was live in the resolved session but was not closed
+    // while `other` stayed unreadable.
+    expect(f.core.appCalls().filter((call) => call.argv[1] === 'tab.close')).toEqual([]);
     expect(existsSync(keptByPane)).toBe(true);
   } finally {
-    f.clean();
+    await other.stop();
+    await f.clean();
   }
-}, 40000);
+}, 45000);
 
 test('foreign-session panes with colliding tab ids keep merged and failed worktrees', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await dispatchFixture({ window: 'open' });
+  const other: HcCore = await hcCore(f, { repo: 'misc' });
   try {
-    leaf(f, 'sibling', 'failed', { tab: 'w1:tS' });
+    f.core.link(other);
+    leaf(f, 'sibling', 'failed', { tab: 'akdeadsibling' });
     const merged: string = resolve(storeDir(f), 'merged');
     const failed: string = resolve(storeDir(f), 'failed');
     await command(['git', 'worktree', 'add', '-b', 'merged', merged], f.root);
     await command(['git', 'worktree', 'add', '-b', 'failed', failed], f.root);
-    const mergedLeaf: string = leaf(f, 'merged', 'merged', { tab: 'w1:t1', worktree: merged });
-    const failedLeaf: string = leaf(f, 'failed', 'failed', { tab: 'w1:t2', worktree: failed });
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [
-        session('other', {
-          workspaces: [{ workspace_id: 'w1', label: 'misc' }],
-          tabs: [
-            { tab_id: 'w1:t1', label: 'merged', workspace_id: 'w1' },
-            { tab_id: 'w1:t2', label: 'failed', workspace_id: 'w1' },
-          ],
-          panes: [seatedPane('w1:p1', 'w1:t1', merged), seatedPane('w1:p2', 'w1:t2', failed)],
-        }),
-      ],
-    });
+    const mergedLeaf: string = leaf(f, 'merged', 'merged', { tab: 'akmergedtab', worktree: merged });
+    const failedLeaf: string = leaf(f, 'failed', 'failed', { tab: 'akfailedtab', worktree: failed });
+    await paneAt(other, merged, { 'herdr.tab': 'akmergedtab' });
+    await paneAt(other, failed, { 'herdr.tab': 'akfailedtab' });
     const result: Result = await next(f, ['--all']);
     expect(result.code, result.stderr).toBe(0);
     expect(existsSync(merged)).toBe(true);
     expect(existsSync(failed)).toBe(true);
     expect(readState(mergedLeaf).worktree).toBe(merged);
     expect(readState(failedLeaf).worktree).toBe(failed);
-    expect(toSession(f, 'other').some((args) => args[2] === 'tab' && args[3] === 'close')).toBe(false);
+    expect(f.core.appCalls().filter((call) => call.argv[1] === 'tab.close')).toEqual([]);
+    expect((await other.terminals({}, false)).map((t: Terminal) => t.state)).toEqual(['live', 'live']);
   } finally {
-    f.clean();
+    await other.stop();
+    await f.clean();
   }
-}, 20000);
+}, 30000);
 
 // Criterion 3: within one pass the inventory reflects launches already made;
-// a leaf whose recorded tab is gone counts nothing and reallocates.
+// a leaf whose recorded tab no terminal holds counts nothing and gets a seat.
 test('a fresh pane read sees the seat created earlier in the pass and ignores a closed tab', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await dispatchFixture();
   try {
     maxActive(f, 1);
     leaf(f, 'a-first', 'plan.synthesis');
     leaf(f, 'b-second', 'plan.synthesis');
-    const result: Result = await next(f, ['--all'], { HERDR_SOCKET_PATH: socket(f, 'default') });
+    const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(0);
     // Sweep order is unspecified: exactly one of the two leaves gets the seat.
     const tabs: (string | undefined)[] = ['a-first', 'b-second'].map(
       (slug) => readState(resolve(f.root, 'issues/open/issue', slug)).tab,
     );
     expect(tabs.filter((tab) => tab !== undefined)).toHaveLength(1);
-    expect(database(f).tabs).toHaveLength(1);
+    expect(await f.core.terminals({ akrogon: '1' }, false)).toHaveLength(1);
 
-    // A leaf whose recorded tab was closed counts nothing and reallocates.
+    // A leaf whose recorded tab no terminal holds counts nothing and gets a seat in that tab.
     maxActive(f, 2);
-    leaf(f, 'gone', 'plan.synthesis', { tab: 'w1:tGone' });
-    saveDatabase(f, { ...database(f), tabs: [], panes: database(f).panes.filter((p) => p.tab_id !== 'w1:tGone') });
-    const redo: Result = await next(f, ['gone'], { HERDR_SOCKET_PATH: socket(f, 'default') });
+    leaf(f, 'gone', 'plan.synthesis', { tab: 'akgonetab' });
+    const redo: Result = await next(f, ['gone']);
     expect(redo.code).toBe(0);
     const state: State = readState(resolve(f.root, 'issues/open/issue/gone'));
     expect(state.tab).toBeDefined();
-    expect(state.tab).not.toBe('w1:tGone');
+    expect((await f.core.terminals({ 'akrogon.leaf': 'gone' })).map((t: Terminal) => t.labels['herdr.tab'])).toEqual([
+      z.string().parse(state.tab),
+    ]);
   } finally {
-    f.clean();
-  }
-}, 30000);
-
-// Criterion 4: a hook acts only when the injected socket identifies the repo's
-// resolved session and the event's workspace_id equals the resolved workspace.
-test('a tab_closed hook acts only for a matching socket and workspace', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
-    leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
-    expect((await next(f, ['first'], { HERDR_SOCKET_PATH: socket(f, 'default') })).code).toBe(0);
-    const tab: string = z.string().parse(readState(first).tab);
-    saveState(first, { ...readState(first), phase: 'merge', ...holding(f) });
-    expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
-    const closedDb: Database = database(f);
-    saveDatabase(f, {
-      ...closedDb,
-      tabs: closedDb.tabs.filter((item) => item.tab_id !== tab),
-      panes: closedDb.panes.filter((pane) => pane.tab_id !== tab),
-      sessions: [session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] })],
-    });
-    const second: string = resolve(f.root, 'issues/open/second-issue/second');
-
-    // Unknown origin: no socket, nothing happens and the log says why.
-    const noSocket: Result = await next(f, [], tabClosed(tab, 'w1'));
-    expect(noSocket.code).toBe(0);
-    expect(noSocket.stderr).toContain('origin');
-    expect(readState(second).tab).toBeUndefined();
-
-    // A different emitting session, even with a matching-looking workspace id.
-    const wrongSession: Result = await next(f, [], {
-      ...tabClosed(tab, 'w9'),
-      HERDR_SOCKET_PATH: socket(f, 'other'),
-    });
-    expect(wrongSession.code).toBe(0);
-    expect(wrongSession.stderr).toContain('other');
-    expect(readState(second).tab).toBeUndefined();
-
-    // Right session, wrong workspace_id.
-    const wrongWorkspace: Result = await next(f, [], {
-      ...tabClosed(tab, 'w7'),
-      HERDR_SOCKET_PATH: socket(f, 'default'),
-    });
-    expect(wrongWorkspace.code).toBe(0);
-    expect(wrongWorkspace.stderr).toContain('w7');
-    expect(readState(second).tab).toBeUndefined();
-
-    // Both matching: the dependent starts.
-    const matching: Result = await next(f, [], {
-      ...tabClosed(tab, 'w1'),
-      HERDR_SOCKET_PATH: socket(f, 'default'),
-    });
-    expect(matching.code).toBe(0);
-    expect(readState(second).tab).toBeDefined();
-  } finally {
-    f.clean();
-  }
-}, 30000);
-
-// Criterion 5: ids come from the event JSON; an inherited HERDR_PANE_ID is no
-// attribution, and a session/workspace mismatch takes no action.
-test('a pane event acts on the event pane only inside the matching session and workspace', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const path: string = leaf(f, 'ev', 'plan.synthesis');
-    expect((await next(f, ['ev'], { HERDR_SOCKET_PATH: socket(f, 'default') })).code).toBe(0);
-    const a: string = z.string().parse(readState(path).pane.A);
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      panes: db.panes.map((p) => (p.pane_id === a ? { ...p, agent_status: 'idle' as const } : p)),
-      sessions: [session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] })],
-    });
-    saveState(path, {
-      ...readState(path),
-      prompted_at: { ...readState(path).prompted_at, A: '2020-01-01T00:00:00.000Z' },
-    });
-    const prompts = (): number => database(f).prompts.length;
-    expect(prompts()).toBe(1);
-
-    // Emitting session is `other`, workspace matches `other` — not this repo.
-    const wrongSession: Result = await next(f, [], {
-      HERDR_PANE_ID: a,
-      HERDR_SOCKET_PATH: socket(f, 'other'),
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'pane_exited',
-        data: { type: 'pane_exited', pane_id: a, workspace_id: 'w9' },
-      }),
-    });
-    expect(wrongSession.code).toBe(0);
-    expect(prompts()).toBe(1);
-
-    // Right session, wrong workspace.
-    const wrongWorkspace: Result = await next(f, [], {
-      HERDR_PANE_ID: a,
-      HERDR_SOCKET_PATH: socket(f, 'default'),
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'pane_exited',
-        data: { type: 'pane_exited', pane_id: a, workspace_id: 'w7' },
-      }),
-    });
-    expect(wrongWorkspace.code).toBe(0);
-    expect(prompts()).toBe(1);
-
-    // Matching origin and workspace: the event's pane_id drives the pass even
-    // though the inherited env names a pane that owns nothing.
-    const matching: Result = await next(f, [], {
-      HERDR_PANE_ID: 'w1:pZZZ',
-      HERDR_SOCKET_PATH: socket(f, 'default'),
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'pane_exited',
-        data: { type: 'pane_exited', pane_id: a, workspace_id: 'w1' },
-      }),
-    });
-    expect(matching.code).toBe(0);
-    expect(prompts()).toBe(2);
-  } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
 
 // Criterion 6: a manual run takes scope from the target or cwd; an inherited
-// HERDR_PANE_ID never selects, attributes or acts on a leaf.
-test('a manual next ignores an inherited HERDR_PANE_ID', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+// HC_TERMINAL_ID never selects, attributes or acts on a leaf.
+test('a manual next ignores an inherited HC_TERMINAL_ID', async () => {
+  // `idle` seats never finish a turn, so a later pass has nothing to re-prompt.
+  const f: HcFixture = await dispatchFixture({ mode: 'idle' });
   try {
     const target: string = leaf(f, 'target', 'plan.synthesis');
     const other: string = leaf(f, 'other-seat', 'plan.synthesis');
-    expect((await next(f, ['other-seat'], { HERDR_SOCKET_PATH: socket(f, 'default') })).code).toBe(0);
-    const otherPane: string = z.string().parse(readState(other).pane.A);
-    const promptsBefore: number = database(f).prompts.length;
+    expect((await next(f, ['other-seat'])).code).toBe(0);
+    const otherSeat: string = z.string().parse(readState(other).seat.A?.address);
+    const inherited: NodeJS.ProcessEnv = { HC_TERMINAL_ID: otherSeat, HC_SESSION: f.core.session };
+    const before: number = (await delivered(f, 'other-seat')).length;
 
-    const named: Result = await next(f, ['target'], { HERDR_PANE_ID: otherPane });
+    const named: Result = await next(f, ['target'], inherited);
     expect(named.code).toBe(0);
     expect(readState(target).tab).toBeDefined();
 
-    // Untyped from the repo root: the sweep, not the env pane, picks leaves.
-    const untyped: Result = await next(f, [], { HERDR_PANE_ID: otherPane });
+    // Untyped from the repo root: the sweep, not the env terminal, picks leaves.
+    const untyped: Result = await next(f, [], inherited);
     expect(untyped.code).toBe(0);
-    expect(database(f).prompts.length).toBe(promptsBefore + 1);
-    expect(database(f).prompts.some((prompt) => prompt.text.includes('target'))).toBe(true);
+    expect((await delivered(f, 'other-seat')).length).toBe(before);
+    expect((await delivered(f, 'target')).map((d) => d.text)).toEqual([expect.stringContaining('plan-issue target')]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
 
 // Criterion 7: a move without a slot records session:null even when
-// HERDR_PANE_ID names a live pane; a slotted move attributes through the
-// slot's recorded pane, never the environment pane.
-test('log session is null without a slot and comes from the slot pane otherwise', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+// HC_TERMINAL_ID names a live seat; a slotted move attributes through the
+// slot's recorded seat, never the environment terminal.
+test('log session is null without a slot and comes from the slot seat otherwise', async () => {
+  const f: HcFixture = await dispatchFixture();
   try {
     const path: string = leaf(f, 'loggy', 'plan.synthesis');
-    expect((await next(f, ['loggy'], { HERDR_SOCKET_PATH: socket(f, 'default') })).code).toBe(0);
+    expect((await next(f, ['loggy'])).code).toBe(0);
     const state: State = readState(path);
-    const a: string = z.string().parse(state.pane.A);
-    const b: string = z.string().parse(state.pane.B);
+    const a: string = z.string().parse(state.seat.A?.address);
     const worktree: string = z.string().parse(state.worktree);
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      panes: db.panes.map((p) =>
-        p.pane_id === a
-          ? { ...p, agent_status: 'idle' as const, agent_session: { kind: 'id' as const, value: 'sess-a' } }
-          : p.pane_id === b
-            ? { ...p, agent_status: 'idle' as const, agent_session: { kind: 'id' as const, value: 'sess-b' } }
-            : p,
-      ),
-    });
+    // Each terminal carries a recorded transcript, which the log reads as the session.
+    const b: string = await paneAt(f.core, resolve(f.home, 'elsewhere'));
+    expect((await f.core.hc(['label', a, 'akrogon.transcript=sess-a'])).code).toBe(0);
+    expect((await f.core.hc(['label', b, 'akrogon.transcript=sess-b'])).code).toBe(0);
     const logPath: string = resolve(f.root, 'issues/log.jsonl');
     const lastSession = (): string | null =>
       z
         .object({ session: z.string().nullable() })
         .parse(JSON.parse(readFileSync(logPath, 'utf8').trim().split('\n').at(-1)!)).session;
 
-    // Slotted move with the env pointing at pane B: attribution is pane A's.
+    // Slotted move with the env pointing at terminal b: attribution is seat A's.
     const failed: Result = await cli(f, ['phase', 'loggy', 'failed', '--slot', 'A', '--reason', 'blocked'], worktree, {
       ...f.env,
-      HERDR_PANE_ID: b,
+      HC_TERMINAL_ID: b,
+      HC_SESSION: f.core.session,
     });
     expect(failed.code).toBe(0);
     expect(lastSession()).toBe('sess-a');
 
     // Operator recovery with no slot: session is null even though the env
-    // pane names a live, sessioned pane in the resolved session.
+    // names a live seat with a recorded transcript in the resolved session.
     const recovered: Result = await cli(f, ['phase', 'loggy', 'plan.synthesis'], worktree, {
       ...f.env,
-      HERDR_PANE_ID: a,
+      HC_TERMINAL_ID: a,
+      HC_SESSION: f.core.session,
     });
     expect(recovered.code).toBe(0);
     expect(lastSession()).toBeNull();
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
