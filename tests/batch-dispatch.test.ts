@@ -1,27 +1,42 @@
 import { test, expect } from 'bun:test';
-import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, fakeHerdr, leaf, editOnSecondStatus, yaml, type Fixture, verified, seatOwned } from './helpers';
+import { cli, fakeSystemctl, leaf, editOnSecondStatus, verified, seatOwned } from './helpers';
+import { adopt, hcFixture, type HcFixture } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
-import type { Database } from './fake-herdr';
 import { z } from 'zod';
 import { commitMove } from '../src/phase';
 import { readRepo } from '../src/config';
 
-type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
-async function dispatchFixture(): Promise<DispatchFixture> {
-  const f: Fixture = await fixture();
-  return { ...f, ...fakeHerdr(f) };
+type DispatchFixture = HcFixture;
+// akrogon's slice stops go to the fake systemctl: a leaf slice is named by repo and slug, so a real
+// stop could end another test file's seat of the same name.
+async function dispatchFixture(opts: { window?: 'open' | 'closed' } = {}): Promise<DispatchFixture> {
+  const f: HcFixture = await hcFixture(opts);
+  return { ...f, env: { ...f.env, ...fakeSystemctl(f).env } };
 }
-function database(f: DispatchFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
+// Every task any seat received, removed terminals included (the stand-in task logs outlive them).
+function prompts(f: DispatchFixture): string[] {
+  return readdirSync(f.core.standin)
+    .filter((name) => name.endsWith('.tasks'))
+    .flatMap((name) => readFileSync(resolve(f.core.standin, name), 'utf8').split('\n'))
+    .filter((text) => text !== '');
 }
-function saveDatabase(f: DispatchFixture, db: Database): void {
-  writeFileSync(f.db, JSON.stringify(db));
+// Starts a new prompt record, as clearing fake herdr's prompt list did.
+function resetPrompts(f: DispatchFixture): void {
+  for (const name of readdirSync(f.core.standin).filter((entry) => entry.endsWith('.tasks')))
+    writeFileSync(resolve(f.core.standin, name), '');
 }
+// The leaf and seat of the terminal that received a task, as `<leaf>/<seat>`.
+async function seatOf(f: DispatchFixture, text: string): Promise<string[]> {
+  return (await f.core.terminals({ akrogon: '1' }, true))
+    .filter((t) => f.core.tasks(t.address).includes(text))
+    .map((t) => `${t.labels['akrogon.leaf']}/${t.labels['akrogon.seat']}`);
+}
+// Notices still go through fake herdr; its call log keeps them.
 function calls(f: DispatchFixture): string[][] {
-  const path: string = f.db + '.calls';
+  const path: string = resolve(f.home, 'herdr.json.calls');
   return existsSync(path)
     ? readFileSync(path, 'utf8')
         .trim()
@@ -39,23 +54,18 @@ async function next(
 ): Promise<Result> {
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
-async function allocatedLeaf(
-  f: DispatchFixture,
-  slug: string,
-  container: string = 'issue',
-): Promise<{ path: string; b: string }> {
+async function allocatedLeaf(f: DispatchFixture, slug: string, container: string = 'issue'): Promise<{ path: string }> {
   const path: string = leaf(f, slug, 'plan.synthesis', {}, container);
   expect((await next(f, [slug])).code).toBe(0);
-  const allocated: State = readState(path);
-  return { path, b: allocated.pane.B! };
+  return { path };
 }
 function toMerge(path: string, mergeStamp: string, extra: object = {}): State {
   const moved: State = { ...readState(path), phase: 'merge', merge_stamp: mergeStamp, ...extra };
   saveState(path, moved);
   return moved;
 }
-function mergePrompts(f: DispatchFixture): Database['prompts'] {
-  return database(f).prompts.filter((prompt) => prompt.text.startsWith('merge-issue'));
+function mergePrompts(f: DispatchFixture): string[] {
+  return prompts(f).filter((prompt) => prompt.startsWith('merge-issue'));
 }
 async function head(f: DispatchFixture, slug: string): Promise<string> {
   return command(['git', 'rev-parse', `refs/heads/${slug}`], f.root);
@@ -66,25 +76,13 @@ async function commitFile(f: DispatchFixture, path: string, name: string, conten
   await command(['git', 'add', name], worktree);
   await command(['git', 'commit', '-m', name], worktree);
 }
-function expectedPrompt(path: string, pane: string): { pane: string; text: string } {
+function expectedPrompt(path: string): string {
   const state: State = readState(path);
   const batch = state.batch;
   expect(batch).toBeDefined();
   const context: string =
     batch!.top === undefined ? `attempt=${batch!.attempt} solo` : `attempt=${batch!.attempt} top=${batch!.top}`;
-  return { pane, text: `merge-issue ${state.slug} slot=B phase=merge leaf=${path} ${context}` };
-}
-
-function idleAllNewSession(f: DispatchFixture): void {
-  const db: Database = database(f);
-  saveDatabase(f, {
-    ...db,
-    panes: db.panes.map((pane, index) => ({
-      ...pane,
-      agent_status: 'idle',
-      agent_session: { kind: 'id', value: `session-later-${index}` },
-    })),
-  });
+  return `merge-issue ${state.slug} slot=B phase=merge leaf=${path} ${context}`;
 }
 
 async function remoteTip(f: DispatchFixture): Promise<string> {
@@ -104,9 +102,10 @@ function attemptLines(f: DispatchFixture): {
     .map((line) => JSON.parse(line));
 }
 
-function idleAll(f: DispatchFixture): void {
-  const db: Database = database(f);
-  saveDatabase(f, { ...db, panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) });
+// Waits until every live seat has finished its turn (or was ended), so the next pass can deliver.
+async function idleAll(f: DispatchFixture): Promise<void> {
+  for (const seat of await f.core.terminals({ akrogon: '1' }, false))
+    await f.core.waitFor(seat.address, (t) => t.state === 'finished' || t.status?.state === 'idle');
 }
 function leafPath(path: string): string {
   return existsSync(path) ? path : path.replace('issues/open', 'issues/closed');
@@ -124,17 +123,17 @@ async function pushMain(f: DispatchFixture, name: string): Promise<void> {
 test('the holder gets a batch record rebased onto the remote and only the holder is prompted', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
-    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string } = await allocatedLeaf(f, 'bb');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     const aaHead: string = await head(f, 'aa');
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     const before: State = toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     // Remote movement between merge and the pass puts the holder on a stale base.
     await pushMain(f, 'main-advance');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, [])).code).toBe(0);
-    expect(database(f).prompts).toEqual([]);
+    expect(prompts(f)).toEqual([]);
     seatOwned(aa.path);
     expect((await next(f, [])).code).toBe(0);
     const state: State = readState(aa.path);
@@ -148,17 +147,18 @@ test('the holder gets a batch record rebased onto the remote and only the holder
       (await run(['git', 'merge-base', '--is-ancestor', 'origin/main', z.string().parse(state.batch?.top)], f.root))
         .code,
     ).toBe(0);
-    expect(database(f).prompts).toEqual([expectedPrompt(aa.path, aa.b)]);
+    expect(prompts(f)).toEqual([expectedPrompt(aa.path)]);
+    expect(await seatOf(f, expectedPrompt(aa.path))).toEqual(['aa/b']);
     expect(readState(bb.path)).toEqual(before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('an interrupted build is discarded and rebuilt under a new attempt', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
     const aaHead: string = await head(f, 'aa');
@@ -172,7 +172,7 @@ test('an interrupted build is discarded and rebuilt under a new attempt', async 
         applied: false,
       },
     });
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     seatOwned(aa.path);
     expect((await next(f, ['--all'])).code).toBe(0);
@@ -181,26 +181,27 @@ test('an interrupted build is discarded and rebuilt under a new attempt', async 
     expect(state.batch?.attempt).not.toBe('interrupted-attempt');
     expect(state.batch?.attempt).toBeTruthy();
     expect(await head(f, 'aa')).toBe(z.string().parse(state.batch?.top));
-    expect(database(f).prompts).toEqual([expectedPrompt(aa.path, aa.b)]);
+    expect(prompts(f)).toEqual([expectedPrompt(aa.path)]);
+    expect(await seatOf(f, expectedPrompt(aa.path))).toEqual(['aa/b']);
     expect(await command(['git', 'status', '--porcelain'], z.string().parse(state.worktree))).toBe('');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a failed holder with a landed candidate is told to move back, then reconciles without run or push', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     const applied: State = readState(aa.path);
     const top: string = z.string().parse(applied.batch?.top);
     await command(['git', 'push', 'origin', 'refs/heads/aa:main'], f.root);
     saveState(aa.path, { ...applied, phase: 'failed', batch: { ...applied.batch!, candidate: top } });
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     const callsBefore: number = calls(f).length;
     expect((await next(f, ['--all'])).code).toBe(1);
     const notice: string[][] = calls(f)
@@ -211,57 +212,57 @@ test('a failed holder with a landed candidate is told to move back, then reconci
     expect(notice[0].join(' ')).toContain('akrogon phase aa merge');
     expect(readState(aa.path).phase).toBe('failed');
     expect(readState(aa.path).batch?.candidate).toBe(top);
-    idleAll(f);
+    await idleAll(f);
     const promptsBefore: number = mergePrompts(f).length;
     expect((await cli(f, ['phase', 'aa', 'merge'], f.root, f.env)).code).toBe(0);
     expect(leafState(aa.path).phase).toBe('merged');
     expect(mergePrompts(f)).toHaveLength(promptsBefore);
-    expect(database(f).prompts.filter((prompt) => prompt.text.startsWith('broadcast-issue aa'))).toHaveLength(1);
+    expect(prompts(f).filter((prompt) => prompt.startsWith('broadcast-issue aa'))).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 20000);
 
 test('a landed candidate moves the holder once, clears the record, and the next pass wakes dependents', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
     await commitFile(f, holder.path, 'h-file', 'h\n');
     const dependent: string = leaf(f, 'dep', 'plan.synthesis', { 'blocked-by': ['holder'] }, 'dep-issue');
     toMerge(holder.path, '2026-09-11T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     const record = readState(holder.path).batch;
     const top: string = z.string().parse(record?.top);
     await command(['git', 'push', 'origin', 'refs/heads/holder:main'], f.root);
     saveState(holder.path, { ...readState(holder.path), batch: { ...record!, candidate: top } });
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(leafState(holder.path).phase).toBe('merged');
     expect(leafState(holder.path).batch).toBeUndefined();
-    expect(database(f).prompts.map((prompt) => prompt.text.split(' ')[0])).toEqual(['broadcast-issue']);
-    saveDatabase(f, { ...database(f), prompts: [] });
+    expect(prompts(f).map((prompt) => prompt.split(' ')[0])).toEqual(['broadcast-issue']);
+    resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(0);
-    expect(database(f).prompts).toEqual([
-      { pane: readState(dependent).pane.A!, text: `plan-issue dep slot=A phase=plan.synthesis leaf=${dependent}` },
-    ]);
+    expect(prompts(f)).toEqual([`plan-issue dep slot=A phase=plan.synthesis leaf=${dependent}`]);
+    expect(await seatOf(f, `plan-issue dep slot=A phase=plan.synthesis leaf=${dependent}`)).toEqual(['dep/a']);
     expect((await run(['git', 'merge-base', '--is-ancestor', top, 'origin/main'], f.root)).code).toBe(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 25000);
 
 test('a green merge clears the record once the holder lands', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await dispatchFixture({ window: 'open' });
+  // An open window adopts each seat into its tab, which the start waits for.
+  const adopting: () => void = adopt(f.core);
   try {
-    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
     await commitFile(f, holder.path, 'h-file', 'h\n');
-    const holderTab: string = z.string().parse(readState(holder.path).tab);
     toMerge(holder.path, '2026-09-11T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     const attempt: string = z.string().parse(readState(holder.path).batch?.attempt);
-    idleAll(f);
+    await idleAll(f);
     await verified(f, 'holder', 'merge');
     expect(
       (await cli(f, ['phase', 'holder', 'merged', '--slot', 'B', '--check', '--attempt', attempt], f.root, f.env)).code,
@@ -271,8 +272,8 @@ test('a green merge clears the record once the holder lands', async () => {
     );
     expect(leafState(holder.path).phase).toBe('merged');
     expect(leafState(holder.path).batch).toBeUndefined();
-    // The holder's own tab belongs to the pane-idle sweep path.
-    expect(database(f).tabs.map((tab) => tab.tab_id)).toEqual([holderTab]);
+    // The holder's own tab belongs to the pane-idle sweep path: the move requests no close.
+    expect(f.core.appCalls().filter((call) => call.argv[1] === 'tab.close')).toEqual([]);
     // With the record gone no pass fetches for it again: rename the remote and the
     // next pass stays clean.
     await command(['git', 'remote', 'rename', 'origin', 'elsewhere'], f.root);
@@ -280,17 +281,18 @@ test('a green merge clears the record once the holder lands', async () => {
     expect(after.code).toBe(0);
     expect(after.stderr).not.toContain('fetch');
   } finally {
-    f.clean();
+    adopting();
+    await f.clean();
   }
 }, 25000);
 
 test('a fetch failure keeps the record, moves nothing and reports the error', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     const record = readState(aa.path).batch;
     const top: string = z.string().parse(record?.top);
@@ -305,7 +307,7 @@ test('a fetch failure keeps the record, moves nothing and reports the error', as
     expect(await head(f, 'aa')).toBe(top);
     expect(readState(aa.path).phase).toBe('merge');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 20000);
 
@@ -315,7 +317,7 @@ test('cleanup retains a merged holder worktree while publication recovery is blo
     const holder = await allocatedLeaf(f, 'holder');
     await commitFile(f, holder.path, 'holder-file', 'h');
     toMerge(holder.path, '2026-09-11T00:00:00Z');
-    idleAll(f);
+    await idleAll(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     const state: State = readState(holder.path);
     await command(['git', 'push', 'origin', state.batch!.top! + ':main'], f.root);
@@ -328,7 +330,7 @@ test('cleanup retains a merged holder worktree while publication recovery is blo
     expect(existsSync(state.worktree!)).toBe(true);
     expect((await run(['git', 'rev-parse', '--verify', 'refs/heads/holder'], f.root)).code).toBe(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -338,7 +340,7 @@ test('a failed published holder receives one recovery notice across repeated pas
     const holder = await allocatedLeaf(f, 'holder');
     await commitFile(f, holder.path, 'holder-file', 'h');
     toMerge(holder.path, '2026-09-11T00:00:00Z');
-    idleAll(f);
+    await idleAll(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     const state: State = readState(holder.path);
     await command(['git', 'push', 'origin', state.batch!.top! + ':main'], f.root);
@@ -347,14 +349,14 @@ test('a failed published holder receives one recovery notice across repeated pas
     expect((await next(f, ['--all'])).code).toBe(1);
     expect(calls(f).filter((args) => args[0] === 'notification' && args[1] === 'show')).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('a dirty holder worktree drops the batch to solo and keeps its branch', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     const aaHead: string = await head(f, 'aa');
     const aaWorktree: string = z.string().parse(readState(aa.path).worktree);
@@ -362,7 +364,7 @@ test('a dirty holder worktree drops the batch to solo and keeps its branch', asy
     mkdirSync(resolve(aaWorktree, 'empty-dirty'));
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     await pushMain(f, 'main-advance');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(readFileSync(resolve(aaWorktree, 'file'), 'utf8')).toBe('holder dirty\n');
     expect(existsSync(resolve(aaWorktree, 'empty-dirty'))).toBe(false);
@@ -370,10 +372,10 @@ test('a dirty holder worktree drops the batch to solo and keeps its branch', asy
     const batch = readState(aa.path).batch;
     expect(batch?.applied).toBe(true);
     expect(batch?.top).toBeUndefined();
-    expect(mergePrompts(f).at(-1)?.text).toContain('solo');
-    expect(mergePrompts(f).at(-1)?.pane).toBe(aa.b);
+    expect(mergePrompts(f).at(-1)).toContain('solo');
+    expect(await seatOf(f, z.string().parse(mergePrompts(f).at(-1)))).toEqual(['aa/b']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -381,10 +383,10 @@ for (const ending of ['check.fix', 'failed'] as const) {
   test(`holder-seat commits survive the ${ending} handoff`, async () => {
     const f: DispatchFixture = await dispatchFixture();
     try {
-      const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+      const holder: { path: string } = await allocatedLeaf(f, 'holder');
       await commitFile(f, holder.path, 'original', 'original');
       toMerge(holder.path, '2026-09-11T00:00:00Z');
-      idleAll(f);
+      await idleAll(f);
       expect((await next(f, ['--all'])).code).toBe(0);
       const attempt: string = readState(holder.path).batch!.attempt;
       await commitFile(f, holder.path, 'seat-fix', 'committed holder repair');
@@ -400,7 +402,7 @@ for (const ending of ['check.fix', 'failed'] as const) {
         'committed holder repair',
       );
     } finally {
-      f.clean();
+      await f.clean();
     }
   });
 }
@@ -408,11 +410,11 @@ for (const ending of ['check.fix', 'failed'] as const) {
 test('late holder dirt during initial apply is isolated and survives cleanup', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
     await commitFile(f, holder.path, 'holder-file', 'h');
     const worktree: string = readState(holder.path).worktree!;
     toMerge(holder.path, '2026-09-11T00:00:00Z');
-    idleAll(f);
+    await idleAll(f);
     const created: string = await editOnSecondStatus(f, worktree);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(created)).toBe(true);
@@ -420,17 +422,17 @@ test('late holder dirt during initial apply is isolated and survives cleanup', a
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(readFileSync(resolve(worktree, 'uncommitted'), 'utf8')).toBe('operator edit\n');
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('an edit arriving after the move status read survives the Git reset', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
     await commitFile(f, holder.path, 'holder-file', 'h');
     toMerge(holder.path, '2026-09-11T00:00:00Z');
-    idleAll(f);
+    await idleAll(f);
     const worktree: string = readState(holder.path).worktree!;
     const git: string = await command(['sh', '-c', 'command -v git']);
     const created: string = resolve(f.home, 'edit-before-reset');
@@ -451,18 +453,18 @@ exec '${git}' "$@"
     expect(readFileSync(resolve(worktree, 'file'), 'utf8')).toBe('operator tracked edit\n');
     expect(readState(holder.path).batch!.top).toBeUndefined();
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('an applied holder retains its checked integration head on red', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
     await commitFile(f, holder.path, 'holder-file', 'h');
     await pushMain(f, 'advance');
     toMerge(holder.path, '2026-09-11T00:00:00Z');
-    idleAll(f);
+    await idleAll(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     const batch = readState(holder.path).batch!;
     const checked: string = await head(f, 'holder');
@@ -472,7 +474,7 @@ test('an applied holder retains its checked integration head on red', async () =
     ).toBe(0);
     expect(await head(f, 'holder')).toBe(checked);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -480,7 +482,7 @@ test('empty untracked folders are removed before an applied merge prompt', async
   const f: DispatchFixture = await dispatchFixture();
   try {
     writeFileSync(resolve(f.root, '.env'), 'secret\n');
-    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
     const worktree: string = z.string().parse(readState(holder.path).worktree);
     mkdirSync(resolve(worktree, 'td'));
     await commitFile(f, holder.path, 'td/keep', 'keep\n');
@@ -497,11 +499,12 @@ test('empty untracked folders are removed before an applied merge prompt', async
     mkdirSync(resolve(worktree, 'node_modules'));
     writeFileSync(resolve(worktree, 'node_modules/pkg.js'), 'module\n');
     toMerge(holder.path, '2026-09-11T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     seatOwned(holder.path);
     expect((await next(f, ['--all'])).code).toBe(0);
-    expect(database(f).prompts).toEqual([expectedPrompt(holder.path, holder.b)]);
+    expect(prompts(f)).toEqual([expectedPrompt(holder.path)]);
+    expect(await seatOf(f, expectedPrompt(holder.path))).toEqual(['holder/b']);
     expect(existsSync(resolve(worktree, 'e1'))).toBe(false);
     expect(existsSync(resolve(worktree, 'td/e2'))).toBe(false);
     expect(existsSync(resolve(worktree, 'up/empty-child'))).toBe(false);
@@ -514,14 +517,14 @@ test('empty untracked folders are removed before an applied merge prompt', async
     expect(lstatSync(envFile).isFile()).toBe(true);
     expect(readFileSync(envFile, 'utf8')).toBe('');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('empty untracked folders are removed before a solo merge prompt', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
     const worktree: string = z.string().parse(readState(holder.path).worktree);
     await commitFile(f, holder.path, '.gitignore', '.env\n.temp/\n');
     mkdirSync(resolve(worktree, 'solempty'));
@@ -531,24 +534,24 @@ test('empty untracked folders are removed before a solo merge prompt', async () 
     writeFileSync(resolve(worktree, '.temp/x'), 'temp\n');
     // up/keep.txt makes the holder dirty, so the prompt takes the solo form.
     toMerge(holder.path, '2026-09-11T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(resolve(worktree, 'solempty'))).toBe(false);
     expect(existsSync(resolve(worktree, 'up/empty-child'))).toBe(false);
     expect(readFileSync(resolve(worktree, 'up/keep.txt'), 'utf8')).toBe('keep\n');
     expect(readFileSync(resolve(worktree, '.temp/x'), 'utf8')).toBe('temp\n');
     expect(mergePrompts(f)).toHaveLength(1);
-    expect(mergePrompts(f)[0].pane).toBe(holder.b);
-    expect(mergePrompts(f)[0].text).toContain('solo');
+    expect(await seatOf(f, mergePrompts(f)[0])).toEqual(['holder/b']);
+    expect(mergePrompts(f)[0]).toContain('solo');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('unreadable ignored folders do not stop empty-folder cleanup before merge', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
     const worktree: string = z.string().parse(readState(holder.path).worktree);
     await commitFile(f, holder.path, '.gitignore', '.env\n.cache/\nnode_modules/\n');
     const ignored: string[] = [resolve(worktree, '.cache'), resolve(worktree, 'up/node_modules')];
@@ -561,12 +564,13 @@ test('unreadable ignored folders do not stop empty-folder cleanup before merge',
     for (const path of ignored) chmodSync(path, 0);
     try {
       toMerge(holder.path, '2026-09-11T00:00:00.000Z');
-      saveDatabase(f, { ...database(f), prompts: [] });
+      resetPrompts(f);
       expect((await command(['git', 'status', '--porcelain'], worktree)).trim()).toBe('');
       expect((await next(f, ['--all'])).code).toBe(0);
       seatOwned(holder.path);
       expect((await next(f, ['--all'])).code).toBe(0);
-      expect(mergePrompts(f)).toEqual([expectedPrompt(holder.path, holder.b)]);
+      expect(mergePrompts(f)).toEqual([expectedPrompt(holder.path)]);
+      expect(await seatOf(f, expectedPrompt(holder.path))).toEqual(['holder/b']);
       expect(existsSync(resolve(worktree, 'empty'))).toBe(false);
       expect(existsSync(resolve(worktree, 'up/empty-child'))).toBe(false);
       expect(existsSync(resolve(worktree, 'up'))).toBe(true);
@@ -575,14 +579,14 @@ test('unreadable ignored folders do not stop empty-folder cleanup before merge',
     }
     for (const path of ignored) expect(readFileSync(resolve(path, 'keep'), 'utf8')).toBe('ignored content\n');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a failed removal stops the merge prompt', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const holder: { path: string; b: string } = await allocatedLeaf(f, 'holder');
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
     const worktree: string = z.string().parse(readState(holder.path).worktree);
     const locked: string = resolve(worktree, 'lp');
     mkdirSync(resolve(locked, 'child'), { recursive: true });
@@ -601,35 +605,36 @@ test('a failed removal stops the merge prompt', async () => {
       chmodSync(locked, 0o755);
     }
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a waiting leaf stays out of the holder turn and lands in its own turn', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
-    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
+    const bb: { path: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     await commitFile(f, bb.path, 'bb-file', 'bb\n');
     const bbHead: string = await head(f, 'bb');
     const bbWorktree: string = z.string().parse(readState(bb.path).worktree);
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, [])).code).toBe(0);
     seatOwned(aa.path);
     expect((await next(f, [])).code).toBe(0);
     const record = readState(aa.path).batch!;
     expect(record).not.toHaveProperty('members');
-    expect(mergePrompts(f)).toEqual([expectedPrompt(aa.path, aa.b)]);
-    expect(mergePrompts(f)[0].text).not.toContain('members=');
+    expect(mergePrompts(f)).toEqual([expectedPrompt(aa.path)]);
+    expect(await seatOf(f, expectedPrompt(aa.path))).toEqual(['aa/b']);
+    expect(mergePrompts(f)[0]).not.toContain('members=');
     expect(await command(['git', 'ls-tree', '--name-only', record.top!], f.root)).not.toContain('bb-file');
     expect(await head(f, 'bb')).toBe(bbHead);
     expect(await command(['git', 'rev-parse', 'HEAD'], bbWorktree)).toBe(bbHead);
     expect(readState(bb.path).phase).toBe('merge');
     expect(readState(bb.path).batch).toBeUndefined();
-    idleAll(f);
+    await idleAll(f);
     await verified(f, 'aa', 'merge');
     const attempt: string = record.attempt;
     expect(
@@ -647,14 +652,15 @@ test('a waiting leaf stays out of the holder turn and lands in its own turn', as
     expect(attempts.map((line) => line.outcome)).toEqual(['merged']);
     expect(attempts[0]).not.toHaveProperty('members');
     // bb takes its own turn on the base aa landed.
-    idleAll(f);
+    await idleAll(f);
     expect((await next(f, [])).code).toBe(0);
     seatOwned(bb.path);
     expect((await next(f, [])).code).toBe(0);
     const own = readState(bb.path).batch!;
     expect(own.attempt).not.toBe(attempt);
     expect(own.built_on).toBe(record.top!);
-    expect(mergePrompts(f)).toContainEqual(expectedPrompt(bb.path, bb.b));
+    expect(mergePrompts(f)).toContainEqual(expectedPrompt(bb.path));
+    expect(await seatOf(f, expectedPrompt(bb.path))).toEqual(['bb/b']);
     await verified(f, 'bb', 'merge');
     expect(
       (await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--check', '--attempt', own.attempt], f.root, f.env)).code,
@@ -671,15 +677,15 @@ test('a waiting leaf stays out of the holder turn and lands in its own turn', as
     expect(await command(['git', 'ls-tree', '--name-only', await remoteTip(f)], f.root)).toContain('bb-file');
     expect(attemptLines(f).map((line) => line.outcome)).toEqual(['merged', 'merged']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
 
 test('a holder that cannot be rebased takes a solo turn with nothing stacked', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
-    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
+    const bb: { path: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
     writeFileSync(resolve(f.root, 'file'), 'main version\n');
     await command(['git', 'add', 'file'], f.root);
     await command(['git', 'commit', '-m', 'main file'], f.root);
@@ -691,31 +697,32 @@ test('a holder that cannot be rebased takes a solo turn with nothing stacked', a
     await commitFile(f, bb.path, 'bb-file', 'bb\n');
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, [])).code).toBe(0);
     expect(readState(aa.path).batch?.top).toBeUndefined();
-    expect(mergePrompts(f)).toEqual([expectedPrompt(aa.path, aa.b)]);
-    expect(mergePrompts(f)[0].text).toContain('solo');
+    expect(mergePrompts(f)).toEqual([expectedPrompt(aa.path)]);
+    expect(await seatOf(f, expectedPrompt(aa.path))).toEqual(['aa/b']);
+    expect(mergePrompts(f)[0]).toContain('solo');
     expect(readState(bb.path).phase).toBe('merge');
-    expect(mergePrompts(f).some((prompt) => prompt.pane === bb.b)).toBe(false);
+    expect(mergePrompts(f).some((prompt) => prompt.startsWith('merge-issue bb '))).toBe(false);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 20000);
 
 test('a red verify with another leaf waiting moves the holder to check.fix', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
-    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
+    const bb: { path: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     await commitFile(f, bb.path, 'bb-file', 'bb\n');
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, [])).code).toBe(0);
     const record = readState(aa.path).batch!;
-    idleAllNewSession(f);
+    await idleAll(f);
     const red: Result = await cli(
       f,
       ['phase', 'aa', 'check.fix', '--slot', 'B', '--attempt', record.attempt],
@@ -732,32 +739,33 @@ test('a red verify with another leaf waiting moves the holder to check.fix', asy
     expect(attempts[0].built_on).toBe(record.built_on);
     expect(attempts[0]).not.toHaveProperty('members');
     expect(readState(bb.path).phase).toBe('merge');
-    idleAll(f);
+    await idleAll(f);
     expect((await next(f, [])).code).toBe(0);
     seatOwned(bb.path);
     expect((await next(f, [])).code).toBe(0);
     expect(readState(bb.path).batch!.attempt).not.toBe(record.attempt);
-    expect(mergePrompts(f)).toContainEqual(expectedPrompt(bb.path, bb.b));
+    expect(mergePrompts(f)).toContainEqual(expectedPrompt(bb.path));
+    expect(await seatOf(f, expectedPrompt(bb.path))).toEqual(['bb/b']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
 
 test('a refused push restacks only the holder while another leaf waits', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
-    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
+    const bb: { path: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     await commitFile(f, bb.path, 'bb-file', 'bb\n');
     const bbHead: string = await head(f, 'bb');
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, [])).code).toBe(0);
     const record = readState(aa.path).batch!;
     const args: string[] = ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', record.attempt];
-    idleAll(f);
+    await idleAll(f);
     await verified(f, 'aa', 'merge');
     expect((await cli(f, [...args, '--check'], f.root, f.env)).code).toBe(0);
     await pushMain(f, 'adv-file');
@@ -784,24 +792,24 @@ test('a refused push restacks only the holder while another leaf waits', async (
     expect(leafState(bb.path).phase).toBe('merge');
     expect(attemptLines(f).map((line) => line.outcome)).toEqual(['merged']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
 
 test('a push reported lost but landed moves only the holder to merged once', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
-    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
+    const bb: { path: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     await commitFile(f, bb.path, 'bb-file', 'bb\n');
     const bbHead: string = await head(f, 'bb');
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
-    saveDatabase(f, { ...database(f), prompts: [] });
+    resetPrompts(f);
     expect((await next(f, [])).code).toBe(0);
     const record = readState(aa.path).batch!;
-    idleAll(f);
+    await idleAll(f);
     await verified(f, 'aa', 'merge');
     expect(
       (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', record.attempt], f.root, f.env))
@@ -841,6 +849,6 @@ exec "${git}" "$@"
         .map((line) => line.outcome),
     ).toEqual(['merged']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
