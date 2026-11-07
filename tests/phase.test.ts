@@ -44,6 +44,8 @@ function herdrCalls(db: string): string[][] {
         .filter((args) => args[0] !== 'session' && args[0] !== 'workspace')
     : [];
 }
+// The skip line a pass prints for a leaf it could not finish: repo, path, slug and error, no source.
+const skipLine = z.object({ repo: z.string(), path: z.string(), slug: z.string(), error: z.string() }).strict();
 // The fixture core's fake herdr database (notices only).
 function herdrDb(f: HcFixture): string {
   return resolve(f.home, 'herdr.json');
@@ -563,22 +565,39 @@ test('source retries recheck state, skip CLOSED, and continue after final failur
         view(8, '{malformed-json'),
         view(7),
         close(7),
+        // The move's own-leaf pass (plan D14) retries the closure once: sources closed by now
+        // read CLOSED, #4 and #5 fail their view twice, #6 and #8 answer as before.
+        view(1, '{"state":"CLOSED"}'),
+        view(2, '{"state":"CLOSED"}'),
+        view(3, '{"state":"CLOSED"}'),
+        view(4, '', 1),
+        view(4, '', 1),
+        view(5, '', 1),
+        view(5, '', 1),
+        view(6, '{"state":"INVALID"}'),
+        view(8, '{malformed-json'),
+        view(7, '{"state":"CLOSED"}'),
       ]),
     );
     const result: Result = await cli(f, ['phase', 'source', 'merged'], f.root, gh.env);
     expect(result.code).not.toBe(0);
-    const warnings: { warning?: string; source: string; code?: number }[] = result.stderr
+    const lines: unknown[] = result.stderr
       .split('\n')
       .filter((line) => /^\s*\{.*\}\s*$/.test(line))
+      .map((line) => JSON.parse(line));
+    // The own-leaf pass reports its failed closure once, as a skip line with no source.
+    expect(lines.filter((line) => skipLine.safeParse(line).success)).toEqual([
+      expect.objectContaining({ slug: 'source', error: expect.stringContaining('Source closure failed') }),
+    ]);
+    const warnings: { warning?: string; source: string; code?: number }[] = lines
+      .filter((line) => !skipLine.safeParse(line).success)
       .map((line) =>
-        z
-          .object({ warning: z.string().optional(), source: z.string(), code: z.number().optional() })
-          .parse(JSON.parse(line)),
+        z.object({ warning: z.string().optional(), source: z.string(), code: z.number().optional() }).parse(line),
       )
       .filter((item) => item.warning !== undefined);
-    expect(warnings).toHaveLength(4);
+    // Move: #2, #3, #4 and #5 retry once each; own-leaf pass: #4 and #5 retry their view again.
     expect(warnings).toEqual(
-      [2, 3, 4, 5].map((n) => ({ warning: expect.any(String), source: `team/project#${n}`, code: 1 })),
+      [2, 3, 4, 5, 4, 5].map((n) => ({ warning: expect.any(String), source: `team/project#${n}`, code: 1 })),
     );
     expect(result.stderr).toContain('close failure');
     expect(result.stderr).toContain('view failure');
@@ -695,31 +714,50 @@ test('failed or malformed retry comment listing prevents another close and conti
           { ...listing, args },
           { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '2', '--json', 'state'] },
           { stdout: '', args: ['issue', 'close', '-R', 'team/project', '2', '--comment', 'delivered by listing'] },
+          // The move's own-leaf pass (plan D14) retries #1 the same way; #2 is closed by now.
+          { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'] },
+          {
+            stdout: '',
+            code: 1,
+            args: ['issue', 'close', '-R', 'team/project', '1', '--comment', 'delivered by listing'],
+          },
+          { stdout: '{"state":"OPEN"}', args: ['issue', 'view', '-R', 'team/project', '1', '--json', 'state'] },
+          { ...listing, args },
+          { stdout: '{"state":"CLOSED"}', args: ['issue', 'view', '-R', 'team/project', '2', '--json', 'state'] },
         ]),
       );
       const result: Result = await cli(f, ['phase', 'listing', 'merged'], f.root, gh.env);
       expect(result.code).not.toBe(0);
       expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
-      const messages: { source: string; warning?: string; error?: string }[] = result.stderr
+      const lines: unknown[] = result.stderr
         .split('\n')
         .filter((line) => /^\s*\{.*\}\s*$/.test(line))
+        .map((line) => JSON.parse(line));
+      // The own-leaf pass reports its failed closure once, as a skip line with no source.
+      expect(lines.filter((line) => skipLine.safeParse(line).success)).toEqual([
+        expect.objectContaining({ slug: 'listing', error: expect.stringContaining('Source closure failed') }),
+      ]);
+      const messages: { source: string; warning?: string; error?: string }[] = lines
+        .filter((line) => !skipLine.safeParse(line).success)
         .map((line) =>
-          z
-            .object({ source: z.string(), warning: z.string().optional(), error: z.string().optional() })
-            .parse(JSON.parse(line)),
+          z.object({ source: z.string(), warning: z.string().optional(), error: z.string().optional() }).parse(line),
         );
-      expect(messages.filter((item) => item.warning !== undefined)).toHaveLength(1);
-      const failure: { source: string; error: string } = z
-        .object({ source: z.string(), error: z.string() })
-        .parse(messages.find((item) => item.error !== undefined));
-      expect(failure.source).toBe('team/project#1');
-      expect(JSON.parse(failure.error)).toMatchObject({
-        command: ['gh', ...args],
-        cwd: f.root,
-        ...(listing.code === 0
-          ? { response: listing.stdout }
-          : { code: 2, stdout: listing.stdout, stderr: 'comment page failed' }),
-      });
+      // One close retry warning and one listing failure for #1 in the move and again in the own-leaf pass.
+      expect(messages.filter((item) => item.warning !== undefined)).toHaveLength(2);
+      const failures: { source: string; error: string }[] = messages
+        .filter((item) => item.error !== undefined)
+        .map((item) => z.object({ source: z.string(), error: z.string() }).parse(item));
+      expect(failures).toHaveLength(2);
+      for (const failure of failures) {
+        expect(failure.source).toBe('team/project#1');
+        expect(JSON.parse(failure.error)).toMatchObject({
+          command: ['gh', ...args],
+          cwd: f.root,
+          ...(listing.code === 0
+            ? { response: listing.stdout }
+            : { code: 2, stdout: listing.stdout, stderr: 'comment page failed' }),
+        });
+      }
       expect(readState(resolve(f.root, 'issues/open/issue/listing')).phase).toBe('merged');
     } finally {
       f.clean();
