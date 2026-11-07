@@ -1365,7 +1365,7 @@ test('a sweep leaves closed merged leaves untouched', async () => {
 }, 15000);
 
 test('next --resume starts an open dependent of an already closed leaf', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     leaf(f, 'done', 'merged', {}, 'done-owner');
     mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
@@ -1374,7 +1374,7 @@ test('next --resume starts an open dependent of an already closed leaf', async (
     expect((await next(f, ['--resume'], {}, f.home)).code).toBe(0);
     expect(readState(child).tab).toBeDefined();
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -1404,7 +1404,7 @@ test('two repos summarize once per repo on every invocation', async () => {
 
 for (const moved of ['worktree root', 'repo root'] as const) {
   test(`changed ${moved} reports recorded and expected worktrees without creating or prompting`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await coreFixture();
     try {
       const recorded: string = resolve(f.root, 'issues/worktrees/relocated');
       await command(['git', 'worktree', 'add', '-b', 'relocated', recorded], f.root);
@@ -1414,7 +1414,7 @@ for (const moved of ['worktree root', 'repo root'] as const) {
       if (moved === 'repo root') renameSync(f.root, root);
       else yaml(resolve(root, 'issues/config.yaml'), { worktree_root: worktreeRoot, grounding: 'none' });
       configure(f, { repos: { repo: root } });
-      const relocated: DispatchFixture = { ...f, root };
+      const relocated: HcFixture = { ...f, root };
       const path: string = resolve(root, 'issues/open/issue/relocated');
       const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
       const expected: string = resolve(root, worktreeRoot, 'relocated');
@@ -1441,22 +1441,22 @@ for (const moved of ['worktree root', 'repo root'] as const) {
         expect(readState(path).worktree).toBeUndefined();
         expect(await command(['git', 'worktree', 'list', '--porcelain'], root)).not.toContain(recorded);
       }
-      expect(database(f).prompts).toHaveLength(0);
-      expect(database(f).tabs).toHaveLength(0);
+      expect(await allTasks(f)).toHaveLength(0);
+      expect(await liveTabs(f)).toEqual([]);
     } finally {
-      f.clean();
+      await f.clean();
     }
   });
 }
 
 test('moving a repo with the same registered key supports status, phase and dispatch without a recorded worktree', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     leaf(f, 'movable', 'plan.synthesis');
     const root: string = resolve(f.home, 'moved-repo');
     renameSync(f.root, root);
     configure(f, { repos: { repo: root } });
-    const moved: DispatchFixture = { ...f, root };
+    const moved: HcFixture = { ...f, root };
     const status: Result = await cli(moved, ['status', 'movable']);
     expect(status.code).toBe(0);
     expect(status.stdout).toContain('repo: repo');
@@ -1467,20 +1467,20 @@ test('moving a repo with the same registered key supports status, phase and disp
     expect(state.phase).toBe('implement');
     expect(state.worktree).toBe(resolve(storeDir(f), 'movable'));
     expect(await command(['git', 'branch', '--show-current'], state.worktree)).toBe('movable');
-    expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
+    expect((await allTasks(f)).map((task) => task.text)).toEqual([
       `implement-issue movable slot=A phase=implement leaf=${root}/issues/open/issue/movable`,
     ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('unknown directory population reserves all new capacity but allows existing tabs', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
     expect((await next(f, ['healthy'])).code).toBe(0);
-    resetPrompts(f, healthy);
+    await rePromptable(f, healthy);
     leaf(f, 'new', 'plan.synthesis');
     const closed: string = resolve(f.root, 'issues/closed');
     writeFileSync(closed, 'not a directory');
@@ -1489,10 +1489,10 @@ test('unknown directory population reserves all new capacity but allows existing
     expect(skips(result)).toHaveLength(1);
     expect(skips(result)[0].path).toBe(closed);
     expect(skips(result)[0].error).toContain('ENOTDIR');
-    expect(database(f).tabs).toHaveLength(1);
-    expect(database(f).prompts).toHaveLength(1);
+    expect(await liveTabs(f)).toEqual(['healthy']);
+    expect(await allTasks(f)).toHaveLength(2);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -1562,83 +1562,61 @@ test('a selected leaf removed before its global lock is reported as skipped', as
   }
 });
 
-for (const session of [null, undefined]) {
-  test(`next prompts an idle agent with ${session === null ? 'null' : 'omitted'} session data`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
-    try {
-      const path: string = leaf(f, 'sessionless', 'plan.synthesis');
-      expect((await next(f, ['sessionless'])).code).toBe(0);
-      resetPrompts(f, path);
-      const db: Database = database(f);
-      saveDatabase(f, {
-        ...db,
-        panes: db.panes.map((pane) => ({ ...pane, agent_session: session })),
-      });
-      expect((await next(f, ['sessionless'])).code).toBe(0);
-      expect(database(f).prompts).toEqual([
-        { pane: readState(path).pane.A!, text: `plan-issue sessionless slot=A phase=plan.synthesis leaf=${path}` },
-      ]);
-      expect(database(f).starts).toHaveLength(1);
-    } finally {
-      f.clean();
-    }
-  });
+// Waits until a seat has ended the turn of every task it received.
+async function quiet(f: HcFixture, address: string): Promise<Terminal> {
+  return seatIdle(f, address, f.core.tasks(address).length);
 }
 
-for (const seat of ['B'] as const) {
-  test(`blocked merge seat ${seat} prevents fetch and clean checks in a dirty worktree`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
-    try {
-      const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
-      expect((await next(f, ['blocked-merge'])).code).toBe(0);
-      const state: State = readState(path);
-      writeFileSync(resolve(state.worktree!, 'unfinished'), 'dirty merge work\n');
-      saveState(path, { ...state, phase: 'merge', attempts: { A: 0, B: seat === 'B' ? 1 : 2 } });
-      const db: Database = database(f);
-      saveDatabase(f, {
-        ...db,
-        panes: db.panes.map((pane) => ({
-          ...pane,
-          agent: 'fake',
-          agent_status: pane.pane_id === state.pane[seat] ? 'blocked' : 'idle',
-        })),
-      });
-      const realGit: string = await command(['sh', '-c', 'command -v git']);
-      const gitLog: string = resolve(f.home, 'git.calls');
-      writeFileSync(
-        resolve(f.home, 'bin/git'),
-        '#!/bin/sh\nprintf "%s\\n" "$*" >> "$GIT_CALL_LOG"\nexec "$REAL_GIT" "$@"\n',
-        { mode: 0o755 },
-      );
-      const before: State = readState(path);
-      const observedAt: number = Date.now();
-      const result: Result = await next(f, ['blocked-merge'], { REAL_GIT: realGit, GIT_CALL_LOG: gitLog });
-      const gitCalls: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');
-      expect(gitCalls).not.toContain('status --porcelain');
-      expect(result.code).toBe(0);
-      const after: State = readState(path);
-      const since: string = z.string().datetime().parse(after.busy_since[seat]);
-      expect(before.busy_since.B).toBeUndefined();
-      expect(Date.parse(since)).toBeGreaterThanOrEqual(observedAt);
-      expect(Date.parse(since)).toBeLessThanOrEqual(Date.now());
-      // The batch pass built and applied a member-less record without touching the seat.
-      expect(after.batch?.applied).toBe(true);
-      const { batch, ...rest }: State = after;
-      expect(rest).toEqual({ ...before, busy_since: { [seat]: since }, busy_notified: {} });
-      expect(database(f).prompts).toEqual(db.prompts);
-      expect(database(f).starts).toEqual(db.starts);
-      expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
-    } finally {
-      f.clean();
-    }
-  });
-}
+test('blocked merge seat B prevents fetch and clean checks in a dirty worktree', async () => {
+  const f: HcFixture = await coreFixture();
+  try {
+    const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
+    expect((await next(f, ['blocked-merge'])).code).toBe(0);
+    await quiet(f, z.string().parse(readState(path).seat.A?.address));
+    holdTurns(f, 'blocked:kind=permission:msg=Allow?');
+    expect((await cli(f, ['seat', 'blocked-merge', 'B'], f.root, f.env)).code).toBe(0);
+    const b: string = z.string().parse(readState(path).seat.B?.address);
+    await f.core.waitFor(b, (t: Terminal) => t.status?.state === 'blocked');
+    const state: State = readState(path);
+    writeFileSync(resolve(state.worktree!, 'unfinished'), 'dirty merge work\n');
+    saveState(path, { ...state, phase: 'merge' });
+    const realGit: string = await command(['sh', '-c', 'command -v git']);
+    const gitLog: string = resolve(f.home, 'git.calls');
+    writeFileSync(
+      resolve(f.home, 'bin/git'),
+      '#!/bin/sh\nprintf "%s\\n" "$*" >> "$GIT_CALL_LOG"\nexec "$REAL_GIT" "$@"\n',
+      { mode: 0o755 },
+    );
+    const before: State = readState(path);
+    const tasksBefore = await allTasks(f);
+    const observedAt: number = Date.now();
+    const result: Result = await next(f, ['blocked-merge'], { REAL_GIT: realGit, GIT_CALL_LOG: gitLog });
+    const gitCalls: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');
+    expect(gitCalls).not.toContain('status --porcelain');
+    expect(result.code).toBe(0);
+    const after: State = readState(path);
+    const since: string = z.string().datetime().parse(after.busy_since.B);
+    expect(before.busy_since.B).toBeUndefined();
+    expect(Date.parse(since)).toBeGreaterThanOrEqual(observedAt);
+    expect(Date.parse(since)).toBeLessThanOrEqual(Date.now());
+    // The batch pass built and applied a member-less record without touching the seat.
+    expect(after.batch?.applied).toBe(true);
+    const { batch, ...rest }: State = after;
+    expect(rest).toEqual({ ...before, busy_since: { B: since }, busy_notified: {} });
+    expect(await allTasks(f)).toEqual(tasksBefore);
+    expect(await seatTerminals(f, 'blocked-merge', true)).toHaveLength(2);
+    expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
+  } finally {
+    await f.clean();
+  }
+});
 
 test('one pass reads the registered root common dir and remote url once each', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
-    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    const paths: string[] = ['aa', 'bb'].map((slug: string) => leaf(f, slug, 'plan.synthesis'));
+    holdTurns(f);
+    for (const slug of ['aa', 'bb']) expect((await next(f, [slug])).code).toBe(0);
     const realGit: string = await command(['sh', '-c', 'command -v git']);
     const gitLog: string = resolve(f.home, 'git.calls');
     writeFileSync(
@@ -1649,7 +1627,7 @@ test('one pass reads the registered root common dir and remote url once each', a
     expect((await next(f, ['--all'], { REAL_GIT: realGit, GIT_CALL_LOG: gitLog })).code).toBe(0);
     const lines: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');
     const count = (cwd: string, args: string): number => lines.filter((line) => line === `${cwd}|${args}`).length;
-    const worktrees: string[] = [aa.path, bb.path].map((path) => readState(path).worktree!);
+    const worktrees: string[] = paths.map((path) => readState(path).worktree!);
     // One read per registered root per run; a worktree's own common dir keeps its one read.
     expect(count(f.root, 'rev-parse --git-common-dir')).toBe(1);
     for (const worktree of worktrees) expect(count(worktree, 'rev-parse --git-common-dir')).toBe(1);
@@ -1657,132 +1635,69 @@ test('one pass reads the registered root common dir and remote url once each', a
     // The branch tip is re-read on every decision; the single remaining read is self-update's.
     expect(count(f.root, 'rev-parse HEAD')).toBe(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 20000);
 
 test('a blocked non-merge seat does not stall a merge leaf', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     const path: string = leaf(f, 'blocked-merge', 'plan.synthesis');
+    holdTurns(f, 'blocked:kind=permission:msg=Allow?');
     expect((await next(f, ['blocked-merge'])).code).toBe(0);
     const state: State = readState(path);
+    await f.core.waitFor(z.string().parse(state.seat.A?.address), (t: Terminal) => t.status?.state === 'blocked');
     writeFileSync(resolve(state.worktree!, 'unfinished'), 'dirty merge work\n');
     saveState(path, { ...state, phase: 'merge' });
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      panes: db.panes.map((pane) => ({
-        ...pane,
-        agent: 'fake',
-        agent_status: pane.pane_id === state.pane.A ? 'blocked' : 'idle',
-      })),
-    });
-    const promptsBefore: number = database(f).prompts.length;
     const result: Result = await next(f, ['blocked-merge']);
     expect(result.code).toBe(0);
     expect(readState(path).phase).toBe('merge');
-    expect(database(f).prompts).toHaveLength(promptsBefore + 1);
-    expect(database(f).prompts.at(-1)).toMatchObject({
-      pane: state.pane.B,
-      text: mergeText(path),
-    });
+    const merges = (await delivered(f, 'blocked-merge')).filter((task) => task.seat === 'b');
+    expect(merges.map((task) => task.text)).toEqual([mergeText(path)]);
+    expect(merges[0].address).toBe(readState(path).seat.B?.address);
     expect(readState(path).busy_since.A).toBeDefined();
     expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('merge, check.fix, check.repair and post-repair review dispatch to their swapped seats', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     const path: string = leaf(f, 'post-repair', 'plan.synthesis');
     expect((await next(f, ['post-repair'])).code).toBe(0);
     const state: State = readState(path);
+    const a: string = z.string().parse(state.seat.A?.address);
     const worktree: string = z.string().parse(state.worktree);
     writeFileSync(resolve(worktree, 'change'), 'fix\n');
     await command(['git', 'add', 'change'], worktree);
     await command(['git', 'commit', '-m', 'change'], worktree);
+    await quiet(f, a);
     saveState(path, { ...state, phase: 'merge', prompted: {} });
-    const db0: Database = database(f);
-    saveDatabase(f, { ...db0, panes: db0.panes.map((p) => ({ ...p, agent: 'fake', agent_status: 'idle' })) });
     expect((await next(f, ['post-repair'])).code).toBe(0);
     seatOwned(path);
     expect((await next(f, ['post-repair'])).code).toBe(0);
-    expect(database(f).prompts.at(-1)).toEqual({
-      pane: state.pane.B!,
-      text: mergeText(path),
-    });
-    saveState(path, { ...readState(path), phase: 'check.fix', prompted: {} });
-    saveDatabase(f, { ...database(f), panes: database(f).panes.map((p) => ({ ...p, agent_status: 'idle' })) });
-    expect((await next(f, ['post-repair'])).code).toBe(0);
-    expect(database(f).prompts.at(-1)).toEqual({
-      pane: state.pane.A!,
-      text: `implement-issue post-repair slot=A phase=check.fix leaf=${path}`,
-    });
-    saveState(path, { ...readState(path), phase: 'check.review', fix_rounds: 1, prompted: {} });
-    saveDatabase(f, { ...database(f), panes: database(f).panes.map((p) => ({ ...p, agent_status: 'idle' })) });
-    expect((await next(f, ['post-repair'])).code).toBe(0);
-    expect(database(f).prompts.at(-1)).toEqual({
-      pane: state.pane.B!,
-      text: `check-issue post-repair slot=B phase=check.review leaf=${path}`,
-    });
-    saveState(path, { ...readState(path), phase: 'check.repair', prompted: {} });
-    saveDatabase(f, { ...database(f), panes: database(f).panes.map((p) => ({ ...p, agent_status: 'idle' })) });
-    expect((await next(f, ['post-repair'])).code).toBe(0);
-    expect(database(f).prompts.at(-1)).toEqual({
-      pane: state.pane.B!,
-      text: `check-issue post-repair slot=B phase=check.repair leaf=${path}`,
-    });
-    expect(
-      database(f)
-        .prompts.slice(1)
-        .map((prompt) => prompt.pane),
-    ).toEqual([state.pane.B!, state.pane.A!, state.pane.B!, state.pane.B!]);
+    const b: string = z.string().parse(readState(path).seat.B?.address);
+    expect(f.core.tasks(b)).toEqual([mergeText(path)]);
+    const move = async (phase: string, extra: object = {}): Promise<void> => {
+      await quiet(f, a);
+      await quiet(f, b);
+      saveState(path, { ...readState(path), phase, ...extra, prompted: {} });
+      expect((await next(f, ['post-repair'])).code).toBe(0);
+    };
+    await move('check.fix');
+    expect(f.core.tasks(a).at(-1)).toBe(`implement-issue post-repair slot=A phase=check.fix leaf=${path}`);
+    await move('check.review', { fix_rounds: 1 });
+    expect(f.core.tasks(b).at(-1)).toBe(`check-issue post-repair slot=B phase=check.review leaf=${path}`);
+    await move('check.repair');
+    expect(f.core.tasks(b).at(-1)).toBe(`check-issue post-repair slot=B phase=check.repair leaf=${path}`);
+    expect(f.core.tasks(a)).toHaveLength(2);
+    expect(f.core.tasks(b)).toHaveLength(3);
+    expect(readState(path).seat.A?.address).toBe(a);
+    expect(readState(path).seat.B?.address).toBe(b);
   } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('two-seat review refreshes pane and tab lists after the first seat starts or receives a prompt', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    const path: string = leaf(f, 'two-seats', 'check.review');
-    expect((await next(f, ['two-seats'])).code).toBe(0);
-    const state: State = readState(path);
-    for (const agent of [null, 'fake'] as const) {
-      resetPrompts(f, path);
-      const db: Database = database(f);
-      saveDatabase(f, {
-        ...db,
-        panes: db.panes.map((pane) =>
-          pane.pane_id === state.pane.A
-            ? { ...pane, agent, agent_session: agent === null ? null : pane.agent_session }
-            : pane,
-        ),
-      });
-      const before: number = calls(f).length;
-      expect((await next(f, ['two-seats'])).code).toBe(0);
-      const invoked: string[][] = calls(f).slice(before);
-      const prompts: number[] = invoked.flatMap((args, index) =>
-        args[0] === 'agent' && args[1] === 'prompt' ? [index] : [],
-      );
-      expect(prompts.map((index) => invoked[index][2])).toEqual([state.pane.A!, state.pane.B!]);
-      const between: string[][] = invoked.slice(prompts[0] + 1, prompts[1]);
-      expect(between.filter((args) => args[0] === 'pane' && args[1] === 'list')).toHaveLength(1);
-      expect(between.filter((args) => args[0] === 'tab' && args[1] === 'list')).toHaveLength(1);
-      const starts: number[] = invoked.flatMap((args, index) =>
-        args[0] === 'agent' && args[1] === 'start' ? [index] : [],
-      );
-      expect(starts).toHaveLength(agent === null ? 1 : 0);
-      if (agent === null)
-        expect(invoked.slice(starts[0] + 1, prompts[0]).some((args) => args[0] === 'pane' && args[1] === 'get')).toBe(
-          true,
-        );
-    }
-  } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
