@@ -1,48 +1,32 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, leaf, fakeHerdr, storeDir, type Fixture } from './helpers';
+import { cli, leaf, storeDir } from './helpers';
+import { hcFixture, type HcFixture, type Terminal } from './hc-fixture';
 import { readState, saveState } from '../src/state';
 import { command, type Result } from '../src/shell';
 import { z } from 'zod';
-import type { Database } from './fake-herdr';
 
-type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
-async function dispatchFixture(): Promise<DispatchFixture> {
-  const f: Fixture = await fixture();
-  return { ...f, ...fakeHerdr(f) };
-}
-function database(f: DispatchFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
-}
-function saveDatabase(f: DispatchFixture, db: Database): void {
-  writeFileSync(f.db, JSON.stringify(db));
-}
-async function next(
-  f: DispatchFixture,
-  args: string[],
-  env: NodeJS.ProcessEnv = {},
-  cwd: string = f.root,
-): Promise<Result> {
+async function next(f: HcFixture, args: string[], env: NodeJS.ProcessEnv = {}, cwd: string = f.root): Promise<Result> {
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
-async function status(f: DispatchFixture, slug: string): Promise<Result> {
+async function status(f: HcFixture, slug: string): Promise<Result> {
   return cli(f, ['status', slug], f.root, f.env);
 }
-function closeTab(f: DispatchFixture, tab: string): void {
-  const db: Database = database(f);
-  saveDatabase(f, {
-    ...db,
-    tabs: db.tabs.filter((item) => item.tab_id !== tab),
-    panes: db.panes.filter((pane) => pane.tab_id !== tab),
-  });
+// The leaf's tab is gone once no terminal holds it: its seat terminals are killed and removed.
+async function closeTab(f: HcFixture, slug: string): Promise<void> {
+  for (const t of await f.core.terminals({ 'akrogon.leaf': slug }, true)) {
+    expect((await f.core.hc(['kill', t.address])).code).toBe(0);
+    expect((await f.core.hc(['rm', t.address])).code).toBe(0);
+  }
+  expect(await f.core.terminals({ 'akrogon.leaf': slug }, true)).toEqual([] as Terminal[]);
 }
-async function dispatchLeaf(f: DispatchFixture, slug: string, extra: object = {}): Promise<string> {
+async function dispatchLeaf(f: HcFixture, slug: string, extra: object = {}): Promise<string> {
   const path: string = leaf(f, slug, 'plan.synthesis', extra);
   expect((await next(f, [slug])).code).toBe(0);
   return path;
 }
-function report(f: DispatchFixture): { kept: { path: string; reason: string }[]; removed: unknown[] } {
+function report(f: HcFixture): { kept: { path: string; reason: string }[]; removed: unknown[] } {
   return z
     .object({
       kept: z.array(z.object({ path: z.string(), reason: z.string() })),
@@ -52,11 +36,11 @@ function report(f: DispatchFixture): { kept: { path: string; reason: string }[];
 }
 
 // DC1: a registered worktree named neither a leaf slug nor a scratch kind stays
-// through a sweep pass and through a tab_closed pass, listed as unmanaged.
+// through a sweep pass and through the automatic pass after its tab closes, listed as unmanaged.
 test('registered worktrees that are no leaf or scratch kind stay through both pass kinds', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
-    const path: string = await dispatchLeaf(f, 'keeper');
+    await dispatchLeaf(f, 'keeper');
     const manual: string = resolve(storeDir(f), 'manual-copy');
     const legacy: string = resolve(f.root, 'issues/worktrees/legacy-copy');
     mkdirSync(resolve(f.root, 'issues/worktrees'), { recursive: true });
@@ -72,22 +56,15 @@ test('registered worktrees that are no leaf or scratch kind stay through both pa
     expect(leftovers.stdout).toContain('unmanaged worktree');
     expect(leftovers.stdout).toContain('manual-copy');
     expect(leftovers.stdout).toContain('legacy-copy');
-    // The tab_closed hook runs reconcile on the owner's repo; unmanaged names stay.
-    const tab: string = readState(path).tab!;
-    closeTab(f, tab);
-    const closed: Result = await next(f, [], {
-      HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
-        event: 'tab_closed',
-        data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' },
-      }),
-      HERDR_SOCKET_PATH: `${f.db}-default.sock`,
-    });
+    // The automatic pass after the tab closes (the listener's wake) reconciles the repo; unmanaged names stay.
+    await closeTab(f, 'keeper');
+    const closed: Result = await next(f, ['--wake']);
     expect(closed.code).toBe(0);
     expect(existsSync(manual)).toBe(true);
     expect(existsSync(legacy)).toBe(true);
     expect((await status(f, 'keeper')).stdout).toContain(`Kept: ${manual} — unmanaged worktree`);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -95,7 +72,7 @@ test('registered worktrees that are no leaf or scratch kind stay through both pa
 // a merged leaf's worker copy and the merged leaf's own worktree all stay,
 // each reported with its lock reason; unlocked scratch kinds are swept again.
 test('locked worktrees stay whatever their name and report the lock reason', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     await dispatchLeaf(f, 'keep-holder');
     const path: string = await dispatchLeaf(f, 'merged-keeper');
@@ -111,7 +88,7 @@ test('locked worktrees stay whatever their name and report the lock reason', asy
     await command(['git', 'worktree', 'lock', '--reason', 'held batch', batch], f.root);
     await command(['git', 'worktree', 'lock', '--reason', 'held copy', nonKind], f.root);
     await command(['git', 'worktree', 'lock', '--reason', 'held leaf', lockedOwn], f.root);
-    closeTab(f, readState(path).tab!);
+    await closeTab(f, readState(path).slug);
     saveState(path, { ...readState(path), phase: 'merged' });
     expect((await next(f, ['--all'])).code).toBe(0);
     for (const wt of [worker, verify, batch, nonKind, lockedOwn]) expect(existsSync(wt)).toBe(true);
@@ -130,7 +107,7 @@ test('locked worktrees stay whatever their name and report the lock reason', asy
     expect(existsSync(lockedOwn)).toBe(true);
     expect(existsSync(nonKind)).toBe(true);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -138,7 +115,7 @@ test('locked worktrees stay whatever their name and report the lock reason', asy
 // branch, head and rule; a pass that removed none writes an empty list, and a
 // report written before `removed` existed still reads.
 test('the reconcile report records removed worktrees and still reads pre-change reports', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = await dispatchLeaf(f, 'report-leaf');
     const worktree: string = readState(path).worktree!;
@@ -163,7 +140,7 @@ test('the reconcile report records removed worktrees and still reads pre-change 
         end: new Date().toISOString(),
       }) + '\n',
     );
-    closeTab(f, readState(path).tab!);
+    await closeTab(f, readState(path).slug);
     saveState(path, { ...readState(path), phase: 'merged' });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worktree)).toBe(false);
@@ -182,6 +159,6 @@ test('the reconcile report records removed worktrees and still reads pre-change 
     const out: Result = await status(f, 'calm-leaf');
     expect(out.stdout).toContain('Kept: /pre-change — old report');
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
