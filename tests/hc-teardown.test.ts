@@ -40,11 +40,12 @@ for (const window of ['open', 'closed'] as const)
     const { f, core, path } = await setup(slug, 'closed');
     try {
       expect(await leafTerminals(core, slug)).toHaveLength(1);
+      // Read before the pass: completing the merged leaf moves its folder to issues/closed.
+      const tab: string = z.string().parse(readState(path).tab);
       merge(path);
       core.setWindow(window);
       expect((await cli(f, ['next', '--resume'], f.root, core.env)).code).toBe(0);
       expect(await leafTerminals(core, slug)).toEqual([]);
-      const tab: string = z.string().parse(readState(path).tab);
       const closes: string[][] = core
         .appCalls()
         .map((call) => call.argv)
