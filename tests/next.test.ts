@@ -40,7 +40,16 @@ import { parseEnv } from 'node:util';
 import { command, run, type Result, spawnCaptured } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import type { Database } from './fake-herdr';
-import { delivered, hcCore, hcFixture, setPrefixes, type HcCore, type HcFixture, type Terminal } from './hc-fixture';
+import {
+  adopt,
+  delivered,
+  hcCore,
+  hcFixture,
+  setPrefixes,
+  type HcCore,
+  type HcFixture,
+  type Terminal,
+} from './hc-fixture';
 import { z } from 'zod';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
@@ -879,7 +888,7 @@ test('seat names support identical repo-local slugs and long numeric-leading slu
 }, 15000);
 
 test('next awaits sourced completion after a failed rename before removing the worktree', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     const path: string = leaf(f, 'rename', 'plan.synthesis');
     expect((await next(f, ['rename'])).code).toBe(0);
@@ -911,8 +920,6 @@ test('next awaits sourced completion after a failed rename before removing the w
         },
       ]),
     );
-    const db: Database = database(f);
-    saveDatabase(f, { ...db, panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) });
     const recovered: Result = await next(f, ['rename']);
     expect(recovered).toMatchObject({ code: 0 });
     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
@@ -926,9 +933,9 @@ test('next awaits sourced completion after a failed rename before removing the w
     expect(existsSync(worktree)).toBe(false);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worktree)).toBe(false);
-    expect(database(f).tabs).toHaveLength(0);
+    expect(await liveTabs(f)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -990,34 +997,40 @@ function resetPrompts(f: DispatchFixture, path: string): void {
   saveDatabase(f, { ...db, prompts: [], panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) });
 }
 
-for (const mode of ['startup', 'hook', 'cwd'] as const) {
+// Lets an allocated seat finish its turn and clears the delivery record, so the next pass prompts it again.
+async function rePromptable(f: HcFixture, path: string): Promise<void> {
+  await seatIdle(f, z.string().parse(readState(path).seat.A?.address), 1);
+  saveState(path, { ...readState(path), prompted: {} });
+}
+
+for (const mode of ['startup', 'cwd'] as const) {
   test(`missing registration is isolated during ${mode}`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await coreFixture();
     try {
       const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
       expect((await next(f, ['healthy'])).code).toBe(0);
-      resetPrompts(f, healthy);
+      await rePromptable(f, healthy);
       const missing: string = resolve(f.home, 'deleted');
       configure(f, { repos: { missing, repo: f.root } });
       const result: Result = await next(
         f,
         mode === 'startup' ? ['--all'] : [],
-        mode === 'hook' ? paneEvent(f, readState(healthy).pane.A!, 'idle') : {},
+        {},
         mode === 'startup' ? f.home : f.root,
       );
       expect(result.code).toBe(1);
       expect(skips(result)).toHaveLength(1);
       expect(skips(result)[0]).toMatchObject({ repo: 'missing', path: missing });
       expect(skips(result)[0].error).toContain('ENOENT');
-      expect(database(f).prompts).toHaveLength(1);
+      expect(await allTasks(f)).toHaveLength(2);
     } finally {
-      f.clean();
+      await f.clean();
     }
   }, 15000);
 }
 
 test('missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     leaf(f, 'broken', 'plan.synthesis', { 'blocked-by': ['nonexistent'] });
     leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['healthy'] });
@@ -1027,21 +1040,21 @@ test('missing dependencies skip their leaf while readable unmet dependencies wai
     expect(skips(result).map((s) => s.slug)).toEqual(['broken']);
     expect(skips(result)[0].error).toContain('nonexistent');
     expect(waits(result)).toEqual(['waiting: waiting on healthy (plan.synthesis)']);
-    expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
+    expect((await allTasks(f)).map((task) => task.text)).toEqual([
       `plan-issue healthy slot=A phase=plan.synthesis leaf=${f.root}/issues/open/issue/healthy`,
     ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 for (const capacity of [3, 4]) {
   test(`bad YAML and invalid states reserve occupancy at capacity ${capacity}`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await coreFixture();
     try {
       const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
       expect((await next(f, ['healthy'])).code).toBe(0);
-      resetPrompts(f, healthy);
+      await rePromptable(f, healthy);
       const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
       writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
       const invalid: string = leaf(f, 'invalid', 'not-a-phase');
@@ -1054,52 +1067,46 @@ for (const capacity of [3, 4]) {
           .map((skip) => skip.path)
           .sort(),
       ).toEqual([invalid, malformed].sort());
-      expect(database(f).tabs).toHaveLength(capacity === 3 ? 1 : 2);
-      expect(database(f).prompts).toHaveLength(capacity === 3 ? 1 : 2);
+      expect(await liveTabs(f)).toHaveLength(capacity === 3 ? 1 : 2);
+      expect(await allTasks(f)).toHaveLength(capacity === 3 ? 2 : 3);
       if (capacity === 3) {
         configure(f, { max_active: 5 });
         expect((await next(f, ['new'])).code).toBe(1);
-        expect(database(f).tabs).toHaveLength(2);
+        expect(await liveTabs(f)).toHaveLength(2);
       }
     } finally {
-      f.clean();
+      await f.clean();
     }
   }, 15000);
 }
 
-test('dirty merged worktree is kept while its tab lives, then removed once clean', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('dirty merged worktree is kept after its tab closes, then removed once clean', async () => {
+  const f: HcFixture = await coreFixture();
   try {
     const dirty: string = leaf(f, 'dirty', 'plan.synthesis', {}, 'dirty-issue');
     expect((await next(f, ['dirty'])).code).toBe(0);
     const worktree: string = readState(dirty).worktree!;
-    const tab: string = readState(dirty).tab!;
     writeFileSync(resolve(worktree, 'untracked'), 'dirty');
     saveState(dirty, { ...readState(dirty), phase: 'merged' });
     leaf(f, 'healthy', 'plan.synthesis', {}, 'healthy-issue');
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
-    // The pass closed the merged tab; the worktree is kept while the close settles.
+    // The pass ended the merged leaf's seats; the dirty worktree is kept.
+    expect(await seatTerminals(f, 'dirty', true)).toEqual([]);
     expect(existsSync(worktree)).toBe(true);
-    expect(database(f).prompts.at(-1)?.text).toContain('healthy');
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      tabs: db.tabs.filter((item) => item.tab_id !== tab),
-      panes: db.panes.filter((pane) => pane.tab_id !== tab),
-    });
+    expect((await allTasks(f)).at(-1)?.text).toContain('healthy');
     rmSync(resolve(worktree, 'untracked'));
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(existsSync(worktree)).toBe(false);
     expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/dirty'], f.root)).code).toBe(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('bare next from inside the repo cleans up its merged leaves', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     const done: string = leaf(f, 'done', 'plan.synthesis', {}, 'done-issue');
     expect((await next(f, ['done'])).code).toBe(0);
@@ -1109,9 +1116,9 @@ test('bare next from inside the repo cleans up its merged leaves', async () => {
     const result: Result = await next(f, []);
     expect(result.code).toBe(0);
     expect(existsSync(worktree)).toBe(false);
-    expect(database(f).prompts.at(-1)?.text).toContain('healthy');
+    expect(await liveTabs(f)).toEqual(['healthy']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
@@ -1133,13 +1140,10 @@ for (const scope of ['global'] as const) {
   });
 }
 
-test('lock finalization failures and invalid hook events remain fatal', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('lock finalization failures remain fatal', async () => {
+  const f: HcFixture = await coreFixture();
   try {
     leaf(f, 'healthy', 'plan.synthesis');
-    const invalid: Result = await next(f, [], { HERDR_PLUGIN_EVENT_JSON: '{"event":"invalid"}' });
-    expect(invalid.code).not.toBe(0);
-    expect(database(f).prompts).toHaveLength(0);
     const flock: string = resolve(f.home, 'bin/flock');
     writeFileSync(flock, '#!/bin/sh\nprintf locked\ncat >/dev/null\nprintf "finalization failure" >&2\nexit 7\n', {
       mode: 0o755,
@@ -1148,15 +1152,15 @@ test('lock finalization failures and invalid hook events remain fatal', async ()
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('finalization failure');
     expect(result.stderr).not.toContain('"repo":"repo"');
-    expect(database(f).prompts).toHaveLength(1);
+    expect(await allTasks(f)).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 for (const invalid of ['duplicate', 'mismatch']) {
   test(`${invalid} leaf identity never dispatches an arbitrary leaf`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await coreFixture();
     try {
       const path: string = leaf(f, 'ambiguous', 'plan.synthesis', invalid === 'mismatch' ? { repo: 'wrong' } : {});
       if (invalid === 'duplicate') leaf(f, 'ambiguous', 'plan.synthesis', {}, 'second');
@@ -1174,22 +1178,23 @@ for (const invalid of ['duplicate', 'mismatch']) {
       } else {
         expect(skips(result).some((skip) => skip.path === path)).toBe(true);
       }
-      expect(database(f).prompts.every((prompt) => prompt.text.includes('healthy'))).toBe(true);
-      expect(database(f).prompts).toHaveLength(1);
+      const tasks = await allTasks(f);
+      expect(tasks.every((task) => task.text.includes('healthy'))).toBe(true);
+      expect(tasks).toHaveLength(1);
     } finally {
-      f.clean();
+      await f.clean();
     }
   });
 }
 
 test('next selection and sweep report both repo keys without dispatching or changing the mismatched leaf', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     const path: string = leaf(f, 'wrong-key', 'plan.synthesis', { repo: 'other' });
     const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
     const selected: Result = await next(f, ['wrong-key']);
     expect(selected.code).not.toBe(0);
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await allTasks(f)).toHaveLength(0);
     leaf(f, 'healthy', 'plan.synthesis');
     const sweep: Result = await next(f, ['--all']);
     expect(sweep.code).not.toBe(0);
@@ -1200,13 +1205,13 @@ test('next selection and sweep report both repo keys without dispatching or chan
       expect(diagnostic.count).toBe(1);
       expect(diagnostic.paths).toContainEqual({ path, stored: 'other' });
     }
-    expect(database(f).prompts.map((prompt) => prompt.text)).toEqual([
+    expect((await allTasks(f)).map((task) => task.text)).toEqual([
       `plan-issue healthy slot=A phase=plan.synthesis leaf=${f.root}/issues/open/issue/healthy`,
     ]);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
     expect(existsSync(resolve(storeDir(f), 'wrong-key'))).toBe(false);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -1233,8 +1238,8 @@ test('foreign leaves summarize once per repo with count and paths', async () => 
 }, 15000);
 
 test('foreign leaves do not consume capacity while healthy leaves in both repos dispatch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  const g: Fixture = await fixture();
+  const f: HcFixture = await coreFixture();
+  const g: HcFixture = await otherRepo(f);
   try {
     const foreign: string[] = [];
     for (let i: number = 0; i < 5; i++) foreign.push(leaf(f, `foreign-${i}`, 'plan.synthesis', { repo: 'other' }));
@@ -1246,13 +1251,10 @@ test('foreign leaves do not consume capacity while healthy leaves in both repos 
     expect(result.code).toBe(1);
     expect(skips(result)).toHaveLength(1);
     expect(skips(result)[0].count).toBe(5);
-    expect(database(f).prompts).toHaveLength(2);
-    expect(database(f).tabs).toHaveLength(2);
-    expect(
-      database(f)
-        .prompts.map((p) => p.text)
-        .sort(),
-    ).toEqual(
+    const tasks = [...(await allTasks(f)), ...(await allTasks(g))];
+    expect(tasks).toHaveLength(2);
+    expect([...(await liveTabs(f)), ...(await liveTabs(g))]).toHaveLength(2);
+    expect(tasks.map((task) => task.text).sort()).toEqual(
       [
         `plan-issue healthy slot=A phase=plan.synthesis leaf=${f.root}/issues/open/issue/healthy`,
         `plan-issue other-healthy slot=A phase=plan.synthesis leaf=${g.root}/issues/open/issue/other-healthy`,
@@ -1260,8 +1262,8 @@ test('foreign leaves do not consume capacity while healthy leaves in both repos 
     );
     foreign.forEach((p: string, i: number) => expect(readFileSync(resolve(p, 'state.yaml'), 'utf8')).toBe(before[i]));
   } finally {
-    f.clean();
-    g.clean();
+    await f.clean();
+    await g.clean();
   }
 }, 15000);
 
@@ -1292,7 +1294,7 @@ test('foreign slugs are missing for lookup and dispatch', async () => {
 }, 15000);
 
 test('unreadable leaves reserve capacity while foreign leaves summarize separately', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture();
   try {
     const healthy: string = leaf(f, 'healthy', 'plan.synthesis');
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
@@ -1311,21 +1313,21 @@ test('unreadable leaves reserve capacity while foreign leaves summarize separate
     expect(summary!.paths).toContainEqual({ path: fb, stored: 'other' });
     expect(skips(result).some((s) => s.path === malformed)).toBe(true);
     expect(readState(healthy).worktree).toBeDefined();
-    expect(database(f).prompts).toHaveLength(1);
-    expect(database(f).tabs).toHaveLength(1);
+    expect(await allTasks(f)).toHaveLength(1);
+    expect(await liveTabs(f)).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('merged foreign leaves survive cleanup with worktree branch and tab intact', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await coreFixture({ window: 'open' });
+  const stopAdopt: () => void = adopt(f.core);
   try {
     const open: string = leaf(f, 'survivor', 'plan.synthesis');
     expect((await next(f, ['survivor'])).code).toBe(0);
     const dispatched: State = readState(open);
     const worktree: string = z.string().parse(dispatched.worktree);
-    const tab: string = z.string().parse(dispatched.tab);
     saveState(open, { ...dispatched, repo: 'other', phase: 'merged' });
     mkdirSync(resolve(f.root, 'issues/closed/issue'), { recursive: true });
     const closed: string = resolve(f.root, 'issues/closed/issue/survivor');
@@ -1339,10 +1341,11 @@ test('merged foreign leaves survive cleanup with worktree branch and tab intact'
     expect(readFileSync(resolve(closed, 'state.yaml'), 'utf8')).toBe(before);
     expect(existsSync(worktree)).toBe(true);
     expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/survivor'], f.root)).code).toBe(0);
-    expect(database(f).tabs.some((t) => t.tab_id === tab)).toBe(true);
-    expect(calls(f).filter((args: string[]) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(0);
+    expect(await liveTabs(f)).toEqual(['survivor']);
+    expect(f.core.appCalls().filter((call) => call.argv[1] === 'tab.close')).toEqual([]);
   } finally {
-    f.clean();
+    stopAdopt();
+    await f.clean();
   }
 }, 15000);
 
