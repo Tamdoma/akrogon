@@ -45,7 +45,7 @@ test('window closed: the start returns with labels set and no rename; a later pa
     expect((await cli(f, ['seat', 'hw-closed', 'A'], f.root, core.env)).code).toBe(0);
     expect(core.appCalls().map((call) => call.argv)).toEqual([['ls']]);
     const seats: Terminal[] = await core.terminals({ 'akrogon.leaf': 'hw-closed' }, false);
-    expect(seats.map((t: Terminal) => t.labels['herdr.tab'])).toEqual([readState(path).tab]);
+    expect(seats.map((t: Terminal) => t.labels['herdr.tab'])).toEqual([z.string().parse(readState(path).tab)]);
     saveState(path, {
       ...readState(path),
       phase: 'failed',
