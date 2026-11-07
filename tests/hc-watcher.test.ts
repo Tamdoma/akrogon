@@ -2,7 +2,7 @@
 // flight per repo, nothing without one, and two live matches reported. The watcher is a stand-in;
 // its task log is the record of wakes.
 import { test, expect } from 'bun:test';
-import { chmodSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, entry, fixture, killTree, leaf, type Fixture } from './helpers';
@@ -36,10 +36,15 @@ async function teardown(f: Fixture, core: HcCore, slug: string): Promise<void> {
   f.clean();
 }
 
+// The listener's passes run `akrogon` from PATH; this one is the checkout under test, never an installed release.
 function listen(f: Fixture, core: HcCore): Bun.Subprocess {
+  const bin: string = resolve(f.home, 'listener-bin');
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(resolve(bin, 'akrogon'), `#!/bin/sh\nexec '${process.execPath}' '${entry}' "$@"\n`);
+  chmodSync(resolve(bin, 'akrogon'), 0o755);
   return Bun.spawn([process.execPath, entry, 'listen'], {
     cwd: f.home,
-    env: { ...process.env, AKROGON_HOME: f.home, HOME: f.home, ...core.env },
+    env: { ...process.env, AKROGON_HOME: f.home, HOME: f.home, ...core.env, PATH: `${bin}:${core.env.PATH}` },
     stdout: 'ignore',
     stderr: 'ignore',
   });
