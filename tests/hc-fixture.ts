@@ -9,7 +9,7 @@ import { connect } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
-import { fakeHerdr, type Fixture } from './helpers';
+import { fakeHerdr, fixture, type Fixture } from './helpers';
 import './isolation';
 
 const uid: number = process.getuid!();
@@ -350,6 +350,38 @@ export async function hcCore(
     if (written.version < 1) throw new Error(`doc.set returned version ${written.version}`);
   }
   return core;
+}
+
+export type HcFixture = Omit<Fixture, 'clean'> & { core: HcCore; env: NodeJS.ProcessEnv; clean: () => Promise<void> };
+
+// Engine tests on one fixture core: both seats run the stand-in in `mode` under prefix `rp`; clean
+// stops the core, which ends every seat and so empties its leaf slice, before removing the fixture.
+export async function hcFixture(opts: { mode?: string; window?: 'open' | 'closed' } = {}): Promise<HcFixture> {
+  const f: Fixture = await fixture();
+  setPrefixes(f, { repo: 'rp' });
+  setSeat(f, 'a', 'fake', opts.mode ?? 'work');
+  setSeat(f, 'b', 'fake', opts.mode ?? 'work');
+  const core: HcCore = await hcCore(f, { window: opts.window });
+  return {
+    ...f,
+    core,
+    env: core.env,
+    clean: async (): Promise<void> => {
+      await core.stop();
+      f.clean();
+    },
+  };
+}
+
+// The tasks each seat terminal of a leaf received, finished terminals included, in terminal order.
+export async function delivered(
+  f: HcFixture,
+  slug: string,
+): Promise<{ seat: string; address: string; text: string }[]> {
+  const seats: Terminal[] = await f.core.terminals({ 'akrogon.leaf': slug }, true);
+  return seats.flatMap((t: Terminal) =>
+    f.core.tasks(t.address).map((text: string) => ({ seat: t.labels['akrogon.seat'], address: t.address, text })),
+  );
 }
 
 // Emulates herdr-app's adoption for fake-window tests: each labelled terminal is put into the
