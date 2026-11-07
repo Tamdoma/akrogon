@@ -9,7 +9,7 @@ import { connect } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
-import { fakeHerdr, fixture, type Fixture } from './helpers';
+import { fakeHerdr, fixture, type Fixture, type SystemctlFixture } from './helpers';
 import './isolation';
 
 const uid: number = process.getuid!();
@@ -352,20 +352,40 @@ export async function hcCore(
   return core;
 }
 
-export type HcFixture = Omit<Fixture, 'clean'> & { core: HcCore; env: NodeJS.ProcessEnv; clean: () => Promise<void> };
+export type HcFixture = Omit<Fixture, 'clean'> & {
+  core: HcCore;
+  systemctl: SystemctlFixture;
+  env: NodeJS.ProcessEnv;
+  clean: () => Promise<void>;
+};
 
 // Engine tests on one fixture core: both seats run the stand-in in `mode` under prefix `rp`; clean
 // stops the core, which ends every seat and so empties its leaf slice, before removing the fixture.
+// akrogon's systemctl is the fake: a leaf slice is named from repo and slug only, so a real stop
+// from reconcile or `stop` would end the seats of a concurrent case with the same slug. It sits in
+// its own folder after the fixture's bin/, so a test's own bin/systemctl stub wins and never
+// writes through to the shared fake.
 export async function hcFixture(opts: { mode?: string; window?: 'open' | 'closed' } = {}): Promise<HcFixture> {
   const f: Fixture = await fixture();
   setPrefixes(f, { repo: 'rp' });
   setSeat(f, 'a', 'fake', opts.mode ?? 'work');
   setSeat(f, 'b', 'fake', opts.mode ?? 'work');
+  const bin: string = resolve(f.home, 'bin');
+  const units: string = resolve(f.home, 'systemctl-bin');
+  mkdirSync(units);
+  symlinkSync(resolve(import.meta.dir, 'fake-systemctl.ts'), resolve(units, 'systemctl'));
+  const db: string = resolve(f.home, 'systemctl.json');
+  const log: string = resolve(f.home, 'systemctl.log');
+  writeFileSync(db, JSON.stringify({ units: [] }));
+  const systemctl: SystemctlFixture = { db, log, env: { FAKE_SYSTEMCTL_DB: db, FAKE_SYSTEMCTL_LOG: log } };
   const core: HcCore = await hcCore(f, { window: opts.window });
+  // core.env.PATH is `<hc shim>:<fixture bin>:...`.
+  const path: string = z.string().parse(core.env.PATH);
   return {
     ...f,
     core,
-    env: core.env,
+    systemctl,
+    env: { ...core.env, ...systemctl.env, PATH: path.replace(`:${bin}:`, `:${bin}:${units}:`) },
     clean: async (): Promise<void> => {
       await core.stop();
       f.clean();
