@@ -133,8 +133,10 @@ test('a working seat gets no send; a send that never starts is recorded, not res
     await core.waitFor(address, idleAfter(error.turn + 1));
     expect((await cli(f, ['next', 'hd-send'], f.root, core.env)).code).toBe(0);
     const settled = readState(path);
-    expect(settled.delivery_error.A).toBeUndefined();
-    expect(settled.prompted.A).toMatchObject({ address });
+    // The late turn counts as the delivered prompt (D13 step 3); it ended without a report, so the same
+    // pass prompts the new idle turn once (step 6), which the idle stand-in again never starts.
+    expect(settled.prompted.A).toMatchObject({ turn: error.turn, address });
+    expect(settled.delivery_error.A).toMatchObject({ code: 'not_started', turn: error.turn + 1, address });
   } finally {
     await teardown(f, core, 'hd-send');
   }
