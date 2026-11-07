@@ -7,6 +7,7 @@ import {
   globalHome,
   parseRepoConfig,
   readGlobal,
+  repoPrefix,
   seats,
   worktreeStore,
 } from './config';
@@ -52,6 +53,7 @@ export async function initialize(
     throw error;
   }
   const global: GlobalConfig = readGlobal();
+  for (const name of Object.keys(global.prefixes ?? {})) repoPrefix(global, name);
   const toolkitPair: RegExpMatchArray | null = toolkit === undefined ? null : toolkit.match(/^([^=\s]+)=(.+)$/);
   if (toolkit !== undefined && toolkitPair === null) throw new Error('Expected --toolkit <lang>=<runner>');
   if (Object.hasOwn(global.repos, repoName) && resolve(globalHome(), global.repos[repoName]) !== root)

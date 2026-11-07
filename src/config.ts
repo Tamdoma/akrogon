@@ -221,6 +221,19 @@ export function readGlobal(): GlobalConfig {
   }
 }
 
+// Seat and consultant names start with the repo's prefix, so a prefix held by two repos is refused.
+export function repoPrefix(global: GlobalConfig, repoName: string): string {
+  const prefixes: Record<string, string> | undefined = global.prefixes;
+  if (prefixes === undefined || !Object.hasOwn(prefixes, repoName))
+    throw new Error(`No prefix for repo ${repoName}: add it under prefixes in ${resolve(globalHome(), 'config.yaml')}`);
+  const prefix: string = prefixes[repoName];
+  const other: string | undefined = Object.keys(prefixes).find(
+    (name: string) => name !== repoName && prefixes[name] === prefix,
+  );
+  if (other !== undefined) throw new Error(`prefixes: repos ${repoName} and ${other} both hold prefix ${prefix}`);
+  return prefix;
+}
+
 type Yaml = ReturnType<typeof Bun.YAML.parse>;
 
 // Retired keys stay in old files; dropping them here keeps the strict schema refusing every other unknown key.
