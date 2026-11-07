@@ -1,32 +1,13 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  fixture,
-  cli,
-  fakeHerdr,
-  fakeAkrogon,
-  leaf,
-  storeDir,
-  yaml,
-  type Fixture,
-  verified,
-  seatOwned,
-} from './helpers';
+import { cli, fakeAkrogon, leaf, storeDir, yaml, type Fixture, verified, seatOwned } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, type Result } from '../src/shell';
-import type { Database } from './fake-herdr';
+import { delivered, hcFixture, type HcFixture } from './hc-fixture';
 
 type Event = { kind: string; slug?: string; [key: string]: unknown };
 
-type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
-async function dispatchFixture(): Promise<DispatchFixture> {
-  const f: Fixture = await fixture();
-  return { ...f, ...fakeHerdr(f) };
-}
-function database(f: DispatchFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
-}
 function timings(f: Fixture): Event[] {
   const path: string = resolve(f.root, 'issues/timings.jsonl');
   if (!existsSync(path)) return [];
@@ -42,53 +23,54 @@ function leafEvents(f: Fixture, slug: string): Event[] {
 function ofKind(events: Event[], kind: string): Event[] {
   return events.filter((event) => event.kind === kind);
 }
-async function next(f: DispatchFixture, args: string[]): Promise<Result> {
+async function next(f: HcFixture, args: string[]): Promise<Result> {
   return cli(f, ['next', ...args], f.root, f.env);
 }
-async function phase(f: DispatchFixture, args: string[]): Promise<Result> {
+async function phase(f: HcFixture, args: string[]): Promise<Result> {
   return cli(f, ['phase', ...args], f.root, f.env);
 }
-async function commitFile(f: DispatchFixture, path: string, name: string): Promise<void> {
+async function commitFile(f: HcFixture, path: string, name: string): Promise<void> {
   const worktree: string = readState(path).worktree!;
   writeFileSync(resolve(worktree, name), `${name}\n`);
   await command(['git', 'add', name], worktree);
   await command(['git', 'commit', '-m', name], worktree);
 }
-function idleAll(f: DispatchFixture): void {
-  const db: Database = database(f);
-  writeFileSync(f.db, JSON.stringify({ ...db, panes: db.panes.map((pane) => ({ ...pane, agent_status: 'idle' })) }));
+// Waits until every live seat of the leaf has finished its turn, so the next pass can deliver.
+async function idleAll(f: HcFixture, slug: string): Promise<void> {
+  for (const seat of await f.core.terminals({ 'akrogon.leaf': slug }, false))
+    await f.core.waitFor(seat.address, (t) => t.status?.state === 'idle');
 }
 function warnings(result: Result): string[] {
   return result.stderr.split('\n').filter((line) => line.includes('timing append failed'));
 }
 
 test('visit events: a leaf driven to merged records every visit, prompt, seat_done and batch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'solo', 'plan.synthesis');
     expect((await next(f, ['solo'])).code).toBe(0);
     await commitFile(f, path, 'app.ts');
     expect((await phase(f, ['solo', 'implement', '--slot', 'A'])).code).toBe(0);
-    idleAll(f);
+    await idleAll(f, 'solo');
     expect((await next(f, ['solo'])).code).toBe(0);
     await verified(f, 'solo', 'leaf');
     expect((await phase(f, ['solo', 'check.review', '--slot', 'A'])).code).toBe(0);
-    idleAll(f);
+    await idleAll(f, 'solo');
     expect((await next(f, ['solo'])).code).toBe(0);
     await commitFile(f, path, 'app2.ts');
     expect((await phase(f, ['solo', 'merge', '--slot', 'A', '--verdict', 'fix'])).stdout).toBe('recorded');
     expect((await phase(f, ['solo', 'check.repair', '--slot', 'B', '--verdict', 'fix'])).code).toBe(0);
-    idleAll(f);
+    await idleAll(f, 'solo');
     expect((await next(f, ['solo'])).code).toBe(0);
     expect((await phase(f, ['solo', 'check.fix', '--slot', 'B'])).code).toBe(0);
-    idleAll(f);
+    await idleAll(f, 'solo');
     expect((await next(f, ['solo'])).code).toBe(0);
     await verified(f, 'solo', 'leaf');
     expect((await phase(f, ['solo', 'check.review', '--slot', 'A'])).code).toBe(0);
-    idleAll(f);
+    await idleAll(f, 'solo');
     expect((await next(f, ['solo'])).code).toBe(0);
     expect((await phase(f, ['solo', 'merge', '--slot', 'B', '--verdict', 'ready'])).code).toBe(0);
-    idleAll(f);
+    await idleAll(f, 'solo');
     expect((await next(f, ['solo'])).code).toBe(0);
     seatOwned(path);
     expect((await next(f, ['solo'])).code).toBe(0);
@@ -125,7 +107,9 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
     expect(delivered).toContainEqual(['B', 'merge', 0]);
     const mergePrompt: Event | undefined = prompts.find((p) => p.phase === 'merge' && p.outcome === 'delivered');
     expect(mergePrompt?.attempt).toBe(attempt);
-    expect(prompts.every((p) => typeof p.session === 'string')).toBe(true);
+    // The stand-in harness writes no transcript, so the resolver records null; the kinds tier
+    // (tests/e2e/kinds.e2e.ts) covers resolved transcripts of real harnesses.
+    expect(prompts.every((p) => Object.hasOwn(p, 'session') && p.session === null)).toBe(true);
 
     const seatDone: Event[] = ofKind(events, 'seat_done');
     expect(seatDone).toHaveLength(1);
@@ -137,12 +121,12 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
     expect(batches[0]).not.toHaveProperty('members');
     expect(typeof batches[0].built_on).toBe('string');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
 test('check events: scope, ordering, exit and duration; killed and worker and verify runs', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'chks', 'implement');
     expect((await next(f, ['chks'])).code).toBe(0);
@@ -186,12 +170,12 @@ test('check events: scope, ordering, exit and duration; killed and worker and ve
     expect(verifyStart).toMatchObject({ scope: 'leaf', phase: 'implement' });
     expect(verifyEnd).toMatchObject({ scope: 'leaf', exit: 0 });
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
 test('check events carry the merge attempt id inside a merge attempt', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'att', 'implement');
     expect((await next(f, ['att'])).code).toBe(0);
@@ -217,12 +201,12 @@ test('check events carry the merge attempt id inside a merge attempt', async () 
     expect(start).toMatchObject({ attempt: 'att-9', phase: 'merge' });
     expect(end).toMatchObject({ attempt: 'att-9' });
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
 
 test('waits: pause writes repo_pause on and off; parked, prerequisite and merge waits open and close once', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     expect((await cli(f, ['pause'], f.root, f.env)).code).toBe(0);
     expect((await cli(f, ['unpause'], f.root, f.env)).code).toBe(0);
@@ -282,24 +266,28 @@ test('waits: pause writes repo_pause on and off; parked, prerequisite and merge 
     expect(m2All.at(-1)).toMatchObject({ reason: 'merge_turn' });
     expect(leafEvents(f, 'm2').findLast((e) => e.kind === 'wait' || e.kind === 'prompt')?.kind).toBe('prompt');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 60000);
 
 test('unwritable timings: prompts, checks and moves complete with one warning per append', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     mkdirSync(resolve(f.root, 'issues/timings.jsonl'));
     const path: string = leaf(f, 'unw', 'plan.synthesis');
     const dispatched: Result = await next(f, ['unw']);
     expect(dispatched.code).toBe(0);
-    expect(database(f).prompts.some((p) => p.text.startsWith('plan-issue unw '))).toBe(true);
+    expect((await delivered(f, 'unw')).some((p) => p.text.startsWith('plan-issue unw '))).toBe(true);
     expect(warnings(dispatched).length).toBeGreaterThanOrEqual(1);
 
+    await idleAll(f, 'unw');
     const moved: Result = await phase(f, ['unw', 'implement', '--slot', 'A']);
     expect(moved.code).toBe(0);
     expect(moved.stdout).toContain('moved implement');
-    expect(warnings(moved)).toHaveLength(1);
+    // The move runs its own-leaf pass (plan D14), which prompts the idle seat: one warning each for
+    // the move's visit_start, the pass's visit_start (the unreadable file reads as empty) and the prompt.
+    expect(warnings(moved)).toHaveLength(3);
+    expect((await delivered(f, 'unw')).some((p) => p.text.startsWith('implement-issue unw '))).toBe(true);
     expect(readState(path).phase).toBe('implement');
 
     const check: Result = await cli(
@@ -311,12 +299,12 @@ test('unwritable timings: prompts, checks and moves complete with one warning pe
     expect(check.code).toBe(5);
     expect(warnings(check)).toHaveLength(2);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
 
 test('wait ends when an operator removes a prerequisite and a picked leaf has missing inputs', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'dep', 'plan.synthesis');
     const path: string = leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['dep'] });
@@ -345,12 +333,12 @@ test('wait ends when an operator removes a prerequisite and a picked leaf has mi
     expect(blocked.stderr).toContain('Leaf inputs are missing');
     expect(ofKind(leafEvents(f, 'waiting'), 'wait').map((event) => event.reason)).toEqual(['prerequisite', 'none']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
 
 test('repo pause event is persisted before its state lock is released', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     writeFileSync(
       resolve(f.home, 'bin/flock'),
@@ -367,6 +355,6 @@ test('repo pause event is persisted before its state lock is released', async ()
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ kind: 'repo_pause', repo: 'repo', pause: 'on' });
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 30000);
