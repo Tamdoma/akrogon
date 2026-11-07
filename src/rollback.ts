@@ -25,6 +25,8 @@ export async function rollback(): Promise<void> {
     if (record === null || record.previous === null || !existsSync(resolve(releasesDir(), record.previous)))
       throw new Error('Cannot roll back: no previous release to roll back to');
     const previous: string = record.previous;
+    if (existsSync(resolve(releasesDir(), previous, 'plugin')))
+      throw new Error('Cannot roll back: previous release runs on old herdr; fix forward');
     const old: string | null = currentReleaseCommit();
     if (old === null) throw new Error('Cannot roll back: current is not a release');
     flip(previous);
