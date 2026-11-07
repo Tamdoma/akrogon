@@ -50,19 +50,29 @@ function passes(shim: Shim): string[] {
 }
 
 // Waits on file changes (fs.watch), never a timed re-read; the timer only bounds the wait.
+// Bun can drop the event of an append that follows another within about a millisecond, so each event
+// also re-checks shortly after it, and once right after the watch starts.
 function until(path: string, check: () => boolean, ms: number = 15_000): Promise<void> {
   return new Promise<void>((done, fail) => {
     if (check()) return done();
-    const watcher = watch(path, () => {
-      if (!check()) return;
+    let finished: boolean = false;
+    const settle = (): void => {
+      if (finished || !check()) return;
+      finished = true;
       clearTimeout(timer);
       watcher.close();
       done();
+    };
+    const watcher = watch(path, () => {
+      settle();
+      setTimeout(settle, 20);
     });
     const timer = setTimeout(() => {
+      finished = true;
       watcher.close();
       fail(new Error(`timed out waiting on ${path}: ${readFileSync(path, 'utf8')}`));
     }, ms);
+    settle();
   });
 }
 
