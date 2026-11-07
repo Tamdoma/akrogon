@@ -49,9 +49,16 @@ function expectRolledBack(
   }
 }
 
+// Releases built after engine-on-hc ship no plugin/; rollback refuses a previous release that does
+// (D22), so cases about rollback itself start from a plugin-less seed.
+async function dropPlugin(d: DeployFixture): Promise<void> {
+  await pushSeed(d, () => rmSync(resolve(d.seed, 'plugin'), { recursive: true, force: true }));
+}
+
 test.serial('rollback flips current to the previous release, prints both commits and holds the bad one', async () => {
   const d: DeployFixture = await deployFixture();
   try {
+    await dropPlugin(d);
     const { previous, current } = await deployedPair(d);
     const result: Result = await cli(d.f, ['rollback'], d.f.root, d.env);
     expect(result.code).toBe(0);
@@ -66,6 +73,7 @@ test.serial('rollback flips current to the previous release, prints both commits
 test.serial('the hold blocks redeploy of the rolled-back commit until main moves past it', async () => {
   const d: DeployFixture = await deployFixture();
   try {
+    await dropPlugin(d);
     const { previous, current } = await deployedPair(d);
     expect((await cli(d.f, ['rollback'], d.f.root, d.env)).code).toBe(0);
     const held: Result = await cli(d.f, ['next', '--all'], d.f.root, d.env);
@@ -214,6 +222,7 @@ test.serial(
   async () => {
     const d: DeployFixture = await deployFixture();
     try {
+      await dropPlugin(d);
       const previous: string = await head(d);
       expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
       const current: string = await pushSeed(d, () => {
