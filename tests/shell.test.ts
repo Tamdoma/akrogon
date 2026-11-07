@@ -100,8 +100,8 @@ for (const stdout of ['not-json-response', '{"result":{"panes":"invalid-panes"}}
       writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, paneListStdout: stdout }));
       const script: string = `import assert from 'node:assert/strict';
 import {z} from ${JSON.stringify(import.meta.resolve('zod'))};
-import {panes, herdr, CommandError} from ${JSON.stringify(resolve(import.meta.dir, '../src/shell.ts'))};
-await assert.rejects(panes(), (error) => {
+import {paneSchema, herdr, CommandError} from ${JSON.stringify(resolve(import.meta.dir, '../src/shell.ts'))};
+await assert.rejects(herdr(['pane', 'list'], z.object({ panes: z.array(paneSchema) })), (error) => {
   assert(error.cause instanceof ${stdout.startsWith('{') ? 'z.ZodError' : 'SyntaxError'});
   const context = JSON.parse(error.message);
   assert.deepEqual(context.command, ['herdr', 'pane', 'list']);
