@@ -213,6 +213,25 @@ function lastStart(f: HcFixture, slug: string, seat: 'a' | 'b'): string[] {
 function harnessOf(start: string[]): string[] {
   return start.slice(start.indexOf('--model') - 1);
 }
+// The single TMPDIR a seat start sets through its `env` wrapper.
+function startTmpdir(start: string[]): string {
+  const found: string[] = start.filter((arg: string) => arg.startsWith('TMPDIR=')).map((arg) => arg.slice(7));
+  expect(found).toHaveLength(1);
+  return found[0];
+}
+// Every seat start any leaf made, in start order.
+function allStarts(f: HcFixture): string[][] {
+  return hcCalls(f)
+    .filter((args: string[]) => args[0] === 'run' && args.includes('akrogon=1'))
+    .map((args: string[]) => args.slice(args.indexOf('--') + 1));
+}
+// A leaf tab is gone once no terminal holds it: each seat terminal is killed and removed.
+async function closeTab(f: HcFixture, slug: string): Promise<void> {
+  for (const seat of await seatTerminals(f, slug, true)) {
+    await f.core.hc(['kill', seat.address]);
+    expect((await f.core.hc(['rm', seat.address])).code).toBe(0);
+  }
+}
 // Sets one global seat with its own effort; the stand-in runs an unknown mode as `work`.
 function globalSlot(f: Fixture, slot: 'a' | 'b', model: string, effort: string): void {
   const path: string = resolve(f.home, 'config.yaml');
@@ -2470,16 +2489,16 @@ test('next refuses an existing worktree whose tracking ref is deleted when the r
 });
 
 test('next dispatches an existing worktree without querying an unreachable remote', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const worktree: string = resolve(storeDir(f), 'resident');
     await command(['git', 'worktree', 'add', '-b', 'resident', worktree], f.root);
     leaf(f, 'resident', 'plan.synthesis', { worktree });
     await command(['git', 'remote', 'set-url', 'origin', resolve(f.home, 'gone.git')], f.root);
     expect((await next(f, ['resident'])).code).toBe(0);
-    expect(database(f).prompts).toHaveLength(1);
+    expect(await delivered(f, 'resident')).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -2499,7 +2518,7 @@ test('next refuses to create a worktree while the remote is unreachable', async 
 });
 
 test('next branches a new worktree from the tracking commit, never a same-named local ref', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const tracked: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
     await command(['git', 'commit', '--allow-empty', '-m', 'impostor'], f.root);
@@ -2509,83 +2528,79 @@ test('next branches a new worktree from the tracking commit, never a same-named 
     leaf(f, 'fresh', 'plan.synthesis');
     expect((await next(f, ['fresh'])).code).toBe(0);
     expect(await command(['git', 'rev-parse', 'refs/heads/fresh'], f.root)).toBe(tracked);
-    const create: string[] | undefined = calls(f).find((args) => args[0] === 'tab' && args[1] === 'create');
-    expect(create).toBeDefined();
-    expect(create!.filter((arg) => arg.startsWith('AKROGON_BASE='))).toEqual([`AKROGON_BASE=${tracked}`]);
+    const start: string[] = lastStart(f, 'fresh', 'a');
+    expect(start.filter((arg) => arg.startsWith('AKROGON_BASE='))).toEqual([`AKROGON_BASE=${tracked}`]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
-test('fresh allocation carries TMPDIR on create and B split with 0700 scratch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('fresh allocation carries TMPDIR on both seat starts with 0700 scratch', async () => {
+  const f: HcFixture = await hcFixture();
   try {
-    leaf(f, 'fresh-tmp', 'plan.synthesis');
+    leaf(f, 'fresh-tmp', 'check.review');
     expect((await next(f, ['fresh-tmp'])).code).toBe(0);
-    const create: string[] = calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!;
-    const splits: string[][] = calls(f).filter((args) => args[0] === 'pane' && args[1] === 'split');
-    expect(splits).toHaveLength(1);
-    const createTmp: string = tmpdirOf(create);
-    expect(tmpdirOf(splits[0])).toBe(createTmp);
+    const createTmp: string = startTmpdir(lastStart(f, 'fresh-tmp', 'a'));
+    expect(seatStarts(f, 'fresh-tmp', 'b')).toHaveLength(1);
+    expect(startTmpdir(lastStart(f, 'fresh-tmp', 'b'))).toBe(createTmp);
     expect(createTmp.startsWith(leafTempRoot(f) + '/')).toBe(true);
     expect(existsSync(createTmp)).toBe(true);
     expect(statSync(createTmp).mode & 0o777).toBe(0o700);
     expect(statSync(resolve(createTmp, '..')).mode & 0o777).toBe(0o700);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('allocation creates missing leaf temp ancestors and recreates deleted intermediate parents', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const root: string = resolve(f.home, 'scratch/missing/parent');
     leaf(f, 'deep-tmp', 'plan.synthesis');
     expect((await next(f, ['deep-tmp'], { AKROGON_LEAF_TEMP_ROOT: root })).code).toBe(0);
-    const create: string[] = calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!;
-    const scratch: string = tmpdirOf(create);
+    const scratch: string = startTmpdir(lastStart(f, 'deep-tmp', 'a'));
     expect(scratch.startsWith(root + '/')).toBe(true);
     expect(existsSync(scratch)).toBe(true);
     expect(statSync(scratch).mode & 0o777).toBe(0o700);
     rmSync(resolve(f.home, 'scratch'), { recursive: true, force: true });
     leaf(f, 'again', 'plan.synthesis');
     expect((await next(f, ['again'], { AKROGON_LEAF_TEMP_ROOT: root })).code).toBe(0);
-    const recreate: string[] = calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create')[1];
-    const second: string = tmpdirOf(recreate);
+    const second: string = startTmpdir(lastStart(f, 'again', 'a'));
     expect(second.startsWith(root + '/')).toBe(true);
     expect(second).not.toBe(scratch);
     expect(existsSync(second)).toBe(true);
     expect(statSync(second).mode & 0o777).toBe(0o700);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('new tab keeps existing scratch for checks that outlive their tab, and seats disable the node compile cache', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
-    leaf(f, 'stale-tmp', 'plan.synthesis');
+    const path: string = leaf(f, 'stale-tmp', 'plan.synthesis');
     expect((await next(f, ['stale-tmp'])).code).toBe(0);
-    const create: string[] = calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!;
-    expect(create).toContain('NODE_DISABLE_COMPILE_CACHE=1');
-    const scratch: string = tmpdirOf(create);
+    const start: string[] = lastStart(f, 'stale-tmp', 'a');
+    expect(start).toContain('NODE_DISABLE_COMPILE_CACHE=1');
+    const scratch: string = startTmpdir(start);
     writeFileSync(resolve(scratch, 'stale'), 'x\n');
     expect((await next(f, ['stale-tmp'])).code).toBe(0);
     expect(existsSync(resolve(scratch, 'stale'))).toBe(true);
     const captured: string = resolve(scratch, 'akrogon-io-detached');
     mkdirSync(captured);
     writeFileSync(resolve(captured, 'out'), 'x\n');
-    saveDatabase(f, { ...database(f), tabs: [], panes: [] });
+    await closeTab(f, 'stale-tmp');
+    saveState(path, { ...readState(path), prompted: {} });
     expect((await next(f, ['stale-tmp'])).code).toBe(0);
-    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create')).toHaveLength(2);
+    expect(seatStarts(f, 'stale-tmp', 'a')).toHaveLength(2);
     expect(statSync(scratch).mode & 0o777).toBe(0o700);
     expect(existsSync(resolve(captured, 'out'))).toBe(true);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
-test('allocation carries TMPDIR refuses symlink override with no tab or split', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('allocation carries TMPDIR refuses symlink override with no seat start', async () => {
+  const f: HcFixture = await hcFixture();
   try {
     const target: string = resolve(f.home, 'real-target');
     mkdirSync(target);
@@ -2596,16 +2611,15 @@ test('allocation carries TMPDIR refuses symlink override with no tab or split', 
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(link);
     expect(result.stderr).toContain('Refusing');
-    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create')).toHaveLength(0);
-    expect(calls(f).filter((args) => args[0] === 'pane' && args[1] === 'split')).toHaveLength(0);
-    expect(database(f).tabs).toHaveLength(0);
+    expect(allStarts(f)).toHaveLength(0);
+    expect(await f.core.terminals({ akrogon: '1' }, true)).toHaveLength(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
-test('allocation carries TMPDIR refuses file override with no tab or split', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('allocation carries TMPDIR refuses file override with no seat start', async () => {
+  const f: HcFixture = await hcFixture();
   try {
     const file: string = resolve(f.home, 'not-a-dir');
     writeFileSync(file, 'x\n');
@@ -2613,16 +2627,15 @@ test('allocation carries TMPDIR refuses file override with no tab or split', asy
     const result: Result = await next(f, ['refuse-file'], { AKROGON_LEAF_TEMP_ROOT: file });
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(file);
-    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create')).toHaveLength(0);
-    expect(calls(f).filter((args) => args[0] === 'pane' && args[1] === 'split')).toHaveLength(0);
-    expect(database(f).tabs).toHaveLength(0);
+    expect(allStarts(f)).toHaveLength(0);
+    expect(await f.core.terminals({ akrogon: '1' }, true)).toHaveLength(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('allocation carries TMPDIR corrects permissive owned dirs to 0700', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const root: string = resolve(f.home, 'permissive-root');
     mkdirSync(root, { mode: 0o777 });
@@ -2631,22 +2644,20 @@ test('allocation carries TMPDIR corrects permissive owned dirs to 0700', async (
     const path: string = leaf(f, 'permissive', 'plan.synthesis');
     expect((await next(f, ['permissive'], { AKROGON_LEAF_TEMP_ROOT: root })).code).toBe(0);
     expect(statSync(root).mode & 0o777).toBe(0o700);
-    const create: string[] = calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!;
-    const scratch: string = tmpdirOf(create);
+    const scratch: string = startTmpdir(lastStart(f, 'permissive', 'a'));
     expect(scratch.startsWith(root + '/')).toBe(true);
     expect(statSync(scratch).mode & 0o777).toBe(0o700);
-    for (const split of calls(f).filter((args) => args[0] === 'pane' && args[1] === 'split'))
-      expect(tmpdirOf(split)).toBe(scratch);
+    for (const start of allStarts(f)) expect(startTmpdir(start)).toBe(scratch);
     const before: State = readState(path);
     chmodSync(scratch, 0o777);
     expect(statSync(scratch).mode & 0o777).toBe(0o777);
     expect((await next(f, ['permissive'], { AKROGON_LEAF_TEMP_ROOT: root })).code).toBe(0);
     const after: State = readState(path);
     expect(after.tab).toBe(before.tab);
-    expect(after.pane).toEqual(before.pane);
+    expect(after.seat).toEqual(before.seat);
     expect(statSync(scratch).mode & 0o777).toBe(0o700);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 test('leaf temp path stays inside the socket budget under /tmp for any slug and repo root', async () => {
@@ -2700,13 +2711,11 @@ test('leaf temp path stays inside the socket budget under /tmp for any slug and 
 }, 15000);
 
 test('closed tab scratch deletes merged folder and prunes inner worktree', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  f.env = { ...f.env, ...fakeSystemctl(f).env };
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'scrub', 'plan.synthesis');
     expect((await next(f, ['scrub'])).code).toBe(0);
-    const tab: string = readState(path).tab!;
-    const scratch: string = tmpdirOf(calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!);
+    const scratch: string = startTmpdir(lastStart(f, 'scrub', 'a'));
     expect(existsSync(scratch)).toBe(true);
     expect(statSync(scratch).mode & 0o777).toBe(0o700);
     const sentinel: string = resolve(scratch, 'sentinel');
@@ -2715,31 +2724,24 @@ test('closed tab scratch deletes merged folder and prunes inner worktree', async
     await command(['git', 'worktree', 'add', '--detach', inner], f.root);
     expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).toContain(inner);
     saveState(path, { ...readState(path), phase: 'merged' });
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      tabs: db.tabs.filter((item) => item.tab_id !== tab),
-      panes: db.panes.filter((pane) => pane.tab_id !== tab),
-    });
-    const closed: Result = await next(f, [], tabClosed(f, tab));
+    await closeTab(f, 'scrub');
+    const closed: Result = await next(f, ['--wake']);
     expect(closed.code).toBe(0);
     expect(existsSync(scratch)).toBe(false);
     expect(existsSync(sentinel)).toBe(false);
     expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).not.toContain(inner);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('closed tab scratch sweeps a failed leaf, keeps its branch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  f.env = { ...f.env, ...fakeSystemctl(f).env };
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'failed-keep', 'plan.synthesis');
     expect((await next(f, ['failed-keep'])).code).toBe(0);
-    const tab: string = readState(path).tab!;
     const worktree: string = readState(path).worktree!;
-    const scratch: string = tmpdirOf(calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!);
+    const scratch: string = startTmpdir(lastStart(f, 'failed-keep', 'a'));
     const sentinel: string = resolve(scratch, 'sentinel');
     writeFileSync(sentinel, 'stay\n');
     saveState(path, {
@@ -2747,25 +2749,19 @@ test('closed tab scratch sweeps a failed leaf, keeps its branch', async () => {
       phase: 'failed',
       failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'test' },
     });
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      tabs: db.tabs.filter((item) => item.tab_id !== tab),
-      panes: db.panes.filter((pane) => pane.tab_id !== tab),
-    });
-    const closed: Result = await next(f, [], tabClosed(f, tab));
+    await closeTab(f, 'failed-keep');
+    const closed: Result = await next(f, ['--wake']);
     expect(closed.code).toBe(0);
     expect(existsSync(scratch)).toBe(false);
     expect(existsSync(sentinel)).toBe(false);
     expect(existsSync(worktree)).toBe(false);
     expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/failed-keep'], f.root)).code).toBe(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
-test('sweep scratch catch-up deletes open and closed folders with no live panes', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  f.env = { ...f.env, ...fakeSystemctl(f).env };
+test('sweep scratch catch-up deletes open and closed folders with no live seats', async () => {
+  const f: HcFixture = await hcFixture();
   try {
     const openPath: string = leaf(f, 'open-done', 'plan.synthesis', {}, 'epic/first');
     leaf(f, 'hold', 'failed', {}, 'other');
@@ -2773,16 +2769,8 @@ test('sweep scratch catch-up deletes open and closed folders with no live panes'
     const soloPath: string = leaf(f, 'solo-done', 'plan.synthesis', {}, 'solo-issue');
     expect((await next(f, ['open-done'])).code).toBe(0);
     expect((await next(f, ['solo-done'])).code).toBe(0);
-    const openTab: string = readState(openPath).tab!;
-    const soloTab: string = readState(soloPath).tab!;
-    function scratchFor(slug: string): string {
-      const create: string[] = calls(f).find(
-        (args) => args[0] === 'tab' && args[1] === 'create' && args.includes(slug),
-      )!;
-      return tmpdirOf(create);
-    }
-    const openScratch: string = scratchFor('open-done');
-    const soloScratch: string = scratchFor('solo-done');
+    const openScratch: string = startTmpdir(lastStart(f, 'open-done', 'a'));
+    const soloScratch: string = startTmpdir(lastStart(f, 'solo-done', 'a'));
     const openSentinel: string = resolve(openScratch, 'sentinel');
     const soloSentinel: string = resolve(soloScratch, 'sentinel');
     writeFileSync(openSentinel, 'open\n');
@@ -2794,15 +2782,11 @@ test('sweep scratch catch-up deletes open and closed folders with no live panes'
     expect(existsSync(openPath)).toBe(true);
     const soloClosed: string = resolve(f.root, 'issues/closed/solo-issue/solo-done');
     expect(existsSync(soloClosed)).toBe(true);
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      tabs: db.tabs.filter((item) => item.tab_id !== openTab && item.tab_id !== soloTab),
-      panes: db.panes.filter((pane) => pane.tab_id !== openTab && pane.tab_id !== soloTab),
-    });
-    const closesBefore: number = calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close').length;
+    await closeTab(f, 'open-done');
+    await closeTab(f, 'solo-done');
+    const closesBefore: number = tabCloses(f).length;
     expect((await next(f, [])).code).toBe(1);
-    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(closesBefore);
+    expect(tabCloses(f)).toHaveLength(closesBefore);
     expect(existsSync(openScratch)).toBe(false);
     expect(existsSync(soloScratch)).toBe(false);
     expect(existsSync(openSentinel)).toBe(false);
@@ -2812,29 +2796,28 @@ test('sweep scratch catch-up deletes open and closed folders with no live panes'
     expect(existsSync(readState(openPath).worktree!)).toBe(false);
     expect(existsSync(readState(soloClosed).worktree!)).toBe(false);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
-test('sweep scratch catch-up keeps sentinel with live panes then deletes on later sweep', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  f.env = { ...f.env, ...fakeSystemctl(f).env };
+test('sweep scratch catch-up keeps sentinel with live seats then deletes on later sweep', async () => {
+  const f: HcFixture = await hcFixture({ window: 'open' });
+  const stopAdopt: () => void = adopt(f.core);
   try {
     const donePath: string = leaf(f, 'live-done', 'plan.synthesis', {}, 'epic/first');
     leaf(f, 'hold', 'failed', {}, 'other');
     leaf(f, 'waiting', 'plan.synthesis', { 'blocked-by': ['hold'] }, 'epic/second');
     expect((await next(f, ['live-done'])).code).toBe(0);
-    const tab: string = readState(donePath).tab!;
-    const scratch: string = tmpdirOf(calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!);
+    const scratch: string = startTmpdir(lastStart(f, 'live-done', 'a'));
     const sentinel: string = resolve(scratch, 'sentinel');
     writeFileSync(sentinel, 'live\n');
     saveState(donePath, { ...readState(donePath), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'live-done', 'merged'], f.root, f.env)).code).toBe(0);
     expect(existsSync(donePath)).toBe(true);
-    expect(database(f).tabs.some((item) => item.tab_id === tab)).toBe(true);
+    expect(await liveTabs(f)).toContain('live-done');
     expect((await next(f, [])).code).toBe(1);
-    expect(database(f).tabs).toHaveLength(0);
-    expect(calls(f).filter((args) => args[0] === 'tab' && args[1] === 'close')).toHaveLength(1);
+    expect(await liveTabs(f)).toEqual([]);
+    expect(tabCloses(f)).toHaveLength(1);
     expect(existsSync(scratch)).toBe(true);
     expect(readFileSync(sentinel, 'utf8')).toBe('live\n');
     expect(existsSync(donePath)).toBe(true);
@@ -2842,48 +2825,46 @@ test('sweep scratch catch-up keeps sentinel with live panes then deletes on late
     expect(existsSync(scratch)).toBe(false);
     expect(existsSync(sentinel)).toBe(false);
   } finally {
-    f.clean();
+    stopAdopt();
+    await f.clean();
   }
 }, 15000);
 
 test('dispatch recreates missing scratch with same tab and seats', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'recreate', 'plan.synthesis');
     expect((await next(f, ['recreate'])).code).toBe(0);
     const before: State = readState(path);
-    const scratch: string = tmpdirOf(calls(f).find((args) => args[0] === 'tab' && args[1] === 'create')!);
+    const scratch: string = startTmpdir(lastStart(f, 'recreate', 'a'));
     expect(existsSync(scratch)).toBe(true);
     rmSync(scratch, { recursive: true, force: true });
     expect(existsSync(scratch)).toBe(false);
-    const beforeCalls: number = calls(f).length;
     expect((await next(f, ['recreate'])).code).toBe(0);
     const after: State = readState(path);
     expect(after.tab).toBe(before.tab);
-    expect(after.pane).toEqual(before.pane);
+    expect(after.seat).toEqual(before.seat);
     expect(existsSync(scratch)).toBe(true);
     expect(statSync(scratch).mode & 0o777).toBe(0o700);
-    const later: string[][] = calls(f).slice(beforeCalls);
-    expect(later.filter((args) => args[0] === 'tab' && args[1] === 'create')).toHaveLength(0);
-    expect(later.filter((args) => args[0] === 'pane' && args[1] === 'split')).toHaveLength(0);
+    expect(allStarts(f)).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('fixture temp root isolates every TMPDIR and envs carry override', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const root: string = leafTempRoot(f);
     expect(root).toBe(resolve(f.home, 'leaf-temp'));
+    // The old fake herdr env carried the leaf temp override; this case's env carries it the same way.
+    f.env = { ...f.env, AKROGON_LEAF_TEMP_ROOT: root };
     expect(f.env['AKROGON_LEAF_TEMP_ROOT']).toBe(root);
     leaf(f, 'first-tmp', 'plan.synthesis');
     expect((await next(f, ['first-tmp'])).code).toBe(0);
-    const creates: string[][] = calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create');
-    const splits: string[][] = calls(f).filter((args) => args[0] === 'pane' && args[1] === 'split');
-    expect(creates).toHaveLength(1);
-    for (const args of [...creates, ...splits]) {
-      const tmp: string = tmpdirOf(args);
+    expect(allStarts(f)).toHaveLength(1);
+    for (const start of allStarts(f)) {
+      const tmp: string = startTmpdir(start);
       expect(tmp.startsWith(root + '/')).toBe(true);
       expect(existsSync(tmp)).toBe(true);
       expect(statSync(tmp).mode & 0o777).toBe(0o700);
@@ -2892,25 +2873,20 @@ test('fixture temp root isolates every TMPDIR and envs carry override', async ()
     const stripped: NodeJS.ProcessEnv = { ...f.env };
     delete stripped['AKROGON_LEAF_TEMP_ROOT'];
     expect('AKROGON_LEAF_TEMP_ROOT' in stripped).toBe(false);
-    const before: number = calls(f).length;
     expect((await cli(f, ['next', 'second-tmp'], f.root, stripped)).code).toBe(0);
-    const fresh: string[][] = calls(f)
-      .slice(before)
-      .filter((args) => args[0] === 'tab' && args[1] === 'create');
-    expect(fresh).toHaveLength(1);
-    const secondTmp: string = tmpdirOf(fresh[0]);
+    expect(seatStarts(f, 'second-tmp', 'a')).toHaveLength(1);
+    const secondTmp: string = startTmpdir(lastStart(f, 'second-tmp', 'a'));
     expect(secondTmp.startsWith(root + '/')).toBe(true);
     expect(existsSync(secondTmp)).toBe(true);
     leaf(f, 'third-tmp', 'plan.synthesis');
     const now: number = Date.parse('2026-09-11T12:00:00Z');
     expect((await nextAt(f, 'third-tmp', now)).code).toBe(0);
-    const allCreates: string[][] = calls(f).filter((args) => args[0] === 'tab' && args[1] === 'create');
-    expect(allCreates).toHaveLength(3);
-    for (const args of allCreates) expect(tmpdirOf(args).startsWith(root + '/')).toBe(true);
+    expect(allStarts(f)).toHaveLength(3);
+    for (const start of allStarts(f)) expect(startTmpdir(start).startsWith(root + '/')).toBe(true);
     const prodRoot: string = '/tmp/akrogon-' + String(process.getuid!());
     expect(root).not.toBe(prodRoot);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
