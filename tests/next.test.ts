@@ -2903,16 +2903,16 @@ const envFoo: object = {
   source: 't',
   done: 'd',
 };
-async function undispatched(f: DispatchFixture, slug: string): Promise<void> {
+async function undispatched(f: HcFixture, slug: string): Promise<void> {
   expect(existsSync(storeDir(f))).toBe(false);
   expect((await run(['git', 'branch', '--list', slug], f.root)).stdout).toBe('');
-  expect(database(f).tabs).toHaveLength(0);
-  expect(database(f).panes).toHaveLength(0);
-  expect(database(f).prompts).toHaveLength(0);
+  expect(allStarts(f)).toHaveLength(0);
+  expect(await f.core.terminals({ akrogon: '1' }, true)).toHaveLength(0);
+  expect(await allTasks(f)).toHaveLength(0);
 }
 
 test('next refuses an env-gapped leaf in every missing .env state and dispatches when set', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'gapped', 'plan.synthesis');
     const path: string = resolve(f.root, 'issues/open/issue/gapped');
@@ -2927,15 +2927,15 @@ test('next refuses an env-gapped leaf in every missing .env state and dispatches
     }
     writeFileSync(resolve(f.root, '.env'), 'FOO=x\n');
     expect((await next(f, ['gapped'])).code).toBe(0);
-    expect(database(f).tabs).toHaveLength(1);
-    expect(database(f).prompts).toHaveLength(1);
+    expect(await liveTabs(f)).toHaveLength(1);
+    expect(await allTasks(f)).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('next refuses a leaf whose declared file input is absent or empty', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'needsfile', 'plan.synthesis');
     readinessInput(path, { ...envFoo, kind: 'file', name: 'need.txt' });
@@ -2949,14 +2949,14 @@ test('next refuses a leaf whose declared file input is absent or empty', async (
     await undispatched(f, 'needsfile');
     writeFileSync(resolve(f.root, 'need.txt'), 'content\n');
     expect((await next(f, ['needsfile'])).code).toBe(0);
-    expect(database(f).tabs).toHaveLength(1);
+    expect(await liveTabs(f)).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('next --all leaves a gapped leaf undispatched while its ungapped sibling dispatches', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const gapped: string = leaf(f, 'gapped', 'plan.synthesis');
     readinessInput(gapped, envFoo);
@@ -2964,15 +2964,15 @@ test('next --all leaves a gapped leaf undispatched while its ungapped sibling di
     expect((await next(f, ['--all'])).code).toBe(1);
     expect(readState(gapped).worktree).toBeUndefined();
     expect((await run(['git', 'branch', '--list', 'gapped'], f.root)).stdout).toBe('');
-    expect(database(f).tabs.map((tab) => tab.label)).toEqual(['ready']);
-    expect(database(f).prompts.every((p) => p.text.includes('ready'))).toBe(true);
+    expect(await liveTabs(f)).toEqual(['ready']);
+    expect((await allTasks(f)).every((p) => p.text.includes('ready'))).toBe(true);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('an input held by an unregistered absolute directory checks that directory .env', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   const holder: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-holder-')));
   try {
     const path: string = leaf(f, 'foreign', 'plan.synthesis');
@@ -2983,16 +2983,16 @@ test('an input held by an unregistered absolute directory checks that directory 
     await undispatched(f, 'foreign');
     writeFileSync(resolve(holder, '.env'), 'FOO=x\n');
     expect((await next(f, ['foreign'])).code).toBe(0);
-    expect(database(f).tabs).toHaveLength(1);
-    expect(database(f).prompts).toHaveLength(1);
+    expect(await liveTabs(f)).toHaveLength(1);
+    expect(await allTasks(f)).toHaveLength(1);
   } finally {
     rmSync(holder, { recursive: true, force: true });
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('an invalid readiness.yaml skips the leaf and names the file path', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
     writeFileSync(resolve(malformed, 'readiness.yaml'), 'inputs: [');
@@ -3013,12 +3013,12 @@ test('an invalid readiness.yaml skips the leaf and names the file path', async (
     expect(skips(second)[0].error).toContain(resolve(invalid, 'readiness.yaml'));
     await undispatched(f, 'invalid');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a dispatched worktree gets a real .env file with the declared subset', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_ONE=1\nSYNTHETIC_TWO=two words\nSYNTHETIC_THREE=3\n');
     yaml(resolve(f.root, 'issues/config.yaml'), {
@@ -3036,12 +3036,12 @@ test('a dispatched worktree gets a real .env file with the declared subset', asy
     expect(state.env_names).toEqual(['SYNTHETIC_ONE', 'SYNTHETIC_TWO']);
     expect(state.env_generation).toBe(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a dispatched .env file round-trips quotes and backslashes through dotenv parsing', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     writeFileSync(
       resolve(f.root, '.env'),
@@ -3059,12 +3059,12 @@ test('a dispatched .env file round-trips quotes and backslashes through dotenv p
     expect(copied.SYNTHETIC_QUOTE).toBe('has"quote');
     expect(copied.SYNTHETIC_PATH).toBe('path\\\\segment');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a dispatched .env file preserves spaced assignments, multiline values and nested assignment text', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const root: string = resolve(f.root, '.env');
     writeFileSync(
@@ -3093,12 +3093,12 @@ test('a dispatched .env file preserves spaced assignments, multiline values and 
     expect(copied.SYNTHETIC_OUTER).toBe('outside');
     expect(copied.OTHER).toBeUndefined();
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a dispatched .env file round-trips mixed quotes, backticks and escape-looking text', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const root: string = resolve(f.root, '.env');
     writeFileSync(
@@ -3146,12 +3146,12 @@ test('a dispatched .env file round-trips mixed quotes, backticks and escape-look
     expect(copied.SYNTHETIC_TRAIL).toBe('path\\');
     expect(copied.SYNTHETIC_UNI).toBe('\u{1F600}a\r\\"b');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('next preserves a declared value that escapes every quoting form', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     // parseEnv reads this as a'b`c\<CR>: quoters plus a backslash-carriage
     // sequence. The accepted root assignment is itself a valid encoding, so
@@ -3170,12 +3170,12 @@ test('next preserves a declared value that escapes every quoting form', async ()
     expect(emitted).toContain('SYNTHETIC_HARD=');
     expect(parseEnv(emitted).SYNTHETIC_HARD).toBe("a'b`c\\\\\r");
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a dispatched .env file preserves declared names matching encoding context names', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     writeFileSync(resolve(f.root, '.env'), 'Z1=x\nY4=y\n');
     yaml(resolve(f.root, 'issues/config.yaml'), {
@@ -3190,12 +3190,12 @@ test('a dispatched .env file preserves declared names matching encoding context 
     );
     expect(copied).toEqual({ Z1: 'x', Y4: 'y' });
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a live tab freezes .env while a dead tab lets the next dispatch rewrite it', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const root: string = resolve(f.root, '.env');
     writeFileSync(root, 'SYNTHETIC_ONE=1\n');
@@ -3212,25 +3212,19 @@ test('a live tab freezes .env while a dead tab lets the next dispatch rewrite it
     expect((await next(f, ['build'])).code).toBe(0);
     expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
     expect(readState(path).env_generation).toBe(0);
-    const tab: string = readState(path).tab!;
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      tabs: db.tabs.filter((item) => item.tab_id !== tab),
-      panes: db.panes.filter((pane) => pane.tab_id !== tab),
-    });
+    await closeTab(f, 'build');
     expect((await next(f, ['build'])).code).toBe(0);
     expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=2\n');
     const state: State = readState(path);
     expect(state.env_names).toEqual(['SYNTHETIC_ONE']);
     expect(state.env_generation).toBe(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('next refuses a declared name missing from the registered .env without leaking its values', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_ONE=S3NTINEL-VALUE-9f8e\n');
     yaml(resolve(f.root, 'issues/config.yaml'), {
@@ -3249,15 +3243,15 @@ test('next refuses a declared name missing from the registered .env without leak
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).not.toContain('S3NTINEL-VALUE-9f8e');
     const envFile: string = resolve(storeDir(f), 'build/.env');
     expect(() => lstatSync(envFile)).toThrow(/ENOENT/);
-    expect(database(f).tabs).toHaveLength(0);
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await liveTabs(f)).toHaveLength(0);
+    expect(await allTasks(f)).toHaveLength(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('pass_env names are not copied from the registered .env', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_ONE=1\n');
     yaml(resolve(f.root, 'issues/config.yaml'), {
@@ -3270,12 +3264,12 @@ test('pass_env names are not copied from the registered .env', async () => {
     expect((await next(f, ['build'])).code).toBe(0);
     expect(readFileSync(resolve(storeDir(f), 'build/.env'), 'utf8')).toBe('SYNTHETIC_ONE=1\n');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('dispatch recreates a deleted .env file in a reused worktree once its tab is gone', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_ONE=1\n');
     yaml(resolve(f.root, 'issues/config.yaml'), {
@@ -3287,25 +3281,19 @@ test('dispatch recreates a deleted .env file in a reused worktree once its tab i
     expect((await next(f, ['build'])).code).toBe(0);
     const envFile: string = resolve(storeDir(f), 'build/.env');
     rmSync(envFile);
-    const tab: string = readState(path).tab!;
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      tabs: db.tabs.filter((item) => item.tab_id !== tab),
-      panes: db.panes.filter((pane) => pane.tab_id !== tab),
-    });
+    await closeTab(f, 'build');
     expect((await next(f, ['build'])).code).toBe(0);
     expect(lstatSync(envFile).isFile()).toBe(true);
     expect(statSync(envFile).mode & 0o777).toBe(0o600);
     expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
     expect(readState(path).env_generation).toBe(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('a pre-linked worktree has its .env symlink replaced by a real file on dispatch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_ONE=1\n');
     yaml(resolve(f.root, 'issues/config.yaml'), {
@@ -3323,13 +3311,13 @@ test('a pre-linked worktree has its .env symlink replaced by a real file on disp
     expect(statSync(envFile).mode & 0o777).toBe(0o600);
     expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 for (const registered of [false, true]) {
   test(`an empty env list writes an empty .env file ${registered ? 'with' : 'without'} a registered .env`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const root: string = resolve(f.root, '.env');
       if (registered) writeFileSync(root, 'SYNTHETIC_ONE=1\n');
@@ -3341,14 +3329,14 @@ for (const registered of [false, true]) {
       expect(readFileSync(envFile, 'utf8')).toBe('');
       if (!registered) expect(existsSync(root)).toBe(false);
     } finally {
-      f.clean();
+      await f.clean();
     }
   }, 15000);
 }
 
 for (const kind of ['tracked file', 'unignored'] as const) {
   test(`next refuses an .env write over ${kind}`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       const worktree: string = resolve(storeDir(f), 'build');
       await command(['git', 'worktree', 'add', '-b', 'build', worktree], f.root);
@@ -3369,17 +3357,17 @@ for (const kind of ['tracked file', 'unignored'] as const) {
       if (kind === 'unignored') expect(error).toContain('path is not ignored by git');
       if (kind === 'tracked file') expect(readFileSync(link, 'utf8')).toBe('SYNTHETIC_SECRET=1\n');
       if (kind === 'unignored') expect(() => lstatSync(link)).toThrow(/ENOENT/);
-      expect(database(f).prompts).toHaveLength(0);
-      expect(database(f).starts).toHaveLength(0);
+      expect(await allTasks(f)).toHaveLength(0);
+      expect(allStarts(f)).toHaveLength(0);
     } finally {
-      f.clean();
+      await f.clean();
     }
   }, 15000);
 }
 
 for (const kind of ['real file', 'stale link'] as const) {
   test(`dispatch replaces an .env ${kind} with a real file`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       writeFileSync(resolve(f.root, '.env'), 'SYNTHETIC_ONE=1\n');
       yaml(resolve(f.root, 'issues/config.yaml'), {
@@ -3398,13 +3386,13 @@ for (const kind of ['real file', 'stale link'] as const) {
       expect(statSync(envFile).mode & 0o777).toBe(0o600);
       expect(readFileSync(envFile, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
     } finally {
-      f.clean();
+      await f.clean();
     }
   }, 15000);
 }
 
 test('next refuses to write .env not ignored in the registered checkout, keeps the worktree, and reuses it after the ignore rule returns', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     writeFileSync(resolve(f.root, '.gitignore'), 'node_modules\n');
     leaf(f, 'build', 'plan.synthesis');
@@ -3419,22 +3407,22 @@ test('next refuses to write .env not ignored in the registered checkout, keeps t
     const worktree: string = resolve(storeDir(f), 'build');
     expect(existsSync(worktree)).toBe(true);
     expect((await run(['git', 'show-ref', '--verify', '--quiet', 'refs/heads/build'], f.root)).code).toBe(0);
-    expect(database(f).prompts).toHaveLength(0);
-    expect(database(f).starts).toHaveLength(0);
+    expect(await allTasks(f)).toHaveLength(0);
+    expect(allStarts(f)).toHaveLength(0);
     writeFileSync(resolve(f.root, '.gitignore'), '.env\n');
     expect((await next(f, ['build'])).code).toBe(0);
     expect(readState(resolve(f.root, 'issues/open/issue/build')).worktree).toBe(worktree);
     expect(lstatSync(resolve(worktree, '.env')).isFile()).toBe(true);
     expect(statSync(resolve(worktree, '.env')).mode & 0o777).toBe(0o600);
     expect(readFileSync(resolve(worktree, '.env'), 'utf8')).toBe('');
-    expect(database(f).prompts).toHaveLength(1);
+    expect(await allTasks(f)).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('merged leaf cleanup removes the worktree and leaves the registered .env untouched', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const target: string = resolve(f.root, '.env');
     writeFileSync(target, 'SYNTHETIC_ONE=1\n');
@@ -3448,7 +3436,7 @@ test('merged leaf cleanup removes the worktree and leaves the registered .env un
     expect(existsSync(worktree)).toBe(false);
     expect(readFileSync(target, 'utf8')).toBe('SYNTHETIC_ONE=1\n');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
