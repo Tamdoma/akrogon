@@ -56,6 +56,10 @@ function calls(f: Fixture): string[][] {
     .map((line) => z.array(z.string()).parse(JSON.parse(line)));
 }
 
+// The checkout's own release ships no plugin/: install skips the integration and plugin link calls
+// and unlinks the old plugin.
+const checkoutCalls: string[][] = [['plugin', 'unlink', 'akrogon']];
+
 function expectedCalls(f: Fixture): string[][] {
   return [
     ['integration', 'install', 'claude'],
@@ -128,10 +132,10 @@ test('install creates all four absent harness roots and repeats without changing
         expect(realpathSync(destination)).toBe(resolve(toolRoot, 'skills', skill));
       }
     }
-    expect(calls(f)).toEqual(expectedCalls(f));
+    expect(calls(f)).toEqual(checkoutCalls);
     expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0, stderr: '' });
     expect(destinations.map((destination) => readlinkSync(destination))).toEqual(targets);
-    expect(calls(f)).toEqual([...expectedCalls(f), ...expectedCalls(f)]);
+    expect(calls(f)).toEqual([...checkoutCalls, ...checkoutCalls]);
   } finally {
     f.clean();
   }
@@ -183,7 +187,7 @@ test('install prunes only dangling owned links and preserves real entries and fo
       for (const skill of skills)
         expect(realpathSync(resolve(directory, skill))).toBe(resolve(toolRoot, 'skills', skill));
     }
-    expect(calls(f)).toEqual(expectedCalls(f));
+    expect(calls(f)).toEqual(checkoutCalls);
     mkdirSync(dirname(artifact), { recursive: true });
     writeFileSync(
       artifact,
