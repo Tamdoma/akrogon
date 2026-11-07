@@ -1,21 +1,17 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fakeHerdr, fixture, leaf, storeDir, yaml, type Fixture } from './helpers';
+import { cli, fixture, leaf, storeDir, yaml, type Fixture } from './helpers';
+import { hcFixture, type HcFixture } from './hc-fixture';
 import { readState } from '../src/state';
 import { command, run, spawnCaptured, type Result } from '../src/shell';
 
-type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
-async function dispatchFixture(): Promise<DispatchFixture> {
-  const f: Fixture = await fixture();
-  return { ...f, ...fakeHerdr(f) };
-}
-async function next(f: DispatchFixture, args: string[], env: NodeJS.ProcessEnv = {}): Promise<Result> {
+async function next(f: HcFixture, args: string[], env: NodeJS.ProcessEnv = {}): Promise<Result> {
   return cli(f, ['next', ...args], f.root, { ...f.env, ...env });
 }
 
 test('a dispatched worktree lands sparse in the home store while the root keeps its issues tree', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'build', 'plan.synthesis');
     await command(['git', 'add', 'issues/config.yaml'], f.root);
@@ -31,12 +27,12 @@ test('a dispatched worktree lands sparse in the home store while the root keeps 
     expect((await run(['git', 'config', '--worktree', '--get', 'core.sparseCheckout'], f.root)).code).toBe(1);
     expect(existsSync(resolve(f.root, 'issues/config.yaml'))).toBe(true);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('a repo worktree_root tilde expands to home so the dispatched worktree lands there', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), { worktree_root: '~/trees', grounding: 'none' });
     const path: string = leaf(f, 'build', 'plan.synthesis');
@@ -46,12 +42,12 @@ test('a repo worktree_root tilde expands to home so the dispatched worktree land
     expect(existsSync(worktree)).toBe(true);
     expect(existsSync(resolve(storeDir(f), 'build'))).toBe(false);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('a rebase inside a sparse dispatch worktree crosses an issues change cleanly', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
@@ -70,7 +66,7 @@ test('a rebase inside a sparse dispatch worktree crosses an issues change cleanl
     expect(existsSync(resolve(worktree, 'issues'))).toBe(false);
     expect(await command(['git', 'log', '--format=%s', '-2'], worktree)).toBe('leaf work\nissues change');
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -136,7 +132,7 @@ console.log(built.top);
 });
 
 test('dispatch refuses a store path under an ancestor holding node_modules and creates nothing', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const bad: string = resolve(f.home, 'bad');
     mkdirSync(resolve(bad, 'node_modules'), { recursive: true });
@@ -151,12 +147,12 @@ test('dispatch refuses a store path under an ancestor holding node_modules and c
     expect(existsSync(resolve(bad, 'trees'))).toBe(false);
     expect(readState(resolve(f.root, 'issues/open/issue/build')).worktree).toBeUndefined();
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('a sparse store leaf resolves only its own modules: foreign left-pad fails, local vendored resolves', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     mkdirSync(resolve(f.root, 'node_modules/left-pad'), { recursive: true });
     writeFileSync(resolve(f.root, 'node_modules/left-pad/package.json'), '{"name":"left-pad","main":"index.js"}');
@@ -181,6 +177,6 @@ test('a sparse store leaf resolves only its own modules: foreign left-pad fails,
     expect(missing.code).not.toBe(0);
     expect(readdirSync(resolve(worktree, 'node_modules'))).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
