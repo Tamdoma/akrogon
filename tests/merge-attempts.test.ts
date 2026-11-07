@@ -17,6 +17,7 @@ import {
   verified,
   unitBin,
 } from './helpers';
+import { hcFixture, type HcFixture } from './hc-fixture';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State, type Tool } from '../src/state';
 import { attemptRecordSchema } from '../src/attempts';
@@ -76,7 +77,12 @@ async function branchAt(
   return { slug, head: await command(['git', 'rev-parse', 'HEAD'], worktree), worktree };
 }
 
-async function batchFixture(f: Fixture, inStore: boolean = false): Promise<BatchFixture> {
+// herdr defaults to a fresh fake herdr; an hc fixture passes its own env, which already carries one.
+async function batchFixture(
+  f: Fixture,
+  inStore: boolean = false,
+  herdr: (f: Fixture) => HerdrFixture = fakeHerdr,
+): Promise<BatchFixture> {
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
   process.env.HOME = f.home;
   const repo: Repo = readRepo('repo', f.root);
@@ -100,7 +106,12 @@ async function batchFixture(f: Fixture, inStore: boolean = false): Promise<Batch
   saveState(holderPath, holderState);
   const holder: Leaf = { path: holderPath, state: holderState };
   if (!(await applyTop(repo, holder, built.top, branch.head))) throw new Error('fixture holder worktree dirty');
-  return { repo, herdr: fakeHerdr(f), builtOn, holder, record, branches: new Map([['hold', branch]]) };
+  return { repo, herdr: herdr(f), builtOn, holder, record, branches: new Map([['hold', branch]]) };
+}
+
+// The reconcile passes run on the hc fixture core; its env keeps the fake herdr for notices.
+function hcHerdr(f: HcFixture): () => HerdrFixture {
+  return () => ({ db: resolve(f.home, 'herdr.json'), env: f.env });
 }
 
 async function soloFixture(f: Fixture): Promise<BatchFixture> {
@@ -292,9 +303,9 @@ test.serial('a green batch appends one merged attempt line and log.jsonl keeps i
 });
 
 test.serial('a landed candidate reconciles to exactly one merged attempt line', async () => {
-  const f: Fixture = await fixture();
+  const f: HcFixture = await hcFixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, true);
+    const { holder, record, herdr } = await batchFixture(f, true, hcHerdr(f));
     await command(['git', 'push', 'origin', 'refs/heads/hold:main'], f.root);
     saveState(holder.path, {
       ...readState(holder.path),
@@ -308,7 +319,7 @@ test.serial('a landed candidate reconciles to exactly one merged attempt line', 
     expect(lines[0].holder).toBe('hold');
     expect(lines[0].attempt).toBe(record.attempt);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -602,9 +613,9 @@ test.serial('legacy held, split and ejected lines still parse beside a recorded 
 });
 
 test.serial('a reconciled merged line carries PSI stall deltas from batch creation', async () => {
-  const f: Fixture = await fixture();
+  const f: HcFixture = await hcFixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, true);
+    const { holder, record, herdr } = await batchFixture(f, true, hcHerdr(f));
     await command(['git', 'push', 'origin', 'refs/heads/hold:main'], f.root);
     saveBatch(holder.path, withStart({ ...record, candidate: record.top }, { cpu: 11, memory: 13, io: 17 }));
     const dir: string = pressureDir(f, { cpu: '21', memory: '23', io: '47' });
@@ -615,7 +626,7 @@ test.serial('a reconciled merged line carries PSI stall deltas from batch creati
     expect(lines[0].outcome).toBe('merged');
     expect(lines[0].pressure).toEqual({ cpu: 10, memory: 10, io: 30 });
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
