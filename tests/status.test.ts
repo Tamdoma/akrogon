@@ -16,6 +16,15 @@ import { command, type Result } from '../src/shell';
 import { z } from 'zod';
 import { readState, saveState, stateSchema, type State } from '../src/state';
 
+// The Listener and Watcher lines read the host's systemd user manager and hc sessions; tests/hc-status.test.ts
+// covers them on a fake systemctl, so exact board comparisons here leave them out.
+function withoutLiveness(stdout: string): string {
+  return stdout
+    .split('\n')
+    .filter((line: string) => !/^(Listener|Watcher): /.test(line))
+    .join('\n');
+}
+
 const columns: string[] = ['LEAF', 'PHASE', 'TIME', 'BLOCKED BY', 'NOTE', 'TURN'];
 function cell(output: string, row: string, name: string): string {
   const lines: string[] = output.split('\n');
@@ -177,7 +186,7 @@ for (const directory of ['missing', 'empty']) {
       const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
       const result: Result = await cli(f, ['status'], f.home);
       expect(result.code).toBe(0);
-      expect(result.stdout).toBe('repo\n  no open leaves');
+      expect(withoutLiveness(result.stdout)).toBe('repo\n  no open leaves');
       expect(result.stderr).toBe('');
       expect(result.stdout.split('\n').filter((line) => /^\s*\S+\s+failed\b/.test(line))).toHaveLength(0);
       expect(existsSync(open)).toBe(directory === 'empty');
@@ -244,7 +253,7 @@ test('leftovers lists kept paths by reason and host items, skips missing paths a
     );
     const board: Result = await cli(f, ['status'], f.home);
     expect(board.code).toBe(0);
-    expect(board.stdout).toBe('repo\n  no open leaves');
+    expect(withoutLiveness(board.stdout)).toBe('repo\n  no open leaves');
     expect(snapshot(f.home)).toEqual(before);
     // Host items still list with zero registered repos.
     const global: object = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
@@ -329,7 +338,7 @@ test('incomplete repositories report exact paths before readable trees and exit 
       const empty: Result = await cli(f, ['status'], f.home);
       expect(empty.code).toBe(0);
       expect(empty.stdout).not.toContain('unreadable');
-      expect(empty.stdout.split('\n')[0]).toBe('bad');
+      expect(withoutLiveness(empty.stdout).split('\n')[0]).toBe('bad');
       expect(cell(empty.stdout, leafRow(empty.stdout, 'resting'), 'PHASE')).toBe('parked');
       expect(empty.stdout).not.toContain('no open leaves');
       expect(cell(empty.stdout, leafRow(empty.stdout, 'visible'), 'PHASE')).toBe('implement');
@@ -587,7 +596,7 @@ test('--charts lists every chart with taken counts, fog items, stage and age', a
     expect(blank).toMatch(/blank\s+0\/0\s+0\s+empty\s+\d+m$/);
     expect((await cli(f, ['status', 'x', '--charts'])).code).not.toBe(0);
     rmSync(store, { recursive: true });
-    expect((await cli(f, ['status', '--charts'])).stdout).toBe('repo\n  no charts');
+    expect(withoutLiveness((await cli(f, ['status', '--charts'])).stdout)).toBe('repo\n  no charts');
   } finally {
     f.clean();
   }
