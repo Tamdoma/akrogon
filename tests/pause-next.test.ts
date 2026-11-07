@@ -1,59 +1,29 @@
 import { test, expect } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { command, finishCaptured, spawnFiles, type Captured, type Result } from '../src/shell';
-import { readState, saveState, type State } from '../src/state';
-import type { Database } from './fake-herdr';
-import {
-  cli,
-  entry,
-  fakeHerdr,
-  fakeSystemctl,
-  fixture,
-  killTree,
-  leaf,
-  leafTempRoot,
-  storeDir,
-  yaml,
-  type Fixture,
-} from './helpers';
+import { readState, type State } from '../src/state';
+import { z } from 'zod';
+import { cli, entry, fakeSystemctl, killTree, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
+import { delivered, hcFixture, setPrefixes, type HcFixture } from './hc-fixture';
 
-type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
+type DispatchFixture = HcFixture;
 
-async function dispatchFixture(): Promise<DispatchFixture> {
-  const f: Fixture = await fixture();
-  return { ...f, ...fakeHerdr(f) };
-}
-
-function database(f: DispatchFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
-}
-
-function saveDatabase(f: DispatchFixture, db: Database): void {
-  writeFileSync(f.db, JSON.stringify(db));
-}
-
-function calls(f: DispatchFixture): string[][] {
-  const path: string = f.db + '.calls';
-  if (!existsSync(path)) return [];
-  const text: string = readFileSync(path, 'utf8').trim();
-  if (text === '') return [];
-  return (
-    text
-      .split('\n')
-      .map((line) => JSON.parse(line) as string[])
-      // Session routing adds discovery calls; strip them so assertions see work calls.
-      .filter((args) => args[0] !== 'session' && args[0] !== 'workspace')
-  );
-}
-
+// akrogon's mutating hc calls (start, send, keys, kill, rm, label) recorded by the fixture's hc shim.
 function mutating(f: DispatchFixture): string[][] {
-  return calls(f).filter(
-    (argv) =>
-      (argv[0] === 'tab' && (argv[1] === 'create' || argv[1] === 'close')) ||
-      (argv[0] === 'pane' && argv[1] === 'split') ||
-      (argv[0] === 'agent' && (argv[1] === 'start' || argv[1] === 'prompt')),
-  );
+  return readFileSync(f.core.shimLog, 'utf8')
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line) => line.split('\t'))
+    .filter((argv) => ['run', 'send', 'keys', 'kill', 'rm', 'label'].includes(argv[0]));
+}
+
+// Every task any seat received, removed terminals included (the stand-in task logs outlive them).
+function prompts(f: DispatchFixture): string[] {
+  return readdirSync(f.core.standin)
+    .filter((name) => name.endsWith('.tasks'))
+    .flatMap((name) => readFileSync(resolve(f.core.standin, name), 'utf8').split('\n'))
+    .filter((text) => text !== '');
 }
 
 async function next(
@@ -65,81 +35,61 @@ async function next(
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
 
-function socket(f: DispatchFixture): string {
-  return `${f.db}-default.sock`;
+// Waits until every live seat of the leaf has finished its turn: an automatic pass then prompts it
+// again (a turn that ended without a phase move, plan D13).
+async function idle(f: DispatchFixture, slug: string): Promise<void> {
+  for (const seat of await f.core.terminals({ 'akrogon.leaf': slug }, false))
+    await f.core.waitFor(seat.address, (t) => t.status?.state === 'idle');
 }
 
-function paneEvent(type: string, pane: string, status: string = 'idle'): string {
-  return JSON.stringify({
-    event: type,
-    data: {
-      type,
-      pane_id: pane,
-      workspace_id: 'w1',
-      ...(type === 'pane_agent_status_changed' ? { agent_status: status } : {}),
-    },
-  });
-}
-
-function tabEvent(tab: string): string {
-  return JSON.stringify({ event: 'tab_closed', data: { type: 'tab_closed', tab_id: tab, workspace_id: 'w1' } });
-}
-
-/** Allocate a leaf with a manual pass, then leave its seats idle with expired grace so an automatic pass would prompt. */
+/** Allocate a leaf with a manual pass, then let its seat finish the turn so an automatic pass would prompt. */
 async function allocatedIdle(f: DispatchFixture, slug: string): Promise<string> {
   const path: string = leaf(f, slug, 'plan.synthesis');
   const run: Result = await next(f, [slug]);
   expect(run.code).toBe(0);
-  expect(database(f).prompts.length).toBeGreaterThan(0);
-  const db: Database = database(f);
-  for (const pane of db.panes) pane.agent_status = 'idle';
-  saveDatabase(f, db);
-  const state: State = readState(path);
-  saveState(path, { ...state, prompted_at: { ...state.prompted_at, A: '2020-01-01T00:00:00.000Z' } });
+  expect((await delivered(f, slug)).length).toBeGreaterThan(0);
+  await idle(f, slug);
   return path;
 }
 
-function resetHerdrEvidence(f: DispatchFixture): void {
-  const db: Database = database(f);
-  db.prompts = [];
-  db.starts = [];
-  saveDatabase(f, db);
-  const log: string = f.db + '.calls';
-  if (existsSync(log)) writeFileSync(log, '');
+// Starts a new evidence window: clears the hc call record and returns the task count so far.
+function resetEvidence(f: DispatchFixture): number {
+  writeFileSync(f.core.shimLog, '');
+  return prompts(f).length;
 }
 
-for (const kind of ['pane_agent_status_changed', 'pane_exited', 'pane_closed', 'tab_closed']) {
-  test(`automatic ${kind} does nothing for a paused repo`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
-    try {
-      const path: string = await allocatedIdle(f, 'build');
-      const pane: string = readState(path).pane.A as string;
-      const tab: string = readState(path).tab as string;
-      const env: NodeJS.ProcessEnv =
-        kind === 'tab_closed'
-          ? { HERDR_PLUGIN_EVENT_JSON: tabEvent(tab), HERDR_SOCKET_PATH: socket(f) }
-          : { HERDR_PANE_ID: pane, HERDR_PLUGIN_EVENT_JSON: paneEvent(kind, pane), HERDR_SOCKET_PATH: socket(f) };
-      const control: Result = await next(f, [], env);
-      expect(control.code).toBe(0);
-      expect(database(f).prompts.length).toBeGreaterThan(0);
-      const afterControl: State = readState(path);
-      saveState(path, { ...afterControl, prompted_at: { ...afterControl.prompted_at, A: '2020-01-01T00:00:00.000Z' } });
-      const db: Database = database(f);
-      for (const item of db.panes) item.agent_status = 'idle';
-      saveDatabase(f, db);
-      resetHerdrEvidence(f);
-      const worktree: string = readState(path).worktree as string;
-      expect((await cli(f, ['pause'])).code).toBe(0);
-      const gated: Result = await next(f, [], env);
-      expect(gated.code).toBe(0);
-      expect(gated.stderr).toBe('');
-      expect(mutating(f)).toEqual([]);
-      expect(database(f).prompts).toEqual([]);
-      expect(readState(path).phase).toBe('plan.synthesis');
-      expect(existsSync(worktree)).toBe(true);
-    } finally {
-      f.clean();
-    }
+test('automatic next --wake does nothing for a paused repo', async () => {
+  const f: DispatchFixture = await hcFixture();
+  try {
+    const path: string = await allocatedIdle(f, 'build');
+    const control: Result = await next(f, ['--wake']);
+    expect(control.code).toBe(0);
+    expect((await delivered(f, 'build')).length).toBe(2);
+    await idle(f, 'build');
+    const before: number = resetEvidence(f);
+    const worktree: string = readState(path).worktree as string;
+    expect((await cli(f, ['pause'])).code).toBe(0);
+    const gated: Result = await next(f, ['--wake']);
+    expect(gated.code).toBe(0);
+    expect(gated.stderr).toBe('');
+    expect(mutating(f)).toEqual([]);
+    expect(prompts(f)).toHaveLength(before);
+    expect(readState(path).phase).toBe('plan.synthesis');
+    expect(existsSync(worktree)).toBe(true);
+  } finally {
+    await f.clean();
+  }
+});
+
+// A second repo's space in the fixture core's herdr-app document, so the core holds both repos.
+async function addSpace(f: DispatchFixture, name: string, folder: string): Promise<void> {
+  const doc = z
+    .object({ version: z.number(), value: z.object({ spaces: z.array(z.unknown()) }).passthrough() })
+    .parse(await f.core.rpc('doc.get', { name: 'herdr-app' }));
+  await f.core.rpc('doc.set', {
+    name: 'herdr-app',
+    value: { ...doc.value, spaces: [...doc.value.spaces, { folder, id: `sp-${name}`, name, tabs: [] }] },
+    version: doc.version,
   });
 }
 
@@ -179,37 +129,30 @@ function leafIn(root: string, repo: string, slug: string, phase: string, extra: 
 }
 
 test('resume skips the paused repo and still dispatches the unpaused repo', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture();
   try {
     leaf(f, 'xleaf', 'plan.synthesis');
     const x: string = resolve(f.root, 'issues/open/issue/xleaf');
     expect((await next(f, ['xleaf'])).code).toBe(0);
     const yRoot: string = await secondRepo(f, 'y');
     const yPath: string = leafIn(yRoot, 'y', 'yleaf', 'plan.synthesis');
-    const db: Database = database(f);
-    db.workspaces = [...db.workspaces, { workspace_id: 'wy', label: 'y' }];
-    saveDatabase(f, db);
+    setPrefixes(f, { repo: 'rp', y: 'yp' });
+    await addSpace(f, 'y', yRoot);
     expect((await next(f, ['yleaf'], {}, yRoot)).code).toBe(0);
-    const withIdle: Database = database(f);
-    for (const pane of withIdle.panes) pane.agent_status = 'idle';
-    saveDatabase(f, withIdle);
-    for (const path of [x, yPath]) {
-      const state: State = readState(path);
-      saveState(path, { ...state, prompted_at: { ...state.prompted_at, A: '2020-01-01T00:00:00.000Z' } });
-    }
-    resetHerdrEvidence(f);
+    expect(readState(yPath).tab).not.toBe(undefined);
+    await idle(f, 'xleaf');
+    await idle(f, 'yleaf');
+    const yBefore: number = (await delivered(f, 'yleaf')).length;
+    const xBefore: number = (await delivered(f, 'xleaf')).length;
+    resetEvidence(f);
     expect((await cli(f, ['pause'])).code).toBe(0);
     const run: Result = await next(f, ['--resume']);
     expect(run.code).toBe(0);
-    const yPrompts = database(f).prompts.filter((prompt) =>
-      database(f).panes.some((pane) => pane.pane_id === prompt.pane && pane.tab_id.startsWith('wy:')),
-    );
-    expect(yPrompts.length).toBeGreaterThan(0);
-    const xPane: string = readState(x).pane.A as string;
-    expect(database(f).prompts.some((prompt) => prompt.pane === xPane)).toBe(false);
+    expect((await delivered(f, 'yleaf')).length).toBeGreaterThan(yBefore);
+    expect((await delivered(f, 'xleaf')).length).toBe(xBefore);
     expect(readState(x).phase).toBe('plan.synthesis');
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -222,7 +165,7 @@ const appliedBatch: object = {
 
 test('phase move in a paused repo commits while its merge wake prompts nothing', async () => {
   for (const paused of [true, false]) {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: DispatchFixture = await hcFixture();
     try {
       leaf(f, 'mover', 'implement');
       leaf(f, 'holder', 'merge', { batch: appliedBatch });
@@ -231,103 +174,98 @@ test('phase move in a paused repo commits while its merge wake prompts nothing',
       expect(moved.code).toBe(0);
       expect(readState(resolve(f.root, 'issues/open/issue/mover')).phase).toBe('check.review');
       if (paused) {
-        expect(database(f).prompts).toEqual([]);
+        expect(prompts(f)).toEqual([]);
         expect(mutating(f)).toEqual([]);
       } else {
-        expect(database(f).prompts.length).toBeGreaterThan(0);
+        expect(prompts(f).length).toBeGreaterThan(0);
       }
     } finally {
-      f.clean();
+      await f.clean();
     }
   }
 });
 
-test('manual next target dispatches a paused repo with an inherited event and stays paused', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('manual next target dispatches a paused repo and stays paused', async () => {
+  const f: DispatchFixture = await hcFixture();
   try {
     leaf(f, 'build', 'plan.synthesis');
     expect((await cli(f, ['pause'])).code).toBe(0);
-    const run: Result = await next(f, ['build'], {
-      HERDR_PLUGIN_EVENT_JSON: tabEvent('w9:t9'),
-      HERDR_SOCKET_PATH: socket(f),
-    });
+    const run: Result = await next(f, ['build']);
     expect(run.code).toBe(0);
-    expect(database(f).prompts.length).toBeGreaterThan(0);
+    expect((await delivered(f, 'build')).length).toBeGreaterThan(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
       'repo',
     ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
-test('manual next all dispatches a paused repo with an inherited event and stays paused', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('manual next all dispatches a paused repo and stays paused', async () => {
+  const f: DispatchFixture = await hcFixture();
   try {
     leaf(f, 'build', 'plan.synthesis');
     expect((await cli(f, ['pause'])).code).toBe(0);
-    const run: Result = await next(f, ['--all'], {
-      HERDR_PLUGIN_EVENT_JSON: tabEvent('w9:t9'),
-      HERDR_SOCKET_PATH: socket(f),
-    });
+    const run: Result = await next(f, ['--all']);
     expect(run.code).toBe(0);
-    expect(database(f).prompts.length).toBeGreaterThan(0);
+    expect((await delivered(f, 'build')).length).toBeGreaterThan(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
       'repo',
     ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
-test('bare manual next with a pane id dispatches a paused repo and stays paused', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('bare manual next dispatches a paused repo and stays paused', async () => {
+  const f: DispatchFixture = await hcFixture();
   try {
     leaf(f, 'build', 'plan.synthesis');
     expect((await cli(f, ['pause'])).code).toBe(0);
-    const run: Result = await next(f, [], { HERDR_PANE_ID: 'operator' });
+    const run: Result = await next(f, []);
     expect(run.code).toBe(0);
-    expect(database(f).prompts.length).toBeGreaterThan(0);
+    expect((await delivered(f, 'build')).length).toBeGreaterThan(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
       'repo',
     ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('manual next target completes a leaf and dispatches its dependent while paused', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture();
   try {
     leaf(f, 'done', 'merged', {}, 'done-issue');
     const dependent: string = leaf(f, 'dep', 'plan.synthesis', { 'blocked-by': ['done'] }, 'dep-issue');
     expect((await cli(f, ['pause'])).code).toBe(0);
     const run: Result = await next(f, ['done']);
     expect(run.code).toBe(0);
-    expect(database(f).prompts.some((prompt) => prompt.pane === readState(dependent).pane.A)).toBe(true);
+    expect((await delivered(f, 'dep')).some((prompt) => prompt.seat === 'a')).toBe(true);
+    expect(readState(dependent).tab).not.toBe(undefined);
     expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8'))).toEqual({ repo: true });
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('manual next target prompts the waiting merge holder while paused', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture();
   try {
     leaf(f, 'build', 'plan.synthesis', {}, 'build-issue');
-    const holder: string = leaf(f, 'holder', 'merge', { batch: appliedBatch }, 'merge-issue');
+    leaf(f, 'holder', 'merge', { batch: appliedBatch }, 'merge-issue');
     expect((await cli(f, ['pause'])).code).toBe(0);
     const run: Result = await next(f, ['build']);
     expect(run.code).toBe(0);
-    expect(database(f).prompts.some((prompt) => prompt.pane === readState(holder).pane.B)).toBe(true);
+    expect((await delivered(f, 'holder')).some((prompt) => prompt.seat === 'b')).toBe(true);
     expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8'))).toEqual({ repo: true });
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('unpause relaunches closed seats with the current seat config', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'build', 'plan.synthesis');
     expect((await next(f, ['build'])).code).toBe(0);
@@ -336,45 +274,57 @@ test('unpause relaunches closed seats with the current seat config', async () =>
     };
     global.slots.a.model = 'fresh-model';
     yaml(resolve(f.home, 'config.yaml'), global);
-    const db: Database = database(f);
-    db.panes = [];
-    db.tabs = [];
-    saveDatabase(f, db);
-    resetHerdrEvidence(f);
+    const closed: string = z.string().parse(readState(path).seat.A?.address);
+    expect((await f.core.hc(['kill', closed])).code).toBe(0);
+    expect((await f.core.hc(['rm', closed])).code).toBe(0);
+    resetEvidence(f);
     expect((await cli(f, ['pause'])).code).toBe(0);
     const run: Result = await cli(f, ['unpause'], f.root, f.env);
     expect(run.code).toBe(0);
     expect(run.stdout).toContain('unpaused');
-    expect(database(f).prompts.length).toBeGreaterThan(0);
-    expect(JSON.stringify(database(f).starts)).toContain('fresh-model');
+    const seats = await f.core.terminals({ 'akrogon.leaf': 'build' }, false);
+    expect(seats).toHaveLength(1);
+    expect(f.core.tasks(seats[0].address).length).toBeGreaterThan(0);
+    const pid: number = z.number().parse(seats[0].pid);
+    expect(readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0')).toContain('fresh-model');
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([]);
     expect(readState(path).tab).not.toBe(undefined);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('unpause runs deferred merged cleanup', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture({ window: 'open' });
   f.env = { ...f.env, ...fakeSystemctl(f).env };
   try {
-    leaf(f, 'live', 'merged', { tab: 'w1:t9' }, 'issue-a');
-    leaf(f, 'dead', 'merged', { tab: 'w1:t8' }, 'issue-b');
-    const db: Database = database(f);
-    // The live leaf's seat sits in the repo workspace inside its worktree path,
-    // the shape a recorded tab needs to be closable.
-    db.tabs = [...db.tabs, { tab_id: 'w1:t9', label: 'live', workspace_id: 'w1' }];
-    db.panes = [
-      ...db.panes,
-      {
-        pane_id: 'w1:p9',
-        tab_id: 'w1:t9',
-        cwd: resolve(storeDir(f), 'live'),
-        agent: null,
-        agent_status: 'unknown',
-      },
-    ];
-    saveDatabase(f, db);
+    // The live leaf's seat terminal holds its tab in the repo space, the shape a recorded tab needs to be closable.
+    const tab: string = 'aklivetab';
+    leaf(f, 'live', 'merged', { tab }, 'issue-a');
+    leaf(f, 'dead', 'merged', { tab: 'akdeadtab' }, 'issue-b');
+    const seat: Result = await f.core.hc([
+      'run',
+      '--bg',
+      '--json',
+      '--no-parent',
+      '--cwd',
+      f.home,
+      '--label',
+      'akrogon=1',
+      '--label',
+      'akrogon.repo=repo',
+      '--label',
+      'akrogon.leaf=live',
+      '--label',
+      'akrogon.seat=a',
+      '--label',
+      `herdr.space=sp-${f.core.session}`,
+      '--label',
+      `herdr.tab=${tab}`,
+      '--',
+      'cat',
+    ]);
+    expect(seat.code).toBe(0);
     const { createHash } = await import('node:crypto');
     const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
     const temp: string = resolve(leafTempRoot(f), hex(f.root).slice(0, 4), hex(f.root + '\n' + 'dead').slice(0, 8));
@@ -383,15 +333,15 @@ test('unpause runs deferred merged cleanup', async () => {
     expect((await cli(f, ['pause'])).code).toBe(0);
     const run: Result = await cli(f, ['unpause'], f.root, f.env);
     expect(run.code).toBe(0);
-    expect(database(f).tabs.some((tab) => tab.tab_id === 'w1:t9')).toBe(false);
+    expect(f.core.appCalls().map((call) => call.argv)).toContainEqual(['do', 'tab.close', '--id', tab]);
     expect(existsSync(temp)).toBe(false);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('unpause starts tab-less leaves only through the dependent cascade', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture();
   try {
     leaf(f, 'm', 'merged');
     leaf(f, 'c', 'plan.synthesis', { 'blocked-by': ['m'] });
@@ -401,17 +351,17 @@ test('unpause starts tab-less leaves only through the dependent cascade', async 
     expect(run.code).toBe(0);
     const c: State = readState(resolve(f.root, 'issues/open/issue/c'));
     expect(c.tab).not.toBe(undefined);
-    expect(database(f).prompts.length).toBeGreaterThan(0);
+    expect((await delivered(f, 'c')).length).toBeGreaterThan(0);
     const d: State = readState(resolve(f.root, 'issues/open/issue/d'));
     expect(d.tab).toBe(undefined);
     expect(d.worktree).toBe(undefined);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('unpause starts an open dependent of an already closed leaf', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture();
   try {
     leaf(f, 'm', 'merged', {}, 'm-owner');
     mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
@@ -421,12 +371,12 @@ test('unpause starts an open dependent of an already closed leaf', async () => {
     expect((await cli(f, ['unpause'], f.root, f.env)).code).toBe(0);
     expect(readState(resolve(f.root, 'issues/open/issue/c')).tab).not.toBe(undefined);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('unpause failure exits non-zero with the pause cleared', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'z', 'plan.synthesis', { worktree: '/nonexistent-z' });
     writeFileSync(resolve(path, 'state.yaml'), 'slug: [');
@@ -437,12 +387,12 @@ test('unpause failure exits non-zero with the pause cleared', async () => {
     expect(run.stderr.length).toBeGreaterThan(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('invalid pause file fails automatic and manual next naming the file', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture();
   try {
     leaf(f, 'build', 'plan.synthesis');
     const file: string = resolve(f.home, 'paused.yaml');
@@ -452,24 +402,21 @@ test('invalid pause file fails automatic and manual next naming the file', async
     expect((await next(f, ['build'])).code).not.toBe(0);
     expect((await next(f, ['build'])).stderr).toContain(file);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
-test('invalid pause file fails an automatic working event naming the file', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('invalid pause file fails an automatic wake naming the file', async () => {
+  const f: DispatchFixture = await hcFixture();
   try {
     const file: string = resolve(f.home, 'paused.yaml');
     writeFileSync(file, '[invalid]\n');
-    const run: Result = await next(f, [], {
-      HERDR_PLUGIN_EVENT_JSON: paneEvent('pane_agent_status_changed', 'p1', 'working'),
-      HERDR_SOCKET_PATH: socket(f),
-    });
+    const run: Result = await next(f, ['--wake']);
     expect(run.code).not.toBe(0);
     expect(run.stderr).toContain(file);
     expect(mutating(f)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -502,16 +449,16 @@ function cliEnv(f: DispatchFixture, extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv
 }
 
 test('race A: pause recorded before the locked merge section suppresses the launch', async () => {
-  const control: DispatchFixture = await dispatchFixture();
+  const control: DispatchFixture = await hcFixture();
   try {
     const controlPath: string = leaf(control, 'holder', 'merge');
     const run: Result = await next(control, ['--resume']);
     expect(run.code).toBe(0);
     expect(readState(controlPath).batch?.owner).toBe('command');
   } finally {
-    control.clean();
+    await control.clean();
   }
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture();
   const child: { current?: Bun.Subprocess } = {};
   try {
     const holderPath: string = leaf(f, 'holder', 'merge');
@@ -521,7 +468,7 @@ test('race A: pause recorded before the locked merge section suppresses the laun
     barrierGit(resolve(f.home, 'gitbin'), barrier, realGit);
     const env: NodeJS.ProcessEnv = cliEnv(f, {
       ...f.env,
-      PATH: `${resolve(f.home, 'gitbin')}:${resolve(f.home, 'bin')}:${process.env.PATH}`,
+      PATH: `${resolve(f.home, 'gitbin')}:${f.env.PATH}`,
     });
     const spawned: { child: Bun.Subprocess; captured: Captured } = spawnFiles(
       [process.execPath, entry, 'next', '--resume'],
@@ -541,32 +488,34 @@ test('race A: pause recorded before the locked merge section suppresses the laun
     const { stdout, stderr, code }: Result = await finishCaptured(child.current, spawned.captured);
     expect({ stdout, stderr, code }).toMatchObject({ code: 0 });
     expect(mutating(f)).toEqual([]);
-    expect(database(f).prompts).toEqual([]);
+    expect(prompts(f)).toEqual([]);
     expect(readState(holderPath).batch?.owner).toBeUndefined();
   } finally {
     if (child.current !== undefined) killTree(child.current);
-    f.clean();
+    await f.clean();
   }
 });
 
 test('race B: pause waits for a held launch lock, later automatic work is suppressed', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: DispatchFixture = await hcFixture();
   const procs: Bun.Subprocess<'ignore', 'pipe', 'pipe'>[] = [];
   try {
     await allocatedIdle(f, 'build');
-    resetHerdrEvidence(f);
+    const sent: number = resetEvidence(f);
     const barrier: string = resolve(f.home, 'barrier');
     mkdirSync(barrier);
-    const wrapper: string = resolve(f.home, 'herdrbin');
+    // The pass blocks inside its prompt send until the test releases it.
+    const wrapper: string = resolve(f.home, 'hcbin-barrier');
     mkdirSync(wrapper, { recursive: true });
+    const shim: string = z.string().parse(Bun.which('hc', { PATH: f.env.PATH }));
     writeFileSync(
-      resolve(wrapper, 'herdr'),
-      `#!/bin/sh\n# Skip the --session prefix session routing prepends.\nif [ "$1" = "--session" ]; then shift; shift; fi\nif [ "$1" = "agent" ] && [ "$2" = "prompt" ] && [ ! -e '${barrier}/done' ]; then\n  touch '${barrier}/entered'\n  while [ ! -e '${barrier}/release' ]; do sleep 0.05; done\n  touch '${barrier}/done'\nfi\nexec '${resolve(f.home, 'bin/herdr')}' "$@"\n`,
+      resolve(wrapper, 'hc'),
+      `#!/bin/sh\nif [ "$1" = "send" ] && [ ! -e '${barrier}/done' ]; then\n  touch '${barrier}/entered'\n  while [ ! -e '${barrier}/release' ]; do sleep 0.05; done\n  touch '${barrier}/done'\nfi\nexec '${shim}' "$@"\n`,
     );
-    chmodSync(resolve(wrapper, 'herdr'), 0o755);
+    chmodSync(resolve(wrapper, 'hc'), 0o755);
     const env: NodeJS.ProcessEnv = cliEnv(f, {
       ...f.env,
-      PATH: `${wrapper}:${resolve(f.home, 'bin')}:${process.env.PATH}`,
+      PATH: `${wrapper}:${f.env.PATH}`,
     });
     const pass = Bun.spawn([process.execPath, entry, 'next', '--resume'], {
       cwd: f.root,
@@ -594,19 +543,14 @@ test('race B: pause waits for a held launch lock, later automatic work is suppre
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
       'repo',
     ]);
-    expect(database(f).prompts.length).toBeGreaterThan(0);
+    expect(prompts(f).length).toBeGreaterThan(sent);
     const before: number = mutating(f).length;
-    const idle: Database = database(f);
-    for (const pane of idle.panes) pane.agent_status = 'idle';
-    saveDatabase(f, idle);
-    const build: string = resolve(f.root, 'issues/open/issue/build');
-    const expired: State = readState(build);
-    saveState(build, { ...expired, prompted_at: { ...expired.prompted_at, A: '2020-01-01T00:00:00.000Z' } });
+    await idle(f, 'build');
     const again: Result = await next(f, ['--resume']);
     expect(again.code).toBe(0);
     expect(mutating(f).length).toBe(before);
   } finally {
     for (const proc of procs) killTree(proc);
-    f.clean();
+    await f.clean();
   }
 });
