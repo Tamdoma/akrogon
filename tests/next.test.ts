@@ -3718,7 +3718,7 @@ test('unstamped merge dispatch uses log order and refuses unreadable history', a
 
 // blocked-report
 test('blocked-report epic folder starts ready and reports dep, input, failed', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'ready', 'plan.synthesis', {}, 'epic');
     leaf(f, 'depblocked', 'plan.synthesis', { 'blocked-by': ['outside'] }, 'epic');
@@ -3736,16 +3736,16 @@ test('blocked-report epic folder starts ready and reports dep, input, failed', a
     expect(waits(result)).toEqual(['waiting: depblocked on outside (plan.synthesis)']);
     expect(skips(result).find((s) => s.slug === 'inputblocked')!.error).toContain('FOO');
     expect(skips(result).find((s) => s.slug === 'failedleaf')!.error).toContain('phase recovery');
-    expect(database(f).prompts.map((p) => p.text)).toEqual([
+    expect((await allTasks(f)).map((p) => p.text)).toEqual([
       `plan-issue ready slot=A phase=plan.synthesis leaf=${f.root}/issues/open/epic/ready`,
     ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report dep detail labels parked, missing, unreadable and skips merged', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'phased', 'implement', {}, 'deps');
     leaf(f, 'merged-open', 'merged', {}, 'deps');
@@ -3779,14 +3779,14 @@ test('blocked-report dep detail labels parked, missing, unreadable and skips mer
     expect(mainSkip.error).toContain('(unreadable)');
     expect(mainSkip.error).not.toContain('merged-open');
     expect(mainSkip.error).not.toContain('merged-closed');
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await allTasks(f)).toHaveLength(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report input detail names gaps without values and defers to deps', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     writeFileSync(resolve(f.root, '.env'), 'PRESENT=s3cr3t-value-xyz\n');
     const inputPath: string = leaf(f, 'inputblocked', 'plan.synthesis');
@@ -3853,14 +3853,14 @@ test('blocked-report input detail names gaps without values and defers to deps',
     const bothResult: Result = await next(f, ['bothblocked']);
     expect(bothResult.code).toBe(0);
     expect(waits(bothResult)).toEqual(['waiting: bothblocked on unmerged2 (plan.synthesis)']);
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await allTasks(f)).toHaveLength(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report a failed dependency stays an error', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'stuck', 'failed');
     leaf(f, 'dependent', 'plan.synthesis', { 'blocked-by': ['stuck'] });
@@ -3869,12 +3869,12 @@ test('blocked-report a failed dependency stays an error', async () => {
     expect(skips(result).find((s) => s.slug === 'dependent')!.error).toContain('stuck (failed)');
     expect(waits(result)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report failed and merged share a folder without a merged line', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'failedleaf', 'failed', {}, 'mixed');
     leaf(f, 'mergedleaf', 'merged', {}, 'mixed');
@@ -3885,14 +3885,14 @@ test('blocked-report failed and merged share a folder without a merged line', as
     expect(failedSkip.slug).toBe('failedleaf');
     expect(failedSkip.error).toContain('failed');
     expect(failedSkip.error).toContain('phase recovery');
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await allTasks(f)).toHaveLength(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report same line by slug, leaf path, and epic path', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'ready', 'plan.synthesis', {}, 'epic');
     const blockedPath: string = leaf(f, 'blocked', 'plan.synthesis', { 'blocked-by': ['outside'] }, 'epic');
@@ -3904,16 +3904,16 @@ test('blocked-report same line by slug, leaf path, and epic path', async () => {
       expect(r.code).toBe(0);
       expect(waits(r)).toEqual(['waiting: blocked on outside (plan.synthesis)']);
     }
-    expect(database(f).prompts.map((p) => p.text)).toEqual([
+    expect((await allTasks(f)).map((p) => p.text)).toEqual([
       `plan-issue ready slot=A phase=plan.synthesis leaf=${f.root}/issues/open/epic/ready`,
     ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report manual forms bare, all inside, all outside match', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'ready', 'plan.synthesis');
     leaf(f, 'blocked', 'plan.synthesis', { 'blocked-by': ['ready'] });
@@ -3925,40 +3925,20 @@ test('blocked-report manual forms bare, all inside, all outside match', async ()
       expect(waits(r)).toEqual(['waiting: blocked on ready (plan.synthesis)']);
     }
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
-test('blocked-report manual forms stay manual with pane and event set', async () => {
-  const f: DispatchFixture = await dispatchFixture();
-  try {
-    leaf(f, 'ready', 'plan.synthesis');
-    leaf(f, 'blocked', 'plan.synthesis', { 'blocked-by': ['ready'] });
-    const event: NodeJS.ProcessEnv = paneEvent(f, 'p1', 'idle');
-    const tPane: Result = await next(f, ['blocked'], { HERDR_PANE_ID: 'operator' });
-    const tEvent: Result = await next(f, ['blocked'], event);
-    const aPane: Result = await next(f, ['--all'], { HERDR_PANE_ID: 'operator' });
-    const aEvent: Result = await next(f, ['--all'], event);
-    for (const r of [tPane, tEvent, aPane, aEvent]) {
-      expect(r.code).toBe(0);
-      expect(waits(r)).toEqual(['waiting: blocked on ready (plan.synthesis)']);
-    }
-  } finally {
-    f.clean();
-  }
-}, 15000);
-
-test('blocked-report automatic silence on hook, resume, and merge wake', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('blocked-report automatic silence on wake, resume, and merge wake', async () => {
+  const f: HcFixture = await hcFixture();
   try {
     const readyPath: string = leaf(f, 'ready', 'plan.synthesis');
     leaf(f, 'blocked', 'plan.synthesis', { 'blocked-by': ['ready'] });
     leaf(f, 'failedleaf', 'failed');
     expect((await next(f, ['ready'])).code).toBe(0);
-    const paneA: string = readState(readyPath).pane.A!;
-    const hook: Result = await next(f, [], paneEvent(f, paneA, 'idle'));
-    expect(hook.code).toBe(0);
-    expect(hook.stderr).toBe('');
+    const wake: Result = await next(f, ['--wake']);
+    expect(wake.code).toBe(0);
+    expect(wake.stderr).toBe('');
     saveState(readyPath, { ...readState(readyPath), 'blocked-by': ['ghost'] });
     const resumed: Result = await next(f, ['--resume'], {}, f.home);
     expect(resumed.code).toBe(0);
@@ -3969,12 +3949,12 @@ test('blocked-report automatic silence on hook, resume, and merge wake', async (
     expect(phased.stderr).not.toContain('blocked');
     expect(phased.stderr).not.toContain('failedleaf');
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report dependent not picked when started by completion', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'first', 'merged', {}, 'first-issue');
     leaf(f, 'other', 'plan.synthesis', {}, 'other-issue');
@@ -3984,31 +3964,31 @@ test('blocked-report dependent not picked when started by completion', async () 
     expect(result.stderr).toBe('');
     expect(readState(second).tab).toBeUndefined();
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report real errors still report on automatic paths', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis');
     writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
     const healthyPath: string = leaf(f, 'healthy', 'plan.synthesis');
     expect((await next(f, ['healthy'])).code).toBe(1);
-    const paneA: string = readState(healthyPath).pane.A!;
-    const hook: Result = await next(f, [], paneEvent(f, paneA, 'idle'));
-    expect(hook.code).toBe(1);
-    expect(hook.stderr).toContain(malformed);
+    expect(readState(healthyPath).seat.A).toBeDefined();
+    const wake: Result = await next(f, ['--wake']);
+    expect(wake.code).toBe(1);
+    expect(wake.stderr).toContain(malformed);
     const resumed: Result = await next(f, ['--resume'], {}, f.home);
     expect(resumed.code).toBe(1);
     expect(resumed.stderr).toContain(malformed);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report no line for capacity waits', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'first', 'plan.synthesis');
     leaf(f, 'second', 'plan.synthesis');
@@ -4016,54 +3996,48 @@ test('blocked-report no line for capacity waits', async () => {
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
-    expect(database(f).tabs).toHaveLength(1);
+    expect(await liveTabs(f)).toHaveLength(1);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report no line for merge turn waits', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
-    const aa: { path: string; b: string } = await allocatedLeaf(f, 'aa');
-    const bb: { path: string; b: string } = await allocatedLeaf(f, 'bb');
+    const aa: { path: string } = await allocatedLeaf(f, 'aa');
+    const bb: { path: string } = await allocatedLeaf(f, 'bb');
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
-    saveDatabase(f, {
-      ...database(f),
-      prompts: [],
-      panes: database(f).panes.map((p) => ({ ...p, agent_status: 'idle' })),
-    });
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
     expect(readState(aa.path).batch?.owner).toBe('command');
-    expect(mergePrompts(f)).toEqual([]);
+    expect(await mergePrompts(f)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 
 test('blocked-report no line for busy seats', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const busyPath: string = leaf(f, 'busy', 'plan.synthesis', {}, 'epic');
     leaf(f, 'ready', 'plan.synthesis', {}, 'epic');
+    holdTurns(f, 'blocked:kind=permission:msg=Allow?');
     expect((await next(f, ['busy'])).code).toBe(0);
-    const paneA: string = readState(busyPath).pane.A!;
-    const db: Database = database(f);
-    saveDatabase(f, {
-      ...db,
-      panes: db.panes.map((p) => (p.pane_id === paneA ? { ...p, agent_status: 'blocked' } : p)),
-    });
-    const promptsBefore: number = database(f).prompts.length;
+    const a: string = z.string().parse(readState(busyPath).seat.A?.address);
+    await f.core.waitFor(a, (t: Terminal) => t.status?.state === 'blocked');
+    const promptsBefore: number = (await allTasks(f)).length;
     const result: Result = await next(f, [resolve(f.root, 'issues/open/epic')]);
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
-    expect(database(f).prompts).toHaveLength(promptsBefore + 1);
-    expect(database(f).prompts.at(-1)!.text).toContain('ready');
+    expect(await allTasks(f)).toHaveLength(promptsBefore + 1);
+    expect((await allTasks(f)).filter((p) => p.slug === 'ready').map((p) => p.text)).toEqual([
+      `plan-issue ready slot=A phase=plan.synthesis leaf=${f.root}/issues/open/epic/ready`,
+    ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 15000);
 function dispatchedSlugs(f: DispatchFixture): string[] {
