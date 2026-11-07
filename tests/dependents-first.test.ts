@@ -1,9 +1,8 @@
 import { test, expect } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { fixture, cli, leaf, fakeHerdr, type Fixture } from './helpers';
+import { fixture, cli, leaf, type Fixture } from './helpers';
+import { delivered, hcFixture, type HcFixture } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import type { Result } from '../src/shell';
-import type { Database } from './fake-herdr';
 
 const columns: string[] = ['LEAF', 'PHASE', 'TIME', 'BLOCKED BY', 'NOTE', 'TURN'];
 function cell(output: string, row: string, name: string): string {
@@ -89,8 +88,7 @@ test('TURN ignores merged leaves when counting dependents', async () => {
 });
 
 test('next --all dispatches a leaf with unmerged dependents before an earlier leaf with none', async () => {
-  const base: Fixture = await fixture();
-  const f: Fixture & { db: string; env: NodeJS.ProcessEnv } = { ...base, ...fakeHerdr(base) };
+  const f: HcFixture = await hcFixture();
   try {
     // Discovery enumerates last-created first on tmpfs, so creating few after
     // the many chain puts few before many in the unsorted visit order.
@@ -102,12 +100,16 @@ test('next --all dispatches a leaf with unmerged dependents before an earlier le
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('waiting: d1 on many (plan.synthesis)');
     expect(result.stdout).toContain('waiting: d2 on d1 (plan.synthesis)');
-    const prompts: Database['prompts'] = (JSON.parse(readFileSync(f.db, 'utf8')) as Database).prompts;
+    // hc numbers terminals in start order, so the address order is the dispatch order.
+    const prompts: { address: string; text: string }[] = [
+      ...(await delivered(f, 'many')),
+      ...(await delivered(f, 'few')),
+    ].sort((a, b) => Number(a.address.slice(1)) - Number(b.address.slice(1)));
     expect(prompts.map((prompt) => prompt.text)).toEqual([
       `plan-issue many slot=A phase=plan.synthesis leaf=${many}`,
       `plan-issue few slot=A phase=plan.synthesis leaf=${few}`,
     ]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 }, 20000);
