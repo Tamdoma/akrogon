@@ -56,6 +56,22 @@ for (const window of ['open', 'closed'] as const)
     }
   });
 
+// Reproduction: a merged leaf whose seat already finished kept its finished terminal, because the
+// close ran only for a tab a live terminal held.
+test("a merged leaf's finished seat terminal is removed too", async () => {
+  const { f, core, path } = await setup('ht-finished');
+  try {
+    const seat: Terminal = (await leafTerminals(core, 'ht-finished'))[0];
+    expect((await core.hc(['kill', seat.address])).code).toBe(0);
+    expect((await core.get(seat.address)).state).toBe('finished');
+    merge(path);
+    expect((await cli(f, ['next', '--resume'], f.root, core.env)).code).toBe(0);
+    expect(await leafTerminals(core, 'ht-finished')).toEqual([]);
+  } finally {
+    await teardown(f, core, 'ht-finished');
+  }
+});
+
 test('akrogon stop ends and removes the leaf seat terminals', async () => {
   const { f, core } = await setup('ht-stop');
   try {
