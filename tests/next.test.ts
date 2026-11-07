@@ -4040,14 +4040,13 @@ test('blocked-report no line for busy seats', async () => {
     await f.clean();
   }
 }, 15000);
-function dispatchedSlugs(f: DispatchFixture): string[] {
-  return database(f)
-    .prompts.map((prompt) => prompt.text.split(' ')[1])
-    .sort();
+// The slug each seat task names, sorted: the leaves a pass dispatched.
+async function dispatchedSlugs(f: HcFixture): Promise<string[]> {
+  return (await allTasks(f)).map((prompt) => prompt.text.split(' ')[1]).sort();
 }
 
-async function namedTargetRepo(): Promise<DispatchFixture> {
-  const f: DispatchFixture = await dispatchFixture();
+async function namedTargetRepo(): Promise<HcFixture> {
+  const f: HcFixture = await hcFixture();
   configure(f, { max_active: 8 });
   leaf(f, 'e1-l1', 'plan.synthesis', {}, 'epic-e/n1');
   leaf(f, 'e1-l2', 'plan.synthesis', {}, 'epic-e/n1');
@@ -4063,9 +4062,10 @@ function stateSnapshot(paths: string[]): string[] {
   return paths.map((path) => readFileSync(resolve(path, 'state.yaml'), 'utf8'));
 }
 
-function expectNoLaunch(f: DispatchFixture, paths: string[], before: string[]): void {
+async function expectNoLaunch(f: HcFixture, paths: string[], before: string[]): Promise<void> {
   expect(paths.map((path) => readFileSync(resolve(path, 'state.yaml'), 'utf8'))).toEqual(before);
-  expect(calls(f)).toEqual([]);
+  expect(allStarts(f)).toEqual([]);
+  expect(await f.core.terminals({ akrogon: '1' }, true)).toEqual([]);
   expect(existsSync(storeDir(f))).toBe(false);
   expect(existsSync(resolve(f.home, '.lock'))).toBe(false);
   expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
@@ -4073,9 +4073,10 @@ function expectNoLaunch(f: DispatchFixture, paths: string[], before: string[]): 
 
 // A refusal inside the dispatch lock creates `.lock` itself, so unlike
 // expectNoLaunch it cannot assert that file's absence.
-function expectRefused(f: DispatchFixture, paths: string[], before: string[]): void {
+async function expectRefused(f: HcFixture, paths: string[], before: string[]): Promise<void> {
   expect(paths.map((path) => readFileSync(resolve(path, 'state.yaml'), 'utf8'))).toEqual(before);
-  expect(calls(f)).toEqual([]);
+  expect(allStarts(f)).toEqual([]);
+  expect(await f.core.terminals({ akrogon: '1' }, true)).toEqual([]);
   expect(existsSync(storeDir(f))).toBe(false);
   expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
 }
@@ -4088,8 +4089,8 @@ const namedTargetOwners: { name: string; path: string; slugs: string[] }[] = [
 for (const owner of namedTargetOwners) {
   for (const cwd of ['root', 'sub', 'worktree'] as const) {
     test(`named target equivalence: owner ${owner.name} matches folder path ${owner.path} from ${cwd}`, async () => {
-      const named: DispatchFixture = await namedTargetRepo();
-      const pathed: DispatchFixture = await namedTargetRepo();
+      const named: HcFixture = await namedTargetRepo();
+      const pathed: HcFixture = await namedTargetRepo();
       try {
         let from: string = named.root;
         if (cwd === 'sub') from = resolve(named.root, 'sub');
@@ -4097,73 +4098,75 @@ for (const owner of namedTargetOwners) {
           const side: string = resolve(named.root, 'issues/open/side-issue/side');
           expect((await next(named, ['side'])).code).toBe(0);
           from = readState(side).worktree!;
-          saveDatabase(named, { ...database(named), prompts: [] });
         }
+        // The side leaf's own task, from the worktree variant's setup pass, is not part of the comparison.
+        const slugsOf = async (g: HcFixture): Promise<string[]> =>
+          (await dispatchedSlugs(g)).filter((slug) => slug !== 'side');
         const byName: Result = await next(named, [owner.name], {}, from);
         const byPath: Result = await next(pathed, [owner.path]);
         expect(byName.code).toBe(0);
         expect(byPath.code).toBe(0);
-        expect(dispatchedSlugs(named)).toEqual(owner.slugs);
-        expect(dispatchedSlugs(pathed)).toEqual(owner.slugs);
-        expect(dispatchedSlugs(named)).toEqual(dispatchedSlugs(pathed));
+        expect(await slugsOf(named)).toEqual(owner.slugs);
+        expect(await slugsOf(pathed)).toEqual(owner.slugs);
+        expect(await slugsOf(named)).toEqual(await slugsOf(pathed));
       } finally {
-        named.clean();
-        pathed.clean();
+        await named.clean();
+        await pathed.clean();
       }
     }, 15000);
   }
 }
 
 test('leaf slug selection keeps open and closed behavior', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'staying', 'plan.synthesis');
     expect((await next(f, ['staying'])).code).toBe(0);
-    expect(dispatchedSlugs(f)).toEqual(['staying']);
+    expect(await dispatchedSlugs(f)).toEqual(['staying']);
   } finally {
-    f.clean();
+    await f.clean();
   }
-  const g: DispatchFixture = await dispatchFixture();
+  const g: HcFixture = await hcFixture();
   try {
     const path: string = leaf(g, 'moved', 'plan.synthesis');
     const closed: string = resolve(g.root, 'issues/closed/issue');
     mkdirSync(closed, { recursive: true });
     renameSync(path, resolve(closed, 'moved'));
     expect((await next(g, ['moved'])).code).toBe(0);
-    expect(dispatchedSlugs(g)).toEqual(['moved']);
+    expect(await dispatchedSlugs(g)).toEqual(['moved']);
   } finally {
-    g.clean();
+    await g.clean();
   }
 });
 
 test('existing folder shadows a same-named owner or leaf', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     configure(f, { max_active: 8 });
     leaf(f, 'a1', 'plan.synthesis', {}, 'epic-a/dup');
     leaf(f, 'b1', 'plan.synthesis', {}, 'epic-b/dup');
     const result: Result = await next(f, ['dup'], {}, resolve(f.root, 'issues/open/epic-a'));
     expect(result.code).toBe(0);
-    expect(dispatchedSlugs(f)).toEqual(['a1']);
+    expect(await dispatchedSlugs(f)).toEqual(['a1']);
   } finally {
-    f.clean();
+    await f.clean();
   }
-  const g: DispatchFixture = await dispatchFixture();
+  const g: HcFixture = await hcFixture();
   try {
     leaf(g, 'ghost', 'plan.synthesis');
     mkdirSync(resolve(g.root, 'sub/ghost'), { recursive: true });
     const result: Result = await next(g, ['ghost'], {}, resolve(g.root, 'sub'));
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('No leaves match');
-    expect(database(g).prompts).toHaveLength(0);
-    expect(calls(g)).toEqual([]);
+    expect(await allTasks(g)).toHaveLength(0);
+    expect(allStarts(g)).toEqual([]);
   } finally {
-    g.clean();
+    await g.clean();
   }
 });
 
 test('ambiguous name refuses two same-name issues under different epics', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const a: string = leaf(f, 'a1', 'plan.synthesis', {}, 'ep-a/dup');
     const b: string = leaf(f, 'b1', 'plan.synthesis', {}, 'ep-b/dup');
@@ -4172,14 +4175,14 @@ test('ambiguous name refuses two same-name issues under different epics', async 
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('issue issues/open/ep-a/dup');
     expect(result.stderr).toContain('issue issues/open/ep-b/dup');
-    expectNoLaunch(f, [a, b], before);
+    await expectNoLaunch(f, [a, b], before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('ambiguous name refuses an epic and its same-name issue', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const a: string = leaf(f, 'l1', 'plan.synthesis', {}, 'same/same');
     const b: string = leaf(f, 'l2', 'plan.synthesis', {}, 'same/other');
@@ -4188,40 +4191,40 @@ test('ambiguous name refuses an epic and its same-name issue', async () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('epic issues/open/same');
     expect(result.stderr).toContain('issue issues/open/same/same');
-    expectNoLaunch(f, [a, b], before);
+    await expectNoLaunch(f, [a, b], before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('same-work name starts an issue and its only same-name leaf once', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'exp', 'plan.synthesis', {}, 'exp');
     const result: Result = await next(f, ['exp']);
     expect(result.code).toBe(0);
-    expect(dispatchedSlugs(f)).toEqual(['exp']);
+    expect(await dispatchedSlugs(f)).toEqual(['exp']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('same-work name starts an epic and its only same-name issue once', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     configure(f, { max_active: 8 });
     leaf(f, 'l1', 'plan.synthesis', {}, 'same/same');
     leaf(f, 'l2', 'plan.synthesis', {}, 'same/same');
     const result: Result = await next(f, ['same']);
     expect(result.code).toBe(0);
-    expect(dispatchedSlugs(f)).toEqual(['l1', 'l2']);
+    expect(await dispatchedSlugs(f)).toEqual(['l1', 'l2']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('ambiguous name refuses an issue whose same-name leaf has a sibling', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const a: string = leaf(f, 'exp', 'plan.synthesis', {}, 'exp');
     const b: string = leaf(f, 'sib', 'plan.synthesis', {}, 'exp');
@@ -4230,14 +4233,14 @@ test('ambiguous name refuses an issue whose same-name leaf has a sibling', async
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('issue issues/open/exp');
     expect(result.stderr).toContain('leaf issues/open/exp/exp');
-    expectNoLaunch(f, [a, b], before);
+    await expectNoLaunch(f, [a, b], before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('ambiguous name refuses a same-name pair when the issue holds an unreadable leaf', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const a: string = leaf(f, 'exp', 'plan.synthesis', {}, 'exp');
     const broken: string = leaf(f, 'broken', 'plan.synthesis', {}, 'exp');
@@ -4247,14 +4250,14 @@ test('ambiguous name refuses a same-name pair when the issue holds an unreadable
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('issue issues/open/exp');
     expect(result.stderr).toContain('leaf issues/open/exp/exp');
-    expectNoLaunch(f, [a], before);
+    await expectNoLaunch(f, [a], before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('ambiguous name refuses an owner and an unrelated leaf', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const a: string = leaf(f, 'l1', 'plan.synthesis', {}, 'own');
     const b: string = leaf(f, 'own', 'plan.synthesis', {}, 'misc');
@@ -4263,14 +4266,14 @@ test('ambiguous name refuses an owner and an unrelated leaf', async () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('issue issues/open/own');
     expect(result.stderr).toContain('leaf issues/open/misc/own');
-    expectNoLaunch(f, [a, b], before);
+    await expectNoLaunch(f, [a, b], before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('closed owner twin refuses next <slug> without dispatch', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'c1', 'plan.synthesis', {}, 'old');
     mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
@@ -4282,14 +4285,14 @@ test('closed owner twin refuses next <slug> without dispatch', async () => {
     expect(result.stderr).toContain('issues/open/old');
     expect(result.stderr).toContain('issues/closed/old');
     expect(result.stderr).not.toContain('Missing leaf');
-    expectRefused(f, [o1], before);
+    await expectRefused(f, [o1], before);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('the twin refusal prints once per owner and other owners dispatch under --all', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     configure(f, { max_active: 16 });
     mkdirSync(resolve(f.root, 'issues/closed/old'), { recursive: true });
@@ -4304,14 +4307,14 @@ test('the twin refusal prints once per owner and other owners dispatch under --a
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('issues/open/old');
     expect(lines[0]).toContain('issues/closed/old');
-    expect(dispatchedSlugs(f)).toEqual(['dep1', 'ok1']);
+    expect(await dispatchedSlugs(f)).toEqual(['dep1', 'ok1']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('a twin merge leaf never heads the merge queue', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     mkdirSync(resolve(f.root, 'issues/closed/old'), { recursive: true });
     leaf(f, 'm1', 'merge', holding(f), 'old');
@@ -4320,17 +4323,19 @@ test('a twin merge leaf never heads the merge queue', async () => {
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('issues/open/old');
-    expect(dispatchedSlugs(f)).toEqual(['m2']);
-    expect(database(f).prompts[0].text).toContain(`merge-issue m2 slot=B phase=merge leaf=`);
-    expect(database(f).prompts[0].text).toContain(`attempt=${batch.attempt} top=${batch.top}`);
+    expect(await dispatchedSlugs(f)).toEqual(['m2']);
+    const merges: { seat: string; text: string }[] = await mergePrompts(f);
+    expect(merges.map((prompt) => prompt.seat)).toEqual(['m2/b']);
+    expect(merges[0].text).toContain(`merge-issue m2 slot=B phase=merge leaf=`);
+    expect(merges[0].text).toContain(`attempt=${batch.attempt} top=${batch.top}`);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 for (const conflict of ['parked leaf', 'empty parked', 'empty closed'] as const) {
   test(`a ${conflict} owner folder twin refuses next <slug>`, async () => {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       if (conflict === 'parked leaf') mkdirSync(resolve(f.root, 'issues/parked/old/p1'), { recursive: true });
       else
@@ -4344,32 +4349,32 @@ for (const conflict of ['parked leaf', 'empty parked', 'empty closed'] as const)
       expect(result.stderr).toContain('issues/open/old');
       expect(result.stderr).toContain(`issues/${conflict === 'empty closed' ? 'closed' : 'parked'}/old`);
       expect(result.stderr).not.toContain('Missing leaf');
-      expectRefused(f, [o1], before);
+      await expectRefused(f, [o1], before);
     } finally {
-      f.clean();
+      await f.clean();
     }
   });
 }
 
 test('a closed leaf dispatches by path while its open twin exists', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'c1', 'plan.synthesis', {}, 'old');
     mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
     renameSync(resolve(f.root, 'issues/open/old'), resolve(f.root, 'issues/closed/old'));
     leaf(f, 'o1', 'plan.synthesis', {}, 'old');
-    const promptsBefore: number = database(f).prompts.length;
+    const promptsBefore: number = (await allTasks(f)).length;
     const result: Result = await next(f, ['issues/closed/old']);
     expect(result.code).toBe(0);
-    expect(database(f).prompts).toHaveLength(promptsBefore + 1);
-    expect(database(f).prompts.at(-1)!.text.split(' ')[1]).toBe('c1');
+    expect(await allTasks(f)).toHaveLength(promptsBefore + 1);
+    expect(await dispatchedSlugs(f)).toEqual(['c1']);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('empty folder and unknown names give the missing-leaf message', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     mkdirSync(resolve(f.root, 'issues/open/emptybox'), { recursive: true });
     const parked: string = resolve(f.root, 'issues/parked/issue/rest');
@@ -4385,14 +4390,14 @@ test('empty folder and unknown names give the missing-leaf message', async () =>
       expect(result.code).toBe(1);
       expect(result.stderr).toContain(message);
     }
-    expect(calls(f)).toEqual([]);
+    expect(allStarts(f)).toEqual([]);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('unreadable leaf under a named issue reports its read error', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'b1', 'plan.synthesis', {}, 'brok');
     writeFileSync(resolve(path, 'state.yaml'), 'slug: [');
@@ -4400,9 +4405,9 @@ test('unreadable leaf under a named issue reports its read error', async () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain(path);
     expect(result.stderr).not.toContain('Missing leaf: brok');
-    expect(database(f).prompts).toHaveLength(0);
+    expect(await allTasks(f)).toHaveLength(0);
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
@@ -4412,7 +4417,7 @@ test('owners resolve without ISSUE.md or EPIC.md', async () => {
     ['ni', ['x1']],
   ];
   for (const [input, slugs] of cases) {
-    const f: DispatchFixture = await dispatchFixture();
+    const f: HcFixture = await hcFixture();
     try {
       configure(f, { max_active: 8 });
       leaf(f, 'x1', 'plan.synthesis', {}, 'ei/ni');
@@ -4422,9 +4427,9 @@ test('owners resolve without ISSUE.md or EPIC.md', async () => {
       expect(existsSync(resolve(f.root, 'issues/open/ei/ni/ISSUE.md'))).toBe(false);
       const result: Result = await next(f, [input]);
       expect(result.code).toBe(0);
-      expect(dispatchedSlugs(f)).toEqual(slugs);
+      expect(await dispatchedSlugs(f)).toEqual(slugs);
     } finally {
-      f.clean();
+      await f.clean();
     }
   }
 });
