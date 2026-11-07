@@ -422,13 +422,18 @@ async function closeLeaf(session: string, repo: Repo, state: State, tab: string)
   if (await windowOpen(session)) await closeTab(session, tab);
 }
 
-// The close runs only in the session holding the repo space, for a tab a live terminal still holds.
+// The close runs only in the session holding the repo space: every recorded seat terminal, live or
+// finished, is killed and removed, then a tab a live terminal still held closes when a window shows it.
 export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Seen[] | null): Promise<boolean> {
   const tab: string | undefined = leaf.state.tab;
-  if (tab === undefined || live === null || broadcastInProgress(leaf.state, live) || !tabLive(live, tab)) return false;
+  if (tab === undefined || live === null || broadcastInProgress(leaf.state, live)) return false;
   const resolved: SpaceResolution = await repoSpace(repo);
   if (!resolved.ok) return false;
-  await closeLeaf(resolved.session, repo, leaf.state, tab);
+  const seats: Seats = await leafSeats(resolved.session, repo, leaf.state);
+  const open: boolean = tabLive(live, tab);
+  if (!open && seats.A === undefined && seats.B === undefined) return false;
+  for (const t of [seats.A, seats.B]) if (t !== undefined) await end(resolved.session, t.address);
+  if (open && (await windowOpen(resolved.session))) await closeTab(resolved.session, tab);
   return true;
 }
 
@@ -729,6 +734,24 @@ export async function reconcile(
     return true;
   }
 
+  // A merged leaf whose tab no live terminal holds may still have finished seat terminals: remove them.
+  async function endFinishedSeats(path: string, leaf: Leaf): Promise<boolean> {
+    if (leaf.state.seat.A === undefined && leaf.state.seat.B === undefined) return true;
+    const resolved: SpaceResolution = await repoSpace(repo);
+    if (!resolved.ok) {
+      keep(path, 'repo session unavailable', 'resolve the repo session refusal and retry cleanup');
+      return false;
+    }
+    try {
+      await endSeats(resolved.session, repo, leaf.state);
+    } catch (error) {
+      if (!(error instanceof HcError || error instanceof CommandError)) throw error;
+      keep(path, error.message, 'resolve the seat teardown error and retry cleanup');
+      return false;
+    }
+    return true;
+  }
+
   const handled: Set<string> = new Set();
   const panes: Seen[] = live ?? [];
   const panesUnion: Seen[] = union === undefined ? panes : (union ?? []);
@@ -763,7 +786,7 @@ export async function reconcile(
     } else if (open && ownerCompletes(repo, leaf)) {
       keep(worktree, 'active leaf', 'removed once the owning leaf finishes');
       return;
-    }
+    } else if (!(await endFinishedSeats(worktree, leaf))) return;
     if (foreignPaneInside(ownPanes, foreignPanes, worktree, tab)) {
       keep(worktree, 'live pane inside', 'removed once the pane closes or leaves this path');
       return;
@@ -784,6 +807,8 @@ export async function reconcile(
         !(within(leaf.path, openRoot) && ownerCompletes(repo, leaf))
       )
         await closeTabOf(leaf.path, z.string().parse(state.tab), leaf);
+      else if (state.phase === 'merged' && state.batch === undefined && live !== null && !tabLive(panes, state.tab))
+        await endFinishedSeats(leaf.path, leaf);
       continue;
     }
     handled.add(worktree);
