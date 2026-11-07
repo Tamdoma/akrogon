@@ -27,6 +27,7 @@ export const globalSchema = z
     harnesses: z.record(text, text),
     toolkits: z.record(text, text).default({}),
     repos: z.record(text, text).default({}),
+    prefixes: z.record(text, z.string().regex(/^[a-z]{2}$/, 'prefix must be two lowercase letters')).optional(),
   })
   .superRefine((config, ctx) => {
     for (const slot of [config.slots.a, config.slots.b]) {

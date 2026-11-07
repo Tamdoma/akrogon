@@ -29,6 +29,7 @@ Akrogon looks for `config.yaml` in its home folder. The home folder is `$AKROGON
 | `harnesses` | Maps a harness name to the command that starts it. `{model}` and `{effort}` in the command are filled from the seat. The command must start with the harness name. Every seat's harness must have an entry here. |
 | `toolkits` | Test toolkit choices per language, for example `<language>: <runner>`. Setup reads them when a repo has no tests. Default empty. |
 | `repos` | Maps a repo name to its checkout folder. A relative path is read from the akrogon home folder, and `~` means your home folder. Default empty. |
+| `prefixes` | Maps a registered repo name to its prefix of two lowercase letters. Optional. No command reads it yet. |
 
 ```yaml
 max_active: 3
@@ -42,6 +43,8 @@ toolkits:
   <language>: <runner>
 repos:
   <repo-name>: <path-to-checkout>
+prefixes:
+  <repo-name>: <two letters>
 ```
 
 ## Repo issues/config.yaml
