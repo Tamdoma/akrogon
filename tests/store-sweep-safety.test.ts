@@ -15,9 +15,11 @@ import {
   procRoot,
   type Fixture,
 } from './helpers';
+import { hcFixture, type HcFixture } from './hc-fixture';
 import { suiteRoot } from './isolation';
 import { z } from 'zod';
-import { command, spawnCaptured, type Pane, type SpawnResult } from '../src/shell';
+import { command, spawnCaptured, type SpawnResult } from '../src/shell';
+import type { Seen } from '../src/hc';
 import type { Reconciled } from '../src/reconcile';
 import { leafSlice } from '../src/scope';
 
@@ -33,25 +35,23 @@ test('F7 test environments isolate the retired temp root', async () => {
 });
 
 test('F1 dangling entries are removed from stores and the host temp root', async () => {
-  const f: Fixture = await fixture();
+  const f: HcFixture = await hcFixture();
   try {
-    const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
     const roots: string[] = [storeDir(f), resolve(f.root, 'issues/worktrees'), leafTempRoot(f)];
     for (const root of roots) {
       mkdirSync(root, { recursive: true });
       symlinkSync(resolve(f.home, 'missing'), resolve(root, 'dangling'));
     }
-    expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
+    expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(0);
     for (const root of roots) expect(lstatSync(resolve(root, 'dangling'), { throwIfNoEntry: false })).toBeUndefined();
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
 test('F2 surviving processes protect leaf entries and leaf temps', async () => {
-  const f: Fixture = await fixture();
-  const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
-  h.env = { ...h.env, ...fakeSystemctl(f).env };
+  const f: HcFixture = await hcFixture();
+  const env: NodeJS.ProcessEnv = { ...f.env, ...fakeSystemctl(f).env, AKROGON_PROC_ROOT: procRoot(f) };
   const repo: Repo = readRepo('repo', f.root);
   const owned: string = resolve(storeDir(f), 'done-old');
   const temp: string = resolve(leafTempRoot(f), relative(process.env.AKROGON_LEAF_TEMP_ROOT!, leafTemp(repo, 'done')));
@@ -59,7 +59,7 @@ test('F2 surviving processes protect leaf entries and leaf temps', async () => {
   await command(['git', 'worktree', 'add', '--detach', registered], f.root);
   leaf(f, 'failed-owned', 'failed', {
     worktree: registered,
-    tab: 'w1:t99',
+    tab: 'akgonetab99',
     failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'fixture' },
   });
   mkdirSync(owned, { recursive: true });
@@ -73,28 +73,27 @@ test('F2 surviving processes protect leaf entries and leaf temps', async () => {
     symlinkSync(owned, resolve(proc, 'cwd'));
     symlinkSync(resolve(temp, 'open'), resolve(proc, 'fd/3'));
     symlinkSync(resolve(registered, 'file'), resolve(proc, 'fd/4'));
-    expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
+    expect((await cli(f, ['next', '--all'], f.root, env)).code).toBe(0);
     expect(existsSync(owned)).toBe(true);
     expect(existsSync(temp)).toBe(true);
     expect(existsSync(registered)).toBe(true);
     child.kill('SIGKILL');
     await child.exited;
-    expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
+    expect((await cli(f, ['next', '--all'], f.root, env)).code).toBe(0);
     expect(existsSync(owned)).toBe(false);
     expect(existsSync(temp)).toBe(false);
     expect(existsSync(registered)).toBe(false);
   } finally {
     if (child.exitCode === null) child.kill('SIGKILL');
     await child.exited;
-    f.clean();
+    await f.clean();
   }
 });
 
 test('F3 live owner records protect recursively deleted parents and batch records', async () => {
-  const f: Fixture = await fixture();
+  const f: HcFixture = await hcFixture();
   const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
   try {
-    const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
     const retired: string = resolve(f.home, 'retired-temp');
     const oldRepo: string = resolve(leafTempRoot(f), 'unregistered');
     const batch: string = resolve(storeDir(f), 'batch-live');
@@ -112,20 +111,20 @@ test('F3 live owner records protect recursively deleted parents and batch record
     }
     mkdirSync(batch, { recursive: true });
     writeFileSync(batch + '.owner', record);
-    expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
+    expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(0);
     for (const path of [retired, oldRepo, verify, batch, batch + '.owner']) expect(existsSync(path)).toBe(true);
     child.kill('SIGKILL');
     await child.exited;
-    expect((await cli(f, ['next', '--all'], f.root, h.env)).code).toBe(0);
+    expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(0);
     for (const path of [retired, oldRepo, verify, batch, batch + '.owner']) expect(existsSync(path)).toBe(false);
   } finally {
     if (child.exitCode === null) child.kill('SIGKILL');
     await child.exited;
-    f.clean();
+    await f.clean();
   }
 });
 
-async function reconcileFixture(f: Fixture, panes: Pane[] | null, env: NodeJS.ProcessEnv): Promise<Reconciled> {
+async function reconcileFixture(f: Fixture, panes: Seen[] | null, env: NodeJS.ProcessEnv): Promise<Reconciled> {
   const source: (name: string) => string = (name: string): string =>
     JSON.stringify(resolve(import.meta.dir, '../src', name + '.ts'));
   const result: SpawnResult = await spawnCaptured(
@@ -166,7 +165,7 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
         f,
         'seat',
         scenario === 'finished-tab' ? 'merged' : 'implement',
-        scenario === 'busy-slice' ? {} : { tab: 'w1:t1' },
+        scenario === 'busy-slice' ? {} : { tab: 'akseattab1' },
       );
       const temp: string = resolve(
         leafTempRoot(f),
@@ -175,9 +174,23 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
       mkdirSync(temp, { recursive: true });
       const junk: string = resolve(storeDir(f), 'junk');
       mkdirSync(junk, { recursive: true });
-      const panes: Pane[] =
+      const panes: Seen[] =
         scenario === 'finished-tab'
-          ? [{ pane_id: 'w1:p1', tab_id: 'w1:t1', cwd: f.root, agent: null, agent_status: 'working' }]
+          ? [
+              {
+                session: 's1',
+                address: 't1',
+                name: null,
+                state: 'live',
+                turn: 0,
+                pid: null,
+                parent: null,
+                cwd: f.root,
+                labels: { 'herdr.tab': 'akseattab1' },
+                status: { state: 'working', kind: null, msg: null },
+                foreground: null,
+              },
+            ]
           : [];
       const db: string = resolve(f.home, 'systemctl.json');
       const cgroups: string = resolve(f.home, 'cgroups');
