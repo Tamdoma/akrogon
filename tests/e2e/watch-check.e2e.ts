@@ -177,11 +177,18 @@ test('watch check: label at start, one check per wake, one check per queued tick
     tier.record('transcript-summary.json', seen);
     expect(tickCount()).toBe(3);
     const firstTick: number = seen.order.findIndex((e) => e.kind === 'user' && e.text.includes(tick));
-    // Every check begins with one `akrogon status`; observe may rerun inside a check after a command error.
-    const checks = (from: number): number =>
-      seen.order.slice(from).filter((e) => e.kind === 'bash' && /\bakrogon status\b/.test(e.text)).length;
-    expect(checks(0)).toBe(4);
-    expect(checks(firstTick)).toBe(3);
+    // A check is one /watch-issues turn that runs `akrogon status`; a check may read status again later in
+    // the same turn (A-F4), so checks are counted per command turn, not per status call.
+    const turns: number[] = seen.order.flatMap((e, i: number) =>
+      e.kind === 'user' && e.text.includes('<command-name>/watch-issues</command-name>') ? [i] : [],
+    );
+    const checked: number[] = turns.filter((start: number, n: number) =>
+      seen.order
+        .slice(start, turns[n + 1] ?? seen.order.length)
+        .some((e) => e.kind === 'bash' && /\bakrogon status\b/.test(e.text)),
+    );
+    expect(checked.length).toBe(4);
+    expect(checked.filter((start: number) => start >= firstTick).length).toBe(3);
 
     // Stop removes the label.
     const stop = await send(tier, watcher, '/watch-issues stop');
