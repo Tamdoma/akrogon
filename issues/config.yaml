@@ -1,7 +1,7 @@
 remote: origin
 default_branch: main
 rebuttal: true
-fix_rounds: 8
+fix_rounds: 12
 implement: subagents
 setup: bun install --frozen-lockfile --backend=copyfile
 checks:

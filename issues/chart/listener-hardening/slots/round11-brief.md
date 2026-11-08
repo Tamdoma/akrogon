@@ -1,0 +1,18 @@
+# Round 11 (door A): review the claude transcript fix
+
+Review commit a8ba0aa9 on branch fix/claude-transcript in the akrogon worktree /tmp/claude-1000/-home-ivan-Work-infra-akrogon/4a3df037-e5ba-4393-85f4-67eb6d4ba7e8/scratchpad/k4 (`git show HEAD`). It implements round10 by majority: claude session from `<config>/sessions/<pid>.json` with procStart check (all), unique `projects/*/<sessionId>.jsonl` scan (B, D over C's cwd encoding), live lookup every call with relabel on change and label fallback only when the process names none and the file exists (B, D over C's no-label: watch-issues steer confirmation compares the label), helper output appended to its log through the launch line (B, C over D's process handlers).
+
+Done: full suite 1143 pass, 3 fail (the known env-only leftovers, status --json, suite env, also failing on main); the new stale-label test fails on main's src/transcript.ts and passes now.
+
+Look for concrete defects only: wrong transcript on any real seat (run the new resolver read-only against live claude, codex, pi seats if you can without labeling them), a crash path (malformed record, missing projects folder, record written mid-read), pid reuse, consumers that now behave differently (src/log.ts, src/next.ts timing, observe.ts, chart transcript.ts, door-reset), the launch line quoting, tests. Read-only: no edits, no labels on live terminals, do not touch t3k. Write `round11-<letter>.md`: verdict ready or changes needed, findings with file:line. Reply with the path.
+
+## Operator question (add to your round11 answer, its own section)
+
+Operator, verbatim: "Okay, but why did the old Herder system work and this one doesn't work by default? What's the additional complexity that we need to introduce? Think about it from the systems thinking perspective. Is there a more simple and more elegant way to solve this without adding new files or polling or watchers?"
+
+Door A's current view (challenge it, don't adopt it):
+- Old herdr: each agent pushed its own session to herdr (pi through `~/.pi/agent/extensions/herdr-agent-state.ts`; claude presumably a hook, unverified), herdr exposed `agent_session {kind,source,value}` per pane (old `src/shell.ts` paneSchema, removed in 14c3c934). One owner, refreshed at every session start including /clear.
+- hc carries only OSC 7501 status (`app`, `state`, `kinds`), no session id. akrogon replaced herdr's field with a guess (the claude process's open tasks folder) plus a trust-forever label: two copies of one fact with no sync, so they drift after /clear.
+- Options: O1 read the owner on demand (claude's own `~/.claude/sessions/<pid>.json`; the committed fix: no new files, no polling, no watchers); O2 a claude hook pushing the session into an hc label like old herdr (exact, but edits Claude settings, which akrogon must never do); O3 upstream: the session id carried in the status hc already receives (OSC 7501 field or hc metadata), so hc holds it like herdr did; O4 make door-reset need no transcript at all (hc turn counts for the input check, the session record or hc for reset confirmation).
+
+Answer: (1) how old herdr actually got claude's session (verify from anything left: herdr-setup history, `~/.claude` hooks history, akrogon issues/closed, the old herdr source if reachable), and whether the diagnosis above is right; (2) which option removes the fragile part with the fewest moving parts, including any option not listed (e.g. does akrogon need the transcript label at all, which consumers could drop it); (3) whether O1 adds complexity or removes it compared with main. Evidence, file:line, short.
