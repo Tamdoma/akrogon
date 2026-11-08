@@ -136,7 +136,7 @@ async function reset(run: Run, start: string, env: Record<string, string> = {}):
     '--',
     'sh',
     '-c',
-    'log=$1; shift; mkdir -p "$(dirname "$log")" && exec "$@" >>"$log" 2>&1',
+    'log=$1; shift; exec "$@" >>"$log" 2>&1',
     'sh',
     run.log,
     'env',
