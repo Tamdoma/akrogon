@@ -61,6 +61,29 @@ async function turnEnded(tier: Tier, address: string, turn: number): Promise<voi
   throw new Error(`${address} did not finish turn ${turn}`);
 }
 
+// Plan O3: Claude Code asks whether to trust the seat's throwaway worktree before it runs the argv
+// task. It is answered "Yes, I trust this folder" once, inside the start verb's proof window, so the
+// start is still proven by the task itself. Claude Code writes its one ~/.claude.json entry; no
+// script edits that file. The dialog's cursor may sit on "No, exit", so the keys follow the screen.
+async function trustClaude(tier: Tier, slug: string): Promise<void> {
+  for (let attempt: number = 0; attempt < 40; attempt += 1) {
+    const live = z
+      .object({ terminals: z.array(terminalSchema) })
+      .parse(await tier.rpc('terminal.list', { labels: { 'akrogon.leaf': slug } }))
+      .terminals.filter((t) => t.state === 'live');
+    const shown: string = live.length === 1 ? (await tier.hc(['read', live[0].address])).stdout : '';
+    if (shown.includes('Yes, I trust this folder')) {
+      const cursor: string = shown.split('\n').find((line: string) => line.includes('❯')) ?? '';
+      const answer: string[] = cursor.includes('Yes, I trust this folder') ? ['enter'] : ['down', 'enter'];
+      tier.record('claude-trust.txt', `${shown}\nkeys: ${answer.join(' ')}\n`);
+      expect((await tier.hc(['keys', live[0].address, ...answer])).code).toBe(0);
+      return;
+    }
+    await Bun.sleep(1000);
+  }
+  throw new Error(`${slug} showed no folder-trust dialog`);
+}
+
 test('kinds tier: first task, later send, report by hc send, transcript label, agy trust and outside write', async () => {
   expect(required('AKROGON_E2E')).toBe('kinds');
   const root: string = required('AKROGON_E2E_ROOT');
@@ -69,11 +92,7 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
     a: { harness: 'claude', model: kinds.claude.model, effort: 'low' },
     b: { harness: 'claude', model: kinds.claude.model, effort: 'low' },
   });
-  // Plan O2: claude's seat folder sits under /tmp, which Claude already trusts, so its folder-trust
-  // dialog never shows and is never answered (Claude settings are never written); the others stay
-  // under the leaf temp.
-  const storeOf = (kind: string): string => (kind === 'claude' ? '/tmp' : root);
-  const cwds: string[] = Object.keys(kinds).map((kind: string) => resolve(storeOf(kind), `akr-e2e-engine-${kind}`));
+  const cwds: string[] = Object.keys(kinds).map((kind: string) => resolve(root, `akr-e2e-engine-${kind}`));
   const trustedBefore: string[] = trustedWorkspaces();
   tier.record('cwds.json', cwds);
   try {
@@ -84,10 +103,6 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
       );
     for (const [kind, spec] of Object.entries(kinds)) {
       const slug: string = `akr-e2e-engine-${kind}`;
-      await Bun.write(
-        resolve(tier.root, 'issues/config.yaml'),
-        Bun.YAML.stringify({ checks: { test: 'true' }, grounding: 'none', worktree_root: storeOf(kind) }),
-      );
       const path: string = resolve(tier.root, 'issues/open/e2e', slug);
       mkdirSync(path, { recursive: true });
       await Bun.write(
@@ -108,7 +123,9 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
       );
       const outside: string = resolve(root, `akr-e2e-engine-${kind}-outside.txt`);
       const first: string = `Run exactly this shell command and nothing else: hc send ${inbox.address} 'done ${kind} 1'${kind === 'agy' ? ` && echo ok > ${outside}` : ''}`;
-      const started = await tier.akrogon(['seat', slug, 'A', '--task', first]);
+      const starting = tier.akrogon(['seat', slug, 'A', '--task', first]);
+      if (kind === 'claude') await trustClaude(tier, slug);
+      const started = await starting;
       tier.record(`${kind}-start.txt`, `${started.stdout}\n${started.stderr}`);
       expect(started.code).toBe(0);
       const t = await seat(tier, slug);
