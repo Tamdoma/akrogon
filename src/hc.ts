@@ -30,6 +30,7 @@ const terminalSchema = z.object({
   labels: z.record(z.string(), z.string()),
   status: statusSchema.nullable().default(null),
   foreground: foregroundSchema.nullable().default(null),
+  keep: z.boolean().default(false),
 });
 
 type Terminal = z.infer<typeof terminalSchema>;
@@ -46,6 +47,7 @@ export type Seen = {
   labels: Record<string, string>;
   status: { state: string; kind: string | null; msg: string | null } | null;
   foreground: { pid: number; cwd: string; argv: string[] } | null;
+  keep?: boolean;
 };
 
 function seen(session: string, t: Terminal): Seen {
