@@ -357,7 +357,7 @@ const heartbeatSchema = z.object({ method: z.literal('heartbeat') });
 export function follow(
   session: string,
   args: string[],
-  onEvent: (line: HcLine) => void,
+  onEvent: (line: HcLine) => void | Promise<void>,
 ): { stop: () => void; ended: Promise<void> } {
   const argv: string[] = ['hc', 'events', '--json', ...args];
   const child = Bun.spawn(argv, { env: hcEnv(session), stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
@@ -373,7 +373,7 @@ export function follow(
         const message: unknown = JSON.parse(line);
         if (heartbeatSchema.safeParse(message).success) continue;
         const parsed = lineSchema.parse(message);
-        onEvent(
+        await onEvent(
           'terminals' in parsed ? { terminals: parsed.terminals.map((t: Terminal) => seen(session, t)) } : parsed,
         );
       }
@@ -424,7 +424,7 @@ function merged(t: Seen, type: string, data: Record<string, unknown>): Seen {
 export function waitFor(
   session: string,
   address: string,
-  until: (t: Seen) => boolean,
+  until: (t: Seen, line: HcLine) => boolean | Promise<boolean>,
   ms: number,
 ): Promise<Seen | null> {
   return new Promise<Seen | null>((done, fail) => {
@@ -437,7 +437,7 @@ export function waitFor(
       stream.stop();
       outcome();
     };
-    const stream = follow(session, ['--terminal', address], (line: HcLine) => {
+    const stream = follow(session, ['--terminal', address], async (line: HcLine): Promise<void> => {
       if (settled) return;
       current =
         'terminals' in line
@@ -446,7 +446,7 @@ export function waitFor(
             ? current
             : merged(current, line.params.type, line.params.data);
       const reached: Seen | null = current;
-      if (reached !== null && until(reached)) settle(() => done(reached));
+      if (reached !== null && (await until(reached, line))) settle(() => done(reached));
     });
     const timer = setTimeout(() => settle(() => done(null)), ms);
     stream.ended.then(

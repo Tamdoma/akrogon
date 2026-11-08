@@ -25,6 +25,7 @@ import {
   waitFor,
   waitForDoc,
   windowOpen,
+  type HcLine,
   type Seen,
   type Space,
 } from './hc';
@@ -80,7 +81,7 @@ function remaining(deadline: number): number {
 }
 
 // agy takes no task in argv: answer its trust dialog once, wait for idle, send the task once, and
-// resend once when hc refuses it as still starting. Returns the turn the task went in at, or the
+// retry on the next status when hc refuses it as still starting. Returns the turn the task went in at, or the
 // state that ended the seat, or null when the budget ran out first.
 async function agyTask(
   session: string,
@@ -88,40 +89,44 @@ async function agyTask(
   task: string,
   deadline: number,
 ): Promise<{ turn: number } | { ended: Seen } | null> {
-  const trust = (t: Seen): boolean => t.status?.state === 'blocked' && t.status.kind === 'permission';
+  let answered: boolean = false;
+  let attempted: boolean = false;
+  let turn: number = 0;
   const ready: Seen | null = await waitFor(
     session,
     address,
-    (t: Seen) => ended(t) || trust(t) || (t.status?.state === 'idle' && t.turn === 0),
+    async (t: Seen, line: HcLine): Promise<boolean> => {
+      if (ended(t)) return true;
+      if (!('terminals' in line) && line.params.type !== 'status') return false;
+      if (!answered && t.status?.state === 'blocked' && t.status.kind === 'permission') {
+        answered = true;
+        await keys(session, address, 'enter');
+        return false;
+      }
+      if (!((t.status?.state === 'idle' && (attempted || t.turn === 0)) || (attempted && t.status?.state === 'done')))
+        return false;
+      attempted = true;
+      try {
+        turn = (await send(session, address, task)).turn;
+        return true;
+      } catch (error) {
+        if (!(error instanceof HcError) || error.kind !== 'unavailable') throw error;
+        console.warn(
+          JSON.stringify({
+            warning: 'first task unavailable, waiting for status',
+            session,
+            address,
+            error: error.message,
+          }),
+        );
+        return false;
+      }
+    },
     remaining(deadline),
   );
   if (ready === null) return null;
   if (ended(ready)) return { ended: ready };
-  if (trust(ready)) {
-    await keys(session, address, 'enter');
-    const idle: Seen | null = await waitFor(
-      session,
-      address,
-      (t: Seen) => ended(t) || t.status?.state === 'idle',
-      remaining(deadline),
-    );
-    if (idle === null) return null;
-    if (ended(idle)) return { ended: idle };
-  }
-  try {
-    return { turn: (await send(session, address, task)).turn };
-  } catch (error) {
-    if (!(error instanceof HcError) || error.kind !== 'unavailable') throw error;
-  }
-  const settled: Seen | null = await waitFor(
-    session,
-    address,
-    (t: Seen) => ended(t) || t.status?.state === 'idle' || t.status?.state === 'done',
-    remaining(deadline),
-  );
-  if (settled === null) return null;
-  if (ended(settled)) return { ended: settled };
-  return { turn: (await send(session, address, task)).turn };
+  return { turn };
 }
 
 // The first task is proven started when the seat goes working or its turn passes the turn the task
