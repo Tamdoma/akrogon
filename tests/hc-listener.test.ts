@@ -116,6 +116,7 @@ test('startup pulls and resumes before handling a wake received while another se
   const bin: string = resolve(f.home, 'subscription-bin');
   const snapshot: string = resolve(f.home, 'snapshot.log');
   const gate: string = resolve(f.home, 'second.fifo');
+  const handled: string = resolve(f.home, 'handled');
   mkdirSync(bin);
   writeFileSync(snapshot, '');
   expect(Bun.spawnSync(['mkfifo', gate]).exitCode).toBe(0);
@@ -125,7 +126,9 @@ test('startup pulls and resumes before handling a wake received while another se
 if [ "$1" = events ]; then
   if [ "$HC_SESSION" = '${second.session}' ]; then cat '${gate}' >/dev/null; fi
   if [ "$HC_SESSION" = '${first.session}' ]; then
-    '${first.env.HC_SHIM_REAL}' "$@" | tee '${snapshot}'
+    # After the finished event, more heartbeats than a pipe holds: the marker appears only once the listener
+    # has read past, so handled, that event.
+    '${first.env.HC_SHIM_REAL}' "$@" | tee '${snapshot}' | awk '{ print; fflush() } /"type":"finished"/ && !d { d = 1; for (i = 0; i < 8000; i++) print "{\\"method\\":\\"heartbeat\\"}"; fflush(); system("touch ${handled}") }'
     exit "\${PIPESTATUS[0]}"
   fi
 fi
@@ -137,8 +140,8 @@ exec '${first.env.HC_SHIM_REAL}' "$@"
   try {
     await until(snapshot, () => readFileSync(snapshot, 'utf8').includes('"terminals"'));
     await standIn(first, labelled, 'exit');
-    // The second session stays unsubscribed until the first session's finished event has arrived.
-    await until(snapshot, () => readFileSync(snapshot, 'utf8').includes('"finished"'));
+    // The second session stays unsubscribed until the listener has handled the first session's finished event.
+    await until(f.home, () => existsSync(handled));
     writeFileSync(gate, 'go\n');
     await until(shim.log, () => passes(shim).includes('end next --resume'));
     await until(shim.log, () => passes(shim).includes('end next --wake'));

@@ -11,10 +11,10 @@ Operator-invoked watch over every leaf under `issues/open` of the registered rep
 
 Claude Code only. When CronCreate is absent, say "This watch needs Claude Code cron, so no watch is running." and claim no watch.
 
-Job identity is the exact prompt `/watch-issues tick <root>`. The watch ends on `/watch-issues stop`, session loss, the job's own expiry or a clear: Claude Code keeps the job through `/clear`, so the clear is honored by the next tick.
+Job identity is the exact prompt `/watch-issues tick <root>`. The watch ends on `/watch-issues stop`, session loss, the job's own expiry or a `/clear` of its conversation.
 
 - `/watch-issues` from `<root>`: run one check now, then use CronList to find jobs with the exact prompt: zero matches creates one job with CronCreate, schedule `*/20 * * * *` recurring and that exact prompt, then reports its id and 7-day expiry; one match is reported and no job is created; several matches are reported and no job is created or deleted. A paused check still runs the CronList and creation step: creation is not an act on a leaf.
-- `/watch-issues tick <root>`: a tick that is the first prompt of its conversation, while CronList finds a job with the exact prompt, means the operator cleared the watch: it runs the stop steps below, replies "Watch stopped: this conversation was cleared." and runs no check. Any other tick runs one check only and never creates a job, even when zero match; ticks queued while a check ran each run their own check, as Claude Code submits each as its own turn.
+- `/watch-issues tick <root>`: Claude Code keeps the job through `/clear`, so a tick that is the first prompt of its conversation while CronList finds a job with the exact prompt means the operator cleared the watch: it runs the stop steps below, replies with their result and runs no check. A compaction summary before the tick means the conversation was not cleared. Another prompt typed after the clear and before the first tick spends that chance, and the watch then runs until `/watch-issues stop`. Any other tick runs one check only and never creates a job, even when zero match; ticks queued while a check ran each run their own check, as Claude Code submits each as its own turn.
 - `/watch-issues stop`: use CronList for the exact prompt: one match is deleted with CronDelete and reported; zero matches is reported as already stopped; several matches are reported and none are deleted.
 
 ## Observe

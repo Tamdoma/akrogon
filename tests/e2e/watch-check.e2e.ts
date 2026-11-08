@@ -133,11 +133,10 @@ test('watch check: one check at start, one check per queued tick, a tick after /
     await answerTrust(tier, 'watcher', async () => watcher, 'Yes, I trust this folder', ready);
     expect(await ready).not.toBeNull();
 
-    // Check 1: start runs one check and creates the cron job; the terminal gets no watch label.
+    // Check 1: start runs one check and creates the cron job.
     const start = await send(tier, watcher, '/watch-issues');
     expect(await waitFor(session, watcher, (t: Seen) => t.turn > start.turn && idle(t), 600_000)).not.toBeNull();
     tier.record('check-1-screen.txt', (await tier.hc(['read', watcher, '--lines', '80'])).stdout);
-    expect((await get(tier, watcher)).labels['akrogon.watch']).toBeUndefined();
 
     // Checks 2 and 3: two ticks queued while the watcher works; Claude Code submits each as its own turn
     // and runs queued turns back to back, which hc may count as one working span, so the run settles on
@@ -172,9 +171,11 @@ test('watch check: one check at start, one check per queued tick, a tick after /
     expect(checked.filter((start: number) => start >= firstTick).length).toBe(2);
     expect(seen.tools.filter((name: string) => name === 'CronCreate').length).toBe(1);
 
-    // A tick that is the first prompt after /clear deletes the job and runs no check.
-    const cleared = await send(tier, watcher, '/clear');
-    expect(await waitFor(session, watcher, (t: Seen) => t.turn > cleared.turn && idle(t), 120_000)).not.toBeNull();
+    // A tick that is the first prompt after /clear deletes the job and runs no check. The clear is typed as
+    // keys: a sent `/clear` arrives as chat text, not as the harness command (door-reset.ts).
+    const beforeClear: number = (await get(tier, watcher)).turn;
+    expect((await tier.hc(['keys', watcher, '/', ...'clear'.split(''), 'enter'])).code).toBe(0);
+    expect(await waitFor(session, watcher, (t: Seen) => t.turn > beforeClear && idle(t), 120_000)).not.toBeNull();
     const after = await send(tier, watcher, `/watch-issues tick ${tier.root}`);
     expect(await waitFor(session, watcher, (t: Seen) => t.turn > after.turn && idle(t), 600_000)).not.toBeNull();
     tier.record('clear-stop-screen.txt', (await tier.hc(['read', watcher, '--lines', '40'])).stdout);

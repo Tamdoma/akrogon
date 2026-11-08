@@ -39,6 +39,6 @@ Stop it with:
 /watch-issues stop
 ```
 
-Clearing the watch's conversation with `/clear` also stops it: Claude Code keeps the cron job through a clear, so the next tick deletes the job instead of checking. The job also ends when the Claude Code session ends or the 7-day expiry passes. It never stops itself otherwise, even when no open leaves are left.
+Clearing the watch's conversation with `/clear` also stops it: Claude Code keeps the cron job through a clear, so the next tick deletes the job instead of checking, as long as that tick is the first thing the cleared conversation receives. The job also ends when the Claude Code session ends or the 7-day expiry passes. It never stops itself otherwise, even when no open leaves are left.
 
 Next: [Commands](../reference/commands.md)
