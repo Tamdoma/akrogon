@@ -1,7 +1,9 @@
-// Finds the transcript file a seat's harness writes (plan D18) from the seat process's open files and
-// argv, and saves it on the terminal as `akrogon.transcript` so later lookups read the label.
-import { readdirSync, readFileSync, readlinkSync, statSync } from 'node:fs';
+// Finds the transcript file a seat's harness writes now (plan D18) from the seat process (claude's own
+// per-process session record, codex's open rollout, pi's argv) and keeps it on the terminal as
+// `akrogon.transcript`, which is read only when the process names none.
+import { existsSync, readdirSync, readFileSync, readlinkSync, statSync, type Dirent } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
+import { z } from 'zod';
 import { HcError, label, sessions, terminal, type Seen } from './hc';
 
 // A process that exited between the hc read and the /proc read holds no transcript.
@@ -59,17 +61,74 @@ function piSession(home: string, id: string): string | null {
 
 type Proc = { argv: string[]; env: Map<string, string>; open: string[] };
 
-// claude's open tasks handle names its project folder and session id under the config root.
-function claudeHandle(p: Proc): { projects: string; id: string } | null {
-  for (const target of p.open) {
-    const claude: RegExpExecArray | null = /\/claude-\d+\/([^/]+)\/([^/]+)\/tasks$/.exec(target);
-    if (claude === null) continue;
-    const home: string | undefined = p.env.get('HOME');
-    const config: string | undefined =
-      p.env.get('CLAUDE_CONFIG_DIR') ?? (home === undefined ? undefined : join(home, '.claude'));
-    return config === undefined ? null : { projects: join(config, 'projects', claude[1]), id: claude[2] };
+// claude keeps one record per live process, <config>/sessions/<pid>.json, naming the conversation it
+// writes now: a /clear or a resume changes it, while the process's tasks folder keeps its first
+// session id. procStart (field 22 of /proc/<pid>/stat) tells a reused pid apart.
+const claudeRecord = z.object({ sessionId: z.string(), procStart: z.string() });
+type ClaudeRecord = z.infer<typeof claudeRecord>;
+
+// Claude rewrites its record in place, so a read can catch it partly written: that read names nothing.
+function recordOf(raw: string): ClaudeRecord | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch (error) {
+    if (error instanceof SyntaxError) return null;
+    throw error;
   }
-  return null;
+  const record = claudeRecord.safeParse(json);
+  return record.success ? record.data : null;
+}
+
+// Null once the process has exited.
+function procStart(pid: number): string | null {
+  let stat: string;
+  try {
+    stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+  } catch (error) {
+    if (gone(error)) return null;
+    throw error;
+  }
+  return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+}
+
+// What a seat process says about its transcript: a harness that knows its conversation speaks for it
+// even before the file exists (path null), and then no older label may answer in its place.
+type Named = { path: string | null };
+
+// A live claude process names the one <config>/projects/*/<sessionId>.jsonl (path null while that file
+// is not written yet); null when the process is not claude or its record is unreadable or another
+// process's.
+function claudeTranscript(pid: number, p: Proc): Named | null {
+  const home: string | undefined = p.env.get('HOME');
+  const config: string | undefined =
+    p.env.get('CLAUDE_CONFIG_DIR') ?? (home === undefined ? undefined : join(home, '.claude'));
+  if (config === undefined) return null;
+  let raw: string;
+  try {
+    raw = readFileSync(join(config, 'sessions', `${pid}.json`), 'utf8');
+  } catch (error) {
+    if (gone(error)) return null;
+    throw error;
+  }
+  // An unreadable record cannot show it is this process's (records outlive their processes), so it
+  // claims nothing; a live claude caught mid-rewrite answers on the next lookup.
+  const record: ClaudeRecord | null = recordOf(raw);
+  if (record === null || record.procStart !== procStart(pid)) return null;
+  const projects: string = join(config, 'projects');
+  // No projects folder yet: claude writes its record before its first conversation.
+  let folders: Dirent[];
+  try {
+    folders = readdirSync(projects, { withFileTypes: true });
+  } catch (error) {
+    if (gone(error)) return { path: null };
+    throw error;
+  }
+  const matches: string[] = folders
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(projects, entry.name, `${record.sessionId}.jsonl`))
+    .filter((path: string) => existsSync(path));
+  return { path: matches.length === 1 ? matches[0] : null };
 }
 
 const rollouts = (p: Proc): string[] => p.open.filter((target: string) => /^rollout-.*\.jsonl$/.test(basename(target)));
@@ -80,31 +139,36 @@ function piStart(p: Proc): string | null {
   return flag !== -1 && flag + 1 < p.argv.length && home !== undefined ? piSession(home, p.argv[flag + 1]) : null;
 }
 
-// claude: its open tasks folder names the project and session; codex: the newest open rollout;
-// agy: the open conversation database; pi: the --session-id it was started with.
-function fromProcess(pid: number): string | null {
+// claude: its session record; codex: the newest open rollout; agy: the open conversation database;
+// pi: the --session-id it was started with.
+function fromProcess(pid: number): Named | null {
   const p = proc(pid);
   if (p === null) return null;
-  const claude = claudeHandle(p);
-  if (claude !== null) return join(claude.projects, `${claude.id}.jsonl`);
+  const claude: Named | null = claudeTranscript(pid, p);
+  if (claude !== null) return claude;
   if (rollouts(p).length > 0)
-    return rollouts(p).reduce((newest: string, path: string) =>
-      statSync(path).mtimeMs > statSync(newest).mtimeMs ? path : newest,
-    );
+    return {
+      path: rollouts(p).reduce((newest: string, path: string) =>
+        statSync(path).mtimeMs > statSync(newest).mtimeMs ? path : newest,
+      ),
+    };
   const agy: string | undefined = p.open.find((target: string) => basename(target) === 'conversation_summaries.db');
-  if (agy !== undefined) return agy;
-  return piStart(p);
+  if (agy !== undefined) return { path: agy };
+  const pi: string | null = piStart(p);
+  return pi === null ? null : { path: pi };
 }
 
-// The files a reset seat may have moved to (session-id final-shape): claude's project folder and pi's
-// sessions folder for the cwd, only files changed since the reset began; codex the rollouts it holds open.
+// The files a reset seat may have moved to (session-id final-shape): the folder of claude's current
+// conversation and pi's sessions folder for the cwd, only files changed since the reset began; codex the
+// rollouts it holds open.
 function resetCandidates(pid: number, sinceMs: number): string[] {
   const p = proc(pid);
   if (p === null) return [];
-  const claude = claudeHandle(p);
+  const claude: Named | null = claudeTranscript(pid, p);
   if (claude === null && rollouts(p).length > 0) return rollouts(p);
   const pi: string | null = claude === null ? piStart(p) : null;
-  const folder: string | null = claude !== null ? claude.projects : pi !== null ? dirname(pi) : null;
+  const folder: string | null =
+    claude !== null ? (claude.path === null ? null : dirname(claude.path)) : pi !== null ? dirname(pi) : null;
   if (folder === null) return [];
   return readdirSync(folder)
     .filter((name: string) => name.endsWith('.jsonl'))
@@ -128,15 +192,16 @@ export async function transcriptFor(seat: { session: string; address: string }):
     if (error instanceof HcError && error.kind === 'not_found') return null;
     throw error;
   }
+  // The process is asked every time: a label can name a conversation the seat has since left, so it
+  // answers only when no seat process speaks for its transcript.
   const recorded: string | undefined = t.labels['akrogon.transcript'];
-  if (recorded !== undefined) return recorded;
-  for (const pid of seatPids(t)) {
-    const found: string | null = fromProcess(pid);
-    if (found === null) continue;
-    await label(seat.session, seat.address, { 'akrogon.transcript': found });
-    return found;
-  }
-  return null;
+  const named: Named | undefined = seatPids(t)
+    .map((pid: number) => fromProcess(pid))
+    .find((n: Named | null): n is Named => n !== null);
+  if (named === undefined) return recorded !== undefined && existsSync(recorded) ? recorded : null;
+  if (named.path !== null && named.path !== recorded)
+    await label(seat.session, seat.address, { 'akrogon.transcript': named.path });
+  return named.path;
 }
 
 // After an in-place reset (/clear, /new) the seat's open files no longer name its conversation (P3):

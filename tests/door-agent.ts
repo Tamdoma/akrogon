@@ -3,8 +3,9 @@
 // `door-agent.ts <claude|codex|pi> <switch|noswitch> <out> [--session-id <id>] <first task>`, with HOME
 // and TMPDIR pointing into the fixture. It reports OSC 7501 status, keeps its transcript where the
 // resolver looks for that kind, and changes transcript on the reset line as each harness did in P3:
-//   claude  holds <TMPDIR>/claude-<uid>/<cwd>/<id>/tasks open and writes ~/.claude/projects/<cwd>/<id>.jsonl;
-//           after /clear the old handle stays open and the next turn writes a new <id>.jsonl
+//   claude  keeps ~/.claude/sessions/<pid>.json naming its conversation and writes
+//           ~/.claude/projects/<cwd>/<id>.jsonl; after /clear the record names the new id, which the next
+//           turn writes, while <TMPDIR>/claude-<uid>/<cwd>/<first id>/tasks stays open under the first id
 //   codex   holds ~/.codex/sessions/<date>/rollout-<ts>-<id>.jsonl open from its first prompt; after /new
 //           a second rollout opens only at the next prompt, the first stays open
 //   pi      holds nothing open; --session-id names ~/.pi/agent/sessions/--<cwd>--/<ts>_<id>.jsonl; after
@@ -13,7 +14,7 @@
 // the turn open until <out>/release is opened for writing.
 // <out>/inputs.jsonl gets one line per received input ({input, busy, label}, label being the terminal's
 // akrogon.transcript at receipt) and one {turnEnd} line after each turn's idle status.
-import { appendFileSync, mkdirSync, openSync } from 'node:fs';
+import { appendFileSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -49,6 +50,13 @@ function open(id: string): string {
     );
     mkdirSync(tasks, { recursive: true });
     if (held.length === 0) held.push(openSync(tasks, 'r'));
+    const stat: string = readFileSync('/proc/self/stat', 'utf8');
+    const procStart: string = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+    mkdirSync(resolve(home, '.claude/sessions'), { recursive: true });
+    writeFileSync(
+      resolve(home, '.claude/sessions', `${process.pid}.json`),
+      JSON.stringify({ pid: process.pid, sessionId: id, procStart }),
+    );
     mkdirSync(resolve(home, '.claude/projects', cwd), { recursive: true });
     return resolve(home, '.claude/projects', cwd, `${id}.jsonl`);
   }

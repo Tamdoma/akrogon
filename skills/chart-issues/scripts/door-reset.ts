@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 // The chart door's handover reset (chart-door Q2 2a): A's last action starts it detached with
-// `hc run --bg --no-notify --rm --no-parent -- bun door-reset.ts <A address> <log> "<start prompt>"`.
+// `hc run --bg --no-notify --rm --no-parent -- sh -c 'log=$1; shift; mkdir -p "$(dirname "$log")" && exec bun "$@" >>"$log" 2>&1' sh <log>
+// door-reset.ts <A address> <log> "<start prompt>"`, so its output and any uncaught error land in <log> too.
 // It follows A's turn end on hc events, cancels on operator input, types the reset as keys, confirms the
 // new transcript by a warm-up code, labels it on A and sends the start prompt. One JSON line per stage
 // goes to <log>; a stage that fails logs its result and the helper exits non-zero.

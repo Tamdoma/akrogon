@@ -233,10 +233,14 @@ test('log session is null without a slot and comes from the slot seat otherwise'
     const state: State = readState(path);
     const a: string = z.string().parse(state.seat.A?.address);
     const worktree: string = z.string().parse(state.worktree);
-    // Each terminal carries a recorded transcript, which the log reads as the session.
+    // Each terminal carries a recorded transcript that exists, which the log reads as the session.
     const b: string = await paneAt(f.core, resolve(f.home, 'elsewhere'));
-    expect((await f.core.hc(['label', a, 'akrogon.transcript=sess-a'])).code).toBe(0);
-    expect((await f.core.hc(['label', b, 'akrogon.transcript=sess-b'])).code).toBe(0);
+    const sessA: string = resolve(f.home, 'sess-a.jsonl');
+    const sessB: string = resolve(f.home, 'sess-b.jsonl');
+    writeFileSync(sessA, '');
+    writeFileSync(sessB, '');
+    expect((await f.core.hc(['label', a, `akrogon.transcript=${sessA}`])).code).toBe(0);
+    expect((await f.core.hc(['label', b, `akrogon.transcript=${sessB}`])).code).toBe(0);
     const logPath: string = resolve(f.root, 'issues/log.jsonl');
     const lastSession = (): string | null =>
       z
@@ -250,7 +254,7 @@ test('log session is null without a slot and comes from the slot seat otherwise'
       HC_SESSION: f.core.session,
     });
     expect(failed.code).toBe(0);
-    expect(lastSession()).toBe('sess-a');
+    expect(lastSession()).toBe(sessA);
 
     // Operator recovery with no slot: session is null even though the env
     // names a live seat with a recorded transcript in the resolved session.

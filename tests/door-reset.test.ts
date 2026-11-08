@@ -115,7 +115,7 @@ async function startA(kind: Kind, mode: 'switch' | 'noswitch'): Promise<Run> {
   return { f, core, a, out, log: resolve(out, 'handover.log') };
 }
 
-// Starts the helper the way A's last action does and returns its terminal.
+// Starts the helper the way A's last action does (its output appended to the log) and returns its terminal.
 async function reset(run: Run, start: string, env: Record<string, string> = {}): Promise<string> {
   const settings: string[] = Object.entries({
     ...Object.fromEntries(Object.entries(run.core.env).filter(([, v]) => v !== undefined && v !== '')),
@@ -134,6 +134,11 @@ async function reset(run: Run, start: string, env: Record<string, string> = {}):
     '--cwd',
     run.f.root,
     '--',
+    'sh',
+    '-c',
+    'log=$1; shift; mkdir -p "$(dirname "$log")" && exec "$@" >>"$log" 2>&1',
+    'sh',
+    run.log,
     'env',
     ...settings,
     process.execPath,
@@ -205,6 +210,96 @@ test.each([
     }
   },
 );
+
+test('claude: a label naming a transcript that is gone gives way to the conversation the session record names', async () => {
+  const run: Run = await startA('claude', 'switch');
+  try {
+    const left: string = resolve(run.f.home, '.claude/projects/left-conversation.jsonl');
+    expect((await run.core.hc(['label', run.a, `akrogon.transcript=${left}`])).code).toBe(0);
+    const address: string = await reset(run, '/chart-issues continue handover t door x next /charts/next');
+    const began: Step = await logged(run.log, 'started');
+    await release(run);
+    await exited(run, address);
+    expect(steps(run.log).map((s: Step) => s.step)).toEqual(STAGES);
+    const pre: string = z.string().parse(began.pre);
+    expect(pre).not.toBe(left);
+    expect(readFileSync(pre, 'utf8')).toContain('hold first task');
+  } finally {
+    await run.core.stop();
+    run.f.clean();
+  }
+});
+
+test('claude: a session the record names wins over an older label even before its file is written', async () => {
+  const f: Fixture = await fixture();
+  setPrefixes(f, { repo: 'rp' });
+  const core: HcCore = await hcCore(f);
+  try {
+    const projects: string = resolve(f.home, '.claude/projects/-repo');
+    mkdirSync(projects, { recursive: true });
+    mkdirSync(resolve(f.home, '.claude/sessions'), { recursive: true });
+    const old: string = resolve(projects, 'old-conversation.jsonl');
+    appendFileSync(old, '{}\n');
+    // A claude stand-in: its record names conversation "new", whose file does not exist yet.
+    const record: string =
+      'printf \'{"sessionId":"new","procStart":"%s"}\' "$(awk \'{print $22}\' /proc/$$/stat)" > "$HOME/.claude/sessions/$$.json"; exec sleep 300';
+    const started: SpawnResult = await core.hc([
+      'run',
+      '--bg',
+      '--json',
+      '--no-parent',
+      '--cwd',
+      f.root,
+      '--',
+      'env',
+      `HOME=${f.home}`,
+      'sh',
+      '-c',
+      record,
+    ]);
+    expect(started.code).toBe(0);
+    const a: string = z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
+    const pid: number = z.number().parse((await core.get(a)).pid);
+    const recordPath: string = resolve(f.home, '.claude/sessions', `${pid}.json`);
+    await new Promise<void>((done) => {
+      const poll = (): unknown =>
+        existsSync(recordPath) && readFileSync(recordPath, 'utf8').includes('procStart')
+          ? done()
+          : setTimeout(poll, 20);
+      poll();
+    });
+    expect((await core.hc(['label', a, `akrogon.transcript=${old}`])).code).toBe(0);
+    const lookup = async (): Promise<string> =>
+      (
+        await spawnCaptured(
+          [process.execPath, resolve(import.meta.dir, '../skills/chart-issues/scripts/transcript.ts'), a],
+          { cwd: f.root, env: { ...core.env, HOME: f.home, AKROGON_HOME: f.home } },
+        )
+      ).stdout.trim();
+    expect(await lookup()).toBe('-');
+    expect((await core.get(a)).labels['akrogon.transcript']).toBe(old);
+    const current: string = resolve(projects, 'new.jsonl');
+    appendFileSync(current, '{}\n');
+    expect(await lookup()).toBe(current);
+    expect((await core.get(a)).labels['akrogon.transcript']).toBe(current);
+  } finally {
+    await core.stop();
+    f.clean();
+  }
+});
+
+test('a helper that fails before its first stage leaves its error in the log', async () => {
+  const run: Run = await startA('claude', 'switch');
+  try {
+    await exited(run, await reset(run, ''));
+    expect(readFileSync(run.log, 'utf8')).toMatch(/too_small|ZodError/);
+    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task']);
+  } finally {
+    await release(run);
+    await run.core.stop();
+    run.f.clean();
+  }
+});
 
 test('an operator input record in A transcript after the helper started cancels the reset with nothing sent', async () => {
   const run: Run = await startA('claude', 'switch');
