@@ -111,6 +111,19 @@ test('silent stops are re-prompted, the third fails the leaf, and a phase move r
   }
 });
 
+test('a turn that ends in done without reporting is a silent stop and is re-prompted', async () => {
+  const { f, core } = await setup('hd-done', 'fake', 'done');
+  try {
+    expect((await cli(f, ['next', 'hd-done'], f.root, core.env)).code).toBe(0);
+    const address: string = (await seatA(core, 'hd-done')).address;
+    await core.waitFor(address, (t: Terminal) => t.turn >= 1 && t.status?.state === 'done');
+    expect((await cli(f, ['next', 'hd-done'], f.root, core.env)).code).toBe(0);
+    expect(core.tasks(address)).toHaveLength(2);
+  } finally {
+    await teardown(f, core, 'hd-done');
+  }
+});
+
 test('a working seat gets no send; a send that never starts is recorded, not resent, and resettled once the turn moves', async () => {
   const { f, core, path } = await setup('hd-send', 'fake', 'idle');
   try {

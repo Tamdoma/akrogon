@@ -506,7 +506,7 @@ async function dispatchSlot(
       delivery_error: { ...state.delivery_error, [slot]: undefined },
     });
   if (prompted === undefined) return deliver();
-  if (prompted.turn >= seat.turn || status === 'done') return;
+  if (prompted.turn >= seat.turn) return;
   const current: State = readState(leaf.path);
   if (current.attempts[slot] < 3) return deliver();
   await commitMove(repo, { path: leaf.path, state: current }, current, 'failed', slot, {

@@ -4,6 +4,7 @@
 # $STANDIN_DIR/<HC_TERMINAL_ID>.tasks (one line each), so tests read what was delivered.
 # Modes (the --model value):
 #   work   idle, then for each task: working, run $STANDIN_DIR/hook <terminal> <task> when present, idle
+#   done   as work, but each turn ends in done, as Claude Code's turns do
 #   idle   reports idle and never goes working (never confirms a start, send gives started:false);
 #          a received line `WORK` makes one working-to-idle turn, so a test can move its turn
 #   exit   exits 3 at once
@@ -24,7 +25,7 @@ turn() {
 	printf '%s\n' "$1" >> "$log"
 	status working
 	if [ -x "$STANDIN_DIR/hook" ]; then "$STANDIN_DIR/hook" "${HC_TERMINAL_ID:-unknown}" "$1"; fi
-	status idle
+	if [ "$mode" = done ]; then status done; else status idle; fi
 }
 case "$mode" in
 exit) exit 3 ;;
