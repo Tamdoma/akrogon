@@ -142,6 +142,8 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
           harnesses,
           repos: { akre2e: tier.root },
           prefixes: { akre2e: 'ae' },
+          // Every kind's leaf keeps its seat until the tier's cleanup, so each kind needs a free slot.
+          max_active: Object.keys(kinds).length,
         }),
       );
       const outside: string = resolve(root, `akr-e2e-engine-${kind}-outside.txt`);
