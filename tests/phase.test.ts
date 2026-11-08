@@ -1343,6 +1343,73 @@ test('failed move logs persisted delivery after a failed notice write', async ()
   }
 });
 
+test('stopped-core moves retain pending notice cleanup until a later pass can remove the files', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  try {
+    const recovering: string = leaf(f, 'recovering', 'implement');
+    const failed: Result = await cli(
+      f,
+      ['phase', 'recovering', 'failed', '--slot', 'A', '--reason', 'dependency unavailable'],
+      f.root,
+      core.env,
+    );
+    expect(failed.code, failed.stderr).toBe(0);
+    const waiting: string = noticeFiles(core)[0].path;
+    const merged: string = resolve(noticeFolder(core), `${noticeId('repo', 'merged', 'recovering')}.json`);
+    writeFileSync(merged, JSON.stringify({ title: 'repo/recovering merged, move it back', body: '', attention: true }));
+    const batch: Batch = holding(f).batch;
+    saveState(recovering, {
+      ...readState(recovering),
+      batch: { ...batch, candidate: batch.top, notified: 'pending' },
+    });
+    const busy: string = resolve(noticeFolder(core), `${noticeId('repo', 'busy', 'busy-stop', 'B')}.json`);
+    writeFileSync(
+      busy,
+      JSON.stringify({ title: 'Busy leaf: repo/busy-stop seat B 1h01m', body: '', attention: false }),
+    );
+    const stopping: string = leaf(f, 'busy-stop', 'implement', { busy_notified: { B: 'pending' } });
+    expect((await core.hc(['server', 'stop'])).code).toBe(0);
+
+    const refused: Result = await cli(f, ['phase', 'recovering', 'implement'], f.root, core.env);
+    expect(refused.code).not.toBe(0);
+    expect(readState(recovering)).toMatchObject({
+      phase: 'failed',
+      failure: { delivery: 'pending' },
+      batch: { notified: 'pending' },
+    });
+    expect(existsSync(waiting)).toBe(true);
+    expect(existsSync(merged)).toBe(true);
+    const stopped: Result = await cli(
+      f,
+      ['phase', 'busy-stop', 'failed', '--slot', 'A', '--reason', 'dependency unavailable'],
+      f.root,
+      core.env,
+    );
+    expect(stopped.code).not.toBe(0);
+    expect(readState(stopping)).toMatchObject({
+      phase: 'failed',
+      failure: { delivery: 'error' },
+      busy_notified: { B: 'pending' },
+    });
+    expect(existsSync(busy)).toBe(true);
+
+    expect((await core.hc(['server', 'start'])).code).toBe(0);
+    expect((await cli(f, ['next', 'busy-stop'], f.root, core.env)).code).toBe(1);
+    expect(readState(stopping).busy_notified).toEqual({});
+    expect(existsSync(busy)).toBe(false);
+    const recovered: Result = await cli(f, ['phase', 'recovering', 'implement'], f.root, core.env);
+    expect(recovered.code, recovered.stderr).toBe(0);
+    expect(readState(recovering).phase).toBe('implement');
+    expect(readState(recovering).failure).toBeUndefined();
+    expect(readState(recovering).batch?.notified).toBeUndefined();
+    expect(noticeFiles(core)).toEqual([]);
+  } finally {
+    await core.stop();
+    f.clean();
+  }
+}, 30000);
+
 test('failed announce writes the failed notice, renames tabs and tolerates missing tabs', async () => {
   const failedNotice = (slug: string) => ({ title: `repo/${slug} failed`, body: 'blocked: x', attention: true });
   const notices = (f: HcFixture) =>
