@@ -2,7 +2,7 @@
 // tests/door-agent.ts emulating claude, codex, pi or agy; the helper is started as A starts it, with
 // `hc run --bg --no-notify --rm --no-parent`, while A's turn is still open.
 import { test, expect } from 'bun:test';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, watch } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, utimesSync, watch } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
@@ -306,6 +306,27 @@ test('claude: a session the record names wins over an older label even before it
   } finally {
     await core.stop();
     f.clean();
+  }
+});
+
+test('pi: a label older than the conversation pi started with does not answer for it', async () => {
+  const run: Run = await startA('pi', 'switch');
+  try {
+    const folder: string = resolve(run.f.home, '.pi/agent/sessions', `--${run.f.root.replace(/[/.]/g, '-')}--`);
+    const left: string = resolve(folder, `1_${randomUUID()}.jsonl`);
+    appendFileSync(left, '{}\n');
+    utimesSync(left, new Date(0), new Date(0));
+    expect((await run.core.hc(['label', run.a, `akrogon.transcript=${left}`])).code).toBe(0);
+    const started: string = await lookup(run, null);
+    expect(started).not.toBe(left);
+    expect(readFileSync(started, 'utf8')).toContain('hold first task');
+    utimesSync(left, new Date(), new Date(Date.now() + 60_000));
+    expect((await run.core.hc(['label', run.a, `akrogon.transcript=${left}`])).code).toBe(0);
+    expect(await lookup(run, null)).toBe(left);
+  } finally {
+    await release(run);
+    await run.core.stop();
+    run.f.clean();
   }
 });
 

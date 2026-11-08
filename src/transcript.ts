@@ -193,13 +193,15 @@ export async function transcriptFor(seat: { session: string; address: string }):
     .find((n: Named | null): n is Named => n !== null);
   if (named === undefined) return recorded !== undefined && existsSync(recorded) ? recorded : null;
   // pi's argv names only the conversation it started with; after /new the seat publishes its current file
-  // as the label (chart-issues scripts/transcript.ts, from pi's PI_SESSION_FILE), which then answers.
+  // as the label (chart-issues scripts/transcript.ts, from pi's PI_SESSION_FILE), which then answers while
+  // it is not older than the argv file (an older one is left from an earlier pi in the same terminal).
   if (
     named.path !== null &&
     recorded !== undefined &&
     transcriptKind(named.path) === 'pi' &&
     transcriptKind(recorded) === 'pi' &&
-    existsSync(recorded)
+    existsSync(recorded) &&
+    statSync(recorded).mtimeMs >= statSync(named.path).mtimeMs
   )
     return recorded;
   if (named.path !== null && named.path !== recorded)
