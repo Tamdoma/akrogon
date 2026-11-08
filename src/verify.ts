@@ -27,15 +27,9 @@ import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { trackingRef } from './preflight';
 import { checkedRun, leafFields, leafTarget, refuse, type LeafTarget } from './run-check';
-import {
-  command,
-  CommandError,
-  herdr,
-  repoSession,
-  spawnCaptured,
-  type SessionResolution,
-  type SpawnResult,
-} from './shell';
+import { command, CommandError, spawnCaptured, type SpawnResult } from './shell';
+import { repoSpace, type SpaceResolution } from './hc';
+import { noticeFolder, noticeId, noticeState, writeNotice, type Notice } from './notice';
 import { allLeaves, withLock, type Leaf } from './state';
 import { isAncestor } from './batch';
 import { callerScope } from './admission';
@@ -47,7 +41,6 @@ import {
   passLive,
   passesRoot,
   passUnit,
-  pidAlive,
   readPassRecord,
   writePassRecord,
   type PassRecord,
@@ -233,10 +226,56 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
   return false;
 }
 
-// A reservation covers only while its process lives on this boot; `error` never covers.
-function noticeCovers(run: VerifyRun, boot: string): boolean {
-  if (run.notice === undefined || run.notice === 'error') return false;
-  return run.notice !== 'pending' || (run.boot_id === boot && pidAlive(run.pid));
+// A pending notice covers only while its file waits in the folder; `error` never covers, `shown` and
+// older herdr reason strings always do.
+function noticeCovers(value: string | undefined, folder: string | null, id: string): boolean {
+  return (
+    value !== undefined &&
+    value !== 'error' &&
+    (value !== 'pending' || (folder !== null && noticeState(folder, id) === 'pending'))
+  );
+}
+
+type NoticeTarget = { folder: string } | { folder: null; error: string };
+
+async function noticeTarget(repo: Repo): Promise<NoticeTarget> {
+  const space: SpaceResolution = await repoSpace(repo);
+  if (!space.ok) return { folder: null, error: space.reason };
+  try {
+    return { folder: noticeFolder(space.session) };
+  } catch (error) {
+    return { folder: null, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+// A pending row whose file the handler removed was shown.
+function foldShown(runs: VerifyRun[], folder: string | null): VerifyRun[] {
+  if (folder === null) return runs;
+  return runs.map((run): VerifyRun => ({
+    ...run,
+    ...(run.notice === 'pending' && noticeState(folder, noticeId(run.repo, 'main-red', run.run)) === 'shown'
+      ? { notice: 'shown' }
+      : {}),
+    ...(run.slow?.notice === 'pending' &&
+    noticeState(folder, noticeId(run.repo, 'merge-slow', run.slow.first!.run)) === 'shown'
+      ? { slow: { ...run.slow, notice: 'shown' } }
+      : {}),
+  }));
+}
+
+// The notice file is written inside the locked rewrite that records it, so concurrent runs write one.
+function recordNotice(target: NoticeTarget, id: string, notice: Notice): 'pending' | 'error' {
+  if (target.folder === null) {
+    process.stderr.write(`notice: ${target.error}\n`);
+    return 'error';
+  }
+  try {
+    writeNotice(target.folder, id, notice);
+    return 'pending';
+  } catch (error) {
+    process.stderr.write(`notice: ${error instanceof Error ? error.message : String(error)}\n`);
+    return 'error';
+  }
 }
 
 // Identity is command name and string + failing test name; sha is evidence, not identity.
@@ -250,8 +289,7 @@ function matching(run: VerifyRun, unit: Unit): VerifyRun['commands'][number] | u
 
 // A green observation is a completed record with the unit's command green whose sha sits on landed
 // main; a red observation R resolves when a green observation lands at or after R's sha.
-async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[]): Promise<string[]> {
-  const boot: string = bootId();
+async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[], folder: string | null): Promise<string[]> {
   const tip: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
   const landed: Map<string, boolean> = new Map();
   const onMain = async (sha: string): Promise<boolean> => {
@@ -291,7 +329,7 @@ async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[]): Promis
         }
         return false;
       })();
-      if (!resolved && noticeCovers(run, boot)) {
+      if (!resolved && noticeCovers(run.notice, folder, noticeId(repo.name, 'main-red', run.run))) {
         covered = true;
         break;
       }
@@ -301,72 +339,13 @@ async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[]): Promis
   return [...new Set(fresh)];
 }
 
-const noticeSchema = z.object({ shown: z.boolean(), reason: z.string() });
-
-// One locked read-mutate-rewrite of a single ledger row by run id.
-async function rewriteRun(
-  repo: Repo,
-  lock: string,
-  runId: string,
-  mutate: (run: VerifyRun) => VerifyRun,
-): Promise<void> {
-  await withLock(lock, async () => {
-    const file: string = recordsPath(repo);
-    const runs: VerifyRun[] = readVerifyRuns(repo);
-    const index: number = runs.findIndex((run) => run.run === runId);
-    if (index === -1) return;
-    runs[index] = mutate(runs[index]);
-    const temporary: string = `${file}.${process.pid}.tmp`;
-    writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
-    renameSync(temporary, file);
-  });
-}
-
-async function noticeSend(repo: Repo, args: string[]): Promise<string> {
-  const resolved: SessionResolution = await repoSession(repo);
-  if (!resolved.ok) throw new Error(resolved.reason);
-  return (await herdr(args, noticeSchema, { session: resolved.session.name })).reason;
-}
-
-// The reply reason or `error` replaces the pending reservation; a failed send only prints.
-async function sendMainRedNotice(repo: Repo, runId: string, lock: string, names: string[]): Promise<void> {
-  const args: string[] = [
-    'notification',
-    'show',
-    `${repo.name} main red`,
-    '--body',
-    `${names.length} new red on main: ${names.slice(0, 3).join(', ')}; receipt ${runId}; chart a repair`,
-    '--sound',
-    'none',
-  ];
-  let delivery: string = 'error';
-  try {
-    delivery = await noticeSend(repo, args);
-  } catch (error) {
-    process.stderr.write(`notice: ${error instanceof Error ? error.message : String(error)}\n`);
-  }
-  await rewriteRun(repo, lock, runId, (run) => ({ ...run, notice: delivery }));
-}
-
-// One notice per episode, retried by later in-episode runs until a reply lands.
-async function sendMergeSlowNotice(repo: Repo, runId: string, lock: string, body: string): Promise<void> {
-  const args: string[] = ['notification', 'show', `${repo.name} merge slow`, '--body', body, '--sound', 'none'];
-  let delivery: string = 'error';
-  try {
-    delivery = await noticeSend(repo, args);
-  } catch (error) {
-    process.stderr.write(`notice: ${error instanceof Error ? error.message : String(error)}\n`);
-  }
-  await rewriteRun(repo, lock, runId, (run) => ({ ...run, slow: { ...run.slow!, notice: delivery } }));
-}
-
 type SlowDecision = { slow: NonNullable<VerifyRun['slow']>; print?: string; send?: string };
 
 // Decided once inside the run's locked final rewrite over earlier ledger rows
 // only (ledger order is append order). An open episode pins its pre-jump
 // normal; outside an episode the normal is the median of the last 20 eligible
 // rows, computed only at 5 or more.
-function decideSlow(runs: VerifyRun[], index: number, boot: string): SlowDecision | undefined {
+function decideSlow(runs: VerifyRun[], index: number, folder: string | null): SlowDecision | undefined {
   const me: VerifyRun = runs[index];
   if (!slowChecked(me)) return undefined;
   const ms: number = Date.parse(me.end!) - Date.parse(me.start);
@@ -403,7 +382,7 @@ function decideSlow(runs: VerifyRun[], index: number, boot: string): SlowDecisio
     !earlier.some(
       (row) =>
         row.slow?.first?.run === first.run &&
-        (row.slow!.notice === 'shown' || (row.slow!.notice === 'pending' && row.boot_id === boot && pidAlive(row.pid))),
+        noticeCovers(row.slow!.notice, folder, noticeId(me.repo, 'merge-slow', first.run)),
     );
   const print: string | undefined =
     flagged || close === 'accepted'
@@ -423,7 +402,6 @@ function decideSlow(runs: VerifyRun[], index: number, boot: string): SlowDecisio
       normal_ms: normal,
       ...(first === undefined ? {} : { first }),
       ...(close === undefined ? {} : { close }),
-      ...(send ? { notice: 'pending' as const } : {}),
     },
     ...(print === undefined ? {} : { print }),
     ...(send
@@ -502,9 +480,7 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
   const ran: VerifyRun['commands'] = [];
   let setupExit: number | undefined;
   let end: string | undefined;
-  let send: string[] = [];
   let slowPrint: string | undefined;
-  let slowSend: string | undefined;
   try {
     await createSparseWorktree(repo, target, sha, { detach: true });
     await emitEnvFile(repo, target, repo.config.env);
@@ -577,9 +553,14 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
     }
     end = new Date().toISOString();
   } finally {
+    // Only base runs and merge runs reach the main-red or merge-slow logic.
+    const notices: NoticeTarget =
+      compares !== undefined || scope === 'merge'
+        ? await noticeTarget(repo)
+        : { folder: null, error: 'no notice folder resolved for this run' };
     await withLock(lock, async () => {
       const file: string = recordsPath(repo);
-      const runs: VerifyRun[] = readVerifyRuns(repo);
+      const runs: VerifyRun[] = foldShown(readVerifyRuns(repo), notices.folder);
       const index: number = runs.findIndex((run) => run.run === id);
       if (index === -1) return;
       runs[index] = {
@@ -589,22 +570,40 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
         ...(end === undefined ? {} : { end }),
       };
       if (compares !== undefined && completed(runs[index])) {
-        send = await newRedUnits(repo, runs[index], runs);
-        if (send.length > 0) runs[index] = { ...runs[index], notice: 'pending' };
+        const names: string[] = await newRedUnits(repo, runs[index], runs, notices.folder);
+        if (names.length > 0)
+          runs[index] = {
+            ...runs[index],
+            notice: recordNotice(notices, noticeId(repo.name, 'main-red', id), {
+              title: `${repo.name} main red`,
+              body: `${names.length} new red on main: ${names.slice(0, 3).join(', ')}; receipt ${id}; chart a repair`,
+              attention: false,
+            }),
+          };
       }
-      const decision: SlowDecision | undefined = decideSlow(runs, index, bootId());
+      const decision: SlowDecision | undefined = decideSlow(runs, index, notices.folder);
       if (decision !== undefined) {
-        runs[index] = { ...runs[index], slow: decision.slow };
+        runs[index] = {
+          ...runs[index],
+          slow:
+            decision.send === undefined
+              ? decision.slow
+              : {
+                  ...decision.slow,
+                  notice: recordNotice(notices, noticeId(repo.name, 'merge-slow', decision.slow.first!.run), {
+                    title: `${repo.name} merge slow`,
+                    body: decision.send,
+                    attention: false,
+                  }),
+                },
+        };
         slowPrint = decision.print;
-        slowSend = decision.send;
       }
       const temporary: string = `${file}.${process.pid}.tmp`;
       writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
       renameSync(temporary, file);
     });
-    if (send.length > 0) await sendMainRedNotice(repo, id, lock, send);
     if (slowPrint !== undefined) process.stdout.write(slowPrint + '\n');
-    if (slowSend !== undefined) await sendMergeSlowNotice(repo, id, lock, slowSend);
     if (existsSync(target)) await command(['git', 'worktree', 'remove', '--force', target], repo.root);
   }
   return {
