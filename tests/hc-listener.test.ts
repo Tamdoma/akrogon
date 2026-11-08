@@ -228,7 +228,7 @@ signal.pause()
   } finally {
     killTree(listener);
     await listener.exited;
-    const stderr: string = await new Response(listener.stderr).text();
+    const stderr: string = await new Response(listener.stderr as ReadableStream<Uint8Array>).text();
     if (stderr !== '') console.error(stderr);
     await core.stop();
     f.clean();

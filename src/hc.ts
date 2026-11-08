@@ -327,7 +327,7 @@ export async function end(session: string, address: string): Promise<void> {
 // Document changes carry no terminal and reach only unfiltered subscriptions.
 export type HcLine =
   | { terminals: Seen[] }
-  | { method: 'event'; params: { type: string; terminal: string; seq: number; data: Record<string, unknown> } }
+  | { method: 'event'; params: { type: string; terminal: string; seq: number; data: Record<string, unknown> | null } }
   | { method: 'event'; params: { type: 'doc'; seq: number; data: { name: string; version: number } } };
 
 const lineSchema = z.union([
@@ -338,7 +338,7 @@ const lineSchema = z.union([
       type: z.string(),
       terminal: z.string(),
       seq: z.number().int(),
-      data: z.record(z.string(), z.unknown()),
+      data: z.record(z.string(), z.unknown()).nullable(),
     }),
   }),
   z.object({
@@ -400,7 +400,7 @@ export function follow(
   };
 }
 
-function merged(t: Seen, type: string, data: Record<string, unknown>): Seen {
+function merged(t: Seen, type: string, data: Record<string, unknown> | null): Seen {
   switch (type) {
     case 'created':
       return seen(t.session, terminalSchema.parse(data));
