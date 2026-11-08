@@ -63,7 +63,7 @@ import { transcriptFor } from './transcript';
 import { checkBase, localBase, trackingRef } from './preflight';
 import { checkLocation } from './guard';
 import { attemptId, applyTop, branchSha, buildStack, isAncestor, memberBase, removeEmptyUntrackedDirs } from './batch';
-import { commandMerged, commitMove, completeOwner, repoNotices } from './phase';
+import { clearBusyNotices, commandMerged, commitMove, completeOwner, repoNotices } from './phase';
 import { noticeId, noticeState, removeNotice, writeNotice } from './notice';
 import { landAlive, launchLand } from './land';
 import { appendAttempt, readPressure, resolveTools, type PressureSnapshot } from './attempts';
@@ -588,6 +588,7 @@ async function dispatchLeaf(
     }
     if (state.phase === 'failed') {
       refusePredatesHc(state);
+      state = await clearBusyNotices(repo, leaf.path, state);
       if (
         state.failure?.delivery === 'pending' &&
         noticeState(await repoNotices(repo), noticeId(repo.name, 'failed', slug)) === 'shown'

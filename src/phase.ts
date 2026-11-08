@@ -51,6 +51,18 @@ export async function repoNotices(repo: Repo): Promise<string> {
   return noticeFolder(space.session);
 }
 
+export async function clearBusyNotices(repo: Repo, path: string, state: State): Promise<State> {
+  if (Object.keys(state.busy_notified).length === 0) return state;
+  const seats: Slot[] = (['A', 'B'] as const).filter((seat: Slot): boolean => state.busy_notified[seat] === 'pending');
+  if (seats.length > 0) {
+    const folder: string = await repoNotices(repo);
+    for (const seat of seats) removeNotice(folder, noticeId(repo.name, 'busy', state.slug, seat));
+  }
+  const cleared: State = { ...state, busy_notified: {} };
+  saveState(path, cleared);
+  return cleared;
+}
+
 // The leaf tab is renamed only while a window shows it; a closed window leaves the name to the next
 // pass that finds it open (plan D11). Pre-hc state carries an old tab id and is skipped.
 async function renameTab(repo: Repo, state: State, name: string): Promise<void> {
@@ -162,8 +174,20 @@ export async function commitMove(
   onCommitted?: () => void,
 ): Promise<State> {
   const leavingFailed: boolean = recorded.phase === 'failed' && to !== 'failed';
+  const stale: string[] = [
+    ...(leavingFailed && recorded.failure?.delivery === 'pending'
+      ? [noticeId(repo.name, 'failed', recorded.slug)]
+      : []),
+    ...(leavingFailed && recorded.batch?.notified === 'pending' ? [noticeId(repo.name, 'merged', recorded.slug)] : []),
+  ];
+  if (stale.length > 0) {
+    const folder: string = await repoNotices(repo);
+    for (const id of stale) removeNotice(folder, id);
+  }
+  const cleared: State =
+    to === 'merged' || leavingFailed ? await clearBusyNotices(repo, leaf.path, recorded) : recorded;
   const after: State = {
-    ...recorded,
+    ...cleared,
     phase: to,
     batch: leavingFailed && recorded.batch !== undefined ? { ...recorded.batch, notified: undefined } : recorded.batch,
     done: [],
@@ -174,7 +198,6 @@ export async function commitMove(
     attempts: { A: 0, B: 0 },
     failure: to === 'failed' ? failure : undefined,
     busy_since: to === 'failed' || to === 'merged' ? {} : recorded.busy_since,
-    busy_notified: to === 'failed' || to === 'merged' ? {} : recorded.busy_notified,
     fix_rounds:
       to === 'check.fix' && (recorded.phase === 'check.repair' || recorded.phase === 'merge')
         ? recorded.fix_rounds + 1
@@ -189,28 +212,12 @@ export async function commitMove(
   onCommitted?.();
   // The transition is committed even if diagnostic collection or append fails.
   let announced: State = after;
-  // Notices still waiting for the window that this move makes stale.
-  const stale: string[] = [
-    ...(to === 'failed' || to === 'merged'
-      ? (['A', 'B'] as const)
-          .filter((seat: Slot): boolean => recorded.busy_notified[seat] === 'pending')
-          .map((seat: Slot): string => noticeId(repo.name, 'busy', recorded.slug, seat))
-      : []),
-    ...(leavingFailed && recorded.failure?.delivery === 'pending'
-      ? [noticeId(repo.name, 'failed', recorded.slug)]
-      : []),
-    ...(leavingFailed && recorded.batch?.notified === 'pending' ? [noticeId(repo.name, 'merged', recorded.slug)] : []),
-  ];
   try {
     if (to === 'failed') {
       // The wake goes first: a failed notice must not cost the watcher its wake.
       await wakeWatcher(repo, `failed ${after.slug}`);
-      announced = await announceFailed(repo, leaf, after);
+      announced = await clearBusyNotices(repo, leaf.path, await announceFailed(repo, leaf, after));
     } else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(repo, after, after.slug);
-    if (stale.length > 0) {
-      const folder: string = await repoNotices(repo);
-      for (const id of stale) removeNotice(folder, id);
-    }
     if (to === 'merged') await completeOwner(repo, leaf, true);
   } catch (error) {
     if (error instanceof MoveCommittedError) throw error;
