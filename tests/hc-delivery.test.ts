@@ -1,7 +1,7 @@
 // Criteria 4 and 5: one prompt per seat per turn, the silent-stop bound and the send guards,
 // on a real hc core with the stand-in agent. `next <slug>` stands in for the listener's wake.
 import { test, expect } from 'bun:test';
-import { chmodSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, watch, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, type Fixture } from './helpers';
@@ -158,5 +158,70 @@ test('an agy seat answers the trust dialog once and its first task, refused unav
     expect(readState(path).prompted.A).toMatchObject({ address });
   } finally {
     await teardown(f, core, 'hd-agy');
+  }
+});
+
+test('an unavailable first agy task waits for a new status before retrying', async () => {
+  const f: Fixture = await fixture();
+  setPrefixes(f, { repo: 'rp' });
+  setSeat(f, 'a', 'agy', 'work');
+  const bin: string = resolve(f.home, 'ready-bin');
+  const gate: string = resolve(f.home, 'ready.fifo');
+  mkdirSync(bin);
+  expect(Bun.spawnSync(['mkfifo', gate]).exitCode).toBe(0);
+  writeFileSync(
+    resolve(bin, 'agy'),
+    `#!/bin/sh
+printf '\\033]7501;state=idle\\007'
+cat '${gate}' >/dev/null
+printf '\\033]7501;state=idle:msg=ready\\007'
+while IFS= read -r task; do
+  printf '%s\\n' "$task" >> "$STANDIN_DIR/$HC_TERMINAL_ID.tasks"
+  printf '\\033]7501;state=working\\007\\033]7501;state=idle\\007'
+done
+`,
+  );
+  chmodSync(resolve(bin, 'agy'), 0o755);
+  const core: HcCore = await hcCore(f, { coreEnv: { PATH: `${bin}:${process.env.PATH}` } });
+  const path: string = leaf(f, 'hd-status-retry', 'plan.synthesis');
+  const unavailable: string = resolve(f.home, 'unavailable-once');
+  writeFileSync(unavailable, '');
+  const sends = (): number =>
+    readFileSync(core.shimLog, 'utf8')
+      .split('\n')
+      .filter((line: string) => line.startsWith('send\t')).length;
+  const sent = (count: number, ms: number): Promise<boolean> =>
+    new Promise<boolean>((done) => {
+      const changed = (): void => {
+        if (sends() >= count) finish(true);
+      };
+      const watcher = watch(core.shimLog, changed);
+      const timer = setTimeout(() => finish(false), ms);
+      function finish(found: boolean): void {
+        clearTimeout(timer);
+        watcher.close();
+        done(found);
+      }
+      changed();
+    });
+  const starting: ReturnType<typeof cli> = cli(f, ['seat', 'hd-status-retry', 'A'], f.root, {
+    ...core.env,
+    HC_SHIM_UNAVAILABLE: unavailable,
+  });
+  try {
+    expect(await sent(1, 5000)).toBe(true);
+    expect(await sent(2, 200)).toBe(false);
+    writeFileSync(gate, 'ready\n');
+    expect((await starting).code).toBe(0);
+    const address: string = (await seatA(core, 'hd-status-retry')).address;
+    await core.waitFor(address, idleAfter(1));
+    expect(sends()).toBe(2);
+    expect(core.tasks(address)).toEqual([`plan-issue hd-status-retry slot=A phase=plan.synthesis leaf=${path}`]);
+    expect(readState(path).prompted.A).toMatchObject({ address, turn: 0 });
+  } finally {
+    await core.stop();
+    await starting;
+    await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: 'repo' }, 'hd-status-retry')]);
+    f.clean();
   }
 });
