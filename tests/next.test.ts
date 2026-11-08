@@ -41,7 +41,9 @@ import type { GhStep } from './fake-gh';
 import type { Database } from './fake-herdr';
 import {
   adopt,
+  blockNotices,
   delivered,
+  noticeFiles,
   hcCore,
   hcFixture,
   setPrefixes,
@@ -388,17 +390,13 @@ async function nextAt(f: Fixture & { env: NodeJS.ProcessEnv }, slug: string, now
   return { stdout, stderr, code };
 }
 
-function failNotices(f: Fixture, failNotification: boolean): void {
-  const db: string = resolve(f.home, 'herdr.json');
-  writeFileSync(db, JSON.stringify({ ...(JSON.parse(readFileSync(db, 'utf8')) as Database), failNotification }));
-}
-
 test('busy seats persist, warn strictly after an hour, retry a failed notice and clear on an idle turn', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'busy', 'check.review');
     const now: number = Date.parse('2026-09-11T12:00:00Z');
     const at = (minutes: number): string => new Date(now + minutes * 60000).toISOString();
+    const shown = () => noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }));
     const release: () => void = holdTurns(f);
     expect((await nextAt(f, 'busy', now)).code).toBe(0);
     expect(await seatTerminals(f, 'busy')).toHaveLength(2);
@@ -406,37 +404,51 @@ test('busy seats persist, warn strictly after an hour, retry a failed notice and
     const started: State = readState(path);
     expect(started.busy_since).toEqual({ A: at(0), B: at(0) });
     for (const minutes of [59, 60]) expect((await nextAt(f, 'busy', now + minutes * 60000)).code).toBe(0);
-    expect(notices(f)).toHaveLength(0);
-    failNotices(f, true);
+    expect(noticeFiles(f.core)).toHaveLength(0);
+    // A failed write records nothing, so the next pass writes again.
+    const unblock: () => void = blockNotices(f.core);
     const failed: Result = await nextAt(f, 'busy', now + 61 * 60000);
     expect(failed.code).not.toBe(0);
-    expect(failed.stderr).toContain('fixture_notification_failed');
+    expect(failed.stderr).toContain('akrogon-notices');
     expect(readState(path).busy_since).toEqual(started.busy_since);
     expect(readState(path).busy_notified).toEqual({});
-    failNotices(f, false);
+    unblock();
     for (const minutes of [61, 62]) expect((await nextAt(f, 'busy', now + minutes * 60000)).code).toBe(0);
-    expect(notices(f)).toHaveLength(3);
+    // One silent notice per seat, written once and kept pending while its file waits.
+    expect(shown()).toEqual([
+      { title: 'Busy leaf: repo/busy seat A 1h01m', body: '', attention: false },
+      { title: 'Busy leaf: repo/busy seat B 1h01m', body: '', attention: false },
+    ]);
     expect(readState(path)).toMatchObject({
       phase: started.phase,
       seat: started.seat,
       attempts: started.attempts,
       busy_since: started.busy_since,
+      busy_notified: { A: 'pending', B: 'pending' },
     });
-    expect(Object.keys(readState(path).busy_notified)).toEqual(['A', 'B']);
     expect(await allTasks(f)).toHaveLength(2);
-    // Both turns end: the idle observation clears each episode, and the re-prompted turn opens a new one.
+    // The handler shows A's notice (deletes its file): the next pass reads it as shown and writes no other.
+    const seatA = noticeFiles(f.core).find((n) => n.title.includes('seat A'));
+    rmSync(seatA!.path);
+    expect((await nextAt(f, 'busy', now + 62 * 60000)).code).toBe(0);
+    expect(readState(path).busy_notified).toEqual({ A: 'shown', B: 'pending' });
+    expect(shown()).toEqual([{ title: 'Busy leaf: repo/busy seat B 1h01m', body: '', attention: false }]);
+    // Both turns end: the idle observation clears each episode and removes B's notice before it shows.
     release();
     for (const seat of await seatTerminals(f, 'busy')) await seatIdle(f, seat.address, 1);
     holdTurns(f);
     expect((await nextAt(f, 'busy', now + 63 * 60000)).code).toBe(0);
     expect(readState(path).busy_since).toEqual({});
     expect(readState(path).busy_notified).toEqual({});
+    expect(noticeFiles(f.core)).toHaveLength(0);
+    // The re-prompted turns open a new episode, which notices again after its own hour.
     for (const seat of await seatTerminals(f, 'busy'))
       await f.core.waitFor(seat.address, (t: Terminal) => t.status?.state === 'working');
     expect((await nextAt(f, 'busy', now + 64 * 60000)).code).toBe(0);
     expect(readState(path).busy_since).toEqual({ A: at(64), B: at(64) });
     expect((await nextAt(f, 'busy', now + 125 * 60000)).code).toBe(0);
-    expect(notices(f)).toHaveLength(5);
+    expect(noticeFiles(f.core)).toHaveLength(2);
+    expect(readState(path).busy_notified).toEqual({ A: 'pending', B: 'pending' });
   } finally {
     await f.clean();
   }

@@ -28,7 +28,8 @@ import { readState, saveState, type Batch, type Failure } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import { z } from 'zod';
-import { hcFixture, type HcFixture } from './hc-fixture';
+import { blockNotices, hcFixture, noticeFiles, noticeFolder, type HcFixture } from './hc-fixture';
+import { noticeId } from '../src/notice';
 
 function bytes(path: string): string {
   return readFileSync(resolve(path, 'state.yaml'), 'utf8');
@@ -1095,12 +1096,16 @@ test('stop from implement on dirty worktree records blocked failure and clears b
     await command(['git', 'worktree', 'add', '-b', 'stop', worktree], f.root);
     const stamp: string = '2026-09-11T12:00:00.000Z';
     const seat = { session: f.core.session, address: 't99' };
+    // B's busy notice is still waiting for the window: the move to failed clears it before it shows.
+    const busy: string = resolve(noticeFolder(f.core), `${noticeId('repo', 'busy', 'stop', 'B')}.json`);
+    mkdirSync(noticeFolder(f.core), { recursive: true });
+    writeFileSync(busy, JSON.stringify({ title: 'Busy leaf: repo/stop seat B 1h01m', body: '', attention: false }));
     const path: string = leaf(f, 'stop', 'implement', {
       worktree,
       tab: 'aktab1',
       seat: { B: seat },
       busy_since: { B: stamp },
-      busy_notified: { B: stamp },
+      busy_notified: { B: 'pending' },
       prompted: { B: { turn: 1, address: 't99' } },
       prompted_at: { B: stamp },
     });
@@ -1110,7 +1115,7 @@ test('stop from implement on dirty worktree records blocked failure and clears b
     expect(result.stdout).toBe('moved failed');
     expect(readState(path)).toMatchObject({
       phase: 'failed',
-      failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'x', delivery: 'shown' },
+      failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'x', delivery: 'pending' },
       busy_since: {},
       busy_notified: {},
       prompted: {},
@@ -1119,10 +1124,9 @@ test('stop from implement on dirty worktree records blocked failure and clears b
       worktree,
       seat: { B: seat },
     });
-    expect(readState(path).failure?.delivery).toBe('shown');
-    const recorded: string[][] = herdrCalls(herdrDb(f));
-    expect(recorded.filter((c) => c[0] === 'notification')).toEqual([
-      ['notification', 'show', 'repo/stop failed', '--body', 'blocked: x', '--sound', 'request'],
+    expect(existsSync(busy)).toBe(false);
+    expect(noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }))).toEqual([
+      { title: 'repo/stop failed', body: 'blocked: x', attention: true },
     ]);
     expect(renames(f)).toEqual([['aktab1', 'stop failed']]);
     expect(existsSync(resolve(worktree, 'dirty'))).toBe(true);
@@ -1351,15 +1355,26 @@ for (const [mode, delivery] of [
   });
 }
 
-test('failed announce renames tabs, tolerates missing tabs, and retries herdr calls', async () => {
+test('failed announce writes the failed notice, renames tabs and tolerates missing tabs', async () => {
+  const failedNotice = (slug: string) => ({ title: `repo/${slug} failed`, body: 'blocked: x', attention: true });
+  const notices = (f: HcFixture) =>
+    noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }));
   {
+    // Recovery clears a failed notice still waiting for the window.
     const f: HcFixture = await hcFixture({ window: 'open' });
     try {
-      const path: string = parked(f, 'back', 'failed', { tab: 'aktab1' });
+      const waiting: string = resolve(noticeFolder(f.core), `${noticeId('repo', 'failed', 'back')}.json`);
+      mkdirSync(noticeFolder(f.core), { recursive: true });
+      writeFileSync(waiting, JSON.stringify(failedNotice('back')));
+      const path: string = parked(f, 'back', 'failed', {
+        tab: 'aktab1',
+        failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'x', delivery: 'pending' },
+      });
       const result: Result = await cli(f, ['phase', 'back', 'implement'], f.root, f.env);
       expect(result.code).toBe(0);
       expect(renames(f)).toEqual([['aktab1', 'back']]);
       expect(readState(path).phase).toBe('implement');
+      expect(existsSync(waiting)).toBe(false);
     } finally {
       await f.clean();
     }
@@ -1380,29 +1395,34 @@ test('failed announce renames tabs, tolerates missing tabs, and retries herdr ca
     }
   }
   {
+    // Pending while the file waits; the pass after the handler deleted it records shown, writing no other.
     const f: HcFixture = await hcFixture({ window: 'open' });
     try {
       const path: string = leaf(f, 'notab', 'implement');
       const result: Result = await cli(f, ['phase', 'notab', 'failed', '--reason', 'x'], f.root, f.env);
       expect(result.code).toBe(0);
-      expect(herdrCalls(herdrDb(f))).toEqual([
-        ['notification', 'show', 'repo/notab failed', '--body', 'blocked: x', '--sound', 'request'],
-      ]);
+      expect(notices(f)).toEqual([failedNotice('notab')]);
       expect(renames(f)).toEqual([]);
+      expect(readState(path).failure?.delivery).toBe('pending');
+      expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(0);
+      expect(readState(path).failure?.delivery).toBe('pending');
+      rmSync(noticeFiles(f.core)[0].path);
+      expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(0);
       expect(readState(path).failure?.delivery).toBe('shown');
+      expect(notices(f)).toEqual([]);
     } finally {
       await f.clean();
     }
   }
   {
+    // A failed write is recorded as error; the tab is still renamed.
     const f: HcFixture = await hcFixture({ window: 'open' });
     try {
-      writeFileSync(herdrDb(f), JSON.stringify({ panes: [], tabs: [], serial: 0, failNotification: true }));
+      blockNotices(f.core);
       const path: string = leaf(f, 'oops', 'implement', { tab: 'aktab1' });
       const result: Result = await cli(f, ['phase', 'oops', 'failed', '--reason', 'x'], f.root, f.env);
       expect(result.code).not.toBe(0);
-      const recorded: string[][] = herdrCalls(herdrDb(f));
-      expect(recorded.filter((c) => c[0] === 'notification')).toHaveLength(1);
+      expect(result.stderr).toContain('akrogon-notices');
       expect(renames(f)).toEqual([['aktab1', 'oops failed']]);
       expect(readState(path)).toMatchObject({ phase: 'failed', failure: { delivery: 'error' } });
     } finally {
@@ -1416,27 +1436,10 @@ test('failed announce renames tabs, tolerates missing tabs, and retries herdr ca
       const path: string = leaf(f, 'oops', 'implement', { tab: 'aktab1' });
       const result: Result = await cli(f, ['phase', 'oops', 'failed', '--reason', 'x'], f.root, f.env);
       expect(result.code).toBe(0);
-      expect(readState(path)).toMatchObject({ phase: 'failed', failure: { delivery: 'shown' } });
-      const recorded: string[][] = herdrCalls(herdrDb(f));
-      expect(recorded.filter((c) => c[0] === 'notification')).toHaveLength(1);
+      expect(readState(path)).toMatchObject({ phase: 'failed', failure: { delivery: 'pending' } });
+      expect(notices(f)).toEqual([failedNotice('oops')]);
       expect(renames(f)).toEqual([['aktab1', 'oops failed']]);
       expect(renameWarnings(result)).toHaveLength(1);
-    } finally {
-      await f.clean();
-    }
-  }
-  {
-    const f: HcFixture = await hcFixture({ window: 'open' });
-    try {
-      writeFileSync(herdrDb(f), JSON.stringify({ panes: [], tabs: [], serial: 0, failNotificationOnce: true }));
-      const path: string = leaf(f, 'flaky', 'implement');
-      const result: Result = await cli(f, ['phase', 'flaky', 'failed', '--reason', 'x'], f.root, f.env);
-      expect(result.code).toBe(0);
-      expect(herdrCalls(herdrDb(f))).toEqual([
-        ['notification', 'show', 'repo/flaky failed', '--body', 'blocked: x', '--sound', 'request'],
-        ['notification', 'show', 'repo/flaky failed', '--body', 'blocked: x', '--sound', 'request'],
-      ]);
-      expect(readState(path).failure?.delivery).toBe('shown');
     } finally {
       await f.clean();
     }

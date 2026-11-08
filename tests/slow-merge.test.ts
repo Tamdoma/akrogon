@@ -1,12 +1,13 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { cli, fakeAkrogon, fakeHerdr, fixture, seedRun, storeDir, yaml, type Fixture } from './helpers';
-import type { Database } from './fake-herdr';
 import { command, type Result } from '../src/shell';
 import { readRepo } from '../src/config';
 import { requireGreenReceipt, verifyRunSchema, type VerifyRun } from '../src/verify';
+import { blockNotices, hcCore, noticeFiles, noticeFolder, type HcCore } from './hc-fixture';
+import { noticeId } from '../src/notice';
 
 const LEDGER: string = 'issues/verify-runs.jsonl';
 
@@ -35,10 +36,6 @@ function noticeCalls(f: Fixture): string[][] {
     .filter((line) => line.trim() !== '')
     .map((line) => JSON.parse(line) as string[])
     .filter((args) => args[0] === 'notification');
-}
-
-function herdrDb(f: Fixture): Database {
-  return JSON.parse(readFileSync(resolve(f.home, 'herdr.json'), 'utf8')) as Database;
 }
 
 function register(f: Fixture, repos: Record<string, string>): void {
@@ -117,25 +114,32 @@ async function backdate(f: Fixture, ms: number): Promise<string> {
   throw new Error('no open merge run to backdate');
 }
 
+// Merge-slow notices are files in the repo session's herdr-app home: these cases run a fixture core.
+function coreEnv(f: Fixture, core: HcCore): NodeJS.ProcessEnv {
+  return { ...core.env, ...fakeAkrogon(f).env, PATH: `${resolve(f.home, 'bin')}:${core.env.PATH}` };
+}
+
 test('a slow merge run is flagged, recorded, printed and notified once', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
+    const env: NodeJS.ProcessEnv = coreEnv(f, core);
     const { direct, holder } = await mergeCaller(f);
     for (let i = 0; i < 4; i++) seedMerge(f, 300000);
     // Run A is the fifth eligible row: it sees only 4 eligible earlier rows
     // and is never compared, so it carries no `slow` record at all.
-    expect((await cli(f, ['verify', '--holder', holder], direct, mergeEnv(f))).code).toBe(0);
+    expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(0);
     const a: VerifyRun = records(f).at(-1)!;
     expect(a.slow).toBeUndefined();
-    expect(noticeCalls(f)).toEqual([]);
+    expect(noticeFiles(core)).toEqual([]);
 
     await bump(direct, 'code.ts');
-    const pendingB: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
+    const pendingB: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
     const bId: string = await backdate(f, 600000);
     const resultB: Result = await pendingB;
     expect(resultB.code).toBe(0);
@@ -146,13 +150,15 @@ test('a slow merge run is flagged, recorded, printed and notified once', async (
     expect(resultB.stdout).toMatch(`verify slow: `);
     expect(resultB.stdout).toMatch(/verify slow: \d+m measured vs 5m normal/);
     expect(resultB.stdout).toContain(`first seen at checkout ${bId}`);
-    expect(noticeCalls(f)).toHaveLength(1);
-    expect(noticeCalls(f)[0].slice(0, 3)).toEqual(['notification', 'show', 'repo merge slow']);
-    expect(noticeCalls(f)[0].join(' ')).toContain('first seen at checkout');
-    expect(records(f).find((run) => run.run === bId)!.slow!.notice).toBe('shown');
+    const files = noticeFiles(core);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatchObject({ title: 'repo merge slow', attention: false });
+    expect(files[0].body).toContain(`first seen at checkout ${bId}`);
+    expect(records(f).find((run) => run.run === bId)!.slow!.notice).toBe('pending');
     const sha: string = await command(['git', 'rev-parse', 'HEAD'], direct);
     await requireGreenReceipt(readRepo('repo', f.root), sha, 'merge');
   } finally {
+    await core.stop();
     f.clean();
   }
 }, 30000);
@@ -292,86 +298,76 @@ test('an open episode pins the normal, cites its first run, notifies once and re
   }
 }, 60000);
 
-test('a failed slow notice is retried by the next in-episode run and a stale pending is resent', async () => {
-  const f: Fixture = await fixture();
-  try {
-    yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
-      checks: { unit: 'echo unit' },
-      grounding: 'none',
-    });
-    const { direct, holder } = await mergeCaller(f);
-    const episode: string = seedEpisode(f);
-    // Rewrite the episode's notice as a recorded failure.
-    {
-      const file: string = resolve(f.root, LEDGER);
-      const lines: string[] = readFileSync(file, 'utf8')
-        .split('\n')
-        .filter((line) => line.trim() !== '');
-      const last = JSON.parse(lines[lines.length - 1]);
-      last.slow = { ...last.slow, notice: 'error' };
-      lines[lines.length - 1] = JSON.stringify(last);
-      writeFileSync(file, lines.join('\n') + '\n');
-    }
-    const env: NodeJS.ProcessEnv = mergeEnv(f);
-    writeFileSync(resolve(f.home, 'herdr.json'), JSON.stringify({ ...herdrDb(f), failNotificationOnce: true }));
+// Rewrites the episode opener's (last ledger row's) slow notice value.
+function setEpisodeNotice(f: Fixture, notice: string): void {
+  const file: string = resolve(f.root, LEDGER);
+  const lines: string[] = readFileSync(file, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim() !== '');
+  const last = JSON.parse(lines[lines.length - 1]);
+  last.slow = { ...last.slow, notice };
+  lines[lines.length - 1] = JSON.stringify(last);
+  writeFileSync(file, lines.join('\n') + '\n');
+}
 
-    const aId: string = await (async () => {
-      const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
-      const id: string = await backdate(f, 600000);
-      const result: Result = await pending;
-      expect(result.code).toBe(0);
-      return id;
-    })();
-    const a: VerifyRun = records(f).find((run) => run.run === aId)!;
-    expect(a.slow).toMatchObject({ first: { run: episode }, notice: 'error' });
-    expect(noticeCalls(f)).toHaveLength(1);
+async function slowRun(f: Fixture, direct: string, holder: string, env: NodeJS.ProcessEnv): Promise<VerifyRun> {
+  const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+  const id: string = await backdate(f, 600000);
+  expect((await pending).code).toBe(0);
+  return records(f).find((run) => run.run === id)!;
+}
 
-    await bump(direct, 'retry.ts');
-    const bId: string = await (async () => {
-      const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
-      const id: string = await backdate(f, 600000);
-      const result: Result = await pending;
-      expect(result.code).toBe(0);
-      return id;
-    })();
-    expect(noticeCalls(f)).toHaveLength(2);
-    expect(noticeCalls(f).every((args) => args[2] === 'repo merge slow')).toBe(true);
-    expect(records(f).find((run) => run.run === bId)!.slow!.notice).toBe('shown');
-
-    // A pending reservation whose process is gone (dead boot) is resent.
-    const g: Fixture = await fixture();
+test('a failed slow notice is retried by the next in-episode run; a pending one covers, waiting or shown', async () => {
+  const config = { setup: 'mkdir -p node_modules', checks: { unit: 'echo unit' }, grounding: 'none' };
+  {
+    const f: Fixture = await fixture();
+    const core: HcCore = await hcCore(f);
     try {
-      yaml(resolve(g.root, 'issues/config.yaml'), {
-        setup: 'mkdir -p node_modules',
-        checks: { unit: 'echo unit' },
-        grounding: 'none',
-      });
-      const other: { direct: string; holder: string } = await mergeCaller(g);
-      seedEpisode(g);
-      {
-        const file: string = resolve(g.root, LEDGER);
-        const lines: string[] = readFileSync(file, 'utf8')
-          .split('\n')
-          .filter((line) => line.trim() !== '');
-        const last = JSON.parse(lines[lines.length - 1]);
-        last.slow = { ...last.slow, notice: 'pending' };
-        lines[lines.length - 1] = JSON.stringify(last);
-        writeFileSync(file, lines.join('\n') + '\n');
-      }
-      const gId: string = await (async () => {
-        const pending: Promise<Result> = cli(g, ['verify', '--holder', other.holder], other.direct, mergeEnv(g));
-        const id: string = await backdate(g, 600000);
-        expect((await pending).code).toBe(0);
-        return id;
-      })();
-      expect(noticeCalls(g)).toHaveLength(1);
-      expect(records(g).find((run) => run.run === gId)!.slow!.notice).toBe('shown');
+      yaml(resolve(f.root, 'issues/config.yaml'), config);
+      const env: NodeJS.ProcessEnv = coreEnv(f, core);
+      const { direct, holder } = await mergeCaller(f);
+      const episode: string = seedEpisode(f);
+      setEpisodeNotice(f, 'error');
+      const unblock: () => void = blockNotices(core);
+      const a: VerifyRun = await slowRun(f, direct, holder, env);
+      expect(a.slow).toMatchObject({ first: { run: episode }, notice: 'error' });
+      unblock();
+      await bump(direct, 'retry.ts');
+      const b: VerifyRun = await slowRun(f, direct, holder, env);
+      expect(b.slow!.notice).toBe('pending');
+      expect(noticeFiles(core).map((n) => n.title)).toEqual(['repo merge slow']);
     } finally {
-      g.clean();
+      await core.stop();
+      f.clean();
     }
-  } finally {
-    f.clean();
+  }
+  {
+    // The opener's notice was written by a process that is gone; its file still waits for the window.
+    const f: Fixture = await fixture();
+    const core: HcCore = await hcCore(f);
+    try {
+      yaml(resolve(f.root, 'issues/config.yaml'), config);
+      const env: NodeJS.ProcessEnv = coreEnv(f, core);
+      const { direct, holder } = await mergeCaller(f);
+      const episode: string = seedEpisode(f);
+      setEpisodeNotice(f, 'pending');
+      mkdirSync(noticeFolder(core), { recursive: true });
+      const waiting: string = resolve(noticeFolder(core), `${noticeId('repo', 'merge-slow', episode)}.json`);
+      writeFileSync(waiting, JSON.stringify({ title: 'repo merge slow', body: 'seeded', attention: false }));
+      const a: VerifyRun = await slowRun(f, direct, holder, env);
+      expect(a.slow!.notice).toBeUndefined();
+      expect(noticeFiles(core).map((n) => n.body)).toEqual(['seeded']);
+      // The handler shows it: the next in-episode run reads it as shown and still sends nothing.
+      rmSync(waiting);
+      await bump(direct, 'later.ts');
+      const b: VerifyRun = await slowRun(f, direct, holder, env);
+      expect(b.slow!.notice).toBeUndefined();
+      expect(noticeFiles(core)).toEqual([]);
+      expect(records(f).find((run) => run.run === episode)!.slow!.notice).toBe('shown');
+    } finally {
+      await core.stop();
+      f.clean();
+    }
   }
 }, 60000);
 

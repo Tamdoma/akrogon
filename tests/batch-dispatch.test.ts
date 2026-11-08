@@ -1,8 +1,8 @@
 import { test, expect } from 'bun:test';
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cli, fakeSystemctl, leaf, editOnSecondStatus, verified, seatOwned } from './helpers';
-import { adopt, hcFixture, type HcFixture } from './hc-fixture';
+import { adopt, hcFixture, noticeFiles, type HcFixture } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import { z } from 'zod';
@@ -33,18 +33,6 @@ async function seatOf(f: DispatchFixture, text: string): Promise<string[]> {
   return (await f.core.terminals({ akrogon: '1' }, true))
     .filter((t) => f.core.tasks(t.address).includes(text))
     .map((t) => `${t.labels['akrogon.leaf']}/${t.labels['akrogon.seat']}`);
-}
-// Notices still go through fake herdr; its call log keeps them.
-function calls(f: DispatchFixture): string[][] {
-  const path: string = resolve(f.home, 'herdr.json.calls');
-  return existsSync(path)
-    ? readFileSync(path, 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
-        // Session routing adds discovery calls; strip them so assertions see work calls.
-        .filter((args) => args[0] !== 'session' && args[0] !== 'workspace')
-    : [];
 }
 async function next(
   f: DispatchFixture,
@@ -202,19 +190,18 @@ test('a failed holder with a landed candidate is told to move back, then reconci
     await command(['git', 'push', 'origin', 'refs/heads/aa:main'], f.root);
     saveState(aa.path, { ...applied, phase: 'failed', batch: { ...applied.batch!, candidate: top } });
     resetPrompts(f);
-    const callsBefore: number = calls(f).length;
     expect((await next(f, ['--all'])).code).toBe(1);
-    const notice: string[][] = calls(f)
-      .slice(callsBefore)
-      .filter((args) => args[0] === 'notification' && args[1] === 'show');
-    expect(notice).toHaveLength(1);
-    expect(notice[0][2]).toBe('repo/aa merged, move it back');
-    expect(notice[0].join(' ')).toContain('akrogon phase aa merge');
+    expect(noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }))).toEqual([
+      { title: 'repo/aa merged, move it back', body: 'next: akrogon phase aa merge', attention: true },
+    ]);
     expect(readState(aa.path).phase).toBe('failed');
     expect(readState(aa.path).batch?.candidate).toBe(top);
+    expect(readState(aa.path).batch?.notified).toBe('pending');
     await idleAll(f);
     const promptsBefore: number = mergePrompts(f).length;
     expect((await cli(f, ['phase', 'aa', 'merge'], f.root, f.env)).code).toBe(0);
+    // Leaving failed clears the move-back notice that was still waiting for the window.
+    expect(noticeFiles(f.core)).toEqual([]);
     expect(leafState(aa.path).phase).toBe('merged');
     expect(mergePrompts(f)).toHaveLength(promptsBefore);
     expect(prompts(f).filter((prompt) => prompt.startsWith('broadcast-issue aa'))).toHaveLength(1);
@@ -347,7 +334,14 @@ test('a failed published holder receives one recovery notice across repeated pas
     saveState(holder.path, { ...state, phase: 'failed', batch: { ...state.batch!, candidate: state.batch!.top } });
     expect((await next(f, ['--all'])).code).toBe(1);
     expect((await next(f, ['--all'])).code).toBe(1);
-    expect(calls(f).filter((args) => args[0] === 'notification' && args[1] === 'show')).toHaveLength(1);
+    expect(noticeFiles(f.core)).toHaveLength(1);
+    expect(readState(holder.path).batch?.notified).toBe('pending');
+    // The handler shows it: the next pass records shown and writes no other.
+    rmSync(noticeFiles(f.core)[0].path);
+    expect((await next(f, ['--all'])).code).toBe(1);
+    expect(readState(holder.path).batch?.notified).toBe('shown');
+    expect((await next(f, ['--all'])).code).toBe(1);
+    expect(noticeFiles(f.core)).toEqual([]);
   } finally {
     await f.clean();
   }

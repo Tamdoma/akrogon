@@ -482,3 +482,31 @@ export function pinnedSchema(raw: string): object {
     methods: Object.fromEntries(schema.methods.filter((m) => methods.includes(m.name)).map((m) => [m.name, m.params])),
   };
 }
+
+// The notice files akrogon left in a fixture core's herdr-app home (`<app home>/akrogon-notices/`),
+// read the way herdr-setup's handler reads them: only complete `<id>.json` files, any other entry
+// (a leftover temporary name) fails the read. Deleting `path` plays the handler's "shown".
+export type NoticeFile = { path: string; title: string; body: string; attention: boolean };
+const noticeFileSchema = z.strictObject({ title: z.string(), body: z.string(), attention: z.boolean() });
+export function noticeFolder(core: HcCore): string {
+  return resolve(core.appHome, 'akrogon-notices');
+}
+export function noticeFiles(core: HcCore): NoticeFile[] {
+  const dir: string = noticeFolder(core);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .sort()
+    .map((name: string): NoticeFile => {
+      const path: string = resolve(dir, name);
+      if (!name.endsWith('.json')) throw new Error(`not a notice file: ${path}`);
+      return { path, ...noticeFileSchema.parse(JSON.parse(readFileSync(path, 'utf8'))) };
+    });
+}
+// Makes every notice write into this core's folder fail: a plain file where the folder goes, set
+// before any notice exists.
+export function blockNotices(core: HcCore): () => void {
+  const dir: string = noticeFolder(core);
+  if (existsSync(dir)) throw new Error(`notice folder already exists: ${dir}`);
+  writeFileSync(dir, '');
+  return (): void => rmSync(dir, { force: true });
+}
