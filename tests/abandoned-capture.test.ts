@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { finishCaptured, quote, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import type { Captured } from '../src/shell';
-import { cli, entry, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
+import { cli, entry, procFixture, fixture, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
 import { hcCore, type HcCore } from './hc-fixture';
 
 type Live = { proc: Bun.Subprocess; captured: Captured; result: Promise<SpawnResult> };
@@ -85,7 +85,7 @@ async function gone(pid: number): Promise<void> {
 
 test('a starting run-check never exposes an unlocked capture', async () => {
   const f: Fixture = await fixture();
-  const herdr = fakeHerdr(f);
+  const proc = procFixture(f);
   const paused: string = resolve(f.home, 'lock-paused');
   const release: string = resolve(f.home, 'lock-release');
   const flock: string = Bun.which('flock')!;
@@ -105,7 +105,7 @@ exec ${quote(flock)} "$@"
     const cap: Live = spawnCheck(f, ['run-check', '--leaf', leafPath, '--name', 'starting', '--', 'true'], f.root);
     try {
       await waitFor(() => existsSync(paused), 'capture lock helper paused');
-      const moved: Result = await cli(f, ['phase', 'starting', 'check.review', '--check'], f.root, herdr.env);
+      const moved: Result = await cli(f, ['phase', 'starting', 'check.review', '--check'], f.root, proc.env);
       expect(moved.code, moved.stderr).toBe(0);
     } finally {
       writeFileSync(release, '');
@@ -119,7 +119,7 @@ exec ${quote(flock)} "$@"
 
 test('a capture published after the probe opens it never refuses a move', async () => {
   const f: Fixture = await fixture();
-  const herdr = fakeHerdr(f);
+  const proc = procFixture(f);
   const paused: string = resolve(f.home, 'probe-paused');
   const release: string = resolve(f.home, 'probe-release');
   const flock: string = Bun.which('flock')!;
@@ -144,7 +144,7 @@ exec ${quote(flock)} "$@"
     );
     try {
       await waitFor(() => existsSync(`${f.home}/ready-publish`), 'command ready');
-      const phase: Live = spawnCheck(f, ['phase', 'publishing', 'check.review', '--check'], f.root, herdr.env);
+      const phase: Live = spawnCheck(f, ['phase', 'publishing', 'check.review', '--check'], f.root, proc.env);
       try {
         await waitFor(() => existsSync(paused), 'probe opened capture');
         writeFileSync(`${f.home}/release-publish`, '');
@@ -280,7 +280,7 @@ test('an abandoned capture pair refuses non-failed moves, and a non-blank cleare
 
 test('a live capture pair never refuses a move, nested run-check included', async () => {
   const f: Fixture = await fixture();
-  const herdr = fakeHerdr(f);
+  const proc = procFixture(f);
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
       env: ['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT'],
@@ -314,7 +314,7 @@ test('a live capture pair never refuses a move, nested run-check included', asyn
       ],
       f.root,
       {
-        ...herdr.env,
+        ...proc.env,
         PATH: `${resolve(f.home, 'bin')}:${resolve(f.home, 'unitbin')}:${process.env.PATH}`,
         AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
       },
@@ -324,7 +324,7 @@ test('a live capture pair never refuses a move, nested run-check included', asyn
       await waitFor(() => captures(innerImpl).length === 1, 'inner capture files');
       // While the nested command runs under its live wrapper, the inner leaf's
       // moves pass the pair gate.
-      const live: Result = await cli(f, ['phase', 'inner', 'check.review', '--check'], f.root, herdr.env);
+      const live: Result = await cli(f, ['phase', 'inner', 'check.review', '--check'], f.root, proc.env);
       expect(live.code, live.stderr).toBe(0);
       // SIGKILL only the inner wrapper: its command survives under the fake
       // seam and keeps the capture fd, so the pair stays live and refuses nothing.
@@ -344,7 +344,7 @@ test('a live capture pair never refuses a move, nested run-check included', asyn
           return true;
         }
       }, 'inner wrapper exit');
-      const stillLive: Result = await cli(f, ['phase', 'inner', 'check.review', '--check'], f.root, herdr.env);
+      const stillLive: Result = await cli(f, ['phase', 'inner', 'check.review', '--check'], f.root, proc.env);
       expect(stillLive.code, stillLive.stderr).toBe(0);
     } finally {
       writeFileSync(`${f.home}/release-inner`, '');
@@ -358,7 +358,7 @@ test('a live capture pair never refuses a move, nested run-check included', asyn
 
 test('the liveness probe creates no file and a pair gone at probe time is finished', async () => {
   const f: Fixture = await fixture();
-  const herdr = fakeHerdr(f);
+  const proc = procFixture(f);
   try {
     const leafPath: string = leaf(f, 'probe', 'implement');
     const impl: string = resolve(leafPath, 'implementation');
@@ -374,11 +374,11 @@ test('the liveness probe creates no file and a pair gone at probe time is finish
     const run2: string = randomUUID();
     const target: string = join(impl, `.gone-${run2}`);
     symlinkSync(target, join(impl, `capture-gone-${run2}-out.log`));
-    const first: Result = await cli(f, ['phase', 'probe', 'check.review', '--check'], f.root, herdr.env);
+    const first: Result = await cli(f, ['phase', 'probe', 'check.review', '--check'], f.root, proc.env);
     expect(first.code, first.stderr).toBe(0);
     expect(existsSync(join(impl, `capture-orphan-${run1}-out.log`))).toBe(false);
     expect(existsSync(target)).toBe(false);
-    const second: Result = await cli(f, ['phase', 'probe', 'check.review', '--check'], f.root, herdr.env);
+    const second: Result = await cli(f, ['phase', 'probe', 'check.review', '--check'], f.root, proc.env);
     expect(second.code, second.stderr).toBe(0);
     expect(existsSync(join(impl, `capture-orphan-${run1}-out.log`))).toBe(false);
     expect(existsSync(target)).toBe(false);

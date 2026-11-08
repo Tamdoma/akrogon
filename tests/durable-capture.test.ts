@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { command, spawnFiles, finishCaptured, type Result, type SpawnResult } from '../src/shell';
-import { fixture, cli, entry, leaf, yaml, fakeHerdr, leafTempRoot, holding, type Fixture } from './helpers';
+import { fixture, cli, entry, leaf, yaml, procFixture, leafTempRoot, holding, type Fixture } from './helpers';
 import type { Captured } from '../src/shell';
 import { hcFixture, type HcFixture } from './hc-fixture';
 
@@ -132,7 +132,7 @@ test('a SIGKILLed nested run-check leaves its captures in its own holder after r
       checks: {},
       grounding: 'none',
     });
-    const herdr: { env: NodeJS.ProcessEnv } = fakeHerdr(f);
+    const proc: { env: NodeJS.ProcessEnv } = procFixture(f);
     symlinkSync(entry, resolve(f.home, 'bin', 'akrogon'));
     const innerLeaf: string = leaf(f, 'inner', 'implement');
     const innerImpl: string = resolve(innerLeaf, 'implementation');
@@ -161,7 +161,7 @@ test('a SIGKILLed nested run-check leaves its captures in its own holder after r
       ],
       f.root,
       {
-        ...herdr.env,
+        ...proc.env,
         PATH: `${resolve(f.home, 'bin')}:${resolve(f.home, 'unitbin')}:${process.env.PATH}`,
         AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
       },
@@ -190,7 +190,7 @@ test('a SIGKILLed nested run-check leaves its captures in its own holder after r
       }, 'inner wrapper exit');
       // Reconcile (driven by next) sweeps the dead inner run root while the
       // holder keeps both capture files.
-      await cli(f, ['next'], f.root, herdr.env);
+      await cli(f, ['next'], f.root, proc.env);
       const remaining: string[] = [
         ...new Bun.Glob('**/run-*/.owner').scanSync({ cwd: leafTempRoot(f), onlyFiles: true }),
       ].map((name) => resolve(leafTempRoot(f), name));

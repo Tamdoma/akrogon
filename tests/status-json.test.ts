@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fakeSystemctl, fixture, cli, leaf, yaml, storeDir, type Fixture, type SystemctlFixture } from './helpers';
 import { event, log, mergeRecord, needs, prompt, register, seedRunRecord, snapshot, timings } from './status-fixture';
@@ -611,7 +611,6 @@ test('status --json writes nothing under the home or any repo', async () => {
     expect(result.code).toBe(0);
     envelope(result);
     expect(snapshot(f.home)).toEqual(before);
-    expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
   } finally {
     f.clean();
   }

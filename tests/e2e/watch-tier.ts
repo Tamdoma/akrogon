@@ -103,8 +103,6 @@ export async function startWatchTier(
   const appPlan: string = resolve(scratch, 'herdr-app-plan.json');
   writeFileSync(appPlan, JSON.stringify({ window: 'closed', rename: 'ok', calls: [] }));
   symlinkSync(resolve(tests, 'fake-herdr-app.ts'), resolve(appBin, 'herdr-app'));
-  // akrogon never reaches the operator's old herdr from these runs.
-  symlinkSync('/usr/bin/false', resolve(appBin, 'herdr'));
   symlinkSync(resolve(tests, 'stand-in.sh'), resolve(standinBin, 'fake'));
   const corePath: string = `${standinBin}:${dirname(process.execPath)}:${z.string().parse(process.env.PATH)}`;
   const coreEnv: Record<string, string> = {

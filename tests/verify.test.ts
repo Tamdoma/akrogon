@@ -14,7 +14,7 @@ import {
   cli,
   entry,
   fakeAkrogon,
-  fakeHerdr,
+  procFixture,
   fixture,
   greenReceipt,
   killTree,
@@ -630,8 +630,8 @@ test('plain verify on a red head writes only its own run', async () => {
 });
 
 function noticeEnv(f: Fixture): NodeJS.ProcessEnv {
-  const herdr: { env: NodeJS.ProcessEnv } = fakeHerdr(f);
-  return { ...herdr.env, PATH: `${resolve(f.home, 'bin')}:${unitBin(f)}:${process.env.PATH}` };
+  const proc: { env: NodeJS.ProcessEnv } = procFixture(f);
+  return { ...proc.env, PATH: `${resolve(f.home, 'bin')}:${unitBin(f)}:${process.env.PATH}` };
 }
 
 function baseRecord(f: Fixture, head: VerifyRun): VerifyRun {
@@ -780,7 +780,7 @@ test('an unreachable hc session is recorded as error and verify keeps its result
   const f: Fixture = await fixture();
   try {
     await failureScript(f, 'alpha');
-    const bin: string = resolve(f.home, 'noherdr');
+    const bin: string = resolve(f.home, 'nohc');
     mkdirSync(bin);
     symlinkSync(process.execPath, resolve(bin, 'bun'));
     symlinkSync(entry, resolve(bin, 'akrogon'));

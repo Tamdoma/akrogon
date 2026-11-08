@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect } from 'bun:test';
-import { fixture, cli, fakeHerdr, type Fixture } from './helpers';
+import { fixture, cli, procFixture, type Fixture } from './helpers';
 import { command } from '../src/shell';
 
 export const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
@@ -47,10 +47,10 @@ export async function deployFixture(): Promise<DeployFixture> {
   await command(['git', 'merge', '--ff-only', 'origin/main'], f.root);
   const global = Bun.YAML.parse(readFileSync(resolve(home, 'config.yaml'), 'utf8')) as object;
   writeFileSync(resolve(home, 'config.yaml'), Bun.YAML.stringify({ ...global, repos: { akrogon: f.root } }));
-  const herdr = fakeHerdr(f);
+  const proc = procFixture(f);
   symlinkSync(resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(home, 'bin/systemctl'));
   const env: NodeJS.ProcessEnv = {
-    ...herdr.env,
+    ...proc.env,
     FAKE_SYSTEMCTL_LOG: resolve(home, 'systemctl.log'),
     FAKE_SLICE_LINK: resolve(home, '.config/systemd/user/akrogon.slice'),
   };

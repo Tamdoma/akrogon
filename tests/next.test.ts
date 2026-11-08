@@ -53,10 +53,6 @@ import {
 } from './hc-fixture';
 import { z } from 'zod';
 
-// The fixture's fake herdr database.
-function herdrDb(f: Fixture): string {
-  return resolve(f.home, 'herdr.json');
-}
 async function next(
   f: Fixture & { env: NodeJS.ProcessEnv },
   args: string[],
@@ -1910,7 +1906,6 @@ for (const area of ['open', 'closed']) {
         renameSync(resolve(source, 'state.yaml'), resolve(path, 'state.yaml'));
         rmSync(source, { recursive: true });
         const state: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
-        const db: string = readFileSync(herdrDb(f), 'utf8');
         writeFileSync(resolve(f.home, 'bin/flock'), '#!/bin/sh\nprintf invoked > "$FLOCK_CALLS"\nexit 91\n', {
           mode: 0o755,
         });
@@ -1927,7 +1922,6 @@ for (const area of ['open', 'closed']) {
           expect(result.stderr).toContain('Invalid leaf depth');
           expect(existsSync(resolve(f.home, 'flock-calls'))).toBe(false);
           expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(state);
-          expect(readFileSync(herdrDb(f), 'utf8')).toBe(db);
           expect(hcCalls(f)).toEqual([]);
           expect(noticeFiles(f.core)).toEqual([]);
           expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);

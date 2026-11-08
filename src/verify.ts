@@ -640,7 +640,6 @@ const passForwarded: readonly string[] = [
   'FAKE_SYSTEMD_RUN_LOG',
   'FAKE_SYSTEMCTL_DB',
   'FAKE_SYSTEMCTL_LOG',
-  'FAKE_HERDR',
 ];
 
 async function launchPass(repo: Repo, record: PassRecord, dir: string): Promise<void> {

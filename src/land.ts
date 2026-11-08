@@ -13,7 +13,8 @@ export function landUnit(attempt: string): string {
   return `akrogon-land-${attempt}`;
 }
 
-// A transient service, not a scope: systemd-run returns once the unit starts. No HERDR_PANE_ID, so moves name no seat.
+// A transient service, not a scope: systemd-run returns once the unit starts. Only the env set below
+// reaches it, so it carries no seat identity.
 export async function launchLand(repo: Repo, slug: string, attempt: string): Promise<void> {
   const argv: string[] = [
     'systemd-run',

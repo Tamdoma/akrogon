@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { cli, fakeAkrogon, fakeHerdr, fixture, seedRun, storeDir, yaml, type Fixture } from './helpers';
+import { cli, fakeAkrogon, procFixture, fixture, seedRun, storeDir, yaml, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
 import { readRepo } from '../src/config';
 import { requireGreenReceipt, verifyRunSchema, type VerifyRun } from '../src/verify';
@@ -22,7 +22,7 @@ const envs: WeakMap<Fixture, NodeJS.ProcessEnv> = new WeakMap();
 function mergeEnv(f: Fixture): NodeJS.ProcessEnv {
   let env: NodeJS.ProcessEnv | undefined = envs.get(f);
   if (env === undefined) {
-    env = { ...fakeHerdr(f).env, ...fakeAkrogon(f).env };
+    env = { ...procFixture(f).env, ...fakeAkrogon(f).env };
     envs.set(f, env);
   }
   return env;

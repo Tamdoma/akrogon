@@ -5,7 +5,7 @@ import { leafTemp, readRepo, type Repo } from '../src/config';
 import { retiredLeafTempRoot } from '../src/config';
 import {
   fixture,
-  fakeHerdr,
+  procFixture,
   fakeSystemctl,
   fakeAkrogon,
   cli,
@@ -27,7 +27,7 @@ test('F7 test environments isolate the retired temp root', async () => {
   expect(retiredLeafTempRoot().startsWith(suiteRoot + '/')).toBe(true);
   const f: Fixture = await fixture();
   try {
-    expect(fakeHerdr(f).env.AKROGON_RETIRED_TEMP_ROOT).toBe(resolve(f.home, 'retired-temp'));
+    expect(procFixture(f).env.AKROGON_RETIRED_TEMP_ROOT).toBe(resolve(f.home, 'retired-temp'));
     expect(fakeAkrogon(f).env.AKROGON_RETIRED_TEMP_ROOT).toBe(resolve(f.home, 'retired-temp'));
   } finally {
     f.clean();
@@ -158,7 +158,7 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
   for (const scenario of ['queued', 'finished-tab', 'busy-slice']) {
     const f: Fixture = await fixture();
     try {
-      const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
+      const h: ReturnType<typeof procFixture> = procFixture(f);
       // busy-slice records no tab: a dead recorded tab now has its slice
       // stopped before repo activity is checked, which would void the premise.
       leaf(
@@ -223,7 +223,7 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
 test('F5 dead-writer temp files wait for an available pane inventory', async () => {
   const f: Fixture = await fixture();
   try {
-    const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
+    const h: ReturnType<typeof procFixture> = procFixture(f);
     const files: string[] = [storeDir(f), resolve(f.root, 'issues/worktrees')].map((root) =>
       resolve(root, 'writer.4194303.tmp'),
     );
@@ -246,7 +246,7 @@ test('F5 dead-writer temp files wait for an available pane inventory', async () 
 test('F6 kept filesystem reports include actionable clearing conditions', async () => {
   const f: Fixture = await fixture();
   try {
-    const h: ReturnType<typeof fakeHerdr> = fakeHerdr(f);
+    const h: ReturnType<typeof procFixture> = procFixture(f);
     const junk: string = resolve(storeDir(f), 'junk');
     mkdirSync(junk, { recursive: true });
     const repoResult: Reconciled = await reconcileFixture(f, null, h.env);

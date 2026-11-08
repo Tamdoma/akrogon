@@ -692,11 +692,11 @@ export async function reconcile(
     const landed: Result = await run(['git', '-C', path, 'cherry', targetRef, 'HEAD'], repo.root);
     if (landed.code !== 0 || landed.stdout.split('\n').some((line) => line.startsWith('+'))) return false;
     if (live === null) {
-      keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      keep(path, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
       return true;
     }
     if (union === null) {
-      keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      keep(path, 'pane union unavailable', 'restore hc terminal reads and retry cleanup');
       return true;
     }
     if (livePaneInside(panesUnion, path)) {
@@ -770,11 +770,11 @@ export async function reconcile(
     }
     const tab: string | undefined = leaf.state.tab;
     if (live === null) {
-      keep(worktree, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      keep(worktree, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
       return;
     }
     if (union === null) {
-      keep(worktree, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      keep(worktree, 'pane union unavailable', 'restore hc terminal reads and retry cleanup');
       return;
     }
     if (tabLive(panes, tab)) {
@@ -847,11 +847,11 @@ export async function reconcile(
     }
     if (state.phase === 'failed') {
       if (live === null) {
-        keep(worktree, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+        keep(worktree, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
         continue;
       }
       if (union === null) {
-        keep(worktree, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+        keep(worktree, 'pane union unavailable', 'restore hc terminal reads and retry cleanup');
         continue;
       }
       if (tabLive(panes, state.tab) || foreignPaneInside(ownPanes, foreignPanes, worktree, state.tab)) {
@@ -873,11 +873,11 @@ export async function reconcile(
       continue;
     }
     if (live === null) {
-      keep(worktree, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      keep(worktree, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
       continue;
     }
     if (union === null) {
-      keep(worktree, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      keep(worktree, 'pane union unavailable', 'restore hc terminal reads and retry cleanup');
       continue;
     }
     if (livePaneInside(panesUnion, worktree) || tabLive(panes, state.tab)) {
@@ -907,11 +907,11 @@ export async function reconcile(
   };
   const dropChecked = (path: string): void => {
     if (live === null) {
-      keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      keep(path, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
       return;
     }
     if (union === null) {
-      keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      keep(path, 'pane union unavailable', 'restore hc terminal reads and retry cleanup');
       return;
     }
     if (livePaneInside(panesUnion, path)) {
@@ -1001,9 +1001,8 @@ export async function reconcile(
         }
         if (leaf.state.phase === 'failed') {
           handled.add(path);
-          if (live === null) keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
-          else if (union === null)
-            keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+          if (live === null) keep(path, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
+          else if (union === null) keep(path, 'pane union unavailable', 'restore hc terminal reads and retry cleanup');
           else if (tabLive(panes, leaf.state.tab) || foreignPaneInside(ownPanes, foreignPanes, path, leaf.state.tab))
             keep(path, 'live pane inside', 'removed once the pane closes or leaves this path');
           else await removeWorktree(path, false, 'failed leaf');
@@ -1048,11 +1047,11 @@ export async function reconcile(
         continue;
       }
       if (live === null) {
-        keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+        keep(path, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
         continue;
       }
       if (union === null) {
-        keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+        keep(path, 'pane union unavailable', 'restore hc terminal reads and retry cleanup');
         continue;
       }
       if (livePaneInside(panesUnion, path)) {
@@ -1084,11 +1083,11 @@ export async function reconcile(
         continue;
       }
       if (live === null) {
-        keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+        keep(path, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
         continue;
       }
       if (union === null) {
-        keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+        keep(path, 'pane union unavailable', 'restore hc terminal reads and retry cleanup');
         continue;
       }
       if (tabLive(panes, ownerLeaf.state.tab) || foreignPaneInside(ownPanes, foreignPanes, path, ownerLeaf.state.tab)) {
@@ -1108,9 +1107,8 @@ export async function reconcile(
       // a dead or unreadable one is dropped once panes are available (D1.3).
       const record: Owner | undefined = readOwner(path);
       if (record !== undefined && !ownerDead(record)) keep(path, 'live owner', 'removed once the owner exits');
-      else if (live === null) keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
-      else if (union === null)
-        keep(path, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      else if (live === null) keep(path, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
+      else if (union === null) keep(path, 'pane union unavailable', 'restore hc terminal reads and retry cleanup');
       else dropChecked(path);
       continue;
     }
@@ -1187,9 +1185,9 @@ export async function reconcile(
           if (broadcastInProgress(leaf.state, live))
             keep(dir, 'broadcast in progress', 'removed once the broadcast seat finishes');
           else if (live === null) {
-            if (done) keep(dir, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+            if (done) keep(dir, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
           } else if (union === null) {
-            if (done) keep(dir, 'pane union unavailable', 'restore the Herdr pane inventory and retry cleanup');
+            if (done) keep(dir, 'pane union unavailable', 'restore hc terminal reads and retry cleanup');
           } else if (tabLive(live, leaf.state.tab) || livePaneInside(panesUnion, dir)) {
             if (done) keep(dir, 'live pane inside', 'removed once the pane closes or leaves this path');
           } else if (kept.length === keptBefore) {
@@ -1382,7 +1380,7 @@ export async function reconcileHost(
   const dropPath = async (path: string, isDir: boolean): Promise<void> => {
     const view: Seen[] | null = await livePanes();
     if (view === null) {
-      keep(path, 'pane list unavailable', 'restore the Herdr pane inventory and retry cleanup');
+      keep(path, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
       return;
     }
     if (isDir && livePaneInside(view, path)) {

@@ -9,7 +9,7 @@ import { connect } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
-import { fakeHerdr, fixture, type Fixture, type SystemctlFixture } from './helpers';
+import { fixture, procRoot, type Fixture, type SystemctlFixture } from './helpers';
 import './isolation';
 
 const uid: number = process.getuid!();
@@ -201,11 +201,8 @@ export async function hcCore(
   });
   if (start.code !== 0) throw new Error(`hc server start failed: ${JSON.stringify(start)}`);
   symlinkSync(socket, linked);
-  // One fake herdr per fixture for today's notice sends (they stay on old herdr until notices-on-hc).
-  const herdrDb: string = resolve(f.home, 'herdr.json');
-  const herdrPath: string = existsSync(herdrDb)
-    ? `${resolve(f.home, 'bin')}:${z.string().parse(process.env.PATH)}`
-    : z.string().parse(fakeHerdr(f).env.PATH);
+  // Tests drop their own stubs in <home>/bin; akrogon's sweeps read the proc root.
+  for (const dir of [resolve(f.home, 'bin'), procRoot(f)]) mkdirSync(dir, { recursive: true });
   const hcBin: string = resolve(f.home, `hc-bin-${serial}`);
   mkdirSync(hcBin);
   symlinkSync(resolve(import.meta.dir, 'hc-shim.sh'), resolve(hcBin, 'hc'));
@@ -217,8 +214,7 @@ export async function hcCore(
   const shimLog: string = resolve(f.home, `hc-calls-${serial}.log`);
   writeFileSync(shimLog, '');
   const env: NodeJS.ProcessEnv = {
-    PATH: `${hcBin}:${herdrPath}`,
-    FAKE_HERDR: herdrDb,
+    PATH: `${hcBin}:${resolve(f.home, 'bin')}:${process.env.PATH}`,
     XDG_RUNTIME_DIR: runtime,
     DBUS_SESSION_BUS_ADDRESS: `unix:path=${realRuntime}/bus`,
     HC_SESSION: '',

@@ -1,19 +1,9 @@
 import assert from 'node:assert/strict';
 import { test, expect, spyOn } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { fixture, type Fixture } from './helpers';
-import {
-  CommandError,
-  herdrError,
-  paneSchema,
-  retryable,
-  retryCommand,
-  run,
-  spawnCaptured,
-  type Result,
-} from '../src/shell';
+import { CommandError, retryCommand, run, spawnCaptured, type Result } from '../src/shell';
 import { registerTemp } from './helpers';
 
 for (const firstFailure of [false, true]) {
@@ -88,97 +78,6 @@ for (const code of [0, 7]) {
     expect(performance.now() - start).toBeLessThan(2000);
   });
 }
-
-for (const stdout of ['not-json-response', '{"result":{"panes":"invalid-panes"}}']) {
-  test(`Herdr response retains native cause for ${stdout}`, async () => {
-    const f: Fixture = await fixture();
-    try {
-      const bin: string = resolve(f.home, 'bin');
-      mkdirSync(bin);
-      symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
-      const db: string = resolve(f.home, 'herdr.json');
-      writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0, paneListStdout: stdout }));
-      const script: string = `import assert from 'node:assert/strict';
-import {z} from ${JSON.stringify(import.meta.resolve('zod'))};
-import {paneSchema, herdr, CommandError} from ${JSON.stringify(resolve(import.meta.dir, '../src/shell.ts'))};
-await assert.rejects(herdr(['pane', 'list'], z.object({ panes: z.array(paneSchema) })), (error) => {
-  assert(error.cause instanceof ${stdout.startsWith('{') ? 'z.ZodError' : 'SyntaxError'});
-  const context = JSON.parse(error.message);
-  assert.deepEqual(context.command, ['herdr', 'pane', 'list']);
-  assert.equal(context.cwd, process.cwd());
-  assert.equal(context.stdout, ${JSON.stringify(stdout)});
-  assert.equal(context.error, error.cause.message);
-  return true;
-});
-await assert.rejects(herdr(['invalid-command'], z.object({})), (error) => {
-  assert(error instanceof CommandError);
-  assert.equal(error.result.code, 1);
-  assert.equal(error.cause, undefined);
-  return true;
-});`;
-      const { stderr, code }: Result = await spawnCaptured([process.execPath, '-e', script], {
-        cwd: f.root,
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_HERDR: db },
-      });
-      expect({ code, stderr }).toEqual({ code: 0, stderr: '' });
-    } finally {
-      f.clean();
-    }
-  });
-}
-
-test('herdrError decodes structured stderr', () => {
-  expect(
-    herdrError({ code: 1, stdout: '', stderr: JSON.stringify({ error: { code: 'timeout', message: 'slow' } }) }),
-  ).toEqual({ code: 'timeout', message: 'slow' });
-});
-
-test('herdrError maps unstructured stderr to exit code', () => {
-  expect(herdrError({ code: 3, stdout: '', stderr: '  boom  \n' })).toEqual({ code: 'exit 3', message: 'boom' });
-  expect(herdrError({ code: 1, stdout: '', stderr: '{"error":{"code":1}}' })).toEqual({
-    code: 'exit 1',
-    message: '{"error":{"code":1}}',
-  });
-});
-
-test('herdrError truncates long stderr to 500 chars', () => {
-  const long: string = 'x'.repeat(600);
-  const decoded: { code: string; message: string } = herdrError({ code: 2, stdout: '', stderr: `  ${long}  ` });
-  expect(decoded.code).toBe('exit 2');
-  expect(decoded.message).toBe('x'.repeat(500));
-});
-
-test('retryable is false on non-JSON stderr without throwing', () => {
-  expect(retryable({ code: 1, stdout: '', stderr: 'plain failure' })).toBe(false);
-  expect(
-    retryable({
-      code: 1,
-      stdout: '',
-      stderr: JSON.stringify({ error: { code: 'timeout', message: 'm' } }),
-    }),
-  ).toBe(true);
-  expect(
-    retryable({
-      code: 1,
-      stdout: '',
-      stderr: JSON.stringify({ error: { code: 'tab_not_found', message: 'm' } }),
-    }),
-  ).toBe(false);
-});
-
-test('paneSchema requires kind when agent_session present', () => {
-  expect(() =>
-    paneSchema.parse({ pane_id: 'p', tab_id: 't', agent_status: 'idle', agent_session: { value: 's' } }),
-  ).toThrow();
-  expect(
-    paneSchema.parse({
-      pane_id: 'p',
-      tab_id: 't',
-      agent_status: 'idle',
-      agent_session: { kind: 'id', value: 's' },
-    }).agent_session,
-  ).toEqual({ kind: 'id', value: 's' });
-});
 
 test('git and gh get the user session bus back under the seat bus cut; other programs keep the cut', async () => {
   const script: string = `

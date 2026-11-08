@@ -16,9 +16,9 @@ import {
   leaf,
   yaml,
   fakeGh,
-  fakeHerdr,
+  procFixture,
   type GhFixture,
-  type HerdrFixture,
+  type ProcFixture,
   type Fixture,
   greenReceipt,
   verified,
@@ -33,17 +33,6 @@ import { noticeId } from '../src/notice';
 
 function bytes(path: string): string {
   return readFileSync(resolve(path, 'state.yaml'), 'utf8');
-}
-function herdrCalls(db: string): string[][] {
-  const callsPath: string = db + '.calls';
-  return existsSync(callsPath)
-    ? readFileSync(callsPath, 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
-        // Session routing adds discovery calls; strip them so assertions see work calls.
-        .filter((args) => args[0] !== 'session' && args[0] !== 'workspace')
-    : [];
 }
 // The skip line a pass prints for a leaf it could not finish: repo, path, slug and error, no source.
 const skipLine = z.object({ repo: z.string(), path: z.string(), slug: z.string(), error: z.string() }).strict();
@@ -135,7 +124,7 @@ test('review fix routes to check.repair, B hands to A past the configured count,
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1, grounding: 'none' });
     const path: string = leaf(f, 'repair', 'check.review');
-    const herdr = fakeHerdr(f);
+    const proc = procFixture(f);
     expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'A'])).code).not.toBe(0);
     expect((await cli(f, ['phase', 'repair', 'merge', '--slot', 'A', '--verdict', 'nits'])).stdout).toBe('recorded');
     expect((await cli(f, ['phase', 'repair', 'check.repair', '--slot', 'B', '--verdict', 'fix'])).stdout).toBe(
@@ -151,22 +140,22 @@ test('review fix routes to check.repair, B hands to A past the configured count,
       'moved check.repair',
     );
     expect(readState(path).fix_rounds).toBe(1);
-    expect((await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'B'], f.root, herdr.env)).stdout).toBe(
+    expect((await cli(f, ['phase', 'repair', 'check.fix', '--slot', 'B'], f.root, proc.env)).stdout).toBe(
       'moved check.fix',
     );
     expect(readState(path)).toMatchObject({ phase: 'check.fix', fix_rounds: 2 });
     expect(readState(path).failure).toBeUndefined();
     expect(
-      (await cli(f, ['phase', 'repair', 'failed', '--slot', 'A', '--reason', 'needs a decision'], f.root, herdr.env))
+      (await cli(f, ['phase', 'repair', 'failed', '--slot', 'A', '--reason', 'needs a decision'], f.root, proc.env))
         .stdout,
     ).toBe('moved failed');
-    expect((await cli(f, ['phase', 'repair', 'implement'], f.root, herdr.env)).code).toBe(0);
+    expect((await cli(f, ['phase', 'repair', 'implement'], f.root, proc.env)).code).toBe(0);
     expect(readState(path)).toMatchObject({ phase: 'implement', fix_rounds: 2 });
     const mergePath: string = leaf(f, 'conflict', 'merge');
     expect((await cli(f, ['phase', 'conflict', 'check.fix'])).code).toBe(0);
     expect(readState(mergePath).fix_rounds).toBe(1);
     const cappedPath: string = leaf(f, 'capped', 'merge', { fix_rounds: 1 });
-    expect((await cli(f, ['phase', 'capped', 'check.fix'], f.root, herdr.env)).stdout).toBe('moved check.fix');
+    expect((await cli(f, ['phase', 'capped', 'check.fix'], f.root, proc.env)).stdout).toBe('moved check.fix');
     expect(readState(cappedPath)).toMatchObject({
       phase: 'check.fix',
       fix_rounds: 2,
@@ -205,7 +194,7 @@ test('review fix routes to check.repair, B hands to A past the configured count,
 test('a failed move logs the state failure object while a moved record omits failure and prints in status', async () => {
   const f: Fixture = await fixture();
   try {
-    const herdr: HerdrFixture = fakeHerdr(f);
+    const proc: ProcFixture = procFixture(f);
     const path: string = leaf(f, 'log-failure', 'plan.synthesis');
     const moved: Result = await cli(f, ['phase', 'log-failure', 'implement', '--slot', 'A']);
     expect(moved.stdout).toBe('moved implement');
@@ -222,7 +211,7 @@ test('a failed move logs the state failure object while a moved record omits fai
       f,
       ['phase', 'log-failure', 'failed', '--slot', 'A', '--reason', 'seats disagree'],
       f.root,
-      herdr.env,
+      proc.env,
     );
     expect(failed.stdout).toBe('moved failed');
     const failedRecord = JSON.parse(readFileSync(history, 'utf8').trim().split('\n')[1]);
@@ -343,7 +332,7 @@ test('completion leaves a chart holding a same-slug draft in place and keeps the
     greenReceipt(f, await command(['git', 'rev-parse', 'HEAD'], f.root), 'merge');
     for (const slug of ['alpha', 'beta']) expect((await cli(f, ['phase', slug, 'merged'])).code).toBe(0);
     expect(snapshot(chart)).toEqual(before);
-    const all: Result = await cli(f, ['next', '--all'], f.root, fakeHerdr(f).env);
+    const all: Result = await cli(f, ['next', '--all'], f.root, procFixture(f).env);
     expect(all.code).toBe(0);
     expect(all.stderr).not.toContain('Invalid leaf depth');
     expect(all.stderr).not.toContain('Duplicate leaf slug');
@@ -1289,8 +1278,8 @@ test('check.fix request at the configured round count moves and increments', asy
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 1, grounding: 'none' });
     const path: string = leaf(f, 'cap', 'check.repair', { fix_rounds: 1 });
-    const herdr = fakeHerdr(f);
-    const result: Result = await cli(f, ['phase', 'cap', 'check.fix', '--slot', 'B'], f.root, herdr.env);
+    const proc = procFixture(f);
+    const result: Result = await cli(f, ['phase', 'cap', 'check.fix', '--slot', 'B'], f.root, proc.env);
     expect(result.stdout).toBe('moved check.fix');
     expect(readState(path)).toMatchObject({ phase: 'check.fix', fix_rounds: 2 });
     expect(readState(path).failure).toBeUndefined();
@@ -1621,7 +1610,7 @@ for (const { phase, slot, extra } of [
 test('failed leaf with explicit slot is refused without effect', async () => {
   const f: Fixture = await fixture();
   try {
-    const herdr: HerdrFixture = fakeHerdr(f);
+    const proc: ProcFixture = procFixture(f);
     const history: string = resolve(f.root, 'issues/log.jsonl');
     writeFileSync(history, '');
     const cases: { slug: string; extra: object; args: string[]; reason?: string }[] = [
@@ -1660,14 +1649,13 @@ test('failed leaf with explicit slot is refused without effect', async () => {
     for (const item of cases) {
       const path: string = leaf(f, item.slug, 'failed', item.extra);
       const before: string = bytes(path);
-      const result: Result = await cli(f, item.args, f.root, herdr.env);
+      const result: Result = await cli(f, item.args, f.root, proc.env);
       expect(result.code).not.toBe(0);
       expect(result.stderr).toContain(seatRefusal);
       if (item.reason !== undefined) expect(result.stderr).toContain(item.reason);
       expect(bytes(path)).toBe(before);
       expect(readFileSync(history, 'utf8')).toBe('');
     }
-    expect(herdrCalls(herdr.db)).toEqual([]);
   } finally {
     f.clean();
   }
@@ -1676,23 +1664,16 @@ test('failed leaf with explicit slot is refused without effect', async () => {
 test('in-flight seat move after stop stays failed', async () => {
   const f: Fixture = await fixture();
   try {
-    const herdr: HerdrFixture = fakeHerdr(f);
+    const proc: ProcFixture = procFixture(f);
     const path: string = leaf(f, 'seat', 'check.fix', { fix_rounds: 1 });
-    const stopped: Result = await cli(
-      f,
-      ['phase', 'seat', 'failed', '--slot', 'A', '--reason', 'x'],
-      f.root,
-      herdr.env,
-    );
+    const stopped: Result = await cli(f, ['phase', 'seat', 'failed', '--slot', 'A', '--reason', 'x'], f.root, proc.env);
     expect(stopped.stdout).toBe('moved failed');
     const before: string = bytes(path);
-    const calls: number = herdrCalls(herdr.db).length;
-    const refused: Result = await cli(f, ['phase', 'seat', 'check.review', '--slot', 'A'], f.root, herdr.env);
+    const refused: Result = await cli(f, ['phase', 'seat', 'check.review', '--slot', 'A'], f.root, proc.env);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain(seatRefusal);
     expect(bytes(path)).toBe(before);
     expect(readState(path)).toMatchObject({ phase: 'failed', fix_rounds: 1 });
-    expect(herdrCalls(herdr.db)).toHaveLength(calls);
   } finally {
     f.clean();
   }
@@ -1895,7 +1876,7 @@ test('phase --check runs the move guards without recording, moving or closing th
       f,
       ['phase', 'check-dirty', 'failed', '--reason', 'x', '--check'],
       f.root,
-      fakeHerdr(f).env,
+      procFixture(f).env,
     );
     expect(failed.code).not.toBe(0);
     expect(bytes(dirtyPath)).toBe(dirtyBefore);
@@ -1910,7 +1891,7 @@ test('phase --check runs the move guards without recording, moving or closing th
   }
 });
 
-test('a phase move still logs and succeeds when herdr is unreachable', async () => {
+test('a phase move logs and succeeds with a stale old herdr socket in its env', async () => {
   const f: Fixture = await fixture();
   try {
     const path: string = leaf(f, 'solo', 'check.review', {
@@ -1998,12 +1979,12 @@ test('an earlier merge_stamp takes the turn over slug order', async () => {
 test('moving into merge writes merge_stamp and re-entering refreshes it', async () => {
   const f: Fixture = await fixture();
   try {
-    const herdr: HerdrFixture = fakeHerdr(f);
+    const proc: ProcFixture = procFixture(f);
     const path: string = leaf(f, 'stamper', 'check.repair');
     expect((await cli(f, ['phase', 'stamper', 'merge', '--slot', 'B'])).stdout).toBe('moved merge');
     const first: string | undefined = readState(path).merge_stamp;
     expect(Date.parse(first ?? '')).not.toBeNaN();
-    expect((await cli(f, ['phase', 'stamper', 'failed', '--reason', 'x'], f.root, herdr.env)).stdout).toBe(
+    expect((await cli(f, ['phase', 'stamper', 'failed', '--reason', 'x'], f.root, proc.env)).stdout).toBe(
       'moved failed',
     );
     expect((await cli(f, ['phase', 'stamper', 'merge'])).stdout).toBe('moved merge');
@@ -2064,13 +2045,13 @@ test('merged --check refuses an applied stack whose top still contains a retired
       top,
     };
     saveState(path, { ...readState(path), batch: record });
-    const herdr: HerdrFixture = fakeHerdr(f);
+    const proc: ProcFixture = procFixture(f);
     await verified(f, 'hold', 'merge');
     const refused: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
       f.root,
-      herdr.env,
+      proc.env,
     );
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('history/alpha');
@@ -2085,7 +2066,7 @@ test('merged --check refuses an applied stack whose top still contains a retired
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
       f.root,
-      herdr.env,
+      proc.env,
     );
     expect(checked.code).toBe(0);
     expect(checked.stdout).toBe('ok');
@@ -2116,20 +2097,20 @@ test('a solo merge push keeps citations valid when the remote ref advanced', asy
       applied: true,
     };
     saveState(path, { ...readState(path), batch: record });
-    const herdr: HerdrFixture = fakeHerdr(f);
+    const proc: ProcFixture = procFixture(f);
     await verified(f, 'push-cite', 'merge');
     const checked: Result = await cli(
       f,
       ['phase', 'push-cite', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
       f.root,
-      herdr.env,
+      proc.env,
     );
     expect(checked.code).toBe(0);
     const merged: Result = await cli(
       f,
       ['phase', 'push-cite', 'merged', '--slot', 'B', '--attempt', 'a1'],
       f.root,
-      herdr.env,
+      proc.env,
     );
     expect(merged.code).toBe(0);
     expect(readState(resolve(f.root, 'issues/closed/issue/push-cite')).phase).toBe('merged');
@@ -2164,13 +2145,13 @@ test('merged --check refuses a solo record whose rebased head contains a retired
       applied: true,
     };
     saveState(path, { ...readState(path), batch: record });
-    const herdr: HerdrFixture = fakeHerdr(f);
+    const proc: ProcFixture = procFixture(f);
     await verified(f, 'hold', 'merge');
     const refused: Result = await cli(
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
       f.root,
-      herdr.env,
+      proc.env,
     );
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('history/alpha');
@@ -2183,7 +2164,7 @@ test('merged --check refuses a solo record whose rebased head contains a retired
       f,
       ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
       f.root,
-      herdr.env,
+      proc.env,
     );
     expect(checked.code).toBe(0);
     expect(checked.stdout).toBe('ok');

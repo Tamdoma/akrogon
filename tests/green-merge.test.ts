@@ -512,7 +512,7 @@ test('next preserves a live command attempt while its refused push restacks', as
   }
 }, 60000);
 
-test('the land service drops the inherited Herdr socket and keeps no seat identity', async () => {
+test('the land service drops an inherited old herdr socket and keeps no seat identity', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
   try {
     const socket: string = resolve(f.home, 'sessions/infra/herdr.sock');

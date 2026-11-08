@@ -2,11 +2,10 @@ import { test, expect } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { resolve } from 'node:path';
-import { fixture, cli, entry, leaf, fakeHerdr, storeDir, yaml, type Fixture } from './helpers';
+import { fixture, cli, entry, leaf, procFixture, storeDir, yaml, type Fixture, type ProcFixture } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, spawnCaptured, type Result } from '../src/shell';
 import { z } from 'zod';
-import type { Database, DatabaseInput, SessionInput } from './fake-herdr';
 import {
   hcCore,
   hcFixture,
@@ -18,52 +17,10 @@ import {
   type Terminal,
 } from './hc-fixture';
 
-type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
-type PaneSeed = {
-  pane_id: string;
-  tab_id: string;
-  cwd: string;
-  agent: string | null;
-  agent_status: 'idle' | 'done' | 'working' | 'blocked' | 'unknown';
-};
-function seatedPane(pane_id: string, tab_id: string, cwd: string): PaneSeed {
-  return { pane_id, tab_id, cwd, agent: null, agent_status: 'unknown' };
-}
-type TabSeed = { tab_id: string; label: string; workspace_id: string };
-type SessionSeed = {
-  name: string;
-  running?: boolean;
-  deadRead?: boolean;
-  readError?: string;
-  delayMs?: number;
-  panes?: PaneSeed[];
-  tabs?: TabSeed[];
-  workspaces?: { workspace_id: string; label: string }[];
-  serial?: number;
-};
-function session(name: string, over: Omit<SessionSeed, 'name'> = {}): SessionInput {
-  return {
-    name,
-    running: true,
-    panes: [],
-    tabs: [],
-    workspaces: [],
-    serial: 0,
-    ...over,
-  };
-}
+type DispatchFixture = Fixture & ProcFixture;
 async function dispatchFixture(): Promise<DispatchFixture> {
   const f: Fixture = await fixture();
-  return { ...f, ...fakeHerdr(f) };
-}
-function database(f: DispatchFixture): Database {
-  return JSON.parse(readFileSync(f.db, 'utf8')) as Database;
-}
-function saveDatabase(f: DispatchFixture, db: DatabaseInput): void {
-  writeFileSync(f.db, JSON.stringify(db));
-}
-function socket(f: DispatchFixture, name: string): string {
-  return `${f.db}-${name}.sock`;
+  return { ...f, ...procFixture(f) };
 }
 async function next(
   f: DispatchFixture,
@@ -128,29 +85,6 @@ exec '${shim}' "$@"
 function appCloses(core: HcCore): { argv: string[]; home: string | null; planned: boolean }[] {
   return core.appCalls().filter((call) => call.argv[1] === 'tab.close');
 }
-function herdrCalls(f: Fixture, name: string): string[][] {
-  const path: string = resolve(f.home, 'herdr.json.calls-raw');
-  return existsSync(path)
-    ? readFileSync(path, 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
-        .filter((args) => args[0] === '--session' && args[1] === name)
-    : [];
-}
-// The fixture core's fake herdr (notices only) gains a running session `other` with no repo workspace.
-function herdrOther(f: Fixture): string {
-  const db: string = resolve(f.home, 'herdr.json');
-  saveDatabase(
-    { ...f, db, env: {} },
-    {
-      ...(JSON.parse(readFileSync(db, 'utf8')) as Database),
-      sessions: [session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] })],
-    },
-  );
-  return `${db}-other.sock`;
-}
-
 test('refuses missing and duplicate repo spaces while naming searched and skipped sessions', async () => {
   const f: Fixture = await hcSetup();
   const other: HcCore = await hcCore(f, { repo: 'misc' });
@@ -357,15 +291,15 @@ test('the reconcile tab close goes to the session holding the repo space', async
   }
 }, 20000);
 
-test('the land unit carries no HERDR_SOCKET_PATH and its calls route to the resolved session', async () => {
+test('the land unit carries no HERDR_SOCKET_PATH from the caller env', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] })],
-    });
     const launches: string = resolve(f.home, 'systemd-run.log');
-    const env: NodeJS.ProcessEnv = { ...f.env, FAKE_SYSTEMD_RUN_LOG: launches, HERDR_SOCKET_PATH: socket(f, 'other') };
+    const env: NodeJS.ProcessEnv = {
+      ...f.env,
+      FAKE_SYSTEMD_RUN_LOG: launches,
+      HERDR_SOCKET_PATH: resolve(f.home, 'other.sock'),
+    };
     // A merge leaf at the head of the queue claims its batch and launches land.
     const path: string = leaf(f, 'landing', 'merge', { merge_stamp: '2026-10-19T00:00:00.000Z' });
     const worktree: string = resolve(storeDir(f), 'landing');
@@ -400,7 +334,6 @@ test('land wake calls reach the resolved session under a stale parent session', 
       HC_SESSION: decoy.session,
       HC_TERMINAL_SOCKET: decoy.socket,
       HC_TERMINAL_ID: 't1',
-      HERDR_SOCKET_PATH: herdrOther(f),
       FAKE_SYSTEMD_RUN_LOG: resolve(f.home, 'systemd-run.log'),
     };
     // A sibling leaf keeps the issue owner incomplete so the merged leaf's
@@ -424,11 +357,6 @@ test('land wake calls reach the resolved session under a stale parent session', 
       { argv: ['do', 'tab.close', '--id', tab], home: f.core.appHome, planned: true },
     ]);
     expect(await decoy.terminals({ akrogon: '1' })).toEqual([]);
-    expect(
-      herdrCalls(f, 'other').filter(
-        (args) => args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? ''),
-      ),
-    ).toHaveLength(0);
     expect(noticeFiles(decoy)).toEqual([]);
   } finally {
     await decoy.stop();
@@ -441,9 +369,8 @@ test('phase renames and the failed notice carry the resolved session', async () 
   const decoy: HcCore = await hcCore(f, { repo: 'misc' });
   try {
     f.core.link(decoy);
-    const stale: string = herdrOther(f);
     const path: string = leaf(f, 'renamed', 'plan.synthesis');
-    expect((await cli(f, ['next', 'renamed'], f.root, { ...f.env, HERDR_SOCKET_PATH: stale })).code).toBe(0);
+    expect((await cli(f, ['next', 'renamed'], f.root, f.env)).code).toBe(0);
     f.core.setWindow('open');
     const worktree: string = z.string().parse(readState(path).worktree);
     const tab: string = z.string().parse(readState(path).tab);
@@ -456,22 +383,14 @@ test('phase renames and the failed notice carry the resolved session', async () 
       f,
       ['phase', 'renamed', 'failed', '--slot', 'A', '--reason', 'blocked for test'],
       worktree,
-      { ...f.env, HERDR_SOCKET_PATH: stale },
+      f.env,
     );
     expect(moved.code).toBe(0);
     expect(noticeFiles(f.core).map((notice) => notice.title)).toEqual(['repo/renamed failed']);
     expect(noticeFiles(decoy)).toEqual([]);
     expect(renames('renamed failed')).toEqual([f.core.appHome]);
-    expect(
-      herdrCalls(f, 'other').filter(
-        (args) => args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? ''),
-      ),
-    ).toHaveLength(0);
     // Recovery renames back in the same session.
-    const back: Result = await cli(f, ['phase', 'renamed', 'plan.synthesis'], worktree, {
-      ...f.env,
-      HERDR_SOCKET_PATH: stale,
-    });
+    const back: Result = await cli(f, ['phase', 'renamed', 'plan.synthesis'], worktree, f.env);
     expect(back.code).toBe(0);
     expect(renames('renamed').length).toBeGreaterThan(0);
     expect(new Set(renames('renamed'))).toEqual(new Set([f.core.appHome]));

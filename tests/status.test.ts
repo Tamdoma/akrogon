@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
-import { fixture, cli, leaf, yaml, fakeHerdr, registerTemp, type Fixture } from './helpers';
+import { fixture, cli, leaf, yaml, procFixture, registerTemp, type Fixture } from './helpers';
 import { event, log, mergeRecord, needs, prompt, register, seedRunRecord, snapshot, timings } from './status-fixture';
 import { command, type Result } from '../src/shell';
 import { z } from 'zod';
@@ -74,7 +74,7 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
       event('ordinary', 'failed', 0, '', at),
     ]);
     timings(f, [prompt('broken', 30, 'delivered', at)]);
-    const env: NodeJS.ProcessEnv = fakeHerdr(f).env;
+    const env: NodeJS.ProcessEnv = procFixture(f).env;
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const otherBefore: Record<string, string> = snapshot(resolve(g.root, 'issues'));
     const result: Result = await cli(f, ['status'], f.home, env);
@@ -112,7 +112,6 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     expect(cell(result.stdout, ordinary, 'TIME')).toBe('-');
     expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
     expect(snapshot(resolve(g.root, 'issues'))).toEqual(otherBefore);
-    expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
   } finally {
     f.clean();
     g.clean();
@@ -444,7 +443,7 @@ test('detail resolves authoritative closed state from a worktree, limits history
         event('selected', index % 2 === 0 ? 'implement' : 'merged', 20 - index, `record-${index}`),
       ).flatMap((line) => [line, event('other', 'merged', 0)]),
     );
-    const env: NodeJS.ProcessEnv = fakeHerdr(f).env;
+    const env: NodeJS.ProcessEnv = procFixture(f).env;
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const inertBefore: Record<string, string> = snapshot(resolve(worktree, 'issues'));
     const result: Result = await cli(f, ['status', 'selected'], worktree, env);
@@ -466,7 +465,6 @@ test('detail resolves authoritative closed state from a worktree, limits history
     expect(records.every((record) => record.slug === 'selected' && record.slot === 'B')).toBe(true);
     expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
     expect(snapshot(resolve(worktree, 'issues'))).toEqual(inertBefore);
-    expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
     rmSync(resolve(f.root, 'issues/log.jsonl'));
     rmSync(resolve(authoritative, 'plan.md'), { recursive: true });
     const noHistory: Result = await cli(f, ['status', 'selected'], worktree, env);
@@ -480,7 +478,7 @@ test('detail resolves authoritative closed state from a worktree, limits history
   }
 });
 
-test('busy durations appear in NOTE for every recorded seat without writes or herdr calls', async () => {
+test('busy durations appear in NOTE for every recorded seat without writes', async () => {
   const f: Fixture = await fixture();
   try {
     const now: number = Date.now();
@@ -491,7 +489,7 @@ test('busy durations appear in NOTE for every recorded seat without writes or he
       busy_since: { A: new Date(now - 2 * 60000).toISOString(), B: new Date(now + 60000).toISOString() },
     });
     leaf(f, 'empty', 'implement');
-    const env: NodeJS.ProcessEnv = fakeHerdr(f).env;
+    const env: NodeJS.ProcessEnv = procFixture(f).env;
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const result: Result = await cli(f, ['status'], f.home, env);
     expect(result.code).toBe(0);
@@ -501,7 +499,6 @@ test('busy durations appear in NOTE for every recorded seat without writes or he
     expect(cell(result.stdout, leafRow(result.stdout, 'short'), 'NOTE')).toContain('busy B 0h 00m');
     expect(cell(result.stdout, leafRow(result.stdout, 'empty'), 'NOTE')).not.toContain('busy');
     expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
-    expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
   } finally {
     f.clean();
   }

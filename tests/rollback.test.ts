@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { repoSchema } from '../src/config';
-import { cli, unitBin } from './helpers';
+import { cli, herdrStub, unitBin } from './helpers';
 import {
   deployFixture,
   deployedPair,
@@ -99,6 +99,8 @@ test.serial('the roll-back page manual steps roll a broken release back using th
     // lands on main (ROLLBACK_BREAK_PREV removes install.ts, which turns this
     // proof red only when the predecessor code actually runs).
     const base: string = '6121559ee158f559842715a552248645f05bd026';
+    // That predecessor's install still calls herdr; a recording stub answers it.
+    herdrStub(resolve(d.home, 'bin'));
     const homeEnv: NodeJS.ProcessEnv = {
       ...process.env,
       ...d.env,

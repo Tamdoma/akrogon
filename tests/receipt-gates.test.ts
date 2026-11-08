@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fakeHerdr, fixture, greenReceipt, leaf, seedRun, type Fixture } from './helpers';
+import { cli, procFixture, fixture, greenReceipt, leaf, seedRun, type Fixture } from './helpers';
 import { readRepo } from '../src/config';
 import { readState, saveState, type Batch } from '../src/state';
 import { command, spawnCaptured, type Result } from '../src/shell';
@@ -76,17 +76,17 @@ test('merged --check stamps tested_top only with a green merge receipt for HEAD 
       applied: true,
     };
     saveState(path, { ...readState(path), batch: record });
-    const herdr: { env: NodeJS.ProcessEnv } = fakeHerdr(f);
+    const proc: { env: NodeJS.ProcessEnv } = procFixture(f);
     const check: string[] = ['phase', 'landing', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'];
-    const missing: Result = await cli(f, check, f.root, herdr.env);
+    const missing: Result = await cli(f, check, f.root, proc.env);
     expect(missing.code).not.toBe(0);
     expect(missing.stderr).toContain(`No green merge verify receipt for ${head}`);
     greenReceipt(f, head, 'merge', stale);
-    const mismatched: Result = await cli(f, check, f.root, herdr.env);
+    const mismatched: Result = await cli(f, check, f.root, proc.env);
     expect(mismatched.code).not.toBe(0);
     expect(readState(path).batch?.tested_top).toBeUndefined();
     greenReceipt(f, head, 'merge');
-    expect((await cli(f, check, f.root, herdr.env)).code).toBe(0);
+    expect((await cli(f, check, f.root, proc.env)).code).toBe(0);
     expect(readState(path).batch?.tested_top).toBe(head);
   } finally {
     f.clean();
@@ -106,7 +106,7 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
       applied: true,
     };
     saveState(path, { ...readState(path), batch: record });
-    const herdr: { env: NodeJS.ProcessEnv } = fakeHerdr(f);
+    const proc: { env: NodeJS.ProcessEnv } = procFixture(f);
     const check: string[] = ['phase', 'landing', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'];
     const tree: string = await command(['git', 'rev-parse', `${head}^{tree}`], f.root);
     const baseTree: string = await command(['git', 'rev-parse', `${builtOn}^{tree}`], f.root);
@@ -143,13 +143,13 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
     const headOnly: string = resolve(path, 'implementation/check-test-base.log');
     writeFileSync(headOnly, '(fail) beta\n');
     pair(headOnly);
-    expect((await cli(f, check, f.root, herdr.env)).stderr).toContain(`No green merge verify receipt for ${head}`);
+    expect((await cli(f, check, f.root, proc.env)).stderr).toContain(`No green merge verify receipt for ${head}`);
     expect(readState(path).batch?.tested_top).toBeUndefined();
     expect((await guards()).code).not.toBe(0);
     const same: string = resolve(path, 'implementation/check-test-base-same.log');
     writeFileSync(same, '(fail) alpha\n');
     pair(same);
-    expect((await cli(f, check, f.root, herdr.env)).code).toBe(0);
+    expect((await cli(f, check, f.root, proc.env)).code).toBe(0);
     expect(readState(path).batch?.tested_top).toBe(head);
     const passed: Result = await guards();
     expect(passed.stderr).toBe('');

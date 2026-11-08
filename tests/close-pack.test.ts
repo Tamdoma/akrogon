@@ -19,7 +19,7 @@ import {
   fixture,
   cli,
   fakeAkrogon,
-  fakeHerdr,
+  procFixture,
   leaf,
   leafTempRoot,
   holding,
