@@ -6,4 +6,4 @@ Evidence: `src/next.ts` `retryable` runs `JSON.parse(result.stderr)` on every fa
 
 Learning: at a process boundary, parse stderr with a schema that fails soft, and on a parse miss throw the existing `CommandError` carrying argv, cwd, code and the raw stdout and stderr. The retry decision then reads only from a successful parse. Same shape applies to every `gh` call the pull-close leaf adds.
 
-Generalized 2026-11-08 by herdr-sweep: the herdr site (`retryable` in `src/shell.ts`) is deleted with old herdr; the class still applies to every outside CLI. `src/hc.ts` `errorKind` parses hc stderr with a `SyntaxError` guard and keeps the raw text on `HcError`; it has no dedicated test.
+Generalized 2026-11-08 by herdr-sweep: the herdr site (`retryable` in `src/shell.ts`) is deleted with old herdr; the class still applies to every outside CLI. `src/hc.ts` `errorKind` parses hc stderr with a `SyntaxError` guard and keeps the raw text on `HcError`; `tests/shell.test.ts` "hc plain-text stderr rejects with HcError kind exit 1 carrying the raw stderr" guards it.
