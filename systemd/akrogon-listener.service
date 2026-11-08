@@ -1,9 +1,11 @@
 [Unit]
 Description=akrogon listener
+StartLimitIntervalSec=0
 
 [Service]
 ExecStart=%h/.local/bin/akrogon listen
-Restart=on-failure
+Restart=always
+RestartSec=2
 
 [Install]
 WantedBy=default.target

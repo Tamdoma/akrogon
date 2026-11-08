@@ -121,6 +121,11 @@ export async function rpc<T>(session: string, method: string, params: object, sc
   return schema.parse(reply.result);
 }
 
+// A socket that is gone, refused or reset is a stopped core: a reset is a core closing while it is probed
+// (test cores stop every few seconds). Any other error, such as a live core this process may not reach,
+// is raised so discovery refuses rather than miss a session.
+export const GONE_CODES: ReadonlySet<string> = new Set(['ECONNREFUSED', 'ENOENT', 'ECONNRESET']);
+
 export function listening(socket: string): Promise<boolean> {
   return new Promise<boolean>((done, fail) => {
     const probe = connect(socket);
@@ -129,7 +134,7 @@ export function listening(socket: string): Promise<boolean> {
       done(true);
     });
     probe.once('error', (error: NodeJS.ErrnoException) =>
-      error.code === 'ECONNREFUSED' || error.code === 'ENOENT' ? done(false) : fail(error),
+      error.code !== undefined && GONE_CODES.has(error.code) ? done(false) : fail(error),
     );
   });
 }

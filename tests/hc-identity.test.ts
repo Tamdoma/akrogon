@@ -1,7 +1,8 @@
 // Criteria 6 and 12 (state half): the repo's space by name across running hc sessions,
 // refusals, prefixes, the pinned hc schema, the first-switch inventory and "state predates hc".
 import { test, expect } from 'bun:test';
-import { lstatSync, mkdirSync, readFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { connect } from 'node:net';
 import { resolve } from 'node:path';
 import { z } from 'zod';
@@ -9,6 +10,7 @@ import { cli, fixture, leaf, yaml, type Fixture } from './helpers';
 import { hcCore, pinnedSchema, setPrefixes, setSeat, type HcCore, type Terminal } from './hc-fixture';
 import { leafSlice } from '../src/scope';
 import { command, spawnCaptured } from '../src/shell';
+import { GONE_CODES, sessions } from '../src/hc';
 
 async function setup(prefixes: Record<string, string> | undefined = { repo: 'rp' }) {
   const f: Fixture = await fixture();
@@ -126,11 +128,38 @@ test('dispatch refuses a repo without a prefix and init refuses a duplicate pref
   }
 });
 
+// Asked of a core the test starts from the installed hc, never of whatever session the environment names
+// (under verify that was the operator's `default` core, so its version decided the result).
 test('the parts of hc schema akrogon parses match the pinned copy', async () => {
-  const reply = await spawnCaptured(['hc', 'schema']);
-  expect(reply.code).toBe(0);
-  const pinned: object = JSON.parse(readFileSync(resolve(import.meta.dir, 'fixtures/hc-schema.json'), 'utf8'));
-  expect(pinnedSchema(reply.stdout)).toEqual(pinned);
+  const f: Fixture = await setup();
+  const core: HcCore = await hcCore(f);
+  try {
+    const reply = await core.hc(['schema']);
+    expect(reply.code).toBe(0);
+    const pinned: object = JSON.parse(readFileSync(resolve(import.meta.dir, 'fixtures/hc-schema.json'), 'utf8'));
+    expect(pinnedSchema(reply.stdout)).toEqual(pinned);
+  } finally {
+    await core.stop();
+    f.clean();
+  }
+});
+
+// The listener died on 2026-11-08: a test core closing while it was probed made connect fail with
+// ECONNRESET, sessions() threw and the listener exited. A reset reads as gone like a refused or missing
+// socket; a socket this process may not reach still fails discovery, so a live duplicate is never hidden.
+test('a closing core reads as stopped, and an unreachable socket still fails the session list', async () => {
+  expect([...GONE_CODES].sort()).toEqual(['ECONNREFUSED', 'ECONNRESET', 'ENOENT']);
+  const runtime: string = mkdtempSync(resolve(tmpdir(), 'akr-probe-'));
+  const before: string | undefined = process.env.XDG_RUNTIME_DIR;
+  try {
+    mkdirSync(resolve(runtime, 'herdr-core'));
+    writeFileSync(resolve(runtime, 'herdr-core', 'locked.sock'), '', { mode: 0o000 });
+    process.env.XDG_RUNTIME_DIR = runtime;
+    await expect(sessions()).rejects.toThrow('EACCES');
+  } finally {
+    process.env.XDG_RUNTIME_DIR = before;
+    rmSync(runtime, { recursive: true, force: true });
+  }
 });
 
 test('first-switch inventory reads cleanly with no hc call on old ids, and live old pane state is refused', async () => {
