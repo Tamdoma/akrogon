@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // Stand-in chart door A for the reset helper tests (criterion 3). Started in an hc terminal as
-// `door-agent.ts <claude|codex|pi> <switch|noswitch> <out> [--session-id <id>] <first task>`, with HOME
+// `door-agent.ts <claude|codex|pi|agy> <switch|noswitch> <out> [--session-id <id>] <first task>`, with HOME
 // and TMPDIR pointing into the fixture. It reports OSC 7501 status, keeps its transcript where the
 // resolver looks for that kind, and changes transcript on the reset line as each harness did in P3:
 //   claude  keeps ~/.claude/sessions/<pid>.json naming its conversation and writes
@@ -10,11 +10,15 @@
 //           a second rollout opens only at the next prompt, the first stays open
 //   pi      holds nothing open; --session-id names ~/.pi/agent/sessions/--<cwd>--/<ts>_<id>.jsonl; after
 //           /new the next turn writes a new <ts>_<newid>.jsonl in the same folder
+//   agy     writes steps (14 user input, 15 reply) into ~/.gemini/antigravity-cli/conversations/<id>.db
+//           (WAL) from its first prompt and locks presence/<id>.lock; /clear runs no turn, opens the new
+//           id's database and lock at once and keeps the earlier database open
 // `noswitch` keeps the first transcript after the reset line. A first task starting with `hold` keeps
 // the turn open until <out>/release is opened for writing.
 // <out>/inputs.jsonl gets one line per received input ({input, busy, label}, label being the terminal's
 // akrogon.transcript at receipt) and one {turnEnd} line after each turn's idle status.
-import { appendFileSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { Database } from 'bun:sqlite';
+import { appendFileSync, closeSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -22,15 +26,17 @@ import { z } from 'zod';
 
 const args: string[] = process.argv.slice(2);
 const [kind, mode, out] = z
-  .tuple([z.enum(['claude', 'codex', 'pi']), z.enum(['switch', 'noswitch']), z.string()])
+  .tuple([z.enum(['claude', 'codex', 'pi', 'agy']), z.enum(['switch', 'noswitch']), z.string()])
   .parse(args.slice(0, 3));
 const flag: number = args.indexOf('--session-id');
 const first: string = z.string().parse(args.at(-1));
 const home: string = z.string().parse(process.env.HOME);
 const cwd: string = process.cwd().replace(/[/.]/g, '-');
 const terminal: string = z.string().parse(process.env.HC_TERMINAL_ID);
-const resetLine: string = kind === 'claude' ? '/clear' : '/new';
+const resetLine: string = kind === 'claude' || kind === 'agy' ? '/clear' : '/new';
 const held: number[] = [];
+const conversations: Map<string, Database> = new Map();
+let lock: number | null = null;
 
 function piFolder(): string {
   return resolve(home, '.pi/agent/sessions', `--${cwd}--`);
@@ -68,6 +74,19 @@ function open(id: string): string {
     held.push(openSync(path, 'a'));
     return path;
   }
+  if (kind === 'agy') {
+    const root: string = resolve(home, '.gemini/antigravity-cli');
+    mkdirSync(resolve(root, 'conversations'), { recursive: true });
+    mkdirSync(resolve(root, 'presence'), { recursive: true });
+    const path: string = resolve(root, 'conversations', `${id}.db`);
+    const db: Database = new Database(path, { create: true });
+    db.exec('pragma journal_mode = wal');
+    db.exec('create table steps (idx integer primary key, step_type integer, step_payload blob)');
+    conversations.set(path, db);
+    if (lock !== null) closeSync(lock);
+    lock = openSync(resolve(root, 'presence', `${id}.lock`), 'w');
+    return path;
+  }
   mkdirSync(piFolder(), { recursive: true });
   return resolve(piFolder(), `${Date.now()}_${id}.jsonl`);
 }
@@ -77,13 +96,20 @@ function record(role: 'user' | 'assistant', text: string): object {
     return role === 'user'
       ? { type: 'user', origin: { kind: 'human' }, message: { role, content: text } }
       : { type: 'assistant', message: { role, content: [{ type: 'text', text }] } };
+  if (kind === 'agy') return { step_type: role === 'user' ? 14 : 15, text };
   if (kind === 'codex')
     return { type: 'response_item', payload: { type: 'message', role, content: [{ type: 'input_text', text }] } };
   return { type: 'message', message: { role, content: [{ type: 'text', text }] } };
 }
 
 function write(entry: object): void {
-  appendFileSync(z.string().parse(transcript), `${JSON.stringify(entry)}\n`);
+  const path: string = z.string().parse(transcript);
+  if (kind !== 'agy') return appendFileSync(path, `${JSON.stringify(entry)}\n`);
+  const step = z.object({ step_type: z.number(), text: z.string() }).parse(entry);
+  z.instanceof(Database)
+    .parse(conversations.get(path))
+    .query('insert into steps values ((select coalesce(max(idx), -1) + 1 from steps), ?, ?)')
+    .run(step.step_type, Buffer.from(step.text));
 }
 
 function status(state: string): void {
@@ -141,7 +167,8 @@ async function clearTurn(): Promise<void> {
 }
 
 // Lines are logged on receipt, so one typed while a turn runs shows busy; turns then run in order.
-// codex and pi start no turn on /new: the next prompt writes the new transcript.
+// codex and pi start no turn on /new: the next prompt writes the new transcript. agy's /clear runs no turn
+// either but opens the new conversation at once.
 let queue: Promise<void> = Promise.resolve();
 function take(input: string): void {
   received(input);
@@ -152,7 +179,8 @@ function take(input: string): void {
   if (input === resetLine) {
     queue = queue.then(() => {
       if (kind === 'claude') return clearTurn();
-      if (mode === 'switch') pendingSwitch = true;
+      if (mode === 'switch' && kind === 'agy') transcript = open(randomUUID());
+      else if (mode === 'switch') pendingSwitch = true;
     });
     return;
   }

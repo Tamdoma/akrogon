@@ -10,6 +10,7 @@ issues/chart/<chart-slug>/
   INTAKE.md
   seats.yaml                    # open time and seat transcript paths, per the door
   USAGE.md                      # last measured usage table; a rerun replaces it
+  door-reset.log                # handover helper's stage lines, appended by each handover into this chart
   forks/signposts.md            # the session's signposts record (original in one chart, verbatim copy elsewhere)
   forks/<fork-slug>.md
   slots/<pass>.md                 # peer exchanges, and direct review returns (review-B-<n>.md)

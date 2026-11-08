@@ -1,5 +1,5 @@
 // Criterion 3: the chart door's handover reset helper on a real hc core. A is the stand-in
-// tests/door-agent.ts emulating claude, codex or pi; the helper is started as A starts it, with
+// tests/door-agent.ts emulating claude, codex, pi or agy; the helper is started as A starts it, with
 // `hc run --bg --no-notify --rm --no-parent`, while A's turn is still open.
 import { test, expect } from 'bun:test';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, watch } from 'node:fs';
@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { fixture, type Fixture } from './helpers';
 import { hcCore, setPrefixes, type HcCore } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
+import { transcriptRecords, type TranscriptRecord } from '../src/transcript';
 
 const agent: string = resolve(import.meta.dir, 'door-agent.ts');
 const helper: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/door-reset.ts');
@@ -25,7 +26,7 @@ const STAGES: string[] = [
   'start-prompt',
 ];
 
-type Kind = 'claude' | 'codex' | 'pi';
+type Kind = 'claude' | 'codex' | 'pi' | 'agy';
 type Step = { t: string; step: string; result: string; pre?: string; code?: string; path?: string };
 type Received = { input: string; busy: boolean; label: string | null };
 type Run = { f: Fixture; core: HcCore; a: string; out: string; log: string };
@@ -168,10 +169,11 @@ test.each([
   ['claude', '/clear'],
   ['codex', '/new'],
   ['pi', '/new'],
+  ['agy', '/clear'],
 ])(
   '%s: the reset helper runs its stages in order and fresh A gets the start prompt on a new transcript',
   async (kind: string, key: string) => {
-    const run: Run = await startA(z.enum(['claude', 'codex', 'pi']).parse(kind), 'switch');
+    const run: Run = await startA(z.enum(['claude', 'codex', 'pi', 'agy']).parse(kind), 'switch');
     try {
       const start: string = `/chart-issues continue handover 2026-11-08T03:00:00Z door ${run.a} next /charts/next`;
       const address: string = await reset(run, start);
@@ -195,7 +197,7 @@ test.each([
           .filter((r: Received) => r.busy),
       ).toEqual([]);
       expect(found).not.toBe(pre);
-      expect(readFileSync(found, 'utf8')).toContain(code);
+      expect(transcriptRecords(found, 0).some((r: TranscriptRecord) => r.text.includes(code))).toBe(true);
       // The label held the new path before the start prompt arrived, and still holds it.
       expect(inputs(run).at(-1)?.label).toBe(found);
       expect((await run.core.get(run.a)).labels['akrogon.transcript']).toBe(found);

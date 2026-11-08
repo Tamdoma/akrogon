@@ -1,6 +1,7 @@
 // Finds the transcript file a seat's harness writes now (plan D18) from the seat process (claude's own
-// per-process session record, codex's open rollout, pi's argv) and keeps it on the terminal as
-// `akrogon.transcript`, which is read only when the process names none.
+// per-process session record, codex's open rollout, agy's conversation lock, pi's argv) and keeps it on
+// the terminal as `akrogon.transcript`, which is read only when the process names none.
+import { Database } from 'bun:sqlite';
 import { existsSync, readdirSync, readFileSync, readlinkSync, statSync, type Dirent } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { z } from 'zod';
@@ -131,6 +132,15 @@ function claudeTranscript(pid: number, p: Proc): Named | null {
   return { path: matches.length === 1 ? matches[0] : null };
 }
 
+// agy locks presence/<id>.lock for its current conversation only (after /clear it keeps the earlier
+// conversation's database open too); that conversation is conversations/<id>.db beside it.
+function agyConversation(p: Proc): string | null {
+  const lock: string | undefined = p.open.find(
+    (target: string) => basename(dirname(target)) === 'presence' && target.endsWith('.lock'),
+  );
+  return lock === undefined ? null : join(dirname(dirname(lock)), 'conversations', `${basename(lock, '.lock')}.db`);
+}
+
 const rollouts = (p: Proc): string[] => p.open.filter((target: string) => /^rollout-.*\.jsonl$/.test(basename(target)));
 
 function piStart(p: Proc): string | null {
@@ -139,7 +149,7 @@ function piStart(p: Proc): string | null {
   return flag !== -1 && flag + 1 < p.argv.length && home !== undefined ? piSession(home, p.argv[flag + 1]) : null;
 }
 
-// claude: its session record; codex: the newest open rollout; agy: the open conversation database;
+// claude: its session record; codex: the newest open rollout; agy: its locked conversation;
 // pi: the --session-id it was started with.
 function fromProcess(pid: number): Named | null {
   const p = proc(pid);
@@ -152,20 +162,22 @@ function fromProcess(pid: number): Named | null {
         statSync(path).mtimeMs > statSync(newest).mtimeMs ? path : newest,
       ),
     };
-  const agy: string | undefined = p.open.find((target: string) => basename(target) === 'conversation_summaries.db');
-  if (agy !== undefined) return { path: agy };
+  const agy: string | null = agyConversation(p);
+  if (agy !== null) return { path: agy };
   const pi: string | null = piStart(p);
   return pi === null ? null : { path: pi };
 }
 
 // The files a reset seat may have moved to (session-id final-shape): the folder of claude's current
 // conversation and pi's sessions folder for the cwd, only files changed since the reset began; codex the
-// rollouts it holds open.
+// rollouts it holds open; agy the conversation it has locked, which /clear replaces at once.
 function resetCandidates(pid: number, sinceMs: number): string[] {
   const p = proc(pid);
   if (p === null) return [];
   const claude: Named | null = claudeTranscript(pid, p);
   if (claude === null && rollouts(p).length > 0) return rollouts(p);
+  const agy: string | null = claude === null ? agyConversation(p) : null;
+  if (agy !== null) return [agy].filter((path: string) => existsSync(path));
   const pi: string | null = claude === null ? piStart(p) : null;
   const folder: string | null =
     claude !== null ? (claude.path === null ? null : dirname(claude.path)) : pi !== null ? dirname(pi) : null;
@@ -214,7 +226,7 @@ export async function transcriptByCode(
   const t: Seen = await terminal(seat.session, seat.address);
   for (const pid of seatPids(t)) {
     const hits: string[] = resetCandidates(pid, sinceMs).filter((path: string) =>
-      readFileSync(path, 'utf8').includes(code),
+      transcriptRecords(path, 0).some((record: TranscriptRecord) => record.text.includes(code)),
     );
     if (hits.length > 1) throw new Error(JSON.stringify({ seat, code, error: 'code found in several files', hits }));
     if (hits.length === 1) return hits[0];
@@ -222,11 +234,58 @@ export async function transcriptByCode(
   return null;
 }
 
+export type Kind = 'claude' | 'codex' | 'pi' | 'agy';
+
 // The harness a transcript path belongs to, from the shapes the resolver returns.
-export function transcriptKind(path: string): 'claude' | 'codex' | 'pi' | null {
+export function transcriptKind(path: string): Kind | null {
   const folder: string = basename(dirname(path));
+  if (folder === 'conversations' && path.endsWith('.db')) return 'agy';
   if (/^rollout-.*\.jsonl$/.test(basename(path))) return 'codex';
   if (basename(dirname(dirname(path))) === 'projects' && path.endsWith('.jsonl')) return 'claude';
   if (folder.startsWith('--') && folder.endsWith('--') && path.endsWith('.jsonl')) return 'pi';
   return null;
+}
+
+// One transcript record: its text, and its value for a harness's record schemas. A JSONL transcript has
+// one per line (a line cut mid-write has no value); agy's conversation database one per step, valued by
+// its step type. Positions are byte offsets into a JSONL file and step indexes into agy's database.
+export type TranscriptRecord = { text: string; value: unknown };
+
+const agyStep = z.object({ step_type: z.number(), step_payload: z.instanceof(Uint8Array) });
+
+function parsed(line: string): unknown {
+  try {
+    return JSON.parse(line);
+  } catch {
+    return undefined;
+  }
+}
+
+export function transcriptRecords(path: string, from: number): TranscriptRecord[] {
+  if (transcriptKind(path) !== 'agy')
+    return readFileSync(path)
+      .subarray(from)
+      .toString('utf8')
+      .split('\n')
+      .map((line: string) => ({ text: line, value: parsed(line) }));
+  const db: Database = new Database(path, { readonly: true });
+  const steps = z
+    .array(agyStep)
+    .parse(db.query('select step_type, step_payload from steps where idx >= ? order by idx').all(from));
+  db.close();
+  return steps.map((step) => ({
+    text: Buffer.from(step.step_payload).toString('utf8'),
+    value: { step_type: step.step_type },
+  }));
+}
+
+// The position the transcript's next record will take.
+export function transcriptEnd(path: string): number {
+  if (transcriptKind(path) !== 'agy') return readFileSync(path).byteLength;
+  const db: Database = new Database(path, { readonly: true });
+  const end: number = z
+    .object({ end: z.number() })
+    .parse(db.query('select coalesce(max(idx), -1) + 1 as end from steps').get()).end;
+  db.close();
+  return end;
 }

@@ -5,23 +5,30 @@
 // It follows A's turn end on hc events, cancels on operator input, types the reset as keys, confirms the
 // new transcript by a warm-up code, labels it on A and sends the start prompt. One JSON line per stage
 // goes to <log>; a stage that fails logs its result and the helper exits non-zero.
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { readGlobal, requireRepo } from '../../../src/config';
 import { hc, label, repoSpace, send, terminal, waitFor, type Seen, type SpaceResolution } from '../../../src/hc';
-import { transcriptByCode, transcriptFor, transcriptKind } from '../../../src/transcript';
-
-type Kind = 'claude' | 'codex' | 'pi';
+import {
+  transcriptByCode,
+  transcriptEnd,
+  transcriptFor,
+  transcriptKind,
+  transcriptRecords,
+  type Kind,
+  type TranscriptRecord,
+} from '../../../src/transcript';
 
 const env = z
   .object({ DOOR_RESET_TURN_BOUND_MS: z.coerce.number().int().positive().default(600_000) })
   .parse(process.env);
-const resetWord: Record<Kind, string> = { claude: 'clear', codex: 'new', pi: 'new' };
+const resetWord: Record<Kind, string> = { claude: 'clear', codex: 'new', pi: 'new', agy: 'clear' };
 
 // Operator input is a record the harness writes when the operator submits or queues a prompt:
 // claude user/queued_command entries with a human origin, codex task_started and user messages,
-// pi user messages. Tool results, notifications and other record types never parse as input.
+// pi user messages, agy user-input steps (type 14). Tool results, notifications and other record types
+// never parse as input.
 const inputSchema: Record<Kind, z.ZodType> = {
   claude: z
     .object({
@@ -44,6 +51,7 @@ const inputSchema: Record<Kind, z.ZodType> = {
   pi: z
     .object({ type: z.string(), message: z.object({ role: z.string() }).optional() })
     .refine((e) => e.type === 'message' && e.message?.role === 'user'),
+  agy: z.object({ step_type: z.literal(14) }),
 };
 
 // The harness's reply record, the only proof a prompt was answered: claude, codex and pi also copy the
@@ -55,6 +63,7 @@ const replySchema: Record<Kind, z.ZodType> = {
     payload: z.object({ type: z.literal('message'), role: z.literal('assistant') }),
   }),
   pi: z.object({ type: z.literal('message'), message: z.object({ role: z.literal('assistant') }) }),
+  agy: z.object({ step_type: z.literal(15) }),
 };
 
 const [a, log, start]: [string, string, string] = z
@@ -72,15 +81,6 @@ function stop(name: string, result: string, extra: Record<string, unknown> = {})
 
 const idle = (t: Seen): boolean => t.status?.state === 'idle' || t.status?.state === 'done';
 
-// A line that is not JSON (a record cut mid-write) is no input record.
-function parsed(line: string): unknown {
-  try {
-    return JSON.parse(line);
-  } catch {
-    return undefined;
-  }
-}
-
 const space: SpaceResolution = await repoSpace(await requireRepo(readGlobal(), process.cwd()));
 if (!space.ok) stop('started', 'no session', { reason: space.reason });
 const session: string = space.session;
@@ -89,8 +89,8 @@ const pre: string | null = await transcriptFor(seat);
 if (pre === null) stop('started', 'transcript unknown');
 const kind: Kind | null = transcriptKind(pre);
 if (kind === null) stop('started', 'unsupported harness', { pre });
-// The boundary is a byte length: anything at or after it was written after the handover was queued.
-const boundary: number = readFileSync(pre).byteLength;
+// Anything at or after the boundary was written after the handover was queued.
+const boundary: number = transcriptEnd(pre);
 step('started', 'queued', { pre, boundary, kind });
 
 const gone = (t: Seen): boolean => t.state === 'finished';
@@ -100,11 +100,9 @@ if (gone(ended)) stop('wait-turn-end', 'identity changed');
 step('wait-turn-end', 'turn ended', { turn: ended.turn });
 
 // A submitted operator input is a transcript record that stays, so one read after the turn sees it.
-const input: boolean = readFileSync(pre)
-  .subarray(boundary)
-  .toString('utf8')
-  .split('\n')
-  .some((line: string) => inputSchema[kind].safeParse(parsed(line)).success);
+const input: boolean = transcriptRecords(pre, boundary).some(
+  (record: TranscriptRecord) => inputSchema[kind].safeParse(record.value).success,
+);
 if (input) stop('input-check', 'superseded');
 step('input-check', 'none');
 
@@ -124,10 +122,10 @@ step('warm-up', 'sent', { code, turn: warm.turn });
 // reply while the lookup runs and only then go idle.
 const answered = (path: string | null): boolean => {
   if (path === null) return false;
-  const lines: string[] = readFileSync(path, 'utf8').split('\n');
-  return lines
-    .slice(lines.findIndex((line: string) => line.includes(code)))
-    .some((line: string) => replySchema[kind].safeParse(parsed(line)).success);
+  const records: TranscriptRecord[] = transcriptRecords(path, 0);
+  return records
+    .slice(records.findIndex((record: TranscriptRecord) => record.text.includes(code)))
+    .some((record: TranscriptRecord) => replySchema[kind].safeParse(record.value).success);
 };
 const warmed: Seen | null = await waitFor(
   session,
