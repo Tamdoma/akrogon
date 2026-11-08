@@ -38,7 +38,6 @@ import { seatName } from '../src/hc';
 import { parseEnv } from 'node:util';
 import { command, run, type Result, spawnCaptured } from '../src/shell';
 import type { GhStep } from './fake-gh';
-import type { Database } from './fake-herdr';
 import {
   adopt,
   blockNotices,
@@ -54,15 +53,9 @@ import {
 } from './hc-fixture';
 import { z } from 'zod';
 
-// Fake herdr still takes notice sends; its database is the fixture's herdr.json.
+// The fixture's fake herdr database.
 function herdrDb(f: Fixture): string {
   return resolve(f.home, 'herdr.json');
-}
-function database(f: Fixture): Database {
-  return JSON.parse(readFileSync(herdrDb(f), 'utf8')) as Database;
-}
-function saveDatabase(f: Fixture, db: Database): void {
-  writeFileSync(herdrDb(f), JSON.stringify(db));
 }
 async function next(
   f: Fixture & { env: NodeJS.ProcessEnv },
@@ -111,17 +104,6 @@ function holdTurns(f: HcFixture, status?: string): () => void {
 // Lets one seat terminal's turns run through a holdTurns hold, current turn included.
 function freeTurns(f: HcFixture, address: string): void {
   writeFileSync(resolve(f.core.standin, `free-${address}`), '');
-}
-// Fake herdr still takes notice sends (they stay on herdr until notices-on-hc).
-function notices(f: Fixture): string[][] {
-  const path: string = resolve(f.home, 'herdr.json.calls');
-  return existsSync(path)
-    ? readFileSync(path, 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
-        .filter((args) => args[0] === 'notification')
-    : [];
 }
 async function seatIdle(f: HcFixture, address: string, turn: number): Promise<Terminal> {
   return f.core.waitFor(address, (t: Terminal) => t.turn >= turn && t.status?.state === 'idle');
@@ -225,7 +207,7 @@ for (const kind of ['relative file', 'absolute file', 'file symlink']) {
       expect(result.stderr).not.toContain('ENOTDIR');
       expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
       expect(hcCalls(f)).toEqual([]);
-      expect(notices(f)).toEqual([]);
+      expect(noticeFiles(f.core)).toEqual([]);
       expect(existsSync(storeDir(f))).toBe(false);
     } finally {
       await f.clean();
@@ -270,7 +252,7 @@ test('next creates one worktree/tab under concurrent passes and starts configure
     expect(tasks[0].text.split(' leaf=')[1]).not.toContain('issues/worktrees');
     expect(tasks[0].address).toBe(z.string().parse(readState(path).seat.A?.address));
     expect(readState(path).attempts.A).toBe(1);
-    expect(notices(f)).toEqual([]);
+    expect(noticeFiles(f.core)).toEqual([]);
     expect(await command(['git', 'branch', '--show-current'], readState(path).worktree)).toBe('build');
   } finally {
     await f.clean();
@@ -359,16 +341,14 @@ test('failed leaves never notify on dispatch', async () => {
       failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'x' },
     });
     expect(readState(path)).toMatchObject({ busy_since: {}, busy_notified: {} });
-    saveDatabase(f, { ...database(f), failNotification: true });
     const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
     for (let sweep: number = 0; sweep < 3; sweep++) expect((await next(f, ['broken'])).code).toBe(1);
-    expect(notices(f)).toEqual([]);
+    expect(noticeFiles(f.core)).toEqual([]);
     expect(await f.core.terminals({ akrogon: '1' }, true)).toEqual([]);
     expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
-    saveDatabase(f, { ...database(f), failNotification: false });
     expect((await next(f, ['broken'])).code).toBe(1);
-    expect(notices(f)).toEqual([]);
+    expect(noticeFiles(f.core)).toEqual([]);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(before);
   } finally {
     await f.clean();
@@ -852,7 +832,7 @@ test('a live merge retains its completion call after pushing, including a peer r
     expect(await allTasks(f)).toHaveLength(tasksBefore);
     expect(readState(path).busy_since.B).toBeDefined();
     expect(readState(path).busy_notified.B).toBeDefined();
-    expect(notices(f).at(-1)![2]).toContain('seat B');
+    expect(noticeFiles(f.core).at(-1)!.title).toContain('seat B');
     const mergeAttempt: string = z.string().parse(readState(path).batch?.attempt);
     await verified(f, 'active-merge', 'merge');
     expect(
@@ -1949,7 +1929,7 @@ for (const area of ['open', 'closed']) {
           expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).toBe(state);
           expect(readFileSync(herdrDb(f), 'utf8')).toBe(db);
           expect(hcCalls(f)).toEqual([]);
-          expect(notices(f)).toEqual([]);
+          expect(noticeFiles(f.core)).toEqual([]);
           expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
           expect(existsSync(storeDir(f))).toBe(false);
           expect(existsSync(resolve(f.home, '.lock'))).toBe(false);
