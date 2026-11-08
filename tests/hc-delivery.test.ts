@@ -174,7 +174,7 @@ test('an unavailable first agy task waits for a new status before retrying', asy
     `#!/bin/sh
 printf '\\033]7501;state=idle\\007'
 cat '${gate}' >/dev/null
-printf '\\033]7501;state=idle:msg=ready\\007'
+printf '\\033]7501;state=done\\007'
 while IFS= read -r task; do
   printf '%s\\n' "$task" >> "$STANDIN_DIR/$HC_TERMINAL_ID.tasks"
   printf '\\033]7501;state=working\\007\\033]7501;state=idle\\007'
