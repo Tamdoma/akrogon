@@ -1,6 +1,6 @@
 # Install
 
-Install Akrogon on the machine where you run Herdr and your coding agents. This page covers what the machine needs, a quick check that skips the rest when it is ready, and the install itself.
+Install Akrogon on the machine where you run herdr-core, herdr-app and your coding agents. This page covers what the machine needs, a quick check that skips the rest when it is ready, and the install itself.
 
 > **What you need**
 >
@@ -8,11 +8,11 @@ Install Akrogon on the machine where you run Herdr and your coding agents. This 
 > - Bun.
 > - Git.
 > - flock, from util-linux.
-> - Herdr.
+> - herdr-core (`hc`) and herdr-app.
 > - One agent CLI: Claude Code, Codex or pi.
 > - An authenticated GitHub CLI (`gh`), only if you bring in or close GitHub issues.
 
-![Machine parts: the akrogon command reads the machine config.yaml in ~/.akrogon, which lists repos, slots and harnesses, and reads each registered repo's issues/config.yaml. It starts seats inside one systemd user slice per leaf, under akrogon.slice, where Herdr pane A and Herdr pane B each run an agent CLI started from that seat's harness template.](../pictures/machine-parts.svg)
+![Machine parts: the akrogon command reads the machine config.yaml in ~/.akrogon, which lists repos, slots and harnesses, and reads each registered repo's issues/config.yaml. It starts seats inside one systemd user slice per leaf, under akrogon.slice, where the hc terminals of seat A and seat B each run an agent CLI started from that seat's harness template.](../pictures/machine-parts.svg)
 
 ## Check your machine
 
@@ -23,7 +23,8 @@ systemctl --user is-system-running   # running or degraded
 bun --version                        # a version number, such as 1.x.y
 git --version                        # git version <number>
 flock --version                      # flock from util-linux <number>
-herdr --version                      # herdr <number>
+hc --version                         # hc <number>
+herdr-app --version                  # herdr-app <number>
 claude --version                     # or codex --version, or pi --version: a version number
 gh auth status                       # Logged in to github.com account <you>
 akrogon config                       # only if Akrogon is already installed: your settings as YAML
@@ -35,7 +36,7 @@ When Akrogon is already installed, `akrogon config` prints your machine settings
 
 ## Write the machine config
 
-Akrogon reads `~/.akrogon/config.yaml`. Write it before you install, because install reads it to know which agent CLIs to connect to Herdr.
+Akrogon reads `~/.akrogon/config.yaml`. Write it before you install, because install stops when the file is missing or invalid.
 
 A minimal file:
 
@@ -69,12 +70,10 @@ Install creates these links:
 
 - `~/.local/bin/akrogon`, the command.
 - Each skill folder into `~/.claude/skills`, `~/.agents/skills`, `~/.codex/skills` and `~/.pi/agent/skills`, so every supported agent CLI finds the same skills.
-- Each `herdr-app/<name>` mod folder into `~/.config/herdr-app/mods`, so herdr-app sessions see the shipped Tasks board.
 - `~/.config/systemd/user/akrogon.slice`, the systemd slice that holds everything Akrogon runs. Install then reloads the systemd user manager.
 - `~/.config/systemd/user/akrogon-listener.service`, when the release ships the listener unit. Install then enables and restarts it.
-- The Herdr plugin, which tells Akrogon when a seat finishes, so it can prompt the next one. Only a release with `plugin/` has it.
 
-For a release with `plugin/`, install also runs `herdr integration install` for each harness in your config. For a release without it, install unlinks akrogon's plugin from Herdr when `herdr` is installed. On a fresh install, the links go through `~/.akrogon/current`, which points at your checkout.
+The listener unit runs `akrogon listen`, which follows hc events from the seats and starts the next pass, so seats get their next prompt without you. Install also removes stale Akrogon links, such as the old Tasks board link in `~/.config/herdr-app/mods`, and leaves every other entry there. On a fresh install, the links go through `~/.akrogon/current`, which points at your checkout.
 
 If a destination already exists and is not an Akrogon link, install stops and prints one `rm` command per conflicting path. Read them, remove what you no longer need, and run install again.
 

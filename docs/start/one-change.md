@@ -30,7 +30,7 @@ The design copied each settled decision word for word from its fork, so the seat
 
 ## akrogon next
 
-The operator ran `akrogon next`. The leaf waited until both earlier leaves had merged. Then `akrogon next` made its worktree, opened a Herdr tab with a pane for seat A and a pane for seat B, and prompted A. See [Run work](../use/run-work.md).
+The operator ran `akrogon next`. The leaf waited until both earlier leaves had merged. Then `akrogon next` made its worktree, started seat A and seat B as hc terminals in one herdr-app tab, and prompted A. See [Run work](../use/run-work.md).
 
 ## The plan
 

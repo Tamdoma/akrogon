@@ -11,3 +11,5 @@ Tamdoma/pi-extensions#5 described a bug that an akrogon chart handed to pi-exten
 
 ## Learning
 A hook command inherits the plugin folder as cwd. Any cwd-sensitive behavior in a command the hook calls applies to every startup. Charted as issues/chart/cross-repo-intake.
+
+Applied 2026-11-08 by src/install.ts (linkServices): akrogon ships no herdr plugin (`plugin/` removed by engine-on-hc) and install and deploy make no `herdr plugin link` or `herdr integration install` call, so no akrogon command runs as a herdr plugin hook.

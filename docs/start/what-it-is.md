@@ -11,7 +11,7 @@ You decide what to build and when to start it. Akrogon keeps track of where each
 1. You start with a request. It can be a note you type, or a GitHub issue you copy into your project with `akrogon pull`.
 2. You open the chart door by running `/chart-issues` in an agent. One signposts round sets the session's direction before the door maps the territory, then the door asks one open question per round — answered per the mode, see [Autopilot](../use/autopilot.md) — until nothing is left to guess.
 3. The door writes the settled work as one or more leaves under `issues/open/`. Each leaf is a written contract: what to build, why, and how to tell it is done.
-4. You run `akrogon next`. It gives the leaf its own worktree and starts two agent seats, A and B, side by side in Herdr.
+4. You run `akrogon next`. It gives the leaf its own worktree and starts two agent seats, A and B, as hc terminals side by side in one herdr-app tab.
 5. The seats plan the work. Seat A builds it.
 6. Both seats review the build without reading each other's review. When they find problems, seat B repairs most of them and hands the rest back to A.
 7. The command lands the leaf. It checks the exact commit, pushes it to your default branch and marks the leaf merged.
@@ -27,7 +27,7 @@ For one small, settled change, the door can offer the direct route instead. The 
 - **Worktree.** A separate checkout of your repository where a leaf's code changes happen. Your own checkout stays untouched while the seats work.
 - **Landing.** Putting a tested commit on your default branch. The command runs it with `akrogon land`, which checks the commit, pushes it and moves the leaf to `merged`.
 
-A skill is a written procedure an agent follows, such as [chart-issues](../../skills/chart-issues/SKILL.md). A command is the `akrogon` program, which does the mechanical parts: it starts seats, moves phases and lands work. Herdr is the terminal tool that holds the seat panes.
+A skill is a written procedure an agent follows, such as [chart-issues](../../skills/chart-issues/SKILL.md). A command is the `akrogon` program, which does the mechanical parts: it starts seats, moves phases and lands work. herdr-core (`hc`) runs the seat terminals, and herdr-app is the window that shows them in tabs.
 
 The full list of phases is in [State and phases](../reference/state-and-phases.md).
 

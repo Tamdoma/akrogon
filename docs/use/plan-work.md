@@ -23,7 +23,7 @@ Open an agent in your registered repository and run:
 
 The pane you run it in is the chart door, called A. Its first reply names the chart consultants you gave it, or says A works alone — and it names the mode and who answers the signposts.
 
-Chart consultants are helper panes (B, C, D and so on) that give A independent views while it charts. They are not the seats A and B that later work on a leaf. To add consultants, name their panes in your request. Inside Herdr you can ask for consultants without naming panes, and the door creates them.
+Chart consultants are helper panes (B, C, D and so on) that give A independent views while it charts. They are not the seats A and B that later work on a leaf. To add consultants, name their panes in your request. Inside hc you can ask for consultants without naming panes, and the door creates them.
 
 Charts live in `issues/chart/<slug>/`. `CHART.md` lists what is settled, the open forks in the order they will be taken, the fog and what is off route. `INTAKE.md` keeps your original words apart from the agent's findings. Each fork has its own file under `forks/`; `forks/signposts.md` is the session's signposts record, not one of the chart's own questions. `akrogon status --charts` lists your charts.
 

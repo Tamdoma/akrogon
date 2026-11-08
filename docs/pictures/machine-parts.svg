@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 620" role="img">
-  <title>Machine parts: the akrogon command, its config, and the leaf slice with Herdr panes</title>
+  <title>Machine parts: the akrogon command, its config, and the leaf slice with the seats' hc terminals</title>
   <rect x="0" y="0" width="640" height="620" rx="12" fill="#ffffff" stroke="#d0d7de"/>
   <style>
     text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
@@ -46,7 +46,7 @@
 
   <!-- Seat A pane -->
   <rect class="node" x="44" y="356" width="268" height="220" rx="8"/>
-  <text class="name" x="178" y="384" text-anchor="middle">Herdr pane: seat A</text>
+  <text class="name" x="178" y="384" text-anchor="middle">hc terminal: seat A</text>
   <path class="edge" d="M178,394 L178,418" marker-end="url(#arrow)"/>
   <text class="label" x="188" y="412">runs</text>
   <rect class="box" x="64" y="420" width="228" height="136" rx="8"/>
@@ -57,7 +57,7 @@
 
   <!-- Seat B pane -->
   <rect class="node" x="328" y="356" width="268" height="220" rx="8"/>
-  <text class="name" x="462" y="384" text-anchor="middle">Herdr pane: seat B</text>
+  <text class="name" x="462" y="384" text-anchor="middle">hc terminal: seat B</text>
   <path class="edge" d="M462,394 L462,418" marker-end="url(#arrow)"/>
   <text class="label" x="472" y="412">runs</text>
   <rect class="box" x="348" y="420" width="228" height="136" rx="8"/>

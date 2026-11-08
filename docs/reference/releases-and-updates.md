@@ -9,7 +9,7 @@ Akrogon runs from an installed release, not from your source checkout. Landed wo
 The state home is `~/.akrogon`, or the folder in `AKROGON_HOME`. It holds three release paths:
 
 - `releases/<commit>` is one built release per deployed commit. A release is the tracked tree from `git archive` plus `bun install --frozen-lockfile --backend=copyfile`. It is not a Git checkout.
-- `current` is a link to the active release. The `akrogon` command, the skills, the `herdr-app/` mods linked into `~/.config/herdr-app/mods`, the systemd slice and the Herdr plugin all link through `current`. `~/.local/bin/akrogon` points at `current/src/akrogon.ts`.
+- `current` is a link to the active release. The `akrogon` command, the skills, the systemd slice and the listener unit all link through `current`. `~/.local/bin/akrogon` points at `current/src/akrogon.ts`.
 - `deploy.yaml` records the active commit, the previous commit and the result of the last deploy.
 
 The previous release is the one that was active before the last deploy. It is kept so `akrogon rollback` has a target. Other releases are removed about a day after they stop being active or previous.
@@ -39,7 +39,7 @@ Self-update runs on these triggers:
 - `akrogon next` with a target, or run by hand from a leaf or worktree folder.
 - `akrogon next --all` and `akrogon next --resume`, which cover every registered checkout.
 
-For the Akrogon repository only, self-update then deploys the tip of the remote default branch. It does nothing when that commit is already active and recorded as a success. Otherwise it builds the release, updates the links, flips `current` to the new release and reloads systemd user units. It relinks the Herdr plugin only when the release has `plugin/`, and enables the listener unit when the release ships it. Then it writes `deploy.yaml` and restarts the listener. Last, when the release has no `plugin/` and `herdr` is installed, it unlinks akrogon's plugin from Herdr. The deploy reads the remote tip, not your checkout, so an uncommitted edit never goes live and never blocks a deploy.
+For the Akrogon repository only, self-update then deploys the tip of the remote default branch. It does nothing when that commit is already active and recorded as a success. Otherwise it builds the release, updates the links, flips `current` to the new release and reloads systemd user units. It enables the listener unit when the release ships it. Then it writes `deploy.yaml` and restarts the listener. The deploy reads the remote tip, not your checkout, so an uncommitted edit never goes live and never blocks a deploy.
 
 A commit held by `akrogon rollback` is not deployed. The step prints `deploy held` instead. The hold ends once a different commit deploys.
 

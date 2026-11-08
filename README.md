@@ -1,6 +1,6 @@
 # Akrogon
 
-Akrogon is a lightweight software factory for people who already use coding agents. You chart work into written contracts. Two agent seats in Herdr plan, build and review it. Then the command lands it on your default branch.
+Akrogon is a lightweight software factory for people who already use coding agents. You chart work into written contracts. Two agent seats in herdr-app tabs on herdr-core plan, build and review it. Then the command lands it on your default branch.
 
 It is for developers who already run an agent CLI and want a repeatable path from request to merged code. You decide what to build and when to start it. Akrogon tracks where each piece of work is and prompts the next seat. It does not decide what your product needs, and it does not deploy your product.
 
@@ -10,7 +10,7 @@ It is for developers who already run an agent CLI and want a repeatable path fro
 > - Bun.
 > - Git.
 > - flock.
-> - Herdr.
+> - herdr-core (`hc`) and herdr-app.
 > - One agent CLI, such as Claude Code, Codex or pi.
 > - An authenticated GitHub CLI (`gh`), only for GitHub work.
 

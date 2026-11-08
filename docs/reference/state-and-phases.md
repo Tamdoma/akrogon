@@ -87,12 +87,12 @@ Leave these to the commands. Editing them by hand makes the file disagree with t
 | `done`           | Seats that finished the current phase.                                                                                                                                                             | `akrogon phase`                                      |
 | `fix_rounds`     | How many times the leaf went to check.fix from check.repair or merge. Kept across recovery.                                                                                                        | `akrogon phase`                                      |
 | `verdict`        | Per seat, the review verdict in check.review.                                                                                                                                                      | `akrogon phase`                                      |
-| `tab`            | The herdr tab that holds the leaf's panes.                                                                                                                                                         | `akrogon next`                                       |
+| `tab`            | The herdr-app tab that holds the leaf's seat terminals. Each seat carries its id in the `herdr.tab` label.                                                                                         | `akrogon next`                                       |
 | `worktree`       | Path of the leaf's git worktree. Removed when the worktree is cleaned up after merge or is gone from disk.                                                                                         | `akrogon next`                                       |
 | `env_names`      | Names of the env values written into the worktree's `.env`.                                                                                                                                        | `akrogon next`                                       |
 | `env_generation` | How many times the `.env` of an existing worktree was rewritten.                                                                                                                                   | `akrogon next`                                       |
-| `pane`           | Per seat, the herdr pane the seat works in.                                                                                                                                                        | `akrogon next`                                       |
-| `prompted`       | Per seat, the agent session that got the current phase prompt.                                                                                                                                     | `akrogon next`                                       |
+| `seat`           | Per seat, the hc session and terminal address the seat runs in. A `pane` field is pre-hc state: dispatch refuses it with `state predates hc` unless the leaf is merged, done or closed.            | `akrogon next`                                       |
+| `prompted`       | Per seat, the hc terminal address and the turn the current phase prompt went in at.                                                                                                                | `akrogon next`                                       |
 | `prompted_at`    | Per seat, when that prompt was delivered.                                                                                                                                                          | `akrogon next`                                       |
 | `delivery_error` | Per seat, the last failed prompt delivery. See below.                                                                                                                                              | `akrogon next`                                       |
 | `failure`        | Why the leaf stopped in failed. See below. Cleared when the leaf leaves failed.                                                                                                                    | `akrogon phase`                                      |
@@ -111,14 +111,15 @@ Exact shapes are in [src/state.ts](../../src/state.ts).
 - `cause` is `blocked`.
 - `phase` and `slot` name where the leaf stopped and which seat stopped it.
 - `reason` is the `--reason` text.
-- `delivery` is `pending` while the failed notice file waits, `shown` once it is gone, or `error` when the write failed. Older herdr reasons stay as written. A pending file is removed when the leaf leaves `failed`.
+- `delivery` is `pending` while the failed notice file waits, `shown` once it is gone, or `error` when the write failed. A value written before hc seats stays as written. A pending file is removed when the leaf leaves `failed`.
 
 `delivery_error` (`deliveryErrorSchema`) is one entry per seat, written when a prompt cannot be delivered and cleared when one is:
 
-- `command`, `code` and `message` are the herdr call and its error. `command` is the routed argv, including the `--session <name>` the resolver picked.
-- `pane` and `session` are the pane and agent session it targeted.
+- `code` is `not_confirmed` when a new seat's first task was not seen to start, or `not_started` when an `hc send` to a running seat started no turn.
+- `address` and `turn` are the hc terminal it targeted and its turn at that send. A later pass that sees the turn move counts the prompt as delivered.
+- `screen` and `status`, when present, are the seat's screen text and hc status at the failure.
 - `at` is when it failed.
-- `offset` is where the agent's session file ended before a timed-out paste. The next pass uses it to see whether the prompt arrived late.
+- An entry written before hc seats keeps its old shape (`command`, `code`, `message`, `pane`, `session`, `offset`) and still parses.
 
 `batch` (`batchSchema`) belongs to the leaf holding the merge turn. The merge turn creates it, and the reconcile step in `akrogon next` removes it once the push is settled:
 

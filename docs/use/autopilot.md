@@ -6,7 +6,7 @@ It is one of the ways to run work shown in [Plan work](plan-work.md). The full m
 
 ## Switch it on
 
-Autopilot needs Herdr. Outside Herdr the door says it cannot start.
+Autopilot needs the door to run inside hc. Outside hc the door says it cannot start.
 
 Three modes exist. In the default manual mode you answer the signposts and every fork. Under autopilot you answer the signposts once, for the whole session, and A answers every fork after. Under full autopilot — "autopilot signposts" — A answers the signposts and every fork. If your words hand over only the signposts while you keep the forks, that matches no mode, so the door asks which you meant.
 

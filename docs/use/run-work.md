@@ -77,7 +77,7 @@ Automatic passes stay quiet about waits. They still report real errors.
 
 ## Release work without managing every prompt
 
-You start work by hand with `akrogon next`. After that, you do not copy prompts between panes. Herdr events trigger new passes as the seats work, and each pass prompts the next seat from the leaf's state.
+You start work by hand with `akrogon next`. After that, you do not copy prompts between panes. hc events from the seat terminals trigger new passes as the seats work, and each pass prompts the next seat from the leaf's state.
 
 When a leaf merges, akrogon starts only the leaves in the same repository that list it in `blocked-by`. Every other leaf waits for your next `akrogon next`.
 
