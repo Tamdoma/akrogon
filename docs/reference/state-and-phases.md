@@ -79,28 +79,28 @@ sources: []
 
 Leave these to the commands. Editing them by hand makes the file disagree with the running seats. "Per seat" means the value holds an `A` and a `B` entry.
 
-| Field            | Meaning                                                                                                                                           | Written by                                           |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `busy_since`     | Per seat, when the seat was first seen busy. Cleared when the seat goes idle.                                                                     | `akrogon next`                                       |
-| `busy_notified`  | Per seat, when the command sent a notice that the seat has been busy for over an hour.                                                            | `akrogon next`                                       |
-| `attempts`       | Per seat, how many prompt deliveries in a row failed. Reset on a delivered prompt and on every move.                                              | `akrogon next`, `akrogon phase`                      |
-| `done`           | Seats that finished the current phase.                                                                                                            | `akrogon phase`                                      |
-| `fix_rounds`     | How many times the leaf went to check.fix from check.repair or merge. Kept across recovery.                                                       | `akrogon phase`                                      |
-| `verdict`        | Per seat, the review verdict in check.review.                                                                                                     | `akrogon phase`                                      |
-| `tab`            | The herdr tab that holds the leaf's panes.                                                                                                        | `akrogon next`                                       |
-| `worktree`       | Path of the leaf's git worktree. Removed when the worktree is cleaned up after merge or is gone from disk.                                        | `akrogon next`                                       |
-| `env_names`      | Names of the env values written into the worktree's `.env`.                                                                                       | `akrogon next`                                       |
-| `env_generation` | How many times the `.env` of an existing worktree was rewritten.                                                                                  | `akrogon next`                                       |
-| `pane`           | Per seat, the herdr pane the seat works in.                                                                                                       | `akrogon next`                                       |
-| `prompted`       | Per seat, the agent session that got the current phase prompt.                                                                                    | `akrogon next`                                       |
-| `prompted_at`    | Per seat, when that prompt was delivered.                                                                                                         | `akrogon next`                                       |
-| `delivery_error` | Per seat, the last failed prompt delivery. See below.                                                                                             | `akrogon next`                                       |
-| `failure`        | Why the leaf stopped in failed. See below. Cleared when the leaf leaves failed.                                                                   | `akrogon phase`                                      |
-| `merge_stamp`    | When the leaf entered merge. Orders leaves waiting for the merge turn.                                                                            | `akrogon phase`                                      |
-| `batch`          | The record of the current merge attempt. See below.                                                                                               | `akrogon next` merge turn, land run, `akrogon phase` |
-| `broadcast`      | The completion update waiting for a broadcast seat after a command-run merge. See below.                                                          | land run, `akrogon next`                             |
-| `frozen`         | Every path the branch changed at the plan.synthesis to implement move, with its git blob id. Later changes to them need a `Test-Change:` trailer. | `akrogon phase`                                      |
-| `frozen_cited`   | `Test-Change:` trailers already on empty commits at that move, so they do not count for later changes.                                            | `akrogon phase`                                      |
+| Field            | Meaning                                                                                                                                                                                            | Written by                                           |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `busy_since`     | Per seat, when the seat was first seen busy. Cleared when the seat goes idle.                                                                                                                      | `akrogon next`                                       |
+| `busy_notified`  | Per seat, `pending` once the busy-over-an-hour notice file is written, `shown` once it is gone (old timestamps read as shown). The seat going idle or a move to failed or merged removes the file. | `akrogon next`                                       |
+| `attempts`       | Per seat, how many prompt deliveries in a row failed. Reset on a delivered prompt and on every move.                                                                                               | `akrogon next`, `akrogon phase`                      |
+| `done`           | Seats that finished the current phase.                                                                                                                                                             | `akrogon phase`                                      |
+| `fix_rounds`     | How many times the leaf went to check.fix from check.repair or merge. Kept across recovery.                                                                                                        | `akrogon phase`                                      |
+| `verdict`        | Per seat, the review verdict in check.review.                                                                                                                                                      | `akrogon phase`                                      |
+| `tab`            | The herdr tab that holds the leaf's panes.                                                                                                                                                         | `akrogon next`                                       |
+| `worktree`       | Path of the leaf's git worktree. Removed when the worktree is cleaned up after merge or is gone from disk.                                                                                         | `akrogon next`                                       |
+| `env_names`      | Names of the env values written into the worktree's `.env`.                                                                                                                                        | `akrogon next`                                       |
+| `env_generation` | How many times the `.env` of an existing worktree was rewritten.                                                                                                                                   | `akrogon next`                                       |
+| `pane`           | Per seat, the herdr pane the seat works in.                                                                                                                                                        | `akrogon next`                                       |
+| `prompted`       | Per seat, the agent session that got the current phase prompt.                                                                                                                                     | `akrogon next`                                       |
+| `prompted_at`    | Per seat, when that prompt was delivered.                                                                                                                                                          | `akrogon next`                                       |
+| `delivery_error` | Per seat, the last failed prompt delivery. See below.                                                                                                                                              | `akrogon next`                                       |
+| `failure`        | Why the leaf stopped in failed. See below. Cleared when the leaf leaves failed.                                                                                                                    | `akrogon phase`                                      |
+| `merge_stamp`    | When the leaf entered merge. Orders leaves waiting for the merge turn.                                                                                                                             | `akrogon phase`                                      |
+| `batch`          | The record of the current merge attempt. See below.                                                                                                                                                | `akrogon next` merge turn, land run, `akrogon phase` |
+| `broadcast`      | The completion update waiting for a broadcast seat after a command-run merge. See below.                                                                                                           | land run, `akrogon next`                             |
+| `frozen`         | Every path the branch changed at the plan.synthesis to implement move, with its git blob id. Later changes to them need a `Test-Change:` trailer.                                                  | `akrogon phase`                                      |
+| `frozen_cited`   | `Test-Change:` trailers already on empty commits at that move, so they do not count for later changes.                                                                                             | `akrogon phase`                                      |
 
 ### Nested records
 
@@ -111,7 +111,7 @@ Exact shapes are in [src/state.ts](../../src/state.ts).
 - `cause` is `blocked`.
 - `phase` and `slot` name where the leaf stopped and which seat stopped it.
 - `reason` is the `--reason` text.
-- `delivery` is how the failed notice went, as herdr reported it, or `error`.
+- `delivery` is `pending` while the failed notice file waits, `shown` once it is gone, or `error` when the write failed. Older herdr reasons stay as written. A pending file is removed when the leaf leaves `failed`.
 
 `delivery_error` (`deliveryErrorSchema`) is one entry per seat, written when a prompt cannot be delivered and cleared when one is:
 
@@ -131,7 +131,7 @@ Exact shapes are in [src/state.ts](../../src/state.ts).
 - `wake`, `red` and `refusal` say where the land run stopped: `red` with the red verify run, `gate` or `push` with the refusal text.
 - `tested_top` and `tested_main` are the head the merge check passed and the remote base under it.
 - `candidate` is the head sent to the push. `decision` is `rerun` after a refused push forced a new rebase.
-- `recorded` is true once the attempt's outcome is in the attempts log. `notified` is true once the operator got the notice that a failed holder's push landed.
+- `recorded` is true once the attempt's outcome is in the attempts log. `notified` is `pending` while the notice that a failed holder's push landed waits as a file and `shown` once it is gone, absent before it is written or when the write failed. It is dropped, and a pending file removed, when the leaf leaves `failed`.
 
 `broadcast` (`broadcastSchema`) is written when the command's own merge completes an issue or epic:
 
