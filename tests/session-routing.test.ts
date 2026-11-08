@@ -7,7 +7,16 @@ import { readState, saveState, type State } from '../src/state';
 import { command, spawnCaptured, type Result } from '../src/shell';
 import { z } from 'zod';
 import type { Database, DatabaseInput, SessionInput } from './fake-herdr';
-import { hcCore, hcFixture, setPrefixes, setSeat, type HcCore, type HcFixture, type Terminal } from './hc-fixture';
+import {
+  hcCore,
+  hcFixture,
+  noticeFiles,
+  setPrefixes,
+  setSeat,
+  type HcCore,
+  type HcFixture,
+  type Terminal,
+} from './hc-fixture';
 
 type DispatchFixture = Fixture & { db: string; env: NodeJS.ProcessEnv };
 type PaneSeed = {
@@ -52,20 +61,6 @@ function database(f: DispatchFixture): Database {
 }
 function saveDatabase(f: DispatchFixture, db: DatabaseInput): void {
   writeFileSync(f.db, JSON.stringify(db));
-}
-// Raw argv per call, including --session; the stripped .calls log stays for
-// pre-session assertions elsewhere.
-function rawCalls(f: DispatchFixture): string[][] {
-  const path: string = f.db + '.calls-raw';
-  return existsSync(path)
-    ? readFileSync(path, 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => z.array(z.string()).parse(JSON.parse(line)))
-    : [];
-}
-function toSession(f: DispatchFixture, name: string): string[][] {
-  return rawCalls(f).filter((args) => args[0] === '--session' && args[1] === name);
 }
 function socket(f: DispatchFixture, name: string): string {
   return `${f.db}-${name}.sock`;
@@ -316,19 +311,23 @@ test('a failed session list is reported once per invocation', async () => {
   }
 });
 
-test('the busy notice goes to the herdr session holding the repo workspace', async () => {
+test('the busy notice lands in the session holding the repo space', async () => {
   // `trust` reports blocked and waits: a busy seat.
   const f: HcFixture = await hcFixture({ mode: 'trust' });
+  const decoy: HcCore = await hcCore(f, { repo: 'misc' });
   try {
-    const stale: string = herdrOther(f);
+    f.core.link(decoy);
+    const env: NodeJS.ProcessEnv = { ...f.env, HC_SESSION: decoy.session };
     const path: string = leaf(f, 'routed2', 'plan.synthesis');
-    expect((await cli(f, ['next', 'routed2'], f.root, { ...f.env, HERDR_SOCKET_PATH: stale })).code).toBe(0);
+    expect((await cli(f, ['next', 'routed2'], f.root, env)).code).toBe(0);
     saveState(path, { ...readState(path), busy_since: { A: new Date(Date.now() - 61 * 60000).toISOString() } });
-    expect((await cli(f, ['next', 'routed2'], f.root, { ...f.env, HERDR_SOCKET_PATH: stale })).code).toBe(0);
-    const notices = herdrCalls(f, 'default').filter((args) => args[2] === 'notification' && args[3] === 'show');
-    expect(notices).toHaveLength(1);
-    expect(herdrCalls(f, 'other').filter((args) => args[2] === 'notification')).toHaveLength(0);
+    expect((await cli(f, ['next', 'routed2'], f.root, env)).code).toBe(0);
+    expect(noticeFiles(f.core).map((notice) => notice.title)).toEqual([
+      expect.stringContaining('Busy leaf: repo/routed2 seat A'),
+    ]);
+    expect(noticeFiles(decoy)).toEqual([]);
   } finally {
+    await decoy.stop();
     await f.clean();
   }
 }, 30000);
@@ -427,10 +426,10 @@ test('land wake calls reach the resolved session under a stale parent session', 
     expect(await decoy.terminals({ akrogon: '1' })).toEqual([]);
     expect(
       herdrCalls(f, 'other').filter(
-        (args) =>
-          (args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? '')) || args[2] === 'notification',
+        (args) => args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? ''),
       ),
     ).toHaveLength(0);
+    expect(noticeFiles(decoy)).toEqual([]);
   } finally {
     await decoy.stop();
     await f.clean();
@@ -439,7 +438,9 @@ test('land wake calls reach the resolved session under a stale parent session', 
 
 test('phase renames and the failed notice carry the resolved session', async () => {
   const f: HcFixture = await hcFixture();
+  const decoy: HcCore = await hcCore(f, { repo: 'misc' });
   try {
+    f.core.link(decoy);
     const stale: string = herdrOther(f);
     const path: string = leaf(f, 'renamed', 'plan.synthesis');
     expect((await cli(f, ['next', 'renamed'], f.root, { ...f.env, HERDR_SOCKET_PATH: stale })).code).toBe(0);
@@ -458,12 +459,12 @@ test('phase renames and the failed notice carry the resolved session', async () 
       { ...f.env, HERDR_SOCKET_PATH: stale },
     );
     expect(moved.code).toBe(0);
-    expect(herdrCalls(f, 'default').some((args) => args[2] === 'notification' && args[3] === 'show')).toBe(true);
+    expect(noticeFiles(f.core).map((notice) => notice.title)).toEqual(['repo/renamed failed']);
+    expect(noticeFiles(decoy)).toEqual([]);
     expect(renames('renamed failed')).toEqual([f.core.appHome]);
     expect(
       herdrCalls(f, 'other').filter(
-        (args) =>
-          (args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? '')) || args[2] === 'notification',
+        (args) => args[2] === 'tab' && ['create', 'rename', 'close'].includes(args[3] ?? ''),
       ),
     ).toHaveLength(0);
     // Recovery renames back in the same session.
@@ -475,18 +476,17 @@ test('phase renames and the failed notice carry the resolved session', async () 
     expect(renames('renamed').length).toBeGreaterThan(0);
     expect(new Set(renames('renamed'))).toEqual(new Set([f.core.appHome]));
   } finally {
+    await decoy.stop();
     await f.clean();
   }
 }, 20000);
 
-test('the merge notice and main-red notice go to the resolved session', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('the merge notice lands in the session holding the repo space', async () => {
+  const f: HcFixture = await hcFixture();
+  const decoy: HcCore = await hcCore(f, { repo: 'misc' });
   try {
-    saveDatabase(f, {
-      ...database(f),
-      sessions: [session('other', { workspaces: [{ workspace_id: 'w9', label: 'misc' }] })],
-    });
-    const env: NodeJS.ProcessEnv = { ...f.env, HERDR_SOCKET_PATH: socket(f, 'other') };
+    f.core.link(decoy);
+    const env: NodeJS.ProcessEnv = { ...f.env, HC_SESSION: decoy.session };
     // A failed merge leaf whose recorded batch candidate already landed gets
     // the "move it back" notice through reconcileBatch.
     const path: string = leaf(f, 'failed-merge', 'merge');
@@ -511,26 +511,23 @@ test('the merge notice and main-red notice go to the resolved session', async ()
         candidate: head,
       },
     });
-    const result: Result = await next(f, ['--all'], env);
+    const result: Result = await cli(f, ['next', '--all'], f.root, env);
     expect(result.code).toBe(0);
-    const notices = toSession(f, 'default').filter((args) => args[2] === 'notification' && args[3] === 'show');
-    expect(notices.some((args) => args.join(' ').includes('merged, move it back'))).toBe(true);
-    expect(toSession(f, 'other').filter((args) => args[2] === 'notification')).toHaveLength(0);
+    expect(noticeFiles(f.core).map((notice) => notice.title)).toEqual(['repo/failed-merge merged, move it back']);
+    expect(noticeFiles(decoy)).toEqual([]);
   } finally {
-    f.clean();
+    await decoy.stop();
+    await f.clean();
   }
 }, 30000);
 
-test('the main-red notice reaches the running session holding the repo workspace', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+test('the main-red notice lands in the running session holding the repo space', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  const decoy: HcCore = await hcCore(f, { repo: 'misc' });
   try {
-    // The repo's workspace sits only in running session `held`; the caller's
-    // ambient session is `default`.
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [{ workspace_id: 'w3', label: 'other' }],
-      sessions: [session('held', { workspaces: [{ workspace_id: 'w4', label: 'repo' }] })],
-    });
+    // The repo's space sits only in `core`; the caller's ambient session is the decoy.
+    core.link(decoy);
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
       // Red on head and base alike: the main-red notice fires on the red base
@@ -548,28 +545,25 @@ test('the main-red notice reaches the running session holding the repo workspace
     await command(['git', 'add', 'marker'], worktree);
     await command(['git', 'commit', '-m', 'marker'], worktree);
     saveState(path, { ...readState(path), worktree });
-    await cli(f, ['verify', '--known-red'], worktree, {
-      ...f.env,
-      HERDR_SOCKET_PATH: socket(f, 'default'),
-    });
+    await cli(f, ['verify', '--known-red'], worktree, { ...core.env, HC_SESSION: decoy.session });
     const receipt: string = readFileSync(resolve(f.root, 'issues/verify-runs.jsonl'), 'utf8');
-    expect(receipt).toContain('"notice":"shown"');
-    const notices: string[][] = toSession(f, 'held').filter((args) => args[2] === 'notification' && args[3] === 'show');
-    expect(notices.some((args) => args.join(' ').includes('main red'))).toBe(true);
+    expect(receipt).toContain('"notice":"pending"');
+    expect(noticeFiles(core).map((notice) => notice.title)).toEqual(['repo main red']);
+    expect(noticeFiles(decoy)).toEqual([]);
   } finally {
+    await decoy.stop();
+    await core.stop();
     f.clean();
   }
 }, 60000);
 
 test('a stopped repo session suppresses the main-red notice but keeps the receipt', async () => {
-  const f: DispatchFixture = await dispatchFixture();
+  const f: Fixture = await fixture();
+  // The repo's only space sits in a stopped session.
+  const down: HcCore = await stoppedCore(f);
+  const host: HcCore = await hcCore(f, { repo: 'misc' });
   try {
-    // The repo's only workspace sits in a stopped session.
-    saveDatabase(f, {
-      ...database(f),
-      workspaces: [{ workspace_id: 'w3', label: 'other' }],
-      sessions: [session('held', { running: false, workspaces: [{ workspace_id: 'w4', label: 'repo' }] })],
-    });
+    host.link(down);
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
       // Red on head and base alike: the main-red notice fires on the red base
@@ -587,17 +581,17 @@ test('a stopped repo session suppresses the main-red notice but keeps the receip
     await command(['git', 'add', 'marker'], worktree);
     await command(['git', 'commit', '-m', 'marker'], worktree);
     saveState(path, { ...readState(path), worktree });
-    await cli(f, ['verify', '--known-red'], worktree, {
-      ...f.env,
-      HERDR_SOCKET_PATH: socket(f, 'default'),
-    });
+    await cli(f, ['verify', '--known-red'], worktree, host.env);
     // Receipt persists regardless of notice delivery.
     const runs: string = resolve(f.root, 'issues/verify-runs.jsonl');
     expect(existsSync(runs)).toBe(true);
     const receipt = readFileSync(runs, 'utf8');
     expect(receipt).toContain('"notice":"error"');
-    expect(toSession(f, 'held')).toHaveLength(0);
+    expect(existsSync(resolve(down.appHome, 'akrogon-notices'))).toBe(false);
+    expect(noticeFiles(host)).toEqual([]);
   } finally {
+    await host.stop();
+    down.discard();
     f.clean();
   }
 }, 60000);
