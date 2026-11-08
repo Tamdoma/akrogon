@@ -251,7 +251,8 @@ export function transcriptKind(path: string): Kind | null {
 // its step type. Positions are byte offsets into a JSONL file and step indexes into agy's database.
 export type TranscriptRecord = { text: string; value: unknown };
 
-const agyStep = z.object({ step_type: z.number(), step_payload: z.instanceof(Uint8Array) });
+// The steps table declares step_payload a nullable blob; a step without one has no text.
+const agyStep = z.object({ step_type: z.number(), step_payload: z.instanceof(Uint8Array).nullable() });
 
 function parsed(line: string): unknown {
   try {
@@ -274,7 +275,7 @@ export function transcriptRecords(path: string, from: number): TranscriptRecord[
     .parse(db.query('select step_type, step_payload from steps where idx >= ? order by idx').all(from));
   db.close();
   return steps.map((step) => ({
-    text: Buffer.from(step.step_payload).toString('utf8'),
+    text: step.step_payload === null ? '' : Buffer.from(step.step_payload).toString('utf8'),
     value: { step_type: step.step_type },
   }));
 }
