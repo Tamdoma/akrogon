@@ -161,6 +161,80 @@ exec '${first.env.HC_SHIM_REAL}' "$@"
   }
 });
 
+test('a cleared foreground from the real core keeps the listener alive through restart', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f, { coreEnv: { HC_FOREGROUND_MS: '10' } });
+  const shim: Shim = akrogonShim(f);
+  const bin: string = resolve(f.home, 'foreground-bin');
+  const events: string = resolve(f.home, 'events.log');
+  const gate: string = resolve(f.home, 'foreground.fifo');
+  mkdirSync(bin);
+  writeFileSync(events, '');
+  expect(Bun.spawnSync(['mkfifo', gate]).exitCode).toBe(0);
+  writeFileSync(
+    resolve(bin, 'hc'),
+    `#!/bin/bash
+if [ "$1" = events ]; then
+  '${core.env.HC_SHIM_REAL}' "$@" | tee '${events}'
+  exit "\${PIPESTATUS[0]}"
+fi
+exec '${core.env.HC_SHIM_REAL}' "$@"
+`,
+  );
+  chmodSync(resolve(bin, 'hc'), 0o755);
+  const listener: Bun.Subprocess = listen(f, { ...core.env, PATH: `${bin}:${shim.bin}:${core.env.PATH}` });
+  try {
+    await until(shim.log, () => passes(shim).includes('end next --resume'));
+    // Keep the terminal alive after its foreground process group exits.
+    const program: string = `import os, signal
+pid = os.fork()
+if pid == 0:
+    os.setpgid(0, 0)
+    with open('${gate}') as fifo:
+        fifo.read()
+    os._exit(0)
+os.setpgid(pid, pid)
+os.tcsetpgrp(0, pid)
+os.waitpid(pid, 0)
+signal.pause()
+`;
+    const run = await core.hc([
+      'run',
+      '--bg',
+      '--json',
+      '--no-parent',
+      ...labelled.flatMap((label: string) => ['--label', label]),
+      '--',
+      'python',
+      '-c',
+      program,
+    ]);
+    expect(run.code).toBe(0);
+    const foreground = (data: z.ZodType): boolean =>
+      readFileSync(events, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .some(
+          (line: string) =>
+            z.object({ params: z.object({ type: z.literal('foreground'), data }) }).safeParse(JSON.parse(line)).success,
+        );
+    await until(events, () => foreground(z.object({ pid: z.number() })));
+    writeFileSync(gate, 'exit\n');
+    await until(events, () => foreground(z.null()));
+    const resumes: number = count(shim, 'end next --resume');
+    expect((await core.hc(['server', 'restart'])).code).toBe(0);
+    await until(shim.log, () => count(shim, 'end next --resume') > resumes);
+    expect(listener.exitCode).toBeNull();
+  } finally {
+    killTree(listener);
+    await listener.exited;
+    const stderr: string = await new Response(listener.stderr).text();
+    if (stderr !== '') console.error(stderr);
+    await core.stop();
+    f.clean();
+  }
+});
+
 test('the listener subscribes before its catch-up, wakes on turn end, blocked and exit of labelled terminals only, and folds queued wakes', async () => {
   const f: Fixture = await fixture();
   const core: HcCore = await hcCore(f);
