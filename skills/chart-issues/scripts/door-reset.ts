@@ -9,7 +9,7 @@ import { appendFileSync, readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { readGlobal, requireRepo } from '../../../src/config';
-import { hc, label, repoSpace, send, waitFor, type Seen, type SpaceResolution } from '../../../src/hc';
+import { hc, label, repoSpace, send, terminal, waitFor, type Seen, type SpaceResolution } from '../../../src/hc';
 import { transcriptByCode, transcriptFor, transcriptKind } from '../../../src/transcript';
 
 type Kind = 'claude' | 'codex' | 'pi';
@@ -119,17 +119,22 @@ if (warm.started === false) stop('warm-up', 'warm-up not started', { code, turn:
 step('warm-up', 'sent', { code, turn: warm.turn });
 
 // A turn end only wakes the check: a reset can end turns of its own (claude's /clear does), so the warm-up
-// is over when A is idle and a reply record holding the code sits in a transcript changed since the reset,
-// never by a turn count.
-const answered = (path: string | null): boolean =>
-  path !== null &&
-  readFileSync(path, 'utf8')
-    .split('\n')
-    .some((line: string) => line.includes(code) && replySchema[kind].safeParse(parsed(line)).success);
+// is over when a reply record follows the code in a transcript changed since the reset and A is idle on a
+// fresh read, never by a turn count. The event's idle can predate the warm-up's turn, which may write its
+// reply while the lookup runs and only then go idle.
+const answered = (path: string | null): boolean => {
+  if (path === null) return false;
+  const lines: string[] = readFileSync(path, 'utf8').split('\n');
+  return lines
+    .slice(lines.findIndex((line: string) => line.includes(code)))
+    .some((line: string) => replySchema[kind].safeParse(parsed(line)).success);
+};
 const warmed: Seen | null = await waitFor(
   session,
   a,
-  async (t) => gone(t) || (idle(t) && answered(await transcriptByCode(seat, code, resetStart))),
+  async (t) =>
+    gone(t) ||
+    (idle(t) && answered(await transcriptByCode(seat, code, resetStart)) && idle(await terminal(session, a))),
   env.DOOR_RESET_TURN_BOUND_MS,
 );
 if (warmed === null) stop('code-lookup', 'reset unconfirmed', { code });

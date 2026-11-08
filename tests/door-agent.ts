@@ -115,7 +115,7 @@ async function turn(input: string): Promise<void> {
   write(record('user', input));
   if (input.startsWith('hold')) await readFile(resolve(out, 'release'));
   else await Bun.sleep(300);
-  write(record('assistant', input.startsWith('reply OK ') ? input.slice('reply '.length) : 'done'));
+  write(record('assistant', 'done'));
   status('idle');
   busy = false;
   appendFileSync(resolve(out, 'inputs.jsonl'), `${JSON.stringify({ turnEnd: new Date().toISOString() })}\n`);
