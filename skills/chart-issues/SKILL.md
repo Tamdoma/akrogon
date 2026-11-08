@@ -107,7 +107,7 @@ Protocol, using the shapes in shapes.md:
 
 1. Attempt start: choose a slug, create the worktree with `git worktree add --lock --reason "<chart-folder> direct" <worktree_store>/<slug>` on branch `<slug>` from the destination's default branch, and write the `Direct attempt` section with the slug recorded.
 2. Implement: the door itself runs `implement-issue direct chart=<chart-folder> worktree=<path>`, which writes `<chart>/direct/plan.md` and `<chart>/direct/report.md`.
-3. B review: `hc send --json <B address> "check-issue direct slot=B chart=<chart-folder> worktree=<path> base=<sha> head=<sha> out=<chart>/slots/review-B-<n>.md. When the review file is written, run: hc send <door address> 'done B: <out path>'"`, with `n` = 1 for the initial review and the exact path named, sent only while B's status is `idle` or `done`, and the door collects the review by that report and the out file under the exchange rules in questions. The Fix/Nit bar and verdict rules are check-issue's.
+3. B review: `hc send --json <B address> "check-issue direct slot=B chart=<chart-folder> worktree=<path> base=<sha> head=<sha> out=<chart>/slots/review-B-<n>.md. When the review file is written, run: hc send <door address> 'done B: <out path>'"`, with `n` = 1 for the initial review and the exact path named, sent only while B's last status under the asking rule in questions is `idle` or `done`, and the door collects the review by that report and the out file under the exchange rules in questions. The Fix/Nit bar and verdict rules are check-issue's.
 4. Repair rounds per the bound below.
 5. Landing, after B returns ready or nits on a committed head:
    1. fetch, rebase onto `<remote>/<default_branch>`, refresh `AKROGON_BASE` from `akrogon config` in the worktree;
