@@ -9,22 +9,10 @@ import { z } from 'zod';
 import { fixture, type Fixture } from './helpers';
 import { hcCore, setPrefixes, type HcCore } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
-import { transcriptRecords, type TranscriptRecord } from '../src/transcript';
 
 const agent: string = resolve(import.meta.dir, 'door-agent.ts');
 const helper: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/door-reset.ts');
-const STAGES: string[] = [
-  'started',
-  'wait-turn-end',
-  'input-check',
-  'reset-keys',
-  'warm-up',
-  'warm-up-turn-end',
-  'code-lookup',
-  'differing-path',
-  'label',
-  'start-prompt',
-];
+const STAGES: string[] = ['started', 'wait-turn-end', 'input-check', 'reset-keys', 'start-prompt'];
 
 type Kind = 'claude' | 'codex' | 'pi' | 'agy';
 type Step = { t: string; step: string; result: string; pre?: string; code?: string; path?: string };
@@ -43,7 +31,7 @@ const stepSchema = z
   .passthrough();
 const lineSchema = z.union([
   z.object({ input: z.string(), busy: z.boolean(), label: z.string().nullable() }),
-  z.object({ turnEnd: z.string() }),
+  z.object({ turnEnd: z.string(), transcript: z.string() }),
 ]);
 
 function lines(path: string): string[] {
@@ -60,6 +48,46 @@ function agentLines(run: Run): z.infer<typeof lineSchema>[] {
 
 function inputs(run: Run): Received[] {
   return agentLines(run).flatMap((l) => ('input' in l ? [l] : []));
+}
+
+// The transcript the turn for `input` wrote, once that turn has ended (woken by the folder's change events).
+function turnOf(run: Run, input: string, ms: number = 15_000): Promise<string> {
+  return new Promise<string>((done, fail) => {
+    const check = (): void => {
+      const all = agentLines(run);
+      const at: number = all.findIndex((l) => 'input' in l && l.input === input);
+      const end = all.slice(at + 1).find((l) => 'turnEnd' in l);
+      if (at === -1 || end === undefined || !('turnEnd' in end)) return;
+      clearTimeout(timer);
+      watcher.close();
+      done(end.transcript);
+    };
+    const watcher = watch(run.out, () => check());
+    const timer = setTimeout(() => {
+      watcher.close();
+      fail(new Error(`A never ended a turn for ${input}: ${JSON.stringify(agentLines(run))}`));
+    }, ms);
+    check();
+  });
+}
+
+// What chart-issues scripts/transcript.ts prints for A: asked by A itself (HC_TERMINAL_ID, plus the
+// PI_SESSION_FILE pi sets for its tool commands) or from outside.
+async function lookup(run: Run, own: Record<string, string> | null): Promise<string> {
+  const looked: SpawnResult = await spawnCaptured(
+    [process.execPath, resolve(import.meta.dir, '../skills/chart-issues/scripts/transcript.ts'), run.a],
+    {
+      cwd: run.f.root,
+      env: {
+        ...run.core.env,
+        HOME: run.f.home,
+        AKROGON_HOME: run.f.home,
+        ...(own === null ? {} : { HC_TERMINAL_ID: run.a, ...own }),
+      },
+    },
+  );
+  expect(looked.code).toBe(0);
+  return looked.stdout.trim();
 }
 
 // Resolves when the helper's log holds `step`, woken by the folder's change events; the timer only bounds it.
@@ -182,30 +210,21 @@ test.each([
       await exited(run, address);
       const log: Step[] = steps(run.log);
       expect(log.map((s: Step) => s.step)).toEqual(STAGES);
-      const code: string = z
-        .string()
-        .min(1)
-        .parse(log.find((s) => s.step === 'warm-up')?.code);
-      const found: string = z.string().parse(log.find((s) => s.step === 'code-lookup')?.path);
       const pre: string = z.string().parse(began.pre);
       // The first task was written before the helper started, so it is no operator input past the boundary.
-      expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', key, `reply OK ${code}`, start]);
+      expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', key, start]);
       // Nothing reached A while a turn was open.
       expect(
         inputs(run)
           .slice(1)
           .filter((r: Received) => r.busy),
       ).toEqual([]);
-      expect(found).not.toBe(pre);
-      expect(transcriptRecords(found, 0).some((r: TranscriptRecord) => r.text.includes(code))).toBe(true);
-      // The label held the new path before the start prompt arrived, and still holds it.
-      expect(inputs(run).at(-1)?.label).toBe(found);
-      expect((await run.core.get(run.a)).labels['akrogon.transcript']).toBe(found);
-      // The code lookup ran only after the warm-up turn had ended.
-      const turnEnds: string[] = agentLines(run).flatMap((l) => ('turnEnd' in l ? [l.turnEnd] : []));
-      const warmEnd: string = z.string().parse(turnEnds[1]);
-      const lookup: string = z.string().parse(log.find((s) => s.step === 'code-lookup')?.t);
-      expect(Date.parse(lookup)).toBeGreaterThanOrEqual(Date.parse(warmEnd));
+      // The start prompt opened a new conversation, and fresh A's own lookup names it; afterwards an outside
+      // lookup agrees (pi's argv still names the first conversation, its published label answers).
+      const fresh: string = await turnOf(run, start);
+      expect(fresh).not.toBe(pre);
+      expect(await lookup(run, kind === 'pi' ? { PI_SESSION_FILE: fresh } : {})).toBe(fresh);
+      expect(await lookup(run, null)).toBe(fresh);
     } finally {
       await run.core.stop();
       run.f.clean();
@@ -344,18 +363,20 @@ test('the helper sends nothing while A turn stays open past the bound', async ()
   }
 });
 
-test('a reset that leaves A on the same transcript stops before the label and the start prompt', async () => {
+test('a reset that leaves A on the same transcript lands the start prompt there, where A own lookup names the entry path', async () => {
   const run: Run = await startA('claude', 'noswitch');
   try {
-    const address: string = await reset(run, '/chart-issues continue handover t door x next /charts/next');
-    await logged(run.log, 'started');
+    const start: string = '/chart-issues continue handover t door x next /charts/next';
+    const address: string = await reset(run, start);
+    const began: Step = await logged(run.log, 'started');
     await release(run);
     await exited(run, address);
-    const log: Step[] = steps(run.log);
-    expect(log.map((s: Step) => s.step)).toEqual(STAGES.slice(0, STAGES.indexOf('differing-path') + 1));
-    expect(log.at(-1)?.result).toBe('same transcript');
-    const code: string = z.string().parse(log.find((s) => s.step === 'warm-up')?.code);
-    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/clear', `reply OK ${code}`]);
+    expect(steps(run.log).map((s: Step) => s.step)).toEqual(STAGES);
+    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/clear', start]);
+    const pre: string = z.string().parse(began.pre);
+    // The receiving session's check (chart-issues SKILL.md) compares this answer with the entry and stops.
+    expect(await turnOf(run, start)).toBe(pre);
+    expect(await lookup(run, {})).toBe(pre);
   } finally {
     await run.core.stop();
     run.f.clean();

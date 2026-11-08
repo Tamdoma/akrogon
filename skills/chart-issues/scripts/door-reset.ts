@@ -2,16 +2,15 @@
 // The chart door's handover reset (chart-door Q2 2a): A's last action starts it detached with
 // `hc run --bg --no-notify --rm --no-parent -- sh -c 'log=$1; shift; exec bun "$@" >>"$log" 2>&1' sh <log>
 // door-reset.ts <A address> <log> "<start prompt>"`, so its output and any uncaught error land in <log> too.
-// It follows A's turn end on hc events, cancels on operator input, types the reset as keys, confirms the
-// new transcript by a warm-up code, labels it on A and sends the start prompt. One JSON line per stage
-// goes to <log>; a stage that fails logs its result and the helper exits non-zero.
+// It follows A's turn end on hc events, cancels on operator input, types the reset as keys and sends the
+// start prompt. It confirms nothing after the reset: the session that receives the start prompt checks its
+// own transcript against the handover entry before it continues (chart-issues SKILL.md, Handover). One
+// JSON line per stage goes to <log>; a stage that fails logs its result and the helper exits non-zero.
 import { appendFileSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { readGlobal, requireRepo } from '../../../src/config';
-import { hc, label, repoSpace, send, terminal, waitFor, type Seen, type SpaceResolution } from '../../../src/hc';
+import { hc, repoSpace, send, waitFor, type Seen, type SpaceResolution } from '../../../src/hc';
 import {
-  transcriptByCode,
   transcriptEnd,
   transcriptFor,
   transcriptKind,
@@ -52,18 +51,6 @@ const inputSchema: Record<Kind, z.ZodType> = {
     .object({ type: z.string(), message: z.object({ role: z.string() }).optional() })
     .refine((e) => e.type === 'message' && e.message?.role === 'user'),
   agy: z.object({ step_type: z.literal(14) }),
-};
-
-// The harness's reply record, the only proof a prompt was answered: claude, codex and pi also copy the
-// prompt into other records (claude's last-prompt and request blobs), so a match there proves receipt only.
-const replySchema: Record<Kind, z.ZodType> = {
-  claude: z.object({ type: z.literal('assistant') }),
-  codex: z.object({
-    type: z.literal('response_item'),
-    payload: z.object({ type: z.literal('message'), role: z.literal('assistant') }),
-  }),
-  pi: z.object({ type: z.literal('message'), message: z.object({ role: z.literal('assistant') }) }),
-  agy: z.object({ step_type: z.literal(15) }),
 };
 
 const [a, log, start]: [string, string, string] = z
@@ -107,46 +94,8 @@ if (input) stop('input-check', 'superseded');
 step('input-check', 'none');
 
 // Keys, not a send: a sent `/clear` would arrive as chat text, not as the harness command.
-const resetStart: number = Date.now();
 await hc(session, ['keys', a, '/', ...resetWord[kind].split(''), 'enter']);
 step('reset-keys', 'sent', { reset: `/${resetWord[kind]}` });
-
-const code: string = randomBytes(6).toString('hex');
-const warm = await send(session, a, `reply OK ${code}`);
-if (warm.started === false) stop('warm-up', 'warm-up not started', { code, turn: warm.turn });
-step('warm-up', 'sent', { code, turn: warm.turn });
-
-// A turn end only wakes the check: a reset can end turns of its own (claude's /clear does), so the warm-up
-// is over when a reply record follows the code in a transcript changed since the reset and A is idle on a
-// fresh read, never by a turn count. The event's idle can predate the warm-up's turn, which may write its
-// reply while the lookup runs and only then go idle.
-const answered = (path: string | null): boolean => {
-  if (path === null) return false;
-  const records: TranscriptRecord[] = transcriptRecords(path, 0);
-  return records
-    .slice(records.findIndex((record: TranscriptRecord) => record.text.includes(code)))
-    .some((record: TranscriptRecord) => replySchema[kind].safeParse(record.value).success);
-};
-const warmed: Seen | null = await waitFor(
-  session,
-  a,
-  async (t) =>
-    gone(t) ||
-    (idle(t) && answered(await transcriptByCode(seat, code, resetStart)) && idle(await terminal(session, a))),
-  env.DOOR_RESET_TURN_BOUND_MS,
-);
-if (warmed === null) stop('code-lookup', 'reset unconfirmed', { code });
-if (gone(warmed)) stop('warm-up-turn-end', 'identity changed');
-step('warm-up-turn-end', 'turn ended', { turn: warmed.turn });
-
-const found: string | null = await transcriptByCode(seat, code, resetStart);
-if (found === null) stop('code-lookup', 'reset unconfirmed', { code });
-step('code-lookup', 'found', { path: found });
-if (found === pre) stop('differing-path', 'same transcript', { path: found });
-step('differing-path', 'differs');
-
-await label(session, a, { 'akrogon.transcript': found });
-step('label', 'set', { path: found });
 
 const sent = await send(session, a, start);
 if (sent.started === false) {

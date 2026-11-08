@@ -16,7 +16,8 @@
 // `noswitch` keeps the first transcript after the reset line. A first task starting with `hold` keeps
 // the turn open until <out>/release is opened for writing.
 // <out>/inputs.jsonl gets one line per received input ({input, busy, label}, label being the terminal's
-// akrogon.transcript at receipt) and one {turnEnd} line after each turn's idle status.
+// akrogon.transcript at receipt) and one {turnEnd, transcript} line after each turn's idle status, naming
+// the transcript that turn wrote.
 import { Database } from 'bun:sqlite';
 import { appendFileSync, closeSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -144,7 +145,10 @@ async function turn(input: string): Promise<void> {
   write(record('assistant', 'done'));
   status('idle');
   busy = false;
-  appendFileSync(resolve(out, 'inputs.jsonl'), `${JSON.stringify({ turnEnd: new Date().toISOString() })}\n`);
+  appendFileSync(
+    resolve(out, 'inputs.jsonl'),
+    `${JSON.stringify({ turnEnd: new Date().toISOString(), transcript })}\n`,
+  );
 }
 
 // claude runs /clear as a short turn of its own: its status leaves working once (hc's turn moves) and the

@@ -1,6 +1,7 @@
 // Finds the transcript file a seat's harness writes now (plan D18) from the seat process (claude's own
 // per-process session record, codex's open rollout, agy's conversation lock, pi's argv) and keeps it on
-// the terminal as `akrogon.transcript`, which is read only when the process names none.
+// the terminal as `akrogon.transcript`, which is read only when the process names none or, for pi, when
+// the seat published its current conversation there itself.
 import { Database } from 'bun:sqlite';
 import { existsSync, readdirSync, readFileSync, readlinkSync, statSync, type Dirent } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -168,26 +169,6 @@ function fromProcess(pid: number): Named | null {
   return pi === null ? null : { path: pi };
 }
 
-// The files a reset seat may have moved to (session-id final-shape): the folder of claude's current
-// conversation and pi's sessions folder for the cwd, only files changed since the reset began; codex the
-// rollouts it holds open; agy the conversation it has locked, which /clear replaces at once.
-function resetCandidates(pid: number, sinceMs: number): string[] {
-  const p = proc(pid);
-  if (p === null) return [];
-  const claude: Named | null = claudeTranscript(pid, p);
-  if (claude === null && rollouts(p).length > 0) return rollouts(p);
-  const agy: string | null = claude === null ? agyConversation(p) : null;
-  if (agy !== null) return [agy].filter((path: string) => existsSync(path));
-  const pi: string | null = claude === null ? piStart(p) : null;
-  const folder: string | null =
-    claude !== null ? (claude.path === null ? null : dirname(claude.path)) : pi !== null ? dirname(pi) : null;
-  if (folder === null) return [];
-  return readdirSync(folder)
-    .filter((name: string) => name.endsWith('.jsonl'))
-    .map((name: string) => join(folder, name))
-    .filter((path: string) => statSync(path).mtimeMs >= sinceMs);
-}
-
 function seatPids(t: Seen): number[] {
   return [t.pid, t.foreground?.pid ?? null].filter(
     (pid: number | null, index: number, all: (number | null)[]): pid is number =>
@@ -211,27 +192,19 @@ export async function transcriptFor(seat: { session: string; address: string }):
     .map((pid: number) => fromProcess(pid))
     .find((n: Named | null): n is Named => n !== null);
   if (named === undefined) return recorded !== undefined && existsSync(recorded) ? recorded : null;
+  // pi's argv names only the conversation it started with; after /new the seat publishes its current file
+  // as the label (chart-issues scripts/transcript.ts, from pi's PI_SESSION_FILE), which then answers.
+  if (
+    named.path !== null &&
+    recorded !== undefined &&
+    transcriptKind(named.path) === 'pi' &&
+    transcriptKind(recorded) === 'pi' &&
+    existsSync(recorded)
+  )
+    return recorded;
   if (named.path !== null && named.path !== recorded)
     await label(seat.session, seat.address, { 'akrogon.transcript': named.path });
   return named.path;
-}
-
-// After an in-place reset (/clear, /new) the seat's open files no longer name its conversation (P3):
-// the transcript is the one file of that kind's folder holding the code its first prompt carried.
-export async function transcriptByCode(
-  seat: { session: string; address: string },
-  code: string,
-  sinceMs: number,
-): Promise<string | null> {
-  const t: Seen = await terminal(seat.session, seat.address);
-  for (const pid of seatPids(t)) {
-    const hits: string[] = resetCandidates(pid, sinceMs).filter((path: string) =>
-      transcriptRecords(path, 0).some((record: TranscriptRecord) => record.text.includes(code)),
-    );
-    if (hits.length > 1) throw new Error(JSON.stringify({ seat, code, error: 'code found in several files', hits }));
-    if (hits.length === 1) return hits[0];
-  }
-  return null;
 }
 
 export type Kind = 'claude' | 'codex' | 'pi' | 'agy';
