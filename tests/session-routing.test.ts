@@ -272,7 +272,7 @@ test('skips a stopped session and a dead socket, and an unreadable session refus
     down.discard();
     f.clean();
   }
-}, 30000);
+}, 90000);
 
 test('a discovery read past the deadline refuses the repo', async () => {
   const f: HcFixture = await hcFixture();

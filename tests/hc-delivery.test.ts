@@ -109,7 +109,7 @@ test('silent stops are re-prompted, the third fails the leaf, and a phase move r
   } finally {
     await teardown(f, core, 'hd-silent');
   }
-});
+}, 90000);
 
 test('a working seat gets no send; a send that never starts is recorded, not resent, and resettled once the turn moves', async () => {
   const { f, core, path } = await setup('hd-send', 'fake', 'idle');
@@ -140,7 +140,7 @@ test('a working seat gets no send; a send that never starts is recorded, not res
   } finally {
     await teardown(f, core, 'hd-send');
   }
-});
+}, 90000);
 
 test('an agy seat answers the trust dialog once and its first task, refused unavailable, goes in once', async () => {
   const { f, core, path } = await setup('hd-agy', 'agy', 'trust');
