@@ -14,13 +14,21 @@ import { type SpawnResult } from '../../src/shell';
 import { answerTrust, required } from './tier';
 import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
+// command: the long shell command the seat runs. agy refuses `sleep 600` as a shell timer (B-R1), so it
+// runs a long ping instead.
 const kinds = {
   codex: {
     line: 'codex --no-daemon -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access',
     model: 'gpt-6.1-sol',
     trust: 'Trust and continue',
+    command: 'sleep 600',
   },
-  agy: { line: 'agy --model {model} --effort {effort} --mode auto', model: 'gemini-3.8-flash-low', trust: null },
+  agy: {
+    line: 'agy --model {model} --effort {effort} --mode auto',
+    model: 'gemini-3.8-flash-low',
+    trust: null,
+    command: 'ping -c 600 127.0.0.1',
+  },
 } as const;
 
 const terminalSchema = z.object({
@@ -115,7 +123,7 @@ test('watch stop: a working seat stops on its stop key, ends idle and takes one 
       resolve(path, 'state.yaml'),
       Bun.YAML.stringify({ slug, phase: 'plan.synthesis', created: '2026-11-08', repo: 'akre2e', 'blocked-by': [] }),
     );
-    const task: string = 'Run exactly this shell command in the foreground and wait for it to finish: sleep 600';
+    const task: string = `Run exactly this shell command in the foreground and wait for it to finish: ${spec.command}`;
     const starting: Promise<SpawnResult> = tier.akrogon(['seat', slug, 'A', '--task', task]);
     if (spec.trust !== null) await answerTrust(tier, kind, () => liveSeat(tier, slug), spec.trust, starting);
     const started: SpawnResult = await starting;
@@ -123,14 +131,15 @@ test('watch stop: a working seat stops on its stop key, ends idle and takes one 
     expect(started.code).toBe(0);
     const address: string = z.string().parse(await liveSeat(tier, slug));
     // The seat is on the long command: hc waits for the harness's tool-running line on the screen
-    // (event-driven, bounded; the task text itself names `sleep 600`, so that text proves nothing), and
+    // (event-driven, bounded; the task text itself names the command, so that text proves nothing), and
     // the seat's process tree must hold the command.
     const shown: SpawnResult = await tier.hc(['wait', address, '--output', 'Running', '--timeout', '180']);
     tier.record(`${kind}-on-command.txt`, `${shown.code}\n${shown.stdout}\n${shown.stderr}`);
     const before: Seen = await get(tier, address);
     const tree: string[] = descendants(z.number().parse(before.pid));
     tier.record(`${kind}-tree.json`, tree);
-    expect(tree.some((argv: string) => /(^|\s|\/)sleep 600$/.test(argv))).toBe(true);
+    const c: string = spec.command;
+    expect(tree.some((argv: string) => argv === c || argv.endsWith(` ${c}`) || argv.endsWith(`/${c}`))).toBe(true);
     tier.record(`${kind}-before.json`, before);
     tier.record(`${kind}-before-screen.txt`, (await tier.hc(['read', address])).stdout);
     expect(before.status?.state).toBe('working');
