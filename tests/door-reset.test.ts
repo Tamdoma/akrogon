@@ -71,9 +71,18 @@ function turnOf(run: Run, input: string, ms: number = 15_000): Promise<string> {
   });
 }
 
-// What chart-issues scripts/transcript.ts prints for A: asked by A itself (HC_TERMINAL_ID, plus the
-// PI_SESSION_FILE pi sets for its tool commands) or from outside.
+// What chart-issues scripts/transcript.ts prints for A: asked by A itself (the HC_SESSION and HC_TERMINAL_ID
+// hc gives A's process, plus the PI_SESSION_FILE pi sets for its tool commands) or from outside.
 async function lookup(run: Run, own: Record<string, string> | null): Promise<string> {
+  const pid: number = z.number().parse((await run.core.get(run.a)).pid);
+  const session: string = z
+    .string()
+    .parse(
+      readFileSync(`/proc/${pid}/environ`, 'utf8')
+        .split('\0')
+        .find((entry: string) => entry.startsWith('HC_SESSION=')),
+    )
+    .slice('HC_SESSION='.length);
   const looked: SpawnResult = await spawnCaptured(
     [process.execPath, resolve(import.meta.dir, '../skills/chart-issues/scripts/transcript.ts'), run.a],
     {
@@ -82,7 +91,7 @@ async function lookup(run: Run, own: Record<string, string> | null): Promise<str
         ...run.core.env,
         HOME: run.f.home,
         AKROGON_HOME: run.f.home,
-        ...(own === null ? {} : { HC_TERMINAL_ID: run.a, ...own }),
+        ...(own === null ? {} : { HC_SESSION: session, HC_TERMINAL_ID: run.a, ...own }),
       },
     },
   );
@@ -309,7 +318,7 @@ test('claude: a session the record names wins over an older label even before it
   }
 });
 
-test('pi: a label older than the conversation pi started with does not answer for it', async () => {
+test('pi: a label older than the conversation pi started with, or a pi file from another session, does not answer for it', async () => {
   const run: Run = await startA('pi', 'switch');
   try {
     const folder: string = resolve(run.f.home, '.pi/agent/sessions', `--${run.f.root.replace(/[/.]/g, '-')}--`);
@@ -320,6 +329,9 @@ test('pi: a label older than the conversation pi started with does not answer fo
     const started: string = await lookup(run, null);
     expect(started).not.toBe(left);
     expect(readFileSync(started, 'utf8')).toContain('hold first task');
+    // The same address in another hc session is another terminal: its pi file is not this seat's.
+    expect(await lookup(run, { HC_SESSION: 'elsewhere', PI_SESSION_FILE: left })).toBe(started);
+    expect((await run.core.get(run.a)).labels['akrogon.transcript']).toBe(started);
     utimesSync(left, new Date(), new Date(Date.now() + 60_000));
     expect((await run.core.hc(['label', run.a, `akrogon.transcript=${left}`])).code).toBe(0);
     expect(await lookup(run, null)).toBe(left);

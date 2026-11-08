@@ -8,12 +8,18 @@ import { transcriptFor } from '../../../src/transcript';
 
 const [address]: [string] = z.tuple([z.string().min(1)]).parse(process.argv.slice(2));
 const env = z
-  .object({ HC_TERMINAL_ID: z.string().optional(), PI_SESSION_FILE: z.string().optional() })
+  .object({
+    HC_SESSION: z.string().optional(),
+    HC_TERMINAL_ID: z.string().optional(),
+    PI_SESSION_FILE: z.string().optional(),
+  })
   .parse(process.env);
 const space: SpaceResolution = await repoSpace(await requireRepo(readGlobal(), process.cwd()));
 if (!space.ok) throw new Error(space.reason);
-// A pi seat asking about itself: pi sets PI_SESSION_FILE for each tool command to the conversation it
+// A pi seat asking about itself (the same terminal in the same hc session: addresses repeat across
+// sessions): pi sets PI_SESSION_FILE for each tool command to the conversation it
 // writes now, which follows /new while its argv does not, so the seat publishes it as its label.
-const own: string | undefined = address === env.HC_TERMINAL_ID ? env.PI_SESSION_FILE : undefined;
+const own: string | undefined =
+  space.session === env.HC_SESSION && address === env.HC_TERMINAL_ID ? env.PI_SESSION_FILE : undefined;
 if (own !== undefined) await label(space.session, address, { 'akrogon.transcript': own });
 process.stdout.write(`${own ?? (await transcriptFor({ session: space.session, address })) ?? '-'}\n`);
