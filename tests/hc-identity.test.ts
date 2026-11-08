@@ -1,7 +1,7 @@
 // Criteria 6 and 12 (state half): the repo's space by name across running hc sessions,
 // refusals, prefixes, the pinned hc schema, the first-switch inventory and "state predates hc".
 import { test, expect } from 'bun:test';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, readFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { resolve } from 'node:path';
 import { z } from 'zod';
@@ -65,6 +65,9 @@ test('no session, several sessions and an unreadable session refuse with todayâ€
   const twin: HcCore = await hcCore(f);
   const holder: HcCore = await hcCore(f);
   let stale: HcCore | undefined;
+  // akrogon reads sessions through its own runtime, where the stale socket is a link: a core hc
+  // auto-started for the dead session would replace that link with a live socket.
+  const effective = (core: HcCore): string => resolve(none.runtime, 'herdr-core', `${core.session}.sock`);
   try {
     leaf(f, 'hi-refuse', 'plan.synthesis');
     const missing = await cli(f, ['next', 'hi-refuse'], f.root, none.env);
@@ -84,8 +87,12 @@ test('no session, several sessions and an unreadable session refuse with todayâ€
     expect(refused(skipped.stderr).join('\n')).toContain('no running session holds it');
     expect(refused(skipped.stderr).join('\n')).toContain(stale.session);
     expect(await listening(stale.socket)).toBe(false);
+    expect(lstatSync(effective(stale)).isSymbolicLink()).toBe(true);
+    expect(await listening(effective(stale))).toBe(false);
     expect(await twin.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
+    for (const core of stale !== undefined && (await listening(effective(stale))) ? [stale] : [])
+      await spawnCaptured(['hc', 'server', 'stop'], { env: { ...none.env, HC_SESSION: core.session } });
     for (const core of [none, twin, holder]) await core.stop();
     for (const core of stale === undefined ? [] : [stale]) core.discard();
     await stopSlice('hi-refuse');
