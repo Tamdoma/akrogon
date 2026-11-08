@@ -1,0 +1,131 @@
+#!/usr/bin/env bun
+// Stand-in chart door A for the reset helper tests (criterion 3). Started in an hc terminal as
+// `door-agent.ts <claude|codex|pi> <switch|noswitch> <out> [--session-id <id>] <first task>`, with HOME
+// and TMPDIR pointing into the fixture. It reports OSC 7501 status, keeps its transcript where the
+// resolver looks for that kind, and changes transcript on the reset line as each harness did in P3:
+//   claude  holds <TMPDIR>/claude-<uid>/<cwd>/<id>/tasks open and writes ~/.claude/projects/<cwd>/<id>.jsonl;
+//           after /clear the old handle stays open and the next turn writes a new <id>.jsonl
+//   codex   holds ~/.codex/sessions/<date>/rollout-<ts>-<id>.jsonl open from its first prompt; after /new
+//           a second rollout opens only at the next prompt, the first stays open
+//   pi      holds nothing open; --session-id names ~/.pi/agent/sessions/--<cwd>--/<ts>_<id>.jsonl; after
+//           /new the next turn writes a new <ts>_<newid>.jsonl in the same folder
+// `noswitch` keeps the first transcript after the reset line. A first task starting with `hold` keeps
+// the turn open until <out>/release is opened for writing.
+// <out>/inputs.jsonl gets one line per received input ({input, busy, label}, label being the terminal's
+// akrogon.transcript at receipt) and one {turnEnd} line after each turn's idle status.
+import { appendFileSync, mkdirSync, openSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
+import { z } from 'zod';
+
+const args: string[] = process.argv.slice(2);
+const [kind, mode, out] = z
+  .tuple([z.enum(['claude', 'codex', 'pi']), z.enum(['switch', 'noswitch']), z.string()])
+  .parse(args.slice(0, 3));
+const flag: number = args.indexOf('--session-id');
+const first: string = z.string().parse(args.at(-1));
+const home: string = z.string().parse(process.env.HOME);
+const cwd: string = process.cwd().replace(/[/.]/g, '-');
+const terminal: string = z.string().parse(process.env.HC_TERMINAL_ID);
+const resetLine: string = kind === 'claude' ? '/clear' : '/new';
+const held: number[] = [];
+
+function piFolder(): string {
+  return resolve(home, '.pi/agent/sessions', `--${cwd}--`);
+}
+
+// The transcript the next turn writes to; codex opens a rollout lazily at a prompt.
+let transcript: string | null = null;
+let pendingSwitch: boolean = false;
+function open(id: string): string {
+  if (kind === 'claude') {
+    const tasks: string = resolve(
+      z.string().parse(process.env.TMPDIR),
+      `claude-${process.getuid!()}`,
+      cwd,
+      id,
+      'tasks',
+    );
+    mkdirSync(tasks, { recursive: true });
+    if (held.length === 0) held.push(openSync(tasks, 'r'));
+    mkdirSync(resolve(home, '.claude/projects', cwd), { recursive: true });
+    return resolve(home, '.claude/projects', cwd, `${id}.jsonl`);
+  }
+  if (kind === 'codex') {
+    const day: string = new Date().toISOString().slice(0, 10).replaceAll('-', '/');
+    const dir: string = resolve(home, '.codex/sessions', day);
+    mkdirSync(dir, { recursive: true });
+    const path: string = resolve(dir, `rollout-${Date.now()}-${id}.jsonl`);
+    held.push(openSync(path, 'a'));
+    return path;
+  }
+  mkdirSync(piFolder(), { recursive: true });
+  return resolve(piFolder(), `${Date.now()}_${id}.jsonl`);
+}
+
+function record(role: 'user' | 'assistant', text: string): object {
+  if (kind === 'claude')
+    return role === 'user'
+      ? { type: 'user', origin: { kind: 'human' }, message: { role, content: text } }
+      : { type: 'assistant', message: { role, content: [{ type: 'text', text }] } };
+  if (kind === 'codex')
+    return { type: 'response_item', payload: { type: 'message', role, content: [{ type: 'input_text', text }] } };
+  return { type: 'message', message: { role, content: [{ type: 'text', text }] } };
+}
+
+function write(entry: object): void {
+  appendFileSync(z.string().parse(transcript), `${JSON.stringify(entry)}\n`);
+}
+
+function status(state: string): void {
+  process.stdout.write(`\u001b]7501;state=${state}\u0007`);
+}
+
+function label(): string | null {
+  const got = Bun.spawnSync(['hc', 'get', '--json', terminal], { stdout: 'pipe', stderr: 'pipe' });
+  if (got.exitCode !== 0) throw new Error(`hc get ${terminal} failed: ${got.stderr.toString()}`);
+  return (
+    z.object({ labels: z.record(z.string(), z.string()) }).parse(JSON.parse(got.stdout.toString())).labels[
+      'akrogon.transcript'
+    ] ?? null
+  );
+}
+
+let busy: boolean = false;
+function received(input: string): void {
+  appendFileSync(resolve(out, 'inputs.jsonl'), `${JSON.stringify({ input, busy, label: label() })}\n`);
+}
+
+async function turn(input: string): Promise<void> {
+  busy = true;
+  status('working');
+  if (transcript === null || pendingSwitch) {
+    transcript = open(kind === 'pi' && transcript === null && flag !== -1 ? args[flag + 1] : randomUUID());
+    pendingSwitch = false;
+  }
+  write(record('user', input));
+  if (input.startsWith('hold')) await readFile(resolve(out, 'release'));
+  else await Bun.sleep(300);
+  write(record('assistant', input.startsWith('reply OK ') ? input.slice('reply '.length) : 'done'));
+  status('idle');
+  busy = false;
+  appendFileSync(resolve(out, 'inputs.jsonl'), `${JSON.stringify({ turnEnd: new Date().toISOString() })}\n`);
+}
+
+// Lines are logged on receipt, so one typed while a turn runs shows busy; turns then run in order.
+let queue: Promise<void> = Promise.resolve();
+function take(input: string): void {
+  received(input);
+  if (input === resetLine) {
+    queue = queue.then(() => {
+      if (mode === 'switch') pendingSwitch = true;
+    });
+    return;
+  }
+  queue = queue.then(() => turn(input));
+}
+
+status('idle');
+take(first);
+for await (const line of console) take(line.trim());

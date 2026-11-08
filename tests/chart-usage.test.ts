@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
 import { registerTemp } from './helpers';
 
@@ -20,7 +20,7 @@ type World = {
   parent: string;
   chartDir: (name: string) => string;
   putSeats: (chart: string, seats: Seat[], openedAt?: string, spans?: SpanEntry[]) => void;
-  putTranscript: (harness: string, session: string, file: string, extraDir?: string) => void;
+  putTranscript: (harness: string, session: string, file: string) => void;
   run: (...args: string[]) => Promise<RunResult>;
   clean: () => void;
 };
@@ -34,6 +34,14 @@ function setup(): World {
   mkdirSync(chart, { recursive: true });
   mkdirSync(resolve(claudeHome, 'projects'), { recursive: true });
   mkdirSync(resolve(codexHome, 'sessions'), { recursive: true });
+  const transcriptPath = (harness: string, session: string): string =>
+    harness === 'claude'
+      ? resolve(claudeHome, 'projects', `proj-${session}`, `${session}.jsonl`)
+      : harness === 'codex'
+        ? resolve(codexHome, 'sessions', '2026', '10', '06', `rollout-2026-10-06T00-00-00-${session}.jsonl`)
+        : session.startsWith('/')
+          ? session
+          : resolve(dir, 'missing', `${session}.jsonl`);
   return {
     chart,
     parent,
@@ -42,17 +50,24 @@ function setup(): World {
       mkdirSync(d, { recursive: true });
       return d;
     },
+    // seats.yaml entries as the door writes them (plan D10): hc address, name (null for A and supplied
+    // seats), launch recipe and `session` as the transcript path; claude and codex transcripts sit where
+    // putTranscript copies them, any other non-path session under missing/.
     putSeats: (c: string, seats: Seat[], openedAt: string = opened, spans?: SpanEntry[]): void => {
       const lines: string[] = [`opened: '${openedAt}'`];
       if (seats.length === 0) lines.push('seats: []');
       else lines.push('seats:');
-      for (const s of seats)
+      seats.forEach((s: Seat, i: number) =>
         lines.push(
           `  - seat: ${s.seat}`,
-          `    pane: w8:p${s.seat}`,
-          `    harness: ${s.harness}`,
-          `    session: ${s.session}`,
-        );
+          `    address: t${i + 1}`,
+          s.seat === 'A' ? '    name: null' : `    name: ak-slot-${s.seat.toLowerCase()}`,
+          '    recipe:',
+          `      harness: ${s.harness}`,
+          ...(s.seat === 'A' ? [] : ['      model: fixture-model', '      effort: low']),
+          `    session: ${transcriptPath(s.harness, s.session)}`,
+        ),
+      );
       if (spans !== undefined) {
         lines.push('spans:');
         for (const sp of spans) {
@@ -62,16 +77,10 @@ function setup(): World {
       }
       writeFileSync(resolve(c, 'seats.yaml'), lines.join('\n') + '\n');
     },
-    putTranscript: (harness: string, session: string, file: string, extraDir?: string): void => {
-      if (harness === 'claude') {
-        const proj: string = resolve(claudeHome, 'projects', extraDir ?? `proj-${session}`);
-        mkdirSync(proj, { recursive: true });
-        copyFileSync(resolve(fixtures, file), resolve(proj, `${session}.jsonl`));
-      } else {
-        const sess: string = resolve(codexHome, 'sessions', '2026', '10', '06');
-        mkdirSync(sess, { recursive: true });
-        copyFileSync(resolve(fixtures, file), resolve(sess, `rollout-2026-10-06T00-00-00-${session}.jsonl`));
-      }
+    putTranscript: (harness: string, session: string, file: string): void => {
+      const target: string = transcriptPath(harness, session);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(resolve(fixtures, file), target);
     },
     run: async (...args: string[]): Promise<RunResult> => {
       const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, ...args], {
@@ -332,22 +341,18 @@ test('unmeasured seats name the file or field; other seats still measure', async
     w.putSeats(w.chart, [
       { seat: 'A', harness: 'claude', session: 'claude-A' },
       { seat: 'D', harness: 'claude', session: 'claude-missing' },
-      { seat: 'E', harness: 'claude', session: 'claude-ambig' },
       { seat: 'F', harness: 'watson', session: 'watson-1' },
       { seat: 'G', harness: 'claude', session: 'claude-broken' },
     ]);
     w.putTranscript('claude', 'claude-A', 'claude/claude-A.jsonl');
-    w.putTranscript('claude', 'claude-ambig', 'claude/claude-A2.jsonl', 'proj-1');
-    w.putTranscript('claude', 'claude-ambig', 'claude/claude-A2.jsonl', 'proj-2');
     w.putTranscript('claude', 'claude-broken', 'claude/claude-broken.jsonl');
     const r: RunResult = await w.run(w.chart, until);
     expect(r.code).toBe(0);
     expect(r.stdout.trimEnd().split('\n').at(-1)).toBe('outcome partial');
     const md: string = readFileSync(resolve(w.chart, 'USAGE.md'), 'utf8');
     const unmeasured: string[] = md.split('\n').filter((l: string) => l.includes('usage unmeasured'));
-    expect(unmeasured).toHaveLength(4);
+    expect(unmeasured).toHaveLength(3);
     expect(unmeasured.find((l: string) => l.includes('seat D'))).toMatch(/claude-missing\.jsonl/);
-    expect(unmeasured.find((l: string) => l.includes('seat E'))).toMatch(/claude-ambig\.jsonl/);
     expect(unmeasured.find((l: string) => l.includes('seat F'))).toMatch(/watson/);
     expect(unmeasured.find((l: string) => l.includes('seat G'))).toMatch(/claude-broken\.jsonl/);
     expect(unmeasured.find((l: string) => l.includes('seat G'))).toMatch(/message\.usage/);

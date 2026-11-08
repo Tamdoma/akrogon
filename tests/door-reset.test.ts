@@ -1,908 +1,266 @@
-import { expect, test } from 'bun:test';
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  existsSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+// Criterion 3: the chart door's handover reset helper on a real hc core. A is the stand-in
+// tests/door-agent.ts emulating claude, codex or pi; the helper is started as A starts it, with
+// `hc run --bg --no-notify --rm --no-parent`, while A's turn is still open.
+import { test, expect } from 'bun:test';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, watch } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
-import { quote, spawnCaptured, type SpawnResult } from '../src/shell';
-import { registerTemp } from './helpers';
+import { z } from 'zod';
+import { fixture, type Fixture } from './helpers';
+import { hcCore, setPrefixes, type HcCore } from './hc-fixture';
+import { spawnCaptured, type SpawnResult } from '../src/shell';
 
-const script: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/door-reset.ts');
-const pane: string = 'w8:pX';
-const session: string = 'sess-a';
+const agent: string = resolve(import.meta.dir, 'door-agent.ts');
+const helper: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/door-reset.ts');
+const STAGES: string[] = [
+  'started',
+  'wait-turn-end',
+  'input-check',
+  'reset-keys',
+  'warm-up',
+  'warm-up-turn-end',
+  'code-lookup',
+  'differing-path',
+  'label',
+  'start-prompt',
+];
 
-type RunResult = { code: number; stdout: string; stderr: string };
-type FakeSession = { kind: 'id' | 'path'; value: string; source?: string; agent?: string };
-type PaneSeed = {
-  agent: string;
-  agent_status: string;
-  agent_session?: FakeSession | null;
-  screen_detection_skipped?: boolean | null;
-  shell_pid?: number;
-};
-type Setup = {
-  dir: string;
-  home: string;
-  db: string;
-  log: string;
-  calls: () => string[][];
-  promptCalls: () => string[][];
-  logLines: () => Record<string, unknown>[];
-  run: (extraEnv?: Record<string, string>, ...args: string[]) => Promise<RunResult>;
-  clean: () => void;
-};
+type Kind = 'claude' | 'codex' | 'pi';
+type Step = { t: string; step: string; result: string; pre?: string; code?: string; path?: string };
+type Received = { input: string; busy: boolean; label: string | null };
+type Run = { f: Fixture; core: HcCore; a: string; out: string; log: string };
 
-const idSession = (value: string, source: string): FakeSession => ({ kind: 'id', value, source });
+const stepSchema = z
+  .object({
+    t: z.string(),
+    step: z.string(),
+    result: z.string(),
+    pre: z.string().optional(),
+    code: z.string().optional(),
+    path: z.string().optional(),
+  })
+  .passthrough();
+const lineSchema = z.union([
+  z.object({ input: z.string(), busy: z.boolean(), label: z.string().nullable() }),
+  z.object({ turnEnd: z.string() }),
+]);
 
-function setup(seed: PaneSeed, dbExtra: Record<string, unknown> = {}): Setup {
-  const dir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'door-reset-')));
-  const home: string = resolve(dir, 'home');
-  mkdirSync(home);
-  const bin: string = resolve(dir, 'bin');
-  mkdirSync(bin);
-  mkdirSync(resolve(dir, 'proc'));
-  symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
-  const db: string = resolve(dir, 'db.json');
-  writeFileSync(
-    db,
-    JSON.stringify({
-      panes: [
-        {
-          pane_id: pane,
-          tab_id: 'w8:t1',
-          cwd: '/tmp',
-          agent: seed.agent,
-          agent_status: seed.agent_status,
-          // w8:pX is the door pane the script anchors to: its shell is the test process.
-          shell_pid: seed.shell_pid ?? process.pid,
-          ...(seed.agent_session === undefined || seed.agent_session === null
-            ? {}
-            : { agent_session: seed.agent_session }),
-          ...(seed.screen_detection_skipped === undefined
-            ? {}
-            : { screen_detection_skipped: seed.screen_detection_skipped }),
-        },
-      ],
-      tabs: [],
-      serial: 0,
-      waitScript: [],
-      promptScript: [],
-      ...dbExtra,
-    }),
-  );
-  const log: string = resolve(dir, 'handover.log');
-  const calls = (): string[][] =>
-    existsSync(`${db}.calls`)
-      ? readFileSync(`${db}.calls`, 'utf8')
-          .trim()
-          .split('\n')
-          .map((line: string) => JSON.parse(line) as string[])
-      : [];
-  return {
-    dir,
-    home,
-    db,
-    log,
-    calls,
-    promptCalls: (): string[][] =>
-      calls().filter((args: string[]): boolean => args[0] === 'agent' && args[1] === 'prompt'),
-    logLines: (): Record<string, unknown>[] =>
-      existsSync(log)
-        ? readFileSync(log, 'utf8')
-            .trim()
-            .split('\n')
-            .filter(Boolean)
-            .map((line: string) => JSON.parse(line) as Record<string, unknown>)
-        : [],
-    run: async (extraEnv: Record<string, string> = {}, ...args: string[]): Promise<RunResult> => {
-      const { stdout, stderr, code }: SpawnResult = await spawnCaptured([process.execPath, script, ...args], {
-        env: {
-          ...process.env,
-          PATH: `${bin}:${process.env.PATH}`,
-          FAKE_HERDR: db,
-          HOME: home,
-          AKROGON_PROC_ROOT: resolve(dir, 'proc'),
-          HERDR_PANE_ID: pane,
-          DOOR_RESET_INLINE: '1',
-          DOOR_RESET_TURN_BOUND_MS: '500',
-          DOOR_RESET_CONFIRM_MS: '400',
-          ...extraEnv,
-        },
-      });
-      return { code, stdout, stderr };
-    },
-    clean: (): void => rmSync(dir, { recursive: true, force: true }),
-  };
+function lines(path: string): string[] {
+  return existsSync(path) ? readFileSync(path, 'utf8').split('\n').filter(Boolean) : [];
 }
 
-function writeTranscript(home: string, sess: string, closed: boolean): void {
-  const path: string = resolve(home, `.claude/projects/proj/${sess}.jsonl`);
-  mkdirSync(dirname(path), { recursive: true });
-  const prompt: string = JSON.stringify({ type: 'user', message: { content: 'go' } });
-  const done: string = JSON.stringify({ type: 'system', subtype: 'turn_duration' });
-  writeFileSync(path, closed ? `${prompt}\n${done}\n` : `${prompt}\n`);
+function steps(log: string): Step[] {
+  return lines(log).map((line: string) => stepSchema.parse(JSON.parse(line)));
 }
 
-function writeRollout(home: string, sess: string, lines: string): string {
-  const path: string = resolve(home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, lines);
-  return path;
+function agentLines(run: Run): z.infer<typeof lineSchema>[] {
+  return lines(resolve(run.out, 'inputs.jsonl')).map((line: string) => lineSchema.parse(JSON.parse(line)));
 }
 
-function writeSessionRecord(home: string, seed: PaneSeed, sess: string, closed: boolean = true): void {
-  if (seed.agent === 'claude') writeTranscript(home, sess, closed);
-  if (seed.agent === 'codex')
-    writeRollout(
-      home,
-      sess,
-      closed
-        ? `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't1' } })}\n`
-        : `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n`,
-    );
-  if (seed.agent === 'pi' && seed.agent_session !== undefined && seed.agent_session !== null)
-    writeFileSync(
-      seed.agent_session.value,
-      `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`,
-    );
+function inputs(run: Run): Received[] {
+  return agentLines(run).flatMap((l) => ('input' in l ? [l] : []));
 }
 
-// Operator-input records copied from real sessions on this machine
-// (/home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/0218f863-24eb-4467-9613-f9f6f4e21171.jsonl and
-// /home/ivan/.claude/projects/-home-ivan-Work/d674fa89-28f3-44d7-acda-5339e3304d30.jsonl,
-// /home/ivan/.codex/sessions/2026/10/11/rollout-2026-10-11T19-46-35-01a12c12-d6b0-7d82-aa14-7acddfe4a526.jsonl,
-// /home/ivan/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-cost-rules--/2026-10-26T10-26-12-959Z_01a177bf-115f-744f-b22d-e9c72f434b49.jsonl,
-// all 2026-10-26), fields trimmed to what the parser reads.
-const claudeUser: string = JSON.stringify({
-  type: 'user',
-  message: { role: 'user', content: 'operator text' },
-  origin: { kind: 'human' },
-  promptSource: 'typed',
-});
-const claudeQueued: string = JSON.stringify({
-  type: 'attachment',
-  attachment: { type: 'queued_command', prompt: 'absorbed text', origin: { kind: 'human' } },
-});
-const claudeToolResult: string = JSON.stringify({
-  type: 'user',
-  message: { role: 'user', content: [{ type: 'tool_result', content: 'ok' }] },
-});
-const claudeTaskNotify: string = JSON.stringify({
-  type: 'user',
-  message: { role: 'user', content: '<task-notification>done</task-notification>' },
-  origin: { kind: 'task-notification' },
-  promptSource: 'system',
-});
-const codexTaskStarted: string = JSON.stringify({
-  type: 'event_msg',
-  payload: { type: 'task_started', turn_id: 't2' },
-});
-const codexUserMsg: string = JSON.stringify({
-  type: 'response_item',
-  payload: { type: 'message', role: 'user', content: [{ type: 'text', text: 'mid-run text' }] },
-});
-const piUserMsg: string = JSON.stringify({
-  type: 'message',
-  id: 'u1',
-  timestamp: '2026-10-26T00:00:01.000Z',
-  message: { role: 'user', content: [{ type: 'text', text: 'mid-run text' }] },
-});
-const piToolResult: string = JSON.stringify({
-  type: 'message',
-  id: 'tr1',
-  timestamp: '2026-10-26T00:00:01.000Z',
-  message: { role: 'toolResult', toolCallId: 't:1', toolName: 'read', content: [{ type: 'text', text: 'ok' }] },
-});
-
-const claudePane = (sess = session, status = 'idle'): PaneSeed => ({
-  agent: 'claude',
-  agent_status: status,
-  agent_session: idSession(sess, 'herdr:claude'),
-});
-
-const codexPane = (sess = session, status = 'idle'): PaneSeed => ({
-  agent: 'codex',
-  agent_status: status,
-  agent_session: idSession(sess, 'herdr:codex'),
-  screen_detection_skipped: null,
-});
-
-const piPane = (sess: string, status: string): PaneSeed => ({
-  agent: 'pi',
-  agent_status: status,
-  agent_session: { kind: 'path', value: sess, source: 'herdr:pi', agent: 'pi' },
-  screen_detection_skipped: true,
-});
-
-// A wrapper herdr that records each `agent list` and runs <actions> on the named counts
-// (1-based, parent read included), then delegates to fake-herdr.
-function wrapLists(s: Setup, actions: string): void {
-  const herdr: string = resolve(s.dir, 'bin', 'herdr');
-  rmSync(herdr);
-  writeFileSync(
-    herdr,
-    [
-      '#!/bin/sh',
-      'if [ "$1 $2" = "agent list" ]; then',
-      '  echo >> "$FAKE_HERDR.lists"',
-      '  N=$(wc -l < "$FAKE_HERDR.lists")',
-      actions,
-      'fi',
-      `exec ${quote(resolve(import.meta.dir, 'fake-herdr.ts'))} "$@"`,
-      '',
-    ].join('\n'),
-    { mode: 0o755 },
-  );
-}
-
-const START: string = 'start prompt text';
-
-// Criterion 2: unknown kind or mismatched session refuses without sending or logging.
-test.each<[string, PaneSeed, string]>([
-  [
-    'unsupported kind',
-    { agent: 'antigravity', agent_status: 'idle', agent_session: idSession(session, 'herdr:agy') },
-    session,
-  ],
-  ['session mismatch', claudePane('sess-other'), session],
-  ['pane without agent', { agent: 'pi', agent_status: 'idle' }, session],
-])('refuses when %s', async (_name: string, seed: PaneSeed, sess: string): Promise<void> => {
-  const s: Setup = setup(seed);
-  try {
-    writeSessionRecord(s.home, seed, sess);
-    const result: RunResult = await s.run({}, pane, sess, s.log, START);
-    expect(result.code).toBe(1);
-    expect(result.stderr).not.toBe('');
-    expect(existsSync(s.log)).toBe(false);
-    expect(s.promptCalls()).toHaveLength(0);
-  } finally {
-    s.clean();
-  }
-});
-
-test('refuses a session mismatch even when the passed session has a transcript', async (): Promise<void> => {
-  const s: Setup = setup(claudePane('sess-other'));
-  try {
-    writeTranscript(s.home, 'sess-other', true);
-    writeTranscript(s.home, session, true);
-    const result: RunResult = await s.run({}, pane, session, s.log, START);
-    expect(result.code).toBe(1);
-    expect(result.stderr).not.toBe('');
-    expect(existsSync(s.log)).toBe(false);
-    expect(s.promptCalls()).toHaveLength(0);
-  } finally {
-    s.clean();
-  }
-});
-
-// Criterion 3: an open turn at the bound logs it and sends nothing.
-test('pi turn still open at the bound is logged and nothing is sent', async (): Promise<void> => {
-  const piDir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-')));
-  const piSess: string = resolve(piDir, 'session.jsonl');
-  writeFileSync(
-    piSess,
-    `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`,
-  );
-  const s: Setup = setup(piPane(piSess, 'working'));
-  try {
-    const result: RunResult = await s.run({}, pane, piSess, s.log, START);
-    expect(result.code).toBe(1);
-    const lines: Record<string, unknown>[] = s.logLines();
-    expect(lines.length).toBeGreaterThan(0);
-    expect(lines.some((l) => l.step === 'wait-turn-end' && l.result === 'turn open')).toBe(true);
-    expect(s.promptCalls()).toHaveLength(0);
-  } finally {
-    s.clean();
-  }
-});
-
-test('claude turn still open at the bound is logged and nothing is sent', async (): Promise<void> => {
-  const s: Setup = setup(claudePane());
-  try {
-    writeTranscript(s.home, session, false);
-    const result: RunResult = await s.run({}, pane, session, s.log, START);
-    expect(result.code).toBe(1);
-    expect(s.logLines().some((l) => l.step === 'wait-turn-end' && l.result === 'turn open')).toBe(true);
-    expect(s.promptCalls()).toHaveLength(0);
-  } finally {
-    s.clean();
-  }
-});
-
-// Criterion 3: a session change observed during the turn wait is logged and nothing is sent.
-test('a session change during the turn wait is logged and nothing is sent', async (): Promise<void> => {
-  const s: Setup = setup(claudePane());
-  try {
-    writeTranscript(s.home, session, false);
-    // The session changes on the third agent list read: the parent check and the child check see
-    // the original identity, the turn wait's first read sees the new one.
-    const herdr: string = resolve(s.dir, 'bin', 'herdr');
-    rmSync(herdr);
-    writeFileSync(
-      herdr,
-      [
-        '#!/bin/sh',
-        'if [ "$1 $2" = "agent list" ]; then',
-        '  echo >> "$FAKE_HERDR.lists"',
-        `  [ "$(wc -l < "$FAKE_HERDR.lists")" -eq 3 ] && sed -i 's/"value":"${session}"/"value":"sess-later"/' "$FAKE_HERDR"`,
-        'fi',
-        `exec ${quote(resolve(import.meta.dir, 'fake-herdr.ts'))} "$@"`,
-        '',
-      ].join('\n'),
-      { mode: 0o755 },
-    );
-    const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, session, s.log, START);
-    expect(result.code).toBe(1);
-    expect(s.logLines().some((l) => l.step === 'wait-turn-end' && l.result === 'identity changed')).toBe(true);
-    expect(s.promptCalls()).toHaveLength(0);
-  } finally {
-    s.clean();
-  }
-});
-
-// Criterion 4: an unconfirmed reset is logged and no start prompt is sent.
-test('unconfirmed reset is logged and no start prompt is sent', async (): Promise<void> => {
-  const piDir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-')));
-  const piSess: string = resolve(piDir, 'session.jsonl');
-  writeFileSync(
-    piSess,
-    `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`,
-  );
-  const s: Setup = setup(piPane(piSess, 'idle'));
-  try {
-    const result: RunResult = await s.run({}, pane, piSess, s.log, START);
-    expect(result.code).toBe(1);
-    const lines: Record<string, unknown>[] = s.logLines();
-    expect(lines.some((l) => l.step === 'wait-new-session' && l.result === 'reset unconfirmed')).toBe(true);
-    const prompts: string[][] = s.promptCalls();
-    expect(prompts).toHaveLength(1);
-    expect(prompts[0][3]).toBe('/new');
-  } finally {
-    s.clean();
-  }
-});
-
-// Criterion 5: a stalled start prompt is logged as failure, with no retry.
-test('a stalled start prompt is logged as failure and not retried', async (): Promise<void> => {
-  const s: Setup = setup(claudePane(), {
-    promptScript: [{ session: 'sess-new', status: 'idle' }, { code: 'agent_prompt_stalled' }],
+// Resolves when the helper's log holds `step`, woken by the folder's change events; the timer only bounds it.
+function logged(log: string, step: string, ms: number = 15_000): Promise<Step> {
+  return new Promise<Step>((done, fail) => {
+    const check = (): boolean => {
+      const found: Step | undefined = steps(log).find((s: Step) => s.step === step);
+      if (found === undefined) return false;
+      clearTimeout(timer);
+      watcher.close();
+      done(found);
+      return true;
+    };
+    const watcher = watch(dirname(log), () => check());
+    const timer = setTimeout(() => {
+      watcher.close();
+      fail(new Error(`helper log ${log} never logged ${step}: ${JSON.stringify(steps(log))}`));
+    }, ms);
+    check();
   });
-  try {
-    writeTranscript(s.home, session, true);
-    const result: RunResult = await s.run({}, pane, session, s.log, START);
-    expect(result.code).toBe(1);
-    const lines: Record<string, unknown>[] = s.logLines();
-    expect(lines.some((l) => l.step === 'send-start-prompt' && l.result === 'prompt_stalled')).toBe(true);
-    expect(s.promptCalls().filter((args) => args[3] === START)).toHaveLength(1);
-  } finally {
-    s.clean();
-  }
-});
+}
 
-// Criterion 3+4+5 happy path: claude — turn end, reset, new session, start prompt, all logged.
-test('claude handover sends reset then start prompt after the new session appears', async (): Promise<void> => {
-  const s: Setup = setup(claudePane(), {
-    promptScript: [{ session: 'sess-new', status: 'idle' }],
-  });
-  try {
-    writeTranscript(s.home, session, true);
-    const result: RunResult = await s.run({}, pane, session, s.log, START);
-    expect(result.code).toBe(0);
-    const lines: Record<string, unknown>[] = s.logLines();
-    for (const step of ['wait-turn-end', 'send-reset', 'wait-new-session', 'send-start-prompt']) {
-      expect(lines.some((l) => l.step === step)).toBe(true);
-    }
-    const prompts: string[][] = s.promptCalls();
-    expect(prompts).toHaveLength(2);
-    expect(prompts[0][3]).toBe('/clear');
-    expect(prompts[1][3]).toBe(START);
-    expect(prompts[1]).toContain('--wait');
-    expect(prompts[1]).toContain('working');
-    expect(prompts[1]).toContain('5000');
-  } finally {
-    s.clean();
-  }
-});
+async function startA(kind: Kind, mode: 'switch' | 'noswitch'): Promise<Run> {
+  const f: Fixture = await fixture();
+  setPrefixes(f, { repo: 'rp' });
+  const core: HcCore = await hcCore(f);
+  const out: string = resolve(f.home, `door-${kind}`);
+  mkdirSync(resolve(out, 'tmp'), { recursive: true });
+  expect((await spawnCaptured(['mkfifo', resolve(out, 'release')])).code).toBe(0);
+  const started: SpawnResult = await core.hc([
+    'run',
+    '--bg',
+    '--json',
+    '--no-parent',
+    '--name',
+    'rp-door-a',
+    '--cwd',
+    f.root,
+    '--',
+    'env',
+    `HOME=${f.home}`,
+    `TMPDIR=${resolve(out, 'tmp')}`,
+    process.execPath,
+    agent,
+    kind,
+    mode,
+    out,
+    ...(kind === 'pi' ? ['--session-id', randomUUID()] : []),
+    'hold first task',
+  ]);
+  expect(started.code).toBe(0);
+  const a: string = z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
+  await core.waitFor(a, (t) => t.status?.state === 'working');
+  return { f, core, a, out, log: resolve(out, 'handover.log') };
+}
 
-// Codex gets the harmless check prompt before the start prompt.
-test('codex handover sends reset, one check prompt, then start prompt', async (): Promise<void> => {
-  const s: Setup = setup(codexPane(), {
-    promptScript: [{ status: 'idle' }],
-    waitScript: [{ status: 'done', session: 'sess-new' }],
-  });
-  try {
-    writeRollout(
-      s.home,
-      session,
-      `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't1' } })}\n`,
-    );
-    const result: RunResult = await s.run({}, pane, session, s.log, START);
-    expect(result.code).toBe(0);
-    const prompts: string[][] = s.promptCalls();
-    expect(prompts).toHaveLength(3);
-    expect(prompts[0][3]).toBe('/new');
-    expect(prompts[1][3]).not.toBe(START);
-    expect(prompts[1]).toContain('--wait');
-    expect(prompts[2][3]).toBe(START);
-    expect(s.calls().some((args) => args[0] === 'agent' && args[1] === 'wait')).toBe(true);
-  } finally {
-    s.clean();
-  }
-});
+// Starts the helper the way A's last action does and returns its terminal.
+async function reset(run: Run, start: string, env: Record<string, string> = {}): Promise<string> {
+  const settings: string[] = Object.entries({
+    ...Object.fromEntries(Object.entries(run.core.env).filter(([, v]) => v !== undefined && v !== '')),
+    PATH: `${dirname(process.execPath)}:${z.string().parse(run.core.env.PATH)}`,
+    AKROGON_HOME: run.f.home,
+    HOME: run.f.home,
+    ...env,
+  }).map(([k, v]) => `${k}=${v}`);
+  const started: SpawnResult = await run.core.hc([
+    'run',
+    '--bg',
+    '--json',
+    '--no-notify',
+    '--rm',
+    '--no-parent',
+    '--cwd',
+    run.f.root,
+    '--',
+    'env',
+    ...settings,
+    process.execPath,
+    helper,
+    run.a,
+    run.log,
+    start,
+  ]);
+  expect(started.code).toBe(0);
+  return z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
+}
 
-// Criterion 3: codex logs and stops when its last task is still open at the bound.
-test.each<[string, string]>([
-  [
-    'a single open task',
-    `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n`,
-  ],
-  [
-    'an older completed task before the open one',
-    `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't0' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't0' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n`,
-  ],
+// Waits on hc until the helper has exited (its --rm terminal is then gone or finished), so its log is
+// complete and nothing more can reach A.
+async function exited(run: Run, address: string): Promise<void> {
+  const waited: SpawnResult = await run.core.hc(['wait', '--json', '--timeout', '15', address]);
+  expect(waited.code).toBe(0);
+  const left = (await run.core.terminals({}, true)).find((t) => t.address === address);
+  expect(left === undefined || left.state === 'finished').toBe(true);
+}
+
+async function release(run: Run): Promise<void> {
+  expect((await spawnCaptured(['sh', '-c', `printf 'go\\n' > ${resolve(run.out, 'release')}`])).code).toBe(0);
+}
+
+test.each([
+  ['claude', '/clear'],
+  ['codex', '/new'],
+  ['pi', '/new'],
 ])(
-  'codex turn still open at the bound with %s is logged and nothing is sent',
-  async (_name: string, rollout: string): Promise<void> => {
-    const s: Setup = setup(codexPane());
+  '%s: the reset helper runs its stages in order and fresh A gets the start prompt on a new transcript',
+  async (kind: string, key: string) => {
+    const run: Run = await startA(z.enum(['claude', 'codex', 'pi']).parse(kind), 'switch');
     try {
-      writeRollout(s.home, session, rollout);
-      const result: RunResult = await s.run({}, pane, session, s.log, START);
-      expect(result.code).toBe(1);
-      expect(s.logLines().some((l) => l.step === 'wait-turn-end' && l.result === 'turn open')).toBe(true);
-      expect(s.promptCalls()).toHaveLength(0);
+      const start: string = `/chart-issues continue handover 2026-11-08T03:00:00Z door ${run.a} next /charts/next`;
+      const address: string = await reset(run, start);
+      const began: Step = await logged(run.log, 'started');
+      await release(run);
+      await exited(run, address);
+      const log: Step[] = steps(run.log);
+      expect(log.map((s: Step) => s.step)).toEqual(STAGES);
+      const code: string = z
+        .string()
+        .min(1)
+        .parse(log.find((s) => s.step === 'warm-up')?.code);
+      const found: string = z.string().parse(log.find((s) => s.step === 'code-lookup')?.path);
+      const pre: string = z.string().parse(began.pre);
+      // The first task was written before the helper started, so it is no operator input past the boundary.
+      expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', key, `reply OK ${code}`, start]);
+      // Nothing reached A while a turn was open.
+      expect(
+        inputs(run)
+          .slice(1)
+          .filter((r: Received) => r.busy),
+      ).toEqual([]);
+      expect(found).not.toBe(pre);
+      expect(readFileSync(found, 'utf8')).toContain(code);
+      // The label held the new path before the start prompt arrived, and still holds it.
+      expect(inputs(run).at(-1)?.label).toBe(found);
+      expect((await run.core.get(run.a)).labels['akrogon.transcript']).toBe(found);
+      // The code lookup ran only after the warm-up turn had ended.
+      const turnEnds: string[] = agentLines(run).flatMap((l) => ('turnEnd' in l ? [l.turnEnd] : []));
+      const warmEnd: string = z.string().parse(turnEnds[1]);
+      const lookup: string = z.string().parse(log.find((s) => s.step === 'code-lookup')?.t);
+      expect(Date.parse(lookup)).toBeGreaterThanOrEqual(Date.parse(warmEnd));
     } finally {
-      s.clean();
+      await run.core.stop();
+      run.f.clean();
     }
   },
 );
 
-// Criterion 5: a stalled codex check prompt is logged as failure, with no retry.
-test('a stalled codex check prompt is logged as failure and not retried', async (): Promise<void> => {
-  const s: Setup = setup(codexPane(), {
-    promptScript: [{ status: 'idle' }, { code: 'agent_prompt_stalled' }],
-    waitScript: [],
-  });
+test('an operator input record in A transcript after the helper started cancels the reset with nothing sent', async () => {
+  const run: Run = await startA('claude', 'switch');
   try {
-    writeRollout(
-      s.home,
-      session,
-      `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't1' } })}\n`,
+    const address: string = await reset(run, '/chart-issues continue handover t door x next /charts/next');
+    const began: Step = await logged(run.log, 'started');
+    appendFileSync(
+      z.string().parse(began.pre),
+      `${JSON.stringify({ type: 'user', origin: { kind: 'human' }, message: { role: 'user', content: 'wait' } })}\n`,
     );
-    const result: RunResult = await s.run({}, pane, session, s.log, START);
-    expect(result.code).toBe(1);
-    const lines: Record<string, unknown>[] = s.logLines();
-    expect(lines.some((l) => l.step === 'send-check-prompt' && l.result === 'prompt_stalled')).toBe(true);
-    expect(s.promptCalls()).toHaveLength(2);
+    await release(run);
+    await exited(run, address);
+    expect(steps(run.log).map((s: Step) => [s.step, s.result])).toEqual([
+      ['started', expect.any(String)],
+      ['wait-turn-end', expect.any(String)],
+      ['input-check', 'superseded'],
+    ]);
+    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task']);
   } finally {
-    s.clean();
+    await run.core.stop();
+    run.f.clean();
   }
 });
 
-// The check turn still working at the bound is logged, and no start prompt is sent.
-test('a codex check turn still working at the bound sends no start prompt', async (): Promise<void> => {
-  const s: Setup = setup(codexPane(), {
-    promptScript: [{ status: 'idle' }],
-    waitScript: [{}],
-  });
+test('the helper sends nothing while A turn stays open past the bound', async () => {
+  const run: Run = await startA('claude', 'switch');
   try {
-    writeRollout(
-      s.home,
-      session,
-      `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't1' } })}\n`,
-    );
-    const result: RunResult = await s.run({}, pane, session, s.log, START);
-    expect(result.code).toBe(1);
-    const lines: Record<string, unknown>[] = s.logLines();
-    expect(lines.some((l) => l.step === 'wait-check-end' && l.result === 'turn open')).toBe(true);
-    expect(s.promptCalls().filter((args) => args[3] === START)).toHaveLength(0);
-  } finally {
-    s.clean();
-  }
-});
-
-// Pi happy path through hook authority.
-test('pi handover sends reset then start prompt', async (): Promise<void> => {
-  const piDir: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-')));
-  const piSess: string = resolve(piDir, 'session.jsonl');
-  writeFileSync(
-    piSess,
-    `${JSON.stringify({ type: 'session', version: 3, id: 'fixture', timestamp: '2026-10-26T00:00:00.000Z' })}\n`,
-  );
-  const s: Setup = setup(piPane(piSess, 'idle'), {
-    promptScript: [{ session: '/tmp/pi-new.jsonl', status: 'idle' }],
-  });
-  try {
-    const result: RunResult = await s.run({}, pane, piSess, s.log, START);
-    expect(result.code).toBe(0);
-    const prompts: string[][] = s.promptCalls();
-    expect(prompts).toHaveLength(2);
-    expect(prompts[0][3]).toBe('/new');
-    expect(prompts[1][3]).toBe(START);
-  } finally {
-    s.clean();
-  }
-});
-
-// Criterion 6: the chart-issues skill describes the handover step and the new mode entries.
-test('docs describe the handover entries and footer wording', (): void => {
-  const skill: string = readFileSync(resolve(import.meta.dir, '../skills/chart-issues/SKILL.md'), 'utf8');
-  const shapes: string = readFileSync(resolve(import.meta.dir, '../skills/chart-issues/assets/shapes.md'), 'utf8');
-  for (const [name, text] of [
-    ['SKILL.md', skill],
-    ['shapes.md', shapes],
-  ] as [string, string][]) {
-    expect(text, `${name} names the handover entry`).toContain('handover');
-  }
-  expect(skill).toContain('continue autopilot (handover');
-  expect(shapes).toContain('continue autopilot (handover');
-  expect(shapes).toContain('agent_session.value');
-  expect(skill).toContain('handover queued');
-  expect(skill).toContain('/clear');
-  expect(skill).toContain('/new');
-  expect(skill).toContain('attended next');
-  expect(shapes).toContain('attended next');
-  expect(skill).toContain('continue attended (handover');
-  expect(shapes).toContain('continue attended (handover');
-});
-
-// Criterion 1: operator input recorded after the handover was queued cancels the reset.
-// The boundary is the session record's byte length at queue time, so records appended after
-// `run()` spawns the child stand for input typed while the handover was queued.
-test.each<[string, PaneSeed, string, string]>([
-  ['claude user entry', claudePane(), 'claude', claudeUser],
-  ['claude queued_command attachment', claudePane(), 'claude', claudeQueued],
-  ['codex task_started', codexPane(), 'codex', codexTaskStarted],
-  ['codex user message', codexPane(), 'codex', codexUserMsg],
-  ['pi user message', piPane('placeholder', 'working'), 'pi', piUserMsg],
-])(
-  'a %s recorded while the turn wait runs cancels with superseded',
-  async (_name: string, seed: PaneSeed, kind: string, record: string): Promise<void> => {
-    const piDir: string | null = kind === 'pi' ? registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-'))) : null;
-    const sess: string = piDir === null ? session : resolve(piDir, 'session.jsonl');
-    const liveSeed: PaneSeed = kind === 'pi' ? piPane(sess, 'working') : seed;
-    const s: Setup = setup(liveSeed);
-    try {
-      writeSessionRecord(s.home, liveSeed, sess, false);
-      const recordPath: string =
-        kind === 'claude'
-          ? resolve(s.home, `.claude/projects/proj/${sess}.jsonl`)
-          : kind === 'codex'
-            ? resolve(s.home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`)
-            : sess;
-      wrapLists(s, `[ "$N" -eq 4 ] && echo '${record.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}`);
-      const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, sess, s.log, START);
-      expect(result.code).toBe(1);
-      expect(s.logLines().some((l) => l.step === 'wait-turn-end' && l.result === 'superseded')).toBe(true);
-      expect(s.promptCalls()).toHaveLength(0);
-    } finally {
-      s.clean();
-    }
-  },
-);
-
-// Criterion 1, second timing: input first appearing after the turn end was seen cancels at the
-// recheck, the last read before the reset is sent.
-test.each<[string, string]>([
-  ['claude', claudeUser],
-  ['codex', codexUserMsg],
-  ['pi', piUserMsg],
-])(
-  'a %s user input first appearing after the turn end cancels with superseded at the recheck',
-  async (kind: string, record: string): Promise<void> => {
-    const piDir: string | null = kind === 'pi' ? registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-'))) : null;
-    const sess: string = piDir === null ? session : resolve(piDir, 'session.jsonl');
-    const seed: PaneSeed = kind === 'pi' ? piPane(sess, 'idle') : kind === 'claude' ? claudePane() : codexPane();
-    const s: Setup = setup(seed);
-    try {
-      writeSessionRecord(s.home, seed, sess);
-      const recordPath: string =
-        kind === 'claude'
-          ? resolve(s.home, `.claude/projects/proj/${sess}.jsonl`)
-          : kind === 'codex'
-            ? resolve(s.home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`)
-            : sess;
-      wrapLists(s, `[ "$N" -eq 3 ] && echo '${record.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}`);
-      const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, sess, s.log, START);
-      expect(result.code).toBe(1);
-      expect(s.logLines().some((l) => l.step === 'recheck' && l.result === 'superseded')).toBe(true);
-      expect(s.promptCalls()).toHaveLength(0);
-    } finally {
-      s.clean();
-    }
-  },
-);
-
-// Criterion 1: claude input absorbed into the running turn (a queued_command attachment) cancels.
-// Covered by the wait variant above; this is the turn-open form staying a cancel.
-test('a claude queued_command absorbed mid-turn cancels with superseded', async (): Promise<void> => {
-  const s: Setup = setup(claudePane());
-  try {
-    writeTranscript(s.home, session, false);
-    const recordPath: string = resolve(s.home, `.claude/projects/proj/${session}.jsonl`);
-    wrapLists(s, `[ "$N" -eq 4 ] && echo '${claudeQueued.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}`);
-    const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, session, s.log, START);
-    expect(result.code).toBe(1);
-    expect(s.logLines().some((l) => l.result === 'superseded')).toBe(true);
-    expect(s.promptCalls()).toHaveLength(0);
-  } finally {
-    s.clean();
-  }
-});
-
-// Criterion 2: the queuing turn's own records do not cancel. claude tool results and a
-// task-notification, then the turn's own end; the reset and start prompt go out as before.
-test.each<[string, string, string]>([
-  ['claude tool result', 'claude', claudeToolResult],
-  ['claude task notification', 'claude', claudeTaskNotify],
-  ['codex turn context', 'codex', JSON.stringify({ type: 'turn_context', payload: { model: 'm' } })],
-  ['pi tool result', 'pi', piToolResult],
-])(
-  'a %s record after the queue boundary still sends the reset and start prompt',
-  async (name: string, kind: string, record: string): Promise<void> => {
-    const piDir: string | null = kind === 'pi' ? registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-'))) : null;
-    const sess: string = piDir === null ? session : resolve(piDir, 'session.jsonl');
-    const seed: PaneSeed = kind === 'pi' ? piPane(sess, 'idle') : kind === 'claude' ? claudePane() : codexPane();
-    const s: Setup = setup(seed, {
-      promptScript:
-        kind === 'codex'
-          ? [{ status: 'idle' }, { session: 'sess-new', status: 'idle' }]
-          : kind === 'pi'
-            ? [{ session: '/tmp/pi-new.jsonl', status: 'idle' }]
-            : [{ session: 'sess-new', status: 'idle' }],
-      ...(kind === 'codex' ? { waitScript: [{ status: 'done' }] } : {}),
+    const address: string = await reset(run, '/chart-issues continue handover t door x next /charts/next', {
+      DOOR_RESET_TURN_BOUND_MS: '1500',
     });
-    try {
-      writeSessionRecord(s.home, seed, sess, false);
-      const recordPath: string =
-        kind === 'claude'
-          ? resolve(s.home, `.claude/projects/proj/${sess}.jsonl`)
-          : kind === 'codex'
-            ? resolve(s.home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`)
-            : sess;
-      wrapLists(
-        s,
-        kind === 'claude'
-          ? `[ "$N" -eq 3 ] && echo '${record.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}\n  [ "$N" -eq 5 ] && echo '${JSON.stringify({ type: 'system', subtype: 'turn_duration' })}' >> ${quote(recordPath)}`
-          : kind === 'codex'
-            ? `[ "$N" -eq 3 ] && echo '${record.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}\n  [ "$N" -eq 5 ] && echo '${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't1' } })}' >> ${quote(recordPath)}`
-            : `[ "$N" -eq 3 ] && echo '${record.replace(/'/g, `'"'"'`)}' >> ${quote(recordPath)}`,
-      );
-      const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, sess, s.log, START);
-      expect(result.code, name).toBe(0);
-      expect(s.logLines().some((l) => l.result === 'superseded')).toBe(false);
-      const prompts: string[][] = s.promptCalls();
-      expect(prompts[prompts.length - 1][3]).toBe(START);
-    } finally {
-      s.clean();
-    }
-  },
-);
-
-// Criterion 2, boundary guard: input recorded before the handover was queued does not cancel.
-test('claude operator input recorded before the queue boundary still sends the reset', async (): Promise<void> => {
-  const s: Setup = setup(claudePane(), {
-    promptScript: [{ session: 'sess-new', status: 'idle' }],
-  });
-  try {
-    writeTranscript(s.home, session, false);
-    const recordPath: string = resolve(s.home, `.claude/projects/proj/${session}.jsonl`);
-    // The earlier operator turn's input then its turn's end, both before the queue point.
-    writeFileSync(recordPath, `${claudeUser}\n${JSON.stringify({ type: 'system', subtype: 'turn_duration' })}\n`);
-    const result: RunResult = await s.run({}, pane, session, s.log, START);
-    expect(result.code).toBe(0);
-    expect(s.promptCalls()).toHaveLength(2);
+    await exited(run, address);
+    expect(steps(run.log).map((s: Step) => [s.step, s.result])).toEqual([
+      ['started', expect.any(String)],
+      ['wait-turn-end', 'turn open'],
+    ]);
+    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task']);
   } finally {
-    s.clean();
+    await run.core.stop();
+    run.f.clean();
   }
 });
 
-// Criterion 3: an unreadable session record at queue time refuses like an identity mismatch:
-// reason on stderr, non-zero exit, nothing sent, no log.
-test.each<[string, PaneSeed]>([
-  ['claude', claudePane()],
-  ['codex', codexPane()],
-])(
-  'an unreadable %s record at queue time is refused with no log and nothing sent',
-  async (_n: string, seed: PaneSeed): Promise<void> => {
-    const s: Setup = setup(seed);
-    try {
-      const result: RunResult = await s.run({}, pane, session, s.log, START);
-      expect(result.code).toBe(1);
-      expect(result.stderr).toContain('refused');
-      expect(existsSync(s.log)).toBe(false);
-      expect(s.promptCalls()).toHaveLength(0);
-    } finally {
-      s.clean();
-    }
-  },
-);
-
-test('a missing pi record at queue time is refused with no log and nothing sent', async (): Promise<void> => {
-  const s: Setup = setup(piPane(resolve(tmpdir(), 'pi-sess-missing.jsonl'), 'idle'));
+test('a reset that leaves A on the same transcript stops before the label and the start prompt', async () => {
+  const run: Run = await startA('claude', 'noswitch');
   try {
-    const result: RunResult = await s.run({}, pane, resolve(tmpdir(), 'pi-sess-missing.jsonl'), s.log, START);
-    expect(result.code).toBe(1);
-    expect(result.stderr).not.toBe('');
-    expect(existsSync(s.log)).toBe(false);
-    expect(s.promptCalls()).toHaveLength(0);
+    const address: string = await reset(run, '/chart-issues continue handover t door x next /charts/next');
+    await logged(run.log, 'started');
+    await release(run);
+    await exited(run, address);
+    const log: Step[] = steps(run.log);
+    expect(log.map((s: Step) => s.step)).toEqual(STAGES.slice(0, STAGES.indexOf('differing-path') + 1));
+    expect(log.at(-1)?.result).toBe('same transcript');
+    const code: string = z.string().parse(log.find((s) => s.step === 'warm-up')?.code);
+    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/clear', `reply OK ${code}`]);
   } finally {
-    s.clean();
-  }
-});
-
-test.each(['claude', 'codex', 'pi'])(
-  'an existing unreadable %s record at queue time is refused with no log and nothing sent',
-  async (kind: string): Promise<void> => {
-    const piDir: string | null = kind === 'pi' ? registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-'))) : null;
-    const sess: string = piDir === null ? session : resolve(piDir, 'session.jsonl');
-    const seed: PaneSeed = kind === 'pi' ? piPane(sess, 'idle') : kind === 'claude' ? claudePane() : codexPane();
-    const s: Setup = setup(seed);
-    try {
-      writeSessionRecord(s.home, seed, sess);
-      const recordPath: string =
-        kind === 'claude'
-          ? resolve(s.home, `.claude/projects/proj/${sess}.jsonl`)
-          : kind === 'codex'
-            ? resolve(s.home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`)
-            : sess;
-      chmodSync(recordPath, 0);
-      const result: RunResult = await s.run({}, pane, sess, s.log, START);
-      expect(result.code).toBe(1);
-      expect(result.stderr).toContain('EACCES');
-      expect(result.stdout).toBe('');
-      expect(existsSync(s.log)).toBe(false);
-      expect(s.promptCalls()).toHaveLength(0);
-    } finally {
-      s.clean();
-    }
-  },
-);
-
-// Criterion 3: a record that goes unreadable while waiting logs the reason and sends nothing.
-test.each<[string, string]>([
-  ['claude', 'claude'],
-  ['codex', 'codex'],
-  ['pi', 'pi'],
-])(
-  'a %s record deleted while waiting is logged and nothing is sent',
-  async (_n: string, kind: string): Promise<void> => {
-    const piDir: string | null = kind === 'pi' ? registerTemp(mkdtempSync(resolve(tmpdir(), 'pi-sess-'))) : null;
-    const sess: string = piDir === null ? session : resolve(piDir, 'session.jsonl');
-    const seed: PaneSeed = kind === 'pi' ? piPane(sess, 'working') : kind === 'claude' ? claudePane() : codexPane();
-    const s: Setup = setup(seed);
-    try {
-      writeSessionRecord(s.home, seed, sess, false);
-      const recordPath: string =
-        kind === 'claude'
-          ? resolve(s.home, `.claude/projects/proj/${sess}.jsonl`)
-          : kind === 'codex'
-            ? resolve(s.home, `.codex/sessions/2026/10/17/rollout-2026-10-17T00-00-00-${sess}.jsonl`)
-            : sess;
-      wrapLists(s, `[ "$N" -eq 4 ] && rm ${quote(recordPath)}`);
-      const result: RunResult = await s.run({ DOOR_RESET_TURN_BOUND_MS: '3000' }, pane, sess, s.log, START);
-      expect(result.code).toBe(1);
-      expect(s.logLines().length).toBeGreaterThan(0);
-      expect(s.logLines().some((l) => l.result === 'record unreadable')).toBe(true);
-      expect(s.promptCalls()).toHaveLength(0);
-    } finally {
-      s.clean();
-    }
-  },
-);
-
-// peer-pane-anchor criterion 1: a HERDR_PANE_ID herdr does not have, or whose shell is not an
-// ancestor, refuses before the first agent list read, naming the envs and herdr's answer.
-test('refuses when HERDR_PANE_ID names a pane herdr does not have', async (): Promise<void> => {
-  const s: Setup = setup(claudePane());
-  try {
-    writeTranscript(s.home, session, true);
-    const result: RunResult = await s.run({ HERDR_PANE_ID: 'w8:pZ' }, 'w8:pZ', session, s.log, START);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain('w8:pZ');
-    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
-    expect(result.stderr).toContain('Missing pane');
-    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', 'w8:pZ']]);
-    expect(existsSync(s.log)).toBe(false);
-  } finally {
-    s.clean();
-  }
-});
-
-test('refuses when the pane shell is not an ancestor of the script', async (): Promise<void> => {
-  const s: Setup = setup({ ...claudePane(), shell_pid: 999999999 });
-  try {
-    writeTranscript(s.home, session, true);
-    const result: RunResult = await s.run({}, pane, session, s.log, START);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain(pane);
-    expect(result.stderr).toContain('999999999');
-    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
-    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', pane]]);
-    expect(existsSync(s.log)).toBe(false);
-  } finally {
-    s.clean();
-  }
-});
-
-// peer-pane-anchor criterion 2: the pane argument must equal the verified pane or nothing runs.
-test('refuses when the pane argument differs from the verified pane', async (): Promise<void> => {
-  const s: Setup = setup(claudePane());
-  try {
-    writeTranscript(s.home, session, true);
-    const result: RunResult = await s.run({}, 'w8:pZ', session, s.log, START);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain(pane);
-    expect(result.stderr).toContain('w8:pZ');
-    expect(s.calls()).toEqual([['pane', 'process-info', '--pane', pane]]);
-    expect(existsSync(s.log)).toBe(false);
-  } finally {
-    s.clean();
-  }
-});
-
-test('refuses when HERDR_PANE_ID is unset or empty, before any herdr call', async (): Promise<void> => {
-  const s: Setup = setup(claudePane());
-  try {
-    writeTranscript(s.home, session, true);
-    const result: RunResult = await s.run({ HERDR_PANE_ID: '' }, pane, session, s.log, START);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain('HERDR_PANE_ID');
-    expect(result.stderr).toContain('HERDR_SOCKET_PATH');
-    expect(s.calls()).toEqual([]);
-    expect(existsSync(s.log)).toBe(false);
-  } finally {
-    s.clean();
-  }
-});
-
-// peer-pane-anchor criterion 3: the detached child inherits the verified env and does not
-// re-verify — it is reparented off the pane shell's ancestry, so a re-check would refuse.
-test('the detached child finishes its reset after the parent exits without re-checking', async (): Promise<void> => {
-  const s: Setup = setup(claudePane(), {
-    promptScript: [{ session: 'sess-new', status: 'idle' }],
-  });
-  try {
-    writeTranscript(s.home, session, true);
-    // Decoy every process-info after the parent's anchor read: a re-checking child sees a
-    // shell_pid it can never descend from and refuses, so passing proves the skip.
-    const herdr: string = resolve(s.dir, 'bin', 'herdr');
-    rmSync(herdr);
-    writeFileSync(
-      herdr,
-      [
-        '#!/bin/sh',
-        'if [ "$1 $2" = "pane process-info" ]; then',
-        '  echo >> "$FAKE_HERDR.pinfos"',
-        '  [ "$(wc -l < "$FAKE_HERDR.pinfos")" -ge 2 ] && sed -i \'s/"shell_pid":[0-9]*/"shell_pid":999999999/\' "$FAKE_HERDR"',
-        'fi',
-        `exec ${quote(resolve(import.meta.dir, 'fake-herdr.ts'))} "$@"`,
-        '',
-      ].join('\n'),
-      { mode: 0o755 },
-    );
-    const result: RunResult = await s.run({ DOOR_RESET_INLINE: '' }, pane, session, s.log, START);
-    expect(result.code).toBe(0);
-    expect(result.stdout.trim()).toBe('queued');
-    const deadline: number = Date.now() + 20000;
-    let logText: string = '';
-    while (Date.now() < deadline) {
-      logText = existsSync(s.log) ? readFileSync(s.log, 'utf8') : '';
-      if (logText.includes('"send-start-prompt"')) break;
-      await Bun.sleep(200);
-    }
-    expect(logText).toContain('"send-start-prompt"');
-    expect(logText).toContain('"send-reset"');
-    const prompts: string[][] = s.promptCalls();
-    expect(prompts[0][3]).toBe('/clear');
-    expect(prompts[prompts.length - 1][3]).toBe(START);
-  } finally {
-    s.clean();
+    await run.core.stop();
+    run.f.clean();
   }
 });

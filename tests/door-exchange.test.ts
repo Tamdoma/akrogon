@@ -1,8 +1,9 @@
 // Criterion 1: the chart door's exchange wiring on a real hc core with stand-in consultants. The door
-// is a terminal that, like a door agent, starts its consultants through the start verb, then runs one
-// `hc wait --children all` from its own terminal and reads the `<hc>` reports typed into it.
+// is a terminal that, like a door agent, starts its consultants through the start verb, then runs
+// `hc wait --children any` from its own terminal (re-armed after a wake, plan D4) and reads the `<hc>`
+// reports typed into it.
 import { test, expect } from 'bun:test';
-import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, watch, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, type Fixture } from './helpers';
@@ -38,11 +39,16 @@ async function setup(): Promise<{ f: Fixture; core: HcCore }> {
 }
 
 // The door reports agent status like a door agent (hc wraps a message to an agent as `<hc from=...>`),
-// waits for `go`, runs the exchange wait in its own turn, then keeps the first line typed into it.
-async function startDoor(core: HcCore, f: Fixture, name: string): Promise<Door> {
+// waits for `go`, runs the exchange wait `waits` times in its own turn (wait.json, wait2.json, ...),
+// then keeps the first line typed into it.
+async function startDoor(core: HcCore, f: Fixture, name: string, waits: number): Promise<Door> {
   const dir: string = resolve(f.home, name);
   await spawnCaptured(['mkdir', '-p', dir]);
-  const script: string = `set -m; printf '\\033]7501;state=idle\\007'; read go; printf '\\033]7501;state=working\\007'; hc wait --children all --json --timeout 20 > ${dir}/wait.json 2> ${dir}/wait.err; echo $? > ${dir}/wait.code; IFS= read -r line; printf '%s\\n' "$line" > ${dir}/inbox; exec cat`;
+  const wait = (n: number): string => {
+    const tag: string = n === 1 ? 'wait' : `wait${n}`;
+    return `hc wait --children any --json --timeout 20 > ${dir}/${tag}.json 2> ${dir}/${tag}.err; echo $? > ${dir}/${tag}.code; `;
+  };
+  const script: string = `set -m; printf '\\033]7501;state=idle\\007'; read go; printf '\\033]7501;state=working\\007'; ${Array.from({ length: waits }, (_: unknown, i: number) => wait(i + 1)).join('')}IFS= read -r line; printf '%s\\n' "$line" > ${dir}/inbox; exec cat`;
   const started: SpawnResult = await core.hc([
     'run',
     '--bg',
@@ -120,6 +126,27 @@ async function foreground(core: HcCore, door: Door, until: (argv: string[] | nul
 
 const inWait = (argv: string[] | null): boolean => argv !== null && argv[0] === 'hc' && argv[1] === 'wait';
 
+// Resolves when `path` exists, woken by the folder's change events; the timer only bounds it.
+function appears(path: string, ms: number = 15_000): Promise<void> {
+  return new Promise<void>((done, fail) => {
+    const watcher = watch(resolve(path, '..'), () => {
+      if (!existsSync(path)) return;
+      clearTimeout(timer);
+      watcher.close();
+      done();
+    });
+    const timer = setTimeout(() => {
+      watcher.close();
+      fail(new Error(`${path} did not appear in ${ms} ms`));
+    }, ms);
+    if (existsSync(path)) {
+      clearTimeout(timer);
+      watcher.close();
+      done();
+    }
+  });
+}
+
 async function trigger(core: HcCore, key: string): Promise<void> {
   expect((await spawnCaptured(['sh', '-c', `printf 'go\\n' > ${resolve(core.standin, `go-${key}`)}`])).code).toBe(0);
 }
@@ -131,7 +158,7 @@ async function exchange(
   triggers: string[],
 ): Promise<{ f: Fixture; core: HcCore; door: Door; children: Terminal[]; ended: { code: string; json: string } }> {
   const { f, core } = await setup();
-  const door: Door = await startDoor(core, f, name);
+  const door: Door = await startDoor(core, f, name, 1);
   const [first, second] = tasks(door);
   const children: Terminal[] = [
     await consult(f, core, door, letters[0], first),
@@ -188,5 +215,36 @@ test('the wait ends when every consultant stopped working without a report', asy
   } finally {
     await run.core.stop();
     run.f.clean();
+  }
+});
+
+// D4: the door re-arms the wait after each wake; news it already saw must not end the next wait.
+test('a re-armed wait ignores the report it already woke on and ends on the next consultant news', async () => {
+  const { f, core } = await setup();
+  try {
+    const door: Door = await startDoor(core, f, 'rp-door-rearm', 2);
+    const reporter: Terminal = await consult(f, core, door, 'h', `report ${door.address} kh`);
+    const blocker: Terminal = await consult(f, core, door, 'i', 'block ki');
+    expect((await core.hc(['send', door.address, 'go'])).code).toBe(0);
+    await foreground(core, door, inWait);
+    await trigger(core, 'kh');
+    await appears(`${door.dir}/wait.code`);
+    expect(readFileSync(`${door.dir}/wait.code`, 'utf8').trim()).toBe('0');
+    expect((await core.get(blocker.address)).status?.state).toBe('working');
+    await trigger(core, 'ki');
+    await foreground(core, door, (argv) => !inWait(argv));
+    expect(readFileSync(`${door.dir}/wait2.code`, 'utf8').trim()).toBe('0');
+    const woke = z.object({
+      reason: z.string(),
+      from: z.string().optional(),
+      children: z.array(z.object({ terminal: z.string(), status: z.string().nullable() })),
+    });
+    const first = woke.parse(JSON.parse(readFileSync(`${door.dir}/wait.json`, 'utf8')));
+    expect([first.reason, first.from]).toEqual(['message', reporter.address]);
+    const second = woke.parse(JSON.parse(readFileSync(`${door.dir}/wait2.json`, 'utf8')));
+    expect(second.children.map((c) => [c.terminal, c.status])).toEqual([[blocker.address, 'blocked']]);
+  } finally {
+    await core.stop();
+    f.clean();
   }
 });
