@@ -36,6 +36,7 @@ const contracts: Record<string, string> = {
   pack: '<folder>...',
   guard: '<ancestors|own-modules>',
   rollback: '',
+  notice: '--title <text> --body <text> [--attention]',
   listen: '',
   seat: '<slug> <A|B> [--task <text>] | --slot <letter> --harness <name> --model <model> --effort <effort> [--task <text>]',
 };
