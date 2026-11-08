@@ -1,0 +1,17 @@
+# Round 15, slot C: review of 953d6054 (agy handover)
+
+Verdict: ready.
+
+## Checked, no defect
+
+- Lock lookup (`src/transcript.ts:137-143`): an open `…/presence/<id>.lock` maps to `<root>/conversations/<id>.db`; on disk `presence/` and `conversations/` are siblings under `~/.gemini/antigravity-cli`, and the 58 lock names match conversation ids. A deleted target reads as `… (deleted)` in `/proc`, so `endsWith('.lock')` skips it. During the `/clear` switch both locks can be open for an instant and `find` takes the lower fd (the old one); `transcriptByCode` only accepts a database holding the code, so a transient old answer cannot be accepted, and `transcriptFor` relabels on the next call.
+- Shared reader, JSONL unchanged (`src/transcript.ts:253-289`): on t3k's `1ae36dec…jsonl`, `transcriptRecords(path, 0)` joined by `\n` equals the file, `transcriptRecords(path, b)` equals `subarray(b)` for a mid-file byte offset, `transcriptEnd` equals the byte length, and the old and new `answered` logic agree on the warm-up code. `transcriptByCode`'s `some(text.includes(code))` equals the old whole-file `includes` since a code never spans a newline.
+- Shared reader, agy: on the real `4b6c381a…db` it returns 8 records typed `[14,15,132,15,14,15,132,15]`, the code step at index 4, `transcriptEnd` 8. All 9069 payloads in 68 databases are `blob` and `bun:sqlite` returns `Uint8Array`, so `agyStep` (`:258`) parses every real row; `idx` is contiguous from 0 in all 68 (count = max+1), so `max(idx)+1` (`:285-288`) is the next position and `idx >= boundary` (`:271`) is exactly "written after the handover was queued". A fresh `/clear` database has `steps` with 0 rows (door A's probe), so `transcriptRecords(new, 0)` is `[]` until the warm-up. Readonly open of a live WAL database was probed by door A.
+- door-reset (`skills/chart-issues/scripts/door-reset.ts:26,54,66,92-93,103-105,123-128`): input = type 14 after the boundary (the helper's own warm-up comes later, so it cannot trip it); reply = a type 15 after the code's step, the same shape as claude's `assistant`; a type-15 row that exists while agy still streams cannot pass because the predicate needs idle at the event and on a fresh read (`:131-138`). `/clear` runs no status turn (probe), which the reply predicate does not need anyway. `resetCandidates` (`src/transcript.ts:180-181`) returns the one locked database, which exists at once after `/clear`, so the code is found there and `found !== pre` holds.
+- Fake (`tests/door-agent.ts:77-89,99,107-112,180-184`): creates the database at the first prompt, WAL, `steps(idx, step_type, step_payload)`, moves the lock on `/clear` without a turn, keeps the old database open, payload as a blob of the text. It omits the real table's other columns and the summaries database, which nothing reads. The stage test runs for agy and fails on the old resolver.
+- Consumers with a `.db` path: `transcriptKind` (`:242`) names it; `src/log.ts:43`, `src/next.ts:430`, `scripts/transcript.ts`, `seats.yaml`, `SKILL.md:163` carry a string; `observe.ts:74-76` shows it. `shapes.md:13` lists `door-reset.log`. log-tail and chart-usage are out of scope as stated.
+
+## Notes, not defects
+
+- `agyStep` rejects a NULL `step_payload` (`:258`); none exists today, and a future one would surface as a logged helper failure, not a wrong answer. `.nullable()` with empty text would make it a non-record instead.
+- `transcriptRecords` opens and closes the database per call (`:272-277`); on a `/clear`-fresh database that is a few rows per hc event, fine.
