@@ -283,7 +283,14 @@ export function screen(session: string, address: string): Promise<string> {
 
 export async function run(
   session: string,
-  spec: { name: string; cwd: string; parent: string | null; labels: Record<string, string>; argv: string[] },
+  spec: {
+    name: string;
+    cwd: string;
+    // outlive: the child keeps running when its parent ends and hc types no notes about it into the parent.
+    parent: { address: string; outlive: boolean } | null;
+    labels: Record<string, string>;
+    argv: string[];
+  },
 ): Promise<Seen> {
   const started = z
     .object({ address: z.string() })
@@ -293,7 +300,9 @@ export async function run(
           'run',
           '--bg',
           '--json',
-          ...(spec.parent === null ? ['--no-parent'] : ['--parent', spec.parent]),
+          ...(spec.parent === null
+            ? ['--no-parent']
+            : ['--parent', spec.parent.address, ...(spec.parent.outlive ? ['--outlive-parent', '--no-notify'] : [])]),
           '--name',
           spec.name,
           '--cwd',

@@ -1,6 +1,8 @@
-// Seats are hc terminals (plan D8-D11). A leaf seat starts parentless inside its leaf scope with its
-// first task in argv (agy gets it by one send after the trust dialog), proves the task started from
-// hc events, and joins its leaf tab when a window is open. A consultant starts under its caller.
+// Seats are hc terminals (plan D8-D11). A leaf seat starts inside its leaf scope with its first task in
+// argv (agy gets it by one send after the trust dialog), proves the task started from hc events, and
+// joins its leaf tab when a window is open. Slot A starts parentless; slot B starts under the leaf's
+// live A, so the sidebar indents it, outliving A and typing no notes into it; with no live A it starts
+// parentless too. A consultant starts under its caller.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
@@ -10,6 +12,7 @@ import { CommandError, quote } from './shell';
 import { readState, saveState, type Leaf, type State } from './state';
 import { leafSlice } from './scope';
 import { type Slot } from './routing';
+import { leafSeats } from './reconcile';
 import {
   consultantName,
   docGet,
@@ -216,10 +219,11 @@ export async function startSeat(
   const harness: Harness = harnessArgv(global, seats(global, repo, leaf.path)[seat]);
   const slice: string = leafSlice(repo, state.slug);
   const unit: string = `${slice.replace(/\.slice$/, '')}-${name}-${randomBytes(4).toString('hex')}.scope`;
+  const a: Seen | undefined = slot === 'B' ? (await leafSeats(space.session, repo, readState(leaf.path))).A : undefined;
   const launched: Seen = await run(space.session, {
     name,
     cwd: worktree,
-    parent: null,
+    parent: a?.state === 'live' ? { address: a.address, outlive: true } : null,
     labels: {
       akrogon: '1',
       'akrogon.repo': repo.name,
@@ -312,7 +316,7 @@ export async function startConsultant(
   const launched: Seen = await run(space.session, {
     name: consultantName(repoPrefix(global, repo.name), letter),
     cwd: process.cwd(),
-    parent: caller,
+    parent: { address: caller, outlive: false },
     labels: {
       akrogon: '1',
       'akrogon.repo': repo.name,

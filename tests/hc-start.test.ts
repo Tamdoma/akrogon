@@ -104,6 +104,27 @@ test('the start verb starts a parentless leaf seat by name, labels, scope, env a
   }
 });
 
+test('slot B starts under the live A, so the sidebar indents it, and outlives it; with no live A it starts parentless', async () => {
+  const { f, core } = await setup('hs-pair', 'work');
+  setSeat(f, 'b', 'fake', 'work');
+  try {
+    expect((await cli(f, ['seat', 'hs-pair', 'B'], f.root, core.env)).code).toBe(0);
+    const alone: Terminal = await seatOf(core, 'rp-hs-pair-b');
+    expect(alone.parent).toBeNull();
+    expect((await core.hc(['kill', alone.address])).code).toBe(0);
+    expect((await cli(f, ['seat', 'hs-pair', 'A'], f.root, core.env)).code).toBe(0);
+    const a: Terminal = await seatOf(core, 'rp-hs-pair-a');
+    expect((await cli(f, ['seat', 'hs-pair', 'B'], f.root, core.env)).code).toBe(0);
+    const b: Terminal = (await core.terminals({ 'akrogon.leaf': 'hs-pair', 'akrogon.seat': 'b' }, false))[0];
+    expect(b.parent).toBe(a.address);
+    expect((await core.hc(['kill', a.address])).code).toBe(0);
+    await core.waitFor(a.address, (t: Terminal) => t.state === 'finished');
+    expect((await core.get(b.address)).state).toBe('live');
+  } finally {
+    await teardown(f, core, 'hs-pair');
+  }
+});
+
 test('a slug that would pass 32 characters is cut and carries 4 hex of repo/slug', async () => {
   const slug: string = 'a-very-long-leaf-slug-that-overflows-names';
   const { f, core } = await setup(slug, 'work');
