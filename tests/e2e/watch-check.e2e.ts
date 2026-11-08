@@ -1,9 +1,10 @@
 // Criteria 2 and 4 (watcher-on-hc), attended paid run under readiness grants[0] (one harness session,
-// the watcher runs at most 3 checks): a Claude watcher terminal in akr-e2e-watch runs this checkout's
+// the watcher runs at most 4 checks): a Claude watcher terminal in akr-e2e-watch runs this checkout's
 // watch-issues skill (project skill under the repo root, user skills not loaded), with the listener
 // program run against the session. Observed: the skill labels its terminal at start (check 1), a
 // stand-in seat that exits wakes it once and it runs one check and replies (check 2), two ticks queued
-// while it works run one check (check 3), and stop removes the label. Logs under AKROGON_E2E_OUT.
+// while it works each run their own check (checks 3 and 4, plan Operator decision C2), and stop removes
+// the label. Logs under AKROGON_E2E_OUT.
 // Run: akrogon run-check --name watch-check -- env AKROGON_E2E=watch-check AKROGON_E2E_WATCHER_MODEL=<model>
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/watch-e2e
 //      bun test --timeout=30000 ./tests/e2e/watch-check.e2e.ts
@@ -69,7 +70,7 @@ function transcript(path: string): {
   };
 }
 
-test('watch check: label at start, one check per wake, queued ticks fold into one check, label gone at stop', async () => {
+test('watch check: label at start, one check per wake, one check per queued tick, label gone at stop', async () => {
   expect(required('AKROGON_E2E')).toBe('watch-check');
   const model: string = required('AKROGON_E2E_WATCHER_MODEL');
   const slug: string = 'akr-e2e-watch-leaf';
@@ -154,39 +155,30 @@ test('watch check: label at start, one check per wake, queued ticks fold into on
     const turnBefore: number = (await get(tier, watcher)).turn;
     expect((await tier.hc(['kill', seatAddress])).code).toBe(0);
     expect(await waitFor(session, watcher, (t: Seen) => t.status?.state === 'working', 120_000)).not.toBeNull();
-    // No further automatic wakes: the fold step below is driven by ticks this test sends.
+    // No further automatic wakes: the tick step below is driven by ticks this test sends.
     killTree(listener);
     listener = null;
-    // Check 3: two ticks queued while the watcher works run one check.
+    // Checks 3 and 4: two ticks queued while the watcher works; Claude Code submits each as its own turn,
+    // so the wake and the two ticks end three turns after check 1.
     await send(tier, watcher, `/watch-issues tick ${tier.root}`);
     await send(tier, watcher, `/watch-issues tick ${tier.root}`);
     const { transcriptFor } = await import('../../src/transcript');
     const log: string = z.string().parse(await transcriptFor({ session, address: watcher }));
-    for (let attempt: number = 0; attempt < 10; attempt += 1) {
-      const settled: Seen | null = await waitFor(
-        session,
-        watcher,
-        (t: Seen) => t.turn > turnBefore && idle(t),
-        600_000,
-      );
-      expect(settled).not.toBeNull();
-      const last = transcript(log).order.at(-1);
-      if (last !== undefined && !(last.kind === 'user' && last.text.includes(`tick ${tier.root}`))) break;
-      await tier.hc(['wait', watcher, '--timeout', '60']);
-    }
+    expect(await waitFor(session, watcher, (t: Seen) => t.turn >= turnBefore + 3 && idle(t), 900_000)).not.toBeNull();
     tier.record('check-2-3-screen.txt', (await tier.hc(['read', watcher, '--lines', '120'])).stdout);
     const seen = transcript(log);
     tier.record('transcript-summary.json', seen);
-    const ticks: number = seen.user
-      .map((text: string) => text.split(`tick ${tier.root}`).length - 1)
-      .reduce((a: number, b: number) => a + b, 0);
+    // A slash command is recorded twice (its <command-args> record and the skill expansion), so ticks are
+    // counted by their <command-args> record only.
+    const tick: string = `<command-args>tick ${tier.root}`;
+    const ticks: number = seen.user.filter((text: string) => text.includes(tick)).length;
     expect(ticks).toBe(3);
-    const firstTick: number = seen.order.findIndex((e) => e.kind === 'user' && e.text.includes(`tick ${tier.root}`));
+    const firstTick: number = seen.order.findIndex((e) => e.kind === 'user' && e.text.includes(tick));
     // Every check begins with one `akrogon status`; observe may rerun inside a check after a command error.
     const checks = (from: number): number =>
       seen.order.slice(from).filter((e) => e.kind === 'bash' && /\bakrogon status\b/.test(e.text)).length;
-    expect(checks(0)).toBe(3);
-    expect(checks(firstTick)).toBe(2);
+    expect(checks(0)).toBe(4);
+    expect(checks(firstTick)).toBe(3);
 
     // Stop removes the label.
     const stop = await send(tier, watcher, '/watch-issues stop');
