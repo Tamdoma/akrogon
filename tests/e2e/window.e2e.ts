@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { spawnCaptured, type SpawnResult } from '../../src/shell';
 import { readState, saveState } from '../../src/state';
-import { appHome, realEnv, required, session, startTier, stopTier, type Tier } from './tier';
+import { engine, realEnv, required, startTier, stopTier, type Tier } from './tier';
 
 const docSchema = z.object({
   version: z.number(),
@@ -60,7 +60,7 @@ async function settled(tier: Tier, ready: (d: Doc) => boolean): Promise<Doc> {
 }
 
 function app(args: string[]): Promise<SpawnResult> {
-  return spawnCaptured(['herdr-app', ...args], { env: realEnv({ HERDR_APP_HOME: appHome }) });
+  return spawnCaptured(['herdr-app', ...args], { env: realEnv({ HERDR_APP_HOME: engine.appHome }) });
 }
 
 async function leafOf(tier: Tier, slug: string, phase: string): Promise<string> {
@@ -92,7 +92,7 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
     a: { harness: 'fake', model: 'work', effort: 'low' },
     b: { harness: 'fake', model: 'work', effort: 'low' },
   };
-  const tier: Tier = await startTier('window', { fake: 'fake --model {model} --effort {effort}' }, slots, {
+  const tier: Tier = await startTier(engine, 'window', { fake: 'fake --model {model} --effort {effort}' }, slots, {
     bin: standinBin,
     dir: standinDir,
   });
@@ -121,7 +121,7 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
       failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'failed while the window was closed' },
     });
     // Open the window; the next engine pass names the adopted tabs.
-    window = Bun.spawn(['herdrapp', '--session', session], { env: realEnv(), stdout: 'ignore', stderr: 'ignore' });
+    window = Bun.spawn(['herdrapp', '--session', engine.name], { env: realEnv(), stdout: 'ignore', stderr: 'ignore' });
     let opened: boolean = false;
     for (let attempt: number = 0; attempt < 20 && !opened; attempt += 1) {
       opened = (await app(['ls'])).code === 0;
@@ -171,7 +171,7 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
       .parse(
         JSON.parse((await spawnCaptured(['herdrapp', 'session', 'list', '--json'], { env: realEnv() })).stdout),
       ).sessions;
-    expect(sessions.find((s) => s.name === session)?.session_dir).toBe(appHome);
+    expect(sessions.find((s) => s.name === engine.name)?.session_dir).toBe(engine.appHome);
     // A merged leaf's tab is closed.
     saveState(closedLeaf, { ...readState(closedLeaf), phase: 'merged', done: [] });
     expect((await tier.akrogon(['next', '--resume'])).code).toBe(0);

@@ -9,7 +9,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { readState } from '../../src/state';
 import { type SpawnResult } from '../../src/shell';
-import { realHome, required, startTier, stopTier, trustedWorkspaces, type Tier } from './tier';
+import { engine, realHome, required, startTier, stopTier, trustedWorkspaces, type Tier } from './tier';
 
 const homedir = (): string => realHome;
 
@@ -108,7 +108,7 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
   expect(required('AKROGON_E2E')).toBe('kinds');
   const root: string = required('AKROGON_E2E_ROOT');
   const harnesses: Record<string, string> = Object.fromEntries(Object.entries(kinds).map(([k, v]) => [k, v.line]));
-  const tier: Tier = await startTier('kinds', harnesses, {
+  const tier: Tier = await startTier(engine, 'kinds', harnesses, {
     a: { harness: 'claude', model: kinds.claude.model, effort: 'low' },
     b: { harness: 'claude', model: kinds.claude.model, effort: 'low' },
   });
