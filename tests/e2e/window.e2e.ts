@@ -36,8 +36,27 @@ async function doc(tier: Tier) {
   return docSchema.parse(await tier.rpc('doc.get', { name: 'herdr-app' }));
 }
 
-async function tabOf(tier: Tier, tab: string) {
-  return (await doc(tier)).value.spaces.flatMap((s) => s.tabs).find((t) => t.id === tab);
+type Doc = z.infer<typeof docSchema>;
+
+function tabIn(d: Doc, tab: string) {
+  return d.value.spaces.flatMap((s) => s.tabs).find((t) => t.id === tab);
+}
+
+// herdr-app answers a `do` call before it writes the changed document (a rename showed about 1.5 s
+// later), so a check of the document waits, bounded, until it shows the expected state.
+// The blocks of a tab, none while the document does not show the tab yet.
+function shown(d: Doc, tab: string): string[] {
+  const found = tabIn(d, tab);
+  return found === undefined ? [] : blocks(found.root);
+}
+
+async function settled(tier: Tier, ready: (d: Doc) => boolean): Promise<Doc> {
+  let current: Doc = await doc(tier);
+  for (let attempt: number = 0; attempt < 50 && !ready(current); attempt += 1) {
+    await Bun.sleep(200);
+    current = await doc(tier);
+  }
+  return current;
 }
 
 function app(args: string[]): Promise<SpawnResult> {
@@ -85,7 +104,17 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
     expect((await tier.akrogon(['seat', 'e2e-closed', 'A'])).code).toBe(0);
     expect((await tier.akrogon(['seat', 'e2e-failed', 'A'])).code).toBe(0);
     const closedSeat: string = await address(tier, { 'akrogon.leaf': 'e2e-closed' });
-    expect((await tier.hc(['wait', closedSeat, '--output', 'never-printed', '--timeout', '16'])).code).not.toBe(0);
+    // hc 0.1.18's wait exits 0 at its timeout with reason "timeout"; an ended seat gives "exit".
+    const waited: SpawnResult = await tier.hc([
+      'wait',
+      '--json',
+      closedSeat,
+      '--output',
+      'never-printed',
+      '--timeout',
+      '16',
+    ]);
+    expect(z.object({ reason: z.string() }).passthrough().parse(JSON.parse(waited.stdout)).reason).toBe('timeout');
     saveState(failedLeaf, {
       ...readState(failedLeaf),
       phase: 'failed',
@@ -101,8 +130,14 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
     expect(opened).toBe(true);
     expect((await tier.akrogon(['next', '--resume'])).code).toBe(0);
     tier.record('closed-then-open.json', await doc(tier));
-    expect((await tabOf(tier, z.string().parse(readState(closedLeaf).tab)))?.name).toBe('e2e-closed');
-    expect((await tabOf(tier, z.string().parse(readState(failedLeaf).tab)))?.name).toBe('e2e-failed failed');
+    const closedTab: string = z.string().parse(readState(closedLeaf).tab);
+    const failedTab: string = z.string().parse(readState(failedLeaf).tab);
+    const named: Doc = await settled(
+      tier,
+      (d: Doc) => tabIn(d, closedTab)?.name === 'e2e-closed' && tabIn(d, failedTab)?.name === 'e2e-failed failed',
+    );
+    expect(tabIn(named, closedTab)?.name).toBe('e2e-closed');
+    expect(tabIn(named, failedTab)?.name).toBe('e2e-failed failed');
     expect((await tier.hc(['get', '--json', closedSeat])).stdout).toContain('"state":"live"');
     // Window open: A then B in one tab, B beside A, active tab and focused pane unchanged.
     const openLeaf: string = await leafOf(tier, 'e2e-open', 'check.review');
@@ -113,25 +148,34 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
     tier.record('status-before.txt', before.stdout);
     tier.record('status-after.txt', after.stdout);
     const focus = (text: string): unknown =>
-      z.object({ space: z.unknown(), tab: z.unknown(), pane: z.unknown() }).passthrough().parse(JSON.parse(text));
+      z
+        .object({ space: z.unknown(), tab: z.unknown(), focused_pane: z.unknown() })
+        .passthrough()
+        .parse(JSON.parse(text));
     expect(focus(after.stdout)).toMatchObject(
-      z.object({ space: z.unknown(), tab: z.unknown(), pane: z.unknown() }).parse(focus(before.stdout)),
+      z.object({ space: z.unknown(), tab: z.unknown(), focused_pane: z.unknown() }).parse(focus(before.stdout)),
     );
-    const openTab = await tabOf(tier, z.string().parse(readState(openLeaf).tab));
-    expect(openTab?.name).toBe('e2e-open');
+    const openId: string = z.string().parse(readState(openLeaf).tab);
     const a: string = await address(tier, { 'akrogon.leaf': 'e2e-open', 'akrogon.seat': 'a' });
     const b: string = await address(tier, { 'akrogon.leaf': 'e2e-open', 'akrogon.seat': 'b' });
+    const openTab = tabIn(
+      await settled(tier, (d: Doc) => tabIn(d, openId)?.name === 'e2e-open' && shown(d, openId).length === 2),
+      openId,
+    );
+    expect(openTab?.name).toBe('e2e-open');
     expect(blocks(openTab?.root)).toEqual([a, b]);
     tier.record('open.json', await doc(tier));
     // App home agrees with herdrapp's own list.
     const sessions = z
-      .array(z.object({ name: z.string(), home: z.string() }).passthrough())
-      .parse(JSON.parse((await spawnCaptured(['herdrapp', 'session', 'list', '--json'], { env: realEnv() })).stdout));
-    expect(sessions.find((s) => s.name === session)?.home).toBe(appHome);
+      .object({ sessions: z.array(z.object({ name: z.string(), session_dir: z.string() }).passthrough()) })
+      .parse(
+        JSON.parse((await spawnCaptured(['herdrapp', 'session', 'list', '--json'], { env: realEnv() })).stdout),
+      ).sessions;
+    expect(sessions.find((s) => s.name === session)?.session_dir).toBe(appHome);
     // A merged leaf's tab is closed.
     saveState(closedLeaf, { ...readState(closedLeaf), phase: 'merged', done: [] });
     expect((await tier.akrogon(['next', '--resume'])).code).toBe(0);
-    expect(await tabOf(tier, z.string().parse(readState(closedLeaf).tab))).toBeUndefined();
+    expect(tabIn(await settled(tier, (d: Doc) => tabIn(d, closedTab) === undefined), closedTab)).toBeUndefined();
     // Consultants: a door in a tab gets its tab; a door in no tab gets only the space.
     const door = z
       .object({ address: z.string() })
@@ -153,13 +197,17 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
           ).stdout,
         ),
       );
+    // The consultant reads its caller's tab from the document: a real door already sits in its tab.
+    await settled(tier, (d: Doc) => shown(d, 'doortab').includes(door.address));
     const consultant: SpawnResult = await tier.akrogon(
       ['seat', '--slot', 'c', '--harness', 'fake', '--model', 'work', '--effort', 'low', '--task', 'hello'],
       { HC_TERMINAL_ID: door.address },
     );
     expect(consultant.code).toBe(0);
     const joined: string = await address(tier, { 'akrogon.seat': 'c' });
-    expect(blocks((await tabOf(tier, 'doortab'))?.root)).toContain(joined);
+    expect(
+      blocks(tabIn(await settled(tier, (d: Doc) => shown(d, 'doortab').includes(joined)), 'doortab')?.root),
+    ).toContain(joined);
     const bare = z
       .object({ address: z.string() })
       .parse(JSON.parse((await tier.hc(['run', '--bg', '--json', '--no-parent', '--', 'cat'])).stdout));
@@ -171,12 +219,19 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
       ).code,
     ).toBe(0);
     const alone: string = await address(tier, { 'akrogon.seat': 'd' });
-    const own = (await doc(tier)).value.spaces.flatMap((s) => s.tabs).filter((t) => blocks(t.root).includes(alone));
+    const placed: Doc = await settled(tier, (d: Doc) =>
+      d.value.spaces.flatMap((s) => s.tabs).some((t) => blocks(t.root).includes(alone)),
+    );
+    const own = placed.value.spaces.flatMap((s) => s.tabs).filter((t) => blocks(t.root).includes(alone));
     expect(own).toHaveLength(1);
     expect(blocks(own[0].root)).toEqual([alone]);
     tier.record('consultants.json', await doc(tier));
   } finally {
-    const left: string[] = await stopTier(tier, [standinDir]);
+    // The seats' worktrees sit under worktree_root, the leaf temp; a left one breaks the next run.
+    const worktrees: string[] = ['e2e-closed', 'e2e-failed', 'e2e-open'].map((slug: string) =>
+      resolve(required('AKROGON_E2E_ROOT'), slug),
+    );
+    const left: string[] = await stopTier(tier, [standinDir, ...worktrees]);
     window?.kill();
     tier.record('absence.txt', left.length === 0 ? 'absent\n' : left.join('\n'));
     expect(left).toEqual([]);
