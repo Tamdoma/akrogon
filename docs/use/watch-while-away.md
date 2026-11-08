@@ -12,7 +12,7 @@ Open Claude Code in an hc terminal of the session that holds the repository's sp
 
 It runs one check right away and labels its own terminal `akrogon.watch=<repo>`. Then it creates one Claude Code cron job that repeats the check every 20 minutes and prints the job id and its 7-day expiry. If a watch job already exists, it reports that job and creates no second one. The watch needs Claude Code cron and an hc terminal, so it does not run in other agent CLIs or outside hc. Started in another hc session, it refuses and names the right one.
 
-Besides the cron, the akrogon listener wakes the labelled terminal when a seat is lost or exits, a seat is blocked or busy too long, or a leaf fails. Each wake runs one check, and wakes that queue up while a check runs fold into one.
+Besides the cron, the akrogon listener wakes the labelled terminal when a seat is lost or exits, a seat is blocked or busy too long, or a leaf fails. Each wake runs one check. The listener wakes the watch only while it is idle, and a tick that queues up while a check runs gets its own check afterwards.
 
 ## What each check does
 
