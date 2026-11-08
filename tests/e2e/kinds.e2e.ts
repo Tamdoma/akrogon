@@ -13,26 +13,32 @@ import { realHome, required, startTier, stopTier, trustedWorkspaces, type Tier }
 
 const homedir = (): string => realHome;
 
-const kinds: Record<string, { line: string; model: string; transcript: RegExp }> = {
+// trust: the folder-trust answer a kind shows in the tier's throwaway git repo (plans O3, O4), or null.
+// pi's -a trusts project files for the run; the start verb answers agy's dialog itself.
+const kinds: Record<string, { line: string; model: string; transcript: RegExp; trust: string | null }> = {
   claude: {
     line: 'claude --model {model} --effort {effort} --dangerously-skip-permissions',
     model: 'claude-haiku-5-5',
     transcript: new RegExp(`^${homedir()}/\\.claude/projects/[^/]+/[0-9a-f-]{36}\\.jsonl$`),
+    trust: 'Yes, I trust this folder',
   },
   codex: {
     line: 'codex --no-daemon -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access',
     model: 'gpt-6.1-sol',
     transcript: new RegExp(`^${homedir()}/\\.codex/sessions/.+/rollout-.+\\.jsonl$`),
+    trust: 'Trust and continue',
   },
   pi: {
     line: 'pi --model {model} --thinking {effort} -a --exclude-tools request_user_input',
     model: 'devin/swe-2-max',
     transcript: new RegExp(`^${homedir()}/\\.pi/agent/sessions/[^/]+/.+_[0-9a-f-]{36}\\.jsonl$`),
+    trust: null,
   },
   agy: {
     line: 'agy --model {model} --effort {effort} --mode auto',
     model: 'gemini-3.8-flash-low',
     transcript: new RegExp(`^${homedir()}/\\.gemini/antigravity-cli/conversation_summaries\\.db$`),
+    trust: null,
   },
 };
 
@@ -62,13 +68,20 @@ async function turnEnded(tier: Tier, address: string, turn: number): Promise<voi
   throw new Error(`${address} did not finish turn ${turn}`);
 }
 
-// Plan O3: Claude Code asks whether to trust the seat's throwaway worktree before it runs the argv
-// task. It is answered "Yes, I trust this folder" once, inside the start verb's proof window, so the
-// start is still proven by the task itself. Claude Code writes its one ~/.claude.json entry; no
-// script edits that file. The dialog's cursor may sit on "No, exit", so the keys follow the screen.
-// Once that entry exists (it names the tier repo, which every run recreates at the same path) the
-// dialog no longer shows, so the wait ends when the start verb returns.
-async function trustClaude(tier: Tier, slug: string, starting: Promise<SpawnResult>): Promise<void> {
+// Plans O3, O4: Claude Code and codex ask whether to trust the tier's throwaway git repo before they
+// run the argv task. The trust answer is chosen once, inside the start verb's proof window, so the
+// start is still proven by the task itself. Each harness writes its own trust entry; no script edits
+// those files. Claude's cursor starts on "No, exit", so the keys follow the screen: Enter when the
+// cursor sits on the answer, else Down then Enter. Once the entry exists (it names the tier repo,
+// which every run recreates at the same path) the dialog no longer shows, so the wait ends when the
+// start verb returns.
+async function answerTrust(
+  tier: Tier,
+  kind: string,
+  slug: string,
+  trust: string,
+  starting: Promise<SpawnResult>,
+): Promise<void> {
   const returned: Promise<boolean> = starting.then(() => true);
   for (let attempt: number = 0; attempt < 90; attempt += 1) {
     const live = z
@@ -76,15 +89,15 @@ async function trustClaude(tier: Tier, slug: string, starting: Promise<SpawnResu
       .parse(await tier.rpc('terminal.list', { labels: { 'akrogon.leaf': slug } }))
       .terminals.filter((t) => t.state === 'live');
     const shown: string = live.length === 1 ? (await tier.hc(['read', live[0].address])).stdout : '';
-    if (shown.includes('Yes, I trust this folder')) {
-      const cursor: string = shown.split('\n').find((line: string) => line.includes('❯')) ?? '';
-      const answer: string[] = cursor.includes('Yes, I trust this folder') ? ['enter'] : ['down', 'enter'];
-      tier.record('claude-trust.txt', `${shown}\nkeys: ${answer.join(' ')}\n`);
+    if (shown.includes(trust)) {
+      const line: string = shown.split('\n').find((l: string) => l.includes(trust)) ?? '';
+      const answer: string[] = /[❯›]/.test(line) ? ['enter'] : ['down', 'enter'];
+      tier.record(`${kind}-trust.txt`, `${shown}\nkeys: ${answer.join(' ')}\n`);
       expect((await tier.hc(['keys', live[0].address, ...answer])).code).toBe(0);
       return;
     }
     if (await Promise.race([returned, Bun.sleep(1000).then(() => false)])) {
-      tier.record('claude-trust.txt', 'no folder-trust dialog before the start verb returned\n');
+      tier.record(`${kind}-trust.txt`, 'no folder-trust dialog before the start verb returned\n');
       return;
     }
   }
@@ -134,7 +147,7 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
       const outside: string = resolve(root, `akr-e2e-engine-${kind}-outside.txt`);
       const first: string = `Run exactly this shell command and nothing else: hc send ${inbox.address} 'done ${kind} 1'${kind === 'agy' ? ` && echo ok > ${outside}` : ''}`;
       const starting = tier.akrogon(['seat', slug, 'A', '--task', first]);
-      if (kind === 'claude') await trustClaude(tier, slug, starting);
+      if (spec.trust !== null) await answerTrust(tier, kind, slug, spec.trust, starting);
       const started = await starting;
       tier.record(`${kind}-start.txt`, `${started.stdout}\n${started.stderr}`);
       expect(started.code).toBe(0);
