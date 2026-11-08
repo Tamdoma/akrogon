@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { readState } from '../../src/state';
+import { type SpawnResult } from '../../src/shell';
 import { realHome, required, startTier, stopTier, trustedWorkspaces, type Tier } from './tier';
 
 const homedir = (): string => realHome;
@@ -65,8 +66,11 @@ async function turnEnded(tier: Tier, address: string, turn: number): Promise<voi
 // task. It is answered "Yes, I trust this folder" once, inside the start verb's proof window, so the
 // start is still proven by the task itself. Claude Code writes its one ~/.claude.json entry; no
 // script edits that file. The dialog's cursor may sit on "No, exit", so the keys follow the screen.
-async function trustClaude(tier: Tier, slug: string): Promise<void> {
-  for (let attempt: number = 0; attempt < 40; attempt += 1) {
+// Once that entry exists (it names the tier repo, which every run recreates at the same path) the
+// dialog no longer shows, so the wait ends when the start verb returns.
+async function trustClaude(tier: Tier, slug: string, starting: Promise<SpawnResult>): Promise<void> {
+  const returned: Promise<boolean> = starting.then(() => true);
+  for (let attempt: number = 0; attempt < 90; attempt += 1) {
     const live = z
       .object({ terminals: z.array(terminalSchema) })
       .parse(await tier.rpc('terminal.list', { labels: { 'akrogon.leaf': slug } }))
@@ -79,9 +83,12 @@ async function trustClaude(tier: Tier, slug: string): Promise<void> {
       expect((await tier.hc(['keys', live[0].address, ...answer])).code).toBe(0);
       return;
     }
-    await Bun.sleep(1000);
+    if (await Promise.race([returned, Bun.sleep(1000).then(() => false)])) {
+      tier.record('claude-trust.txt', 'no folder-trust dialog before the start verb returned\n');
+      return;
+    }
   }
-  throw new Error(`${slug} showed no folder-trust dialog`);
+  throw new Error(`${slug}: neither a folder-trust dialog nor the start verb's return in 90 s`);
 }
 
 test('kinds tier: first task, later send, report by hc send, transcript label, agy trust and outside write', async () => {
@@ -127,7 +134,7 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
       const outside: string = resolve(root, `akr-e2e-engine-${kind}-outside.txt`);
       const first: string = `Run exactly this shell command and nothing else: hc send ${inbox.address} 'done ${kind} 1'${kind === 'agy' ? ` && echo ok > ${outside}` : ''}`;
       const starting = tier.akrogon(['seat', slug, 'A', '--task', first]);
-      if (kind === 'claude') await trustClaude(tier, slug);
+      if (kind === 'claude') await trustClaude(tier, slug, starting);
       const started = await starting;
       tier.record(`${kind}-start.txt`, `${started.stdout}\n${started.stderr}`);
       expect(started.code).toBe(0);
