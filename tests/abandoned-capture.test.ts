@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { finishCaptured, quote, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import type { Captured } from '../src/shell';
 import { cli, entry, fakeHerdr, fixture, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
+import { hcCore, type HcCore } from './hc-fixture';
 
 type Live = { proc: Bun.Subprocess; captured: Captured; result: Promise<SpawnResult> };
 
@@ -169,7 +170,7 @@ exec ${quote(flock)} "$@"
 
 test('an abandoned capture pair refuses non-failed moves, and a non-blank cleared-<run>.md clears it', async () => {
   const f: Fixture = await fixture();
-  const herdr = fakeHerdr(f);
+  const core: HcCore = await hcCore(f);
   try {
     const leafPath: string = leaf(f, 'abandoned', 'implement');
     const impl: string = resolve(leafPath, 'implementation');
@@ -184,7 +185,7 @@ test('an abandoned capture pair refuses non-failed moves, and a non-blank cleare
       await waitFor(() => captures(impl).length === 1, 'capture files');
       pair = captures(impl)[0];
       // A live pair refuses nothing yet: the command is still running.
-      const live: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, herdr.env);
+      const live: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, core.env);
       expect(live.code, live.stderr).toBe(0);
       const orphanPid: number = Number(readFileSync(`${f.home}/pid-gone`, 'utf8').trim());
       cap.proc.kill('SIGKILL');
@@ -213,10 +214,10 @@ test('an abandoned capture pair refuses non-failed moves, and a non-blank cleare
 
     const before: string = stateBytes(leafPath);
     const beforeLog: string[] = logLines(f);
-    const refused: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, herdr.env);
+    const refused: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, core.env);
     expectPairRefusal(refused, { out, err }, cleared);
     expectPairRefusal(refused, { out: out2, err: err2 }, cleared2);
-    const singleSlot: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--slot', 'A'], f.root, herdr.env);
+    const singleSlot: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--slot', 'A'], f.root, core.env);
     expectPairRefusal(singleSlot, { out, err }, cleared);
     expect(stateBytes(leafPath)).toBe(before);
     expect(logLines(f)).toEqual(beforeLog);
@@ -226,28 +227,28 @@ test('an abandoned capture pair refuses non-failed moves, and a non-blank cleare
       f,
       ['phase', 'abandoned', 'failed', '--reason', 'blocked by test'],
       f.root,
-      herdr.env,
+      core.env,
     );
     expect(failed.code, failed.stderr).toBe(0);
-    const recovered: Result = await cli(f, ['phase', 'abandoned', 'implement'], f.root, herdr.env);
+    const recovered: Result = await cli(f, ['phase', 'abandoned', 'implement'], f.root, core.env);
     expect(recovered.code, recovered.stderr).toBe(0);
 
     // A cleared second pair drops out of the refusal; the first still names it.
     writeFileSync(cleared2, 'cleared the second run\n');
-    const stillRefused: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, herdr.env);
+    const stillRefused: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, core.env);
     expectPairRefusal(stillRefused, { out, err }, cleared);
     expect(stillRefused.stderr).not.toContain(out2);
 
     // A whitespace-only cleared file still refuses.
     writeFileSync(cleared, '   \n');
-    const blank: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, herdr.env);
+    const blank: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, core.env);
     expectPairRefusal(blank, { out, err }, cleared);
 
     // Non-blank clears: the pair gate passes, names and bytes keep.
     const outBytes: string = readFileSync(out, 'utf8');
     const errBytes: string = readFileSync(err, 'utf8');
     writeFileSync(cleared, 'found the test user, cleaned it, absence read returned none\n');
-    const passed: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, herdr.env);
+    const passed: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, core.env);
     expect(passed.code, passed.stderr).toBe(0);
     expect(existsSync(out)).toBe(true);
     expect(existsSync(err)).toBe(true);
@@ -268,10 +269,11 @@ test('an abandoned capture pair refuses non-failed moves, and a non-blank cleare
     );
     expect(red.code).toBe(3);
     expect(captures(impl)).toHaveLength(2);
-    const after: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, herdr.env);
+    const after: Result = await cli(f, ['phase', 'abandoned', 'check.review', '--check'], f.root, core.env);
     expect(after.code, after.stderr).toBe(0);
     expect(readFileSync(out, 'utf8')).toBe(outBytes);
   } finally {
+    await core.stop();
     f.clean();
   }
 }, 60000);

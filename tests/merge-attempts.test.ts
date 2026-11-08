@@ -407,9 +407,9 @@ test.serial('an unlanded candidate discards to exactly one red attempt line', as
 });
 
 test.serial('a failed unlanded holder records one red attempt before recovery discards its batch', async () => {
-  const f: Fixture = await fixture();
+  const f: HcFixture = await hcFixture();
   try {
-    const { holder, record, herdr } = await batchFixture(f, true);
+    const { holder, record, herdr } = await batchFixture(f, true, hcHerdr(f));
     saveState(holder.path, { ...readState(holder.path), batch: { ...record, candidate: record.top } });
     const failed: Result = await cli(
       f,
@@ -429,7 +429,7 @@ test.serial('a failed unlanded holder records one red attempt before recovery di
       expect(attemptLines(f)).toEqual(lines);
     }
   } finally {
-    f.clean();
+    await f.clean();
   }
 });
 
