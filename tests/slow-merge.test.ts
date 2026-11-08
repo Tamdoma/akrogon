@@ -28,16 +28,6 @@ function mergeEnv(f: Fixture): NodeJS.ProcessEnv {
   return env;
 }
 
-function noticeCalls(f: Fixture): string[][] {
-  const file: string = resolve(f.home, 'herdr.json.calls');
-  if (!existsSync(file)) return [];
-  return readFileSync(file, 'utf8')
-    .split('\n')
-    .filter((line) => line.trim() !== '')
-    .map((line) => JSON.parse(line) as string[])
-    .filter((args) => args[0] === 'notification');
-}
-
 function register(f: Fixture, repos: Record<string, string>): void {
   const global: object = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
   yaml(resolve(f.home, 'config.yaml'), { ...global, repos });
@@ -165,7 +155,9 @@ test('a slow merge run is flagged, recorded, printed and notified once', async (
 
 test('only eligible rows enter the normal and checked bounds follow the design', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
+    const env: NodeJS.ProcessEnv = coreEnv(f, core);
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
       checks: { unit: 'echo unit' },
@@ -186,13 +178,13 @@ test('only eligible rows enter the normal and checked bounds follow the design',
     seedMerge(f, 5500, { compares: 'some-head' });
 
     // Only 4 eligible earlier rows: silent.
-    expect((await cli(f, ['verify', '--holder', holder], direct, mergeEnv(f))).code).toBe(0);
+    expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(0);
     expect(records(f).at(-1)!.slow).toBeUndefined();
 
     // Run 2 sees 5 eligible rows: the ineligible kinds at 5500ms never count.
     await bump(direct, 'second.ts');
     const secondId: string = await (async () => {
-      const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
+      const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
       const id: string = await backdate(f, 1000);
       const result: Result = await pending;
       expect(result.code).toBe(0);
@@ -215,7 +207,7 @@ test('only eligible rows enter the normal and checked bounds follow the design',
     });
     // The known-red head must hold check.sh: verify the pushed main tip.
     await command(['git', 'checkout', '-b', 'kr', 'origin/main'], direct);
-    const pendingKr: Promise<Result> = cli(f, ['verify', '--holder', holder, '--known-red'], direct, mergeEnv(f));
+    const pendingKr: Promise<Result> = cli(f, ['verify', '--holder', holder, '--known-red'], direct, env);
     const headId: string = await backdate(f, 600000);
     const knownRed: Result = await pendingKr;
     expect(knownRed.code).toBe(0);
@@ -227,15 +219,18 @@ test('only eligible rows enter the normal and checked bounds follow the design',
     expect(base!.slow).toBeUndefined();
     expect(all.find((run) => run.compares === 'some-head')!.slow).toBeUndefined();
     expect(knownRed.stdout).toContain('verify slow:');
-    expect(noticeCalls(f).some((args) => args[2] === 'repo merge slow')).toBe(true);
+    expect(noticeFiles(core).some((notice) => notice.title === 'repo merge slow')).toBe(true);
   } finally {
+    await core.stop();
     f.clean();
   }
 }, 60000);
 
 test('an open episode pins the normal, cites its first run, notifies once and recovers', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
+    const env: NodeJS.ProcessEnv = coreEnv(f, core);
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
       checks: { unit: 'echo unit', extra: 'echo extra' },
@@ -259,7 +254,7 @@ test('an open episode pins the normal, cites its first run, notifies once and re
     });
 
     const aId: string = await (async () => {
-      const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
+      const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
       const id: string = await backdate(f, 600000);
       const result: Result = await pending;
       expect(result.code).toBe(0);
@@ -275,25 +270,26 @@ test('an open episode pins the normal, cites its first run, notifies once and re
       first: { run: episode, leaf: 'firstleaf' },
     });
     expect(a.slow!.close).toBeUndefined();
-    expect(noticeCalls(f)).toEqual([]);
+    expect(noticeFiles(core)).toEqual([]);
 
     // A fresh eligible run under the threshold closes the episode recovered.
     await bump(direct, 'recover.ts');
-    const recovered: Result = await cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
+    const recovered: Result = await cli(f, ['verify', '--holder', holder], direct, env);
     expect(recovered.code).toBe(0);
     const b: VerifyRun = records(f).at(-1)!;
     expect(b.slow).toMatchObject({ first: { run: episode }, close: 'recovered' });
-    expect(noticeCalls(f)).toEqual([]);
+    expect(noticeFiles(core)).toEqual([]);
 
     // The next run is evaluated fresh: no episode fields.
     await bump(direct, 'fresh.ts');
-    const fresh: Result = await cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
+    const fresh: Result = await cli(f, ['verify', '--holder', holder], direct, env);
     expect(fresh.code).toBe(0);
     const c: VerifyRun = records(f).at(-1)!;
     expect(c.slow).toBeDefined();
     expect(c.slow!.first).toBeUndefined();
     expect(c.slow!.close).toBeUndefined();
   } finally {
+    await core.stop();
     f.clean();
   }
 }, 60000);
@@ -373,6 +369,7 @@ test('a failed slow notice is retried by the next in-episode run; a pending one 
 
 test('the last 20 eligible runs inside the episode close it accepted', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
@@ -386,7 +383,7 @@ test('the last 20 eligible runs inside the episode close it accepted', async () 
       seedMerge(f, 500000, {
         slow: { ms: 500000, normal_ms: 300000, first: { run: episode, leaf: 'firstleaf' } },
       });
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
+    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, coreEnv(f, core));
     const id: string = await backdate(f, 600000);
     const result: Result = await pending;
     expect(result.code).toBe(0);
@@ -394,8 +391,9 @@ test('the last 20 eligible runs inside the episode close it accepted', async () 
     expect(row.slow).toMatchObject({ first: { run: episode }, close: 'accepted' });
     expect(result.stdout).toMatch(/verify slow: \d+m measured vs 5m normal/);
     expect(result.stdout).toContain('accepted as new normal');
-    expect(noticeCalls(f)).toEqual([]);
+    expect(noticeFiles(core)).toEqual([]);
   } finally {
+    await core.stop();
     f.clean();
   }
 }, 30000);
