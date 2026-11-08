@@ -7,7 +7,7 @@
 //      bun test --timeout=30000 ./tests/e2e/watch-stop.e2e.ts
 // Prompts per session: the first task (argv, or agy's first send) and one corrective send.
 import { test, expect } from 'bun:test';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { type SpawnResult } from '../../src/shell';
@@ -28,6 +28,7 @@ const terminalSchema = z.object({
   state: z.string(),
   turn: z.number(),
   reported: z.boolean().default(false),
+  pid: z.number().nullable().default(null),
   labels: z.record(z.string(), z.string()),
   status: z.object({ state: z.string() }).passthrough().nullable(),
   foreground: z
@@ -48,6 +49,35 @@ async function liveSeat(tier: WatchTier, slug: string): Promise<string | null> {
     .parse(await tier.rpc('terminal.list', { labels: { 'akrogon.leaf': slug } }))
     .terminals.filter((t) => t.state === 'live');
   return live.length === 1 ? live[0].address : null;
+}
+
+// The seat's process tree from /proc (one read): the argv of every descendant of `root`.
+function descendants(root: number): string[] {
+  const procs: { pid: number; ppid: number; argv: string }[] = readdirSync('/proc')
+    .filter((name: string) => /^\d+$/.test(name))
+    .flatMap((name: string) => {
+      try {
+        const stat: string = readFileSync(`/proc/${name}/stat`, 'utf8');
+        const ppid: number = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1]);
+        const argv: string = readFileSync(`/proc/${name}/cmdline`, 'utf8').split('\0').join(' ').trim();
+        return [{ pid: Number(name), ppid, argv }];
+      } catch (error) {
+        // A process that exits between the listing and the read is gone, not an error.
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT' || (error as NodeJS.ErrnoException).code === 'ESRCH')
+          return [];
+        throw error;
+      }
+    });
+  const found: Set<number> = new Set([root]);
+  for (let grown: boolean = true; grown;) {
+    grown = false;
+    for (const p of procs)
+      if (!found.has(p.pid) && found.has(p.ppid)) {
+        found.add(p.pid);
+        grown = true;
+      }
+  }
+  return procs.filter((p) => p.pid !== root && found.has(p.pid)).map((p) => p.argv);
 }
 
 // Bounded by hc's own wait (event-driven), never a sleep.
@@ -92,10 +122,15 @@ test('watch stop: a working seat stops on its stop key, ends idle and takes one 
     tier.record(`${kind}-start.txt`, `${started.code}\n${started.stdout}\n${started.stderr}`);
     expect(started.code).toBe(0);
     const address: string = z.string().parse(await liveSeat(tier, slug));
-    // The seat is on the long command: hc waits for it on the screen (event-driven, bounded).
-    const shown: SpawnResult = await tier.hc(['wait', address, '--output', 'sleep 600', '--timeout', '180']);
+    // The seat is on the long command: hc waits for the harness's tool-running line on the screen
+    // (event-driven, bounded; the task text itself names `sleep 600`, so that text proves nothing), and
+    // the seat's process tree must hold the command.
+    const shown: SpawnResult = await tier.hc(['wait', address, '--output', 'Running', '--timeout', '180']);
     tier.record(`${kind}-on-command.txt`, `${shown.code}\n${shown.stdout}\n${shown.stderr}`);
     const before: Seen = await get(tier, address);
+    const tree: string[] = descendants(z.number().parse(before.pid));
+    tier.record(`${kind}-tree.json`, tree);
+    expect(tree.some((argv: string) => /(^|\s|\/)sleep 600$/.test(argv))).toBe(true);
     tier.record(`${kind}-before.json`, before);
     tier.record(`${kind}-before-screen.txt`, (await tier.hc(['read', address])).stdout);
     expect(before.status?.state).toBe('working');
