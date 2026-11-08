@@ -135,7 +135,7 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
       }
     }
   } finally {
-    const left: string[] = await stopTier(tier, cwds, false);
+    const left: string[] = await stopTier(tier, cwds);
     const trusted: string[] = trustedWorkspaces();
     tier.record(
       'absence.txt',

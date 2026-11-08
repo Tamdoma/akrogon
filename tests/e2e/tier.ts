@@ -75,6 +75,28 @@ export function absent(): string[] {
   return [socket, appHome, coreState].filter((path: string) => existsSync(path));
 }
 
+// A herdr-app session home exists only once its window has opened ("a new name starts blank"), and
+// akrogon refuses a session without one (plan D12), as herdr-setup gives every repo session one. The
+// window opens once to make the home and closes again; the session stop also stops the core herdr-app
+// started, whose state goes too, so the tier then starts its own core with the window closed.
+async function openOnce(): Promise<void> {
+  const window: Bun.Subprocess = Bun.spawn(['herdrapp', '--session', session], {
+    env: realEnv(),
+    stdout: 'ignore',
+    stderr: 'ignore',
+  });
+  const ready: string = resolve(appHome, '.herdrapp-ready');
+  for (let attempt: number = 0; attempt < 100 && !existsSync(ready); attempt += 1) await Bun.sleep(200);
+  if (!existsSync(ready)) throw new Error(`herdr-app did not create the session home: ${ready}`);
+  const stopped: SpawnResult = await spawnCaptured(['herdrapp', 'session', 'stop', session], { env: realEnv() });
+  if (stopped.code !== 0) throw new Error(`herdrapp session stop failed: ${JSON.stringify(stopped)}`);
+  // The launcher may outlive the stopped window; it holds nothing once the session is stopped.
+  window.kill();
+  await window.exited;
+  if (await listening(socket)) throw new Error(`herdrapp session stop left the core listening: ${socket}`);
+  rmSync(coreState, { recursive: true, force: true });
+}
+
 // Builds a scratch akrogon home and repo named `akre2e` under the leaf temp, starts the grant's core
 // with a clean environment (forks/proofs.md P0) and seeds its document with the repo's space.
 export async function startTier(
@@ -110,6 +132,7 @@ export async function startTier(
     resolve(home, 'config.yaml'),
     Bun.YAML.stringify({ slots, harnesses, repos: { akre2e: root }, prefixes: { akre2e: 'ae' } }),
   );
+  await openOnce();
   const path: string = `${standin === null ? '' : `${standin.bin}:`}${dirname(process.execPath)}:${z.string().parse(process.env.PATH)}`;
   const started: SpawnResult = await spawnCaptured(['hc', 'server', 'start'], {
     cwd: root,
@@ -155,7 +178,7 @@ export async function startTier(
 }
 
 // The grant's cleanup and absence check (readiness grants[0].fixtures[0]).
-export async function stopTier(tier: Tier, cwds: string[], window: boolean): Promise<string[]> {
+export async function stopTier(tier: Tier, cwds: string[]): Promise<string[]> {
   const listed = z
     .object({ terminals: z.array(z.object({ address: z.string(), state: z.string() }).passthrough()) })
     .parse(await tier.rpc('terminal.list', { all: true, labels: {} }));
@@ -164,11 +187,11 @@ export async function stopTier(tier: Tier, cwds: string[], window: boolean): Pro
   const status = z
     .object({ pid: z.number() })
     .safeParse(JSON.parse((await tier.hc(['server', 'status', '--json'])).stdout || '{}'));
-  if (window) await spawnCaptured(['herdrapp', 'session', 'stop', session], { env: realEnv() });
+  await spawnCaptured(['herdrapp', 'session', 'stop', session], { env: realEnv() });
   // Any hc call on a stopped session starts a new core, so stop only a core still listening.
   if (await listening(socket)) await tier.hc(['server', 'stop']);
   if (status.success) await spawnCaptured(['timeout', '10', 'tail', `--pid=${status.data.pid}`, '-f', '/dev/null']);
-  if (window) await spawnCaptured(['herdrapp', 'session', 'delete', session], { env: realEnv() });
+  await spawnCaptured(['herdrapp', 'session', 'delete', session], { env: realEnv() });
   rmSync(coreState, { recursive: true, force: true });
   for (const cwd of cwds) rmSync(cwd, { recursive: true, force: true });
   rmSync(tier.root, { recursive: true, force: true });

@@ -176,7 +176,7 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
     expect(blocks(own[0].root)).toEqual([alone]);
     tier.record('consultants.json', await doc(tier));
   } finally {
-    const left: string[] = await stopTier(tier, [standinDir], true);
+    const left: string[] = await stopTier(tier, [standinDir]);
     window?.kill();
     tier.record('absence.txt', left.length === 0 ? 'absent\n' : left.join('\n'));
     expect(left).toEqual([]);
