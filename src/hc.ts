@@ -7,9 +7,8 @@ import { connect } from 'node:net';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { globalHome, type Repo } from './config';
+import { type Repo } from './config';
 import { CommandError, DISCOVERY_DEADLINE_MS, spawnCaptured, type Result, type SpawnResult } from './shell';
-import { withLock } from './state';
 
 const statusSchema = z.object({
   state: z.string(),
@@ -564,30 +563,4 @@ export function consultantName(prefix: string, letter: string): string {
 
 export function leafTab(repo: string, slug: string): string {
   return 'ak' + sha256(`${repo}/${slug}`).slice(0, 30);
-}
-
-// Resolved fresh, not memoized: the long-running listener calls this, and a repo's space can move or come up later.
-export async function wakeWatcher(repo: Repo, reason: string): Promise<void> {
-  const space: SpaceResolution = await resolveSpace(repo);
-  if (!space.ok) return;
-  const watchers: Seen[] = (await terminals(space.session, { 'akrogon.watch': repo.name })).filter(
-    (t: Seen) => t.status !== null,
-  );
-  if (watchers.length === 0) return;
-  if (watchers.length > 1) {
-    console.error(
-      JSON.stringify({
-        repo: repo.name,
-        watch: 'several live watch terminals',
-        terminals: watchers.map((t: Seen) => t.address),
-        reason,
-      }),
-    );
-    return;
-  }
-  await withLock(resolve(globalHome(), `watch-${repo.name}.lock`), async (): Promise<void> => {
-    const watcher: Seen = await terminal(space.session, watchers[0].address);
-    if (watcher.status?.state === 'idle' || watcher.status?.state === 'done')
-      await send(space.session, watcher.address, `/watch-issues tick ${repo.root}`);
-  });
 }

@@ -29,7 +29,7 @@ import {
   type Verdict,
 } from './routing';
 import { command, run, CommandError, type Result } from './shell';
-import { renameTab as renameAppTab, repoSpace, wakeWatcher, windowOpen, type SpaceResolution } from './hc';
+import { renameTab as renameAppTab, repoSpace, windowOpen, type SpaceResolution } from './hc';
 import { noticeFolder, noticeId, removeNotice, writeNotice } from './notice';
 import { logMove, readLog } from './log';
 import { appendTiming, currentVisit } from './timing';
@@ -214,8 +214,6 @@ export async function commitMove(
   let announced: State = after;
   try {
     if (to === 'failed') {
-      // The wake goes first: a failed notice must not cost the watcher its wake.
-      await wakeWatcher(repo, `failed ${after.slug}`);
       announced = await clearBusyNotices(repo, leaf.path, await announceFailed(repo, leaf, after));
     } else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(repo, after, after.slug);
     if (to === 'merged') await completeOwner(repo, leaf, true);

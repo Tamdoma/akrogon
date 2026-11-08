@@ -7,8 +7,7 @@
 import { dirname, resolve } from 'node:path';
 import { lstatSync, mkdirSync, realpathSync, watch, type FSWatcher } from 'node:fs';
 import { z } from 'zod';
-import { readGlobal, readRepo, type GlobalConfig } from './config';
-import { follow, sessions, wakeWatcher, type HcLine, type Seen } from './hc';
+import { follow, sessions, type HcLine } from './hc';
 
 type Pass = 'pull --all' | 'next --resume' | 'next --wake';
 
@@ -20,7 +19,6 @@ const PASS_DEADLINE_MS: number = msSchema.parse(process.env.AKROGON_PASS_DEADLIN
 // silent session cannot hold startup or the scans behind it.
 const SNAPSHOT_MS: number = msSchema.parse(process.env.AKROGON_SNAPSHOT_MS) ?? 30_000;
 
-const labelsSchema = z.object({ labels: z.record(z.string(), z.string()) });
 const statusSchema = z.object({ status: z.object({ state: z.string() }).nullable() });
 
 export async function listenCommand(): Promise<void> {
@@ -75,39 +73,14 @@ export async function listenCommand(): Promise<void> {
     retries.add(pass);
   };
 
-  // Watcher wakes run one after another so a burst of seat events does not race the watch lock.
-  let wakes: Promise<void> = Promise.resolve();
-  const wake = (name: string, reason: string): void => {
-    const global: GlobalConfig = readGlobal();
-    if (!Object.hasOwn(global.repos, name)) {
-      console.error(JSON.stringify({ listen: 'watcher wake skipped: unknown repo', repo: name, reason }));
-      return;
-    }
-    // The watcher is optional: a failed wake is logged and the engine carries on.
-    wakes = wakes
-      .then(() => wakeWatcher(readRepo(name, global.repos[name]), reason))
-      .catch((error: unknown) =>
-        console.error(JSON.stringify({ listen: 'watcher wake failed', repo: name, reason, error: String(error) })),
-      );
-  };
-
   const subscribed: Set<string> = new Set();
   const watched: Set<string> = new Set();
 
   const subscribe = (session: string): Promise<void> => {
-    const labels: Map<string, Record<string, string>> = new Map();
     let snapshot: () => void = () => {};
     const ready: Promise<void> = new Promise<void>((done) => (snapshot = done));
     const onLine = (line: HcLine): void => {
       if ('terminals' in line) {
-        for (const t of line.terminals) labels.set(t.address, t.labels);
-        // A seat that ended while nothing listened wakes its repo's watcher once.
-        const ended: Set<string> = new Set(
-          line.terminals
-            .filter((t: Seen) => t.state === 'finished' && t.labels['akrogon.seat'] !== undefined)
-            .map((t: Seen) => t.labels['akrogon.repo']),
-        );
-        for (const repo of ended) wake(repo, `seat finished before subscription in ${session}`);
         clearTimeout(overdue);
         snapshot();
         // Every (re)subscription catches up: a seat may have ended its turn while nothing listened.
@@ -115,16 +88,9 @@ export async function listenCommand(): Promise<void> {
         return;
       }
       if (!('terminal' in line.params)) return;
-      const { type, terminal, data } = line.params;
-      if (type === 'created' || type === 'labels') labels.set(terminal, labelsSchema.parse(data).labels);
+      const { type, data } = line.params;
       const blocked: boolean = type === 'status' && statusSchema.parse(data).status?.state === 'blocked';
       if (type === 'turn' || blocked || type === 'finished' || type === 'lost') enqueue('next --wake');
-      const seat: Record<string, string> | undefined = labels.get(terminal);
-      if (seat?.['akrogon.seat'] !== undefined && (blocked || ['finished', 'lost', 'restarted'].includes(type)))
-        wake(
-          seat['akrogon.repo'],
-          `seat ${seat['akrogon.leaf']}/${seat['akrogon.seat']} ${blocked ? 'blocked' : type}`,
-        );
     };
     // Watched first: a socket gone since the scan throws here, before anything is started or marked.
     watchSocket(session);

@@ -42,7 +42,7 @@ import { landAlive, landUnit } from './land';
 import { requiredSlots } from './routing';
 import { lineRuns, type RunRecord } from './admission';
 import { readVerifyRuns, type VerifyRun } from './verify';
-import { docGet, repoSpace, terminals, type Seen, type SpaceResolution } from './hc';
+import { docGet, repoSpace, type SpaceResolution } from './hc';
 import { expectedTabName } from './seat';
 import { sessionBusAddress } from './scope';
 import { spawnCaptured, type SpawnResult } from './shell';
@@ -736,15 +736,6 @@ async function listenerLine(): Promise<string> {
   return `Listener: ${result.code === 0 ? 'live' : 'down'}`;
 }
 
-// The watcher lookup of plan D16: live terminals labelled akrogon.watch=<repo> in the repo's session.
-async function watcherLine(repo: Repo): Promise<string> {
-  const space: SpaceResolution = await repoSpace(repo);
-  const live: Seen[] = space.ok
-    ? (await terminals(space.session, { 'akrogon.watch': repo.name })).filter((t: Seen) => t.status !== null)
-    : [];
-  return `Watcher: ${repo.name} ${live.length === 0 ? 'none' : `live ${live.map((t: Seen) => t.address).join(' ')}`}`;
-}
-
 export async function statusCommand(
   slug: string | undefined,
   charts: boolean = false,
@@ -920,7 +911,6 @@ export async function statusCommand(
       );
   }
   console.log(await listenerLine());
-  for (const scan of scans) if (scan.ok) console.log(await watcherLine(scan.repo));
   for (const scan of scans) {
     if (!scan.ok) continue;
     const marks: string[] = [paused.has(scan.repo.name) ? 'paused' : ''].filter((mark) => mark !== '');

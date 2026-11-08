@@ -115,16 +115,13 @@ test('startup pulls and resumes before handling a wake received while another se
   const shim: Shim = akrogonShim(f);
   const bin: string = resolve(f.home, 'subscription-bin');
   const snapshot: string = resolve(f.home, 'snapshot.log');
-  const processed: string = resolve(f.home, 'processed.log');
   const gate: string = resolve(f.home, 'second.fifo');
   mkdirSync(bin);
   writeFileSync(snapshot, '');
-  writeFileSync(processed, '');
   expect(Bun.spawnSync(['mkfifo', gate]).exitCode).toBe(0);
   writeFileSync(
     resolve(bin, 'hc'),
     `#!/bin/bash
-if [ "$1" = connect ]; then printf 'connect\\n' >> '${processed}'; fi
 if [ "$1" = events ]; then
   if [ "$HC_SESSION" = '${second.session}' ]; then cat '${gate}' >/dev/null; fi
   if [ "$HC_SESSION" = '${first.session}' ]; then
@@ -140,8 +137,8 @@ exec '${first.env.HC_SHIM_REAL}' "$@"
   try {
     await until(snapshot, () => readFileSync(snapshot, 'utf8').includes('"terminals"'));
     await standIn(first, labelled, 'exit');
-    // The watcher's discovery runs after the finished event's dispatch callback.
-    await until(processed, () => readFileSync(processed, 'utf8').includes('connect'));
+    // The second session stays unsubscribed until the first session's finished event has arrived.
+    await until(snapshot, () => readFileSync(snapshot, 'utf8').includes('"finished"'));
     writeFileSync(gate, 'go\n');
     await until(shim.log, () => passes(shim).includes('end next --resume'));
     await until(shim.log, () => passes(shim).includes('end next --wake'));

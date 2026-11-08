@@ -53,7 +53,6 @@ import {
   sessions,
   terminal,
   terminals,
-  wakeWatcher,
   windowOpen,
   type Seen,
   type SpaceResolution,
@@ -185,7 +184,6 @@ async function observeBusy(
   });
   const recorded: State = { ...observed, busy_notified: { ...observed.busy_notified, [seat]: 'pending' } };
   saveState(path, recorded);
-  await wakeWatcher(repo, `busy ${state.slug} seat ${seat}`);
   return { state: recorded, notified: true };
 }
 

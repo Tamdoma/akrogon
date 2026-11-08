@@ -9,13 +9,13 @@ Operator-invoked watch over every leaf under `issues/open` of the registered rep
 
 ## Invocations
 
-Claude Code inside hc only. `/watch-issues` and `tick` first check `HC_TERMINAL_ID`: when it is unset, say "This watch needs a terminal inside hc, so no watch is running." and claim no watch. Then, when CronCreate is absent, say "This watch needs Claude Code cron, so no watch is running." and claim no watch.
+Claude Code only. When CronCreate is absent, say "This watch needs Claude Code cron, so no watch is running." and claim no watch.
 
-Job identity is the exact prompt `/watch-issues tick <root>`. The watch never self-deletes: it ends only on `/watch-issues stop`, session loss or the job's own expiry. The akrogon listener wakes the watch by sending the same `/watch-issues tick <root>` to the terminal labelled `akrogon.watch=<repo>`, where `<repo>` is the `repo` key `akrogon config` prints at `<root>`.
+Job identity is the exact prompt `/watch-issues tick <root>`. The watch ends on `/watch-issues stop`, session loss, the job's own expiry or a clear: Claude Code keeps the job through `/clear`, so the clear is honored by the next tick.
 
-- `/watch-issues` from `<root>`: run one check now. When that check's `session=` line differs from `$HC_SESSION`, say "Start the watch in hc session <name>." and set no label and create no job. Otherwise run `hc label $HC_TERMINAL_ID akrogon.watch=<repo>`, then use CronList to find jobs with the exact prompt: zero matches creates one job with CronCreate, schedule `*/20 * * * *` recurring and that exact prompt, then reports its id and 7-day expiry; one match is reported and no job is created; several matches are reported and no job is created or deleted. A paused check prints no session, so it still runs the label and the CronList and creation step without the comparison: neither is an act on a leaf.
-- `/watch-issues tick <root>`: one check only. It never creates a job, even when zero match. A cron fire and a listener wake are the same tick. Each tick runs one check, including ticks queued while a check ran: Claude Code submits each queued tick as its own turn.
-- `/watch-issues stop`: use CronList for the exact prompt: one match is deleted with CronDelete and reported; zero matches is reported as already stopped; several matches are reported and none are deleted. Always run `hc label $HC_TERMINAL_ID akrogon.watch=` to remove the label.
+- `/watch-issues` from `<root>`: run one check now, then use CronList to find jobs with the exact prompt: zero matches creates one job with CronCreate, schedule `*/20 * * * *` recurring and that exact prompt, then reports its id and 7-day expiry; one match is reported and no job is created; several matches are reported and no job is created or deleted. A paused check still runs the CronList and creation step: creation is not an act on a leaf.
+- `/watch-issues tick <root>`: a tick that is the first prompt of its conversation, while CronList finds a job with the exact prompt, means the operator cleared the watch: it runs the stop steps below, replies "Watch stopped: this conversation was cleared." and runs no check. Any other tick runs one check only and never creates a job, even when zero match; ticks queued while a check ran each run their own check, as Claude Code submits each as its own turn.
+- `/watch-issues stop`: use CronList for the exact prompt: one match is deleted with CronDelete and reported; zero matches is reported as already stopped; several matches are reported and none are deleted.
 
 ## Observe
 
@@ -25,7 +25,7 @@ Run `bun <skill-folder>/scripts/observe.ts <root>` under a Bash timeout. Its fir
 
 `OBSERVE_AKROGON` overrides the akrogon binary for tests only.
 
-Every `hc` command below that names a seat runs as `HC_SESSION=<name> hc ...` with the session from that line. Commands on the watch's own terminal (`hc label $HC_TERMINAL_ID ...`) run plain.
+Every `hc` command below that names a seat runs as `HC_SESSION=<name> hc ...` with the session from that line.
 
 Line format, stable field order:
 

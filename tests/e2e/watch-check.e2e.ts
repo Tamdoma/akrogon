@@ -1,10 +1,9 @@
 // Criteria 2 and 4 (watcher-on-hc), attended paid run under readiness grants[0] (one harness session,
 // the watcher runs at most 4 checks): a Claude watcher terminal in akr-e2e-watch runs this checkout's
-// watch-issues skill (project skill under the repo root, user skills not loaded), with the listener
-// program run against the session. Observed: the skill labels its terminal at start (check 1), a
-// stand-in seat that exits wakes it once and it runs one check and replies (check 2), two ticks queued
-// while it works each run their own check (checks 3 and 4, plan Operator decision C2), and stop removes
-// the label. Logs under AKROGON_E2E_OUT.
+// watch-issues skill (project skill under the repo root, user skills not loaded). Observed: start runs
+// one check and creates the cron job (check 1), two ticks queued while it works each run their own check
+// (checks 2 and 3, plan Operator decision C2), and a tick that is the first prompt after /clear deletes
+// the job and runs no check. Logs under AKROGON_E2E_OUT.
 // Run: akrogon run-check --name watch-check -- env AKROGON_E2E=watch-check AKROGON_E2E_WATCHER_MODEL=<model>
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/watch-e2e
 //      bun test --timeout=30000 ./tests/e2e/watch-check.e2e.ts
@@ -14,11 +13,9 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { waitFor, type Seen } from '../../src/hc';
 import { type SpawnResult } from '../../src/shell';
-import { killTree } from '../helpers';
 import { answerTrust, required } from './tier';
 import { lines, observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
-const entry: string = resolve(import.meta.dir, '../../src/akrogon.ts');
 const skill: string = resolve(import.meta.dir, '../../skills/watch-issues');
 
 async function get(tier: WatchTier, address: string) {
@@ -44,9 +41,11 @@ const idle = (t: Seen): boolean => t.status?.state === 'idle' || t.status?.state
 function transcript(path: string): {
   user: string[];
   bash: string[];
+  tools: string[];
   order: { kind: 'user' | 'bash'; text: string }[];
 } {
   const order: { kind: 'user' | 'bash'; text: string }[] = [];
+  const tools: string[] = [];
   for (const line of lines(readFileSync(path, 'utf8'))) {
     const parsed = z
       .object({ type: z.string(), message: z.object({ content: z.unknown() }).passthrough().optional() })
@@ -57,6 +56,8 @@ function transcript(path: string): {
     if (parsed.data.type === 'user') order.push({ kind: 'user', text: JSON.stringify(content) });
     if (parsed.data.type === 'assistant' && Array.isArray(content))
       for (const part of content) {
+        const used = z.object({ type: z.literal('tool_use'), name: z.string() }).safeParse(part);
+        if (used.success) tools.push(used.data.name);
         const tool = z
           .object({ type: z.literal('tool_use'), name: z.literal('Bash'), input: z.object({ command: z.string() }) })
           .safeParse(part);
@@ -66,11 +67,12 @@ function transcript(path: string): {
   return {
     user: order.filter((e) => e.kind === 'user').map((e) => e.text),
     bash: order.filter((e) => e.kind === 'bash').map((e) => e.text),
+    tools,
     order,
   };
 }
 
-test('watch check: label at start, one check per wake, one check per queued tick, label gone at stop', async () => {
+test('watch check: one check at start, one check per queued tick, a tick after /clear stops the watch', async () => {
   expect(required('AKROGON_E2E')).toBe('watch-check');
   const model: string = required('AKROGON_E2E_WATCHER_MODEL');
   const slug: string = 'akr-e2e-watch-leaf';
@@ -85,7 +87,6 @@ test('watch check: label at start, one check per wake, one check per queued tick
   );
   tier.record('watch-check-cwds.json', [tier.root, seatCwd]);
   process.env.XDG_RUNTIME_DIR = tier.runtime;
-  let listener: Bun.Subprocess | null = null;
   try {
     await observeReady(tier);
     mkdirSync(resolve(tier.root, '.claude/skills'), { recursive: true });
@@ -100,19 +101,6 @@ test('watch check: label at start, one check per wake, one check per queued tick
     const seated: SpawnResult = await tier.akrogon(['seat', slug, 'A']);
     tier.record('seat-start.txt', `${seated.code}\n${seated.stdout}\n${seated.stderr}`);
     expect(seated.code).toBe(0);
-    const seatAddress: string = z
-      .object({ terminals: z.array(z.object({ address: z.string(), state: z.string() }).passthrough()) })
-      .parse(await tier.rpc('terminal.list', { labels: { 'akrogon.leaf': slug } }))
-      .terminals.filter((t) => t.state === 'live')
-      .map((t) => t.address)[0];
-
-    listener = Bun.spawn([process.execPath, entry, 'listen'], {
-      cwd: tier.root,
-      env: tier.akrogonEnv,
-      stdout: Bun.file(resolve(tier.out, 'listener.out.log')),
-      stderr: Bun.file(resolve(tier.out, 'listener.err.log')),
-    });
-
     const run: SpawnResult = await tier.hc([
       'run',
       '--bg',
@@ -133,7 +121,7 @@ test('watch check: label at start, one check per wake, one check per queued tick
       'project,local',
       // Named tools instead of bypass mode: bypass asks for its own acceptance once user settings are not loaded.
       // dontAsk keeps auto mode off: auto mode opens its onboarding dialog after the first turn, which swallows
-      // the listener's wake.
+      // the next prompt.
       '--permission-mode',
       'dontAsk',
       '--allowedTools',
@@ -145,22 +133,16 @@ test('watch check: label at start, one check per wake, one check per queued tick
     await answerTrust(tier, 'watcher', async () => watcher, 'Yes, I trust this folder', ready);
     expect(await ready).not.toBeNull();
 
-    // Check 1: start labels the terminal for the listener.
+    // Check 1: start runs one check and creates the cron job; the terminal gets no watch label.
     const start = await send(tier, watcher, '/watch-issues');
     expect(await waitFor(session, watcher, (t: Seen) => t.turn > start.turn && idle(t), 600_000)).not.toBeNull();
     tier.record('check-1-screen.txt', (await tier.hc(['read', watcher, '--lines', '80'])).stdout);
-    expect((await get(tier, watcher)).labels['akrogon.watch']).toBe('akre2e');
+    expect((await get(tier, watcher)).labels['akrogon.watch']).toBeUndefined();
 
-    // Check 2: the seat exits; the listener's wake reaches the watcher once.
-    const turnBefore: number = (await get(tier, watcher)).turn;
-    expect((await tier.hc(['kill', seatAddress])).code).toBe(0);
-    expect(await waitFor(session, watcher, (t: Seen) => t.status?.state === 'working', 120_000)).not.toBeNull();
-    // No further automatic wakes: the tick step below is driven by ticks this test sends.
-    killTree(listener);
-    listener = null;
-    // Checks 3 and 4: two ticks queued while the watcher works; Claude Code submits each as its own turn
+    // Checks 2 and 3: two ticks queued while the watcher works; Claude Code submits each as its own turn
     // and runs queued turns back to back, which hc may count as one working span, so the run settles on
-    // an idle watcher whose transcript holds the wake and both ticks.
+    // an idle watcher whose transcript holds both ticks.
+    const turnBefore: number = (await get(tier, watcher)).turn;
     await send(tier, watcher, `/watch-issues tick ${tier.root}`);
     await send(tier, watcher, `/watch-issues tick ${tier.root}`);
     const { transcriptFor } = await import('../../src/transcript');
@@ -170,12 +152,11 @@ test('watch check: label at start, one check per wake, one check per queued tick
     const tick: string = `<command-args>tick ${tier.root}`;
     const tickCount = (): number => transcript(log).user.filter((text: string) => text.includes(tick)).length;
     expect(
-      await waitFor(session, watcher, (t: Seen) => t.turn > turnBefore && idle(t) && tickCount() === 3, 900_000),
+      await waitFor(session, watcher, (t: Seen) => t.turn > turnBefore && idle(t) && tickCount() === 2, 900_000),
     ).not.toBeNull();
     tier.record('check-2-3-screen.txt', (await tier.hc(['read', watcher, '--lines', '120'])).stdout);
     const seen = transcript(log);
     tier.record('transcript-summary.json', seen);
-    expect(tickCount()).toBe(3);
     const firstTick: number = seen.order.findIndex((e) => e.kind === 'user' && e.text.includes(tick));
     // A check is one /watch-issues turn that runs `akrogon status`; a check may read status again later in
     // the same turn (A-F4), so checks are counted per command turn, not per status call.
@@ -187,17 +168,24 @@ test('watch check: label at start, one check per wake, one check per queued tick
         .slice(start, turns[n + 1] ?? seen.order.length)
         .some((e) => e.kind === 'bash' && /\bakrogon status\b/.test(e.text)),
     );
-    expect(checked.length).toBe(4);
-    expect(checked.filter((start: number) => start >= firstTick).length).toBe(3);
+    expect(checked.length).toBe(3);
+    expect(checked.filter((start: number) => start >= firstTick).length).toBe(2);
+    expect(seen.tools.filter((name: string) => name === 'CronCreate').length).toBe(1);
 
-    // Stop removes the label.
-    const stop = await send(tier, watcher, '/watch-issues stop');
-    expect(await waitFor(session, watcher, (t: Seen) => t.turn > stop.turn && idle(t), 600_000)).not.toBeNull();
-    tier.record('stop-screen.txt', (await tier.hc(['read', watcher, '--lines', '40'])).stdout);
-    expect((await get(tier, watcher)).labels['akrogon.watch']).toBeUndefined();
-    tier.record('watcher-transcript-path.txt', log);
+    // A tick that is the first prompt after /clear deletes the job and runs no check.
+    const cleared = await send(tier, watcher, '/clear');
+    expect(await waitFor(session, watcher, (t: Seen) => t.turn > cleared.turn && idle(t), 120_000)).not.toBeNull();
+    const after = await send(tier, watcher, `/watch-issues tick ${tier.root}`);
+    expect(await waitFor(session, watcher, (t: Seen) => t.turn > after.turn && idle(t), 600_000)).not.toBeNull();
+    tier.record('clear-stop-screen.txt', (await tier.hc(['read', watcher, '--lines', '40'])).stdout);
+    const fresh: string = z.string().parse(await transcriptFor({ session, address: watcher }));
+    expect(fresh).not.toBe(log);
+    const stopped = transcript(fresh);
+    tier.record('clear-stop-summary.json', stopped);
+    expect(stopped.tools.filter((name: string) => name === 'CronDelete').length).toBe(1);
+    expect(stopped.bash.some((command: string) => /\bakrogon status\b/.test(command))).toBe(false);
+    tier.record('watcher-transcript-path.txt', `${log}\n${fresh}`);
   } finally {
-    if (listener !== null) killTree(listener);
     const left: string[] = await stopWatchTier(tier, [seatCwd]);
     tier.record('watch-check-absence.json', { left });
     expect(left).toEqual([]);
