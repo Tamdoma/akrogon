@@ -634,16 +634,6 @@ function noticeEnv(f: Fixture): NodeJS.ProcessEnv {
   return { ...herdr.env, PATH: `${resolve(f.home, 'bin')}:${unitBin(f)}:${process.env.PATH}` };
 }
 
-function noticeCalls(f: Fixture): string[][] {
-  const file: string = resolve(f.home, 'herdr.json.calls');
-  if (!existsSync(file)) return [];
-  return readFileSync(file, 'utf8')
-    .split('\n')
-    .filter((line) => line.trim() !== '')
-    .map((line) => JSON.parse(line) as string[])
-    .filter((args) => args[0] === 'notification');
-}
-
 function baseRecord(f: Fixture, head: VerifyRun): VerifyRun {
   const found: VerifyRun | undefined = records(f).find((run) => run.compares === head.run);
   if (found === undefined) throw new Error(`no base run for ${head.run}`);
@@ -713,13 +703,14 @@ test('a later base run red on the same unresolved unit sends nothing, while pend
 
 test('the incident resolves only on green evidence at or after the red on landed main', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
     await failureScript(f, 'alpha');
-    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const env: NodeJS.ProcessEnv = core.env;
     const { worktree: w1 } = await callerWorktree(f, 'one');
     await commitIn(w1, 'a.ts');
     expect((await cli(f, ['verify', '--known-red'], w1, env)).code).toBe(0);
-    expect(noticeCalls(f)).toHaveLength(1);
+    expect(noticeFiles(core)).toHaveLength(1);
 
     // A green leaf-head run does not resolve: the unit stays covered by the first notice.
     const { worktree: wOk } = await callerWorktree(f, 'fixer');
@@ -729,7 +720,7 @@ test('the incident resolves only on green evidence at or after the red on landed
     expect((await cli(f, ['verify'], wOk, env)).code).toBe(0);
     await commitIn(w1, 'more.ts');
     expect((await cli(f, ['verify', '--known-red'], w1, env)).code).toBe(0);
-    expect(noticeCalls(f)).toHaveLength(1);
+    expect(noticeFiles(core)).toHaveLength(1);
 
     // Once that green head is main it resolves the incident; a new red re-notifies.
     await command(['git', 'push', 'origin', 'HEAD:main'], wOk);
@@ -741,9 +732,9 @@ test('the incident resolves only on green evidence at or after the red on landed
     const { worktree: w3 } = await callerWorktree(f, 'after');
     const head3: string = await commitIn(w3, 'new.ts');
     expect((await cli(f, ['verify', '--known-red'], w3, env)).code).toBe(0);
-    expect(noticeCalls(f)).toHaveLength(2);
+    expect(noticeFiles(core)).toHaveLength(2);
     const second: VerifyRun | undefined = records(f).find((run) => run.sha === head3);
-    expect(baseRecord(f, second!).notice).toBe('shown');
+    expect(baseRecord(f, second!).notice).toBe('pending');
 
     // A green on an older revision finishing later never clears the newer red.
     const s1: string = await command(['git', 'rev-parse', 'origin/main~1'], f.root);
@@ -751,9 +742,10 @@ test('the incident resolves only on green evidence at or after the red on landed
     const { worktree: w4 } = await callerWorktree(f, 'later');
     await commitIn(w4, 'yet.ts');
     expect((await cli(f, ['verify', '--known-red'], w4, env)).code).toBe(0);
-    expect(noticeCalls(f)).toHaveLength(2);
-    expect(records(f).filter((run) => run.notice === 'shown')).toHaveLength(2);
+    expect(noticeFiles(core)).toHaveLength(2);
+    expect(records(f).filter((run) => run.notice === 'pending')).toHaveLength(2);
   } finally {
+    await core.stop();
     f.clean();
   }
 });
@@ -784,7 +776,7 @@ test('a failed notice write is recorded as error and retried by the next base ru
   }
 });
 
-test('an absent herdr binary is recorded as error and verify keeps its result', async () => {
+test('an unreachable hc session is recorded as error and verify keeps its result', async () => {
   const f: Fixture = await fixture();
   try {
     await failureScript(f, 'alpha');
@@ -805,11 +797,12 @@ test('an absent herdr binary is recorded as error and verify keeps its result', 
   }
 });
 
-test('two simultaneous base runs produce one notification', async () => {
+test('two simultaneous base runs produce one notice file', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
     await failureScript(f, 'alpha');
-    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const env: NodeJS.ProcessEnv = core.env;
     const { worktree: w1 } = await callerWorktree(f, 'one');
     const { worktree: w2 } = await callerWorktree(f, 'two');
     await commitIn(w1, 'a.ts');
@@ -819,11 +812,12 @@ test('two simultaneous base runs produce one notification', async () => {
       cli(f, ['verify', '--known-red'], w2, env),
     ]);
     expect([first.code, second.code]).toEqual([0, 0]);
-    expect(noticeCalls(f)).toHaveLength(1);
+    expect(noticeFiles(core)).toHaveLength(1);
     const bases: VerifyRun[] = records(f).filter((run) => run.compares !== undefined);
     expect(bases).toHaveLength(2);
-    expect(bases.filter((run) => run.notice === 'shown')).toHaveLength(1);
+    expect(bases.filter((run) => run.notice === 'pending')).toHaveLength(1);
   } finally {
+    await core.stop();
     f.clean();
   }
 });
@@ -870,13 +864,14 @@ test('a pending notice whose file outlives its sending process still covers the 
 
 test('a green on the same revision clears only the earlier main-red incident', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
     await failureScript(f, 'alpha');
-    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const env: NodeJS.ProcessEnv = core.env;
     const { worktree } = await callerWorktree(f);
     await commitIn(worktree, 'one.ts');
     expect((await cli(f, ['verify', '--known-red'], worktree, env)).code).toBe(0);
-    expect(noticeCalls(f)).toHaveLength(1);
+    expect(noticeFiles(core)).toHaveLength(1);
 
     const base: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
     greenReceipt(f, base, 'leaf');
@@ -886,22 +881,24 @@ test('a green on the same revision clears only the earlier main-red incident', a
     const { worktree: w2 } = await callerWorktree(f, 'after');
     await commitIn(w2, 'two.ts');
     expect((await cli(f, ['verify', '--known-red'], w2, env)).code).toBe(0);
-    expect(noticeCalls(f)).toHaveLength(2);
+    expect(noticeFiles(core)).toHaveLength(2);
 
     await commitIn(w2, 'three.ts');
     expect((await cli(f, ['verify', '--known-red'], w2, env)).code).toBe(0);
-    expect(noticeCalls(f)).toHaveLength(2);
+    expect(noticeFiles(core)).toHaveLength(2);
   } finally {
+    await core.stop();
     f.clean();
   }
 });
 
 test('a failed base setup does not send a main-red test notice', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
     await failureScript(f, 'alpha');
     config(f, { setup: 'echo dependency-install-failed; exit 9', checks: { test: 'sh check.sh' } });
-    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const env: NodeJS.ProcessEnv = core.env;
     const { worktree } = await callerWorktree(f);
     const head: string = await commitIn(worktree, 'code.ts');
     expect((await cli(f, ['verify', '--known-red'], worktree, env)).code).toBe(1);
@@ -911,9 +908,10 @@ test('a failed base setup does not send a main-red test notice', async () => {
     );
     expect(run.setup).toBe(9);
     expect(run.end).toBeDefined();
-    expect(noticeCalls(f)).toHaveLength(0);
+    expect(noticeFiles(core)).toHaveLength(0);
     expect(run.notice).toBeUndefined();
   } finally {
+    await core.stop();
     f.clean();
   }
 });
@@ -1683,16 +1681,17 @@ test('a merge-only command the leaf row lacks runs at merge verify and the gate 
 
 test('a leaf-scope green on main resolves a merge-scope main-red unit and re-notifies on recurrence', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
     await failureScript(f, 'alpha');
-    const env: NodeJS.ProcessEnv = noticeEnv(f);
+    const env: NodeJS.ProcessEnv = core.env;
     const { worktree: w1 } = await callerWorktree(f, 'one', {
       phase: 'merge',
       batch: { attempt: 'att-1', built_on: 'x', holder: { base: 'x', head: 'x' }, applied: true },
     });
     await commitIn(w1, 'a.ts');
     expect((await cli(f, ['verify', '--attempt', 'att-1', '--known-red'], w1, env)).code).toBe(0);
-    expect(noticeCalls(f)).toHaveLength(1);
+    expect(noticeFiles(core)).toHaveLength(1);
 
     // The fix lands on main through a leaf-scope green on the landed commit.
     const { worktree: wOk } = await callerWorktree(f, 'fixer');
@@ -1713,10 +1712,11 @@ test('a leaf-scope green on main resolves a merge-scope main-red unit and re-not
     });
     const head3: string = await commitIn(w3, 'new.ts');
     expect((await cli(f, ['verify', '--attempt', 'att-2', '--known-red'], w3, env)).code).toBe(0);
-    expect(noticeCalls(f)).toHaveLength(2);
+    expect(noticeFiles(core)).toHaveLength(2);
     const second: VerifyRun | undefined = records(f).find((run) => run.sha === head3);
-    expect(baseRecord(f, second!).notice).toBe('shown');
+    expect(baseRecord(f, second!).notice).toBe('pending');
   } finally {
+    await core.stop();
     f.clean();
   }
 });
