@@ -28,7 +28,7 @@ import { readState, saveState, type Batch, type Failure } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import { z } from 'zod';
-import { blockNotices, hcFixture, noticeFiles, noticeFolder, type HcFixture } from './hc-fixture';
+import { blockNotices, hcCore, hcFixture, noticeFiles, noticeFolder, type HcCore, type HcFixture } from './hc-fixture';
 import { noticeId } from '../src/notice';
 
 function bytes(path: string): string {
@@ -47,10 +47,6 @@ function herdrCalls(db: string): string[][] {
 }
 // The skip line a pass prints for a leaf it could not finish: repo, path, slug and error, no source.
 const skipLine = z.object({ repo: z.string(), path: z.string(), slug: z.string(), error: z.string() }).strict();
-// The fixture core's fake herdr database (notices only).
-function herdrDb(f: HcFixture): string {
-  return resolve(f.home, 'herdr.json');
-}
 // Each herdr-app tab rename akrogon asked for, as [tab, name], all through the fixture core's app home.
 function renames(f: HcFixture): string[][] {
   const calls = f.core.appCalls().filter((call) => call.argv[1] === 'tab.rename');
@@ -1137,25 +1133,25 @@ test('stop from implement on dirty worktree records blocked failure and clears b
 
 test('stops land in failed immediately without phase advance and validate slots', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
-    const herdr = fakeHerdr(f);
     const planPath: string = leaf(f, 'stop-plan', 'plan.synthesis');
     expect(
-      (await cli(f, ['phase', 'stop-plan', 'failed', '--slot', 'A', '--reason', 'x'], f.root, herdr.env)).stdout,
+      (await cli(f, ['phase', 'stop-plan', 'failed', '--slot', 'A', '--reason', 'x'], f.root, core.env)).stdout,
     ).toBe('moved failed');
     expect(readState(planPath).failure).toEqual({
       cause: 'blocked',
       phase: 'plan.synthesis',
       slot: 'A',
       reason: 'x',
-      delivery: 'shown',
+      delivery: 'pending',
     });
     const reviewPath: string = leaf(f, 'stop-review', 'check.review');
     const review: Result = await cli(
       f,
       ['phase', 'stop-review', 'failed', '--slot', 'A', '--reason', 'x'],
       f.root,
-      herdr.env,
+      core.env,
     );
     expect(review.stdout).toBe('moved failed');
     expect(readState(reviewPath).failure).toEqual({
@@ -1163,17 +1159,17 @@ test('stops land in failed immediately without phase advance and validate slots'
       phase: 'check.review',
       slot: 'A',
       reason: 'x',
-      delivery: 'shown',
+      delivery: 'pending',
     });
     const mergePath: string = leaf(f, 'stop-merge', 'merge');
-    const merge: Result = await cli(f, ['phase', 'stop-merge', 'failed', '--reason', 'x'], f.root, herdr.env);
+    const merge: Result = await cli(f, ['phase', 'stop-merge', 'failed', '--reason', 'x'], f.root, core.env);
     expect(merge.stdout).toBe('moved failed');
     expect(readState(mergePath).failure).toEqual({
       cause: 'blocked',
       phase: 'merge',
       slot: 'B',
       reason: 'x',
-      delivery: 'shown',
+      delivery: 'pending',
     });
     leaf(f, 'bad-slot', 'implement');
     const bad: Result = await cli(f, ['phase', 'bad-slot', 'failed', '--slot', 'B', '--reason', 'x']);
@@ -1186,6 +1182,7 @@ test('stops land in failed immediately without phase advance and validate slots'
     expect(done.stderr).toContain('Slot already recorded');
     expect(bytes(donePath)).toBe(doneBefore);
   } finally {
+    await core.stop();
     f.clean();
   }
 });
@@ -1224,8 +1221,8 @@ test('blocked restart skips clean check and removes failure while attempts resta
 
 test('failed routing and reason misuse are guarded', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
-    const herdr = fakeHerdr(f);
     const fixPath: string = leaf(f, 'to-fix', 'failed');
     expect((await cli(f, ['phase', 'to-fix', 'check.fix'])).stdout).toBe('moved check.fix');
     expect(readState(fixPath).phase).toBe('check.fix');
@@ -1256,11 +1253,12 @@ test('failed routing and reason misuse are guarded', async () => {
       f,
       ['phase', 'padded-reason', 'failed', '--reason', '  real reason  '],
       f.root,
-      herdr.env,
+      core.env,
     );
     expect(padded.code).toBe(0);
     expect(readState(paddedPath).failure).toMatchObject({ reason: 'real reason' });
   } finally {
+    await core.stop();
     f.clean();
   }
 });
@@ -1324,36 +1322,26 @@ test('failed restart refuses issue files on branch but allows move without workt
   }
 });
 
-for (const [mode, delivery] of [
-  ['failNotification', 'error'],
-  ['failRename', 'shown'],
-] as const) {
-  test(`failed move logs persisted delivery after ${mode}`, async () => {
-    const f: Fixture = await fixture();
-    try {
-      const herdr: HerdrFixture = fakeHerdr(f);
-      writeFileSync(
-        herdr.db,
-        JSON.stringify({ panes: [], tabs: [{ tab_id: 'tab-1', label: 'oops' }], serial: 0, [mode]: true }),
-      );
-      const path: string = leaf(f, 'oops', 'implement', { tab: 'tab-1' });
-      const result: Result = await cli(
-        f,
-        ['phase', 'oops', 'failed', '--slot', 'A', '--reason', 'Required permission is missing'],
-        f.root,
-        herdr.env,
-      );
-      expect(result.code).not.toBe(0);
-      expect(readState(path).failure?.delivery).toBe(delivery);
-      const record: { failure?: Failure } = JSON.parse(
-        readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim(),
-      );
-      expect(record.failure).toEqual(readState(path).failure);
-    } finally {
-      f.clean();
-    }
-  });
-}
+// A failed notice write fails the move's follow-up work; the log still records the persisted delivery.
+test('failed move logs persisted delivery after a failed notice write', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    blockNotices(f.core);
+    const path: string = leaf(f, 'oops', 'implement', { tab: 'tab-1' });
+    const result: Result = await cli(
+      f,
+      ['phase', 'oops', 'failed', '--slot', 'A', '--reason', 'Required permission is missing'],
+      f.root,
+      f.env,
+    );
+    expect(result.code).not.toBe(0);
+    expect(readState(path).failure?.delivery).toBe('error');
+    const record: { failure?: Failure } = JSON.parse(readFileSync(resolve(f.root, 'issues/log.jsonl'), 'utf8').trim());
+    expect(record.failure).toEqual(readState(path).failure);
+  } finally {
+    await f.clean();
+  }
+});
 
 test('failed announce writes the failed notice, renames tabs and tolerates missing tabs', async () => {
   const failedNotice = (slug: string) => ({ title: `repo/${slug} failed`, body: 'blocked: x', attention: true });
@@ -1446,7 +1434,7 @@ test('failed announce writes the failed notice, renames tabs and tolerates missi
   }
 }, 60000);
 
-for (const { slug, phase, args, failNotification, code, notices, name, delivery } of [
+for (const { slug, phase, args, failNotice, code, notices, name, delivery } of [
   {
     slug: 'stale-resume',
     phase: 'failed',
@@ -1460,17 +1448,17 @@ for (const { slug, phase, args, failNotification, code, notices, name, delivery 
     phase: 'implement',
     args: ['phase', 'stale-fail', 'failed', '--slot', 'A', '--reason', 'x'],
     code: 0,
-    notices: [['notification', 'show', 'repo/stale-fail failed', '--body', 'blocked: x', '--sound', 'request']],
+    notices: [{ title: 'repo/stale-fail failed', body: 'blocked: x', attention: true }],
     name: 'stale-fail failed',
-    delivery: 'shown',
+    delivery: 'pending',
   },
   {
     slug: 'stale-fail',
     phase: 'implement',
     args: ['phase', 'stale-fail', 'failed', '--slot', 'A', '--reason', 'x'],
-    failNotification: true,
+    failNotice: true,
     code: 1,
-    notices: [['notification', 'show', 'repo/stale-fail failed', '--body', 'blocked: x', '--sound', 'request']],
+    notices: [],
     name: 'stale-fail failed',
     delivery: 'error',
   },
@@ -1478,30 +1466,29 @@ for (const { slug, phase, args, failNotification, code, notices, name, delivery 
   slug: string;
   phase: string;
   args: string[];
-  failNotification?: boolean;
+  failNotice?: boolean;
   code: number;
-  notices: string[][];
+  notices: { title: string; body: string; attention: boolean }[];
   name: string;
   delivery?: string;
 }[]) {
-  test(`rename on a missing tab warns once and continues (${slug} ${failNotification === true ? 'notification error' : 'clean'})`, async () => {
+  test(`rename on a missing tab warns once and continues (${slug} ${failNotice === true ? 'notice error' : 'clean'})`, async () => {
     // The fake herdr-app answers this rename with herdr-app's "tab ... not found" failure.
     const f: HcFixture = await hcFixture({ window: 'open' });
     try {
       f.core.setWindow('open', 'fail');
-      writeFileSync(
-        herdrDb(f),
-        JSON.stringify({ panes: [], tabs: [], serial: 0, failNotification: failNotification === true }),
-      );
+      if (failNotice === true) blockNotices(f.core);
       const path: string = parked(f, slug, phase, { tab: 'aktab1' });
       const result: Result = await cli(f, [...args], f.root, f.env);
       expect(result.code).toBe(code);
-      if (failNotification === true) expect(result.stderr).toContain('fixture_notification_failed');
+      if (failNotice === true) expect(result.stderr).toContain(noticeFolder(f.core));
       const warnings = renameWarnings(result);
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toMatchObject({ slug, tab: 'aktab1', name });
       expect(warnings[0].error).toContain('not found');
-      expect(herdrCalls(herdrDb(f))).toEqual(notices);
+      if (failNotice === true) expect(statSync(noticeFolder(f.core)).isFile()).toBe(true);
+      else
+        expect(noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }))).toEqual(notices);
       expect(renames(f)).toEqual([['aktab1', name]]);
       const state: { phase: string; tab?: string; failure?: { delivery?: string } } = readState(path);
       expect(state.phase).toBe(args[2]);
@@ -1879,8 +1866,8 @@ test('a phase move still logs and succeeds when herdr is unreachable', async () 
 
 test('merge turn refusal names the holder for merged and check.fix while failed is never refused', async () => {
   const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
   try {
-    const herdr: HerdrFixture = fakeHerdr(f);
     const holderPath: string = leaf(f, 'aa', 'merge', holding(f));
     const nonHolderPath: string = leaf(f, 'bb', 'merge', holding(f));
     // Unstamped merge leaves take turns in slug order, so aa holds the queue.
@@ -1894,7 +1881,7 @@ test('merge turn refusal names the holder for merged and check.fix while failed 
       expect(result.stderr).toContain('aa');
     }
     expect(readState(nonHolderPath).phase).toBe('merge');
-    const failed: Result = await cli(f, ['phase', 'bb', 'failed', '--reason', 'x'], f.root, herdr.env);
+    const failed: Result = await cli(f, ['phase', 'bb', 'failed', '--reason', 'x'], f.root, core.env);
     expect(failed.code).toBe(0);
     expect(readState(nonHolderPath).phase).toBe('failed');
     expect((await cli(f, ['phase', 'aa', 'merged', '--check'])).stdout).toBe('ok');
@@ -1903,6 +1890,7 @@ test('merge turn refusal names the holder for merged and check.fix while failed 
     expect(moved.code).toBe(0);
     expect(readState(holderPath).phase).toBe('merged');
   } finally {
+    await core.stop();
     f.clean();
   }
 });
