@@ -4,13 +4,15 @@ Optional: the [watch-issues](../../skills/watch-issues/SKILL.md) skill checks ev
 
 ## Start the watch
 
-Open Claude Code in the registered repository and run:
+Open Claude Code in an hc terminal of the session that holds the repository's space, in the registered repository, and run:
 
 ```text
 /watch-issues
 ```
 
-It runs one check right away. Then it creates one Claude Code cron job that repeats the check every 20 minutes and prints the job id and its 7-day expiry. If a watch job already exists, it reports that job and creates no second one. The watch needs Claude Code cron, so it does not run in other agent CLIs.
+It runs one check right away and labels its own terminal `akrogon.watch=<repo>`. Then it creates one Claude Code cron job that repeats the check every 20 minutes and prints the job id and its 7-day expiry. If a watch job already exists, it reports that job and creates no second one. The watch needs Claude Code cron and an hc terminal, so it does not run in other agent CLIs or outside hc. Started in another hc session, it refuses and names the right one.
+
+Besides the cron, the akrogon listener wakes the labelled terminal when a seat is lost or exits, a seat is blocked or busy too long, or a leaf fails. Each wake runs one check, and wakes that queue up while a check runs fold into one.
 
 ## What each check does
 
@@ -27,7 +29,7 @@ It runs one check right away. Then it creates one Claude Code cron job that repe
 
 The watch never recovers a leaf that failed on a credential, a permission, a decision or an outside step. It notifies you instead. Fix the cause, then move the leaf yourself as shown in [Limits](../reference/limits.md).
 
-The watch never kills an agent, closes a pane, answers a seat, or edits `state.yaml`, worktrees or `issues/`.
+The watch never kills an agent, kills or removes a terminal, answers a seat, or edits `state.yaml`, worktrees or `issues/`.
 
 ## Stop the watch
 
@@ -37,6 +39,6 @@ Stop it with:
 /watch-issues stop
 ```
 
-The job also ends when the Claude Code session ends or the 7-day expiry passes. It never stops itself, even when no open leaves are left.
+Stopping also removes the terminal's `akrogon.watch` label, so the listener sends no more wakes. The job also ends when the Claude Code session ends or the 7-day expiry passes. It never stops itself, even when no open leaves are left.
 
 Next: [Commands](../reference/commands.md)
