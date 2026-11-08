@@ -7,7 +7,8 @@
 #   idle   reports idle and never goes working (never confirms a start, send gives started:false);
 #          a received line `WORK` makes one working-to-idle turn, so a test can move its turn
 #   exit   exits 3 at once
-#   trust  agy's trust dialog first (blocked, permission); one Enter answers it, then behaves as work
+#   trust  agy's trust dialog first (blocked, permission); one Enter answers it, then idle, done a
+#          second later, and behaves as work
 mode=work
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -40,6 +41,11 @@ trust)
 	printf '\033]7501;state=blocked:kind=permission:msg=Trust this folder?\007'
 	IFS= read -r line
 	printf 'ENTER\n' >> "$log"
+	# Like a starting agent whose output settles after the dialog: idle, then a later status, so a
+	# first send refused as still starting has the next status event to retry on (criterion 5).
+	status idle
+	sleep 1
+	status done
 	;;
 esac
 status idle
