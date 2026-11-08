@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, readFileSync, watch, writeFileSync } from 'node:f
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, type Fixture } from './helpers';
-import { hcCore, setPrefixes, setSeat, type HcCore, type Terminal } from './hc-fixture';
+import { coreBin, hcCore, setPrefixes, setSeat, type HcCore, type Terminal } from './hc-fixture';
 import { readState } from '../src/state';
 import { leafSlice } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
@@ -182,7 +182,7 @@ done
 `,
   );
   chmodSync(resolve(bin, 'agy'), 0o755);
-  const core: HcCore = await hcCore(f, { coreEnv: { PATH: `${bin}:${process.env.PATH}` } });
+  const core: HcCore = await hcCore(f, { coreEnv: { PATH: `${bin}:${coreBin}:${process.env.PATH}` } });
   const path: string = leaf(f, 'hd-status-retry', 'plan.synthesis');
   const unavailable: string = resolve(f.home, 'unavailable-once');
   writeFileSync(unavailable, '');

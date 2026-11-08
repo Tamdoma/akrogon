@@ -1,8 +1,10 @@
 // Real throwaway hc core per test file (forks/tests.md Q1): a unique HC_SESSION, scratch state,
 // the stand-in agent on the core's PATH under the fixture harness names, the strict fake herdr-app
-// and a recording hc shim on akrogon's PATH. The core keeps the real XDG_RUNTIME_DIR so
-// `systemd-run --user` works inside its terminals; akrogon gets a scratch XDG_RUNTIME_DIR whose
-// herdr-core/ holds only this file's sockets (plan N1), so discovery never sees other sessions.
+// and a recording hc shim on akrogon's PATH. akrogon gets a scratch XDG_RUNTIME_DIR whose herdr-core/
+// holds only this file's sockets (plan N1), so discovery never sees other sessions. The core gets its
+// own scratch runtime under it, so the operator's listener never sees test cores, and with no systemd
+// link there hc starts no units for a test core; `systemd-run` on the core's PATH reaches the user
+// manager for seat scopes.
 import { afterAll } from 'bun:test';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
@@ -14,6 +16,8 @@ import './isolation';
 
 const uid: number = process.getuid!();
 const realRuntime: string = `/run/user/${uid}`;
+// The `systemd-run` every test core needs on its PATH, kept by a test that replaces the core's PATH.
+export const coreBin: string = resolve(import.meta.dir, 'core-bin');
 const realHc: string | null = Bun.which('hc');
 let serial: number = 0;
 
@@ -45,22 +49,15 @@ function listening(path: string): Promise<boolean> {
 }
 
 async function sweepAbandoned(): Promise<void> {
-  const dir: string = resolve(realRuntime, 'herdr-core');
-  for (const name of existsSync(dir) ? readdirSync(dir) : []) {
-    const owner: RegExpExecArray | null = /^akt([0-9a-z]+)-\d+\.sock$/.exec(name);
-    if (owner === null || alive(parseInt(owner[1], 36)) || realHc === null) continue;
-    const session: string = name.slice(0, -'.sock'.length);
-    if (await listening(resolve(dir, name)))
-      await spawnCaptured([realHc, 'server', 'stop'], {
-        env: cleanEnv(session, {}, z.string().parse(process.env.PATH)),
-      });
-    for (const left of readdirSync(dir))
-      if (left === name || left.startsWith(`${session}.holder.`)) rmSync(resolve(dir, left), { force: true });
-  }
   for (const name of readdirSync(realRuntime)) {
     const owner: RegExpExecArray | null = /^akt([0-9a-z]+)-\d+$/.exec(name);
-    if (owner !== null && !alive(parseInt(owner[1], 36)))
-      rmSync(resolve(realRuntime, name), { recursive: true, force: true });
+    if (owner === null || alive(parseInt(owner[1], 36)) || realHc === null) continue;
+    const runtime: string = resolve(realRuntime, name);
+    if (await listening(resolve(runtime, 'core/herdr-core', `${name}.sock`)))
+      await spawnCaptured([realHc, 'server', 'stop'], {
+        env: cleanEnv(name, resolve(runtime, 'core'), {}, z.string().parse(process.env.PATH)),
+      });
+    rmSync(runtime, { recursive: true, force: true });
   }
 }
 
@@ -160,13 +157,18 @@ export function setSeat(f: Fixture, slot: 'a' | 'b', harness: 'fake' | 'agy', mo
   );
 }
 
-function cleanEnv(session: string, extra: Record<string, string>, path: string): Record<string, string> {
+function cleanEnv(
+  session: string,
+  runtime: string,
+  extra: Record<string, string>,
+  path: string,
+): Record<string, string> {
   return {
     HOME: z.string().parse(process.env.HOME),
     PATH: path,
     LANG: 'C.UTF-8',
     TERM: 'xterm-256color',
-    XDG_RUNTIME_DIR: realRuntime,
+    XDG_RUNTIME_DIR: runtime,
     DBUS_SESSION_BUS_ADDRESS: `unix:path=${realRuntime}/bus`,
     HC_SESSION: session,
     ...extra,
@@ -181,26 +183,34 @@ export async function hcCore(
   if (serial === 0) await sweepAbandoned();
   serial += 1;
   const session: string = `akt${process.pid.toString(36)}-${serial}`;
-  const socket: string = resolve(realRuntime, 'herdr-core', `${session}.sock`);
   const state: string = resolve(f.home, `hc-state-${serial}`);
   const standin: string = resolve(f.home, `standin-${serial}`);
   const standinBin: string = resolve(f.home, `standin-bin-${serial}`);
   // Under the real runtime dir, not TMPDIR: hc refuses a socket path its own limit finds too long, and
-  // run-check's longer TMPDIR pushed the scratch link past it (115 bytes reported).
+  // run-check's longer TMPDIR pushed the socket path past it (115 bytes reported).
   const runtime: string = resolve(realRuntime, session);
-  const linked: string = resolve(runtime, 'herdr-core', `${session}.sock`);
-  if (Buffer.byteLength(linked) >= 107) throw new Error(`fixture socket path too long (${linked.length}): ${linked}`);
-  for (const dir of [state, standin, standinBin, resolve(runtime, 'herdr-core')]) mkdirSync(dir, { recursive: true });
+  const coreRuntime: string = resolve(runtime, 'core');
+  const socket: string = resolve(coreRuntime, 'herdr-core', `${session}.sock`);
+  if (Buffer.byteLength(socket) >= 107) throw new Error(`fixture socket path too long (${socket.length}): ${socket}`);
+  const dirs: string[] = [
+    state,
+    standin,
+    standinBin,
+    resolve(runtime, 'herdr-core'),
+    resolve(coreRuntime, 'herdr-core'),
+  ];
+  for (const dir of dirs) mkdirSync(dir, { recursive: true });
   for (const name of ['fake', 'agy']) symlinkSync(resolve(import.meta.dir, 'stand-in.sh'), resolve(standinBin, name));
   symlinkSync(resolve(realRuntime, 'bus'), resolve(runtime, 'bus'));
   symlinkSync(resolve(realRuntime, 'systemd'), resolve(runtime, 'systemd'));
-  const corePath: string = `${standinBin}:${dirname(process.execPath)}:${z.string().parse(process.env.PATH)}`;
+  symlinkSync(resolve(realRuntime, 'bus'), resolve(coreRuntime, 'bus'));
+  const corePath: string = `${standinBin}:${coreBin}:${dirname(process.execPath)}:${z.string().parse(process.env.PATH)}`;
   const start: SpawnResult = await spawnCaptured([realHc, 'server', 'start'], {
     cwd: f.home,
-    env: cleanEnv(session, { XDG_STATE_HOME: state, STANDIN_DIR: standin, ...opts.coreEnv }, corePath),
+    env: cleanEnv(session, coreRuntime, { XDG_STATE_HOME: state, STANDIN_DIR: standin, ...opts.coreEnv }, corePath),
   });
   if (start.code !== 0) throw new Error(`hc server start failed: ${JSON.stringify(start)}`);
-  symlinkSync(socket, linked);
+  symlinkSync(socket, resolve(runtime, 'herdr-core', `${session}.sock`));
   // Tests drop their own stubs in <home>/bin; akrogon's sweeps read the proc root.
   for (const dir of [resolve(f.home, 'bin'), procRoot(f)]) mkdirSync(dir, { recursive: true });
   const hcBin: string = resolve(f.home, `hc-bin-${serial}`);
@@ -229,11 +239,14 @@ export async function hcCore(
     AKROGON_PANE_WAIT_MS: '2000',
   };
   const hc = (args: string[]): Promise<SpawnResult> =>
-    spawnCaptured([realHc, ...args], { cwd: f.home, env: cleanEnv(session, { XDG_STATE_HOME: state }, corePath) });
+    spawnCaptured([realHc, ...args], {
+      cwd: f.home,
+      env: cleanEnv(session, coreRuntime, { XDG_STATE_HOME: state }, corePath),
+    });
   const rpc = async (method: string, params: object): Promise<unknown> => {
     const reply: SpawnResult = await spawnCaptured([realHc, 'connect'], {
       cwd: f.home,
-      env: cleanEnv(session, { XDG_STATE_HOME: state }, corePath),
+      env: cleanEnv(session, coreRuntime, { XDG_STATE_HOME: state }, corePath),
       stdin: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n',
     });
     const parsed = z
@@ -254,7 +267,7 @@ export async function hcCore(
     new Promise<Terminal>((done, fail) => {
       const child = Bun.spawn([realHc, 'events', '--json', '--terminal', address], {
         cwd: f.home,
-        env: cleanEnv(session, { XDG_STATE_HOME: state }, corePath),
+        env: cleanEnv(session, coreRuntime, { XDG_STATE_HOME: state }, corePath),
         stdout: 'pipe',
         stderr: 'ignore',
       });
@@ -404,7 +417,7 @@ export async function delivered(
 // document as a block of its herdr.tab under its herdr.space (P7 shape), retried on a version conflict.
 export function adopt(core: HcCore): () => void {
   const child = Bun.spawn([z.string().parse(realHc), 'events', '--json', '--label', 'akrogon=1'], {
-    env: cleanEnv(core.session, {}, z.string().parse(process.env.PATH)),
+    env: cleanEnv(core.session, resolve(core.runtime, 'core'), {}, z.string().parse(process.env.PATH)),
     stdout: 'pipe',
     stderr: 'ignore',
   });

@@ -1,0 +1,4 @@
+#!/bin/sh
+# A test core's runtime dir has no systemd link, so hc starts no units for it; seat scopes still reach
+# the user manager through the real runtime dir, and the scoped command keeps the core's own.
+XDG_RUNTIME_DIR="/run/user/$(id -u)" exec /usr/bin/systemd-run --setenv=XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" "$@"
