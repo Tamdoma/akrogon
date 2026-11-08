@@ -8,8 +8,7 @@ import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { readState } from '../../src/state';
-import { type SpawnResult } from '../../src/shell';
-import { engine, realHome, required, startTier, stopTier, trustedWorkspaces, type Tier } from './tier';
+import { answerTrust, engine, realHome, required, startTier, stopTier, trustedWorkspaces, type Tier } from './tier';
 
 const homedir = (): string => realHome;
 
@@ -58,6 +57,14 @@ async function seat(tier: Tier, slug: string) {
   return listed.terminals.filter((t) => t.state === 'live')[0];
 }
 
+async function liveSeat(tier: Tier, slug: string): Promise<string | null> {
+  const live = z
+    .object({ terminals: z.array(terminalSchema) })
+    .parse(await tier.rpc('terminal.list', { labels: { 'akrogon.leaf': slug } }))
+    .terminals.filter((t) => t.state === 'live');
+  return live.length === 1 ? live[0].address : null;
+}
+
 // Bounded by hc's own wait (event-driven), never a sleep.
 async function turnEnded(tier: Tier, address: string, turn: number): Promise<void> {
   for (let attempt: number = 0; attempt < 10; attempt += 1) {
@@ -66,42 +73,6 @@ async function turnEnded(tier: Tier, address: string, turn: number): Promise<voi
     await tier.hc(['wait', address, '--timeout', '60']);
   }
   throw new Error(`${address} did not finish turn ${turn}`);
-}
-
-// Plans O3, O4: Claude Code and codex ask whether to trust the tier's throwaway git repo before they
-// run the argv task. The trust answer is chosen once, inside the start verb's proof window, so the
-// start is still proven by the task itself. Each harness writes its own trust entry; no script edits
-// those files. Claude's cursor starts on "No, exit", so the keys follow the screen: Enter when the
-// cursor sits on the answer, else Down then Enter. Once the entry exists (it names the tier repo,
-// which every run recreates at the same path) the dialog no longer shows, so the wait ends when the
-// start verb returns.
-async function answerTrust(
-  tier: Tier,
-  kind: string,
-  slug: string,
-  trust: string,
-  starting: Promise<SpawnResult>,
-): Promise<void> {
-  const returned: Promise<boolean> = starting.then(() => true);
-  for (let attempt: number = 0; attempt < 90; attempt += 1) {
-    const live = z
-      .object({ terminals: z.array(terminalSchema) })
-      .parse(await tier.rpc('terminal.list', { labels: { 'akrogon.leaf': slug } }))
-      .terminals.filter((t) => t.state === 'live');
-    const shown: string = live.length === 1 ? (await tier.hc(['read', live[0].address])).stdout : '';
-    if (shown.includes(trust)) {
-      const line: string = shown.split('\n').find((l: string) => l.includes(trust)) ?? '';
-      const answer: string[] = /[❯›]/.test(line) ? ['enter'] : ['down', 'enter'];
-      tier.record(`${kind}-trust.txt`, `${shown}\nkeys: ${answer.join(' ')}\n`);
-      expect((await tier.hc(['keys', live[0].address, ...answer])).code).toBe(0);
-      return;
-    }
-    if (await Promise.race([returned, Bun.sleep(1000).then(() => false)])) {
-      tier.record(`${kind}-trust.txt`, 'no folder-trust dialog before the start verb returned\n');
-      return;
-    }
-  }
-  throw new Error(`${slug}: neither a folder-trust dialog nor the start verb's return in 90 s`);
 }
 
 test('kinds tier: first task, later send, report by hc send, transcript label, agy trust and outside write', async () => {
@@ -149,7 +120,7 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
       const outside: string = resolve(root, `akr-e2e-engine-${kind}-outside.txt`);
       const first: string = `Run exactly this shell command and nothing else: hc send ${inbox.address} 'done ${kind} 1'${kind === 'agy' ? ` && echo ok > ${outside}` : ''}`;
       const starting = tier.akrogon(['seat', slug, 'A', '--task', first]);
-      if (spec.trust !== null) await answerTrust(tier, kind, slug, spec.trust, starting);
+      if (spec.trust !== null) await answerTrust(tier, kind, () => liveSeat(tier, slug), spec.trust, starting);
       const started = await starting;
       tier.record(`${kind}-start.txt`, `${started.stdout}\n${started.stderr}`);
       expect(started.code).toBe(0);

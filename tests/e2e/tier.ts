@@ -186,6 +186,40 @@ export async function startTier(
   return { session: s, root, runtime, home, repo: 'akre2e', out, env, hc, rpc, akrogon, record };
 }
 
+// Plans O3, O4: Claude Code and codex ask whether to trust the tier's throwaway git repo before they
+// run the argv task. The trust answer is chosen once, inside the start verb's proof window, so the
+// start is still proven by the task itself. Each harness writes its own trust entry; no script edits
+// those files. Claude's cursor starts on "No, exit", so the keys follow the screen: Enter when the
+// cursor sits on the answer, else Down then Enter. Once the entry exists (it names the tier repo,
+// which every run recreates at the same path) the dialog no longer shows, so the wait ends when the
+// start verb returns.
+export async function answerTrust(
+  tier: Pick<Tier, 'hc' | 'record'>,
+  kind: string,
+  address: () => Promise<string | null>,
+  trust: string,
+  starting: Promise<unknown>,
+): Promise<void> {
+  const returned: Promise<boolean> = starting.then(() => true);
+  for (let attempt: number = 0; attempt < 90; attempt += 1) {
+    const live: string | null = await address();
+    const shown: string = live === null ? '' : (await tier.hc(['read', live])).stdout;
+    if (shown.includes(trust)) {
+      const line: string = shown.split('\n').find((l: string) => l.includes(trust)) ?? '';
+      const answer: string[] = /[❯›]/.test(line) ? ['enter'] : ['down', 'enter'];
+      tier.record(`${kind}-trust.txt`, `${shown}\nkeys: ${answer.join(' ')}\n`);
+      const pressed: SpawnResult = await tier.hc(['keys', z.string().parse(live), ...answer]);
+      if (pressed.code !== 0) throw new Error(`hc keys failed: ${JSON.stringify(pressed)}`);
+      return;
+    }
+    if (await Promise.race([returned, Bun.sleep(1000).then(() => false)])) {
+      tier.record(`${kind}-trust.txt`, 'no folder-trust dialog before the start verb returned\n');
+      return;
+    }
+  }
+  throw new Error(`${kind}: neither a folder-trust dialog nor the start verb's return in 90 s`);
+}
+
 // The grant's cleanup and absence check (readiness grants[0].fixtures[0]).
 export async function stopTier(tier: Tier, cwds: string[]): Promise<string[]> {
   const listed = z
