@@ -1,0 +1,16 @@
+/home/ivan/.local/bin/herdr-update-check
+    Files /home/ivan/.config/herdr-app-sessions/infra/mods/tabs/mod.json and /home/ivan/Work/infra/herdr-setup/mods/panel-bar/mod.json differ
+    Only in /home/ivan/Work/infra/herdr-setup/mods/panel-bar: routine.js
+    Only in /home/ivan/.config/herdr-app-sessions/infra/mods/tabs: win-close.svg
+    Only in /home/ivan/.config/herdr-app-sessions/infra/mods/tabs: win-max.svg
+    Only in /home/ivan/.config/herdr-app-sessions/infra/mods/tabs: win-min.svg
+    Only in /home/ivan/.config/herdr-app-sessions/infra/mods/tabs: win-restore.svg
+  /home/ivan/Work/infra/herdr-setup/mods/spaces-list <- spaces 0.1.12
+    Files /home/ivan/.config/herdr-app-sessions/infra/mods/spaces/main.js and /home/ivan/Work/infra/herdr-setup/mods/spaces-list/main.js differ
+    Files /home/ivan/.config/herdr-app-sessions/infra/mods/spaces/mod.json and /home/ivan/Work/infra/herdr-setup/mods/spaces-list/mod.json differ
+failed (5); recorded pair unchanged:
+  session default: core runs 0.1.17, installed is hc 0.1.18; restart the core
+  session default: core executable /home/ivan/.local/bin/herdr-core (deleted); restart the core
+  mod tasks: /home/ivan/.config/herdr-app-sessions/infra/mods/tasks/main.js changed after the window started; restart the window
+  session mdconsultingny: core runs 0.1.17, installed is hc 0.1.18; restart the core
+  session mdconsultingny: core executable /home/ivan/.local/bin/herdr-core (deleted); restart the core

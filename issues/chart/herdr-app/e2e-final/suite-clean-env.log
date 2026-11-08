@@ -1,0 +1,42 @@
+bun test v1.4.4 (38afee6c8) 4x PARALLEL
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+
+tests/next.test.ts:
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-vB2HMK/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-vB2HMK/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-uHkXhL/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-uHkXhL/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-vB2HMK/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-vB2HMK/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-uHkXhL/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-uHkXhL/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-ukHyUf/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-ukHyUf/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-53CGwV/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-53CGwV/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-ukHyUf/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-ukHyUf/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-53CGwV/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-53CGwV/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-WGvHDB/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-WGvHDB/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-4NJ0MC/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-4NJ0MC/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-WGvHDB/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-WGvHDB/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-743243-6Fey1r/akrogon-4NJ0MC/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-743243-6Fey1r/akrogon-4NJ0MC/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+
+tests/batch.test.ts:
+{"ok":true,"top":"577284f51fa6821f7382e0893b34939b5ccc4a35"}
+
+tests/install.test.ts:
+Install filesystem evidence: /var/tmp/akr-1000/e2e-final/main/.evidence/install-prune-links/home-listing.json
+
+tests/hc-observe.test.ts:
+263 |         stderr: 'ignore',
+264 |       });
+265 |       let current: Terminal | null = null;
+266 |       const timer = setTimeout(() => {
+267 |         child.kill();
+268 |         fail(new Error(`terminal ${address} did not reach the expected state in ${ms} ms: ${JSON.stringify(current)}`));
+                       ^
+error: terminal t6 did not reach the expected state in 15000 ms: {"address":"t6","name":null,"state":"live","turn":0,"pid":919744,"parent":null,"cwd":"/tmp/akrogon-suite-743242-NTIRnD/akrogon-cZeKad","labels":{"akrogon":"1","akrogon.leaf":"ob-exit","akrogon.repo":"repo","akrogon.seat":"a"},"status":null}
+      at <anonymous> (/var/tmp/akr-1000/e2e-final/main/tests/hc-fixture.ts:268:18)
+(fail) observe prints each recorded leaf from its hc seats in the repo session [15334.20ms]
+
+ 1166 pass
+ 1 fail
+ 11965 expect() calls
+Ran 1167 tests across 82 files. [67.78s]

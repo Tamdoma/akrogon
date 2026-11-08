@@ -1,0 +1,15 @@
+{
+  "transcripts": {
+    "claude": "/home/ivan/.claude/projects/-var-tmp-akr-1000-5d20-1f23ef6e-akr-e2e-engine-claude/e42d3e35-fdba-401b-bd1b-a64d2f16f5ee.jsonl",
+    "codex": "/home/ivan/.codex/sessions/2026/11/08/rollout-2026-11-08T02-46-08-01a1b8d5-99c2-70f2-a5c7-ae0837b030b7.jsonl",
+    "pi": "/home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-1f23ef6e-akr-e2e-engine-pi--/2026-11-08T01-46-20-371Z_4c46a081-a3d3-409a-a2bf-a678a636cfc5.jsonl",
+    "agy": "/home/ivan/.gemini/antigravity-cli/conversation_summaries.db"
+  },
+  "temps": {
+    "claude": "/var/tmp/akr-1000/4f79/84737d8d",
+    "codex": "/var/tmp/akr-1000/4f79/46402f38",
+    "pi": "/var/tmp/akr-1000/4f79/9ba61a17",
+    "agy": "/var/tmp/akr-1000/4f79/10a5bfe4"
+  },
+  "retained_agy": "8d8f4dae-b418-46dc-8621-31eb43056f98"
+}

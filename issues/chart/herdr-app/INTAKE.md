@@ -169,3 +169,50 @@ Door A = Claude in t15 (herdr-app session infra). Consultants: codex (`codex --n
 ## Carry from tasks-hierarchy (2026-11-04)
 
 The Tasks board's row click should jump to the agent's pane (operator direction 1b in issues/chart/tasks-hierarchy/forks/direction.md: "a click jumps to the agent's pane or log"). Today akrogon records old herdr pane ids (`wA:p1WA`), which herdr-app cannot focus, so the board opens the leaf folder in Files instead. When seats run as herdr-app terminals, the producer reports the seat's herdr-app terminal and the board runs `pane.focus` (problem seat first on a Needs you row).
+
+## Found 2026-11-04: a backgrounded door reports no status (chart agent-status-stale)
+Agent finding, akrogon door t15: after the door's Claude session was sent to the background (`/background` or `/bg`, 2026-11-03T19:56:41Z), hc kept `status: null` for t15 and listed it as `agent: bash`. A Claude Code background worker (`CLAUDE_CODE_SESSION_KIND=bg`) sends no OSC 7501 program status, and its viewer in the terminal does not relay it (installed claude 2.1.318). The job's live state is only in `~/.claude/jobs/<id>/state.json`. So the port cannot read a backgrounded door's or seat's status from hc, and the Agents sidebar shows its group idle once the consultants finish. Recovery the binary names: `/stop`, then `claude --resume` from the shell. Evidence: issues/chart/agent-status-stale/slots/map-C.md section 1.
+
+## Found 2026-11-05: a sandboxed codex consultant cannot reach hc (herdr-setup chart files-edit)
+Agent findings, herdr-setup door t3f (Claude Code, auto mode), consultant `hs-slot-b` (codex 0.166.0, gpt-6.1-sol):
+- Claude Code's auto mode classifier refused `hc run --bg --name hs-slot-b codex --no-daemon ... -s danger-full-access -a never "<task>"` as "Create Unsafe Agents". A door running in auto mode cannot start a full-access codex consultant without a permission rule from the operator.
+- Started instead with `-s workspace-write -a never`, codex ran its brief and wrote its return file, but its `hc send t3f "done B: ..."` failed: the sandbox blocks the hc socket (`/run/user/1000/herdr-core/infra.sock`), so `hc` tried to start its own core and failed with `cannot start core: Read-only file system (os error 30)`. The door got no `done` message and fell back to watching the terminal's status.
+- Fix, proven 2026-11-05: `codex sandbox -c sandbox_mode=workspace-write -c sandbox_workspace_write.network_access=true -- hc ls` reaches the `infra` core, while the same call without `network_access=true` fails as above. The consultant now runs as `codex --no-daemon -m gpt-6.1-sol -c model_reasoning_effort=high -s workspace-write -c sandbox_workspace_write.network_access=true -a never "<pointer>"`.
+- For the port: the start helper's codex argv needs `sandbox_workspace_write.network_access=true` whenever codex runs sandboxed, or every `done` report is lost silently. A restart is the only way to change it on a live seat (kill, then `hc run` under the same name), and the restart lost the pane placement again (`terminal.keep --place right` redone).
+
+## Source: operator 2026-11-06, door t15 (chart-issues open)
+
+Operator words, verbatim:
+
+"Look at the herdr-app INTAKE.md issue and my intake file. Also, Read ~/.config/herdr-app/AGENTS.md. What we need to do is we need to completely move from the old herder app that is right now on this computer and move to herdr-app (the new version that consists of herdr-core + herdr-app). We've been filling out the herder app Issue for the fast past couple of days while we were testing how everything was gonna work. We need to chart this out in detail. You will have me involved in everything. We need to make sure that all of the functionalities, including the lifecycle, follow the way the new Herder core actually functions in the backend with <hc> tags. There will also be no polling. Every time the slot needs to communicate something with the other slot, we need to make sure that it sends the message. So there will be no polling from the opposite side and waiting on messages. Also, we need to make sure that all of the agents inside of the acrogon system have to be aware of the fact that they are running as a part of the herdr-core. I'm also debating whether to put this into claw.md and agents.md inside of Py Codex and Clawed Code, een when they're running outside of akrogon. We need to figure this out. I don't want to pollute that, because I'm not running claude code JUST in herdr-core and herdr-app. Maybe replacing the global "herdr" skill that now points to the old system is the solution (or ~/.config/herdr-app/AGENTS.md should be enough but the agents need to be aware of it every time they're run in the herdr-app and herdr-core environment) But the point is that WHEN agents are being run inside of herdr-app and herdr-core, they need to be aware of that. Use slot b conusltant (codex), slot c consultant (Claude Fable 5.1 high effort), slot d consultant (pi, meta muse wonder full 1.0), slot e consultant (agy, argon high effort). Read ~/.config/herdr-app/AGENTS.md because this is how the new herdr-core and herdr-app work."
+
+## Agent findings, 2026-11-06 (door t15, chart open)
+
+- Equal consultant heights are reachable with public commands. Placing in this order gives four equal panes: focus A, `terminal.keep B --place right`; focus B, `keep D --place down`; focus B, `keep C --place down`; focus D, `keep E --place down`. Each keep halves the focused pane's weight, so the stored column reads B 0.5, C 0.5, D 0.5, E 0.5 (25% each) and A 0.5 beside it. Checked in `~/.local/state/herdr-core/infra/docs.json` for tab `c-akrogon` (t6c, t6d, t6f, t6g). Halving only gives equal shares for 2, 4 or 8 seats. Three seats cannot be equal this way (best is 25/25/50 or 50/25/25).
+- Consultants started for this chart: `ak-slot-b` codex (`-s workspace-write -c sandbox_workspace_write.network_access=true -a never`), `ak-slot-c` claude `--model claude-fable-5-1 --effort high --permission-mode auto`, `ak-slot-d` pi `--model meta/muse-wonder-full-1.0 -a --exclude-tools request_user_input`, `ak-slot-e` agy `--model gemini-4-argon-high --mode auto -i`. All four took the first task from the start command and reported `done` by `hc send` without polling.
+
+## Source: operator 2026-11-06, door t15 (after E's silent stop)
+
+"so it's a problem with E, right? We need to stop this from happening in the future, so this needs to be charted as well."
+
+## Agent findings, 2026-11-06 (door t15, start-and-pane N2 check)
+
+- Silent stop seen live: `ak-slot-e` (agy, gemini-4-argon-high) received the N2 brief by `hc send` (shown in its input), read one file, then ended its turn printing only "⚙️": no return file, no `hc send t15 "done E: ..."`. hc reported `status done`, turn 12, so `hc wait --children all` returned with every child done while E's report was missing. Delivery worked; the harness ended the turn without doing the task. A turn ending is not proof the task was done or reported.
+
+## Source: operator 2026-11-06, door t15 (standing direction)
+
+"just make sure that we have all the behavior very similar to what the old akrogon is doing for now, with the addition of all the improvements of herdr-core and herdr-app"
+
+"Yes, by improvements, I mean no polling or waiting, and using <hc> wherever possible for communication." (operator 2026-11-06, door t15, clarifying the standing direction above)
+
+"when it comes to the new way of communication, I want the most elegant solutions so that the least amount of things can break. I had the old akrogon and herdr working perfectly, nothing should break with this migration. Only made better." (operator 2026-11-06, door t15)
+
+## Agent findings, 2026-11-06 (door t15, notices rebuttal send)
+
+- `hc send` to `ak-slot-e` (agy) returned `started: false` while status was `idle`: agy had its scroll viewer open ("↑/↓ Scroll ... esc Close") and the paste went nowhere. Reading the screen showed the viewer; `hc keys ak-slot-e esc` closed it, the input box was empty, and a second send returned `started: true`. This is the delivery Q2 2a path working live: `started: false` caught, screen read before any resend, no double paste.
+
+## Source: operator 2026-11-07 (seats)
+
+Operator 2026-11-07, door t15, verbatim: "also, when building all leafs for transfer, use Opus 5.5 high as slot A model in every leaf. Look at akrogon's mechanism to do that."
+
+Read as: every leaf this session hands off, in akrogon and in herdr-setup, runs slot A as `{ harness: claude, model: claude-opus-5-5, effort: high }`, set by a `slots:` front matter block holding only `a` at the top of each owner index (`EPIC.md` for the akrogon epic, `ISSUE.md` for each herdr-setup issue), written before any leaf `state.yaml` (docs/reference/config.md "slots"; skill shapes Handoff tree). Slot B is not set and keeps the repo or machine default (codex).

@@ -1,0 +1,21 @@
+{
+  "uid": 1000,
+  "removedTrustEntries": 1,
+  "unrelatedTrustEntriesKept": true,
+  "recordedTrustAbsent": true,
+  "left": [],
+  "processesInRecordedCwds": [],
+  "retainedConversationFiles": [
+    "conversations/5df4f39a-3218-485f-83c2-4d1e246b314c.db"
+  ],
+  "retainedConversationIds": [
+    "5df4f39a-3218-485f-83c2-4d1e246b314c"
+  ],
+  "runArtifacts": [
+    "b-r1-agy-absence.json",
+    "b-r1-agy-cwd.json",
+    "b-r1-agy-on-command.txt",
+    "b-r1-agy-start.txt",
+    "b-r1-agy-tree.json"
+  ]
+}

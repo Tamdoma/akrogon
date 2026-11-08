@@ -1,0 +1,31 @@
+slug: deploy-listener-ready
+phase: merged
+created: 2026-11-07
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFT
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pYM
+  B: w8:pYN
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-07T14:37:55.133Z
+frozen:
+  tests/config.test.ts: 8042b8816cf193282903e434a4648da67acda42c
+  tests/deploy-shapes.test.ts: 8b94d7c491bdbbe861bc1856ce4eda59661d3d61
+  tests/fake-herdr.ts: 125e673253839716c2d1e1ceac516d348a180925
+  tests/fake-systemctl.sh: 2477e3b6f23104b95e5b8a4a66264975f6917f82
+  tests/install.test.ts: 8e018126d7a521996bd85f6db6f6b31dcc8dd756
+frozen_cited: []

@@ -1,0 +1,5 @@
+# Identity rebuttal B
+
+- F1. “Rejected by all: address alone as the stored key (changes on restart)” misstates my pick. I store the current address qualified by session/core, with the name derived. Changing that address on replacement is useful instance separation, not a reason to add another stored seat key. Unqualified addresses are what I reject.
+- F2. “Finished terminals vanish” is incorrect. `hc ls --help` documents --all for finished terminals, and `hc get` can inspect retained finished records. Also, `hc run --help` makes names unique among live terminals. Do not require removing a finished record merely to reuse its name without proof that native reuse needs it. That adds cleanup and discards evidence unnecessarily.
+- F3. Do not attribute a blanket name+instance+labels+tab+cwd check before every prompt/kill to B. My pick uses qualified native instance identity, ownership labels at the external-data boundary, and the existing repo/tab/worktree guards where applicable. A derived name is not another independent authority. Specify the lookup/ownership contract once rather than adding five scattered checks.

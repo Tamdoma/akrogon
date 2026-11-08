@@ -1,0 +1,73 @@
+bun test v1.4.4 (38afee6c8) 4x PARALLEL
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+
+tests/next.test.ts:
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-BEcMuE/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-BEcMuE/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-NDzI6q/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-NDzI6q/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-mq6FND/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-mq6FND/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-BEcMuE/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-BEcMuE/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-NDzI6q/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-NDzI6q/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-mq6FND/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-mq6FND/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-AIt0Px/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-AIt0Px/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-ezdeL2/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-ezdeL2/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-dhRCom/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-dhRCom/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-ezdeL2/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-ezdeL2/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-dhRCom/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-dhRCom/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-500612-hNkvNe/akrogon-AIt0Px/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-500612-hNkvNe/akrogon-AIt0Px/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+
+tests/batch.test.ts:
+{"ok":true,"top":"c57030d826a3e0ab1384244e8cdee73a23b66fc5"}
+
+tests/hc-identity.test.ts:
+128 | 
+129 | test('the parts of hc schema akrogon parses match the pinned copy', async () => {
+130 |   const reply = await spawnCaptured(['hc', 'schema']);
+131 |   expect(reply.code).toBe(0);
+132 |   const pinned: object = JSON.parse(readFileSync(resolve(import.meta.dir, 'fixtures/hc-schema.json'), 'utf8'));
+133 |   expect(pinnedSchema(reply.stdout)).toEqual(pinned);
+                                           ^
+error: expect(received).toEqual(expected)
+
+@@ -190,2 +190,13 @@
+          },
++         "first_message": {
++           "anyOf": [
++             {
++               "$ref": "#/components/schemas/FirstMessage",
++             },
++             {
++               "type": "null",
++             },
++           ],
++           "description": "A template first message that was not sent; retained for later inspection.",
++         },
+          "foreground": {
+
+- Expected  - 0
++ Received  + 11
+
+      at <anonymous> (/var/tmp/akr-1000/e2e-final/main/tests/hc-identity.test.ts:133:38)
+(fail) the parts of hc schema akrogon parses match the pinned copy [8.81ms]
+
+tests/install.test.ts:
+Install filesystem evidence: /var/tmp/akr-1000/e2e-final/main/.evidence/install-prune-links/home-listing.json
+
+tests/hc-observe.test.ts:
+263 |         stderr: 'ignore',
+264 |       });
+265 |       let current: Terminal | null = null;
+266 |       const timer = setTimeout(() => {
+267 |         child.kill();
+268 |         fail(new Error(`terminal ${address} did not reach the expected state in ${ms} ms: ${JSON.stringify(current)}`));
+                       ^
+error: terminal t6 did not reach the expected state in 15000 ms: {"address":"t6","name":null,"state":"live","turn":0,"pid":675381,"parent":null,"cwd":"/tmp/akrogon-suite-500611-RiKPEK/akrogon-x5hu0u","labels":{"akrogon":"1","akrogon.leaf":"ob-exit","akrogon.repo":"repo","akrogon.seat":"a"},"status":null}
+      at <anonymous> (/var/tmp/akr-1000/e2e-final/main/tests/hc-fixture.ts:268:18)
+(fail) observe prints each recorded leaf from its hc seats in the repo session [15290.47ms]
+
+ 1165 pass
+ 2 fail
+ 11965 expect() calls
+Ran 1167 tests across 82 files. [67.45s]

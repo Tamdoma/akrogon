@@ -1,0 +1,11 @@
+# config rebuttal — slot C, 2026-11-07
+
+Attributions to me are correct. Three disagreements and one correction to a claim.
+
+1. Q4, B's "read the home from `herdrapp session list --json`, once per resolution": it lists only sessions herdrapp knows (`session_names`: the ready-marked folders plus `default`), while identity Q1 finds sessions from the core sockets in `/run/user/<uid>/herdr-core/`. A session that hc has run but no window has opened yet has a socket and no herdrapp entry, so B's lookup fails exactly in the window-closed case notices were designed for; the two-line convention still names the folder, which herdr-app adopts on first open. It also puts a bash-plus-python spawn inside every resolution for a mapping herdrapp itself hardcodes (`bin/herdrapp:9-10,58-64`). Keep the function; use `herdrapp session list --json` only in the e2e assertion that pins the two agree.
+
+2. Q4, A/D's "the caller's own `HERDR_APP_HOME` wins for its own session": it contradicts identity Q1 (every herdr-app call pins `HERDR_APP_HOME` for the resolved session and strips inherited `HC_*`) and containment Q4 (detached work resolves the repo's session itself, no forwarding of the caller's values). A door in session `infra` charting a repo whose space lives in another session must write notices to that session's home, not its own; B is right that the caller's env is never used.
+
+3. Q3, E's `Bash(hc:*)` allow rule at the cutover step: not needed and harmful. The door has run `hc send`, `hc get`, `hc read` and `hc wait` for days under auto mode with no hc rule in `permissions.allow` (zero `hc` lines today), because the classifier passes routine commands; the one hc call the classifier refused was a raw `hc run … -s danger-full-access`, which the rule would hide from it, removing the only check on a hand-typed full-access start. The dead `herdr agent` lines are simply deleted (cutover step 2).
+
+4. Q2, A/D's reason "agy has no transcript reader": session-id Q2 reads agy's path like codex's, from its open file in `/proc/<pid>/fd`; what cannot read it is the watcher's jsonl log tail (a sqlite file), which session-id already answers with "unknown path keeps today's no-log path". That weakens the case for leaving agy out, but does not decide it; my pick stands with the free probe on the auto-approve flag.

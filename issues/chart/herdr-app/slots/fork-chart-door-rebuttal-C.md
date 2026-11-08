@@ -1,0 +1,9 @@
+# chart-door rebuttal, C (2026-11-06)
+
+Attributions to C are correct. One pick changes, one addition to the helper design, one question answered.
+
+1. Q2: I move from the two self-sends to D and E's detached helper, because my own cost line was a regression by the operator's standard ("a regression is a failed migration, not a cost"): the self-send loses the new-session check and the operator-input cancel, and INTAKE's 1-in-10 unsubmitted start prompt stalls an autopilot handover with nobody there to press enter. A ported `door-reset` that follows hc events keeps every guard and can fix that case (`hc keys <A> enter` when the prompt sits unsubmitted after the start proof fails). It is the one script that survives, skill-owned as today, started by old A as its last action (`hc run --bg --no-notify --rm`, no herdr labels so no pane).
+
+2. Addition the merged helper design lacks: the helper is not A's terminal, so its `hc send <A> "/clear"` arrives wrapped as `<hc from=...>` and is chat, not a command (INTAKE line 50: "Only a terminal's own sends arrive unwrapped"; Claude answered "Context is cleared" without clearing). The helper must type the reset as keys, `hc keys <A> / c l e a r enter` (`/ n e w enter` for codex and pi), or run with the caller identity of A if `terminal.send`'s `caller` accepts it, which is a probe, not an assumption. The start prompt may travel wrapped, since fresh A reads it as text; the Handover rule should say so. Probe before handoff: `hc keys` types `/` and letters as named keys, the reset clears in a throwaway session for claude, codex and pi, and the helper's `hc wait <A>` after the keys returns on the clear's own short turn without waiting the full timeout (INTAKE line 53).
+
+3. Q3: the temp-path question is answered (chart folder and seats.yaml at Open); no disagreement.

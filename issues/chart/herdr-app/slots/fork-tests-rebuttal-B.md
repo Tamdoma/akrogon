@@ -1,0 +1,6 @@
+# B: tests rebuttal
+
+- F1 Q3's final wording grep is not an all-seat agreement. I proposed removing obsolete runtime/test machinery after proof, not deleting every historical `herdr` mention. The cutover fork still owns wording/history scope. A grep cannot establish behavioral migration success.
+- F2 “Containment's scope math” needs narrowing. `tests/fake-proc.ts` has an old `expectedScope` derived from pane ID, synthetic PID and start time. The taken wrapper uses a seat name and random scope suffix. Keep only helpers still expressing the new design, such as the shared leaf-slice identity. Do not preserve adoption identity math through the port.
+- F3 “Pane repair” is too broad as removed behavior. Preserve replacement failure, retaining the other live seat and protecting unrelated manual terminals (`tests/seat-containment.test.ts:272`, `:319`, `:365`). Rewrite obsolete geometry/adoption mechanics, not these ownership and partial-state guarantees.
+- F4 The deletion proof must run on the final installed repository revisions and observe the intended mod build actually loaded. Installed hc/app/harness versions alone do not establish that. Earlier leaf or chart passes do not replace the assembled final run. This matters because a broken reload can leave the old mod running, as already carried by patch-mechanism.

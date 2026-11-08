@@ -1,0 +1,26 @@
+== door t1f: shell commands in order, with each result's first line
+ $ cd /home/ivan/.akrogon/worktrees/akrogon/chart-door-on-hc/skills/chart-issues; awk '/^## Open/{f=1;print;next} /^## /{f=0} f' SKILL.md; echo =====; awk '/^## Blind peer exchange/{f=1;print;next} /^## /{f=0} f' assets/questions.md; echo; echo $HC_TERMINAL_ID
+   -> ## Open
+ $ cd /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round; ls -R . | head -30; cat slots/probe-brief-B.md; grep -n -A5 '## Autopilot' CHART.md; hc get $HC_TERMINAL_ID | head -5; which akrogon
+   -> .:
+ $ cd /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round; echo "A note: probe round, no findings." > slots/probe-A.md; akrogon seat --slot b --harness claude --model claude-haiku-5-5 --effort low --task "You are slot B. Read and follow /va
+   -> t1g
+ $ hc wait --children any --timeout 120 --json 2>&1
+   -> Exit code 7
+ $ hc wait --children any --timeout 120 --json $HC_TERMINAL_ID 2>&1 || hc wait --help 2>&1 | head -20
+   -> {"children":[{"children":[],"ended":true,"exit_code":null,"reason":"status","signal":null,"status":"done","terminal":"t1g","turn":1}],"ended":false,"e
+ $ cd /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round; ls -la slots; hc get t1g | head -c 400; echo; hc send --json t1g "Nudge: you stopped without the return file /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-rou
+   -> total 8
+ $ hc wait --children any --timeout 120 --json $HC_TERMINAL_ID 2>&1; ls /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round/slots
+   -> {"children":[{"children":[],"ended":true,"exit_code":null,"reason":"status","signal":null,"status":"done","terminal":"t1g","turn":2}],"ended":false,"e
+ $ cd /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round; sed -n 1,20p CHART.md
+   -> # Chart: e2e-round
+ $ cd /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round; printf '\n- consultant: B dropped (harness claude, model claude-haiku-5-5): stopped twice without return file or report, even after one nudge.\n' >> CHART.md; tail -4 CHART.md
+   -> ## Autopilot
+door permission prompt/denial markers found: none
+== consultant B (ad-slot-b) inputs and replies
+ > You are slot B. Read and follow /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round/slots/probe-brief-B.md
+ TOOL Read
+ < no
+ > Nudge: you stopped without the return file /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round/slots/probe-B.md and without the report to t1f. Both are missing.
+ < no

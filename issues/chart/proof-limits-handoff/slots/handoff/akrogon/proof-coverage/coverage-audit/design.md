@@ -53,7 +53,7 @@ Read as (asked in the simpler wording of the same round):
 
 What the session prioritizes and gives up (A): written skill rules over command checks, a whole bug family over the single case, charting-time proof over discovery during the build, and only parts that survive the herdr-app move. It gives up command-enforced refusals and a hard cap on paid runs: overspend past a bound can still happen, with a warning.
 
-Exclusions: 7a (chart order) and 2b (paid runs past a bound, owned by chart grant-run-count, Tamdoma/akrogon#126) have no home in this leaf.
+Exclusions: 7a (chart order) and 2b (paid runs past a bound, not restated in this leaf's text, owned by chart grant-run-count, Tamdoma/akrogon#126) have no home in this leaf.
 
 ### proof-coverage (issues/chart/proof-limits-handoff/forks/proof-coverage.md)
 
@@ -85,9 +85,18 @@ A's picks under autopilot, 2026-11-04 (not operator words).
 
 Carried into the leaf: the fix reaches doors only at the next release link; the handoff review says so (C R4). New handoffs only (signpost 5a).
 
+### Final-shape check, adopted 2026-11-04 (A's picks; slots/proof-coverage-final-check-B.md, -C.md)
+
+- Pick 2 (B F1): "ceiling" becomes the approved test budget. Signpost 2b stands: a run past the approved bound is allowed with a warning; grant counting is #126's.
+- Pick 1 (B F2): a clause that needs an existing checker to accept output the leaf builds is split: the existing input or contract assumption (here: the checked-in fixture and the current verify checks) is observed at charting; acceptance of the new output stays the leaf's done-criterion proof. Neither the finished product before handoff nor labelling the existing-data assumption as new work satisfies the rule.
+- Pick 1 (C K1): every observation a kept key part rests on, free ones included, is a `proofs` entry in `readiness.yaml` with its own `limits` (`cleanup` may say none); the review line cites those entries.
+- Pick 3 (C K2): `assets/questions.md` "Optional measurement" sentence "Declining a required probe holds the handoff under the Take operation-proof rule" is replaced by the cut rule; "never replaces required operation proof" stays.
+- Pick 3 (C K3): a cut that removes the chart's useful outcome parks the chart for the operator under the existing non-grant approval wait, with the cut and its reason recorded; A never answers it (A never drops a handed chart).
+- Pick 3 (C K4): a cut names where it lands: a prerequisite leaf under the machinery rule, an exclusion in each dependent's design, or an Off route entry in CHART.md; the brief's What drops a cut operation, so the existing missing-proof refusal stays consistent.
+
 ## Standing design
 
-/home/ivan/.claude/skills/chart-issues/assets/standing-design.md. This leaf changes skill text only: no secrets, auth, backend or browser surface, so those lines do not apply. No vanity tests: no test pins the new prose; review reads it against the done-criteria. `bun test` runs only to show nothing else broke. The new rule itself restates two standing-design lines for charting ("cheapest sufficient test", "an input whose effect on a model stage is unknown is investigated"); the leaf points to them rather than copying them.
+/home/ivan/.claude/skills/chart-issues/assets/standing-design.md. This leaf changes skill text only: no secrets, auth, backend or browser surface, so those lines do not apply. No vanity tests: no test pins the new prose; review reads it against the done-criteria. The new rule itself restates two standing-design lines for charting ("cheapest sufficient test", "an input whose effect on a model stage is unknown is investigated"); the leaf points to them rather than copying them.
 
 ## Leaf architecture
 
@@ -95,10 +104,10 @@ Owned surfaces:
 - `skills/chart-issues/SKILL.md` "Take": the paragraph beginning "Every external operation a brief names" (the general proof rule, the key-part rule, the cut rule replacing "when no safe sufficient probe exists the handoff is held and scope is not narrowed"). The two special-case sentences (provider dry-run, locked outside-tool setting) fold into the general rule; their specifics (real identity and target; same key, location and value) stay.
 - `SKILL.md` "Handoff": one sentence beside the existing live-run review line, for the key-part line and the release-link note.
 - `skills/chart-issues/assets/shapes.md` "Preflight and validation": the implementer-audit paragraph beginning "Read the briefs as an implementer" gains the per-criterion key-part step; the sentence "Refuse the handoff when a brief names an external operation with no recorded proof" stays and gains the key-part refusal beside it.
-- `skills/chart-issues/assets/questions.md` "Optional measurement": only if needed so it agrees ("never replaces required operation proof" becomes "required proof" if the plan finds the narrower word now wrong).
+- `skills/chart-issues/assets/questions.md` "Optional measurement": its last sentence ("Declining a required probe holds the handoff under the Take operation-proof rule") is replaced by the cut rule; "never replaces required operation proof" stays.
 - `docs/use/plan-work.md` "Review the handoff": one sentence.
 
-Consumers of the changed rule: the chart door (A) reading "Take" and the shapes audit at every handoff; consultants reviewing leaf drafts. No code reads `limits`: `src/readiness.ts` `proofSchema` stays as is (signpost 1c; schema field rejected in proof-coverage).
+Consumers of the changed rule: the chart door (A) reading "Take" and the shapes audit at every handoff; consultants reviewing leaf drafts. `SKILL.md` "Autopilot" wait list: a cut that removes the chart's useful outcome uses the existing "operator approval that is not a grant" wait; the leaf adds a pointer there only if the plan finds the existing wording does not cover it. No code reads `limits`: `src/readiness.ts` `proofSchema` stays as is (signpost 1c; schema field rejected in proof-coverage).
 
 Exclusions:
 - Grant run counting and bounds: chart grant-run-count (#126).
@@ -107,4 +116,6 @@ Exclusions:
 - `src/`, `tests/`, `issues/`: unchanged.
 - The installed release copy (`~/.akrogon/current`): updated by the normal release, not by this leaf.
 
-Open for the plan: whether other docs restate the proof rule or the handoff review (grep `docs/` for "proof", "limits", "handoff review"; lesson learnings/history/2026-09-11-stale-rule-in-docs.md) and need the same one-sentence agreement; any hit outside `docs/use/plan-work.md` is owned and listed in the report.
+The review line is written as decided. B's standing dissent on its format (fork proof-coverage, pick 1) is recorded and changes nothing in this leaf.
+
+Docs inventory (A, 2026-11-04, B leaf review): `grep -rn -i "handoff review|operation proof|real call|probe|waiver|not narrowed" docs README.md` finds only `docs/use/plan-work.md` "Review the handoff" listing what the review shows; `docs/use/quick-fix.md`, `docs/examples/quick-fix-story.md`, `docs/examples/autopilot-story.md` and `docs/start/one-change.md` mention the review without restating the proof rule or its contents, so they stay unchanged. No other docs page is in scope; a hit the plan finds elsewhere is reported under known limitations, not edited.

@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdrapp session list --json and hc ls in a named session
+    command: forks/proofs.md P6 and P9
+    identity: operator user ivan
+    target: operator's herdr-app sessions; throwaway hc session akr-probe2
+    version: herdr-app 0.1.13, hc 0.1.18
+    date: '2026-11-07'
+    result: herdrapp lists sessions with session_dir; HC_SESSION=<name> hc ls --json lists that session's terminals
+    cleanup: throwaway session stopped
+    limits: clone diff not run (report only); loaded-build signs are P13
+    record: /home/ivan/Work/infra/akrogon/issues/chart/herdr-app/forks/proofs.md
+  - operation: running builds (core version and exe, window exe, mod files against window start)
+    command: forks/proofs.md P13 (hc server status --json per session socket, readlink /proc/<pid>/exe, stat -L, find -newer /proc/<window pid>)
+    identity: operator user ivan
+    target: operator's running cores and herdr-app window, read only
+    version: hc 0.1.18, herdr-app 0.1.13
+    date: '2026-11-07'
+    result: infra core 0.1.18 current; default and mdconsultingny cores 0.1.17 with exe (deleted); window exe matched the resolved ~/.local/bin/herdr-app; several mod js files newer than the window start; dotted holder sockets refused status and started nothing
+    cleanup: none, read only
+    limits: whether the window reloaded those mods was not tested
+    record: /home/ivan/Work/infra/akrogon/issues/chart/herdr-app/forks/proofs.md

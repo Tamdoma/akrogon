@@ -1,0 +1,43 @@
+slug: watcher-on-hc
+phase: merged
+created: 2026-11-07
+repo: akrogon
+blocked-by:
+  - engine-on-hc
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: akb60da8d0ad682110f99506641cc15f
+env_names: []
+env_generation: 1
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t6k
+  B:
+    session: infra
+    address: t6q
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-08T07:43:40.904Z
+frozen:
+  skills/watch-issues/scripts/fixtures/herdr-agent-list.json: null
+  skills/watch-issues/scripts/fixtures/herdr-session-list.json: null
+  skills/watch-issues/scripts/fixtures/herdr-workspace-list.json: null
+  skills/watch-issues/scripts/observe-log-tail.test.ts: null
+  skills/watch-issues/scripts/observe.test.ts: null
+  tests/e2e/kinds.e2e.ts: 518467daa62a9bd5b3f78845621aa53f5a609a27
+  tests/e2e/tier.ts: 6460d5f22cc27931ea76e3f103793255ad4c9866
+  tests/e2e/watch-check.e2e.ts: a40dc843117065a1764f665ff7e46926a943d076
+  tests/e2e/watch-stop.e2e.ts: d0a9465b23213ede9e358b03c2f3063ddb99db8e
+  tests/e2e/watch-tier.ts: e678c9a8d8b10842c68311dae0e99c5b084d8603
+  tests/hc-observe.test.ts: ac023d664f70fa32e8187b5264f84eda48c65b76
+frozen_cited: []

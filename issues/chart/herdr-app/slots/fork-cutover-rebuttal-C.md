@@ -1,0 +1,11 @@
+# cutover rebuttal — slot C, 2026-11-07
+
+Attributions to me are correct, with one small one to fix. Two disagreements, one confirmation, one self-correction.
+
+1. Q1, D's "the engine release's install unlinks the old plugin in the same deploy that installs the listener": that install code never runs in that deploy. `deployStage` of the previous release does the engine's deploy (corrections, first bullet), so the engine release's own install runs only at the deploy after it, unless the `deploy-on-hc` prerequisite lands first; and `herdr plugin unlink` inside the new release is akrogon code calling `herdr`, which the intake forbids from the first hc release on. The unlink is an operator step while the binary exists (Q3 step 2). E's "tolerate the link failure" is a deploy recorded `ok: false` after the flip, shown by `akrogon status` as failed until a later success: not a tolerable state for the one deploy that switches twelve repos.
+
+2. Q2, B's "release manifest declares the hc runtime" and D's listener-unit sentinel as rollback detection: both add a part for a check that one `existsSync(<releases>/<previous>/plugin)` already answers exactly, on the tree rollback is about to flip to. Keep the one check.
+
+3. Confirmed from code, so no disagreement with B: `nextCommand` runs `selfUpdate` for the selected repos before any pause check (`src/next.ts:1645-1653`; the pause check is per leaf at `:876` and later), so `akrogon pause` does not stop a deploy, and any `next --all` from the old plugin's startup or the watcher deploys whatever is on akrogon main. The drain's freeze is therefore "nothing pushed to akrogon main until the switch is wanted", and the engine leaf's merge is the switch; handoff freezes alone do not hold it.
+
+4. Self-correction and misattribution: "prunes pre-hc releases explicitly (C,D)" is not mine. Releases are removed by the existing collector about a day after they stop being active or previous (`docs/reference/releases-and-updates.md:15`); the sweep only checks that none remains before deleting the rollback guard, it adds no prune code. And A's correction on 6a stands against my own open question: the signposts option read "built by the door itself or by hand" (`forks/signposts.md:37`), so the engine leaf is not an old-engine leaf and the zero-open-leaves rule has no exception to state.

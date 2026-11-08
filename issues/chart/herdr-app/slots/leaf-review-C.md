@@ -1,0 +1,44 @@
+# Leaf review C (herdr-app handoff drafts)
+
+Disagreements only. Paths under `slots/handoff/` unless absolute.
+
+1. engine-on-hc, `brief.md:38` (criterion 14). Names `src/install.ts` and `src/self-update.ts` as herdr-free, but deploy-listener-ready `brief.md:11` keeps the `herdr integration install` loop and cutover Q1 keeps the conditional `herdr plugin link` until the sweep (herdr-sweep `brief.md:7` owns both). As written it cannot pass without stealing the sweep's work. Fix: drop those two files from the list, or except the integration loop and the plugin conditional.
+
+2. engine-on-hc, `design.md:250` (`Open for the plan:` tab close). Not open: `herdr-app commands` lists `tab.close` (and `terminal.kill`), so the choice is a decision for the design, and the herdr-app calls at `design.md:235` list only `ls` and `tab.rename`. Fix: add `herdr-app do tab.close --id <tab>` to the literal interfaces and the closed command list (window open, after the seats are killed); whether herdr-app drops a tab whose terminals died with the window closed was never probed (P6/P7 limits), so put that case in criterion 7's window tier. Criterion 13 (`brief.md:37`) can show the tab close only as the fake's call sequence; say so.
+
+3. engine-on-hc, `design.md` Leaf architecture. Criteria 1, 4, 5, 6 and 11 run on the fixture core, yet identity Q1 resolves a repo's session by finding its space in the `herdr-app` document through `doc.get`; nothing says how a throwaway core gets such a document (no window ever ran there). Fix: state that the fixture seeds the document with `hc connect doc.set` from a recording taken in the window tier (P7's `doc1.json` shape), refreshed with the fake's captures; akrogon code itself still never calls `doc.set` (F3).
+
+4. engine-on-hc, `design.md:245` and D2 timing. The prefix home is marked `Open for the plan:` while D2 decides it; after this review write it as decided. The timing has a trap: `globalSchema` is a `strictObject` (`/home/ivan/Work/infra/akrogon/src/config.ts:23-30`), so a `prefixes:` key added before the engine deploys breaks every command of the running release, which is why N1 must happen "right after" the deploy, with the operator present at the switch. Fix: deploy-listener-ready's schema accepts an optional, unused `prefixes:` map (add `src/config.ts` to its owned surfaces), so the operator fills it before the switch and the engine's first `next --resume` finds every repo configured.
+
+5. deploy-listener-ready, `brief.md:22` (criterion 4). Names `issues/verify-runs.jsonl`; `skills/chart-issues/assets/shapes.md:369` refuses a leaf whose done-criteria touch any path under `issues/`. Fix: "(median 75 s)" as the other five briefs write it.
+
+6. chart-door-on-hc, `brief.md:21` (criterion 1). The nudge and the drop are door skill text (chart-door Q1: the peer scripts go, `design.md:201` shows only `hc send` and `hc wait`); no akrogon code runs them, so "own tests in the `test` check" cannot prove them, and a test script that nudges would be a sixth peer script. Fix: own test covers the wiring only (start verb with `--parent`, stand-in children, `hc send` report, `hc wait --children all` returning on report, blocked, exit, all idle); nudge and drop are proven by one attended consultant round under this leaf's grant (one door session is already in the bound) and repeated by the 2a proof.
+
+7. chart-door-on-hc `brief.md:26` (criterion 6) and consultant-weights `brief.md:18` (criterion 2). Both rest on how herdr-app lays out one door plus three consultants of one tab, which no proof shows: P6 limits "4-seat column geometry not built" (`forks/proofs.md:51`, engine `readiness.yaml:78`). The helper's "finds the split holding the given consultant terminals" (`brief.md:7`) assumes one split; nested splits would leave it no single weights array. Fix: the first attended run (consultant-weights criterion 2, before the door's window tier per N6) records the real document for door plus three consultants; criterion 1's routine test uses that recording; if splits nest, the helper's contract names the nested path before chart-door-on-hc opens.
+
+8. notices-on-hc, `brief.md:22` (criterion 3) with `design.md:119`. The criterion says "as that rule states" while the rule is `Open for the plan:`; the plan cannot invent a verify semantics. Today `pending` covers only while the sender pid lives (`/home/ivan/Work/infra/akrogon/src/verify.ts:236-240`) because an old pending had no durable carrier. Fix, decide now: with files, `pending` covers while the notice file exists (it shows when the window opens), `shown` covers, `error` (write failed) never covers, and the pid and boot clauses go.
+
+9. notices-on-hc, `brief.md:23` (criterion 4) "a posting failure leaves the file pending". Not producible in a real window: nothing makes `notify()` fail on demand. Fix: either define the kept-file case as an unparseable `.json` (then status-notices `brief.md:8` must say the handler keeps a file it cannot parse) or move "posting failure keeps the file" to status-notices criterion 1 only (routine test with a failing notify stub) and drop it from the window tier.
+
+10. watcher-on-hc, `brief.md:22` (criterion 4). Its proof is "part of the recorded end-to-end proof before old herdr is removed", which herdr-sweep `readiness.yaml:7` places after watcher-on-hc has merged; a done-criterion must pass before merge. The grant already holds one watcher session. Fix: the leaf runs its own watcher check under its grant and the 2a proof repeats it. Also the installed listener's session set is open (engine `design.md:251`), so a wake may never reach a throwaway session; add "run the listener program against akr-e2e-watch" to the grant's operations.
+
+11. watcher-on-hc, `brief.md:21` (criterion 3). No outcome if neither `hc interrupt` nor `hc keys esc` stops codex on a long command (P4: esc left it working). Fix: name the exit: codex falls to the existing notify path and the skill records it as a limit; the criterion passes with that record.
+
+12. herdr-sweep, `brief.md:27` (criterion 5). "The full `test` check passes" is a repo-health claim (shapes.md Leaf files rule) and verify runs that check regardless. Fix: keep only the duration record.
+
+13. herdr-sweep, `brief.md:26` and `design.md:85`. The removal command list reaches CHART.md Pending steps "by the door", but no door exists after handoff, and cutover Taken says the sweep writes the Pending steps. Fix: write the Pending steps into CHART.md at handoff from cutover's removal list (steps 2 to 5 and the checkout step are known now); the sweep's report refines commands and checks, and criterion 4 says "refines".
+
+14. herdr-skill, `brief.md:18` (criterion 2). No outcome when a harness still does not load the skill after the one wording repeat (agy unproven, `readiness.yaml:38`). Fix: after the repeat a non-loading harness is recorded as a limit the operator reminds by hand; the criterion passes with that record. Low confidence: the agy CLI may read `~/.gemini/antigravity-cli/skills` rather than `~/.gemini/config/skills`; a link path change is not a new mechanism and should be allowed by the wording.
+
+15. update-check, `brief.md:22` (criterion 3). A stopped core cannot produce "does not answer": any `hc` call with `HC_SESSION=<name>` starts a new core (probe: `hc server status` after `hc server stop` came back with a new pid, `slots/fork-tests-C.md:3`), so the probe would start a stray core for a mistyped name and list zero terminals. Fix: the probe first requires `/run/user/<uid>/herdr-core/<name>.sock` to exist and fails naming that path; the test's non-answering case is a `chmod 000` socket (tests Q1 error cases).
+
+16. update-check, `design.md:70`. "How the new build actually loaded is observed" is binding (patch-mechanism Q2) and left `Open for the plan:`; the plan has no observation point to pick from. Fix: decide one: each herdr-setup mod writes `appHome()/herdr-setup/loaded/<mod>.json` with its revision at load (`writeTextFile` exists in `herdr.d.ts:28`), and the check fails naming any mod whose stamp is older than the installed copy.
+
+A's calls:
+- D1: agree. The deployer skips the link only when `plugin/` is absent, the rollback guard keys on `<previous>/plugin`, and the old plugin's `next` calls until step (2) are serialized by `withLock` on `~/.akrogon/.lock` (`src/next.ts:1111`).
+- D2: agree on the shape (`repos` is `record(name, path)`, `src/config.ts:28`); disagree on the timing, see item 4.
+- D3: agree.
+- D4: agree (shapes.md:214 allows parallel leaves with overlapping files; the watch skill's needs-you line is the only overlap).
+- Budgets: engine 8, door 7, watcher 3, herdr-skill 8 agree. The door's final proof at 4 disagree: the 2a proof is one per-kind run on the final revisions (4) plus one real leaf (A and B, 2), one consultant round (door and one consultant, 2) and one watcher (1), so 9 sessions.
+
+Verdict: changes needed

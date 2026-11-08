@@ -1,0 +1,46 @@
+slug: engine-on-hc
+phase: merged
+created: 2026-11-07
+repo: akrogon
+blocked-by:
+  - deploy-listener-ready
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: w8:tFV
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pYP
+  B: w8:pYQ
+seat: {}
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-08T01:50:20.415Z
+frozen:
+  tests/e2e/kinds.e2e.ts: 0abc19d3d471819517a83bde68a5f40842c27961
+  tests/e2e/tier.ts: 0ff3fe115b92e27fc4c95b7e87dbabd6f437de1c
+  tests/e2e/window.e2e.ts: 9613cdf30c12f4a72aa263a41e67a24c457e5120
+  tests/fake-herdr-app.ts: c7fbc654d7adb2b9420d764998c0484cc10d85b3
+  tests/fixtures/hc-schema.json: 265f90fd2975a13ec76c92799035b3264a073b7c
+  tests/fixtures/herdr-app-doc.json: a2d92a0fb8590d0ebc7ef043416cc5df47ce0a0c
+  tests/hc-delivery.test.ts: 15cb50f2b3efdfddd3e8b164826b6a8951ac572e
+  tests/hc-fixture.ts: 09cd4065530e6b97ef5abed93ff3dec07ed37a7d
+  tests/hc-identity.test.ts: 12a4110a12a52fb50896eb72fc2cf3e219fc60b4
+  tests/hc-listener.test.ts: 7231a8fe34e9d4edb9649d0f539c340cdf22682a
+  tests/hc-shim.sh: c9860ce6041365e47d871ba0ad6043f1b94dc5b7
+  tests/hc-start.test.ts: 88e874f12859f548fba9b9d5b5d80cc306fc4cc9
+  tests/hc-status.test.ts: cfce9d9e27da624efd44c211f147dd5e3e789181
+  tests/hc-teardown.test.ts: 14f31b88266798ccac98139129c241e00031c17e
+  tests/hc-watcher.test.ts: 35e88879ae7d146bdc928f4c96dea177d3e5460d
+  tests/hc-window-calls.test.ts: 9694cb74b10787fa2465f751d1cc9cd580ae329f
+  tests/rollback.test.ts: 73549c31d28dbfa50858d6ba058f92cb24c5d41e
+  tests/stand-in.sh: 240fa42e596fd3469cb1d500640d96f9274afd5f
+frozen_cited: []

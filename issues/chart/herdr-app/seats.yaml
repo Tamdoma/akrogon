@@ -1,0 +1,25 @@
+opened: '2026-11-06T11:09:05Z'
+seats:
+  - seat: A
+    pane: t15
+    harness: claude
+    session: 4a3df037-e5ba-4393-85f4-67eb6d4ba7e8
+  - seat: B
+    pane: t6c
+    harness: codex
+    session: none
+  - seat: C
+    pane: t6d
+    harness: claude
+    session: none
+  - seat: D
+    pane: t6f
+    harness: pi
+    session: none
+  - seat: E
+    pane: t6g
+    harness: agy
+    session: none
+spans:
+  - from: '2026-11-06T11:09:05Z'
+    to: '2026-11-07T14:12:53Z'

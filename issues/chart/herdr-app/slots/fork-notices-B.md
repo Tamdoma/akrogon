@@ -1,0 +1,46 @@
+# Notices: B
+
+Read 2026-11-06. Binding: `forks/signposts.md:47` and each carried fork's Taken, including path-based transcripts and no polling/waiting. These are design picks, not claims that the proposed command exists.
+
+## Evidence used first
+
+- S1 practitioner: [kokokuo/claude-code-notifier](https://github.com/kokokuo/claude-code-notifier), README “How it works” and “Test manually”, read 2026-11-06. Claude Stop/Notification hooks invoke a native macOS notifier; a click activates the terminal. Delivery is checked by manual banner/click tests. The README documents no durable acknowledgement to the producer. Useful evidence for event-driven notification and testing, not proof of reliable delivery.
+- S2 better-than-training: [freedesktop notification specification](https://specifications.freedesktop.org/notification/latest-single/), v1.3, 2024-08-18, read 2026-11-06. Notify returns a notification ID; actions and sound hints depend on server capabilities. Closed/ActionInvoked signals do not prove somebody read the message.
+- S3 better-than-training: installed `/home/ivan/.config/herdr-app/herdr.d.ts:365` gives `notify(...): string`, not an acknowledgement promise. `AGENTS.md:728` describes mod-copy lifetime, `:738` shown-copy command routing, `:896` toast posting, `:919` watchFolder, and `:601` sounds. `herdr-app commands` lists 71 commands and no notification/sound command. Read 2026-11-06.
+- S4 better-than-training: old Herdr source `/home/ivan/Work/infra/herdrdev/herdr-worktrees/focused-pane-border/src/app/api.rs:1242-1251` reports shown after placing a toast in app state, before proof of a rendered frame. Its `target: None` means no executable merge action. This source checkout is historical evidence, not a live probe of the installed binary. Read 2026-11-06.
+
+## Q1: channel
+
+- D1 pick: native herdr-app toast through a small generic notification command patch, owned and kept across updates by herdr-setup per signpost 3. Akrogon supplies its existing title/body/sound and receives a result. Reuse the host's existing notify and sound functions, independently of layout and Tasks. This omitted option removes the need for a mod bridge. Cost: a source patch and a tested update/install path, which herdr-setup does not have yet.
+- Rejected: Tasks-only delivery. `herdr-app/tasks/mod.json:1` says place none, so installing the mod does not guarantee a running copy. Board presence is not a toast acknowledgement.
+- Rejected: a second akrogon mod or herdr-setup mod fed by files. Both add producer/consumer state, startup replay, duplicate-copy ownership and layout lifetime to a generic missing app capability. `watchFolder` removes polling, not those failure cases.
+- Rejected: notify-send as the default. It changes the destination and sound controls, depends on a desktop notification service, and does not preserve Herdr's presentation. It is a possible different product choice, not a migration fallback.
+- Rejected: hc label/event alone or hc send to a worker. Neither is a human notification. Sending notice text to an idle agent also starts an unnecessary agent turn. Keep hc messages for seat communication and hc events for engine wakes.
+- Evidence: operator `forks/signposts.md:49,62,68,72`; S1 first for outside practice, then S3; repo `src/install.ts:29-48`, `herdr-app/tasks/main.js:52-81,166-177`. Date: 2026-11-06.
+- Pitfall/removal: an invented CLI call accidentally reaches implementation. Done criterion: the herdr-setup patch exposes and tests the command before akrogon changes its callers; no fake-only capability and no legacy fallback.
+- Pitfall/removal: patch disappears at update. Before handoff, install/update a throwaway app through herdr-setup and prove the command still works, including the actual loaded build. This is a dependency of the notices leaf.
+- Missing question: why exclude a native app command from the options when signpost 3 explicitly authorizes filling missing substrate capabilities?
+
+## Q2: handoff, result and closed window
+
+- D2 pick: one request/reply through that native command. Return an explicit shown/reason result when the host posts the toast, matching old Herdr's meaning in S4. An allocated toast ID is evidence of posting, never human acknowledgement. No asynchronous consumer acknowledgement or rendered-frame protocol is needed for parity.
+- Window closed: return an explicit unshown/no-window outcome immediately. Preserve the caller's failure record and existing retry opportunity. Do not report shown because text was stored, and do not start the window. No sleeps, repeated reads, or new always-on notification worker.
+- Preserve the actual retry distinctions: busy records only a successful posting (`src/next.ts:247-263`); merge retains batch.notified false until success (`:1142`); verify keeps its locked in-flight pending reservation and retries error on a later qualifying run (`src/verify.ts:237-240,332-360,401-426`). An unavailable window must release the in-flight reservation into error, not leave a live PID suppressing future sends indefinitely.
+- Failure notices also exist: `src/phase.ts:98-132` saves failure.delivery and then reports delivery errors after the phase has committed. Preserve that path and the watcher's recovery behavior. The fork's “four notices” misses this fifth caller.
+- Cost: closed-window notices may remain unshown until an existing later engine/verify/watch action retries or reports the problem. This pick deliberately promises today's retry opportunities, not a new durable replay-on-open service. Verify does not currently retry on every engine wake.
+- Rejected: treating command acceptance, a file write, terminal label change or Notify's ID as proof of user attention. None provides it. Also reject new exactly-once delivery machinery: the old toast/state-write crash boundary already permits an occasional duplicate.
+- Rejected: durable file queue plus acknowledgement files, core-document outbox, or per-terminal notice labels. Each adds another source of truth and reconciliation merely to retain existing domain receipts. Do not bolt a native command on top of one of these.
+- Evidence: S1 has manual delivery tests and no documented producer ack; S2 distinguishes IDs/actions; S3/S4 establish native and old semantics. Repo paths above are better-than-training; `forks/signposts.md:68,72` is operator. Date: 2026-11-06.
+- Pitfall/removal: repeated or missing notices after races. Done criteria: concurrent verify runs produce one episode notice; process death during pending permits the next run; command error never writes shown; retry success updates the existing receipt; repeat successful engine passes do not repeat a busy/merge notice.
+- Pitfall/removal: a fake returns success while the app cannot show it. Live probes: open window, hidden/inactive Tasks, another layout, window closed, then reopen plus the next existing retry trigger. Assert the visible toast and stored outcome, with no focus change. Close the window between the request and response too.
+- Missing question: must a notice reach the desktop immediately while the Herdr window is closed, or automatically replay merely on opening it? Both exceed the retry behavior established above and would change D1/D2. Settle that explicitly rather than hiding a queue in this port.
+
+## Q3: sounds and click behavior
+
+- D3 pick: preserve existing payloads and intent. request remains the attention sound, mapped to the app's blocked sound; none does not call playSound. Respect sounds.enabled and the configured sound file. Failed and merged notices request attention; main-red, merge-slow and busy stay silent (`src/phase.ts:112`, `src/next.ts:1056`, `src/verify.ts:339,353`; old CLI defaults sound to none).
+- Preserve merge's visible body `next: akrogon phase <slug> merge`. There is no current click-to-run merge action in `src/next.ts:1050-1058` or S4. Leave action absent. A toast click may dismiss it as today; it must not execute phase, create a terminal, prompt a model or focus a different tab.
+- Cost: the new app's bundled blocked sound may differ from the old request recording. Preserve attention semantics and user sound controls, and include listening in the acceptance probe.
+- Rejected: deleting sound as cosmetic, mapping request to done, using desktop sound themes, or adding a clickable merge command. These change working behavior and add unnecessary command-routing risk. Also reject unconditional sound playback that bypasses sounds.enabled.
+- Evidence: operator parity direction `forks/signposts.md:64,72`; S1 demonstrates why click behavior is a separate explicit choice; S3 sound API/settings; S4 and repo callers above prove no existing executable action. Date: 2026-11-06.
+- Pitfall/removal: host notify may not itself play a requested sound. The patch must invoke the existing attention sound path once, only when a toast posts, with settings applied. Live done criteria cover request/none, sounds disabled, custom blocked file, repeated successful retry, body visibility and click without a lifecycle change.
+- Missing question: is the exact old request audio required, or the same configured attention behavior? Do not silently replace it with an arbitrary system beep.

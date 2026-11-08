@@ -1,0 +1,38 @@
+# cutover: merged notes (A,B,C,D,E)
+
+Sources: fork-cutover-A.md .. -E.md.
+
+## Corrections (verified by A, 2026-11-07)
+- The deploy that installs the engine release runs the previous release's code: `deployStage` flips `current`, reloads systemd, then runs `herdr plugin link <current>/plugin` and throws on failure (`src/self-update.ts:282-287`; C,B). E's "catches and prints a warning" is wrong. An engine release without `plugin/` fails its own deploy after the flip, and the old code starts no listener (B,C).
+- `akrogon rollback` flips to `previous` and then runs the running release's `install()` (`src/rollback.ts:30-37`; C,E), so rollback across the cutover yields a hybrid even while old herdr exists. A's "allowed until removal" does not hold.
+- `/usr/bin/herdr` exists, owned by pacman package `herdr 0.9.1-2` (B). `~/.config/systemd/user/moshi-hook.service.d/herdr.conf` sets `MOSHI_HERDR_PATH=/home/ivan/.local/bin/herdr` (B). `~/.claude/rules/herdr.md` does not exist (E's pitfall is moot). `~/.config/herdr/plugins.json` points at the current akrogon release's plugin (B,C,D).
+- Live old herdr: 3 `herdr server` processes plus `herdr --session personal`, 7 herdr user units (C).
+- Signpost 6a: the engine leaf is built by the door or by hand, not dispatched, so its own seats are not old-engine leaves (A; D,E assumed otherwise).
+
+## Q1. Drain and first switch
+- Zero open leaves in every registered repo when the engine release deploys; no state migration; handoffs and dispatch frozen from the engine leaf's start until it is live and smoke-proven (all). Checked just before merge, not at chart time (B,C,D,E). Today none is open; `stopped.yaml` holds one stopped leaf (`framework/relay-obrazac`) (C). A leaf with old pane ids fails the strict parse with "state predates hc" (C).
+- First switch:
+  - A small prerequisite leaf before the engine: deploy and install relink the herdr plugin only while the release has `plugin/`, and install, enable and restart the listener unit when the release ships it; the engine leaf is `blocked-by` it (C). The standard "deploy the deployer first"; the sweep deletes the conditional.
+  - First activation as an attended, serialized step owned by the engine contract, proven from the actual old installed release on a disposable installation, including failure and resume; freeze manual `next`/`pull` and pushes during it, since pause only gates automatic dispatch and self-update runs before the pause check (`src/next.ts:876`) (B).
+  - The engine release's install unlinks the old plugin in the same deploy that installs the listener (D); keep `plugin/` until a later cleanup or tolerate the link failure (E).
+
+## Q2. Rollback
+- Refused across the cutover, from the first hc release on; hc-to-hc rollback works as today; fix forward with repos paused and the bad commit held (B,C,D,E; A moves). The refusal runs before `flip`, under the install lock. Detection: previous release has `plugin/` (C,E), a listener unit sentinel too (D), or the release manifest declares the hc runtime (B). The window closes by itself once a second hc release becomes `previous` (C); the sweep deletes the guard once no pre-hc release remains and prunes pre-hc releases explicitly (C,D).
+
+## Q3. Removal, after the 2a proof
+- Owner and order (all agree on the shape):
+  1. akrogon's final sweep leaf: deletes `plugin/`, `herdr integration install`/`plugin link` calls (`src/install.ts:146-147`, `src/self-update.ts:282-287`), the prerequisite's conditional and the rollback guard, fake herdr and herdr fixtures, current wording.
+  2. Operator steps while the binary still exists: `herdr plugin unlink` and `herdr integration uninstall <kind>` for every kind ever installed, checked by `herdr plugin list`/`integration status` (C,D); dead `herdr agent` lines in `~/.claude/settings.json` listed (C,D).
+  3. Patch machinery before the binary (it rebuilds the binary): disable and remove `herdr-patches.path/.timer/.service`, `herdr-patches-failed.service`, `herdr-claude-rules.path/.service`, omarchy hooks `apply-omarchy-theme` and `ensure-herdr-after-omarchy-update`, `~/.local/share/herdr-patches`, `~/.cache/herdr-patches` (B,C,D,E); remove `omarchy-customizations/herdr/` and its `install.sh` lines so a reinstall never brings it back (C: unregistered repo, operator edit or direct chart; D: an omarchy-customizations leaf).
+  4. Moshi hook's `MOSHI_HERDR_PATH` dependency moved or removed by its owner (B).
+  5. Stop old herdr servers and sessions, remove `~/.local/bin/herdr`, `/usr/bin/herdr` through pacman, `~/.config/herdr/`, the old desktop shortcut, then prune pre-hc akrogon releases; done when `command -v herdr` is empty and no herdr unit is listed (B,C,D,E). Keep hc, herdr-app and their trees.
+- Source checkouts `infra/herdrdev/` (about 4 GB, D) and `infra/herdr-plugins/`: kept as inert archives, the operator's call (A,C,D,E) vs removed after any unique unpushed work is preserved, Git history being the record (B). `herdr-patched`'s origin is upstream `herdrdev/herdr` (A), so its local fix commits exist only on disk.
+
+## Q4. Wording
+- The sweep rewrites current text: README, `docs/` (including `docs/pictures/machine-parts.svg`), `src/` and AREA files, skills, tests (all). Exempt as dated history: `learnings/history/`, `issues/closed/`, chart folders, append-only records (B,C,D,E; A). The two active LESSONS lines (`:11` stderr parsing, `:21` plugin cwd) are retired or generalized through the lesson rule, not rewritten as prose; `:43` (herdr-app) stays (B,C,D,E). The done-check is a scoped grep allowing `herdr-app`, `herdr-core`, `herdr-setup`, `HERDR_APP_HOME`, `herdr.d.ts`, the `"herdr"` mod import and the `herdr` skill, excluding history and archives, then each remaining hit read for substance (B,C,D,E). Other repos' docs are outside this epic (D asks).
+
+## Corrections after rebuttals (2026-11-07)
+- B: B's drain rule is zero old-runtime owners (including outstanding land, verify and broadcast work), allowing untouched pending contracts with no legacy allocation; not literally zero folders. The rollback guard stays until no pre-hc release remains and deploy or resume cannot restore a legacy `previous`; step 1 must not delete it before releases are gone. "No herdr unit listed" is too broad: herdr-app scopes contain the name; remove identified obsolete units and old-server processes, keep the new runtime, and check reinstall hooks are gone, not only `command -v herdr`.
+- C: D's in-release unlink never runs in the switching deploy (the previous release deploys it) and would be akrogon calling `herdr`; the unlink is an operator step. E's tolerated link failure leaves the switching deploy `ok: false`. Rollback detection is one `existsSync(<releases>/<previous>/plugin)`; no manifest field or sentinel. Confirmed: `nextCommand` runs `selfUpdate` before any pause check (`src/next.ts:1645-1653`), so `akrogon pause` does not stop a deploy; the freeze is "nothing pushed to akrogon main until the switch is wanted", and the engine leaf's merge is the switch. Pre-hc releases leave by the existing collector about a day after they stop being active or previous (`docs/reference/releases-and-updates.md:15`); the sweep checks none remain before deleting the guard, no prune code. The engine leaf is not an old-engine leaf (6a).
+- D: withdraws the in-release unlink; the first switch needs C's prerequisite or B's attended activation. The drain inventory includes `~/.akrogon/stopped.yaml`: it holds `framework/relay-obrazac: true` with no leaf folder (A checked), a stale mark to clear before the switch.
+- E: no disagreement.

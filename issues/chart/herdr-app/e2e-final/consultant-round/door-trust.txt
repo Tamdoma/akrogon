@@ -1,0 +1,1 @@
+trust: down enter on 'Yes, I trust this folder' for /var/tmp/akr-1000/e2e-final/akr-e2e-final-claude (Claude Code writes the ~/.claude.json entry; retained as engine-on-hc O3)

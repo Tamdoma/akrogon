@@ -1,0 +1,5 @@
+### Q2b N2 + Q4/F3/F5 — Distinguishing "window closed" from "failed placement"
+
+1. **`doc.get` alone cannot tell whether `herdr-app` is open:** `herdr-core` serves the last persisted `herdr-app` document via `doc.get` even when no `herdr-app` window is running.
+2. **Conflict between Q2 closed-window start and Q4/F5 ("only a pane that never shows kills the agent"):** When `herdr-app` is closed, a newly started leaf seat's tab/pane will not appear in `doc.get` until `herdr-app` opens later. If `start` unconditionally polls `doc.get` for the pane and kills the agent on timeout, every leaf start with the window closed will kill the seat.
+3. **Fix in `start` / F3:** `start` needs a live window check (e.g. `herdr-app ls` or socket probe) alongside `tab.rename`: when the window is open, wait for the pane to appear (killing on timeout per Q4/F5) and call `herdr-app do tab.rename --id <tabId> --name <slug>`; when the window is closed, leaf `start` returns after `hc run` (since `herdr.space`/`herdr.tab` labels are already set) and defers both adoption and `tab.rename` to when the window opens.

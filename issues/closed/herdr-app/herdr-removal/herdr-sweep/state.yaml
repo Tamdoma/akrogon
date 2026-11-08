@@ -1,0 +1,46 @@
+slug: herdr-sweep
+phase: merged
+created: 2026-11-07
+repo: akrogon
+blocked-by:
+  - chart-door-on-hc
+  - watcher-on-hc
+  - notices-on-hc
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 1
+done: []
+fix_rounds: 1
+verdict: {}
+tab: ak268ee5aea47de3aefe41c4cad0b507
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t6s
+  B:
+    session: infra
+    address: t6v
+prompted:
+  B:
+    turn: 3
+    address: t6v
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-08T09:34:09.562Z
+broadcast:
+  kind: epic
+  name: herdr-app
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/herdr-app
+  pushed: 083185aadf981f3cb8e1650ed23e7cb9e05fc386
+  sources: []
+frozen:
+  tests/deploy-shapes.test.ts: ae0e0c786933bffe6ecfb865a79bb90029a22f6d
+  tests/helpers.ts: 0fe3c14194d88a5b306bfb49fa78a29d86bc557c
+  tests/install.test.ts: b6a4246ff781fc391a002193f574c9b0ebad80e5
+frozen_cited: []

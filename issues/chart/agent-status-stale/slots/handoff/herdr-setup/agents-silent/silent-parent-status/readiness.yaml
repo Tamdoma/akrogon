@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: theme colour `unknown` available to mods
+    command: grep -n unknown ~/.config/herdr-app/herdr.d.ts; grep -n t.unknown ~/.config/herdr-app/mods/spaces/main.js /home/ivan/Work/infra/herdr-setup/mods/spaces-list/main.js
+    identity: operator's local user (read-only file reads)
+    target: herdr-app 0.1.12 type files and mods on this machine
+    version: herdr-app 0.1.12
+    date: '2026-11-04'
+    result: herdr.d.ts theme() doc names `unknown` among the colours; the shipped spaces mod and herdr-setup spaces-list fall back to `t.unknown`
+    cleanup: none (read-only)
+    limits: does not prove how `unknown` looks in every user theme; the marker's shape is the plan's
+    record: issues/chart/agent-status-stale/forks/silent-parent.md

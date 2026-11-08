@@ -1,0 +1,19 @@
+opened: '2026-11-08T08:33:29Z'
+seats:
+  - seat: A
+    address: t3
+    name: af-door
+    recipe:
+      harness: claude
+    session: /home/ivan/.claude/projects/-var-tmp-akr-1000-e2e-final-akr-e2e-final-claude/b6d3b442-0216-4ada-b80c-7f365e67ba61.jsonl
+  - seat: B
+    address: t4
+    name: af-slot-b
+    recipe:
+      harness: claude
+      model: claude-haiku-5-5
+      effort: low
+    session: /home/ivan/.claude/projects/-var-tmp-akr-1000-e2e-final-akr-e2e-final-claude-issues-chart-e2e-round/a659d895-b5fc-46aa-a2ad-7abba356b1dc.jsonl
+spans:
+  - from: '2026-11-08T08:33:29Z'
+    to: '2026-11-08T08:33:59Z'

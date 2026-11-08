@@ -1,0 +1,34 @@
+import {test,expect} from 'bun:test';
+import {writeFileSync,readFileSync,chmodSync,mkdirSync,watch} from 'node:fs';
+import {resolve} from 'node:path';
+import {fixture,entry,killTree} from '/home/ivan/.akrogon/worktrees/akrogon/engine-on-hc/tests/helpers';
+import {hcCore} from '/home/ivan/.akrogon/worktrees/akrogon/engine-on-hc/tests/hc-fixture';
+function until(path:string, count:number):Promise<void> {
+ return new Promise((done,fail)=>{
+  const finish=():void=>{if(readFileSync(path,'utf8').split('\n').filter(x=>x==='next --resume').length<count)return;clearTimeout(timer);w.close();done();};
+  const w=watch(path,()=>{finish();setTimeout(finish,20);});
+  const timer=setTimeout(()=>{w.close();fail(new Error('missing resume '+count+': '+readFileSync(path,'utf8')))},3000);
+  finish();
+ });
+}
+test('restart diagnostic',async()=>{
+ const f=await fixture(); const core=await hcCore(f);
+ const bin=resolve(f.home,'diag-bin');mkdirSync(bin);
+ const calls=resolve(f.home,'calls.log');writeFileSync(calls,'');
+ writeFileSync(resolve(bin,'akrogon'),`#!/bin/sh\nprintf '%s\\n' "$*" >> '${calls}'\n`);
+ chmodSync(resolve(bin,'akrogon'),0o755);
+ const p=Bun.spawn([process.execPath,entry,'listen'],{cwd:f.home,env:{...process.env,HOME:f.home,AKROGON_HOME:f.home,...core.env,PATH:bin+':'+core.env.PATH},stdout:'ignore',stderr:'pipe'});
+ try{
+  await until(calls,1);
+  for(let i=0;i<12;i++){
+   const r=await core.hc(['server','restart']);
+   console.log('restart',i,'code',r.code,'listener exit',p.exitCode);
+   expect(r.code).toBe(0); await until(calls,i+2);
+  }
+ } finally{
+  console.log('listener before cleanup',p.exitCode,p.signalCode);
+  killTree(p); await p.exited; console.log('listener stderr:',await new Response(p.stderr).text());
+  await core.stop(); f.clean();
+ }
+},45000);
+

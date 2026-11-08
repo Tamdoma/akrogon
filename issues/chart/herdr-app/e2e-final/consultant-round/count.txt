@@ -1,0 +1,1 @@
+count line C-final: N7 consultant round, bound 2 harness sessions (door + consultant), sessions 6 and 7 of 7 total; door claude-sonnet-5-5 medium (operator settings unchanged), consultant claude-haiku-5-5 low; cwd /var/tmp/akr-1000/e2e-final/akr-e2e-final-claude; 2026-11-08T08:32:37Z

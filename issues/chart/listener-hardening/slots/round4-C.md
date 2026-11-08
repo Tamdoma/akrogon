@@ -1,0 +1,14 @@
+# Round 4, slot C: review of c01b6020 (listener recovery)
+
+Read: `git -C <k3 worktree> log -p origin/main..HEAD`, the resulting `src/listen.ts`, `src/hc.ts:85-102,124-135`, `src/shell.ts:25-70`, `systemd/akrogon-listener.service`, `src/pull.ts:83-104`, `src/next.ts:1021,1267`.
+
+The commit matches what I asked for in R2 and R4 (retry where the failure was only logged, a pass bound, a default hc deadline, a session's failure kept to that session), and the earlier pieces it leans on are on the branch: `listening()` treats `ECONNRESET` as gone (`src/hc.ts:128-131`) and the unit is `Restart=always`, `RestartSec=2`, `StartLimitIntervalSec=0`. A permanently failing pass now retries every 60 s, which is the right shape (recovery when the cause clears, bounded noise).
+
+Defects:
+
+- D1 `src/listen.ts:115-131`: `subscribe` starts the stream (`:115`) and marks the session subscribed (`:116`) before `watchSocket` (`:117`), whose `lstatSync`/`realpathSync` throws `ENOENT` when the socket vanished between `sessions()` and this line (a core stopping, the race this commit is about). The throw leaves `subscribe` before the `ended` handlers at `:120-131` attach, so: the session stays in `subscribed` for the life of the process and is never resubscribed when its core comes back (every later scan filters it out, `:153`), and the stream's eventual rejection has no handler. Before this commit the same race was fatal and the restart cleared the set; now it is a silent loss of one session until the listener restarts, the failure class this commit exists to remove. Fix: `watchSocket(session)` first, then `follow` and `subscribed.add`, so a throw starts nothing (or treat a missing socket as "not fresh" and return).
+- D2 `src/listen.ts:43,58-62`: the retry records which pass failed (`command`) but always enqueues `next --resume`. A `pull --all` that fails or is killed at the deadline (`src/pull.ts:99-103` throws when any repo's pull fails, for instance network down at boot) is never run again until the next listener start; nothing else enqueues it (`:33` is the only place) and `next` does not pull. Deploys do not depend on it (`src/next.ts:1021,1267` run `selfUpdate`), so no leaf stops, but new intake is silently missed for the listener's lifetime, which can be days. Fix: the retry enqueues the failed pass (`pull --all` stays `pull --all`; a failed stream or scan enqueues `next --resume` as now); `enqueue` already dedups.
+
+Limits, not defects: `child.kill()` at the pass deadline ends the pass process only; a grandchild that caused the hang (a `git fetch` with no timeout, since `hc` calls are now bounded) keeps running as an orphan, and the lock is released only because the flock holder's stdin pipe closes with the pass (`src/state.ts:362`). Worth a process-group kill when it shows up; nothing to change today.
+
+Verdict: changes needed

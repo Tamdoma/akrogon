@@ -1,0 +1,17 @@
+{
+  "left": [],
+  "target_trust_absent": true,
+  "trusted_count": 10,
+  "all_other_trust_entries_unchanged": true,
+  "other_settings_unchanged": true,
+  "retained_agy": "8d8f4dae-b418-46dc-8621-31eb43056f98",
+  "temps": [
+    "/var/tmp/akr-1000/4f79/84737d8d",
+    "/var/tmp/akr-1000/4f79/46402f38",
+    "/var/tmp/akr-1000/4f79/9ba61a17",
+    "/var/tmp/akr-1000/4f79/10a5bfe4",
+    "/var/tmp/akr-1000/3d60/95d29c06",
+    "/var/tmp/akr-1000/3d60/903ea3b8",
+    "/var/tmp/akr-1000/3d60/486cb875"
+  ]
+}

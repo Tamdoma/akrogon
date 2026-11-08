@@ -1,0 +1,13 @@
+inputs:
+  - kind: file
+    name: issues/chart/herdr-app/forks/e2e-proof.md
+    holder: akrogon
+    purpose: the recorded end-to-end proof that must exist before anything old is deleted (signposts 2a, tests agreed 2a proof)
+    consumers: [herdr-sweep]
+    steps: after engine-on-hc, chart-door-on-hc, watcher-on-hc and notices-on-hc merge and herdr-setup's leaves land with ./install run, the door runs and records on main the full suite green, one window and per-kind run on the installed revisions with the loaded mod build observed, one real leaf through its whole life, one consultant round and one watcher check, logs kept
+    source: door A writes the record on akrogon main
+    done: the file exists on akrogon main naming each part with its log path
+produces: []
+grants: []
+retained: []
+proofs: []

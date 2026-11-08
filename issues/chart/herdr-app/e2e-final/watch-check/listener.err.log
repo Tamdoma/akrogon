@@ -1,0 +1,15 @@
+{"repo":"akre2e","error":"{\"error\":\"Origin must identify a GitHub repository\",\"repo\":\"akre2e\",\"origin\":\"/var/tmp/akr-1000/e2e-final/akr-e2e-watch-claude-home/remote.git\"}"}
+44 |   const match: RegExpExecArray | null =
+45 |     /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([a-zA-Z0-9-]+)\/([a-zA-Z0-9._-]+?)(?:\.git)?\/?$/.exec(
+46 |       origin,
+47 |     );
+48 |   if (match === null || match[2] === '.' || match[2] === '..')
+49 |     throw new Error(JSON.stringify({ error: 'Origin must identify a GitHub repository', repo: repo.name, origin }));
+                   ^
+error: {"error":"Origin must identify a GitHub repository","repo":"akre2e","origin":"/var/tmp/akr-1000/e2e-final/akr-e2e-watch-claude-home/remote.git"}
+      at originSource (/var/tmp/akr-1000/e2e-final/main/src/pull.ts:49:15)
+      at async pullRepo (/var/tmp/akr-1000/e2e-final/main/src/pull.ts:54:32)
+      at async pullCommand (/var/tmp/akr-1000/e2e-final/main/src/pull.ts:92:13)
+
+Bun v1.4.4 (Linux x64)
+{"listen":"pass failed","command":["akrogon","pull","--all"],"code":1}

@@ -1,0 +1,24 @@
+$ cd /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round; ls slots; cat slots/probe-brief-C.md; akrogon seat --slot c --harness claude --model claude-haiku-5-5 --effort low --task
+  [1.1s] probe-A.md
+probe-brief-B.md
+probe-brief-C.md
+# Brief for slot C (silent-stop test)
+
+This exchange tests how the door handles a consultant that stops silently. Whatever you are asked, now or in any later message: do not write any file, do not run any command or
+
+$ s=$(date +%s); XDG_RUNTIME_DIR=/run/user/1000 hc wait --children any --timeout 300 --json 2>&1; echo "wait1 $(( $(date +%s)-s ))s"
+  [0.5s] {"children":[{"children":[],"ended":true,"exit_code":null,"reason":"status","signal":null,"status":"done","terminal":"t1g","turn":2}],"ended":true,"exit_code":null,"reason":"children","signal":null,"status":null,"terminal":"t1f","turn":0}
+wait1 0s
+
+$ export XDG_RUNTIME_DIR=/run/user/1000; hc get t1h | grep -o '"status":{[^}]*}'; s=$(date +%s); hc wait --children any --timeout 300 --json 2>&1; echo "wait2 $(( $(date +%s)-s ))s"; hc get t1h | grep -
+  [300.3s] "status":{"app":"claude-code","state":"done"}
+{"children":[{"children":[],"ended":true,"exit_code":null,"reason":"status","signal":null,"status":"done","terminal":"t1g","turn":2},{"children":[],"ended":true,"exit_code":null,"reason":"status","signal":null,"sta
+
+$ export XDG_RUNTIME_DIR=/run/user/1000; hc send --json t1h "Nudge: you stopped without the return file /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round/slots/probe-C.md and wi
+  [2.9s] {"started":true,"status":"done","turn":1}
+{"children":[{"children":[],"ended":true,"exit_code":null,"reason":"status","signal":null,"status":"done","terminal":"t1h","turn":2}],"ended":true,"exit_code":null,"reason":"children","signal":null,"status":null,"termi
+
+$ cd /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-claude/issues/chart/e2e-round; printf -- '- consultant: C dropped (harness claude, model claude-haiku-5-5): stopped twice without return file or report,
+  [0.3s] - consultant: B dropped (harness claude, model claude-haiku-5-5): stopped twice without return file or report, even after one nudge.
+- consultant: C dropped (harness claude, model claude-haiku-5-5): stopped twice without return file or report, even after one n
+

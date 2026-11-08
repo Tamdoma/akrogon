@@ -1,0 +1,5 @@
+# Watcher rebuttal: B
+
+- F1: The wake list omits B's committed phase and prerequisite/dependency state changes, including phase invoked outside an hc terminal. A leaf can become failed or eligible for recovery without a new seat fact. The chosen engine/phase path must request the check explicitly. hc lifecycle events plus transcript watches alone do not cover this.
+- F2: B's Escape option includes a two-turn correction when needed. Spend the once-per-watch stop budget before sending the one esc. If the seat has not stopped, retain the intent, end the check and resume on its native status/turn event. Preserve that intent and spent budget through watcher handover. An immediate read does not justify waiting or sending while it still works.
+- F3: The corrective-send guard must confirm the same current conversation as well as the same address. /clear or /new can change the conversation without replacing the hc terminal. An unknown current transcript path cannot be replaced with an older saved path as identity proof. If confirmation or stop history is missing, notify instead of guessing.

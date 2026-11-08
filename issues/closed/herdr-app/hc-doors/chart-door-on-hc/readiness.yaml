@@ -1,0 +1,107 @@
+inputs:
+  - kind: file
+    name: herdr-consultant-column
+    holder: /home/ivan/.local/bin
+    purpose: herdr-setup's consultant column helper the door calls (B,E)
+    consumers: [chart-door-on-hc]
+    steps: herdr-setup leaf consultant-weights merges; the operator runs /home/ivan/Work/infra/herdr-setup/install
+    source: herdr-setup bin/herdr-consultant-column, linked by ./install
+    done: /home/ivan/.local/bin/herdr-consultant-column exists
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-07'
+      answer: '1a | 2a | 3a (final handoff review, door t15; paid budgets as listed there)'
+    principal: chart-door-on-hc leaf seats on the operator's machine, user ivan (uid 1000)
+    account: the operator's existing harness logins for claude, codex and pi
+    credential:
+      name: harness logins (~/.claude, ~/.codex, ~/.pi), never read by the leaf
+      holder: /home/ivan
+    targets: [throwaway hc session akr-e2e-door, throwaway herdr-app session akr-e2e-door]
+    fixtures:
+      - account: operator user ivan
+        purpose: hc core and herdr-app window for the reset tier, the auto-mode door run and the window tier
+        marker: session name prefix akr-e2e-
+        naming: akr-e2e-door; cwd folders <leaf temp>/akr-e2e-door-<kind>, each path recorded in the report before use
+        count: 1
+        cleanup:
+          - step: every call with HC_SESSION=akr-e2e-door and HC_TERMINAL_SOCKET, HC_TERMINAL_ID, HC_SCOPE unset; hc kill and hc rm each terminal the leaf recorded; herdrapp session stop akr-e2e-door; hc server stop; herdrapp session delete akr-e2e-door; remove ~/.local/state/herdr-core/akr-e2e-door and each recorded cwd folder; after the report quotes what it needs, remove the runs' transcripts, namely the claude projects folder of each recorded cwd, the recorded codex rollout files and the pi sessions folder of each recorded cwd (B)
+            identity: operator user ivan (the leaf seat)
+        absence_check: no akr-e2e-door socket under /run/user/1000/herdr-core/, no ~/.config/herdr-app-sessions/akr-e2e-door, no ~/.local/state/herdr-core/akr-e2e-door
+    operations: [hc server start with a clean environment, the start verb for claude/codex/pi, hc send, hc keys (including one enter answering claude's folder-trust dialog for a recorded <leaf temp>/akr-e2e-door-claude cwd, codex 'Trust and continue' for a recorded codex cwd and any pi first-run dialog, plan Operator decision O2), hc wait, hc events, hc label, hc kill, herdrapp --session akr-e2e-door, herdr-consultant-column in that session, the cleanup above]
+    effects: billing (paid model tokens, small models at low effort; the auto-mode door uses the operator's Claude settings unchanged); no public, DNS or retention effects
+    bounds: at most 9 harness sessions, counting every harness session the leaf's live runs start, whatever its outcome (reset tier one per kind plus one repeat per kind; one Claude door for the permission check, which also runs the consultant round as door; one real consultant in that round; one fresh consultant for a repeat of the round, reusing the same door (B)); at most 4 prompts per session; the window tier uses stand-in consultants only
+    stop_line: never the operator's own sessions or doors; never hc server stop on a core the leaf did not start; never Claude settings writes (the only ~/.claude.json change is the projects trust entry Claude Code itself writes when a recorded claude cwd is trusted; likewise the only ~/.codex/config.toml change is the trust entry codex itself writes for a recorded codex cwd, and any pi first-run state pi itself writes, plan Operator decision O2; no script edits those files); never herdr-app feedback; no transcript of the runs is kept after cleanup (B)
+retained:
+  - resources: [the ~/.claude.json projects trust entry of each recorded claude cwd <leaf temp>/akr-e2e-door-claude*, paths listed in the report]
+    purpose: answering Claude Code's folder-trust dialog writes it; removing it means editing ~/.claude.json while live Claude sessions rewrite that file, so it stays (plan Operator decision O2, as engine-on-hc O3)
+    owner: operator
+    remove_by: '2027-05-08'
+    cost: one small JSON entry each
+    exposure: local user only; it names a deleted throwaway folder
+    cleanup:
+      identity: operator user ivan
+      route: removed by Claude Code when the operator clears project history, or by hand with no Claude session running
+    reason: a script edit of ~/.claude.json could clobber live Claude sessions' writes (door t15 under the operator's overnight delegation 2026-11-08)
+  - resources: [the ~/.codex/config.toml trust entry of each recorded codex cwd, and any first-run state pi writes, paths listed in the report]
+    purpose: answering the harness's own trust or first-run dialog writes them; removing them means a script editing the harness's own config, so they stay (plan Operator decision O2, as engine-on-hc O4)
+    owner: operator
+    remove_by: '2027-05-08'
+    cost: one small config entry each
+    exposure: local user only; they name a deleted throwaway folder
+    cleanup:
+      identity: operator user ivan
+      route: removed by hand with no codex or pi session running
+    reason: no script edits a harness's own config while its sessions may run (door t15 under the operator's overnight delegation 2026-11-08)
+proofs:
+  - operation: hc wait --children all, hc send reports as <hc> messages
+    command: every consultant exchange of this chart (door t15, hc wait --children all --timeout 900 --json re-armed per report)
+    identity: operator user ivan
+    target: operator session (door t15, consultants t6c, t6d, t6f, t6g)
+    version: hc 0.1.18
+    date: '2026-11-07'
+    result: the wait returned on each child report; reports arrived as <hc from=...> messages
+    cleanup: none
+    limits: no blocked or errored child observed in a wait; the stand-in tests cover those
+    record: issues/chart/herdr-app/forks/chart-door.md
+  - operation: reset keys and transcript after reset per kind
+    command: forks/proofs.md P3 (hc keys /clear or /new then enter, fds and transcript folders)
+    identity: operator user ivan
+    target: throwaway hc session akr-probe
+    version: claude 2.1.318, codex 0.167.0, pi 1.5.0
+    date: '2026-11-07'
+    result: claude keeps the old tasks handle and writes a new projects file; codex opens a new rollout only after the next prompt; pi writes a new session file
+    cleanup: session stopped and removed
+    limits: one reset per kind; the warm-up code lookup itself not run
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: hc run --bg --no-notify --rm, hc label, hc events snapshot
+    command: forks/proofs.md P9
+    identity: operator user ivan
+    target: throwaway hc session akr-probe2
+    version: hc 0.1.18
+    date: '2026-11-07'
+    result: the --rm terminal vanished after exit; labels set and removed; events start with a snapshot
+    cleanup: session stopped, state removed
+    limits: helper typing into a live agent not run
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: herdr-app doc.get and doc.set with version (weights helper contract)
+    command: forks/proofs.md P7
+    identity: operator user ivan
+    target: throwaway herdr-app session akr-probe
+    version: herdr-app 0.1.13
+    date: '2026-11-07'
+    result: doc.set with the read version changed weights; a stale version got conflict
+    cleanup: session deleted
+    limits: the helper itself is herdr-setup's leaf
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: consultants joining the door's tab by labels, column built by doc.set
+    command: forks/proofs.md P11
+    identity: operator user ivan
+    target: throwaway herdr-app session akr-probe3
+    version: herdr-app 0.1.13, hc 0.1.18
+    date: '2026-11-07'
+    result: labelled children joined the door's tab in one uneven row; a versioned doc.set to row[door, column[consultants]] was accepted with no errors; an added child joined as a split of the last column child
+    cleanup: session stopped and deleted, checked
+    limits: drawing not seen (stale shot)
+    record: issues/chart/herdr-app/forks/proofs.md

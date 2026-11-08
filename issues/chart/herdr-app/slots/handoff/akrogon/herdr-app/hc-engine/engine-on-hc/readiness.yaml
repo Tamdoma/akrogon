@@ -1,0 +1,109 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-07'
+      answer: '1a | 2a | 3a (final handoff review, door t15; paid budgets as listed there)'
+    principal: engine-on-hc leaf seats on the operator's machine, user ivan (uid 1000)
+    account: the operator's existing harness logins for claude, codex, pi and agy
+    credential:
+      name: harness logins (~/.claude, ~/.codex, ~/.pi, ~/.gemini), never read by the leaf
+      holder: /home/ivan
+    targets: [throwaway hc session akr-e2e-engine, throwaway herdr-app session akr-e2e-engine]
+    fixtures:
+      - account: operator user ivan
+        purpose: hc core and herdr-app window for the window tier and the per-kind tier
+        marker: session name prefix akr-e2e-
+        naming: akr-e2e-engine (hc session and herdr-app session); cwd folders <leaf temp>/akr-e2e-engine-<kind>, each path recorded in the report before use
+        count: 1
+        cleanup:
+          - step: every call with HC_SESSION=akr-e2e-engine and HC_TERMINAL_SOCKET, HC_TERMINAL_ID, HC_SCOPE unset; hc kill each terminal the leaf recorded; herdrapp session stop akr-e2e-engine; hc server stop; herdrapp session delete akr-e2e-engine; remove ~/.local/state/herdr-core/akr-e2e-engine and each recorded cwd folder; remove from ~/.gemini/antigravity-cli/settings.json trustedWorkspaces exactly the recorded agy cwd paths, keeping every other entry; after the report quotes what it needs, remove the runs' transcripts, namely the claude projects folder of each recorded cwd, the recorded codex rollout files, and the pi sessions folder of each recorded cwd (B); agy keeps its runs in its own conversation store, which has no per-conversation delete (P14), named in the report
+            identity: operator user ivan (the leaf seat)
+        absence_check: no akr-e2e-engine socket under /run/user/1000/herdr-core/, no ~/.config/herdr-app-sessions/akr-e2e-engine, no ~/.local/state/herdr-core/akr-e2e-engine, none of the recorded cwd paths in trustedWorkspaces and every other entry unchanged (B)
+    operations: [hc server start with a clean environment, hc run of claude/codex/pi/agy through the start verb, hc send, hc keys enter (agy trust), hc wait, hc events, hc interrupt, hc kill, herdrapp --session akr-e2e-engine, herdr-app ls, herdr-app do tab.rename in that session, the cleanup above]
+    effects: billing (paid model tokens on small models at low effort); agy appends each answered folder to its trustedWorkspaces (removed by cleanup); no public, DNS or retention effects
+    bounds: at most 8 harness sessions, counting every harness session the per-kind tier starts, whatever its outcome (one per kind plus one repeat per kind); at most 4 prompts per session; window tier sessions start only the stand-in agent and cat
+    stop_line: never the operator's own hc or herdr-app sessions (default, infra, personal, mdconsultingny); never hc server stop on a core the leaf did not start; never herdr-app feedback; never Claude settings writes; agy settings changed only in the recorded trustedWorkspaces entries; no transcript of the runs is kept after cleanup (B)
+retained:
+  - resources: [agy conversation records of the engine-on-hc agy runs in ~/.gemini/antigravity-cli (conversation store), ids listed in the report]
+    purpose: agy has no per-conversation delete (forks/proofs.md P14), so the runs' conversations cannot be removed alone
+    owner: operator
+    remove_by: '2027-05-07'
+    cost: a few kilobytes of local disk
+    exposure: local user only, inside agy's own history
+    cleanup:
+      identity: operator user ivan
+      route: removed through agy's own conversation history when the operator clears it; no private database edit
+    reason: no supported way to delete one agy conversation (B)
+proofs:
+  - operation: core environment inherited by agents; env -u clears Claude child-session variables
+    command: core auto-started from the door, then restarted with env -i ... hc server start (forks/proofs.md P0)
+    identity: operator user ivan
+    target: throwaway hc session akr-probe
+    version: hc 0.1.18, claude 2.1.318
+    date: '2026-11-07'
+    result: inherited core passed CLAUDECODE and CLAUDE_CODE_* to seats and Claude wrote no transcript; clean core gave a normal transcript
+    cleanup: session stopped and removed, checked
+    limits: env -u inside the exec chain itself not run; criterion 2 proves it
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: hc run --bg first task in argv, start proof on hc events, later hc send, systemd-run --scope wrap
+    command: forks/proofs.md P1 and P2 (probe.sh per kind)
+    identity: operator user ivan, existing harness logins
+    target: throwaway hc session akr-probe
+    version: hc 0.1.18, claude 2.1.318, codex 0.167.0 (--no-daemon), pi 1.5.0, systemd 262
+    date: '2026-11-07'
+    result: first task ran and reported for claude, codex and pi; turn reached 1; later sends started true; a send before the first working was refused unavailable (claude, codex) or merged (pi); pid was the harness and the cgroup the scope
+    cleanup: probe terminals killed, slice gone, checked
+    limits: one run per kind; --unit, CollectMode and SendSIGHUP on grandchildren not exercised; small models only
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: transcript locations (resolver)
+    command: forks/proofs.md P3 (fds of the live agents before and after a reset)
+    identity: operator user ivan
+    target: throwaway hc session akr-probe
+    version: claude 2.1.318, codex 0.167.0, pi 1.5.0, agy 1.5.3
+    date: '2026-11-07'
+    result: claude tasks handle under the seat TMPDIR, codex newest open rollout after the first prompt, pi argv session id file, agy sqlite db
+    cleanup: as P1
+    limits: one reset per kind; resets are chart-door-on-hc's
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: agy start in a new folder, trust answered by hc keys enter, first task by hc send
+    command: forks/proofs.md P5 and P8
+    identity: operator user ivan, agy login
+    target: throwaway hc session akr-probe, cwd ~/.cache/akr-probe-agy5
+    version: agy 1.5.3 --mode auto
+    date: '2026-11-07'
+    result: blocked kind permission "Trust this folder?", one enter gave idle turn 0, the sent first task counted as turn 1, a second send turn 2; P5 run wrote a file outside its cwd unattended
+    cleanup: trust entries removed (12 to 10), folders removed, core stopped
+    limits: one session, --mode auto only
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: herdr-app adoption by labels, tab.rename, doc.get, window check, app home
+    command: forks/proofs.md P6 and P7 (window.sh)
+    identity: operator user ivan
+    target: throwaway herdr-app session akr-probe
+    version: herdr-app 0.1.13, hc 0.1.18
+    date: '2026-11-07'
+    result: labelled terminals showed as tabs with the window closed at start and open; same tab id joined as a split; tab.rename named it; focus unchanged; herdrapp session list matched the folder rule
+    cleanup: session stopped and deleted, checked
+    limits: 4-seat geometry and drawing not checked
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: hc label set and remove, hc events and hc ls from a systemd user service
+    command: forks/proofs.md P9
+    identity: operator user ivan
+    target: throwaway hc session akr-probe2
+    version: hc 0.1.18, systemd 262
+    date: '2026-11-07'
+    result: labels set and removed one by one; a transient user service listed terminals and followed events after an initial snapshot
+    cleanup: session stopped, state removed, no units left
+    limits: no long-running service, Restart= and stream end not observed
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: consultants joining the caller's tab by herdr.space and herdr.tab labels
+    command: forks/proofs.md P11
+    identity: operator user ivan
+    target: throwaway herdr-app session akr-probe3
+    version: herdr-app 0.1.13, hc 0.1.18
+    date: '2026-11-07'
+    result: children labelled with the door's space and tab joined the door's tab; doc.get shows each terminal's tab
+    cleanup: session stopped and deleted, checked
+    limits: the column itself is herdr-setup's helper
+    record: issues/chart/herdr-app/forks/proofs.md

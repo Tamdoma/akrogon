@@ -1,0 +1,49 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-07'
+      answer: '1a | 2a | 3a (final handoff review, door t15; paid budgets as listed there)'
+    principal: consultant-weights leaf seats on the operator's machine, user ivan (uid 1000)
+    account: none (free, no model launch)
+    credential:
+      name: none
+      holder: /home/ivan
+    targets: [throwaway hc and herdr-app session hs-e2e-column]
+    fixtures:
+      - account: operator user ivan
+        purpose: window for the column window tier (B)
+        marker: session name prefix hs-e2e-
+        naming: hs-e2e-column
+        count: 1
+        cleanup:
+          - step: every call with HC_SESSION=hs-e2e-column and HC_TERMINAL_SOCKET, HC_TERMINAL_ID, HC_SCOPE unset; hc kill and hc rm each recorded terminal; herdrapp session stop hs-e2e-column; hc server stop; herdrapp session delete hs-e2e-column; remove ~/.local/state/herdr-core/hs-e2e-column
+            identity: operator user ivan (the leaf seat)
+        absence_check: no hs-e2e-column socket, no ~/.config/herdr-app-sessions/hs-e2e-column, no ~/.local/state/herdr-core/hs-e2e-column
+    operations: [hc server start with a clean environment, hc run of cat stand-ins with tab labels, hc kill and hc rm of a stand-in for the restart case, herdrapp --session hs-e2e-column, doc.get and doc.set of herdr-app and herdr-setup.consultant-column in that session, herdr-app ls and shot, the cleanup above]
+    effects: local only; no billing, public, DNS or retention effects
+    bounds: at most 2 window sessions, counting every herdrapp start of hs-e2e-column
+    stop_line: never doc.set on the operator's own sessions
+retained: []
+proofs:
+  - operation: doc.get and versioned doc.set through hc connect
+    command: forks/proofs.md P7 (window.sh, doc.get, doc.set with version 5 then stale 5)
+    identity: operator user ivan
+    target: throwaway herdr-app session akr-probe
+    version: herdr-app 0.1.13, hc 0.1.18
+    date: '2026-11-07'
+    result: doc.set with the read version set weights 0.7/0.3 (version 6); a stale version got conflict; the re-read kept the change
+    cleanup: session stopped and deleted, checked
+    limits: drawing of the new weights not looked at
+    record: /home/ivan/Work/infra/akrogon/issues/chart/herdr-app/forks/proofs.md
+  - operation: door plus consultants by labels, column rewrite by doc.set, added consultant placement
+    command: forks/proofs.md P11
+    identity: operator user ivan
+    target: throwaway herdr-app session akr-probe3
+    version: herdr-app 0.1.13, hc 0.1.18
+    date: '2026-11-07'
+    result: labels gave one uneven row; doc.set to row[door, column[consultants]] accepted with no errors; an added consultant joined as a row split of the last column child
+    cleanup: session stopped and deleted, checked
+    limits: drawing not seen (stale shot)
+    record: /home/ivan/Work/infra/akrogon/issues/chart/herdr-app/forks/proofs.md

@@ -1,0 +1,1 @@
+{"code":0,"signalCode":null,"killed":true,"stdout":"/home/ivan/Work/infra/akrogon/issues/open/herdr-app/hc-doors/notices-on-hc/implementation/notices-tier-2/open.png\n","stderr":""}

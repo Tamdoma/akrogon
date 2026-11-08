@@ -1,0 +1,31 @@
+  again on B's
+  stop.
+
+  I added the -
+  consultant:
+  line under ##
+  Autopilot in
+  CHART.md and
+  wrote
+  seats.yaml
+  with A and B
+  entries. B has
+  no session
+  line because
+  its transcript
+  path was
+  unknown (-),
+  and I didn't
+  start any
+  other
+  consultant.
+
+✻ Crunched for
+  35s · done
+  4:38 AM
+
+────────────────
+❯ 
+────────────────
+  CC │ 6% │ $…
+  ⏵⏵ auto mode

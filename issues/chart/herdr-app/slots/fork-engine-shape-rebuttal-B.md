@@ -1,0 +1,4 @@
+# Engine-shape rebuttal B
+
+- Q2: “restart in reload step” drops my activation constraint. The listener will invoke next, which can invoke self-update (`src/next.ts:1653`). Current deployment reloads at `src/self-update.ts:274` before writing success at :290. Restarting the listener's service from its updating child can interrupt deployment before that record. Keep activation after completed installation and outside a protected mutation, with a done-criterion exercising self-update triggered through the listener and proving the new resident version runs. This changes restart sequencing, not my listener-owner pick.
+- Q2 evidence: do not attribute superlance crashmail research to B. I inspected Supervisor's event protocol, listener-failure handling and buffer-loss documentation. I did not inspect crashmail.

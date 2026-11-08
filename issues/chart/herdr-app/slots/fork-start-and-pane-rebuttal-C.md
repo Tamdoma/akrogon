@@ -1,0 +1,9 @@
+# Rebuttal C: start-and-pane
+
+Correction accepted: `hc get` on the four live consultants (direct `hc run <harness> "<task>"`, 2026-11-06) shows `first_message: null`, `template: null`. My Q4 start check loses the `sent` field; its second half stands as the only proof for a direct run: a fresh terminal starts at `turn` 0, so `turn >= 1` or status `working` in one `hc get` after start, else non-zero with `hc read` attached.
+
+One changed position for the delivery fork: I rejected hc templates in Q4 because argv would live outside the repo. With `first_message` and the 60 s readiness retry (trust dialogs, `hc keys down enter`) available only to template runs, that comparison is no longer one-sided. The repo can stay the one source if `akrogon install` writes `~/.config/herdr-core/templates/<kind>.md` from `harnesses:` as a build artifact, body empty so the brief keeps the report line (intake). Delivery should weigh template runs against direct runs on that basis, not on my earlier dismissal.
+
+Q3, where the weights write lives: I hold herdr-setup, with one argument the merged notes do not state. akrogon deploys on every merge and its suite runs on every deploy; a `doc.set` writer in akrogon's hc module means a herdr-app update that changes the document shape breaks akrogon's engine tests and deploys. In herdr-setup it breaks a presentation script the door calls, which is what lock 3 names as the place for app gaps. The engine never needs weights (leaf tabs have two panes side by side), so no cross-repo call happens on an engine start; only the door's skill text calls it, and the door already depends on herdr-setup's sessions (`herdrapp`). The `doc.get` read for space discovery stays in akrogon as identity decided; reading with a strict schema and writing structure are different risks.
+
+No other disagreement. Attributions to C are correct.

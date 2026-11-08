@@ -1,0 +1,12 @@
+claude: pre /home/ivan/.claude/projects/-var-tmp-akr-1000-5d20-34e9098a-akr-e2e-door-claude/5cd738a3-ff4e-4964-aed8-bc0895e92a63.jsonl
+  label /home/ivan/.claude/projects/-var-tmp-akr-1000-5d20-34e9098a-akr-e2e-door-claude/559c853e-bcd8-48b4-bd94-2964129dacdd.jsonl
+  label==found True; found!=pre True; code 280478ec938e in new file True; code in pre file False
+  user records in new file: ['reply OK 280478ec938e', 'Run the chart-issues skill (/home/ivan/.akrogon/worktrees/akrogon/char']
+codex: pre /home/ivan/.codex/sessions/2026/11/08/rollout-2026-11-08T04-00-56-01a1b91a-12e1-7a42-8cce-55761cd7cc71.jsonl
+  label /home/ivan/.codex/sessions/2026/11/08/rollout-2026-11-08T04-01-18-01a1b91a-69a3-7da1-9e7e-eefff03adb52.jsonl
+  label==found True; found!=pre True; code eb245d3366f2 in new file True; code in pre file False
+  user records in new file: ['# AGENTS.md instructions\n\n<INSTRUCTIONS>\n# Clear, Concise, Actionable ', 'reply OK eb245d3366f2', 'Run the chart-issues skill (/home/ivan/.akrogon/worktrees/akrogon/char']
+pi: pre /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-34e9098a-akr-e2e-door-pi--/2026-11-08T03-00-55-652Z_72a30c14-a652-4226-a933-32b658c897c4.jsonl
+  label /home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-34e9098a-akr-e2e-door-pi--/2026-11-08T03-01-13-056Z_01a1b91a-54e0-75b4-9436-90756cfe9f03.jsonl
+  label==found True; found!=pre True; code 8fb07ac0c8aa in new file True; code in pre file False
+  user records in new file: ['reply OK 8fb07ac0c8aa', 'Run the chart-issues skill (/home/ivan/.akrogon/worktrees/akrogon/char']

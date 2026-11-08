@@ -1,0 +1,5 @@
+# Start-and-pane rebuttal B
+
+- F1. Q4 omits my restart boundary: the door composes plain hc kill/wait with the common start operation. A --replace/--restart mode wrapping those steps broadens code beyond the binding start-only rule for skill choreography. Replacing the new terminal into its recorded pane node remains part of placement. Treat a compiled restart wrapper as an operator exception, not an equivalent implementation choice.
+- F2. I reject Q2's deferred tab.rename-on-later-passes option as equivalent to the old behavior. It leaves a successful headless launch without its required slug-named tab until a window answers. My pick commits the name through the core document as part of start. Accepting deferred naming would need an explicit relaxation of that guarantee.
+- F3. Q4's nonzero partial-start result is necessary but insufficient when the created agent has no pane. My notes require an explicit cleanup owner so it is not left running headless after failure. Distinguish that case from a visible pane with incorrect geometry. Neither case permits blindly replaying the first task.

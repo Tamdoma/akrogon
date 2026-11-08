@@ -1,0 +1,17 @@
+opened: '2026-11-08T03:37:20Z'
+seats:
+  - seat: A
+    address: t3
+    name: null
+    recipe:
+      harness: claude
+    session: /home/ivan/.claude/projects/-var-tmp-akr-1000-5d20-34e9098a-akr-e2e-door-claude/5eefeebc-68fd-459d-a7ed-b02c33ae98db.jsonl
+  - seat: B
+    address: t4
+    name: ad-slot-b
+    recipe:
+      harness: claude
+      model: claude-haiku-5-5
+      effort: low
+spans:
+  - from: '2026-11-08T03:37:20Z'

@@ -1,0 +1,11 @@
+# herdr-skill rebuttal — slot C, 2026-11-07
+
+Attributions to me are correct. Three disagreements and one self-correction.
+
+1. Q3, B's per-harness startup hook: not a pick I would take. It is four new mechanisms (Claude SessionStart, Codex hook, a pi extension, agy SessionStart; I did not verify Codex ships a session-start hook) installed and kept in step by herdr-setup, for text that hc already delivers: every terminal gets `HC_TERMINAL_ID` in its environment, and every incoming message arrives as `<hc from=... reach="hc send <t> when done or stuck">` (hc --skill, Talk section). The hook's own sentence still only asks the model to read a skill, so it is the same judgment moved one step earlier. Operator direction 2026-11-06 ("the most elegant solutions so that the least amount of things can break") and signposts (no new features) point the other way. If the probe fails for one harness, the fix with no new part is one address line at the end of the start task that akrogon already sends, as the chart briefs do today; a failed probe otherwise means a better description (A,D).
+
+2. Q1, D's "short list of stable facts" in the body: `codex --no-daemon` is an akrogon harness setting, not herdr knowledge; "sends from another terminal arrive wrapped" and "never `hc server stop`" are hc 0.1.18 behavior. Each can change with an update, which is the staleness Q1's pick exists to avoid, and `$HC_TERMINAL_ID` as the address is already line 10 of `hc --skill`. Keep the body to the gate and the three pointers.
+
+3. Q2, B's "minus `~/.codex/skills`": that leaves the old real `~/.codex/skills/herdr` folder in place until a probe, while `link()` into that path retires it in the same install run. Whether Codex 0.167 still reads `~/.codex/skills` is unproven either way (its `.system` folder there was refreshed today), and a duplicate listing is what every akrogon skill does there today. Link all five homes.
+
+Self-correction: pi dedupes symlinked skill aliases by canonical path (pi CHANGELOG.md:2735, :5605), so the merged "pi deduplicates the same real path (B,E)" is right, and my pi name-collision pitfall applies only while an old real `herdr` folder remains in a pi home, which linking into `~/.pi/agent/skills` removes.

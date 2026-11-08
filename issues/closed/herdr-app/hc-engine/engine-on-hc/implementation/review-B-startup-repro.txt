@@ -1,0 +1,61 @@
+import { test, expect } from 'bun:test';
+import { chmodSync, mkdirSync, readFileSync, watch, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fixture, entry, killTree } from '/home/ivan/.akrogon/worktrees/akrogon/engine-on-hc/tests/helpers';
+import { hcCore } from '/home/ivan/.akrogon/worktrees/akrogon/engine-on-hc/tests/hc-fixture';
+
+function until(path: string, check: () => boolean): Promise<void> {
+  return new Promise((done, fail) => {
+    const watcher = watch(path, () => { if (check()) finish(); });
+    const timer = setTimeout(() => { watcher.close(); fail(new Error('timeout: '+path)); }, 10000);
+    function finish(): void { clearTimeout(timer); watcher.close(); done(); }
+    if (check()) finish();
+  });
+}
+test('startup catch-up precedes event wakes across sessions', async () => {
+ const f = await fixture();
+ const first = await hcCore(f);
+ const slow = await hcCore(f, {repo:'second'});
+ first.link(slow);
+ const bin = resolve(f.home,'review-bin');
+ mkdirSync(bin);
+ const snapshot=resolve(f.home,'snapshot.log');
+ const calls=resolve(f.home,'passes.log');
+ const gate=resolve(f.home,'slow.fifo');
+ writeFileSync(snapshot,''); writeFileSync(calls,'');
+ const fifo = Bun.spawnSync(['mkfifo',gate]);
+ expect(fifo.exitCode).toBe(0);
+ writeFileSync(resolve(bin,'hc'), `#!/bin/bash
+if [ "$1" = events ]; then
+ if [ "$HC_SESSION" = "${slow.session}" ]; then cat '${gate}' >/dev/null; fi
+ if [ "$HC_SESSION" = "${first.session}" ]; then
+  '${first.env.HC_SHIM_REAL}' "$@" | tee '${snapshot}'
+  exit "${'$'}{PIPESTATUS[0]}"
+ fi
+fi
+exec '${first.env.HC_SHIM_REAL}' "$@"
+`);
+ writeFileSync(resolve(bin,'akrogon'), `#!/bin/sh
+printf '%s\\n' "$*" >> '${calls}'
+`);
+ for(const file of ['hc','akrogon']) chmodSync(resolve(bin,file),0o755);
+ const listener=Bun.spawn([process.execPath,entry,'listen'], {
+  cwd:f.home,
+  env:{...process.env,HOME:f.home,AKROGON_HOME:f.home,...first.env,PATH:bin+':'+first.env.PATH},
+  stdout:'ignore',stderr:'pipe'
+ });
+ try {
+  await until(snapshot,()=>readFileSync(snapshot,'utf8').includes('"terminals"'));
+  const started=await first.hc(['run','--bg','--json','--no-parent','--label','akrogon=1','--label','akrogon.repo=repo','--label','akrogon.leaf=review-startup','--label','akrogon.seat=a','--','fake','--model','exit']);
+  expect(started.code).toBe(0);
+  await until(calls,()=>readFileSync(calls,'utf8').includes('next --wake'));
+  console.log('before second snapshot:',readFileSync(calls,'utf8').trim());
+  writeFileSync(gate,'release\n');
+  await until(calls,()=>readFileSync(calls,'utf8').includes('pull --all'));
+  console.log('startup pass order:',readFileSync(calls,'utf8').trim());
+  expect(readFileSync(calls,'utf8').trim().split('\n')[0]).toBe('pull --all');
+ } finally {
+  killTree(listener);
+  await first.stop(); await slow.stop(); f.clean();
+ }
+},20000);

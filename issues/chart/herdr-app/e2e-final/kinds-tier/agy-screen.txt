@@ -1,0 +1,29 @@
+
+      ▄▀▀▄        Antigravity CLI 1.5.3
+     ▀▀▀▀▀▀       authoritly@gmail.com (Google AI Ultra)
+    ▀▀▀▀▀▀▀▀      Gemini 3.8 Flash (Low)
+   ▄▀▀    ▀▀▄     /var/tmp/akr-1000/e2e-final/akr-e2e-engine-agy
+  ▄▀▀      ▀▀▄
+
+────────────────────────────────────────────────────────────
+> Run exactly this shell command and nothing else: hc send t1 'done agy 1' && echo ok > /var/tmp/akr-1000/e2e-final/akr-e2e-engine-agy-outside.txt
+
+● Ran (hc send t1 'done agy 1' && echo ok > /var/tmp/akr-1000/e2e-final/akr-e2e-engine-agy-outside.txt) (ctrl+o to expand)
+
+  The command has been executed successfully:
+
+    hc send t1 'done agy 1' && echo ok > /var/tmp/akr-1000/e2e-final/akr-e2e-engine-agy-outside.txt
+
+────────────────────────────────────────────────────────────
+> Run exactly: hc send t1 'done agy 2'
+
+● Ran (hc send t1 'done agy 2') (ctrl+o to expand)
+
+  The command has been executed successfully:
+
+    hc send t1 'done agy 2'
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+? for shortcuts                                                                                                                                                                   Gemini 3.8 Flash · low

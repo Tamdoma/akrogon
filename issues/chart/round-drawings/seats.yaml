@@ -12,6 +12,16 @@ seats:
     pane: t3v
     harness: claude
     session: none
+  - seat: B
+    pane: t44
+    harness: codex
+    session: none
+  - seat: C
+    pane: t45
+    harness: claude
+    session: none
 spans:
   - from: '2026-11-04T08:58:05Z'
     to: '2026-11-04T11:53:16Z'
+  - from: '2026-11-04T12:18:16Z'
+    to: '2026-11-04T12:22:42Z'

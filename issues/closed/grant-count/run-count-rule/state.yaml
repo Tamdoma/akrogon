@@ -1,0 +1,37 @@
+slug: run-count-rule
+phase: merged
+created: 2026-11-04
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#126"
+busy_since:
+  B: 2026-11-04T12:42:37.535Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFQ
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pYE
+  B: w8:pYF
+prompted:
+  B: 01a1a692-dd67-7732-8f4a-00404f950ca2
+prompted_at:
+  B: 2026-11-04T12:42:37.535Z
+delivery_error: {}
+merge_stamp: 2026-11-04T12:42:30.096Z
+broadcast:
+  kind: issue
+  name: grant-count
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/grant-count
+  pushed: 29f01f38bc0c7ad023844029dfd409705bb67acd
+  sources:
+    - "Tamdoma/akrogon#126"
+frozen: {}
+frozen_cited: []

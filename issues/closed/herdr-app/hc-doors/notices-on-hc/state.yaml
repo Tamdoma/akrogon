@@ -1,0 +1,61 @@
+slug: notices-on-hc
+phase: merged
+created: 2026-11-07
+repo: akrogon
+blocked-by:
+  - engine-on-hc
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak3324425a832e373473df46bce70018
+env_names: []
+env_generation: 1
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t6m
+  B:
+    session: infra
+    address: t6p
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-08T03:52:18.215Z
+frozen:
+  docs/reference/checks.md: ee56677701ac29fdffdfa192f167dd42a9243b46
+  docs/reference/commands.md: f5be5e2e19a2be611557bc5b16d8748ff97ea082
+  docs/reference/state-and-phases.md: 880e251eed32b8455b89e944499eb4e2f781b272
+  docs/use/watch-while-away.md: 0d943acfa8915ed26690e13de655c228a27155af
+  skills/watch-issues/SKILL.md: 339e5cbcfaf51e12fa6d717cd75f40f2cc63e0ca
+  src/AREA.md: d2dacdcf9afe97e9be8ce1b80ee03ceec2bd0568
+  src/akrogon.ts: c5215022c0b710b35edcd1977893822db17f8e1a
+  src/next.ts: 60b67e31809f9b65e166f2cbf06435622ebf8fee
+  src/notice.ts: 170dc2ce8f7709dbb00ce5bd736a8a73c131204f
+  src/phase.ts: f96b35076703148c63f712b61ee3317b4fa732f0
+  src/state.ts: 895db577dc72ebe36b58cb237df96894971216bd
+  src/verify.ts: aff6a73db672afe9ff89bafe158df7e77e116e74
+  tests/AREA.md: b6299a41ab11021e35eefd94a9c4eefcce7f590d
+  tests/abandoned-capture.test.ts: adb8e43c1b843e225b506e78068a3701d6d0e471
+  tests/batch-dispatch.test.ts: 1de0e41114db688192458d6acc5f068ca2a2ccc7
+  tests/command-reference.test.ts: b48cef949f3d454d854cb3c953c43c25bdcecd9b
+  tests/e2e/kinds.e2e.ts: 60e5cbaaae53919a929280302f1e064f9511a10e
+  tests/e2e/notices.e2e.ts: 19ce27e90e9516f4eb5da21b90c2c7a99ed14b40
+  tests/e2e/tier.ts: 5e2a76f244385c9400f0cd4947e2c68f84a60538
+  tests/e2e/window.e2e.ts: 6fc8424230b89b202860740ad96267daf62e3d62
+  tests/hc-fixture.ts: 48e76dc161048673f0cd3d00b50c62c11d9cbb06
+  tests/merge-attempts.test.ts: a5205f3700f91a1d6103a91e5626ea58d1e65a80
+  tests/next.test.ts: 0e6b3bc4d1f7f1dea7054d83b11fbc5131e83528
+  tests/notices.test.ts: 5a8b5d26fc7fd27fceb53bbee73cc9d5f21a899e
+  tests/phase.test.ts: 921100ee52984dc210e7e64158e572899fcafac2
+  tests/session-routing.test.ts: 7efe52ff57a93aecf55069e66e69b1262b498f36
+  tests/slow-merge.test.ts: 658227685306ff0378fea164eafd7eef1f04fe20
+  tests/verify.test.ts: 012d96dad37b35163d897e0b1a69f573144a2dd7
+frozen_cited:
+  - "tests/AREA.md plan U7 docs; the hc-fixture notice helpers and the session-routing notice line describe notice files, doc text only, no expectation"

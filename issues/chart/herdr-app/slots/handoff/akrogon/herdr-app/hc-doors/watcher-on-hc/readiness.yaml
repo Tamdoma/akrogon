@@ -1,0 +1,59 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-07'
+      answer: '1a | 2a | 3a (final handoff review, door t15; paid budgets as listed there)'
+    principal: watcher-on-hc leaf seats on the operator's machine, user ivan (uid 1000)
+    account: the operator's existing claude, codex and agy logins
+    credential:
+      name: harness logins (~/.claude, ~/.codex, ~/.gemini), never read by the leaf
+      holder: /home/ivan
+    targets: [throwaway hc session akr-e2e-watch]
+    fixtures:
+      - account: operator user ivan
+        purpose: hc core for the codex stop check and the watcher check
+        marker: session name prefix akr-e2e-
+        naming: akr-e2e-watch; cwd folders <leaf temp>/akr-e2e-watch-<kind>, each path recorded in the report before use
+        count: 1
+        cleanup:
+          - step: every call with HC_SESSION=akr-e2e-watch and HC_TERMINAL_SOCKET, HC_TERMINAL_ID, HC_SCOPE unset; stop the listener program run against the session; hc kill and hc rm each terminal the leaf recorded; hc server stop; remove ~/.local/state/herdr-core/akr-e2e-watch and each recorded cwd folder; remove from trustedWorkspaces exactly the recorded agy cwd path, keeping every other entry; after the report quotes what it needs, remove the runs' transcripts, namely the claude projects folder of each recorded cwd, the recorded codex rollout files, the pi sessions folder of each recorded cwd (B); agy keeps its runs in its own conversation store, which has no per-conversation delete (P14), named in the report
+            identity: operator user ivan (the leaf seat)
+        absence_check: no akr-e2e-watch socket under /run/user/1000/herdr-core/, no ~/.local/state/herdr-core/akr-e2e-watch, no listener process for the session, the recorded agy cwd absent from trustedWorkspaces
+    operations: [hc server start with a clean environment, the start verb for codex and agy, the listener program run against akr-e2e-watch, a Claude watcher terminal running /watch-issues in that session, hc send, hc interrupt, hc keys esc, hc wait, hc label, hc kill, the cleanup above]
+    effects: billing (paid model tokens; codex and agy on small models at low effort, the watcher on the operator's watcher model); agy appends its answered folder to trustedWorkspaces (removed by cleanup); no public, DNS or retention effects
+    bounds: at most 4 harness sessions, counting every harness session the leaf's live runs start, whatever its outcome (one codex and one agy stop check, one repeat of either, one watcher); at most 4 prompts per stop-check session; the watcher runs at most 3 checks
+    stop_line: never the operator's own sessions or watchers; never hc server stop on a core the leaf did not start; never a cron created outside the leaf's session; never the installed akrogon-listener.service; no transcript of the runs is kept after cleanup (B)
+retained:
+  - resources: [agy conversation records of the watcher-on-hc agy runs in ~/.gemini/antigravity-cli (conversation store), ids listed in the report]
+    purpose: agy has no per-conversation delete (forks/proofs.md P14), so the runs' conversations cannot be removed alone
+    owner: operator
+    remove_by: '2027-05-07'
+    cost: a few kilobytes of local disk
+    exposure: local user only, inside agy's own history
+    cleanup:
+      identity: operator user ivan
+      route: removed through agy's own conversation history when the operator clears it; no private database edit
+    reason: no supported way to delete one agy conversation (B)
+proofs:
+  - operation: hc interrupt per kind
+    command: forks/proofs.md P4
+    identity: operator user ivan
+    target: throwaway hc session akr-probe
+    version: hc 0.1.18, claude 2.1.318, codex 0.167.0, pi 1.5.0
+    date: '2026-11-07'
+    result: claude and pi stopped on esc (outcome stopped); codex with a background terminal stayed working (still_working)
+    cleanup: probe terminals killed
+    limits: codex's stop key unknown; criterion 3 settles it
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: hc label, hc ls --json with labels, hc read
+    command: forks/proofs.md P9 and P1 (hc read for screens)
+    identity: operator user ivan
+    target: throwaway hc sessions akr-probe and akr-probe2
+    version: hc 0.1.18
+    date: '2026-11-07'
+    result: labels set and removed; hc ls and hc get show labels; hc read printed the screen
+    cleanup: sessions stopped and removed
+    limits: no label filter flag used; observe filters the JSON
+    record: issues/chart/herdr-app/forks/proofs.md

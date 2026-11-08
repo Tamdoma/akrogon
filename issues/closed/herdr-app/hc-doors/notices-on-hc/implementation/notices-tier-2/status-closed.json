@@ -1,0 +1,15 @@
+{
+  "zoom": 1.0,
+  "font_size": 18.67,
+  "ui_font_size": 13.0,
+  "space": "spakre2e",
+  "tab": null,
+  "focused_pane": null,
+  "layout": "flat",
+  "agent": null,
+  "floats": {},
+  "overlays": [
+    "toast"
+  ],
+  "errors": []
+}

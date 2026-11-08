@@ -1,0 +1,36 @@
+slug: chart-door-on-hc
+phase: merged
+created: 2026-11-07
+repo: akrogon
+blocked-by:
+  - engine-on-hc
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: ak87d48865c2fb8e49afb90a14784566
+env_names: []
+env_generation: 1
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t6j
+  B:
+    session: infra
+    address: t6n
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-08T07:44:25.907Z
+frozen:
+  tests/chart-usage.test.ts: e5b6629b88ff4cdbb8310b60d075709436fabbf6
+  tests/door-agent.ts: bde4476066efee26ccc48168ea8c291dc892e3f4
+  tests/door-exchange.test.ts: cb91800c59aa84c70c0af4dd91f7efccfafb930c
+  tests/door-reset.test.ts: d208ce1f5ba5532938204e37dffb0c80fb894cbb
+frozen_cited: []

@@ -1,0 +1,6 @@
+slug: engine-on-hc
+phase: plan.synthesis
+created: '2026-11-07'
+repo: akrogon
+blocked-by: [deploy-listener-ready]
+sources: []

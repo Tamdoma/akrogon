@@ -1,0 +1,1 @@
+count line W-final: N7 watcher check, bound 1 harness session (5 of 7 total after this), at most 4 checks (test drives 4 per decision C2; N7 says 3, the 4th is the second queued tick), model claude-opus-5-5; 2026-11-08T08:30:03Z

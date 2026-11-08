@@ -1,0 +1,49 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-07'
+      answer: '1a | 2a | 3a (final handoff review, door t15; paid budgets as listed there)'
+    principal: status-notices leaf seats on the operator's machine, user ivan (uid 1000)
+    account: none (free, no model launch)
+    credential:
+      name: none
+      holder: /home/ivan
+    targets: [throwaway hc and herdr-app session hs-e2e-notices]
+    fixtures:
+      - account: operator user ivan
+        purpose: window for the notice window tier (B)
+        marker: session name prefix hs-e2e-
+        naming: hs-e2e-notices
+        count: 1
+        cleanup:
+          - step: every call with HC_SESSION=hs-e2e-notices and HC_TERMINAL_SOCKET, HC_TERMINAL_ID, HC_SCOPE unset; herdrapp session stop hs-e2e-notices; hc server stop; herdrapp session delete hs-e2e-notices; remove ~/.local/state/herdr-core/hs-e2e-notices
+            identity: operator user ivan (the leaf seat)
+        absence_check: no hs-e2e-notices socket, no ~/.config/herdr-app-sessions/hs-e2e-notices, no ~/.local/state/herdr-core/hs-e2e-notices
+    operations: [hc server start with a clean environment, herdrapp --session hs-e2e-notices, notice files written into that session's akrogon-notices folder, herdr-app ls, status and shot in that session, the cleanup above]
+    effects: local only; a toast and a sound in the throwaway window; no billing, public, DNS or retention effects
+    bounds: at most 2 window sessions, counting every herdrapp start of hs-e2e-notices
+    stop_line: never the operator's own herdr-app sessions or their notice folders
+retained: []
+proofs:
+  - operation: herdr-app mod surface (watchFolder, notify, playSound, appHome, readTextFile, exec)
+    command: read ~/.config/herdr-app/herdr.d.ts
+    identity: operator user ivan
+    target: herdr-app 0.1.13 installed mod API
+    version: herdr-app 0.1.13
+    date: '2026-11-07'
+    result: all six functions documented as used here; watchFolder returns changed paths without polling
+    cleanup: none, read only
+    limits: documentation; toast and deletion are criterion 2
+    record: /home/ivan/Work/infra/akrogon/issues/chart/herdr-app/forks/proofs.md
+  - operation: handler calls in a real window (exec ls and rm, readTextFile, notify, playSound, watchFolder)
+    command: forks/proofs.md P11 (throwaway mod akrnotify)
+    identity: operator user ivan
+    target: throwaway herdr-app session akr-probe3
+    version: herdr-app 0.1.13
+    date: '2026-11-07'
+    result: file listed and read, notify returned an id, rm deleted it, watchFolder returned the temp and final names of a renamed write
+    cleanup: session stopped and deleted, checked
+    limits: toast drawing not seen (stale shot)
+    record: /home/ivan/Work/infra/akrogon/issues/chart/herdr-app/forks/proofs.md

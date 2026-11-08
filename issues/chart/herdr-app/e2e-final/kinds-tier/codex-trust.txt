@@ -1,0 +1,16 @@
+
+  Folder access
+  /var/tmp/akr-1000/e2e-final/akr-e2e-engine-codex
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /var/tmp/akr-1000/e2e-final/akr-e2e-engine-kinds-root
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings can run code automatically, even without a model request. Continue only if you
+  trust these files. Your trust decision will be saved.
+
+› 1. Trust and continue
+  2. Back to Agent Command Center
+
+  enter continue · esc back
+
+keys: enter

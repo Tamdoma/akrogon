@@ -1,0 +1,69 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-07'
+      answer: '1a | 2a | 3a (final handoff review, door t15; paid budgets as listed there)'
+    principal: herdr-skill leaf seats on the operator's machine, user ivan (uid 1000)
+    account: the operator's existing harness logins for claude, codex, pi and agy
+    credential:
+      name: harness logins (~/.claude, ~/.codex, ~/.pi, ~/.gemini), never read by the leaf
+      holder: /home/ivan
+    targets: [throwaway hc session hs-e2e-skill]
+    fixtures:
+      - account: operator user ivan
+        purpose: hc core for the per-harness discovery runs
+        marker: session name prefix hs-e2e-
+        naming: hs-e2e-skill; cwd folders <leaf temp>/hs-e2e-skill-<kind>, each holding the candidate skill link in that harness's project skill folder, each path recorded in the report before use
+        count: 1
+        cleanup:
+          - step: every call with HC_SESSION=hs-e2e-skill and HC_TERMINAL_SOCKET, HC_TERMINAL_ID, HC_SCOPE unset; hc kill each terminal the leaf recorded; hc server stop; remove ~/.local/state/herdr-core/hs-e2e-skill and each recorded cwd folder; remove from trustedWorkspaces exactly the recorded agy cwd path, keeping every other entry; after the report quotes what it needs, remove the runs' transcripts, namely the claude projects folder of each recorded cwd, the recorded codex rollout files, the pi sessions folder of each recorded cwd (B,D); agy keeps its runs in its own conversation store, which has no per-conversation delete (P14), named in the report
+            identity: operator user ivan (the leaf seat)
+        absence_check: no hs-e2e-skill socket under /run/user/1000/herdr-core/, no ~/.local/state/herdr-core/hs-e2e-skill, the recorded agy cwd absent from trustedWorkspaces and every other entry unchanged (D)
+    operations: [hc server start with a clean environment, hc run of claude/codex/pi/agy, hc send, hc keys enter (agy trust), hc wait, hc read, hc kill, the cleanup above]
+    effects: billing (paid model tokens on small models at low effort); agy appends its answered folder to trustedWorkspaces (removed by cleanup); no public, DNS or retention effects
+    bounds: at most 8 harness sessions, counting every harness session the discovery runs start, whatever its outcome (one per harness plus one repeat per harness after a wording change); at most 3 prompts per session
+    stop_line: never the operator's own sessions; never hc server stop on a core the leaf did not start; never edits to global CLAUDE.md, AGENTS.md or harness settings except the recorded agy trustedWorkspaces entry; never links in the operator's live skill homes before merge; no transcript of the runs is kept after cleanup (D)
+retained:
+  - resources: [agy conversation records of the herdr-skill agy runs in ~/.gemini/antigravity-cli (conversation store), ids listed in the report]
+    purpose: agy has no per-conversation delete (forks/proofs.md P14), so the runs' conversations cannot be removed alone
+    owner: operator
+    remove_by: '2027-05-07'
+    cost: a few kilobytes of local disk
+    exposure: local user only, inside agy's own history
+    cleanup:
+      identity: operator user ivan
+      route: removed through agy's own conversation history when the operator clears it; no private database edit
+    reason: no supported way to delete one agy conversation (B)
+proofs:
+  - operation: symlinked skill folders in harness homes
+    command: ls -la ~/.claude/skills (akrogon skills are links into the release), forks/herdr-skill.md findings
+    identity: operator user ivan
+    target: harness skill homes
+    version: claude 2.1.318, codex 0.167.0, pi 1.5.0, agy 1.5.3
+    date: '2026-11-07'
+    result: akrogon's skills already reach claude, codex and pi homes through symlinked folders; ~/.claude, ~/.codex and ~/.pi herdr skills are real folders today
+    cleanup: none, read only
+    limits: description triggering is criterion 2
+    record: /home/ivan/Work/infra/akrogon/issues/chart/herdr-app/forks/herdr-skill.md
+  - operation: agy global skill folder
+    command: forks/proofs.md P11 (agy binary documentation, ls ~/.gemini/config/skills)
+    identity: operator user ivan
+    target: agy 1.5.3 install
+    version: agy 1.5.3
+    date: '2026-11-07'
+    result: global skills at ~/.gemini/config/skills/<name>/SKILL.md; that folder already holds symlinked skill folders
+    cleanup: none, read only
+    limits: agy loading a linked skill unprompted not observed
+    record: /home/ivan/Work/infra/akrogon/issues/chart/herdr-app/forks/proofs.md
+  - operation: agy loading a skill through a linked folder in its global skill path
+    command: forks/proofs.md P14 (link ~/.gemini/config/skills/akr-probe-skill, fresh agy session, one prompt)
+    identity: operator user ivan, agy login
+    target: throwaway hc session akr-probe4, cwd /home/ivan (already trusted)
+    version: agy 1.5.3 --mode auto
+    date: '2026-11-07'
+    result: agy explored the linked SKILL.md and answered its random probe word without being told about the skill
+    cleanup: link, folder, core and state removed; skill folder back to three entries; trust list unchanged
+    limits: one prompt; does not prove the herdr description triggers (criterion 2)
+    record: /home/ivan/Work/infra/akrogon/issues/chart/herdr-app/forks/proofs.md

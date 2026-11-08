@@ -1,0 +1,5 @@
+# Final-shape check: `session-id` (Seat E)
+
+Recording the transcript file path works across all readers (`chart-usage.ts` pricing/tokens read JSONL contents only and `locate()` simplifies to `existsSync(session)` for all harnesses; `observe.ts`/`log-tail.ts` and `door-reset.ts` `recordPath`/`waitNewSession` already operate on file paths; `log.jsonl`/`timings.jsonl` schemas accept any string). Two small wiring notes for implementation/probes:
+1. **Door A (`t15`) lookup (`Q2 2a`):** `CLAUDE_CODE_SESSION_ID` is not set in `claude`'s environment (checked `/proc/2197513/environ` on `t15`), and `env` does not update in a shell after `/clear` or `/new`. Use the same `foreground.pid` → `pid` live fd lookup on `HC_TERMINAL_ID` (`t15`) for Door A as for every other seat.
+2. **`pi` path from `argv` (`Q2 2a`) & `/new` probe:** `pi --session-id <id>` writes `~/.pi/agent/sessions/--<slug-cwd>--/<ISO-ts>_<id>.jsonl`, so the resolver maps `<id>` from `argv` to that `*_ <id>.jsonl` path; add `pi` after `/new` to the handover probe list since `/new` mints a new file not in `argv`.

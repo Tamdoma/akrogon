@@ -1,0 +1,1 @@
+count line K-final: N7 per-kind, bound 4 harness sessions of 7 total, count so far 0, launching 4 (claude-haiku-5-5, gpt-6.1-sol, pi, agy), 2 prompts each; 2026-11-08T08:28:53Z

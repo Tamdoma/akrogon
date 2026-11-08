@@ -1,0 +1,37 @@
+slug: coverage-audit
+phase: merged
+created: 2026-11-04
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#127"
+busy_since:
+  B: 2026-11-04T12:15:11.569Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFP
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pYC
+  B: w8:pYD
+prompted:
+  B: 01a1a67a-337c-7b92-b44f-7b0f801bad53
+prompted_at:
+  B: 2026-11-04T12:15:11.569Z
+delivery_error: {}
+merge_stamp: 2026-11-04T12:15:05.003Z
+broadcast:
+  kind: issue
+  name: proof-coverage
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/proof-coverage
+  pushed: 5499e3dab209ccc6fae14c8f4568e62e5c4c15c2
+  sources:
+    - "Tamdoma/akrogon#127"
+frozen: {}
+frozen_cited: []

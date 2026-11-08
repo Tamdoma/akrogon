@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr plugin link in deploy (today's call, kept for releases with plugin/)
+    command: read src/self-update.ts deployStage reload step and src/install.ts install (inspected 2026-11-07 at 67f0b262)
+    identity: operator user ivan (uid 1000)
+    target: akrogon release home ~/.akrogon
+    version: akrogon 67f0b262
+    date: '2026-11-07'
+    result: deploy throws CommandError when herdr plugin link fails; install calls herdr integration install per harness then herdr plugin link
+    cleanup: none, read only
+    limits: code reading; does not run a deploy
+    record: issues/chart/herdr-app/forks/cutover.md
+  - operation: herdr plugin unlink akrogon, herdr plugin list
+    command: forks/proofs.md P12 and P13 (herdr plugin link, list, unlink twice on a disposable local plugin akr-probe-plugin)
+    identity: operator user ivan (uid 1000)
+    target: operator's old herdr install
+    version: herdr 0.9.5
+    date: '2026-11-07'
+    result: unlink removed the disposable plugin (removed true, exit 0) and list no longer showed it; a second unlink gave removed false, exit 0; the live akrogon plugin is listed as enabled from the release plugin folder
+    cleanup: disposable plugin folder and its config folder removed, checked; live akrogon plugin untouched
+    limits: unlinking a plugin whose startup process runs was not observed; the deploy unlinks last
+    record: issues/chart/herdr-app/forks/proofs.md

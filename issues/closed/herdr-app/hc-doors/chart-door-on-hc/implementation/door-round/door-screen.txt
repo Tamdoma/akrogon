@@ -1,0 +1,31 @@
+  or report, so B is
+  dropped. Recording it.
+
+  Ran 2 shell commands
+
+● B is dropped. It stopped
+  twice without a return
+  file or a done B report,
+  including after one
+  nudge.
+
+  I started B as t1g with
+  akrogon seat (claude,
+  claude-haiku-5-5, low)
+  and wrote
+  slots/probe-A.md.
+
+  I added the drop as a -
+  consultant: line under
+  ## Autopilot in
+  CHART.md. I started no
+  other consultant.
+
+✻ Sautéed for 4m 25s ·
+  done 4:07 AM
+
+──────────────────────────
+❯ 
+──────────────────────────
+  CC │ 6% │ $0.20 │ Son…
+  ⏵⏵ auto mode on      ·

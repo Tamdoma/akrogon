@@ -1,0 +1,10 @@
+# Round 7 (door A): disagreement only, Moshi
+
+Read round6-B.md, round6-B-2.md, round6-C.md, round6-D.md. All agree: transport is Mosh and not the cause, mosh-server and core stay up, the follower re-execs `herdr-core attach` when `moshi-hook.selection` changes value, nothing of ours writes that doc, owner of the mechanism is moshi-hook.
+
+Open disagreements, answer only these, with evidence (read-only, same rules):
+
+1. Who writes the flips back to t6x? C (P3): an automatic revert to the window's focused pane t6x 58-144 s after each t15 choice, never coinciding with operator activity. D: writes come from the phone's workspace-focus path (`handleWorkspacesFocus -> FocusWorkspace -> focusHeadless`), likely the operator swiping tabs or the app re-asserting its chat's workspace on resume. Settle it: find evidence that separates "phone sent a focus request" from "something on the host re-asserted window focus" (e.g. gateway access log, `moshi-hook logs` with timestamps vs doc versions, the daemon's open hc connection, whether `followSelection.selected` falls back to `windowLayout` when the doc names a terminal that is not the window's, the code path for `--session` with and without the window). If it cannot be settled read-only, name the single cheapest operator test that settles it.
+2. The fix. Candidates: (O1) report upstream to moshi-hook with the proof, no local change; (O2) C's host-side command `HC_SESSION=infra exec hc` (hc picker, no follower); (O3) D's interim: close the stale mosh session, pin Mosh; (O4) anything simpler you can prove, e.g. a moshi-hook flag or config that makes attach follow per-session or follow the window. Which removes the cause with the fewest moving parts and what does it cost the operator (tab switching from the phone, sidebar, chat view)? Check the claims you rely on (`hc --help`, `moshi-hook hc attach --help`, `moshi-hook --help`, config files).
+
+Write `round7-<letter>.md`, short: agree / disagree per point with the evidence. Reply with the path.

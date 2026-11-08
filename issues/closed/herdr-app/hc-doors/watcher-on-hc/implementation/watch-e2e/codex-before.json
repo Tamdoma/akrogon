@@ -1,0 +1,37 @@
+{
+  "address": "t1",
+  "state": "live",
+  "turn": 0,
+  "reported": true,
+  "pid": 2820670,
+  "labels": {
+    "akrogon": "1",
+    "akrogon.leaf": "akr-e2e-watch-codex",
+    "akrogon.repo": "akre2e",
+    "akrogon.seat": "a",
+    "herdr.space": "spakre2e",
+    "herdr.tab": "ak162f770225be7337894114427d81bb"
+  },
+  "status": {
+    "state": "working",
+    "app": "codex"
+  },
+  "foreground": {
+    "argv": [
+      "/home/ivan/.local/share/mise/installs/codex/latest/bin/codex",
+      "--no-daemon",
+      "-m",
+      "gpt-6.1-sol",
+      "-c",
+      "model_reasoning_effort=low",
+      "-a",
+      "never",
+      "-s",
+      "danger-full-access",
+      "Run exactly this shell command in the foreground and wait for it to finish: sleep 600"
+    ],
+    "cwd": "/var/tmp/akr-1000/5d20/3eecfe3d/akr-e2e-watch-codex",
+    "name": "codex",
+    "pid": 2820670
+  }
+}

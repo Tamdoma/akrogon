@@ -1,0 +1,67 @@
+inputs:
+  - kind: file
+    name: mods/session-status/notices.js
+    holder: /home/ivan/.config/herdr-app
+    purpose: herdr-setup's notice handler in the installed session-status mod, needed by the window tier (B,E)
+    consumers: [notices-on-hc]
+    steps: herdr-setup leaf status-notices merges; the operator runs /home/ivan/Work/infra/herdr-setup/install
+    source: herdr-setup mods/session-status/notices.js, reached through the installed mod link
+    done: /home/ivan/.config/herdr-app/mods/session-status/notices.js exists
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-07'
+      answer: '1a | 2a | 3a (final handoff review, door t15; paid budgets as listed there)'
+    principal: notices-on-hc leaf seats on the operator's machine, user ivan (uid 1000)
+    account: none (free, no model launch)
+    credential:
+      name: none
+      holder: /home/ivan
+    targets: [throwaway hc and herdr-app session akr-e2e-notices]
+    fixtures:
+      - account: operator user ivan
+        purpose: window for the notice window tier (B)
+        marker: session name prefix akr-e2e-
+        naming: akr-e2e-notices
+        count: 1
+        cleanup:
+          - step: every call with HC_SESSION=akr-e2e-notices and HC_TERMINAL_SOCKET, HC_TERMINAL_ID, HC_SCOPE unset; herdrapp session stop akr-e2e-notices; hc server stop; herdrapp session delete akr-e2e-notices; remove ~/.local/state/herdr-core/akr-e2e-notices
+            identity: operator user ivan (the leaf seat)
+        absence_check: no akr-e2e-notices socket, no ~/.config/herdr-app-sessions/akr-e2e-notices, no ~/.local/state/herdr-core/akr-e2e-notices
+    operations: [hc server start with a clean environment, herdrapp --session akr-e2e-notices, notice files written into that session's akrogon-notices folder, herdr-app ls and shot in that session, the cleanup above]
+    effects: local only; a toast and a sound in the throwaway window; no billing, public, DNS or retention effects
+    bounds: at most 2 window sessions, counting every herdrapp start of akr-e2e-notices
+    stop_line: never the operator's own herdr-app sessions or their notice folders
+retained: []
+proofs:
+  - operation: herdr-app mod surface for the handler (watchFolder, notify, playSound, appHome, exec)
+    command: forks/proofs.md P10 (read ~/.config/herdr-app/herdr.d.ts)
+    identity: operator user ivan
+    target: herdr-app 0.1.13 installed mod API
+    version: herdr-app 0.1.13
+    date: '2026-11-07'
+    result: watchFolder returns changed paths without polling, notify posts a toast, playSound("blocked") honors settings, exec runs a command
+    cleanup: none, read only
+    limits: documentation; the toast and deletion are criterion 4
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: handler calls run in a real window (exec ls and rm, readTextFile, notify, playSound, watchFolder on a temp-then-rename write)
+    command: forks/proofs.md P11 (throwaway mod akrnotify opened by herdr-app do tab.new --mod)
+    identity: operator user ivan
+    target: throwaway herdr-app session akr-probe3
+    version: herdr-app 0.1.13
+    date: '2026-11-07'
+    result: file listed and read, notify returned an id, rm deleted it, watchFolder returned both the temp and the final name
+    cleanup: session stopped and deleted, checked
+    limits: toast drawing not seen (stale shot)
+    record: issues/chart/herdr-app/forks/proofs.md
+  - operation: app home folders per session
+    command: forks/proofs.md P6 (herdrapp session list --json)
+    identity: operator user ivan
+    target: operator's herdr-app sessions
+    version: herdr-app 0.1.13
+    date: '2026-11-07'
+    result: default maps to ~/.config/herdr-app, others to ~/.config/herdr-app-sessions/<name>
+    cleanup: none, read only
+    limits: a session with a core and no herdrapp entry is not listed
+    record: issues/chart/herdr-app/forks/proofs.md

@@ -1,0 +1,108 @@
+{
+  "version": 12,
+  "value": {
+    "spaces": [
+      {
+        "id": "spakre2e",
+        "name": "akre2e",
+        "tabs": [
+          {
+            "id": "akac8982079479143fa00eea34430f3b",
+            "name": "e2e-failed failed",
+            "root": {
+              "children": [
+                {
+                  "content": {
+                    "terminal": "t2"
+                  },
+                  "id": "pd9de82972f2789058624cc654c9d82ac",
+                  "type": "block"
+                }
+              ],
+              "id": "akac8982079479143fa00eea34430f3b",
+              "type": "row"
+            }
+          },
+          {
+            "id": "ak88a8734001bb37b5730a6ae1fc5479",
+            "name": "e2e-open",
+            "root": {
+              "children": [
+                {
+                  "content": {
+                    "terminal": "t3"
+                  },
+                  "id": "ped42f95f4686bcec1444260a1f47b669",
+                  "size": {
+                    "weight": 0.5
+                  },
+                  "type": "block"
+                },
+                {
+                  "content": {
+                    "terminal": "t4"
+                  },
+                  "id": "pe950aa50820469f1613fde0ff9a957ba",
+                  "size": {
+                    "weight": 0.5
+                  },
+                  "type": "block"
+                }
+              ],
+              "id": "ak88a8734001bb37b5730a6ae1fc5479",
+              "type": "row"
+            }
+          },
+          {
+            "id": "doortab",
+            "name": "",
+            "root": {
+              "children": [
+                {
+                  "content": {
+                    "terminal": "t5"
+                  },
+                  "id": "p82b319af335e20382cbb522b2d5a6235",
+                  "size": {
+                    "weight": 0.5
+                  },
+                  "type": "block"
+                },
+                {
+                  "content": {
+                    "terminal": "t6"
+                  },
+                  "id": "pc18d71244142808e7cce6b3794f0af58",
+                  "size": {
+                    "weight": 0.5
+                  },
+                  "type": "block"
+                }
+              ],
+              "id": "doortab",
+              "type": "row"
+            }
+          },
+          {
+            "id": "tbe8af9aab4797d3f9eb9729ac1b1993d3",
+            "name": "",
+            "root": {
+              "children": [
+                {
+                  "content": {
+                    "terminal": "t8"
+                  },
+                  "id": "p761b036ad9a62fe6cca8c24501b4b3f9",
+                  "type": "block"
+                }
+              ],
+              "id": "tbe8af9aab4797d3f9eb9729ac1b1993d3",
+              "type": "row"
+            }
+          }
+        ],
+        "folder": "/var/tmp/akr-1000/e2e-final/akr-e2e-engine-window-root"
+      }
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "address": "t1",
+  "state": "live",
+  "turn": 0,
+  "reported": true,
+  "pid": 2815906,
+  "labels": {
+    "akrogon": "1",
+    "akrogon.leaf": "akr-e2e-watch-agy",
+    "akrogon.repo": "akre2e",
+    "akrogon.seat": "a",
+    "herdr.space": "spakre2e",
+    "herdr.tab": "ak8a5cb00d4d18fe7eebe20260408cfc"
+  },
+  "status": {
+    "state": "working",
+    "app": "antigravity"
+  },
+  "foreground": {
+    "argv": [
+      "agy",
+      "--model",
+      "gemini-3.8-flash-low",
+      "--effort",
+      "low",
+      "--mode",
+      "auto"
+    ],
+    "cwd": "/var/tmp/akr-1000/5d20/3eecfe3d/akr-e2e-watch-agy",
+    "name": "agy",
+    "pid": 2815906
+  }
+}

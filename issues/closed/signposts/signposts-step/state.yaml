@@ -15,7 +15,6 @@ done: []
 fix_rounds: 0
 verdict: {}
 tab: w8:tFN
-worktree: /home/ivan/.akrogon/worktrees/akrogon/signposts-step
 env_names: []
 env_generation: 0
 pane:

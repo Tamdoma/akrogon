@@ -1,0 +1,7 @@
+[
+  "/usr/lib/chatgpt/resources/cua_node/bin/node --import file:///home/ivan/.codex/plugins/cache/openai-bundled/unified-computer-use/26.1023.51421/require-browser-access.mjs /usr/lib/chatgpt/resources/cua_node/lib/node_modules/@oai/cua-repl/bin/cua-repl.mjs",
+  "/usr/lib/chatgpt/resources/cua_node/bin/node_repl",
+  "/usr/lib/chatgpt/resources/cua_node/bin/node_repl",
+  "/home/ivan/.local/share/mise/installs/codex/0.167.0/bin/codex-code-mode-host",
+  "sleep 600"
+]

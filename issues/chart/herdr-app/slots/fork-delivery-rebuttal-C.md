@@ -1,0 +1,9 @@
+# delivery rebuttal, C (2026-11-06)
+
+Attributions to C are correct. Two disagreements, one note.
+
+1. E's reading of engine-shape "one prompt per seat per phase" as a ban on automatic re-prompt is wrong against the code and the carries. Today `dispatchSlot` prompts an idle, unfinished seat again once the 2-minute grace has passed (`src/next.ts:766-771`: the guard returns only while `prompted` matches the live session inside `PROMPT_GRACE_MS`); nothing else in the pass counts prompts. Removing that re-prompt changes the workflow (signpost 4a: unchanged) and makes every silent stop wait up to 20 minutes for the watcher, the exact gap the operator asked to close. The binding should read "one prompt per seat per turn": the phase run and the turn-end event may not both prompt the same idle turn, which `prompted.turn == turn` already prevents. My bound (third engine prompt in one phase without `phase` fails the leaf) is the smallest addition on top of today's loop.
+
+2. D and E's objection that a pi seat ending its turn with a question is indistinguishable from a silent stop does not move the pick. The re-prompt is the right answer to both: the phase prompt restates the task and the report line, and a seat that needs the operator keeps ending without `phase`, so the leaf fails on the third prompt with a reason naming the seat, and the watcher or operator reads the screen then. Reading screens in the engine is foreclosed (engine-shape Q1), so a bounded re-prompt is the only engine-side option that is not "leave it idle".
+
+Note on D's no-kill timeout: start-and-pane Q4 binds the kill to failed placement; a seat idle at turn 0 after the budget means the argv task was not consumed, so I keep kill and non-zero, with the budget at hc's own 60 seconds (the template readiness window, `hc --skill` Delegate a task) so a slow first paint is not a failure.

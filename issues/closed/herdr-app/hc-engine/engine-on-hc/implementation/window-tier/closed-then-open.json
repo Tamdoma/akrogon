@@ -1,0 +1,48 @@
+{
+  "version": 4,
+  "value": {
+    "spaces": [
+      {
+        "id": "spakre2e",
+        "name": "akre2e",
+        "tabs": [
+          {
+            "id": "ak880b6e717a0a57be4f26e90f7bdd81",
+            "name": "e2e-closed",
+            "root": {
+              "children": [
+                {
+                  "content": {
+                    "terminal": "t1"
+                  },
+                  "id": "p3f1951a6ba7e58fd4479f9418b92ed9e",
+                  "type": "block"
+                }
+              ],
+              "id": "ak880b6e717a0a57be4f26e90f7bdd81",
+              "type": "row"
+            }
+          },
+          {
+            "id": "akac8982079479143fa00eea34430f3b",
+            "name": "",
+            "root": {
+              "children": [
+                {
+                  "content": {
+                    "terminal": "t2"
+                  },
+                  "id": "pbcc35901f3e0745d04b8a3850553ac97",
+                  "type": "block"
+                }
+              ],
+              "id": "akac8982079479143fa00eea34430f3b",
+              "type": "row"
+            }
+          }
+        ],
+        "folder": "/var/tmp/akr-1000/5d20/1f23ef6e/akr-e2e-engine-window-root"
+      }
+    ]
+  }
+}

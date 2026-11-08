@@ -1,0 +1,120 @@
+ The t19 script is running a door-reset.ts command on t18, which appears to be an akrogon chart-issues "door" handover. I need to determine where to send the "reply OK 8fb07ac0c8aa" message, as it
+ seems to be part of a handshake protocol requiring a response to a specific handover reference. I should consult the chart-issues skill to understand the protocol's requirements and my ability to
+ handle them.
+
+
+ $ sed -n 1,120p /home/ivan/.akrogon/worktrees/akrogon/chart-door-on-hc/skills/chart-issues/SKILL.md
+
+ ---
+ name: chart-issues
+ … 247 more lines (ctrl+o)
+    6. per delivered source, after checking other owners' outstanding work, `akrogon close <id> --by "<chart> direct <sha>"`;
+    7. broadcast-issue as sender when the repo configures broadcast, with the chart brief, pushed SHA and closed sources as context, and a failure does not reopen;
+    8. `git worktree unlock <path>` then `git worktree remove <path>` verified by `git worktree list`, then `git branch -D <slug>` verified by empty `git branch --list <slug>`;
+
+ Done · 121 lines · 0.0s
+
+
+ I'm examining the door-reset handshake. The script sends a handover message to reset the terminal, and I need to respond with "OK <id>". I'll check the reset script to confirm the exact response
+ format.
+
+
+ $ sed -n 1,150p /home/ivan/.akrogon/worktrees/akrogon/chart-door-on-hc/skills/chart-issues/scripts/door-reset.ts
+
+ #!/usr/bin/env bun
+ // The chart door's handover reset (chart-door Q2 2a): A's last action starts it detached with
+ … 127 more lines (ctrl+o)
+   await hc(session, ['keys', a, 'enter']);
+   step('start-prompt', 'enter pressed', { turn: sent.turn });
+ } else step('start-prompt', 'sent', { turn: sent.turn });
+
+ Done · 133 lines · 0.0s
+
+
+ Wait, "reply OK 8fb07ac0c8aa" isn't an instruction, it's a verification code. The script needs that exact response to confirm the transcript and proceed with the handover reset.
+
+ OK 8fb07ac0c8aa
+
+
+ Run the chart-issues skill (/home/ivan/.akrogon/worktrees/akrogon/chart-door-on-hc/skills/chart-issues/SKILL.md): continue handover 2026-11-08T04:01:00Z door t18 next
+ /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root/issues/chart/next-e2e
+
+
+ The door reset script completed successfully and I've resumed the chart-issues handover from November 8, 2026. I need to consult the Handover section of SKILL.md to understand the next steps, as I'd
+ only reviewed the initial part of this workflow previously.
+
+
+ $ grep -n "Handover\|handover" /home/ivan/.akrogon/worktrees/akrogon/chart-door-on-hc/skills/chart-issues/SKILL.md
+
+ 39:The seat record holds the open time, the time the door began its first pass on this chart, before the opening map, and one entry per seat holding the hc address, the hc name (null for A and
+ supplied consultants), the launch recipe (`harness`, plus `model` and `effort` for door-created consultants) and `session`, the transcript path `bun <skill-folder>/scripts/transcript.ts <address>`
+ … 59 more lines (ctrl+o)
+ door or supplied consultant is not detected, so that seat's usage may count its old transcript until akrogon's next reset or restart. The modes differ only in the trigger and next-chart selection,
+ the created folder's contents and the resume entry's name.
+ 178:The pass that queued a handover prints `Next: none handover queued to a fresh A in <A address>`.
+
+ Done · 13 lines · 0.0s
+
+
+
+ $ sed -n 120,200p /home/ivan/.akrogon/worktrees/akrogon/chart-door-on-hc/skills/chart-issues/SKILL.md
+
+ 8. `git worktree unlock <path>` then `git worktree remove <path>` verified by `git worktree list`, then `git branch -D <slug>` verified by empty `git branch --list <slug>`;
+    9. `akrogon pack <chart>` when `<chart>/direct` holds a log, then the landed SHA into the `Direct attempt` section, then `Closed <date>`.
+ … 123 more lines (ctrl+o)
+ The pass that queued a handover prints `Next: none handover queued to a fresh A in <A address>`.
+
+ The footer is printed only when the turn ends, and never while a prompted peer's turn is open.
+
+ Done · 62 lines · 0.0s
+
+
+ I need to verify the session start requirements by matching my address and next chart against the latest Mode entry, ensuring it's unconsumed and that my transcript path differs from the entry's
+ path via transcript.ts. Unknown paths don't continue. Once verified, I'll append the continue attended (handover <time>) record, update the A seat with my transcript path, and open the first span.
+ My chart folder is at /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root/issues/chart/next-e2e. I'm now checking the chart folder structure and mode records, getting the transcript path, and running
+ akrogon config to locate the repo root.
+
+
+ $ ls -la /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root/issues/chart/next-e2e/ 2>&1; echo "=== CHART.md ==="; cat /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root/issues/chart/next-e2e/CHART.md…
+
+ ls: cannot access '/var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root/issues/chart/next-e2e/': No such file or directory
+ === CHART.md ===
+ cat: /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root/issues/chart/next-e2e/CHART.md: No such file or directory
+
+ Failed (exit 1) · 4 lines · 0.0s · full output saved
+
+
+
+ $ find /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root -name CHART.md 2>/dev/null; echo "=== issues tree ==="; find /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root/issues -type f 2>/dev/null | …
+
+ === issues tree ===
+ /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root/issues/config.yaml
+ … 11 more lines (ctrl+o)
+ {"t":"2026-11-08T03:01:36.030Z","step":"label","result":"set","path":"/home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-34e9098a-akr-e2e-door-pi--/2026-11-08T03-01-13-056Z_01a1b91a-54e0-75b4-943
+ 6-90756cfe9f03.jsonl"}
+ {"t":"2026-11-08T03:01:36.238Z","step":"start-prompt","result":"sent","turn":3}
+
+ Done · 14 lines · 0.0s
+
+
+ The chart folder is missing from the expected directory in the test environment, even though the start prompt references it. This suggests the chart might be located elsewhere, perhaps at the actual
+ repository root, and the test setup is using a sandboxed home directory. I'll examine the config.yaml file to better understand the directory structure and configuration.
+
+
+ $ cat /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root/issues/config.yaml; echo "==="; find /var/tmp/akr-1000/5d20/34e9098a -name "CHART.md" 2>/dev/null; echo "=== akrogon config ==="; cd /var/tmp…
+
+ checks:
+   test: 'true'
+ … 39 more lines (ctrl+o)
+ grounding: none
+ repo: akre2e
+ worktree_store: /var/tmp/akr-1000/5d20/34e9098a
+
+ Done · 45 lines · 0.0s
+
+
+ Parent — Working · task: Run the chart-issues skill (/home/ivan/.akrogon · action: bash cat /var/tmp/akr-1000/5d20/34e9098a/akr-e2e-door-root/issues/config.yaml; echo "===" · elapsed: 11s · idle: 0s
+── ● Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ PI │ 12.0% │ $0.000 │ swe-2-max │ akr-e2e-door-pi

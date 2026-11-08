@@ -1,0 +1,3 @@
+-
+/home/ivan/.codex/sessions/2026/11/08/rollout-2026-11-08T03-48-01-01a1b90e-3f60-77a1-8df6-2b8b444b125d.jsonl
+/home/ivan/.pi/agent/sessions/--var-tmp-akr-1000-5d20-34e9098a-akr-e2e-door-pi--/2026-11-08T02-48-00-280Z_85fbf1ca-aded-482e-8413-b70e27fe0d36.jsonl

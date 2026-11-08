@@ -1,0 +1,91 @@
+  r-e2e-final-claude/issu
+  es/chart/e2e-round/slot
+  s/probe-brief-B.md'
+  (its return file is
+  /var/tmp/akr-1000/e2e-f
+  inal/akr-e2e-final-clau
+  de/issues/chart/e2e-rou
+  nd/slots/probe-B.md);
+  2) write your own
+  one-line note to
+  /var/tmp/akr-1000/e2e-f
+  inal/akr-e2e-final-clau
+  de/issues/chart/e2e-rou
+  nd/slots/probe-A.md; 3)
+  wait for B and collect
+  it exactly as the
+  Waiting and Collecting
+  rules say, including
+  what to do if B stops
+  without its return file
+  and report, and record
+  any drop as a '-
+  consultant:' line under
+  '## Autopilot' in
+  /var/tmp/akr-1000/e2e-f
+  inal/akr-e2e-final-clau
+  de/issues/chart/e2e-rou
+  nd/CHART.md; 4) when B
+  is collected or
+  dropped, write
+  /var/tmp/akr-1000/e2e-f
+  inal/akr-e2e-final-clau
+  de/issues/chart/e2e-rou
+  nd/seats.yaml as the
+  seat record paragraph
+  says (A and B entries,
+  transcript lookups only
+  when that paragraph
+  allows them). Do not
+  start any other
+  consultant. Then reply
+  with a two-line summary
+  that includes how many
+  seconds each wait
+  took, and stop.
+
+  Ran 4 shell commands
+
+❯ <hc from="t4
+  af-slot-b">done B: /var
+  /tmp/akr-1000/e2e-final
+  /akr-e2e-final-claude/i
+  ssues/chart/e2e-round/s
+  lots/probe-B.md</hc>
+
+  Ran 3 shell commands
+
+● B was collected and
+  nothing was dropped, so
+  I added no - consultant:
+  line to CHART.md. B's
+  return file reads B: ok,
+  its report came from
+  t4, and the wait took 4
+  s (1 s of setup before
+  the wait started).
+  The 240 s timeout never
+  fired. I wrote
+  probe-A.md and
+  seats.yaml with A (t3)
+  and B (t4,
+  claude-haiku-5-5, low),
+  and used no column
+  helper or restart.
+
+  I had no recorded open
+  time, so opened and the
+  span start are estimated
+  from the door's status
+  timestamp (08:33:29Z). I
+  also closed the span at
+  the write time.
+
+✻ Cooked for 32s · done
+  9:34 AM
+
+──────────────────────────
+❯
+──────────────────────────
+  CC │ 6% │ $0.20 │ Son…
+  ⏵⏵ auto mode on      ·

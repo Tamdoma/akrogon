@@ -1,0 +1,37 @@
+slug: option-drawings
+phase: merged
+created: 2026-11-04
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#125"
+busy_since:
+  B: 2026-11-04T12:46:44.690Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFR
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pYG
+  B: w8:pYH
+prompted:
+  B: 01a1a695-5f27-7923-b719-149096b2ce1d
+prompted_at:
+  B: 2026-11-04T12:46:44.690Z
+delivery_error: {}
+merge_stamp: 2026-11-04T12:45:15.967Z
+broadcast:
+  kind: issue
+  name: round-drawings
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/round-drawings
+  pushed: bfca777d2ae0921cc50e72a4e6f0c95c5c1388ef
+  sources:
+    - "Tamdoma/akrogon#125"
+frozen: {}
+frozen_cited: []

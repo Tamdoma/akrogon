@@ -1,0 +1,35 @@
+slug: signposts-references
+phase: merged
+created: 2026-11-04
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since:
+  B: 2026-11-04T12:59:32.706Z
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: w8:tFS
+env_names: []
+env_generation: 0
+pane:
+  A: w8:pYJ
+  B: w8:pYK
+prompted:
+  B: 01a1a69f-554e-7ab2-a175-98af03caa11d
+prompted_at:
+  B: 2026-11-04T12:59:32.706Z
+delivery_error: {}
+merge_stamp: 2026-11-04T12:59:26.584Z
+broadcast:
+  kind: issue
+  name: signposts-docs
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/signposts-docs
+  pushed: 67f0b262f7a0c7dde48dc17fe0234befadad02cb
+  sources: []
+frozen: {}
+frozen_cited: []

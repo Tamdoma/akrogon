@@ -1,0 +1,5 @@
+# Rebuttal notices: slot D
+
+One pick change forced by the corrections; the rest of my notes stand.
+
+Q1 channel: I withdraw the `tasks` mod as the drain. It is `"place": "none"` and in none of the operator's layouts, so no copy runs unless the operator opens it, and notices would silently not show — a break of working behavior. My spool-plus-ack mechanism (Q2) is unchanged, but its drain moves to a second, dedicated akrogon mod (`notices`) whose only job is the spool watch, claim, `notify()`/`playSound`, and ack. Because layouts decide which copies live and the operator's layouts are herdr-setup's, herdr-setup needs one matching change: a block for this mod in the `flat` and `board` layouts, hidden if a hidden block's copy still runs its spawn loop (AGENTS.md says copies stay alive and timers run while hidden; probe that a hidden `notices` block drains the spool, else use the smallest docked strip C proposes). This also revises my herdr-setup rejection: herdr-setup still gets no protocol or code of akrogon's, only the layout block that keeps akrogon's mod alive, which only the layout owner can add.

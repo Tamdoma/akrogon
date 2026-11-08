@@ -1,0 +1,7 @@
+sockets: 0
+ls: cannot access '/home/ivan/.config/herdr-app-sessions/akr-e2e-final': No such file or directory
+ls: cannot access '/home/ivan/.local/state/herdr-core/akr-e2e-final': No such file or directory
+ls: cannot access '/var/tmp/akr-1000/e2e-final/akr-e2e-final-claude': No such file or directory
+ls: cannot access '/var/tmp/akr-1000/e2e-final/akr-e2e-final-home': No such file or directory
+ls: cannot access '/home/ivan/.claude/projects/-var-tmp-akr-1000-e2e-final-*': No such file or directory
+e2e-final folder: main

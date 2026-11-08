@@ -1,0 +1,3 @@
+0
+{"children":[],"ended":true,"exit_code":null,"reason":"output","signal":null,"status":"working","terminal":"t1","turn":0}
+

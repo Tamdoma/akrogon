@@ -1,0 +1,31 @@
+# Round 6 brief (door A, 2026-11-08): Moshi phone connection keeps dropping
+
+Operator, verbatim: "Why do I always have to reconnect to moshi now, the connection is gettin lost and needs to rexonnect all the time" and "Consult with consultants, dont do it on your own. Come to the real core systemic problem and then resolve."
+
+Work independently. Find the root cause, not a symptom patch. Write `issues/chart/listener-hardening/slots/round6-<letter>.md` with: the cause you can prove (commands and outputs), what you could not prove, and the smallest fix that removes the cause (which repo or tool owns it). Read-only on the machine: do not restart, kill, attach, focus, or send anything to the operator's terminals or window. Reply with the path.
+
+## Facts door A gathered (verify, don't trust)
+
+- Before today the phone (Moshi app, mosh) ran `exec herdr --session 'infra'` (old herdr TUI) and was stable for hours. Old herdr is now removed (binary, config, units; `/usr/bin/herdr` package still installed until the operator runs pacman).
+- Now each phone connection runs, under `mosh-server new ... sh -lc ...`: `moshi-hook hc attach --session infra`, which spawns `herdr-core attach --history 1000 t15` (t15 = door A, Claude Code, in hc session `infra`). See `ps -eo pid,lstart,args | grep -E 'mosh-server|hc attach|herdr-core attach'`.
+- `moshi-hook hc attach --help`: "Show the Herdr window's (or sidebar's) selected terminal here"; `--session` = "herdr-core session whose core to follow (default: the Herdr window's)". moshi-hook 0.4.50 (Go, `~/.local/bin/moshi-hook`; `strings` shows herdr-core/herdr-app support: `HC_SESSION`, `herdr.tab`, `tab.select`, `space.new`, `herdr-app`).
+- Observed: the two `moshi-hook hc attach` wrappers started 11:37:55 and 11:38:08 (door A killed the old herdr mosh session around then and restarted the moshi-hook daemon at 11:38:46, which explains those). Their `herdr-core attach` children both restarted at exactly 12:08:23 (same second), core not restarted (`HC_SESSION=infra hc server status`, uptime about 3 days). A third attach appeared about 12:10. A 40 s sample at 12:10 saw no churn.
+- Probe on a throwaway core: a second `hc attach` of the same terminal does NOT end the first (both stay alive), so "takeover kicks the other" is ruled out.
+- No hc log: `~/.local/state/herdr-core/infra/core.log` is empty. `moshi-hook logs` shows the daemon only (gateway prompts, restart at 11:38:46), nothing about attach. Journals around 12:08:23 show nothing relevant.
+- Door A started a 15 minute passive logger at about 12:12: `scratchpad/attach.log` (herdr-core attach pid set changes, 1 s) and `scratchpad/docs.log` (`hc events --json` lines with `"type":"doc"` in session infra, timestamped), under `/tmp/claude-1000/-home-ivan-Work-infra-akrogon/4a3df037-e5ba-4393-85f4-67eb6d4ba7e8/scratchpad/`. Read them as they grow.
+- Things that write the herdr-app document or the window selection in session `infra` today: akrogon (leaf tab placement/rename, `src/seat.ts` place, `src/hc.ts`), herdr-setup's `herdr-consultant-column` (doc CAS writes, `lib/consultant-column.js`), herdr-app itself, herdr-setup mods (the new session-status tab rule is pushed but not loaded until the window restarts). The listener (akrogon) runs passes on terminal events.
+- Unverified hypotheses (test them, don't adopt them): (H1) moshi-hook re-attaches on every window selection or document event even when the selected terminal is unchanged; (H2) stale mosh sessions pile up (each phone reconnect opens a new `mosh-server new`); (H3) something on the phone side (iOS backgrounding) and not the computer; (H4) the mosh UDP path (UFW) drops; (H5) something else you find.
+
+Answer also: why was old herdr stable where this is not, and what is the real systemic difference.
+
+## New fact (door A, 12:15)
+
+`scratchpad/docs.log` shows at 12:12:34.921 a doc event `{"name":"moshi-hook.selection","version":40}` in session infra; in the same second both phone `herdr-core attach` children were replaced (attach.log 12:12:34-35). So moshi-hook keeps its own core document `moshi-hook.selection` (40 writes so far) and every write restarts every moshi-hook attach follower. Read it with `echo '{"jsonrpc":"2.0","id":1,"method":"doc.get","params":{"name":"moshi-hook.selection"}}' | HC_SESSION=infra hc connect`. Who writes it, and why? (the phone's workspace switcher, the window, each attach start?). attach.log before 12:13 also lists the logger's own pids (noise); a clean logger runs from about 12:14 with `pid:terminal` entries.
+
+## Operator evidence (12:2x)
+
+Operator, verbatim: "Look at this, every time I change the tab, it starts reconnecting." Screenshot copied to `issues/chart/listener-hardening/slots/round6-phone.jpg`: Moshi chat view header reads `c-akrogon` (t15's tab) with subtitle `Himne • Connecting… • main` (Himne is t6x's space, the current `moshi-hook.selection` value `{"terminal":"t6x"}`, version 40). So: a tab change makes Moshi write the selection, every attach follower restarts, and the view shows a mixed state stuck on "Connecting…". Clean attach log since 12:13 shows `3555496:t6x 3555517:t6x`. Find what makes the reconnect slow or stuck after a tab change, and whether anything of ours (akrogon, herdr-setup mods, herdr-app window focus) writes or fights that selection.
+
+## Operator addition (12:27)
+
+Operator, verbatim: "Maybe its the connection type? We need to find the reason why the sidebar isnt automatically connected". Screenshot `round6-connect-with.jpg`: Moshi host `omarchy`, `ivan@100.84.11.83:22` (Tailscale IP), connection setting `Auto`, menu "Connect With": Auto, SSH, Mosh, Osewa, ET. Add to your answer (or a short `round6-<letter>-2.md` if already done): (1) which transport `Auto` picks here and how to prove it from the host side (mosh-server vs sshd children, `ss -uap`, `moshi-hook logs`); (2) what Moshi's "sidebar" is (the workspace/terminal list fed by moshi-hook? `moshi-hook --help`, `strings` for sidebar/gateway), what connection it needs and why it does not come up by itself after a tab change or app resume; (3) whether a transport choice (Mosh vs SSH vs Osewa vs ET) changes the reconnect behavior, with evidence, not guesses. Same read-only rules.

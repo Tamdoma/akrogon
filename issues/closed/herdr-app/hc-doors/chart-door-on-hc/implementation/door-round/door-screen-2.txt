@@ -1,0 +1,31 @@
+
+  Ran 1 shell command
+
+● C (t1h) is dropped. It
+  stopped twice without a
+  return file or a done C
+  report, including after
+  one nudge. I recorded
+  the drop under ##
+  Autopilot in CHART.md.
+
+  Waits (no terminal
+  argument, all with the
+  scratch-folder prefix):
+  wait 1 returned after
+  0s, wait 2 after 300s,
+  wait 3 after 2s. Wait 1
+  woke on B's old stop
+  (t1g) rather than on C.
+  Wait 2 hit its timeout
+  even though C was
+  already done.
+
+✻ Crunched for 5m 17s ·
+  done 4:14 AM
+
+──────────────────────────
+❯ 
+──────────────────────────
+  CC │ 6% │ $0.27 │ Son…
+  ⏵⏵ auto mode on      ·
