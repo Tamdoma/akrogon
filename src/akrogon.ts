@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import {
@@ -65,7 +66,9 @@ const options: Record<string, { type: 'string' | 'boolean' }> =
                       ? { charts: { type: 'boolean' }, json: { type: 'boolean' } }
                       : verb === 'timing'
                         ? { cohort: { type: 'boolean' }, flow: { type: 'boolean' }, since: { type: 'string' } }
-                        : {};
+                        : verb === 'notice'
+                          ? { title: { type: 'string' }, body: { type: 'string' }, attention: { type: 'boolean' } }
+                          : {};
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(3),
@@ -171,6 +174,20 @@ switch (verb) {
       await import('./seat')
     ).startConsultant(global, repo, { session: space.session, space: space.space.id }, caller, letter, config, task);
     if (started?.outcome === 'failed') process.exitCode = 1;
+    break;
+  }
+  case 'notice': {
+    z.tuple([]).parse(positionals);
+    const title: string = z.string().trim().min(1).parse(values.title);
+    const body: string = z.string().parse(values.body);
+    const repo: Repo = await requireRepo(readGlobal(), process.cwd());
+    const resolution: SpaceResolution = await (await import('./hc')).repoSpace(repo);
+    if (!resolution.ok) throw new Error(resolution.reason);
+    const { noticeFolder, noticeId, noticePath, writeNotice } = await import('./notice');
+    const folder: string = noticeFolder(resolution.session);
+    const id: string = noticeId(repo.name, 'notice', randomUUID());
+    writeNotice(folder, id, { title, body, attention: values.attention === true });
+    console.log(noticePath(folder, id));
     break;
   }
   case 'pull':
@@ -321,6 +338,6 @@ switch (verb) {
     break;
   default:
     throw new Error(
-      'Usage: akrogon <install|listen|init|config|preflight|phase|land|next|seat|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|rollback>',
+      'Usage: akrogon <install|listen|init|config|preflight|phase|land|next|seat|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|notice|rollback>',
     );
 }

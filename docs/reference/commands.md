@@ -22,6 +22,7 @@ Every `akrogon` command, one line each. Run commands from the registered reposit
 | `akrogon land <slug> --attempt <id>` | Verify one merge attempt, run the merge checks, push and move the leaf to `merged`. `akrogon next` starts it for you when a merge attempt is ready. A red check, a refused gate or push, or a needed rebase hands the attempt to seat B and the [merge-issue](../../skills/merge-issue/SKILL.md) skill. |
 | `akrogon pull [--all]` | Copy open GitHub issues into `issues/seeds/`. With `--all`, it pulls every registered repository from any directory. |
 | `akrogon close <owner/repo#n> --by <text>` | Close one GitHub issue with a "delivered by" note. |
+| `akrogon notice --title <text> --body <text> [--attention]` | Write one notice file into the `akrogon-notices/` folder of the herdr-app session holding the current repository's space and print its path. herdr-setup's `session-status` bar shows it as a toast, with the attention sound when `--attention` is given. The watcher's needs-you notice uses it. |
 
 ## Control work
 
