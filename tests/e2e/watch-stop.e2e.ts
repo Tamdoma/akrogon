@@ -15,19 +15,22 @@ import { answerTrust, required } from './tier';
 import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
 // command: the long shell command the seat runs. agy refuses `sleep 600` as a shell timer (B-R1), so it
-// runs a long ping instead.
+// runs a long ping instead. running: screen text that shows the command itself started; agy prints
+// "Running command..." for its exploratory commands too, so its marker names the command (A-F1).
 const kinds = {
   codex: {
     line: 'codex --no-daemon -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access',
     model: 'gpt-6.1-sol',
     trust: 'Trust and continue',
     command: 'sleep 600',
+    running: 'Running',
   },
   agy: {
     line: 'agy --model {model} --effort {effort} --mode auto',
     model: 'gemini-3.8-flash-low',
     trust: null,
     command: 'ping -c 600 127.0.0.1',
+    running: 'Running (ping -c 600',
   },
 } as const;
 
@@ -133,7 +136,7 @@ test('watch stop: a working seat stops on its stop key, ends idle and takes one 
     // The seat is on the long command: hc waits for the harness's tool-running line on the screen
     // (event-driven, bounded; the task text itself names the command, so that text proves nothing), and
     // the seat's process tree must hold the command.
-    const shown: SpawnResult = await tier.hc(['wait', address, '--output', 'Running', '--timeout', '180']);
+    const shown: SpawnResult = await tier.hc(['wait', address, '--output', spec.running, '--timeout', '180']);
     tier.record(`${kind}-on-command.txt`, `${shown.code}\n${shown.stdout}\n${shown.stderr}`);
     const before: Seen = await get(tier, address);
     const tree: string[] = descendants(z.number().parse(before.pid));
