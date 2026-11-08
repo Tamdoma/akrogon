@@ -1392,10 +1392,10 @@ test('failed announce writes the failed notice, renames tabs and tolerates missi
       expect(notices(f)).toEqual([failedNotice('notab')]);
       expect(renames(f)).toEqual([]);
       expect(readState(path).failure?.delivery).toBe('pending');
-      expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(0);
+      expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(1);
       expect(readState(path).failure?.delivery).toBe('pending');
       rmSync(noticeFiles(f.core)[0].path);
-      expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(0);
+      expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(1);
       expect(readState(path).failure?.delivery).toBe('shown');
       expect(notices(f)).toEqual([]);
     } finally {
