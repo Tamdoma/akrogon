@@ -4,8 +4,8 @@
 // and TMPDIR pointing into the fixture. It reports OSC 7501 status, keeps its transcript where the
 // resolver looks for that kind, and changes transcript on the reset line as each harness did in P3:
 //   claude  keeps ~/.claude/sessions/<pid>.json naming its conversation and writes
-//           ~/.claude/projects/<cwd>/<id>.jsonl; after /clear the record names the new id, which the next
-//           turn writes, while <TMPDIR>/claude-<uid>/<cwd>/<first id>/tasks stays open under the first id
+//           ~/.claude/projects/<cwd>/<id>.jsonl; /clear is a short turn that opens the new id's file and
+//           record, while <TMPDIR>/claude-<uid>/<cwd>/<first id>/tasks stays open under the first id
 //   codex   holds ~/.codex/sessions/<date>/rollout-<ts>-<id>.jsonl open from its first prompt; after /new
 //           a second rollout opens only at the next prompt, the first stays open
 //   pi      holds nothing open; --session-id names ~/.pi/agent/sessions/--<cwd>--/<ts>_<id>.jsonl; after
@@ -121,12 +121,37 @@ async function turn(input: string): Promise<void> {
   appendFileSync(resolve(out, 'inputs.jsonl'), `${JSON.stringify({ turnEnd: new Date().toISOString() })}\n`);
 }
 
+// claude runs /clear as a short turn of its own: its status leaves working once (hc's turn moves) and the
+// new conversation opens with the command, before any prompt. On t3k that turn ended 2 ms after the
+// helper's warm-up went in and 45 ms before claude wrote the warm-up into the transcript; the stand-in ends
+// its /clear turn when the next line arrives and starts that line's turn a moment later. A line typed
+// meanwhile finds A working, so hc counts it started at the pre-clear turn; it is not busy input.
+let endClear: (() => void) | null = null;
+async function clearTurn(): Promise<void> {
+  status('working');
+  if (mode === 'switch') {
+    transcript = open(randomUUID());
+    write({ type: 'system', subtype: 'local_command', content: '<command-name>/clear</command-name>' });
+  }
+  await new Promise<void>((done) => {
+    endClear = done;
+  });
+  status('idle');
+  await Bun.sleep(300);
+}
+
 // Lines are logged on receipt, so one typed while a turn runs shows busy; turns then run in order.
+// codex and pi start no turn on /new: the next prompt writes the new transcript.
 let queue: Promise<void> = Promise.resolve();
 function take(input: string): void {
   received(input);
+  if (endClear !== null) {
+    endClear();
+    endClear = null;
+  }
   if (input === resetLine) {
     queue = queue.then(() => {
+      if (kind === 'claude') return clearTurn();
       if (mode === 'switch') pendingSwitch = true;
     });
     return;

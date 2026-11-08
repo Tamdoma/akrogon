@@ -46,6 +46,17 @@ const inputSchema: Record<Kind, z.ZodType> = {
     .refine((e) => e.type === 'message' && e.message?.role === 'user'),
 };
 
+// The harness's reply record, the only proof a prompt was answered: claude, codex and pi also copy the
+// prompt into other records (claude's last-prompt and request blobs), so a match there proves receipt only.
+const replySchema: Record<Kind, z.ZodType> = {
+  claude: z.object({ type: z.literal('assistant') }),
+  codex: z.object({
+    type: z.literal('response_item'),
+    payload: z.object({ type: z.literal('message'), role: z.literal('assistant') }),
+  }),
+  pi: z.object({ type: z.literal('message'), message: z.object({ role: z.literal('assistant') }) }),
+};
+
 const [a, log, start]: [string, string, string] = z
   .tuple([z.string().min(1), z.string().min(1), z.string().min(1)])
   .parse(process.argv.slice(2));
@@ -107,13 +118,21 @@ const warm = await send(session, a, `reply OK ${code}`);
 if (warm.started === false) stop('warm-up', 'warm-up not started', { code, turn: warm.turn });
 step('warm-up', 'sent', { code, turn: warm.turn });
 
+// A turn end only wakes the check: a reset can end turns of its own (claude's /clear does), so the warm-up
+// is over when A is idle and a reply record holding the code sits in a transcript changed since the reset,
+// never by a turn count.
+const answered = (path: string | null): boolean =>
+  path !== null &&
+  readFileSync(path, 'utf8')
+    .split('\n')
+    .some((line: string) => line.includes(code) && replySchema[kind].safeParse(parsed(line)).success);
 const warmed: Seen | null = await waitFor(
   session,
   a,
-  (t) => gone(t) || (t.turn > warm.turn && idle(t)),
+  async (t) => gone(t) || (idle(t) && answered(await transcriptByCode(seat, code, resetStart))),
   env.DOOR_RESET_TURN_BOUND_MS,
 );
-if (warmed === null) stop('warm-up-turn-end', 'turn open');
+if (warmed === null) stop('code-lookup', 'reset unconfirmed', { code });
 if (gone(warmed)) stop('warm-up-turn-end', 'identity changed');
 step('warm-up-turn-end', 'turn ended', { turn: warmed.turn });
 
