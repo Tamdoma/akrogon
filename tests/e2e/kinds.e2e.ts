@@ -92,6 +92,9 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
     a: { harness: 'claude', model: kinds.claude.model, effort: 'low' },
     b: { harness: 'claude', model: kinds.claude.model, effort: 'low' },
   });
+  // transcriptFor runs in this process, whose preload points XDG_RUNTIME_DIR at the suite's own
+  // runtime; it must find akr-e2e-engine where akrogon's runs find it, in the tier runtime.
+  process.env.XDG_RUNTIME_DIR = tier.runtime;
   const cwds: string[] = Object.keys(kinds).map((kind: string) => resolve(root, `akr-e2e-engine-${kind}`));
   const trustedBefore: string[] = trustedWorkspaces();
   tier.record('cwds.json', cwds);
