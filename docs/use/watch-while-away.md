@@ -21,7 +21,7 @@ It runs one check right away. Then it creates one Claude Code cron job that repe
 3. It starts leaves that wait on an idle seat with `akrogon next <slug>`, or `akrogon next --all` when several wait. It leaves a leaf alone while a leaf it is blocked by is not merged.
 4. It retries a failed leaf at the phase where it failed with `akrogon phase <slug> <phase>` and `akrogon next <slug>`. It does this only when the leaf's seats are idle, and it gives up after two retries in a row that fail again.
 5. It reads a busy seat's log and screen. If the seat repeats the same failing step, or works outside its brief, the check stops it once and sends one correcting prompt. A slow command alone is not a reason to step in.
-6. It sends you a Herdr notification when a leaf needs you, then replies with a few lines on what it saw and did.
+6. It sends a notice that herdr-app shows as a toast when a leaf needs you, then replies with a few lines on what it saw and did.
 
 ## What stays yours
 
