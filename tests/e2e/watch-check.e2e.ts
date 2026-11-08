@@ -158,21 +158,24 @@ test('watch check: label at start, one check per wake, one check per queued tick
     // No further automatic wakes: the tick step below is driven by ticks this test sends.
     killTree(listener);
     listener = null;
-    // Checks 3 and 4: two ticks queued while the watcher works; Claude Code submits each as its own turn,
-    // so the wake and the two ticks end three turns after check 1.
+    // Checks 3 and 4: two ticks queued while the watcher works; Claude Code submits each as its own turn
+    // and runs queued turns back to back, which hc may count as one working span, so the run settles on
+    // an idle watcher whose transcript holds the wake and both ticks.
     await send(tier, watcher, `/watch-issues tick ${tier.root}`);
     await send(tier, watcher, `/watch-issues tick ${tier.root}`);
     const { transcriptFor } = await import('../../src/transcript');
     const log: string = z.string().parse(await transcriptFor({ session, address: watcher }));
-    expect(await waitFor(session, watcher, (t: Seen) => t.turn >= turnBefore + 3 && idle(t), 900_000)).not.toBeNull();
-    tier.record('check-2-3-screen.txt', (await tier.hc(['read', watcher, '--lines', '120'])).stdout);
-    const seen = transcript(log);
-    tier.record('transcript-summary.json', seen);
     // A slash command is recorded twice (its <command-args> record and the skill expansion), so ticks are
     // counted by their <command-args> record only.
     const tick: string = `<command-args>tick ${tier.root}`;
-    const ticks: number = seen.user.filter((text: string) => text.includes(tick)).length;
-    expect(ticks).toBe(3);
+    const tickCount = (): number => transcript(log).user.filter((text: string) => text.includes(tick)).length;
+    expect(
+      await waitFor(session, watcher, (t: Seen) => t.turn > turnBefore && idle(t) && tickCount() === 3, 900_000),
+    ).not.toBeNull();
+    tier.record('check-2-3-screen.txt', (await tier.hc(['read', watcher, '--lines', '120'])).stdout);
+    const seen = transcript(log);
+    tier.record('transcript-summary.json', seen);
+    expect(tickCount()).toBe(3);
     const firstTick: number = seen.order.findIndex((e) => e.kind === 'user' && e.text.includes(tick));
     // Every check begins with one `akrogon status`; observe may rerun inside a check after a command error.
     const checks = (from: number): number =>
