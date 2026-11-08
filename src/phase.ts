@@ -202,14 +202,15 @@ export async function commitMove(
     ...(leavingFailed && recorded.batch?.notified === 'pending' ? [noticeId(repo.name, 'merged', recorded.slug)] : []),
   ];
   try {
-    // The wake goes first: a failed notice must not cost the watcher its wake.
-    if (to === 'failed') await wakeWatcher(repo, `failed ${after.slug}`);
+    if (to === 'failed') {
+      // The wake goes first: a failed notice must not cost the watcher its wake.
+      await wakeWatcher(repo, `failed ${after.slug}`);
+      announced = await announceFailed(repo, leaf, after);
+    } else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(repo, after, after.slug);
     if (stale.length > 0) {
       const folder: string = await repoNotices(repo);
       for (const id of stale) removeNotice(folder, id);
     }
-    if (to === 'failed') announced = await announceFailed(repo, leaf, after);
-    else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(repo, after, after.slug);
     if (to === 'merged') await completeOwner(repo, leaf, true);
   } catch (error) {
     if (error instanceof MoveCommittedError) throw error;
