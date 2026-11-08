@@ -28,18 +28,9 @@ import {
   type Slot,
   type Verdict,
 } from './routing';
-import {
-  command,
-  run,
-  herdr,
-  herdrArgv,
-  repoSession,
-  retryable,
-  CommandError,
-  type Result,
-  type SessionResolution,
-} from './shell';
+import { command, run, CommandError, type Result } from './shell';
 import { renameTab as renameAppTab, repoSpace, wakeWatcher, windowOpen, type SpaceResolution } from './hc';
+import { noticeFolder, noticeId, removeNotice, writeNotice } from './notice';
 import { logMove, readLog } from './log';
 import { appendTiming, currentVisit } from './timing';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
@@ -54,22 +45,10 @@ import { enclosingCapture, packFolderLocked } from './pack';
 import { flockHold } from './flock';
 import { abandonedCaptures } from './run-check';
 
-async function herdrCall<T>(args: string[], schema: z.ZodType<T>, slug: string, session: string): Promise<T> {
-  try {
-    return await herdr(args, schema, { session });
-  } catch (error) {
-    if (!(error instanceof CommandError) || !retryable(error.result)) throw error;
-    console.warn(
-      JSON.stringify({
-        warning: 'herdr call failed, retrying',
-        slug,
-        command: herdrArgv(args, { session }),
-        code: error.result.code,
-        stderr: error.result.stderr,
-      }),
-    );
-    return await herdr(args, schema, { session });
-  }
+export async function repoNotices(repo: Repo): Promise<string> {
+  const space: SpaceResolution = await repoSpace(repo);
+  if (!space.ok) throw new Error(space.reason);
+  return noticeFolder(space.session);
 }
 
 // The leaf tab is renamed only while a window shows it; a closed window leaves the name to the next
@@ -93,24 +72,13 @@ async function announceFailed(repo: Repo, leaf: Leaf, state: State): Promise<Sta
   const failure: Failure = failureSchema.parse(state.failure);
   let lastError: unknown;
   let delivery: string = 'error';
-  const resolved: SessionResolution = await repoSession(repo);
   try {
-    if (!resolved.ok) throw new Error(resolved.reason);
-    const shown = await herdrCall(
-      [
-        'notification',
-        'show',
-        `${repo.name}/${state.slug} failed`,
-        '--body',
-        `${failure.cause}: ${failure.reason}`,
-        '--sound',
-        'request',
-      ],
-      z.object({ shown: z.boolean(), reason: z.string() }),
-      state.slug,
-      resolved.session.name,
-    );
-    delivery = shown.reason;
+    writeNotice(await repoNotices(repo), noticeId(repo.name, 'failed', state.slug), {
+      title: `${repo.name}/${state.slug} failed`,
+      body: `${failure.cause}: ${failure.reason}`,
+      attention: true,
+    });
+    delivery = 'pending';
   } catch (error) {
     lastError = error;
   }
@@ -193,9 +161,11 @@ export async function commitMove(
   failure?: Failure,
   onCommitted?: () => void,
 ): Promise<State> {
+  const leavingFailed: boolean = recorded.phase === 'failed' && to !== 'failed';
   const after: State = {
     ...recorded,
     phase: to,
+    batch: leavingFailed && recorded.batch !== undefined ? { ...recorded.batch, notified: undefined } : recorded.batch,
     done: [],
     verdict: {},
     prompted: {},
@@ -219,12 +189,27 @@ export async function commitMove(
   onCommitted?.();
   // The transition is committed even if diagnostic collection or append fails.
   let announced: State = after;
+  // Notices still waiting for the window that this move makes stale.
+  const stale: string[] = [
+    ...(to === 'failed' || to === 'merged'
+      ? (['A', 'B'] as const)
+          .filter((seat: Slot): boolean => recorded.busy_notified[seat] === 'pending')
+          .map((seat: Slot): string => noticeId(repo.name, 'busy', recorded.slug, seat))
+      : []),
+    ...(leavingFailed && recorded.failure?.delivery === 'pending'
+      ? [noticeId(repo.name, 'failed', recorded.slug)]
+      : []),
+    ...(leavingFailed && recorded.batch?.notified === 'pending' ? [noticeId(repo.name, 'merged', recorded.slug)] : []),
+  ];
   try {
-    if (to === 'failed') {
-      // The wake goes first: a failed notice must not cost the watcher its wake.
-      await wakeWatcher(repo, `failed ${after.slug}`);
-      announced = await announceFailed(repo, leaf, after);
-    } else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(repo, after, after.slug);
+    // The wake goes first: a failed notice must not cost the watcher its wake.
+    if (to === 'failed') await wakeWatcher(repo, `failed ${after.slug}`);
+    if (stale.length > 0) {
+      const folder: string = await repoNotices(repo);
+      for (const id of stale) removeNotice(folder, id);
+    }
+    if (to === 'failed') announced = await announceFailed(repo, leaf, after);
+    else if (recorded.phase === 'failed' && after.tab !== undefined) await renameTab(repo, after, after.slug);
     if (to === 'merged') await completeOwner(repo, leaf, true);
   } catch (error) {
     if (error instanceof MoveCommittedError) throw error;

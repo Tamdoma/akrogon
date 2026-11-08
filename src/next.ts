@@ -40,17 +40,7 @@ import {
   type Inventory,
 } from './state';
 import { requiredSlots, routing, type Phase, type Slot } from './routing';
-import {
-  herdr,
-  command,
-  run,
-  CommandError,
-  retryable,
-  herdrArgv,
-  repoSession,
-  type Result,
-  type SessionResolution,
-} from './shell';
+import { command, run, CommandError, type Result } from './shell';
 import {
   docGet,
   end,
@@ -73,7 +63,8 @@ import { transcriptFor } from './transcript';
 import { checkBase, localBase, trackingRef } from './preflight';
 import { checkLocation } from './guard';
 import { attemptId, applyTop, branchSha, buildStack, isAncestor, memberBase, removeEmptyUntrackedDirs } from './batch';
-import { commandMerged, commitMove, completeOwner } from './phase';
+import { commandMerged, commitMove, completeOwner, repoNotices } from './phase';
+import { noticeId, noticeState, removeNotice, writeNotice } from './notice';
 import { landAlive, launchLand } from './land';
 import { appendAttempt, readPressure, resolveTools, type PressureSnapshot } from './attempts';
 import { readLog } from './log';
@@ -162,9 +153,11 @@ async function observeBusy(
   t: Seen,
   now: number,
 ): Promise<{ state: State; notified: boolean }> {
+  const id: string = noticeId(repo.name, 'busy', state.slug, seat);
   if (t.status?.state !== 'working' && t.status?.state !== 'blocked') {
     if (state.busy_since[seat] === undefined && state.busy_notified[seat] === undefined)
       return { state, notified: false };
+    if (state.busy_notified[seat] === 'pending') removeNotice(await repoNotices(repo), id);
     const cleared: State = {
       ...state,
       busy_since: { ...state.busy_since, [seat]: undefined },
@@ -176,26 +169,21 @@ async function observeBusy(
   const since: string = state.busy_since[seat] ?? new Date(now).toISOString();
   const observed: State = { ...state, busy_since: { ...state.busy_since, [seat]: since } };
   if (state.busy_since[seat] === undefined) saveState(path, observed);
+  if (observed.busy_notified[seat] === 'pending') {
+    if (noticeState(await repoNotices(repo), id) === 'pending') return { state: observed, notified: false };
+    const shown: State = { ...observed, busy_notified: { ...observed.busy_notified, [seat]: 'shown' } };
+    saveState(path, shown);
+    return { state: shown, notified: false };
+  }
   const elapsed: number = now - Date.parse(since);
   if (elapsed <= STALL_MS || observed.busy_notified[seat] !== undefined) return { state: observed, notified: false };
   const minutes: number = Math.floor(elapsed / 60000);
-  // The busy notice stays on herdr until notices move (plan D25).
-  const resolution: SessionResolution = await repoSession(repo);
-  if (!resolution.ok) throw new Error(resolution.reason);
-  const notice: string[] = herdrArgv(
-    [
-      'notification',
-      'show',
-      `Busy leaf: ${state.repo}/${state.slug} seat ${seat} ${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`,
-    ],
-    { session: resolution.session.name },
-  );
-  const shown: Result = await run(notice);
-  if (shown.code !== 0) throw new CommandError(notice, process.cwd(), shown);
-  const recorded: State = {
-    ...observed,
-    busy_notified: { ...observed.busy_notified, [seat]: new Date(now).toISOString() },
-  };
+  writeNotice(await repoNotices(repo), id, {
+    title: `Busy leaf: ${state.repo}/${state.slug} seat ${seat} ${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`,
+    body: '',
+    attention: false,
+  });
+  const recorded: State = { ...observed, busy_notified: { ...observed.busy_notified, [seat]: 'pending' } };
   saveState(path, recorded);
   await wakeWatcher(repo, `busy ${state.slug} seat ${seat}`);
   return { state: recorded, notified: true };
@@ -600,6 +588,13 @@ async function dispatchLeaf(
     }
     if (state.phase === 'failed') {
       refusePredatesHc(state);
+      if (
+        state.failure?.delivery === 'pending' &&
+        noticeState(await repoNotices(repo), noticeId(repo.name, 'failed', slug)) === 'shown'
+      ) {
+        state = { ...state, failure: { ...state.failure, delivery: 'shown' } };
+        saveState(leaf.path, state);
+      }
       const tabbed: boolean = state.tab !== undefined && state.failure?.cause !== 'attempts';
       const place: Place | null = tabbed ? await ownPlace() : null;
       if (tabbed && place === null) return 'skipped';
@@ -724,39 +719,19 @@ async function sweep(
   }
 }
 
-async function mergeNotice(repo: Repo, slug: string): Promise<boolean> {
-  const resolution: SessionResolution = await repoSession(repo);
-  if (!resolution.ok) {
-    console.warn(JSON.stringify({ warning: 'merge notice failed', slug, error: resolution.reason }));
-    return false;
-  }
-  const session: string = resolution.session.name;
-  const args: string[] = [
-    'notification',
-    'show',
-    `${repo.name}/${slug} merged, move it back`,
-    '--body',
-    `next: akrogon phase ${slug} merge`,
-    '--sound',
-    'request',
-  ];
-  const schema = z.object({ shown: z.boolean(), reason: z.string() });
+// A refused session or a failed write keeps the record as it was, so the next pass tries again.
+async function mergeNotice(repo: Repo, slug: string, notified: Batch['notified']): Promise<Batch['notified']> {
+  if (notified === 'shown') return notified;
+  const id: string = noticeId(repo.name, 'merged', slug);
   try {
-    return (await herdr(args, schema, { session })).shown;
-  } catch (error) {
-    if (!(error instanceof CommandError) || !retryable(error.result)) {
-      console.warn(
-        JSON.stringify({
-          warning: 'merge notice failed',
-          slug,
-          error: error instanceof Error ? error.message : String(error),
-        }),
-      );
-      return false;
-    }
-  }
-  try {
-    return (await herdr(args, schema, { session })).shown;
+    const folder: string = await repoNotices(repo);
+    if (notified === 'pending') return noticeState(folder, id);
+    writeNotice(folder, id, {
+      title: `${repo.name}/${slug} merged, move it back`,
+      body: `next: akrogon phase ${slug} merge`,
+      attention: true,
+    });
+    return 'pending';
   } catch (error) {
     console.warn(
       JSON.stringify({
@@ -765,7 +740,7 @@ async function mergeNotice(repo: Repo, slug: string): Promise<boolean> {
         error: error instanceof Error ? error.message : String(error),
       }),
     );
-    return false;
+    return notified;
   }
 }
 
@@ -823,7 +798,7 @@ async function reconcileBatch(
       const remaining: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
       if (remaining !== undefined) saveState(remaining.path, { ...remaining.state, batch: undefined });
     } else if (holderNow.state.phase === 'failed') {
-      const notified: boolean = batch.notified === true || (await mergeNotice(repo, holderNow.state.slug));
+      const notified: Batch['notified'] = await mergeNotice(repo, holderNow.state.slug, batch.notified);
       saveState(holderNow.path, { ...holderNow.state, batch: { ...batch, notified, recorded: true } });
     } else saveState(holderNow.path, { ...holderNow.state, batch: undefined });
   });

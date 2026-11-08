@@ -82,7 +82,13 @@ export const batchSchema = z.strictObject({
   tested_main: z.string().optional(),
   decision: z.enum(['reuse', 'rerun']).optional(),
   candidate: z.string().optional(),
-  notified: z.boolean().optional(),
+  // Records written before notice files hold a boolean: true was shown, false was never delivered.
+  notified: z
+    .preprocess(
+      (value) => (value === true ? 'shown' : value === false ? undefined : value),
+      z.enum(['pending', 'shown']).optional(),
+    )
+    .optional(),
   applied: z.boolean(),
   // Absent means seat: records written before command-run merges are B's.
   owner: z.enum(['command', 'seat']).optional(),
