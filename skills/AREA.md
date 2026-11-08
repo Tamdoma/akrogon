@@ -8,7 +8,7 @@
 
 ## Key files
 
-- `skills/chart-issues/SKILL.md` runs the chart door — signposts round, three modes, drain, take and handoff; `assets/` holds `shapes.md` (chart records), `questions.md` (round shape) and `standing-design.md`.
+- `skills/chart-issues/SKILL.md` runs the chart door — signposts round, three modes, drain, take and handoff; `assets/` holds `shapes.md` (chart records), `questions.md` (round shape and consultant exchange) and `standing-design.md`; `scripts/` holds `chart-usage.ts`, `door-reset.ts` (the handover reset, started with `hc run --bg`), `transcript.ts` (a terminal's transcript path) and `direct-guards.ts`.
 - `skills/init-akrogon/SKILL.md` proposes checks, grounding and repository setup.
 - `skills/implement-issue/SKILL.md` runs implementation and repair passes.
 - `skills/implement-issue/worker-protocol.md` defines worker scope and returns.

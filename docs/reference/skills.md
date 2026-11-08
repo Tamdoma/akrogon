@@ -7,7 +7,7 @@ There are two kinds:
 - **Skills you start yourself.** You type them in an agent session, for example `/chart-issues` or `/seed-issue`.
 - **Skills the `akrogon` command starts.** When a leaf moves to a new phase, the command sends a prompt to a seat's pane. Seat A and seat B are the two execution seats. They plan, build, review and repair leaves. You do not type these skills during normal work.
 
-Chart consultants are different from seats A and B. A consultant is a peer pane (B, C, D and so on) that chart-issues asks for an independent view while it plans a chart. Consultants help decide what to build. Execution seats do the leaf work after handoff.
+Chart consultants are different from seats A and B. A consultant is an hc terminal (B, C, D and so on), started by the door as its child or supplied by the operator, that chart-issues asks for an independent view while it plans a chart. Consultants help decide what to build. Execution seats do the leaf work after handoff.
 
 [`skills/lesson-rule.md`](../../skills/lesson-rule.md) is not a skill you run. It is a shared rule every skill follows when it writes a lesson into `learnings/`.
 

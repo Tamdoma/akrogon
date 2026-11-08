@@ -1,15 +1,23 @@
 #!/usr/bin/env bun
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, type Dirent } from 'node:fs';
-import { homedir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { z } from 'zod';
 
-const seatSchema = z.strictObject({
-  seat: z.string().min(1),
-  pane: z.string(),
-  harness: z.string().min(1),
-  session: z.string().min(1),
-});
+// One seats.yaml entry as the door writes it: hc address and name, the launch recipe, and `session`
+// as the transcript path from the session-id resolver.
+const seatSchema = z
+  .strictObject({
+    seat: z.string().min(1),
+    address: z.string().min(1),
+    name: z.string().min(1).nullable(),
+    recipe: z.strictObject({
+      harness: z.string().min(1),
+      model: z.string().min(1).optional(),
+      effort: z.string().min(1).optional(),
+    }),
+    session: z.string().min(1),
+  })
+  .transform((e) => ({ seat: e.seat, harness: e.recipe.harness, session: e.session }));
 const spanEntrySchema = z.strictObject({ from: z.iso.datetime(), to: z.iso.datetime().optional() });
 const seatsSchema = z.object({
   opened: z.iso.datetime(),
@@ -107,45 +115,9 @@ function tsOf(r: Rec, field: string): number | string {
   return Number.isFinite(t) ? t : `field timestamp unparseable`;
 }
 
-function findTranscripts(root: string, match: (dir: string, name: string) => boolean, depth: number): string[] {
-  const out: string[] = [];
-  const walk = (dir: string, d: number): void => {
-    let entries: Dirent[];
-    try {
-      entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      const p: string = join(dir, e.name);
-      if (d === 0) {
-        if (e.isFile() && match(dir, e.name)) out.push(p);
-      } else if (e.isDirectory()) walk(p, d - 1);
-    }
-  };
-  walk(root, depth);
-  return out;
-}
-
 function locate(harness: string, session: string): { file: string } | { detail: string } {
-  if (harness === 'claude') {
-    const root: string = join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude'), 'projects');
-    const hits: string[] = findTranscripts(root, (_d, name) => name === `${session}.jsonl`, 1);
-    if (hits.length === 1) return { file: hits[0] };
-    return { detail: `${session}.jsonl: ${hits.length} matches under ${root}` };
-  }
-  if (harness === 'pi') {
-    if (existsSync(session)) return { file: resolve(session) };
-    return { detail: `${session}: session file missing` };
-  }
-  if (harness === 'codex') {
-    const root: string = join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'sessions');
-    const suffix: string = `-${session}.jsonl`;
-    const hits: string[] = findTranscripts(root, (_d, name) => name.startsWith('rollout-') && name.endsWith(suffix), 3);
-    if (hits.length === 1) return { file: hits[0] };
-    return { detail: `rollout-*-${session}.jsonl: ${hits.length} matches under ${root}` };
-  }
-  return { detail: `unknown harness ${harness}` };
+  if (!['claude', 'codex', 'pi'].includes(harness)) return { detail: `unknown harness ${harness}` };
+  return existsSync(session) ? { file: resolve(session) } : { detail: `${session}: session file missing` };
 }
 
 function claudeSession(session: string, file: string, wins: Win[], untilMs: number): SessionResult | string {
