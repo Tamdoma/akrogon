@@ -2,7 +2,7 @@
 // herdr-setup's session-status handler. Run: AKROGON_E2E=notices
 // AKROGON_E2E_HANDLER=$HOME/.config/herdr-app/mods/session-status/notices.js AKROGON_E2E_ROOT=<leaf temp>
 // AKROGON_E2E_OUT=<leaf>/implementation/notices-tier bun test --timeout=600000 ./tests/e2e/notices.e2e.ts
-// Exactly two herdrapp starts (startTier's openOnce, then the window below); a missing handler fails
+// Exactly two herdr starts (startTier's openOnce, then the window below); a missing handler fails
 // before either.
 import { test, expect } from 'bun:test';
 import { existsSync, readFileSync, realpathSync, watch } from 'node:fs';
@@ -156,7 +156,7 @@ test('notices tier: closed-window wait, toast and deletion, attention sound only
     const closed: string = await notice(tier, 'akre2e closed', 'written with the window closed', true);
 
     // Start 2: the window opens, shows the waiting notice and deletes it.
-    window = Bun.spawn(['herdrapp', '--session', notices.name], {
+    window = Bun.spawn(['herdr', '--session', notices.name], {
       env: realEnv(desktop),
       stdout: 'ignore',
       stderr: 'ignore',
@@ -187,12 +187,12 @@ test('notices tier: closed-window wait, toast and deletion, attention sound only
     tier.record('pactl.txt', output.text);
     // The window log was still empty while the window ran (implementation/report.md, launch T1), so the
     // handler's shown lines are read once the window has stopped.
-    const stopped: SpawnResult = await spawnCaptured(['herdrapp', 'session', 'stop', notices.name], { env: realEnv() });
+    const stopped: SpawnResult = await spawnCaptured(['herdr', 'session', 'stop', notices.name], { env: realEnv() });
     expect(stopped.code, stopped.stderr).toBe(0);
     for (const path of [closed, loud, quiet]) expect(shownLine(path)).toBe(true);
   } finally {
     pactl?.kill();
-    // herdrapp session delete removes the window log, so it is kept first.
+    // herdr session delete removes the window log, so it is kept first.
     tier.record('window.log', existsSync(windowLog) ? readFileSync(windowLog, 'utf8') : '(no window log)\n');
     const left: string[] = await stopTier(tier, []);
     window?.kill();

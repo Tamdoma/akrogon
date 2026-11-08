@@ -88,7 +88,7 @@ export function absent(s: TierSession): string[] {
 // window opens once to make the home and closes again; the session stop also stops the core herdr-app
 // started, whose state goes too, so the tier then starts its own core with the window closed.
 async function openOnce(s: TierSession): Promise<void> {
-  const window: Bun.Subprocess = Bun.spawn(['herdrapp', '--session', s.name], {
+  const window: Bun.Subprocess = Bun.spawn(['herdr', '--session', s.name], {
     env: realEnv(),
     stdout: 'ignore',
     stderr: 'ignore',
@@ -96,12 +96,12 @@ async function openOnce(s: TierSession): Promise<void> {
   const ready: string = resolve(s.appHome, '.herdrapp-ready');
   for (let attempt: number = 0; attempt < 100 && !existsSync(ready); attempt += 1) await Bun.sleep(200);
   if (!existsSync(ready)) throw new Error(`herdr-app did not create the session home: ${ready}`);
-  const stopped: SpawnResult = await spawnCaptured(['herdrapp', 'session', 'stop', s.name], { env: realEnv() });
-  if (stopped.code !== 0) throw new Error(`herdrapp session stop failed: ${JSON.stringify(stopped)}`);
+  const stopped: SpawnResult = await spawnCaptured(['herdr', 'session', 'stop', s.name], { env: realEnv() });
+  if (stopped.code !== 0) throw new Error(`herdr session stop failed: ${JSON.stringify(stopped)}`);
   // The launcher may outlive the stopped window; it holds nothing once the session is stopped.
   window.kill();
   await window.exited;
-  if (await listening(s.socket)) throw new Error(`herdrapp session stop left the core listening: ${s.socket}`);
+  if (await listening(s.socket)) throw new Error(`herdr session stop left the core listening: ${s.socket}`);
   rmSync(s.coreState, { recursive: true, force: true });
 }
 
@@ -230,11 +230,11 @@ export async function stopTier(tier: Tier, cwds: string[]): Promise<string[]> {
   const status = z
     .object({ pid: z.number() })
     .safeParse(JSON.parse((await tier.hc(['server', 'status', '--json'])).stdout || '{}'));
-  await spawnCaptured(['herdrapp', 'session', 'stop', tier.session.name], { env: realEnv() });
+  await spawnCaptured(['herdr', 'session', 'stop', tier.session.name], { env: realEnv() });
   // Any hc call on a stopped session starts a new core, so stop only a core still listening.
   if (await listening(tier.session.socket)) await tier.hc(['server', 'stop']);
   if (status.success) await spawnCaptured(['timeout', '10', 'tail', `--pid=${status.data.pid}`, '-f', '/dev/null']);
-  await spawnCaptured(['herdrapp', 'session', 'delete', tier.session.name], { env: realEnv() });
+  await spawnCaptured(['herdr', 'session', 'delete', tier.session.name], { env: realEnv() });
   rmSync(tier.session.coreState, { recursive: true, force: true });
   for (const cwd of cwds) rmSync(cwd, { recursive: true, force: true });
   rmSync(tier.root, { recursive: true, force: true });

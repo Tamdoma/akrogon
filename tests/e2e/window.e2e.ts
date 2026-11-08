@@ -121,7 +121,7 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
       failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'failed while the window was closed' },
     });
     // Open the window; the next engine pass names the adopted tabs.
-    window = Bun.spawn(['herdrapp', '--session', engine.name], { env: realEnv(), stdout: 'ignore', stderr: 'ignore' });
+    window = Bun.spawn(['herdr', '--session', engine.name], { env: realEnv(), stdout: 'ignore', stderr: 'ignore' });
     let opened: boolean = false;
     for (let attempt: number = 0; attempt < 20 && !opened; attempt += 1) {
       opened = (await app(['ls'])).code === 0;
@@ -165,11 +165,11 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
     expect(openTab?.name).toBe('e2e-open');
     expect(blocks(openTab?.root)).toEqual([a, b]);
     tier.record('open.json', await doc(tier));
-    // App home agrees with herdrapp's own list.
+    // App home agrees with herdr's own list.
     const sessions = z
       .object({ sessions: z.array(z.object({ name: z.string(), session_dir: z.string() }).passthrough()) })
       .parse(
-        JSON.parse((await spawnCaptured(['herdrapp', 'session', 'list', '--json'], { env: realEnv() })).stdout),
+        JSON.parse((await spawnCaptured(['herdr', 'session', 'list', '--json'], { env: realEnv() })).stdout),
       ).sessions;
     expect(sessions.find((s) => s.name === engine.name)?.session_dir).toBe(engine.appHome);
     // A merged leaf's tab is closed.
