@@ -22,8 +22,8 @@ export async function listenCommand(): Promise<void> {
 
   // Single flight: a pass already queued is not queued twice, so any number of wakes during a pass
   // give one following pass.
-  const queue: Pass[] = [];
-  let running: boolean = false;
+  const queue: Pass[] = ['pull --all', 'next --resume'];
+  let running: boolean = true;
   const runPasses = async (): Promise<void> => {
     running = true;
     for (let pass: Pass | undefined = queue.shift(); pass !== undefined; pass = queue.shift()) {
@@ -123,7 +123,6 @@ export async function listenCommand(): Promise<void> {
 
   watchDir(socketDir);
   await Promise.race([scan(), fatal]);
-  enqueue('pull --all');
-  enqueue('next --resume');
+  runPasses().catch(fail);
   await fatal;
 }
