@@ -131,6 +131,10 @@ test('watch check: label at start, one check per wake, queued ticks fold into on
       '--setting-sources',
       'project,local',
       // Named tools instead of bypass mode: bypass asks for its own acceptance once user settings are not loaded.
+      // dontAsk keeps auto mode off: auto mode opens its onboarding dialog after the first turn, which swallows
+      // the listener's wake.
+      '--permission-mode',
+      'dontAsk',
       '--allowedTools',
       'Bash,Read,Grep,Glob,CronCreate,CronList,CronDelete',
     ]);
