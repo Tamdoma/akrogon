@@ -435,14 +435,11 @@ describe('self-update', () => {
     if (!existsSync(bin)) {
       mkdirSync(bin);
       symlinkSync(resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(bin, 'systemctl'));
-      symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
-      writeFileSync(resolve(home, 'herdr.json'), JSON.stringify({ panes: [], tabs: [], serial: 0 }));
     }
     process.env.AKROGON_HOME = home;
     process.env.PATH = `${bin}:${previousPath}`;
     process.env.FAKE_SYSTEMCTL_LOG = resolve(home, 'systemctl.log');
     process.env.FAKE_SLICE_LINK = resolve(home, '.config/systemd/user/akrogon.slice');
-    process.env.FAKE_HERDR = resolve(home, 'herdr.json');
     try {
       await body();
     } finally {
@@ -451,7 +448,6 @@ describe('self-update', () => {
       process.env.PATH = previousPath;
       delete process.env.FAKE_SYSTEMCTL_LOG;
       delete process.env.FAKE_SLICE_LINK;
-      delete process.env.FAKE_HERDR;
     }
   }
 
