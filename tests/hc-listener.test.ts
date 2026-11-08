@@ -107,6 +107,60 @@ async function standIn(core: HcCore, labels: string[], mode: string = 'work'): P
 
 const labelled: string[] = ['akrogon=1', 'akrogon.repo=repo', 'akrogon.leaf=hl-x', 'akrogon.seat=a'];
 
+test('startup pulls and resumes before handling a wake received while another session subscribes', async () => {
+  const f: Fixture = await fixture();
+  const first: HcCore = await hcCore(f);
+  const second: HcCore = await hcCore(f, { repo: 'second' });
+  first.link(second);
+  const shim: Shim = akrogonShim(f);
+  const bin: string = resolve(f.home, 'subscription-bin');
+  const snapshot: string = resolve(f.home, 'snapshot.log');
+  const processed: string = resolve(f.home, 'processed.log');
+  const gate: string = resolve(f.home, 'second.fifo');
+  mkdirSync(bin);
+  writeFileSync(snapshot, '');
+  writeFileSync(processed, '');
+  expect(Bun.spawnSync(['mkfifo', gate]).exitCode).toBe(0);
+  writeFileSync(
+    resolve(bin, 'hc'),
+    `#!/bin/bash
+if [ "$1" = connect ]; then printf 'connect\\n' >> '${processed}'; fi
+if [ "$1" = events ]; then
+  if [ "$HC_SESSION" = '${second.session}' ]; then cat '${gate}' >/dev/null; fi
+  if [ "$HC_SESSION" = '${first.session}' ]; then
+    '${first.env.HC_SHIM_REAL}' "$@" | tee '${snapshot}'
+    exit "\${PIPESTATUS[0]}"
+  fi
+fi
+exec '${first.env.HC_SHIM_REAL}' "$@"
+`,
+  );
+  chmodSync(resolve(bin, 'hc'), 0o755);
+  const listener: Bun.Subprocess = listen(f, { ...first.env, PATH: `${bin}:${shim.bin}:${first.env.PATH}` });
+  try {
+    await until(snapshot, () => readFileSync(snapshot, 'utf8').includes('"terminals"'));
+    await standIn(first, labelled, 'exit');
+    // The watcher's discovery runs after the finished event's dispatch callback.
+    await until(processed, () => readFileSync(processed, 'utf8').includes('connect'));
+    writeFileSync(gate, 'go\n');
+    await until(shim.log, () => passes(shim).includes('end next --resume'));
+    await until(shim.log, () => passes(shim).includes('end next --wake'));
+    expect(passes(shim).slice(0, 4)).toEqual([
+      'start pull --all',
+      'end pull --all',
+      'start next --resume',
+      'end next --resume',
+    ]);
+    expect(count(shim, 'start next --wake')).toBe(1);
+    expect(passes(shim)).not.toContain('OVERLAP');
+  } finally {
+    killTree(listener);
+    await first.stop();
+    await second.stop();
+    f.clean();
+  }
+});
+
 test('the listener subscribes before its catch-up, wakes on turn end, blocked and exit of labelled terminals only, and folds queued wakes', async () => {
   const f: Fixture = await fixture();
   const core: HcCore = await hcCore(f);
