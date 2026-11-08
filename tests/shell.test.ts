@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test, expect, spyOn } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { CommandError, retryCommand, run, spawnCaptured, type Result } from '../src/shell';
@@ -90,4 +90,24 @@ console.log(JSON.stringify([git.stdout, other.stdout]));
     env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: 'unix:path=/nonexistent', XDG_RUNTIME_DIR: '/run/user/test' },
   });
   expect(JSON.parse(child.stdout)).toEqual(['unix:path=/run/user/test/bus', 'unix:path=/nonexistent']);
+});
+
+// Lesson 11 (learnings/history/2026-09-10-stderr-json-parse.md): an outside CLI's plain-text stderr
+// (a panic, usage error or socket failure) reaches the caller with its raw text, never as a SyntaxError.
+// A driver child gets the stub hc on its startup PATH, which is the PATH spawned commands resolve.
+test('hc plain-text stderr rejects with HcError kind exit 1 carrying the raw stderr', async () => {
+  const bin: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'hc-plain-')));
+  writeFileSync(resolve(bin, 'hc'), "#!/bin/sh\nprintf 'hc: socket gone\\n' >&2\nexit 1\n", { mode: 0o755 });
+  const script: string = `import assert from 'node:assert/strict';
+import {hc, HcError} from ${JSON.stringify(resolve(import.meta.dir, '../src/hc.ts'))};
+await assert.rejects(hc('plain', ['get', 't1']), (error) => {
+  assert(error instanceof HcError, String(error));
+  assert.equal(error.kind, 'exit 1');
+  assert.equal(error.result.stderr, 'hc: socket gone\\n');
+  return true;
+});`;
+  const { code, stderr }: Result = await spawnCaptured([process.execPath, '-e', script], {
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+  });
+  expect({ code, stderr }).toEqual({ code: 0, stderr: '' });
 });
