@@ -161,6 +161,199 @@ exec '${first.env.HC_SHIM_REAL}' "$@"
   }
 });
 
+// A wrapper ahead of `real` on PATH that fails the first call whose argv starts with `first`, logging
+// `fail <argv>` to `log`, and runs `real` for every other call.
+function failOnce(f: Fixture, name: string, first: string, real: string, log: string): string {
+  const bin: string = resolve(f.home, `fail-${name}-bin`);
+  const marker: string = resolve(f.home, `fail-${name}.done`);
+  mkdirSync(bin);
+  writeFileSync(
+    resolve(bin, name),
+    `#!/bin/sh
+case "$*" in '${first}'*) if mkdir '${marker}' 2>/dev/null; then echo "fail $*" >> '${log}'; exit 1; fi ;; esac
+exec '${real}' "$@"
+`,
+  );
+  chmodSync(resolve(bin, name), 0o755);
+  return bin;
+}
+
+test('a failed pass is retried after the retry delay with no further hc event', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  const shim: Shim = akrogonShim(f);
+  const bin: string = failOnce(f, 'akrogon', 'next --resume', resolve(shim.bin, 'akrogon'), shim.log);
+  const listener: Bun.Subprocess = listen(f, {
+    ...core.env,
+    PATH: `${bin}:${shim.bin}:${core.env.PATH}`,
+    AKROGON_LISTEN_RETRY_MS: '300',
+  });
+  try {
+    await until(shim.log, () => passes(shim).includes('end next --resume'));
+    expect(passes(shim)).toEqual([
+      'start pull --all',
+      'end pull --all',
+      'fail next --resume',
+      'start next --resume',
+      'end next --resume',
+    ]);
+    expect(listener.exitCode).toBeNull();
+  } finally {
+    killTree(listener);
+    await core.stop();
+    f.clean();
+  }
+});
+
+test('a failed pull is retried as a pull', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  const shim: Shim = akrogonShim(f);
+  const bin: string = failOnce(f, 'akrogon', 'pull --all', resolve(shim.bin, 'akrogon'), shim.log);
+  const listener: Bun.Subprocess = listen(f, {
+    ...core.env,
+    PATH: `${bin}:${shim.bin}:${core.env.PATH}`,
+    AKROGON_LISTEN_RETRY_MS: '300',
+  });
+  try {
+    await until(shim.log, () => passes(shim).includes('end pull --all'));
+    expect(passes(shim)).toEqual([
+      'fail pull --all',
+      'start next --resume',
+      'end next --resume',
+      'start pull --all',
+      'end pull --all',
+    ]);
+  } finally {
+    killTree(listener);
+    await core.stop();
+    f.clean();
+  }
+});
+
+test('a hung pass is killed at its deadline with the commands it started, and retried', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  const shim: Shim = akrogonShim(f);
+  // The first resume starts a background command and hangs on it; later passes run the shim.
+  const bin: string = resolve(f.home, 'hang-bin');
+  const pidFile: string = resolve(f.home, 'hang.pid');
+  mkdirSync(bin);
+  writeFileSync(
+    resolve(bin, 'akrogon'),
+    `#!/bin/sh
+if [ "$*" = 'next --resume' ] && mkdir '${resolve(f.home, 'hang.done')}' 2>/dev/null; then
+  echo "hang $*" >> '${shim.log}'
+  sleep 300 &
+  echo $! > '${pidFile}'
+  wait
+fi
+exec '${resolve(shim.bin, 'akrogon')}' "$@"
+`,
+  );
+  chmodSync(resolve(bin, 'akrogon'), 0o755);
+  const listener: Bun.Subprocess = listen(f, {
+    ...core.env,
+    PATH: `${bin}:${shim.bin}:${core.env.PATH}`,
+    AKROGON_LISTEN_RETRY_MS: '300',
+    AKROGON_PASS_DEADLINE_MS: '500',
+  });
+  try {
+    await until(shim.log, () => passes(shim).includes('end next --resume'));
+    expect(passes(shim)).toEqual([
+      'start pull --all',
+      'end pull --all',
+      'hang next --resume',
+      'start next --resume',
+      'end next --resume',
+    ]);
+    // Killed: gone, or a zombie its new parent has not reaped yet.
+    const stat: string = resolve('/proc', readFileSync(pidFile, 'utf8').trim(), 'stat');
+    expect(existsSync(stat) ? readFileSync(stat, 'utf8').split(') ')[1][0] : 'gone').toMatch(/^(Z|gone)$/);
+    expect(listener.exitCode).toBeNull();
+  } finally {
+    killTree(listener);
+    await core.stop();
+    f.clean();
+  }
+});
+
+test('a session that sends no first snapshot holds neither startup nor the other sessions', async () => {
+  const f: Fixture = await fixture();
+  const first: HcCore = await hcCore(f);
+  const silent: HcCore = await hcCore(f, { repo: 'silent' });
+  first.link(silent);
+  const shim: Shim = akrogonShim(f);
+  const bin: string = resolve(f.home, 'silent-bin');
+  mkdirSync(bin);
+  writeFileSync(
+    resolve(bin, 'hc'),
+    `#!/bin/sh
+if [ "$1" = events ] && [ "$HC_SESSION" = '${silent.session}' ] && mkdir '${resolve(f.home, 'silent.done')}' 2>/dev/null; then
+  exec sleep 300
+fi
+exec '${first.env.HC_SHIM_REAL}' "$@"
+`,
+  );
+  chmodSync(resolve(bin, 'hc'), 0o755);
+  const listener: Bun.Subprocess = listen(f, {
+    ...first.env,
+    PATH: `${bin}:${shim.bin}:${first.env.PATH}`,
+    AKROGON_LISTEN_RETRY_MS: '300',
+    AKROGON_SNAPSHOT_MS: '500',
+  });
+  try {
+    await until(shim.log, () => count(shim, 'end next --resume') >= 2);
+    expect(passes(shim).slice(0, 2)).toEqual(['start pull --all', 'end pull --all']);
+    expect(listener.exitCode).toBeNull();
+  } finally {
+    killTree(listener);
+    await first.stop();
+    await silent.stop();
+    f.clean();
+  }
+});
+
+test('a failed session stream is retried and the listener stays up', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  const shim: Shim = akrogonShim(f);
+  const bin: string = failOnce(f, 'hc', 'events', z.string().parse(core.env.HC_SHIM_REAL), shim.log);
+  const listener: Bun.Subprocess = listen(f, {
+    ...core.env,
+    PATH: `${bin}:${shim.bin}:${core.env.PATH}`,
+    AKROGON_LISTEN_RETRY_MS: '300',
+  });
+  try {
+    await until(shim.log, () => count(shim, 'end next --resume') >= 2);
+    expect(passes(shim)[0]).toBe('fail events --json --label akrogon=1');
+    expect(listener.exitCode).toBeNull();
+  } finally {
+    killTree(listener);
+    await core.stop();
+    f.clean();
+  }
+});
+
+test('a session first seen after startup gets a catch-up pass', async () => {
+  const f: Fixture = await fixture();
+  const first: HcCore = await hcCore(f);
+  const second: HcCore = await hcCore(f, { repo: 'second' });
+  const shim: Shim = akrogonShim(f);
+  const listener: Bun.Subprocess = listen(f, { ...first.env, PATH: `${shim.bin}:${first.env.PATH}` });
+  try {
+    await until(shim.log, () => passes(shim).includes('end next --resume'));
+    first.link(second);
+    await until(shim.log, () => count(shim, 'end next --resume') === 2);
+    expect(listener.exitCode).toBeNull();
+  } finally {
+    killTree(listener);
+    await first.stop();
+    await second.stop();
+    f.clean();
+  }
+});
+
 test('a cleared foreground from the real core keeps the listener alive through restart', async () => {
   const f: Fixture = await fixture();
   const core: HcCore = await hcCore(f, { coreEnv: { HC_FOREGROUND_MS: '10' } });

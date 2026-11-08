@@ -1,13 +1,24 @@
 // `akrogon listen` (plan D15): follows every live hc session's labelled terminals and runs engine
 // passes as `akrogon` child processes, one at a time. A new or restarted session's socket is seen
-// through fs.watch on the socket directories, never by polling.
+// through fs.watch on the socket directories, never by polling. A failed or overdue pass, a failed
+// session stream and a failed scan are logged and retried once after RETRY_MS (a resume pass and a
+// scan), so no failure leaves a leaf with nothing to wake it; only a broken directory watch or a pass
+// that cannot be spawned ends the listener, which systemd restarts.
 import { dirname, resolve } from 'node:path';
-import { lstatSync, realpathSync, watch, type FSWatcher } from 'node:fs';
+import { lstatSync, mkdirSync, realpathSync, watch, type FSWatcher } from 'node:fs';
 import { z } from 'zod';
 import { readGlobal, readRepo, type GlobalConfig } from './config';
 import { follow, sessions, wakeWatcher, type HcLine, type Seen } from './hc';
 
 type Pass = 'pull --all' | 'next --resume' | 'next --wake';
+
+const msSchema = z.coerce.number().int().positive().optional();
+const RETRY_MS: number = msSchema.parse(process.env.AKROGON_LISTEN_RETRY_MS) ?? 60_000;
+// A pass can self-update (build and install a release) or pull every repo; past this it is hung.
+const PASS_DEADLINE_MS: number = msSchema.parse(process.env.AKROGON_PASS_DEADLINE_MS) ?? 20 * 60_000;
+// hc sends a subscription's snapshot first; one that sends none by then is stopped and retried, so a
+// silent session cannot hold startup or the scans behind it.
+const SNAPSHOT_MS: number = msSchema.parse(process.env.AKROGON_SNAPSHOT_MS) ?? 30_000;
 
 const labelsSchema = z.object({ labels: z.record(z.string(), z.string()) });
 const statusSchema = z.object({ status: z.object({ state: z.string() }).nullable() });
@@ -28,15 +39,40 @@ export async function listenCommand(): Promise<void> {
     running = true;
     for (let pass: Pass | undefined = queue.shift(); pass !== undefined; pass = queue.shift()) {
       const argv: string[] = ['akrogon', ...pass.split(' ')];
-      const child = Bun.spawn(argv, { env: process.env, stdin: 'ignore', stdout: 'inherit', stderr: 'inherit' });
+      // Its own process group, so an overdue pass is killed with every command it started: none of them
+      // may keep running past the locks the pass held.
+      const child = Bun.spawn(argv, {
+        env: process.env,
+        stdin: 'ignore',
+        stdout: 'inherit',
+        stderr: 'inherit',
+        detached: true,
+      });
+      const overdue = setTimeout(() => process.kill(-child.pid, 'SIGKILL'), PASS_DEADLINE_MS);
       const code: number = await child.exited;
-      if (code !== 0) console.error(JSON.stringify({ listen: 'pass failed', command: argv, code }));
+      clearTimeout(overdue);
+      if (code !== 0) retry(pass, { listen: 'pass failed', command: argv.join(' '), code, signal: child.signalCode });
     }
     running = false;
   };
   const enqueue = (pass: Pass): void => {
     if (!queue.includes(pass)) queue.push(pass);
     if (!running) runPasses().catch(fail);
+  };
+
+  // One pending retry at a time: any number of failures before it fires give one scan and each failed
+  // pass once (a failed stream or scan retries with a resume pass).
+  const retries: Set<Pass> = new Set();
+  const retry = (pass: Pass, failure: Record<string, string | number | null>): void => {
+    console.error(JSON.stringify({ ...failure, retry_ms: RETRY_MS }));
+    if (retries.size === 0)
+      setTimeout(() => {
+        const due: Pass[] = [...retries];
+        retries.clear();
+        void scan();
+        for (const again of due) enqueue(again);
+      }, RETRY_MS);
+    retries.add(pass);
   };
 
   // Watcher wakes run one after another so a burst of seat events does not race the watch lock.
@@ -47,11 +83,15 @@ export async function listenCommand(): Promise<void> {
       console.error(JSON.stringify({ listen: 'watcher wake skipped: unknown repo', repo: name, reason }));
       return;
     }
-    wakes = wakes.then(() => wakeWatcher(readRepo(name, global.repos[name]), reason)).catch(fail);
+    // The watcher is optional: a failed wake is logged and the engine carries on.
+    wakes = wakes
+      .then(() => wakeWatcher(readRepo(name, global.repos[name]), reason))
+      .catch((error: unknown) =>
+        console.error(JSON.stringify({ listen: 'watcher wake failed', repo: name, reason, error: String(error) })),
+      );
   };
 
   const subscribed: Set<string> = new Set();
-  const catchUp: Set<string> = new Set();
   const watched: Set<string> = new Set();
 
   const subscribe = (session: string): Promise<void> => {
@@ -68,8 +108,10 @@ export async function listenCommand(): Promise<void> {
             .map((t: Seen) => t.labels['akrogon.repo']),
         );
         for (const repo of ended) wake(repo, `seat finished before subscription in ${session}`);
+        clearTimeout(overdue);
         snapshot();
-        if (catchUp.delete(session)) enqueue('next --resume');
+        // Every (re)subscription catches up: a seat may have ended its turn while nothing listened.
+        enqueue('next --resume');
         return;
       }
       if (!('terminal' in line.params)) return;
@@ -84,15 +126,32 @@ export async function listenCommand(): Promise<void> {
           `seat ${seat['akrogon.leaf']}/${seat['akrogon.seat']} ${blocked ? 'blocked' : type}`,
         );
     };
-    const stream = follow(session, ['--label', 'akrogon=1'], onLine);
-    subscribed.add(session);
+    // Watched first: a socket gone since the scan throws here, before anything is started or marked.
     watchSocket(session);
-    stream.ended.then(() => {
-      subscribed.delete(session);
-      catchUp.add(session);
-      snapshot();
-      void scan();
-    }, fail);
+    const stream = follow(session, ['--label', 'akrogon=1'], onLine);
+    let late: boolean = false;
+    const overdue = setTimeout(() => {
+      late = true;
+      stream.stop();
+    }, SNAPSHOT_MS);
+    subscribed.add(session);
+    // A session that ended is rescanned at once (a restarted core resubscribes); a failed stream, or
+    // one stopped for a missing snapshot, waits for the retry, so it cannot spin.
+    stream.ended.then(
+      () => {
+        clearTimeout(overdue);
+        subscribed.delete(session);
+        snapshot();
+        if (late) retry('next --resume', { listen: 'no first snapshot', session, snapshot_ms: SNAPSHOT_MS });
+        else void scan();
+      },
+      (error: unknown) => {
+        clearTimeout(overdue);
+        subscribed.delete(session);
+        snapshot();
+        retry('next --resume', { listen: 'session stream failed', session, error: String(error) });
+      },
+    );
     return ready;
   };
 
@@ -117,10 +176,12 @@ export async function listenCommand(): Promise<void> {
       const fresh: string[] = (await sessions()).live.filter((session: string) => !subscribed.has(session));
       await Promise.all(fresh.map((session: string) => subscribe(session)));
     });
-    scans = scanned.catch(fail);
+    scans = scanned.catch((error: unknown) => retry('next --resume', { listen: 'scan failed', error: String(error) }));
     return scans;
   };
 
+  // hc creates this folder with its first core; made here, a listener started first watches it at once.
+  mkdirSync(socketDir, { recursive: true, mode: 0o700 });
   watchDir(socketDir);
   await Promise.race([scan(), fatal]);
   runPasses().catch(fail);

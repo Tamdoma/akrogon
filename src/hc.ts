@@ -84,6 +84,10 @@ function hcEnv(session: string): NodeJS.ProcessEnv {
   return { ...rest, HC_SESSION: session };
 }
 
+// Every finite hc call ends by this deadline at the latest, so a wedged core fails a pass (which the
+// listener retries) instead of hanging it and every pass queued behind it.
+const HC_DEADLINE_MS: number = 60_000;
+
 export async function hc(
   session: string,
   args: string[],
@@ -93,7 +97,7 @@ export async function hc(
   const result: SpawnResult = await spawnCaptured(argv, {
     env: hcEnv(session),
     stdin: opts.stdin,
-    timeout: opts.deadlineMs,
+    timeout: opts.deadlineMs ?? HC_DEADLINE_MS,
   });
   if (result.code !== 0) throw new HcError(errorKind(result), argv, result, opts.stdin);
   return result.stdout;
