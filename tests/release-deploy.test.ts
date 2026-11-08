@@ -190,8 +190,6 @@ test.serial('every link resolves through current and a skill add or remove leave
       expect(readlinkSync(link)).toBe(resolve(current, 'skills/skill-two'));
       expect(realpathSync(link)).toBe(resolve(releases(d), sha, 'skills/skill-two'));
     }
-    const calls: string = readFileSync(resolve(d.home, 'herdr.json.calls'), 'utf8');
-    expect(calls).toContain(JSON.stringify(['plugin', 'link', resolve(current, 'plugin')]));
   } finally {
     d.f.clean();
   }

@@ -68,12 +68,9 @@ async function selfUpdateFixture(): Promise<SelfUpdateFixture> {
   const fakeBin: string = resolve(home, 'fake-bin');
   mkdirSync(fakeBin);
   symlinkSync(resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(fakeBin, 'systemctl'));
-  symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(fakeBin, 'herdr'));
   process.env.PATH = `${fakeBin}:${savedPath}`;
   process.env.FAKE_SYSTEMCTL_LOG = resolve(home, 'systemctl.log');
   process.env.FAKE_SLICE_LINK = resolve(home, '.config/systemd/user/akrogon.slice');
-  process.env.FAKE_HERDR = resolve(home, 'herdr.json');
-  writeFileSync(process.env.FAKE_HERDR, JSON.stringify({ panes: [], tabs: [], serial: 0 }));
   return {
     home,
     clone,
@@ -86,7 +83,6 @@ async function selfUpdateFixture(): Promise<SelfUpdateFixture> {
       process.env.PATH = savedPath;
       delete process.env.FAKE_SYSTEMCTL_LOG;
       delete process.env.FAKE_SLICE_LINK;
-      delete process.env.FAKE_HERDR;
       if (savedTempRoot === undefined) delete process.env.AKROGON_LEAF_TEMP_ROOT;
       else process.env.AKROGON_LEAF_TEMP_ROOT = savedTempRoot;
       rmSync(home, { recursive: true, force: true });

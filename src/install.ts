@@ -28,11 +28,6 @@ export function planSkillLinks(
   const skills: string[] = readdirSync(resolve(listRoot, 'skills'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
-  const mods: string[] = existsSync(resolve(listRoot, 'herdr-app'))
-    ? readdirSync(resolve(listRoot, 'herdr-app'), { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => entry.name)
-    : [];
   const planned: Link[] = [
     { source: resolve(sourceRoot, 'src/akrogon.ts'), destination: resolve(home, '.local/bin/akrogon') },
     {
@@ -45,10 +40,6 @@ export function planSkillLinks(
         destination: resolve(home, root, skill),
       })),
     ),
-    ...mods.map((mod) => ({
-      source: resolve(sourceRoot, 'herdr-app', mod),
-      destination: resolve(home, '.config/herdr-app/mods', mod),
-    })),
     ...(existsSync(resolve(listRoot, 'systemd', listenerUnit))
       ? [
           {
@@ -128,10 +119,6 @@ export function applySkillLinks(links: Link[]): void {
   }
 }
 
-function shipsPlugin(): boolean {
-  return existsSync(resolve(currentLink(), 'plugin'));
-}
-
 function shipsListener(): boolean {
   return existsSync(resolve(currentLink(), 'systemd', listenerUnit));
 }
@@ -144,12 +131,8 @@ async function call(argv: string[]): Promise<void> {
   if (result.code !== 0) throw new CommandError(argv, process.cwd(), result);
 }
 
-export async function linkServices(kinds: string[]): Promise<void> {
+export async function linkServices(): Promise<void> {
   await call(['systemctl', '--user', 'daemon-reload']);
-  if (shipsPlugin()) {
-    for (const kind of kinds) await call(['herdr', 'integration', 'install', kind]);
-    await call(['herdr', 'plugin', 'link', resolve(currentLink(), 'plugin')]);
-  }
   if (shipsListener()) await call(['systemctl', '--user', 'enable', listenerUnit]);
 }
 
@@ -157,11 +140,6 @@ export async function restartListener(): Promise<void> {
   // --no-block returns once the job is queued, so a caller inside the unit is
   // not stopped while systemctl waits.
   if (shipsListener()) await call(['systemctl', '--user', 'restart', '--no-block', listenerUnit]);
-}
-
-export async function unlinkPlugin(): Promise<void> {
-  if (!shipsPlugin() && Bun.which('herdr', { PATH: process.env.PATH }) !== null)
-    await call(['herdr', 'plugin', 'unlink', 'akrogon']);
 }
 
 export async function install(): Promise<void> {
@@ -188,7 +166,6 @@ export async function install(): Promise<void> {
     throw new Error('Install destinations conflict. Remove the listed paths before installing.');
   }
   applySkillLinks(links);
-  await linkServices(Object.keys(global.harnesses));
+  await linkServices();
   await restartListener();
-  await unlinkPlugin();
 }

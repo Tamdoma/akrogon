@@ -2,7 +2,7 @@ import { lstatSync, realpathSync, rmSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { ensureLeafTemp, expandPath, leafTemp, toolRoot, worktreeStore, type Repo } from './config';
-import { applySkillLinks, linkServices, planSkillLinks, restartListener, unlinkPlugin, type Link } from './install';
+import { applySkillLinks, linkServices, planSkillLinks, restartListener, type Link } from './install';
 import {
   buildRelease,
   clearReleaseHold,
@@ -271,7 +271,7 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
       for (const path of planned.stale) if (lstatSync(path, { throwIfNoEntry: false }) !== undefined) unlinkSync(path);
     });
     await step('flip', () => flip(sha));
-    await step('reload', () => linkServices([]));
+    await step('reload', () => linkServices());
     await step('record', () => {
       writeDeploySuccess(
         sha,
@@ -281,7 +281,6 @@ async function deployStage(repo: Repo, home: string): Promise<string | null> {
       pruneReleases();
     });
     await step('restart', () => restartListener());
-    await step('unlink', () => unlinkPlugin());
     return `deployed ${sha.slice(0, 12)}${previous === null ? '; switched from checkout to release' : ''}`;
   } catch (error) {
     const failed: string =
