@@ -1,4 +1,14 @@
-import { appendFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+  symlinkSync,
+  chmodSync,
+} from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -149,6 +159,20 @@ export function fakeHerdr(f: Fixture): HerdrFixture {
       AKROGON_RETIRED_TEMP_ROOT: resolve(f.home, 'retired-temp'),
     },
   };
+}
+
+// A `herdr` on PATH that records each call's argv as one line in `<bin>/herdr.log` and succeeds,
+// so a test sees any herdr call a command still makes.
+export function herdrStub(bin: string): void {
+  mkdirSync(bin, { recursive: true });
+  const path: string = resolve(bin, 'herdr');
+  rmSync(path, { force: true });
+  writeFileSync(path, '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$(dirname "$0")/herdr.log"\n', { mode: 0o755 });
+}
+
+export function herdrCalls(bin: string): string[] {
+  const log: string = resolve(bin, 'herdr.log');
+  return existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
 }
 
 export type SystemctlFixture = { db: string; log: string; env: NodeJS.ProcessEnv };

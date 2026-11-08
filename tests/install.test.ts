@@ -15,11 +15,10 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, relative, resolve } from 'node:path';
-import { z } from 'zod';
 import { repoSchema, toolRoot, type Repo } from '../src/config';
 import { command, quote, type Result } from '../src/shell';
 import { selfUpdate } from '../src/self-update';
-import { fixture, cli, leafTempRoot, registerTemp, yaml, type Fixture } from './helpers';
+import { fixture, cli, herdrCalls, herdrStub, leafTempRoot, registerTemp, yaml, type Fixture } from './helpers';
 
 const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
 const skills: string[] = readdirSync(resolve(toolRoot, 'skills'), { withFileTypes: true })
@@ -29,10 +28,8 @@ const skills: string[] = readdirSync(resolve(toolRoot, 'skills'), { withFileType
 function installEnv(f: Fixture): NodeJS.ProcessEnv {
   const bin: string = resolve(f.home, 'bin');
   mkdirSync(bin);
-  symlinkSync(resolve(import.meta.dir, 'fake-herdr.ts'), resolve(bin, 'herdr'));
+  herdrStub(bin);
   symlinkSync(resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(bin, 'systemctl'));
-  const db: string = resolve(f.home, 'herdr.json');
-  writeFileSync(db, JSON.stringify({ panes: [], tabs: [], serial: 0 }));
   yaml(resolve(f.home, 'config.yaml'), {
     slots: {
       a: { harness: 'claude', model: 'a', effort: 'high' },
@@ -43,30 +40,13 @@ function installEnv(f: Fixture): NodeJS.ProcessEnv {
   return {
     HOME: f.home,
     PATH: `${bin}:${process.env.PATH}`,
-    FAKE_HERDR: db,
     FAKE_SYSTEMCTL_LOG: resolve(f.home, 'systemctl.log'),
     FAKE_SLICE_LINK: resolve(f.home, '.config/systemd/user/akrogon.slice'),
   };
 }
 
-function calls(f: Fixture): string[][] {
-  return readFileSync(resolve(f.home, 'herdr.json.calls'), 'utf8')
-    .trim()
-    .split('\n')
-    .map((line) => z.array(z.string()).parse(JSON.parse(line)));
-}
-
-// The checkout's own release ships no plugin/: install skips the integration and plugin link calls
-// and unlinks the old plugin.
-const checkoutCalls: string[][] = [['plugin', 'unlink', 'akrogon']];
-
-function expectedCalls(f: Fixture): string[][] {
-  return [
-    ['integration', 'install', 'claude'],
-    ['integration', 'install', 'codex'],
-    ['integration', 'install', 'pi'],
-    ['plugin', 'link', resolve(f.home, 'current', 'plugin')],
-  ];
+function calls(f: Fixture): string[] {
+  return herdrCalls(resolve(f.home, 'bin'));
 }
 
 test('install links akrogon.slice with the ceiling values and reloads the user manager after linking', async () => {
@@ -107,19 +87,16 @@ test('install reports a non-link akrogon.slice path as a conflict', async () => 
   }
 });
 
-test('install creates all four absent harness roots and repeats without changing links or herdr arguments', async () => {
+test('install creates all four absent harness roots, links no herdr-app mod, calls no herdr and repeats without changing links', async () => {
   const f: Fixture = await fixture();
   try {
     expect(skills).toContain('watch-issues');
     const env: NodeJS.ProcessEnv = installEnv(f);
     for (const root of roots) expect(existsSync(resolve(f.home, root))).toBe(false);
     expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0, stderr: '' });
-    const modLink: string = resolve(f.home, '.config/herdr-app/mods/tasks');
-    expect(lstatSync(modLink).isSymbolicLink()).toBe(true);
-    expect(realpathSync(modLink)).toBe(resolve(toolRoot, 'herdr-app/tasks'));
+    expect(existsSync(resolve(f.home, '.config/herdr-app'))).toBe(false);
     const destinations: string[] = [
       resolve(f.home, '.local/bin/akrogon'),
-      modLink,
       ...roots.flatMap((root) => skills.map((skill) => resolve(f.home, root, skill))),
     ];
     const targets: string[] = destinations.map((destination) => readlinkSync(destination));
@@ -132,10 +109,35 @@ test('install creates all four absent harness roots and repeats without changing
         expect(realpathSync(destination)).toBe(resolve(toolRoot, 'skills', skill));
       }
     }
-    expect(calls(f)).toEqual(checkoutCalls);
+    expect(calls(f)).toEqual([]);
     expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0, stderr: '' });
     expect(destinations.map((destination) => readlinkSync(destination))).toEqual(targets);
-    expect(calls(f)).toEqual([...checkoutCalls, ...checkoutCalls]);
+    expect(existsSync(resolve(f.home, '.config/herdr-app'))).toBe(false);
+    expect(calls(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
+// The link earlier releases made, in the shape this machine holds: through current into the release's
+// herdr-app/tasks. Real folders and links into other trees (herdr-setup's mods) share the folder.
+test('install removes the old herdr-app mods/tasks link and keeps every other entry in the mods folder', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const env: NodeJS.ProcessEnv = installEnv(f);
+    const mods: string = resolve(f.home, '.config/herdr-app/mods');
+    mkdirSync(resolve(mods, 'agents'), { recursive: true });
+    writeFileSync(resolve(mods, 'agents/mod.json'), '{}\n');
+    const foreign: string = resolve(f.home, 'herdr-setup/mods/board');
+    mkdirSync(foreign, { recursive: true });
+    symlinkSync(foreign, resolve(mods, 'board'));
+    symlinkSync(resolve(f.home, 'current/herdr-app/tasks'), resolve(mods, 'tasks'));
+    expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0, stderr: '' });
+    expect(lstatSync(resolve(mods, 'tasks'), { throwIfNoEntry: false })).toBeUndefined();
+    expect(readdirSync(mods).sort()).toEqual(['agents', 'board']);
+    expect(readlinkSync(resolve(mods, 'board'))).toBe(foreign);
+    expect(readFileSync(resolve(mods, 'agents/mod.json'), 'utf8')).toBe('{}\n');
+    expect(calls(f)).toEqual([]);
   } finally {
     f.clean();
   }
@@ -187,7 +189,7 @@ test('install prunes only dangling owned links and preserves real entries and fo
       for (const skill of skills)
         expect(realpathSync(resolve(directory, skill))).toBe(resolve(toolRoot, 'skills', skill));
     }
-    expect(calls(f)).toEqual(checkoutCalls);
+    expect(calls(f)).toEqual([]);
     mkdirSync(dirname(artifact), { recursive: true });
     writeFileSync(
       artifact,
@@ -246,7 +248,8 @@ for (const root of roots) {
         for (const other of roots.filter((other) => other !== root))
           expect(existsSync(resolve(f.home, other))).toBe(false);
         expect(existsSync(resolve(f.home, '.local/bin/akrogon'))).toBe(false);
-        expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
+        expect(existsSync(resolve(f.home, 'systemctl.log'))).toBe(false);
+        expect(calls(f)).toEqual([]);
       } finally {
         f.clean();
       }
@@ -283,7 +286,8 @@ test('install still refuses an executable destination conflict before linking or
     expect(result.stderr).toContain(`rm -r -- ${quote(destination)}`);
     expect(readFileSync(destination, 'utf8')).toBe('keep');
     for (const root of roots) expect(existsSync(resolve(f.home, root))).toBe(false);
-    expect(existsSync(resolve(f.home, 'herdr.json.calls'))).toBe(false);
+    expect(existsSync(resolve(f.home, 'systemctl.log'))).toBe(false);
+    expect(calls(f)).toEqual([]);
   } finally {
     f.clean();
   }
@@ -306,13 +310,8 @@ function currentRelease(f: Fixture, shape: { plugin: boolean; listener: boolean 
   symlinkSync(release, resolve(f.home, 'current'));
 }
 
-// systemctl and herdr append to one file, so the calls read back in the order they ran.
-function sequenceEnv(f: Fixture): NodeJS.ProcessEnv {
-  return { ...installEnv(f), FAKE_SYSTEMCTL_LOG: resolve(f.home, 'herdr.json.calls') };
-}
-
 function sequence(f: Fixture): string[] {
-  return readFileSync(resolve(f.home, 'herdr.json.calls'), 'utf8').trim().split('\n');
+  return readFileSync(resolve(f.home, 'systemctl.log'), 'utf8').trim().split('\n');
 }
 
 const listenerCalls: string[] = [
@@ -321,44 +320,29 @@ const listenerCalls: string[] = [
   '--user restart --no-block akrogon-listener.service linked=yes',
 ];
 
-test('install from a plugin release makes only the reload, integration and plugin link calls, in that order', async () => {
+test('install from a release holding plugin/ makes only the reload call and no herdr call', async () => {
   const f: Fixture = await fixture();
   try {
-    const env: NodeJS.ProcessEnv = sequenceEnv(f);
+    const env: NodeJS.ProcessEnv = installEnv(f);
     currentRelease(f, { plugin: true, listener: false });
     expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0 });
-    expect(sequence(f)).toEqual([
-      '--user daemon-reload linked=yes',
-      ...expectedCalls(f).map((call) => JSON.stringify(call)),
-    ]);
+    expect(sequence(f)).toEqual(['--user daemon-reload linked=yes']);
+    expect(calls(f)).toEqual([]);
   } finally {
     f.clean();
   }
 });
 
-test('install from a listener release links, enables and restarts the unit, then unlinks the plugin', async () => {
+test('install from a listener release links, enables and restarts the unit and calls no herdr', async () => {
   const f: Fixture = await fixture();
   try {
-    const env: NodeJS.ProcessEnv = sequenceEnv(f);
+    const env: NodeJS.ProcessEnv = installEnv(f);
     currentRelease(f, { plugin: false, listener: true });
     expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0 });
     const unit: string = resolve(f.home, '.config/systemd/user/akrogon-listener.service');
     expect(readlinkSync(unit)).toBe(resolve(f.home, 'current', 'systemd/akrogon-listener.service'));
-    expect(sequence(f)).toEqual([...listenerCalls, JSON.stringify(['plugin', 'unlink', 'akrogon'])]);
-  } finally {
-    f.clean();
-  }
-});
-
-test('install from a listener release succeeds with no herdr binary on PATH', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const env: NodeJS.ProcessEnv = sequenceEnv(f);
-    const bin: string = resolve(f.home, 'bin');
-    rmSync(resolve(bin, 'herdr'));
-    currentRelease(f, { plugin: false, listener: true });
-    expect(await cli(f, ['install'], f.root, { ...env, PATH: bin })).toMatchObject({ code: 0 });
     expect(sequence(f)).toEqual(listenerCalls);
+    expect(calls(f)).toEqual([]);
   } finally {
     f.clean();
   }
@@ -662,40 +646,41 @@ describe('self-update', () => {
     }
   });
 
-  test.serial('links a skill added on the remote and prunes links to a removed skill after deploying', async () => {
-    const f: SelfUpdateFixture = await selfUpdateFixture();
-    try {
-      for (const root of roots) {
-        const directory: string = resolve(f.home, root);
-        mkdirSync(directory, { recursive: true });
-        symlinkSync(resolve(f.clone, 'skills/skill-two'), resolve(directory, 'skill-two'));
+  test.serial(
+    'links a skill added on the remote, prunes links to a removed skill and links no herdr-app mod after deploying',
+    async () => {
+      const f: SelfUpdateFixture = await selfUpdateFixture();
+      try {
+        for (const root of roots) {
+          const directory: string = resolve(f.home, root);
+          mkdirSync(directory, { recursive: true });
+          symlinkSync(resolve(f.clone, 'skills/skill-two'), resolve(directory, 'skill-two'));
+        }
+        const newSha: string = await pushSeed(f, () => {
+          mkdirSync(resolve(f.seed, 'skills/skill-three'));
+          writeFileSync(resolve(f.seed, 'skills/skill-three/SKILL.md'), 'three\n');
+          rmSync(resolve(f.seed, 'skills/skill-two'), { recursive: true, force: true });
+        });
+        const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
+        expect(logs).toHaveLength(1);
+        expect(logs[0]).toContain(`deployed ${newSha.slice(0, 12)}`);
+        expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(newSha);
+        expect(existsSync(resolve(f.home, '.config/herdr-app'))).toBe(false);
+        for (const root of roots) {
+          const directory: string = resolve(f.home, root);
+          expect(lstatSync(resolve(directory, 'skill-two'), { throwIfNoEntry: false })).toBeUndefined();
+          expect(realpathSync(resolve(directory, 'skill-three'))).toBe(
+            resolve(f.home, 'releases', newSha, 'skills/skill-three'),
+          );
+          expect(realpathSync(resolve(directory, 'skill-one'))).toBe(
+            resolve(f.home, 'releases', newSha, 'skills/skill-one'),
+          );
+        }
+      } finally {
+        f.clean();
       }
-      const newSha: string = await pushSeed(f, () => {
-        mkdirSync(resolve(f.seed, 'skills/skill-three'));
-        writeFileSync(resolve(f.seed, 'skills/skill-three/SKILL.md'), 'three\n');
-        rmSync(resolve(f.seed, 'skills/skill-two'), { recursive: true, force: true });
-      });
-      const logs: string[] = await captured(f.home, () => selfUpdate(f.repo, f.home));
-      expect(logs).toHaveLength(1);
-      expect(logs[0]).toContain(`deployed ${newSha.slice(0, 12)}`);
-      expect(await command(['git', 'rev-parse', 'HEAD'], f.clone)).toBe(newSha);
-      const modLink: string = resolve(f.home, '.config/herdr-app/mods/tasks');
-      expect(lstatSync(modLink).isSymbolicLink()).toBe(true);
-      expect(realpathSync(modLink)).toBe(resolve(f.home, 'releases', newSha, 'herdr-app/tasks'));
-      for (const root of roots) {
-        const directory: string = resolve(f.home, root);
-        expect(lstatSync(resolve(directory, 'skill-two'), { throwIfNoEntry: false })).toBeUndefined();
-        expect(realpathSync(resolve(directory, 'skill-three'))).toBe(
-          resolve(f.home, 'releases', newSha, 'skills/skill-three'),
-        );
-        expect(realpathSync(resolve(directory, 'skill-one'))).toBe(
-          resolve(f.home, 'releases', newSha, 'skills/skill-one'),
-        );
-      }
-    } finally {
-      f.clean();
-    }
-  });
+    },
+  );
 
   test.serial('names a conflicting directory in the line and still creates the other links', async () => {
     const f: SelfUpdateFixture = await selfUpdateFixture();
