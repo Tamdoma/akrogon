@@ -69,7 +69,11 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
     a: { harness: 'claude', model: kinds.claude.model, effort: 'low' },
     b: { harness: 'claude', model: kinds.claude.model, effort: 'low' },
   });
-  const cwds: string[] = Object.keys(kinds).map((kind: string) => resolve(root, `akr-e2e-engine-${kind}`));
+  // Plan O2: claude's seat folder sits under /tmp, which Claude already trusts, so its folder-trust
+  // dialog never shows and is never answered (Claude settings are never written); the others stay
+  // under the leaf temp.
+  const storeOf = (kind: string): string => (kind === 'claude' ? '/tmp' : root);
+  const cwds: string[] = Object.keys(kinds).map((kind: string) => resolve(storeOf(kind), `akr-e2e-engine-${kind}`));
   const trustedBefore: string[] = trustedWorkspaces();
   tier.record('cwds.json', cwds);
   try {
@@ -80,6 +84,10 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
       );
     for (const [kind, spec] of Object.entries(kinds)) {
       const slug: string = `akr-e2e-engine-${kind}`;
+      await Bun.write(
+        resolve(tier.root, 'issues/config.yaml'),
+        Bun.YAML.stringify({ checks: { test: 'true' }, grounding: 'none', worktree_root: storeOf(kind) }),
+      );
       const path: string = resolve(tier.root, 'issues/open/e2e', slug);
       mkdirSync(path, { recursive: true });
       await Bun.write(
