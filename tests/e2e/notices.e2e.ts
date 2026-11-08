@@ -162,7 +162,6 @@ test('notices tier: closed-window wait, toast and deletion, attention sound only
       stderr: 'ignore',
     });
     expect(await gone(closed, 20)).toBe(true);
-    expect(shownLine(closed)).toBe(true);
     const afterClosed: SpawnResult = await app(desktop, ['status']);
     tier.record('status-closed.json', afterClosed.stdout);
     expect(toasts(afterClosed)).toBeGreaterThanOrEqual(1);
@@ -174,7 +173,6 @@ test('notices tier: closed-window wait, toast and deletion, attention sound only
     const loudFrom: number = output.text.length;
     const loud: string = await notice(tier, 'akre2e open', 'attention notice with the window open', true);
     expect(await gone(loud, 20)).toBe(true);
-    expect(shownLine(loud)).toBe(true);
     expect(await sinkInputs(output, loudFrom, 5000)).toBeGreaterThanOrEqual(1);
     const afterLoud: SpawnResult = await app(desktop, ['status']);
     tier.record('status-open.json', afterLoud.stdout);
@@ -184,10 +182,14 @@ test('notices tier: closed-window wait, toast and deletion, attention sound only
     const quietFrom: number = output.text.length;
     const quiet: string = await notice(tier, 'akre2e silent', 'silent notice with the window open', false);
     expect(await gone(quiet, 20)).toBe(true);
-    expect(shownLine(quiet)).toBe(true);
     expect(await sinkInputs(output, quietFrom, 5000)).toBe(0);
     tier.record('status-silent.json', (await app(desktop, ['status'])).stdout);
     tier.record('pactl.txt', output.text);
+    // The window log was still empty while the window ran (implementation/report.md, launch T1), so the
+    // handler's shown lines are read once the window has stopped.
+    const stopped: SpawnResult = await spawnCaptured(['herdrapp', 'session', 'stop', notices.name], { env: realEnv() });
+    expect(stopped.code, stopped.stderr).toBe(0);
+    for (const path of [closed, loud, quiet]) expect(shownLine(path)).toBe(true);
   } finally {
     pactl?.kill();
     // herdrapp session delete removes the window log, so it is kept first.
