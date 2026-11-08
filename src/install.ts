@@ -126,7 +126,7 @@ function shipsListener(): boolean {
 async function call(argv: string[]): Promise<void> {
   // env: process.env is load-bearing: Bun.spawn with env undefined forks the
   // startup environment, so in-process callers that mutate PATH or fake-env
-  // vars (every test fixture) would silently hit real systemctl/herdr.
+  // vars (every test fixture) would silently hit real systemctl.
   const result: SpawnResult = await spawnCaptured(argv, { env: process.env });
   if (result.code !== 0) throw new CommandError(argv, process.cwd(), result);
 }
