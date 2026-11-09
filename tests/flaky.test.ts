@@ -52,9 +52,12 @@ test('flaky reports a deleted log when its owner remains without an archive', as
       { tree: 'A', command: 'bun test', exit: 1, log, end: '2026-10-14T01:00:00.000Z' },
       { tree: 'A', command: 'bun test', exit: 0, log, end: '2026-10-14T02:00:00.000Z' },
     ];
-    expect(await flakyLines(repo, steps.map((step, index) => run(f, step, index)))).toEqual([
-      { name: 'test', test: '(log gone)', count: 1, last: '2026-10-14T02:00:00.000Z' },
-    ]);
+    expect(
+      await flakyLines(
+        repo,
+        steps.map((step, index) => run(f, step, index)),
+      ),
+    ).toEqual([{ name: 'test', test: '(log gone)', count: 1, last: '2026-10-14T02:00:00.000Z' }]);
     const result: Awaited<ReturnType<typeof cli>> = await cli(f, ['log', log]);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(log);
@@ -89,9 +92,12 @@ test('flaky lists a command red then green on the same tree by failed test, and 
       { tree: 'F', command: 'bun test', exit: 1, log: redLog },
       { tree: 'F', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
     ];
-    expect(await flakyLines(repo, steps.map((step, index) => run(f, step, index)))).toEqual([
-      { name: 'test', test: 'browser owner > dies with run', count: 1, last: '2026-10-14T02:00:00.000Z' },
-    ]);
+    expect(
+      await flakyLines(
+        repo,
+        steps.map((step, index) => run(f, step, index)),
+      ),
+    ).toEqual([{ name: 'test', test: 'browser owner > dies with run', count: 1, last: '2026-10-14T02:00:00.000Z' }]);
   } finally {
     f.clean();
   }
@@ -115,11 +121,25 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
       { name: 'test', test: 'browser owner > dies with run', count: 1, last: '2026-10-14T02:00:00.000Z' },
       { name: 'test', test: 'browser owner > flakes on retry', count: 1, last: '2026-10-14T02:00:00.000Z' },
     ];
-    expect((await flakyLines(repo, flip.map((step, index) => run(f, step, index)))).sort((a, b) => a.test.localeCompare(b.test))).toEqual(names);
+    expect(
+      (
+        await flakyLines(
+          repo,
+          flip.map((step, index) => run(f, step, index)),
+        )
+      ).sort((a, b) => a.test.localeCompare(b.test)),
+    ).toEqual(names);
 
     rmSync(log);
     await packEvidence(dirname(dir), { 'leaf/check-test.log': content });
-    expect((await flakyLines(repo, flip.map((step, index) => run(f, step, index)))).sort((a, b) => a.test.localeCompare(b.test))).toEqual(names);
+    expect(
+      (
+        await flakyLines(
+          repo,
+          flip.map((step, index) => run(f, step, index)),
+        )
+      ).sort((a, b) => a.test.localeCompare(b.test)),
+    ).toEqual(names);
 
     const gone: Step[] = [
       {
@@ -131,9 +151,12 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
       },
       { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
     ];
-    expect(await flakyLines(repo, gone.map((step, index) => run(f, step, index)))).toEqual([
-      { name: 'test', test: '(log gone)', count: 1, last: '2026-10-14T02:00:00.000Z' },
-    ]);
+    expect(
+      await flakyLines(
+        repo,
+        gone.map((step, index) => run(f, step, index)),
+      ),
+    ).toEqual([{ name: 'test', test: '(log gone)', count: 1, last: '2026-10-14T02:00:00.000Z' }]);
 
     const broken: string = resolve(f.root, 'issues/open/bad/evidence.tar.zst');
     mkdirSync(resolve(f.root, 'issues/open/bad'), { recursive: true });
@@ -148,7 +171,12 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
       },
       { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
     ];
-    await expect(flakyLines(repo, brokenRun.map((step, index) => run(f, step, index)))).rejects.toThrow(broken);
+    await expect(
+      flakyLines(
+        repo,
+        brokenRun.map((step, index) => run(f, step, index)),
+      ),
+    ).rejects.toThrow(broken);
 
     const present: string = resolve(f.root, 'issues/open/present');
     await packEvidence(present, { 'other.log': 'x' });
@@ -162,7 +190,12 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
       },
       { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
     ];
-    await expect(flakyLines(repo, absent.map((step, index) => run(f, step, index)))).rejects.toThrow(resolve(present, 'evidence.tar.zst'));
+    await expect(
+      flakyLines(
+        repo,
+        absent.map((step, index) => run(f, step, index)),
+      ),
+    ).rejects.toThrow(resolve(present, 'evidence.tar.zst'));
   } finally {
     f.clean();
   }
@@ -190,9 +223,12 @@ test('a reused green entry adds no flip, while a real later green still records 
       // A real green run of the command records the flip.
       { tree: 'A', command: 'bun test', exit: 0, log: greenLog, end: '2026-10-14T03:00:00.000Z' },
     ];
-    expect(await flakyLines(repo, steps.map((step, index) => run(f, step, index)))).toEqual([
-      { name: 'test', test: 'alpha', count: 1, last: '2026-10-14T03:00:00.000Z' },
-    ]);
+    expect(
+      await flakyLines(
+        repo,
+        steps.map((step, index) => run(f, step, index)),
+      ),
+    ).toEqual([{ name: 'test', test: 'alpha', count: 1, last: '2026-10-14T03:00:00.000Z' }]);
   } finally {
     f.clean();
   }

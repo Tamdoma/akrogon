@@ -228,7 +228,9 @@ function mergePassBody(repo: string): string {
     JSON.stringify(resolve(import.meta.dir, '../src/next.ts')) +
     ';\nimport { readGlobal, readRepo } from ' +
     JSON.stringify(resolve(import.meta.dir, '../src/config.ts')) +
-    (';\ntry { await mergePass(readGlobal(), readRepo(' + JSON.stringify(repo) + ", process.cwd()), { skipped: new Set(), dispatched: new Set() }, false, process.argv[2]); } catch (e) { console.error(e); process.exit(1); }\n")
+    (';\ntry { await mergePass(readGlobal(), readRepo(' +
+      JSON.stringify(repo) +
+      ', process.cwd()), { skipped: new Set(), dispatched: new Set() }, false, process.argv[2]); } catch (e) { console.error(e); process.exit(1); }\n')
   );
 }
 

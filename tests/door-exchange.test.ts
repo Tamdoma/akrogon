@@ -175,7 +175,12 @@ async function exchange(
 }
 
 test('a consultant report ends the wait at once and arrives as an <hc> message while a sibling still works', async () => {
-  const run = await exchange((f) => `${f.prefix}-door-report`, ['b', 'c'], (door) => [`report ${door.address} kb`, 'hold kc'], ['kb']);
+  const run = await exchange(
+    (f) => `${f.prefix}-door-report`,
+    ['b', 'c'],
+    (door) => [`report ${door.address} kb`, 'hold kc'],
+    ['kb'],
+  );
   try {
     expect(run.ended.code).toBe('0');
     expect((await run.core.get(run.children[1].address)).status?.state).toBe('working');
@@ -194,9 +199,12 @@ test.each([
   ['errored', 'error'],
   ['exited', 'exit'],
 ])('a %s consultant ends the wait at once while a sibling still works', async (_label: string, action: string) => {
-  const run = await exchange((f) => `${f.prefix}-door-${action}`, ['d', 'e'], () => [`${action} k${action}`, `hold h${action}`], [
-    `k${action}`,
-  ]);
+  const run = await exchange(
+    (f) => `${f.prefix}-door-${action}`,
+    ['d', 'e'],
+    () => [`${action} k${action}`, `hold h${action}`],
+    [`k${action}`],
+  );
   try {
     expect(run.ended.code).toBe('0');
     expect((await run.core.get(run.children[1].address)).status?.state).toBe('working');
@@ -207,7 +215,12 @@ test.each([
 });
 
 test('the wait ends when every consultant stopped working without a report', async () => {
-  const run = await exchange((f) => `${f.prefix}-door-stop`, ['f', 'g'], () => ['stop kf', 'stop kg'], ['kf', 'kg']);
+  const run = await exchange(
+    (f) => `${f.prefix}-door-stop`,
+    ['f', 'g'],
+    () => ['stop kf', 'stop kg'],
+    ['kf', 'kg'],
+  );
   try {
     expect(run.ended.code).toBe('0');
     for (const child of run.children) expect((await run.core.get(child.address)).status?.state).not.toBe('working');

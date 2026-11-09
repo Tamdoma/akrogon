@@ -86,7 +86,9 @@ test('the start verb starts a parentless leaf seat by name, labels, scope, env a
     const slice: string = leafSlice({ name: f.repo }, 'hs-one');
     const cgroup: string = readFileSync(`/proc/${pid}/cgroup`, 'utf8').trim();
     expect(cgroup).toMatch(
-      new RegExp(`/${slice.replace('.', '\\.')}/${slice.replace(/\.slice$/, '')}-${f.prefix}-hs-one-a-[0-9a-f]+\\.scope$`),
+      new RegExp(
+        `/${slice.replace('.', '\\.')}/${slice.replace(/\.slice$/, '')}-${f.prefix}-hs-one-a-[0-9a-f]+\\.scope$`,
+      ),
     );
     const env: Map<string, string> = environ(pid);
     expect(env.get('GIT_EDITOR')).toBe('true');

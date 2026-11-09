@@ -38,8 +38,8 @@ test('draft readiness.yaml gaps without state.yaml', async () => {
     const parsedYaml: unknown = Bun.YAML.parse(readinessBlock());
     const readiness: Readiness = readinessSchema.parse({
       ...(parsedYaml as object),
-      inputs: (parsedYaml as { inputs: { holder: string }[] }).inputs.map(
-        (input: { holder: string }) => (input.holder === 'repo' ? { ...input, holder: f.repo } : input),
+      inputs: (parsedYaml as { inputs: { holder: string }[] }).inputs.map((input: { holder: string }) =>
+        input.holder === 'repo' ? { ...input, holder: f.repo } : input,
       ),
     });
     const env: Readiness['inputs'][number] | undefined = readiness.inputs.find(

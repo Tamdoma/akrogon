@@ -1084,7 +1084,10 @@ test('stop from implement on dirty worktree records blocked failure and clears b
     // B's busy notice is still waiting for the window: the move to failed clears it before it shows.
     const busy: string = resolve(noticeFolder(f.core), `${noticeId(f.repo, 'busy', 'stop', 'B')}.json`);
     mkdirSync(noticeFolder(f.core), { recursive: true });
-    writeFileSync(busy, JSON.stringify({ title: `Busy leaf: ${f.repo}/stop seat B 1h01m`, body: '', attention: false }));
+    writeFileSync(
+      busy,
+      JSON.stringify({ title: `Busy leaf: ${f.repo}/stop seat B 1h01m`, body: '', attention: false }),
+    );
     const path: string = leaf(f, 'stop', 'implement', {
       worktree,
       tab: 'aktab1',
@@ -1346,7 +1349,10 @@ test('stopped-core moves retain pending notice cleanup until a later pass can re
     expect(failed.code, failed.stderr).toBe(0);
     const waiting: string = noticeFiles(core)[0].path;
     const merged: string = resolve(noticeFolder(core), `${noticeId(f.repo, 'merged', 'recovering')}.json`);
-    writeFileSync(merged, JSON.stringify({ title: `${f.repo}/recovering merged, move it back`, body: '', attention: true }));
+    writeFileSync(
+      merged,
+      JSON.stringify({ title: `${f.repo}/recovering merged, move it back`, body: '', attention: true }),
+    );
     const batch: Batch = holding(f).batch;
     saveState(recovering, {
       ...readState(recovering),
@@ -1400,7 +1406,11 @@ test('stopped-core moves retain pending notice cleanup until a later pass can re
 }, 30000);
 
 test('failed announce writes the failed notice, renames tabs and tolerates missing tabs', async () => {
-  const failedNotice = (f: HcFixture, slug: string) => ({ title: `${f.repo}/${slug} failed`, body: 'blocked: x', attention: true });
+  const failedNotice = (f: HcFixture, slug: string) => ({
+    title: `${f.repo}/${slug} failed`,
+    body: 'blocked: x',
+    attention: true,
+  });
   const notices = (f: HcFixture) =>
     noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }));
   {

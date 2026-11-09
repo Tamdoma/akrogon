@@ -85,7 +85,11 @@ test('migration retains strict validation of unknown keys, required fields, know
     expect(() => readState(path)).toThrow(z.ZodError);
     expect(() => readState(path)).toThrow('unexpected');
     const { repo: _repo, ...missingRepo } = canonical;
-    for (const invalid of [missingRepo, { ...canonical, repo: f.repo, phase: 'invalid' }, { ...canonical, repo: f.repo, done: ['A', 'A'] }]) {
+    for (const invalid of [
+      missingRepo,
+      { ...canonical, repo: f.repo, phase: 'invalid' },
+      { ...canonical, repo: f.repo, done: ['A', 'A'] },
+    ]) {
       yaml(file, { ...invalid, priority: 'n', slot: 'B' });
       expect(() => readState(path)).toThrow(z.ZodError);
     }

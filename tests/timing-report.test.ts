@@ -218,7 +218,13 @@ type MemberSpec = {
   extraTimings?: Row[];
 };
 
-function member(f: Fixture, slug: string, planTs: string, fMin: number, spec: MemberSpec = {}): { log: Row[]; timings: Row[] } {
+function member(
+  f: Fixture,
+  slug: string,
+  planTs: string,
+  fMin: number,
+  spec: MemberSpec = {},
+): { log: Row[]; timings: Row[] } {
   const implPrompt: string = new Date(Date.parse(planTs) + 10 * 60000).toISOString();
   const implEnd: string = new Date(Date.parse(planTs) + 20 * 60000).toISOString();
   const merged: string = new Date(Date.parse(planTs) + (fMin + 10) * 60000).toISOString();

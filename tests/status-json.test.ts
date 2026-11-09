@@ -476,7 +476,9 @@ test('merges hold the 5 most recent across repos and charts match --charts rows'
     for (let i = 0; i < 3; i++) {
       const p: string = leaf(g, `other-${i}`, 'merged', { repo: 'other' }, 'issue');
       renameSync(p, resolve(g.root, 'issues/closed', `issue/other-${i}`));
-      glines.push(JSON.stringify({ ...JSON.parse(event(g, `other-${i}`, 'merged', 45 - i * 10, '', at)), repo: 'other' }));
+      glines.push(
+        JSON.stringify({ ...JSON.parse(event(g, `other-${i}`, 'merged', 45 - i * 10, '', at)), repo: 'other' }),
+      );
       gtlines.push(prompt(g, `other-${i}`, 80 - i * 10, 'delivered', at));
     }
     // A merged leaf still in open counts once via closed only; a closed non-merged leaf is excluded.
