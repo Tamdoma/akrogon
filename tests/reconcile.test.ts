@@ -374,7 +374,15 @@ for (const refusal of ['dirty', 'mid-rebase', 'live tab', 'live cwd', 'batch'] a
         refusal === 'batch'
           ? {
               worktree: old,
-              batch: { attempt: 'a1', built_on: 'x', holder: { base: 'x', head: 'x' }, applied: false },
+              // The pass now releases a dead record before cleanup runs; a live command-owned
+              // land attempt keeps the record, and the record keeps the old worktree.
+              batch: {
+                attempt: 'a1',
+                built_on: 'x',
+                holder: { base: 'x', head: 'x' },
+                applied: false,
+                owner: 'command',
+              },
             }
           : { worktree: old };
       const slug: string = `stay-${refusal.replace(' ', '-')}`;
@@ -389,6 +397,11 @@ for (const refusal of ['dirty', 'mid-rebase', 'live tab', 'live cwd', 'batch'] a
         saveState(path, { ...readState(path), tab: 'akstaylivetab1' });
       }
       if (refusal === 'live cwd') await paneAt(f, old);
+      if (refusal === 'batch')
+        writeFileSync(
+          f.systemctl.db,
+          JSON.stringify({ units: [{ unit: 'akrogon-land-a1.service', sub: 'running' }] }),
+        );
       await next(f, [slug]);
       expect(existsSync(old)).toBe(true);
       expect(readState(path).worktree).toBe(old);
