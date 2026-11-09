@@ -156,9 +156,6 @@ function greenRun(repo: Repo, tree: string, expected: readonly NamedCommand[]): 
   );
 }
 
-// A failed test name stands in for "no names" when the log is missing or names none.
-const noTestNames: readonly string[] = ['(no test name)', '(log gone)'];
-
 // A completed merge head run is checked against the normal; base comparisons
 // and unfinished passes never are.
 function slowChecked(run: VerifyRun): boolean {
@@ -188,6 +185,8 @@ function minutes(ms: number): number {
 // One eligible head row passes when it holds at least one red entry and every red entry's failed
 // names also fail the same command on a completed base run linked from that head at the merge-base;
 // a blocked entry never ran on the head and needs no cover, and a base entry at exit 0 never covers.
+// A head entry whose log is gone is never covered; a head entry naming no test is covered only by a
+// base entry of the same command also naming none, so a named-vs-nameless pair never covers.
 async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Promise<boolean> {
   const runs: VerifyRun[] = readVerifyRuns(repo);
   const expected: NamedCommand[] = verifyCommands(repo.config, scope);
@@ -203,7 +202,7 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
         if (entry.exit === 0 || entry.blocked !== undefined) continue;
         red += 1;
         const names: string[] = await failedTests(repo, entry.log);
-        if (names.some((name) => noTestNames.includes(name))) return false;
+        if (names.includes('(log gone)')) return false;
         const onCoveredBase = async (): Promise<boolean> => {
           for (const baseRun of runs.filter(
             (run) => run.compares === head.run && run.sha === mergeBase && completed(run),
