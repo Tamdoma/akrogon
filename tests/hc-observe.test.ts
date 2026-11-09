@@ -54,8 +54,8 @@ async function seat(
   return z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
 }
 
-function seatLabels(slug: string, letter: 'a' | 'b'): Record<string, string> {
-  return { akrogon: '1', 'akrogon.repo': 'repo', 'akrogon.leaf': slug, 'akrogon.seat': letter };
+function seatLabels(f: Fixture, slug: string, letter: 'a' | 'b'): Record<string, string> {
+  return { akrogon: '1', 'akrogon.repo': f.repo, 'akrogon.leaf': slug, 'akrogon.seat': letter };
 }
 
 // hc ends a terminal's own event stream at loss and announces the keep shell on the session stream.
@@ -106,7 +106,7 @@ test('observe prints each recorded leaf from its hc seats in the repo session', 
     const now: string = new Date().toISOString();
 
     // Status words come from hc; a terminal that never reported prints unknown.
-    const nullA: string = await seat(core, seatLabels('ob-null', 'a'), ['sleep', '600']);
+    const nullA: string = await seat(core, seatLabels(f, 'ob-null', 'a'), ['sleep', '600']);
     leaf(f, 'ob-null', 'implement', { seat: { A: ref(nullA) } });
 
     // A working seat whose transcript the resolver knows (label) prints its path; one it cannot
@@ -114,8 +114,8 @@ test('observe prints each recorded leaf from its hc seats in the repo session', 
     const log: string = resolve(f.home, 'pi/sessions/pi-session.jsonl');
     mkdirSync(dirname(log), { recursive: true });
     copyFileSync(resolve(scripts, 'fixtures/pi-session.jsonl'), log);
-    const workA: string = await seat(core, seatLabels('ob-work', 'a'), working);
-    const workB: string = await seat(core, seatLabels('ob-work', 'b'), working);
+    const workA: string = await seat(core, seatLabels(f, 'ob-work', 'a'), working);
+    const workB: string = await seat(core, seatLabels(f, 'ob-work', 'b'), working);
     expect((await core.hc(['label', workA, `akrogon.transcript=${log}`])).code).toBe(0);
     leaf(f, 'ob-work', 'check.review', {
       attempts: { A: 1, B: 2 },
@@ -125,24 +125,24 @@ test('observe prints each recorded leaf from its hc seats in the repo session', 
     });
 
     // A resolved path whose file is gone is no usable log.
-    const goneA: string = await seat(core, seatLabels('ob-gone', 'a'), working);
+    const goneA: string = await seat(core, seatLabels(f, 'ob-gone', 'a'), working);
     expect((await core.hc(['label', goneA, `akrogon.transcript=${resolve(f.home, 'missing.jsonl')}`])).code).toBe(0);
     leaf(f, 'ob-gone', 'implement', { seat: { A: ref(goneA) } });
 
     // Only a working seat gets a log field.
-    const idleA: string = await seat(core, seatLabels('ob-idle', 'a'), ['fake', '--model', 'idle']);
+    const idleA: string = await seat(core, seatLabels(f, 'ob-idle', 'a'), ['fake', '--model', 'idle']);
     expect((await core.hc(['label', idleA, `akrogon.transcript=${log}`])).code).toBe(0);
     leaf(f, 'ob-idle', 'implement', { seat: { A: ref(idleA) } });
 
     // An exited seat and a seat replaced by hc's keep shell are absent.
-    const exitA: string = await seat(core, seatLabels('ob-exit', 'a'), ['fake', '--model', 'exit']);
+    const exitA: string = await seat(core, seatLabels(f, 'ob-exit', 'a'), ['fake', '--model', 'exit']);
     leaf(f, 'ob-exit', 'implement', { seat: { A: ref(exitA) } });
-    const keepA: string = await seat(core, seatLabels('ob-keep', 'a'), working, true);
+    const keepA: string = await seat(core, seatLabels(f, 'ob-keep', 'a'), working, true);
     leaf(f, 'ob-keep', 'implement', { seat: { A: ref(keepA) } });
 
     // A labelled seat whose address state does not record is not the leaf's seat, and a recorded
     // address whose terminal carries no seat labels is absent.
-    const strayA: string = await seat(core, seatLabels('ob-unrec', 'a'), working);
+    const strayA: string = await seat(core, seatLabels(f, 'ob-unrec', 'a'), working);
     const plainA: string = await seat(core, {}, working);
     leaf(f, 'ob-unrec', 'implement', { seat: { A: ref(plainA) } });
 
@@ -150,7 +150,7 @@ test('observe prints each recorded leaf from its hc seats in the repo session', 
     leaf(f, 'ob-absent', 'implement', { seat: { A: ref('t999') } });
 
     // A seat recorded in another session is absent here.
-    const otherA: string = await seat(core, seatLabels('ob-elsewhere', 'a'), working);
+    const otherA: string = await seat(core, seatLabels(f, 'ob-elsewhere', 'a'), working);
     leaf(f, 'ob-elsewhere', 'implement', { seat: { A: ref(otherA, 'akt-elsewhere') } });
 
     // State-only fields keep their format.
@@ -179,7 +179,7 @@ test('observe prints each recorded leaf from its hc seats in the repo session', 
         slug: 'shallow-leaf',
         phase: 'implement',
         created: '2026-09-10',
-        repo: 'repo',
+        repo: f.repo,
         'blocked-by': [],
       }),
     );

@@ -404,7 +404,7 @@ test.serial('skill steps resolve the akrogon root through the release, never thr
     const global = Bun.YAML.parse(readFileSync(resolve(d.home, 'config.yaml'), 'utf8')) as {
       repos: { [key: string]: string };
     };
-    const workspace: string | undefined = global.repos['akrogon'];
+    const workspace: string | undefined = global.repos[d.f.repo];
     expect(workspace).toBeDefined();
     expect(realpathSync(workspace as string)).toBe(realpathSync(d.f.root));
   } finally {

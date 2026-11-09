@@ -7,7 +7,7 @@ import { chmodSync, existsSync, readFileSync, watch, writeFileSync } from 'node:
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, type Fixture } from './helpers';
-import { hcCore, setPrefixes, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, type HcCore, type Terminal } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
 
 // Each consultant's task names a key; its hook holds on the fifo go-<key> until the test opens it,
@@ -31,7 +31,6 @@ type Door = { address: string; dir: string };
 
 async function setup(): Promise<{ f: Fixture; core: HcCore }> {
   const f: Fixture = await fixture();
-  setPrefixes(f, { repo: 'rp' });
   const core: HcCore = await hcCore(f);
   writeFileSync(resolve(core.standin, 'hook'), HOOK);
   chmodSync(resolve(core.standin, 'hook'), 0o755);
@@ -79,7 +78,7 @@ async function consult(f: Fixture, core: HcCore, door: Door, letter: string, tas
   );
   expect(started.code).toBe(0);
   const child: Terminal = (await core.terminals({ akrogon: '1' })).filter(
-    (t: Terminal) => t.name === `rp-slot-${letter}`,
+    (t: Terminal) => t.name === `${f.prefix}-slot-${letter}`,
   )[0];
   expect(child.parent).toBe(door.address);
   expect(child.labels['akrogon.seat']).toBe(letter);
@@ -152,13 +151,13 @@ async function trigger(core: HcCore, key: string): Promise<void> {
 }
 
 async function exchange(
-  name: string,
+  name: (f: Fixture) => string,
   letters: [string, string],
   tasks: (door: Door) => [string, string],
   triggers: string[],
 ): Promise<{ f: Fixture; core: HcCore; door: Door; children: Terminal[]; ended: { code: string; json: string } }> {
   const { f, core } = await setup();
-  const door: Door = await startDoor(core, f, name, 1);
+  const door: Door = await startDoor(core, f, name(f), 1);
   const [first, second] = tasks(door);
   const children: Terminal[] = [
     await consult(f, core, door, letters[0], first),
@@ -176,7 +175,7 @@ async function exchange(
 }
 
 test('a consultant report ends the wait at once and arrives as an <hc> message while a sibling still works', async () => {
-  const run = await exchange('rp-door-report', ['b', 'c'], (door) => [`report ${door.address} kb`, 'hold kc'], ['kb']);
+  const run = await exchange((f) => `${f.prefix}-door-report`, ['b', 'c'], (door) => [`report ${door.address} kb`, 'hold kc'], ['kb']);
   try {
     expect(run.ended.code).toBe('0');
     expect((await run.core.get(run.children[1].address)).status?.state).toBe('working');
@@ -195,7 +194,7 @@ test.each([
   ['errored', 'error'],
   ['exited', 'exit'],
 ])('a %s consultant ends the wait at once while a sibling still works', async (_label: string, action: string) => {
-  const run = await exchange(`rp-door-${action}`, ['d', 'e'], () => [`${action} k${action}`, `hold h${action}`], [
+  const run = await exchange((f) => `${f.prefix}-door-${action}`, ['d', 'e'], () => [`${action} k${action}`, `hold h${action}`], [
     `k${action}`,
   ]);
   try {
@@ -208,7 +207,7 @@ test.each([
 });
 
 test('the wait ends when every consultant stopped working without a report', async () => {
-  const run = await exchange('rp-door-stop', ['f', 'g'], () => ['stop kf', 'stop kg'], ['kf', 'kg']);
+  const run = await exchange((f) => `${f.prefix}-door-stop`, ['f', 'g'], () => ['stop kf', 'stop kg'], ['kf', 'kg']);
   try {
     expect(run.ended.code).toBe('0');
     for (const child of run.children) expect((await run.core.get(child.address)).status?.state).not.toBe('working');
@@ -222,7 +221,7 @@ test('the wait ends when every consultant stopped working without a report', asy
 test('a re-armed wait ignores the report it already woke on and ends on the next consultant news', async () => {
   const { f, core } = await setup();
   try {
-    const door: Door = await startDoor(core, f, 'rp-door-rearm', 2);
+    const door: Door = await startDoor(core, f, `${f.prefix}-door-rearm`, 2);
     const reporter: Terminal = await consult(f, core, door, 'h', `report ${door.address} kh`);
     const blocker: Terminal = await consult(f, core, door, 'i', 'block ki');
     expect((await core.hc(['send', door.address, 'go'])).code).toBe(0);

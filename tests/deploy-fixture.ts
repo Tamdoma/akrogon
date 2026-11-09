@@ -46,7 +46,7 @@ export async function deployFixture(): Promise<DeployFixture> {
   await command(['git', 'fetch', 'origin', 'main'], f.root);
   await command(['git', 'merge', '--ff-only', 'origin/main'], f.root);
   const global = Bun.YAML.parse(readFileSync(resolve(home, 'config.yaml'), 'utf8')) as object;
-  writeFileSync(resolve(home, 'config.yaml'), Bun.YAML.stringify({ ...global, repos: { akrogon: f.root } }));
+  writeFileSync(resolve(home, 'config.yaml'), Bun.YAML.stringify({ ...global, repos: { [f.repo]: f.root } }));
   const proc = procFixture(f);
   symlinkSync(resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(home, 'bin/systemctl'));
   const env: NodeJS.ProcessEnv = {

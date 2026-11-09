@@ -34,7 +34,6 @@ async function next(
 // hc cases: the repo's session is the one whose herdr-app document holds a space named after the repo.
 async function hcSetup(): Promise<Fixture> {
   const f: Fixture = await fixture();
-  setPrefixes(f, { repo: 'rp' });
   setSeat(f, 'a', 'fake', 'work');
   return f;
 }
@@ -124,7 +123,7 @@ test('refuses missing and duplicate repo spaces while naming searched and skippe
 
 test('a refused repo reports once in --all while a healthy repo still dispatches', async () => {
   const f: Fixture = await hcSetup();
-  setPrefixes(f, { repo: 'rp', second: 'sc' });
+  setPrefixes(f, { [f.repo]: f.prefix, second: 'sc' });
   // Only `second` has a space; `repo` has none anywhere.
   const core: HcCore = await hcCore(f, { repo: 'second' });
   try {
@@ -150,7 +149,7 @@ test('a refused repo reports once in --all while a healthy repo still dispatches
       'blocked-by': [],
     });
     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as Record<string, unknown>;
-    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, second } });
+    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { [f.repo]: f.root, second } });
     leaf(f, 'blocked-repo', 'plan.synthesis');
     // --all sweeps only the current checkout's repo when run inside one; run
     // from f.home so both registered repos are swept.
@@ -188,7 +187,7 @@ test('skips a stopped session and a dead socket, and an unreadable session refus
     const dispatched: Result = await cli(f, ['next', 'skipped'], f.root, live.env);
     expect(dispatched.code).toBe(0);
     expect((await live.terminals({ 'akrogon.leaf': 'skipped' })).map((t: Terminal) => t.name)).toEqual([
-      'rp-skipped-a',
+      `${f.prefix}-skipped-a`,
     ]);
     expect(await listening(down.socket)).toBe(false);
 
@@ -257,7 +256,7 @@ test('the busy notice lands in the session holding the repo space', async () => 
     saveState(path, { ...readState(path), busy_since: { A: new Date(Date.now() - 61 * 60000).toISOString() } });
     expect((await cli(f, ['next', 'routed2'], f.root, env)).code).toBe(0);
     expect(noticeFiles(f.core).map((notice) => notice.title)).toEqual([
-      expect.stringContaining('Busy leaf: repo/routed2 seat A'),
+      expect.stringContaining(`Busy leaf: ${f.repo}/routed2 seat A`),
     ]);
     expect(noticeFiles(decoy)).toEqual([]);
   } finally {
@@ -386,7 +385,7 @@ test('phase renames and the failed notice carry the resolved session', async () 
       f.env,
     );
     expect(moved.code).toBe(0);
-    expect(noticeFiles(f.core).map((notice) => notice.title)).toEqual(['repo/renamed failed']);
+    expect(noticeFiles(f.core).map((notice) => notice.title)).toEqual([`${f.repo}/renamed failed`]);
     expect(noticeFiles(decoy)).toEqual([]);
     expect(renames('renamed failed')).toEqual([f.core.appHome]);
     // Recovery renames back in the same session.
@@ -432,7 +431,7 @@ test('the merge notice lands in the session holding the repo space', async () =>
     });
     const result: Result = await cli(f, ['next', '--all'], f.root, env);
     expect(result.code).toBe(0);
-    expect(noticeFiles(f.core).map((notice) => notice.title)).toEqual(['repo/failed-merge merged, move it back']);
+    expect(noticeFiles(f.core).map((notice) => notice.title)).toEqual([`${f.repo}/failed-merge merged, move it back`]);
     expect(noticeFiles(decoy)).toEqual([]);
   } finally {
     await decoy.stop();
@@ -467,7 +466,7 @@ test('the main-red notice lands in the running session holding the repo space', 
     await cli(f, ['verify', '--known-red'], worktree, { ...core.env, HC_SESSION: decoy.session });
     const receipt: string = readFileSync(resolve(f.root, 'issues/verify-runs.jsonl'), 'utf8');
     expect(receipt).toContain('"notice":"pending"');
-    expect(noticeFiles(core).map((notice) => notice.title)).toEqual(['repo main red']);
+    expect(noticeFiles(core).map((notice) => notice.title)).toEqual([`${f.repo} main red`]);
     expect(noticeFiles(decoy)).toEqual([]);
   } finally {
     await decoy.stop();

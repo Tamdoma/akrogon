@@ -3,11 +3,10 @@ import { test, expect } from 'bun:test';
 import { writeFileSync } from 'node:fs';
 import { z } from 'zod';
 import { cli, fakeSystemctl, fixture, type Fixture } from './helpers';
-import { hcCore, setPrefixes, type HcCore } from './hc-fixture';
+import { hcCore, type HcCore } from './hc-fixture';
 
 test('status reports the listener live or down without changing its exit or attention', async () => {
   const f: Fixture = await fixture();
-  setPrefixes(f, { repo: 'rp' });
   const core: HcCore = await hcCore(f);
   const systemctl = fakeSystemctl(f);
   const env: NodeJS.ProcessEnv = { ...core.env, ...systemctl.env };

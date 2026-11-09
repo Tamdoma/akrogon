@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { fixture, type Fixture } from './helpers';
-import { hcCore, setPrefixes, type HcCore } from './hc-fixture';
+import { hcCore, type HcCore } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
 
 const agent: string = resolve(import.meta.dir, 'door-agent.ts');
@@ -121,7 +121,6 @@ function logged(log: string, step: string, ms: number = 15_000): Promise<Step> {
 
 async function startA(kind: Kind, mode: 'switch' | 'noswitch'): Promise<Run> {
   const f: Fixture = await fixture();
-  setPrefixes(f, { repo: 'rp' });
   const core: HcCore = await hcCore(f);
   const out: string = resolve(f.home, `door-${kind}`);
   mkdirSync(resolve(out, 'tmp'), { recursive: true });
@@ -132,7 +131,7 @@ async function startA(kind: Kind, mode: 'switch' | 'noswitch'): Promise<Run> {
     '--json',
     '--no-parent',
     '--name',
-    'rp-door-a',
+    `${f.prefix}-door-a`,
     '--cwd',
     f.root,
     '--',
@@ -262,7 +261,6 @@ test('claude: a label naming a transcript that is gone gives way to the conversa
 
 test('claude: a session the record names wins over an older label even before its file is written', async () => {
   const f: Fixture = await fixture();
-  setPrefixes(f, { repo: 'rp' });
   const core: HcCore = await hcCore(f);
   try {
     const projects: string = resolve(f.home, '.claude/projects/-repo');

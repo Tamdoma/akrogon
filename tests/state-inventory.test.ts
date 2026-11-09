@@ -71,7 +71,7 @@ test('one bad leaf stops only itself: next, phase, config, run-check and status 
 
     const config: Result = await cli(f, ['config'], worktree, f.env);
     expect(config.code).toBe(0);
-    expect(Bun.YAML.parse(config.stdout)).toMatchObject({ repo: 'repo' });
+    expect(Bun.YAML.parse(config.stdout)).toMatchObject({ repo: f.repo });
 
     const check: Result = await cli(
       f,
@@ -99,15 +99,16 @@ test('one bad leaf stops only itself: next, phase, config, run-check and status 
 for (const variant of [
   {
     name: 'unknown top-level key',
-    body: 'slug: bad-leaf\nphase: plan.synthesis\ncreated: 2026-10-19\nrepo: repo\nblocked-by: []\nnotes: stray\n',
+    body: (f: HcFixture) =>
+      `slug: bad-leaf\nphase: plan.synthesis\ncreated: 2026-10-19\nrepo: ${f.repo}\nblocked-by: []\nnotes: stray\n`,
   },
-  { name: 'invalid known value', body: 'slug: bad-leaf\nphase: not-a-phase\n' },
-  { name: 'malformed YAML', body: 'slug: [' },
+  { name: 'invalid known value', body: () => 'slug: bad-leaf\nphase: not-a-phase\n' },
+  { name: 'malformed YAML', body: () => 'slug: [' },
 ]) {
   test(`isolation holds when the bad leaf has ${variant.name}`, async () => {
     const f: HcFixture = await hcFixture();
     try {
-      const bad: string = makeBad(f, 'bad-leaf', variant.body);
+      const bad: string = makeBad(f, 'bad-leaf', variant.body(f));
       leaf(f, 'healthy', 'plan.synthesis');
       const result: Result = await next(f, ['healthy']);
       expect(result.code).toBe(1);
@@ -217,7 +218,7 @@ test('a bad leaf is never dispatched or queued but stays owned: reconcile keeps 
     expect(existsSync(badWorktree)).toBe(true);
     expect(await liveTabs(f)).toContain(badTab);
     const keptReport: { kept: { path: string; reason: string }[] } = JSON.parse(
-      readFileSync(resolve(f.home, 'reconcile', 'repo.json'), 'utf8'),
+      readFileSync(resolve(f.home, 'reconcile', `${f.repo}.json`), 'utf8'),
     );
     expect(keptReport.kept.some((entry) => entry.path === badWorktree && entry.reason === 'unknown directory')).toBe(
       true,

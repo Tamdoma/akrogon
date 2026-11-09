@@ -101,7 +101,7 @@ test('stop records the leaf, then stops its leaf slice and keeps the worktree', 
     const worktree: string = z.string().parse(readState(path).worktree);
     const stopped: Result = await run(f, ['stop', 'build']);
     expect(stopped.code).toBe(0);
-    expect(stoppedKeys(f)).toEqual(['repo/build']);
+    expect(stoppedKeys(f)).toEqual([`${f.repo}/build`]);
     expect(systemctlCalls(f)).toEqual([`--user stop ${slice(path)}`]);
     expect(existsSync(worktree)).toBe(true);
     expect(readState(path).phase).toBe('plan.synthesis');
@@ -169,11 +169,11 @@ test('a failed slice stop keeps the record, prints the error, exits non-zero and
     expect(failed.code).not.toBe(0);
     expect(failed.stderr).toContain(slice(path));
     expect(failed.stderr).toContain('fake failure');
-    expect(stoppedKeys(f)).toEqual(['repo/build']);
+    expect(stoppedKeys(f)).toEqual([`${f.repo}/build`]);
     const retried: Result = await run(f, ['stop', 'build']);
     expect(retried.code).toBe(0);
     expect(systemctlCalls(f)).toEqual([`--user stop ${slice(path)}`, `--user stop ${slice(path)}`]);
-    expect(stoppedKeys(f)).toEqual(['repo/build']);
+    expect(stoppedKeys(f)).toEqual([`${f.repo}/build`]);
   } finally {
     await f.clean();
   }
@@ -190,7 +190,7 @@ test('stop --all stops every allocated leaf, reports each, and one failure does 
     expect(`${all.stdout}\n${all.stderr}`).toContain('aa');
     expect(`${all.stdout}\n${all.stderr}`).toContain('bb');
     expect(systemctlCalls(f).sort()).toEqual([`--user stop ${slice(aa)}`, `--user stop ${slice(bb)}`].sort());
-    expect(stoppedKeys(f)).toEqual(['repo/aa', 'repo/bb']);
+    expect(stoppedKeys(f)).toEqual([`${f.repo}/aa`, `${f.repo}/bb`]);
   } finally {
     await f.clean();
   }
@@ -293,13 +293,13 @@ test('stop --all skips merged and closed leaves that keep their tab', async () =
       slug: 'done',
       phase: 'merged',
       created: '2026-09-10',
-      repo: 'repo',
+      repo: f.repo,
       'blocked-by': [],
       tab: 'akclosedtab',
     });
     const all: Result = await run(f, ['stop', '--all']);
     expect(all.code).toBe(0);
-    expect(stoppedKeys(f)).toEqual(['repo/live']);
+    expect(stoppedKeys(f)).toEqual([`${f.repo}/live`]);
     expect(systemctlCalls(f)).toEqual([`--user stop ${slice(live)}`]);
   } finally {
     await f.clean();
