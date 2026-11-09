@@ -61,7 +61,9 @@ export function unitBin(f: Fixture): string {
 }
 export async function fixture(): Promise<Fixture> {
   const home: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-')));
-  const root: string = resolve(home, 'repo');
+  // The repo dir's basename is the registered name: `akrogon init` names a repo basename(root),
+  // so a re-init of the fixture root stays idempotent under this identity.
+  const root: string = resolve(home, basename(home));
   mkdirSync(resolve(root, 'issues/open'), { recursive: true });
   await command(['git', 'init', '-b', 'main', root]);
   await command(['git', 'config', 'user.email', 'test@example.invalid'], root);

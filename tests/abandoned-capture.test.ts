@@ -4,8 +4,11 @@ import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { finishCaptured, quote, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import type { Captured } from '../src/shell';
-import { cli, entry, procFixture, fixture, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
+import { cli, entry, procFixture, fixture, leaf, leafTempRoot, verified, yaml, type Fixture } from './helpers';
 import { hcCore, type HcCore } from './hc-fixture';
+import { command } from '../src/shell';
+import { readState } from '../src/state';
+import { z } from 'zod';
 
 type Live = { proc: Bun.Subprocess; captured: Captured; result: Promise<SpawnResult> };
 
@@ -232,6 +235,14 @@ test('an abandoned capture pair refuses non-failed moves, and a non-blank cleare
     expect(failed.code, failed.stderr).toBe(0);
     const recovered: Result = await cli(f, ['phase', 'abandoned', 'implement'], f.root, core.env);
     expect(recovered.code, recovered.stderr).toBe(0);
+    // Recovery wakes a dispatch under the real core, which now allocates the leaf worktree (the
+    // fixture registers a prefix for its repo), so the check gate needs a cited commit plus a
+    // green receipt on its head; on base the allocate step refused for a missing prefix.
+    const leafWorktree: string = z.string().parse(readState(leafPath).worktree);
+    writeFileSync(resolve(leafWorktree, 'abandoned.txt'), 'recovered\n');
+    await command(['git', 'add', 'abandoned.txt'], leafWorktree);
+    await command(['git', 'commit', '-m', 'abandoned: recovered work'], leafWorktree);
+    await verified(f, 'abandoned', 'leaf');
 
     // A cleared second pair drops out of the refusal; the first still names it.
     writeFileSync(cleared2, 'cleared the second run\n');
