@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cli, fakeAkrogon, leaf, storeDir, yaml, type Fixture, verified, seatOwned } from './helpers';
 import { readState, saveState, type State } from '../src/state';
-import { command, type Result } from '../src/shell';
+import { command, quote, type Result } from '../src/shell';
 import { delivered, hcFixture, type HcFixture } from './hc-fixture';
 
 type Event = { kind: string; slug?: string; [key: string]: unknown };
@@ -342,7 +342,7 @@ test('repo pause event is persisted before its state lock is released', async ()
   try {
     writeFileSync(
       resolve(f.home, 'bin/flock'),
-      '#!/bin/sh\n/usr/bin/flock "$@"\nstatus=$?\nif [ -f "$AKROGON_HOME/repo/issues/timings.jsonl" ]; then\n  cp "$AKROGON_HOME/repo/issues/timings.jsonl" "$AKROGON_HOME/timings-at-unlock.jsonl"\nelse\n  : > "$AKROGON_HOME/timings-at-unlock.jsonl"\nfi\nexit "$status"\n',
+      `#!/bin/sh\n/usr/bin/flock "$@"\nstatus=$?\nif [ -f ${quote(resolve(f.root, 'issues/timings.jsonl'))} ]; then\n  cp ${quote(resolve(f.root, 'issues/timings.jsonl'))} "$AKROGON_HOME/timings-at-unlock.jsonl"\nelse\n  : > "$AKROGON_HOME/timings-at-unlock.jsonl"\nfi\nexit "$status"\n`,
       { mode: 0o755 },
     );
     expect((await cli(f, ['pause'], f.root, f.env)).code).toBe(0);
