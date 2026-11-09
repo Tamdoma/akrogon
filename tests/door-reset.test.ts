@@ -192,8 +192,9 @@ async function reset(run: Run, start: string, env: Record<string, string> = {}):
 // complete and nothing more can reach A.
 async function exited(run: Run, address: string): Promise<void> {
   const waited: SpawnResult = await run.core.hc(['wait', '--json', '--timeout', '15', address]);
-  expect(waited.code).toBe(0);
   const left = (await run.core.terminals({}, true)).find((t) => t.address === address);
+  // --rm removes the terminal at exit; a helper done before wait attaches answers 3 for a gone address.
+  expect(waited.code === 0 || waited.code === 3).toBe(true);
   expect(left === undefined || left.state === 'finished').toBe(true);
 }
 
@@ -320,6 +321,8 @@ test('pi: a label older than the conversation pi started with, or a pi file from
   const run: Run = await startA('pi', 'switch');
   try {
     const folder: string = resolve(run.f.home, '.pi/agent/sessions', `--${run.f.root.replace(/[/.]/g, '-')}--`);
+    // 'working' is reported before the agent opens its first transcript, so the folder may not exist yet.
+    mkdirSync(folder, { recursive: true });
     const left: string = resolve(folder, `1_${randomUUID()}.jsonl`);
     appendFileSync(left, '{}\n');
     utimesSync(left, new Date(0), new Date(0));
