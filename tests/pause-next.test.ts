@@ -129,7 +129,7 @@ function leafIn(root: string, repo: string, slug: string, phase: string, extra: 
 }
 
 test('resume skips the paused repo and still dispatches the unpaused repo', async () => {
-  const f: DispatchFixture = await hcFixture();
+  const f: DispatchFixture = await hcFixture({ occupiedPrefix: 'yp' });
   try {
     leaf(f, 'xleaf', 'plan.synthesis');
     const x: string = resolve(f.root, 'issues/open/issue/xleaf');

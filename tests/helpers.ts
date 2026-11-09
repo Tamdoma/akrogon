@@ -30,10 +30,15 @@ process.on('exit', () => {
 export type Fixture = { home: string; root: string; repo: string; prefix: string; clean: () => void };
 // The fixture's registered repo identity: unique per fixture (mkdtemp suffix) so a run's teardown
 // never stops another fixture's leaf slice; the prefix is two letters derived from home.
-export function fixtureRepo(home: string): { repo: string; prefix: string } {
+export function fixtureRepo(home: string, occupiedPrefix?: string): { repo: string; prefix: string } {
   const digest: Buffer = createHash('sha256').update(home).digest();
-  const prefix: string = [digest[0] % 26, digest[1] % 26].map((n: number) => String.fromCharCode(97 + n)).join('');
-  return { repo: basename(home), prefix };
+  const first: number = digest[0] % 26;
+  const second: number = digest[1] % 26;
+  const prefix: string = String.fromCharCode(97 + first, 97 + second);
+  return {
+    repo: basename(home),
+    prefix: prefix === occupiedPrefix ? String.fromCharCode(97 + ((first + 1) % 26), 97 + second) : prefix,
+  };
 }
 export function leafTempRoot(f: Fixture): string {
   return resolve(f.home, 'leaf-temp');
@@ -59,7 +64,7 @@ export function seedStat(f: Fixture, anon: number, shmem: number = 0): void {
 export function unitBin(f: Fixture): string {
   return resolve(f.home, 'unitbin');
 }
-export async function fixture(): Promise<Fixture> {
+export async function fixture(occupiedPrefix?: string): Promise<Fixture> {
   const home: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-')));
   // The repo dir's basename is the registered name: `akrogon init` names a repo basename(root),
   // so a re-init of the fixture root stays idempotent under this identity.
@@ -76,7 +81,7 @@ export async function fixture(): Promise<Fixture> {
   await command(['git', 'remote', 'add', 'origin', resolve(home, 'remote.git')], root);
   await command(['git', 'push', 'origin', 'HEAD:main'], root);
   yaml(resolve(root, 'issues/config.yaml'), { checks: { test: 'bun test' }, grounding: 'none' });
-  const identity: { repo: string; prefix: string } = fixtureRepo(home);
+  const identity: { repo: string; prefix: string } = fixtureRepo(home, occupiedPrefix);
   yaml(resolve(home, 'config.yaml'), {
     slots: {
       a: { harness: 'fake', model: 'strong-a', effort: 'high' },

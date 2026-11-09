@@ -15,7 +15,7 @@ type Cap = { proc: Bun.Subprocess; result: Promise<SpawnResult> };
 
 test('a repo-local pass preserves another registered repo slice with a live tab', async () => {
   const f: SliceFixture = await slicesFixture();
-  const other: Fixture = await fixture();
+  const other: Fixture = await fixture(f.prefix);
   const otherCore: HcCore = await hcCore(other, { repo: other.repo });
   try {
     const config: GlobalConfig = globalSchema.parse(

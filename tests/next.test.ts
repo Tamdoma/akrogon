@@ -106,7 +106,7 @@ async function seatIdle(f: HcFixture, address: string, turn: number): Promise<Te
 }
 // A second registered repo on its own fixture core, linked so akrogon sees both sessions.
 async function otherRepo(f: HcFixture): Promise<HcFixture> {
-  const g: Fixture = await fixture();
+  const g: Fixture = await fixture(f.prefix);
   const core: HcCore = await hcCore(g, { repo: g.repo });
   f.core.link(core);
   // akrogon runs with HOME at f.home, so the other session's herdr-app home lives there too (plan D12).

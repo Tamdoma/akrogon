@@ -32,8 +32,8 @@ async function next(
 }
 
 // hc cases: the repo's session is the one whose herdr-app document holds a space named after the repo.
-async function hcSetup(): Promise<Fixture> {
-  const f: Fixture = await fixture();
+async function hcSetup(occupiedPrefix?: string): Promise<Fixture> {
+  const f: Fixture = await fixture(occupiedPrefix);
   setSeat(f, 'a', 'fake', 'work');
   return f;
 }
@@ -122,7 +122,7 @@ test('refuses missing and duplicate repo spaces while naming searched and skippe
 }, 30000);
 
 test('a refused repo reports once in --all while a healthy repo still dispatches', async () => {
-  const f: Fixture = await hcSetup();
+  const f: Fixture = await hcSetup('sc');
   setPrefixes(f, { [f.repo]: f.prefix, second: 'sc' });
   // Only `second` has a space; `repo` has none anywhere.
   const core: HcCore = await hcCore(f, { repo: 'second' });

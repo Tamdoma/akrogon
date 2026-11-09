@@ -374,8 +374,10 @@ export type HcFixture = Omit<Fixture, 'clean'> & {
 // from reconcile or `stop` would end the seats of a concurrent case with the same slug. It sits in
 // its own folder after the fixture's bin/, so a test's own bin/systemctl stub wins and never
 // writes through to the shared fake.
-export async function hcFixture(opts: { mode?: string; window?: 'open' | 'closed' } = {}): Promise<HcFixture> {
-  const f: Fixture = await fixture();
+export async function hcFixture(
+  opts: { mode?: string; window?: 'open' | 'closed'; occupiedPrefix?: string } = {},
+): Promise<HcFixture> {
+  const f: Fixture = await fixture(opts.occupiedPrefix);
   setSeat(f, 'a', 'fake', opts.mode ?? 'work');
   setSeat(f, 'b', 'fake', opts.mode ?? 'work');
   const bin: string = resolve(f.home, 'bin');
