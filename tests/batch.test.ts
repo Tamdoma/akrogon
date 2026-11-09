@@ -118,7 +118,7 @@ async function batchFixture(): Promise<{ f: Fixture; repo: Repo; builtOn: string
   await command(['git', 'add', '.'], f.root);
   await command(['git', 'commit', '-m', 'main-advance'], f.root);
   await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
-  const repo: Repo = readRepo('repo', f.root);
+  const repo: Repo = readRepo(f.repo, f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
   return { f, repo, builtOn };
 }
@@ -153,7 +153,7 @@ async function lessonsFixture(): Promise<{ f: Fixture; repo: Repo; builtOn: stri
   await command(['git', 'commit', '-m', 'gamma'], f.root);
   await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
-  return { f, repo: readRepo('repo', f.root), builtOn, base };
+  return { f, repo: readRepo(f.repo, f.root), builtOn, base };
 }
 
 test.serial('buildStack re-removes a retired lesson line the union merge resurrects', async () => {
@@ -279,7 +279,7 @@ test.serial('buildStack refuses a store path under an ancestor holding node_modu
       worktree_root: resolve(f.home, 'bad/trees'),
       grounding: 'none',
     });
-    const dirty: Repo = readRepo('repo', f.root);
+    const dirty: Repo = readRepo(f.repo, f.root);
     await expect(buildStack(dirty, builtOn, builtOn)).rejects.toThrow(realpathSync(bad));
     expect(existsSync(resolve(bad, 'trees'))).toBe(false);
     expect(await command(['git', 'worktree', 'list', '--porcelain'], f.root)).not.toContain('batch-');
@@ -331,7 +331,7 @@ exec '${git}' "$@"
       driver,
       `import { buildStack } from '${resolve(import.meta.dir, '../src/batch')}';
 import { readRepo } from '${resolve(import.meta.dir, '../src/config')}';
-const repo = readRepo('repo', process.argv[2]!);
+const repo = readRepo(${JSON.stringify(f.repo)}, process.argv[2]!);
 const result = await buildStack(repo, process.argv[3]!, process.argv[3]!);
 console.log(JSON.stringify(result));
 `,

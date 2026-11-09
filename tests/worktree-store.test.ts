@@ -99,7 +99,7 @@ test('buildStack rebases the holder inside a sparse store checkout that is remov
       script,
       `const { readRepo } = await import(${JSON.stringify(resolve(import.meta.dir, '../src/config.ts'))});
 const { buildStack } = await import(${JSON.stringify(resolve(import.meta.dir, '../src/batch.ts'))});
-const repo = readRepo('repo', ${JSON.stringify(f.root)});
+const repo = readRepo(${JSON.stringify(f.repo)}, ${JSON.stringify(f.root)});
 const built = await buildStack(repo, ${JSON.stringify(moved)}, ${JSON.stringify(holder)});
 if (!built.ok) throw new Error('holder does not rebase onto main');
 console.log(built.top);

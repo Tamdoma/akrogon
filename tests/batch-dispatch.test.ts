@@ -192,7 +192,7 @@ test('a failed holder with a landed candidate is told to move back, then reconci
     resetPrompts(f);
     expect((await next(f, ['--all'])).code).toBe(1);
     expect(noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }))).toEqual([
-      { title: 'repo/aa merged, move it back', body: 'next: akrogon phase aa merge', attention: true },
+      { title: `${f.repo}/aa merged, move it back`, body: 'next: akrogon phase aa merge', attention: true },
     ]);
     expect(readState(aa.path).phase).toBe('failed');
     expect(readState(aa.path).batch?.candidate).toBe(top);
@@ -310,7 +310,7 @@ test('cleanup retains a merged holder worktree while publication recovery is blo
     await command(['git', 'push', 'origin', state.batch!.top! + ':main'], f.root);
     const published: State = { ...state, batch: { ...state.batch!, candidate: state.batch!.top } };
     saveState(holder.path, published);
-    await commitMove(readRepo('repo', f.root), { path: holder.path, state: published }, published, 'merged', null);
+    await commitMove(readRepo(f.repo, f.root), { path: holder.path, state: published }, published, 'merged', null);
     await command(['git', 'remote', 'rename', 'origin', 'elsewhere'], f.root);
     expect((await next(f, ['--all'])).code).toBe(1);
     expect(leafState(holder.path).batch?.attempt).toBe(state.batch!.attempt);

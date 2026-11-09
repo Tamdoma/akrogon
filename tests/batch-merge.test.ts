@@ -26,7 +26,7 @@ test.serial('restack preserves a holder retirement the union merge resurrects', 
   try {
     process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
     process.env.HOME = f.home;
-    const repo: Repo = readRepo('repo', f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
     const alpha: string = '- alpha. 2026-10-09. history/alpha.md\n';
     const beta: string = '- beta. 2026-10-09. history/beta.md\n';
     const gamma: string = '- gamma. 2026-10-10. history/gamma.md\n';
@@ -138,7 +138,7 @@ async function branchAt(
 async function batchFixture(f: Fixture, top: boolean = true): Promise<BatchFixture> {
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
   process.env.HOME = f.home;
-  const repo: Repo = readRepo('repo', f.root);
+  const repo: Repo = readRepo(f.repo, f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
   const branch: Branch = await branchAt(f, 'hold', builtOn, 'file-hold');
   const holderPath: string = leaf(f, 'hold', 'merge', {

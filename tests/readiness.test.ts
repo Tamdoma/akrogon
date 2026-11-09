@@ -97,7 +97,7 @@ function global(f: Fixture): GlobalConfig {
       b: { harness: 'fake', model: 'm', effort: 'medium' },
     },
     harnesses: { fake: 'fake --model {model}' },
-    repos: { repo: f.root },
+    repos: { [f.repo]: f.root },
     toolkits: {},
   };
 }
@@ -145,7 +145,7 @@ test('holderRoot resolves registered keys and absolute paths, refuses the rest',
   const f: Fixture = await fixture();
   try {
     const g: GlobalConfig = global(f);
-    expect(holderRoot(g, 'repo')).toBe(realpathSync(f.root));
+    expect(holderRoot(g, f.repo)).toBe(realpathSync(f.root));
     const dir: string = resolve(f.home, 'outside');
     expect(holderRoot(g, dir)).toBe(dir);
     expect(() => holderRoot(g, 'ghost')).toThrow(/ghost/);
@@ -167,8 +167,9 @@ test('readReadiness returns null without readiness.yaml', async () => {
 test('readReadiness returns the parsed readiness for a valid file', async () => {
   const f: Fixture = await fixture();
   try {
-    yaml(resolve(f.root, 'readiness.yaml'), complete);
-    expect(readReadiness(f.root)).toEqual(readinessSchema.parse(complete));
+    const bound: object = { ...complete, inputs: complete.inputs.map((input) => ({ ...input, holder: f.repo })) };
+    yaml(resolve(f.root, 'readiness.yaml'), bound);
+    expect(readReadiness(f.root)).toEqual(readinessSchema.parse(bound));
   } finally {
     f.clean();
   }
@@ -200,9 +201,9 @@ test('gaps reports an env input when .env is absent, the name is missing or the 
   const f: Fixture = await fixture();
   try {
     const g: GlobalConfig = global(f);
-    const input: Readiness['inputs'][number] = readinessSchema.parse(complete).inputs[0];
+    const input: Readiness['inputs'][number] = { ...readinessSchema.parse(complete).inputs[0], holder: f.repo };
     const readiness: Readiness = readinessSchema.parse({ ...complete, inputs: [input] });
-    const gap: Gap = { kind: 'env', name: 'API_KEY', holder: 'repo', steps: input.steps };
+    const gap: Gap = { kind: 'env', name: 'API_KEY', holder: f.repo, steps: input.steps };
 
     expect(gaps(g, readiness)).toEqual([gap]);
 
@@ -226,9 +227,9 @@ test('gaps reports a file input when the file is absent or zero bytes', async ()
   const f: Fixture = await fixture();
   try {
     const g: GlobalConfig = global(f);
-    const input: Readiness['inputs'][number] = readinessSchema.parse(complete).inputs[1];
+    const input: Readiness['inputs'][number] = { ...readinessSchema.parse(complete).inputs[1], holder: f.repo };
     const readiness: Readiness = readinessSchema.parse({ ...complete, inputs: [input] });
-    const gap: Gap = { kind: 'file', name: 'cert.pem', holder: 'repo', steps: input.steps };
+    const gap: Gap = { kind: 'file', name: 'cert.pem', holder: f.repo, steps: input.steps };
     const file: string = resolve(f.root, 'cert.pem');
 
     expect(gaps(g, readiness)).toEqual([gap]);

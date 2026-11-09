@@ -121,7 +121,7 @@ test('verify runs every leaf check on a fresh checkout of HEAD, keeps logs and w
     const result: Result = await verify(f, [], worktree);
     expect(result.code).toBe(1);
     const run: VerifyRun = records(f)[0];
-    expect(run).toMatchObject({ repo: 'repo', leaf: 'caller', sha, scope: 'leaf' });
+    expect(run).toMatchObject({ repo: f.repo, leaf: 'caller', sha, scope: 'leaf' });
     expect(run.commands.map((item) => [item.name, item.exit])).toEqual([
       ['probe', 0],
       ['red', 7],
@@ -325,7 +325,7 @@ test('a failed setup with no configured checks exits red and its receipt is refu
     const sha: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     expect((await verify(f, [], worktree)).code).not.toBe(0);
     expect(records(f)[0]).toMatchObject({ sha, scope: 'leaf', setup: 7, commands: [] });
-    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).rejects.toThrow(
+    await expect(requireGreenReceipt(readRepo(f.repo, f.root), sha, 'leaf')).rejects.toThrow(
       'No green leaf verify receipt',
     );
   } finally {
@@ -342,7 +342,7 @@ test('known-red refuses a failed head setup when the base setup passes and no ch
     const result: Result = await verify(f, ['--known-red'], worktree);
     expect(records(f)[0]).toMatchObject({ setup: 1, commands: [] });
     expect(result.code).toBe(1);
-    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).rejects.toThrow(
+    await expect(requireGreenReceipt(readRepo(f.repo, f.root), sha, 'leaf')).rejects.toThrow(
       'No green leaf verify receipt',
     );
   } finally {
@@ -364,7 +364,7 @@ test('a green receipt covers another commit with the same tree and command set w
     expect(reused.code).toBe(0);
     expect(reused.stdout).toBe(`reuse receipt ${records(f)[0].run} tree=${tree}`);
     expect(records(f)).toHaveLength(1);
-    await requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf');
+    await requireGreenReceipt(readRepo(f.repo, f.root), sha, 'leaf');
   } finally {
     f.clean();
   }
@@ -378,7 +378,7 @@ test('a green receipt is refused for a different tree', async () => {
     await commitIn(worktree, 'code.ts');
     expect((await verify(f, [], worktree)).code).toBe(0);
     const changed: string = await commitIn(worktree, 'other.ts');
-    await expect(requireGreenReceipt(readRepo('repo', f.root), changed, 'leaf')).rejects.toThrow(
+    await expect(requireGreenReceipt(readRepo(f.repo, f.root), changed, 'leaf')).rejects.toThrow(
       `No green leaf verify receipt for ${changed}`,
     );
   } finally {
@@ -394,7 +394,7 @@ test('a green receipt is refused under a different command set and verify runs a
     const sha: string = await commitIn(worktree, 'code.ts');
     expect((await verify(f, [], worktree)).code).toBe(0);
     config(f, { checks: { unit: 'echo unit changed' } });
-    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).rejects.toThrow(
+    await expect(requireGreenReceipt(readRepo(f.repo, f.root), sha, 'leaf')).rejects.toThrow(
       `No green leaf verify receipt for ${sha}`,
     );
     expect((await verify(f, [], worktree)).code).toBe(0);
@@ -532,7 +532,7 @@ test('a linked pair fails to satisfy requireGreenReceipt with unnamed or unlinke
     const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], worktree);
     const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
     const baseTree: string = await command(['git', 'rev-parse', `${base}^{tree}`], f.root);
-    const repo: Repo = readRepo('repo', f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
     const cmds: { name: string; command: string }[] = verifyCommands(repo.config, 'leaf');
     const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
     const log = (name: string, content: string): string => {
@@ -659,7 +659,7 @@ test('a fresh red base run writes one main-red notice and records it pending', a
     const baseRun: VerifyRun = baseRecord(f, head);
     expect(noticesOf(core)).toEqual([
       {
-        title: 'repo main red',
+        title: `${f.repo} main red`,
         body: `1 new red on main: alpha; receipt ${baseRun.run}; chart a repair`,
         attention: false,
       },
@@ -833,7 +833,7 @@ test('a pending notice whose file outlives its sending process still covers the 
     const baseTree: string = await command(['git', 'rev-parse', `${base}^{tree}`], f.root);
     const log: string = resolve(leafPath, 'red.log');
     writeFileSync(log, '(fail) alpha\n');
-    const repo: Repo = readRepo('repo', f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
     // Written by a process that is gone, on another boot; its file still waits for the window.
     const seeded: VerifyRun = seedRun(f, {
       sha: base,
@@ -847,12 +847,12 @@ test('a pending notice whose file outlives its sending process still covers the 
     });
     mkdirSync(noticeFolder(core), { recursive: true });
     writeFileSync(
-      resolve(noticeFolder(core), `${noticeId('repo', 'main-red', seeded.run)}.json`),
-      JSON.stringify({ title: 'repo main red', body: 'seeded', attention: false }),
+      resolve(noticeFolder(core), `${noticeId(f.repo, 'main-red', seeded.run)}.json`),
+      JSON.stringify({ title: `${f.repo} main red`, body: 'seeded', attention: false }),
     );
     const result: Result = await cli(f, ['verify', '--known-red'], worktree, core.env);
     expect(result.code).toBe(0);
-    expect(noticesOf(core)).toEqual([{ title: 'repo main red', body: 'seeded', attention: false }]);
+    expect(noticesOf(core)).toEqual([{ title: `${f.repo} main red`, body: 'seeded', attention: false }]);
     const runs: VerifyRun[] = records(f);
     expect(runs.find((run) => run.run === seeded.run)?.notice).toBe('pending');
     expect(runs.filter((run) => run.run !== seeded.run && run.notice !== undefined)).toEqual([]);
@@ -1068,7 +1068,7 @@ test('a red check outside full blocks every full check, and the fixed tree runs 
     expect(existsSync(`${dir}/quick1.ran`)).toBe(true);
     expect(existsSync(`${dir}/quick2.ran`)).toBe(true);
     expect(existsSync(`${dir}/suite.ran`)).toBe(false);
-    const repo: Repo = readRepo('repo', f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
     await expect(requireGreenReceipt(repo, head, 'leaf')).rejects.toThrow(`No green leaf verify receipt for ${head}`);
 
     await command(['git', 'rm', 'broken'], worktree);
@@ -1147,7 +1147,7 @@ test('a failed setup blocks full checks while other checks record the setup resu
     expect(run.commands[1]).toMatchObject({ name: 'suite', exit: 9, blocked: 'setup' });
     expect(run.commands[1].log).toBe(run.commands[0].log);
     expect(existsSync(`${dir}/suite.ran`)).toBe(false);
-    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).rejects.toThrow(
+    await expect(requireGreenReceipt(readRepo(f.repo, f.root), sha, 'leaf')).rejects.toThrow(
       `No green leaf verify receipt for ${sha}`,
     );
   } finally {
@@ -1186,7 +1186,7 @@ test('a red full check never blocks a later full check, while the merge members 
     expect(run.commands[2].blocked).toBeUndefined();
     expect(existsSync(`${dir}/s2.ran`)).toBe(true);
     expect(existsSync(`${dir}/member.ran`)).toBe(false);
-    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'merge')).rejects.toThrow(
+    await expect(requireGreenReceipt(readRepo(f.repo, f.root), sha, 'merge')).rejects.toThrow(
       `No green merge verify receipt for ${sha}`,
     );
   } finally {
@@ -1328,7 +1328,7 @@ test('an incomplete or failed-setup run never satisfies the receipt, which a fre
       tree,
       scope: 'leaf',
       end: undefined,
-      commands: verifyCommands(readRepo('repo', f.root).config, 'leaf').map((item) => ({
+      commands: verifyCommands(readRepo(f.repo, f.root).config, 'leaf').map((item) => ({
         ...item,
         exit: 0,
         log: holderLog,
@@ -1339,13 +1339,13 @@ test('an incomplete or failed-setup run never satisfies the receipt, which a fre
       tree,
       scope: 'leaf',
       setup: 3,
-      commands: verifyCommands(readRepo('repo', f.root).config, 'leaf').map((item) => ({
+      commands: verifyCommands(readRepo(f.repo, f.root).config, 'leaf').map((item) => ({
         ...item,
         exit: 0,
         log: holderLog,
       })),
     });
-    await expect(requireGreenReceipt(readRepo('repo', f.root), sha, 'leaf')).rejects.toThrow(
+    await expect(requireGreenReceipt(readRepo(f.repo, f.root), sha, 'leaf')).rejects.toThrow(
       `No green leaf verify receipt for ${sha}`,
     );
     expect((await verify(f, [], worktree)).code).toBe(0);
@@ -1420,7 +1420,7 @@ test('requireGreenReceipt refuses rows green only across different runs on one t
     mkdirSync(dirname(log), { recursive: true });
     writeFileSync(log, 'seeded\n');
     config(f, { checks: { c1: 'echo c1' }, merge_checks: { m1: 'echo m1' } });
-    const repo: Repo = readRepo('repo', f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
     const rowA: VerifyRun = seedRun(f, {
       sha,
       tree,
@@ -1519,7 +1519,7 @@ test('known-red passes when the red head member is covered by a fresh base run t
     expect(member).toMatchObject({ exit: 7 });
     expect(member).not.toHaveProperty('reused');
     expect(readFileSync(member.log, 'utf8')).toContain('(fail) alpha');
-    await requireGreenReceipt(readRepo('repo', f.root), head, 'merge');
+    await requireGreenReceipt(readRepo(f.repo, f.root), head, 'merge');
   } finally {
     f.clean();
   }
@@ -1543,7 +1543,7 @@ test('verify --known-red runs no base pass when the base tree holds a whole-gree
       sha: base,
       tree: baseTree,
       scope: 'merge',
-      commands: verifyCommands(readRepo('repo', f.root).config, 'merge').map((item) => ({
+      commands: verifyCommands(readRepo(f.repo, f.root).config, 'merge').map((item) => ({
         ...item,
         exit: 0,
         log: holderLog,
@@ -1553,7 +1553,7 @@ test('verify --known-red runs no base pass when the base tree holds a whole-gree
     expect(result.code).toBe(1);
     expect(result.stdout).toContain('fail');
     expect(records(f).some((run) => run.compares !== undefined)).toBe(false);
-    await expect(requireGreenReceipt(readRepo('repo', f.root), head, 'merge')).rejects.toThrow(
+    await expect(requireGreenReceipt(readRepo(f.repo, f.root), head, 'merge')).rejects.toThrow(
       'No green merge verify receipt',
     );
   } finally {
@@ -1576,7 +1576,7 @@ test('verify --known-red runs no base pass on a whole-green base and fails like 
     expect(runs).toHaveLength(2);
     expect(runs.filter((run) => run.compares !== undefined)).toHaveLength(0);
     expect(runs.find((run) => run.sha === head)?.commands[0].exit).toBe(7);
-    await expect(requireGreenReceipt(readRepo('repo', f.root), head, 'leaf')).rejects.toThrow(
+    await expect(requireGreenReceipt(readRepo(f.repo, f.root), head, 'leaf')).rejects.toThrow(
       `No green leaf verify receipt for ${head}`,
     );
   } finally {
@@ -1602,11 +1602,11 @@ test('a blocked merge member needs no known-red cover and gives no flaky observa
     const result: Result = await cli(f, ['verify', '--attempt', 'att-blocked', '--known-red'], worktree, env);
     expect(existsSync(marker)).toBe(false);
     expect(result.code).toBe(0);
-    await requireGreenReceipt(readRepo('repo', f.root), head, 'merge');
+    await requireGreenReceipt(readRepo(f.repo, f.root), head, 'merge');
     config(f, { checks: { cheap: 'echo cheap' }, merge_checks: { member } });
     expect((await cli(f, ['verify', '--attempt', 'att-blocked'], worktree, env)).code).toBe(0);
     expect(existsSync(marker)).toBe(true);
-    expect(await flakyLines(readRepo('repo', f.root), records(f))).toEqual([]);
+    expect(await flakyLines(readRepo(f.repo, f.root), records(f))).toEqual([]);
   } finally {
     f.clean();
   }
@@ -1630,7 +1630,7 @@ test('merge verification accepts same-tree receipts and links a cross-scope know
     const tree: string = await command(['git', 'rev-parse', `${head}^{tree}`], f.root);
     expect(reused.stdout).toContain(`reuse receipt ${leaf.run} tree=${tree}`);
     expect(records(f)).toHaveLength(1);
-    await requireGreenReceipt(readRepo('repo', f.root), head, 'merge');
+    await requireGreenReceipt(readRepo(f.repo, f.root), head, 'merge');
 
     config(f, { checks: { unit: 'echo "(fail) alpha"; exit 1' } });
     expect((await cli(f, ['verify'], worktree, env)).code).toBe(1);
@@ -1642,7 +1642,7 @@ test('merge verification accepts same-tree receipts and links a cross-scope know
     expect(runs).toHaveLength(3);
     expect(runs[2].compares).toBe(redLeaf.run);
     expect(runs.filter((run) => run.compares === undefined).map((run) => run.run)).toEqual([leaf.run, redLeaf.run]);
-    await requireGreenReceipt(readRepo('repo', f.root), head, 'merge');
+    await requireGreenReceipt(readRepo(f.repo, f.root), head, 'merge');
   } finally {
     f.clean();
   }
@@ -1655,7 +1655,7 @@ test('a merge-only command the leaf row lacks runs at merge verify and the gate 
     config(f, { checks: { unit: 'echo unit' }, merge_checks: { member: `touch ${marker}` } });
     const { worktree } = await callerWorktree(f);
     const head: string = await commitIn(worktree, 'code.ts');
-    const repo: Repo = readRepo('repo', f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
     expect((await verify(f, [], worktree)).code).toBe(0);
     const leafRow: VerifyRun = records(f)[0];
     expect(leafRow.commands.map((item) => item.name)).toEqual(['unit']);

@@ -64,7 +64,7 @@ for (const area of ['open', 'closed', 'parked']) {
           renameSync(created, path);
         }
         const file: string = resolve(path, 'state.yaml');
-        yaml(file, { ...stateSchema.parse(canonical), ...legacy });
+        yaml(file, { ...stateSchema.parse(canonical), repo: f.repo, ...legacy });
         const before: string = readFileSync(file, 'utf8');
         expect(() => readState(path)).toThrow(z.ZodError);
         expect(() => readState(path)).toThrow(file);
@@ -81,11 +81,11 @@ test('migration retains strict validation of unknown keys, required fields, know
   try {
     const path: string = leaf(f, 'example', 'implement');
     const file: string = resolve(path, 'state.yaml');
-    yaml(file, { ...canonical, priority: 'n', slot: 'B', unexpected: true });
+    yaml(file, { ...canonical, repo: f.repo, priority: 'n', slot: 'B', unexpected: true });
     expect(() => readState(path)).toThrow(z.ZodError);
     expect(() => readState(path)).toThrow('unexpected');
-    const { repo, ...missingRepo } = canonical;
-    for (const invalid of [missingRepo, { ...canonical, phase: 'invalid' }, { ...canonical, done: ['A', 'A'] }]) {
+    const { repo: _repo, ...missingRepo } = canonical;
+    for (const invalid of [missingRepo, { ...canonical, repo: f.repo, phase: 'invalid' }, { ...canonical, repo: f.repo, done: ['A', 'A'] }]) {
       yaml(file, { ...invalid, priority: 'n', slot: 'B' });
       expect(() => readState(path)).toThrow(z.ZodError);
     }
@@ -103,7 +103,7 @@ for (const area of ['open', 'closed']) {
     test(`the inventory reports ${area} depth ${depth} as a per-leaf failure`, async () => {
       const f: Fixture = await fixture();
       try {
-        const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({ grounding: 'none' }) };
+        const repo: Repo = { name: f.repo, root: f.root, config: repoSchema.parse({ grounding: 'none' }) };
         const original: string = leaf(f, 'target', 'plan.synthesis');
         const path: string = resolve(f.root, 'issues', area, ...['owner', 'issue', 'nested', 'target'].slice(0, depth));
         mkdirSync(path, { recursive: true });
@@ -130,7 +130,7 @@ for (const owner of ['issue', 'epic/issue']) {
   test(`findLeaf identifies parked ${owner}/leaf without parsing its state`, async () => {
     const f: Fixture = await fixture();
     try {
-      const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({ grounding: 'none' }) };
+      const repo: Repo = { name: f.repo, root: f.root, config: repoSchema.parse({ grounding: 'none' }) };
       const parked: string = resolve(f.root, 'issues/parked', owner, 'target');
       mkdirSync(parked, { recursive: true });
       writeFileSync(resolve(parked, 'state.yaml'), 'invalid: [');
@@ -189,7 +189,7 @@ test('failure record round-trips and rejects unknown keys', async () => {
 test('findLeaf ignores parked folders without state and unsupported nesting', async () => {
   const f: Fixture = await fixture();
   try {
-    const repo: Repo = { name: 'repo', root: f.root, config: repoSchema.parse({ grounding: 'none' }) };
+    const repo: Repo = { name: f.repo, root: f.root, config: repoSchema.parse({ grounding: 'none' }) };
     mkdirSync(resolve(f.root, 'issues/parked/issue/empty'), { recursive: true });
     const nested: string = resolve(f.root, 'issues/parked/epic/issue/extra/deep');
     mkdirSync(nested, { recursive: true });

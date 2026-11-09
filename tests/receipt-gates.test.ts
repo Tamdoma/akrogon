@@ -110,7 +110,7 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
     const check: string[] = ['phase', 'landing', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'];
     const tree: string = await command(['git', 'rev-parse', `${head}^{tree}`], f.root);
     const baseTree: string = await command(['git', 'rev-parse', `${builtOn}^{tree}`], f.root);
-    const cmds: { name: string; command: string }[] = verifyCommands(readRepo('repo', f.root).config, 'merge');
+    const cmds: { name: string; command: string }[] = verifyCommands(readRepo(f.repo, f.root).config, 'merge');
     mkdirSync(resolve(path, 'implementation'), { recursive: true });
     const pair = (baseLog: string): void => {
       const headLog: string = resolve(path, 'implementation/check-test-head.log');
@@ -135,7 +135,7 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
           process.execPath,
           resolve(import.meta.dir, '../skills/chart-issues/scripts/direct-guards.ts'),
           worktree,
-          'repo',
+          f.repo,
           resolve(f.home, 'chart'),
         ],
         { env: { ...process.env, AKROGON_HOME: f.home } },
@@ -169,7 +169,7 @@ test('direct guards need a green merge receipt for the worktree HEAD under the c
           process.execPath,
           resolve(import.meta.dir, '../skills/chart-issues/scripts/direct-guards.ts'),
           worktree,
-          'repo',
+          f.repo,
           resolve(f.home, 'chart'),
         ],
         { env: { ...process.env, AKROGON_HOME: f.home } },
