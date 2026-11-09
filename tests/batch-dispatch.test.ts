@@ -1,12 +1,15 @@
 import { test, expect } from 'bun:test';
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fakeSystemctl, leaf, editOnSecondStatus, verified, seatOwned } from './helpers';
+import { cli, fakeSystemctl, leaf, leafTempRoot, editOnSecondStatus, verified, seatOwned } from './helpers';
 import { adopt, hcFixture, noticeFiles, type HcFixture } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import { z } from 'zod';
+import { createHash } from 'node:crypto';
 import { commitMove } from '../src/phase';
+import { appendAttempt } from '../src/attempts';
+import { readRemoved } from '../src/reconcile';
 import { readRepo } from '../src/config';
 
 type DispatchFixture = HcFixture;
@@ -176,6 +179,94 @@ test('an interrupted build is discarded and rebuilt under a new attempt', async 
     await f.clean();
   }
 }, 15000);
+
+test('the pass that releases a merged holder batch cleans up the holder in the same invocation', async () => {
+  const f: DispatchFixture = await dispatchFixture({ window: 'open' });
+  const adopting: () => void = adopt(f.core);
+  try {
+    const holder = await allocatedLeaf(f, 'holder');
+    await commitFile(f, holder.path, 'holder-file', 'h');
+    toMerge(holder.path, '2026-09-11T00:00:00Z');
+    await idleAll(f);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const applied: State = readState(holder.path);
+    const top: string = z.string().parse(applied.batch?.top);
+    const worktree: string = z.string().parse(applied.worktree);
+    const tab: string = z.string().parse(applied.tab);
+    await command(['git', 'push', 'origin', `refs/heads/holder:main`], f.root);
+    appendAttempt(readRepo(f.repo, f.root), 'holder', applied.batch!, 'merged');
+    const landed: State = {
+      ...applied,
+      batch: { ...applied.batch!, candidate: top, recorded: true },
+    };
+    saveState(holder.path, landed);
+    await commitMove(readRepo(f.repo, f.root), { path: holder.path, state: landed }, landed, 'merged', null);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const closed: State = leafState(holder.path);
+    expect(closed.batch).toBeUndefined();
+    expect(closed.worktree).toBeUndefined();
+    expect(existsSync(worktree)).toBe(false);
+    expect((await run(['git', 'rev-parse', '--verify', 'refs/heads/holder'], f.root)).code).not.toBe(0);
+    expect((await command(['git', 'worktree', 'list', '--porcelain'], f.root)).split('\n')).not.toContain(
+      `worktree ${worktree}`,
+    );
+    expect(f.core.appCalls().map((call) => call.argv)).toContainEqual(['do', 'tab.close', '--id', tab]);
+    expect(await f.core.terminals({ 'akrogon.leaf': 'holder' }, true)).toEqual([]);
+  } finally {
+    adopting();
+    await f.clean();
+  }
+}, 25000);
+
+test('the releasing pass leaves a merged holder fully cleaned for the next pass', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    leaf(f, 'waiting', 'failed', { tab: 'akwaitingtab' });
+    const holder = await allocatedLeaf(f, 'holder');
+    await commitFile(f, holder.path, 'holder-file', 'h');
+    toMerge(holder.path, '2026-09-11T00:00:00Z');
+    await idleAll(f);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const applied: State = readState(holder.path);
+    const top: string = z.string().parse(applied.batch?.top);
+    const worktree: string = z.string().parse(applied.worktree);
+    await command(['git', 'push', 'origin', `refs/heads/holder:main`], f.root);
+    saveState(holder.path, {
+      ...applied,
+      batch: { ...applied.batch!, candidate: top, owner: 'command' },
+    });
+    // The land unit is gone and no live tab holds the leaf: every seat terminal is removed.
+    for (const seat of await f.core.terminals({ 'akrogon.leaf': 'holder' }, true)) {
+      await f.core.hc(['kill', seat.address]);
+      expect((await f.core.hc(['rm', seat.address])).code).toBe(0);
+    }
+    const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
+    const temp: string = resolve(leafTempRoot(f), hex(f.root).slice(0, 4), hex(`${f.root}\nholder`).slice(0, 8));
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const state: State = readState(holder.path);
+    expect(state.phase).toBe('merged');
+    expect(state.batch).toBeUndefined();
+    expect(state.worktree).toBeUndefined();
+    expect(state.broadcast).toBeUndefined();
+    expect(existsSync(worktree)).toBe(false);
+    expect((await run(['git', 'rev-parse', '--verify', 'refs/heads/holder'], f.root)).code).not.toBe(0);
+    expect(existsSync(temp)).toBe(false);
+    expect(attemptLines(f).map((line) => line.outcome)).toEqual(['merged']);
+    // A second pass over the same state removes nothing more.
+    writeFileSync(f.core.shimLog, '');
+    const before: State = readState(holder.path);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(readRemoved(readRepo(f.repo, f.root))).toEqual([]);
+    expect(readState(holder.path)).toEqual(before);
+    expect(
+      readFileSync(f.core.shimLog, 'utf8')
+        .split('\n')
+        .filter((line) => ['run', 'send', 'keys', 'kill', 'rm', 'label'].includes(line.split('\t')[0])),
+    ).toEqual([]);
+  } finally {
+    await f.clean();
+  }
+}, 25000);
 
 test('a failed holder with a landed candidate is told to move back, then reconciles without run or push', async () => {
   const f: DispatchFixture = await dispatchFixture();
