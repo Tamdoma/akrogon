@@ -398,10 +398,7 @@ for (const refusal of ['dirty', 'mid-rebase', 'live tab', 'live cwd', 'batch'] a
       }
       if (refusal === 'live cwd') await paneAt(f, old);
       if (refusal === 'batch')
-        writeFileSync(
-          f.systemctl.db,
-          JSON.stringify({ units: [{ unit: 'akrogon-land-a1.service', sub: 'running' }] }),
-        );
+        writeFileSync(f.systemctl.db, JSON.stringify({ units: [{ unit: 'akrogon-land-a1.service', sub: 'running' }] }));
       await next(f, [slug]);
       expect(existsSync(old)).toBe(true);
       expect(readState(path).worktree).toBe(old);
