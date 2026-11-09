@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, leafTempRoot, storeDir, type Fixture } from './helpers';
-import { hcCore, setPrefixes, setSeat, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, setSeat, type HcCore, type Terminal } from './hc-fixture';
 import { readState } from '../src/state';
 import { leafSlice } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
@@ -29,7 +29,6 @@ async function setup(
   coreEnv: Record<string, string> = {},
 ): Promise<{ f: Fixture; core: HcCore; path: string }> {
   const f: Fixture = await fixture();
-  setPrefixes(f, { repo: 'rp' });
   setSeat(f, 'a', 'fake', mode);
   const core: HcCore = await hcCore(f, { coreEnv });
   const path: string = leaf(f, slug, 'plan.synthesis');
@@ -38,7 +37,7 @@ async function setup(
 
 async function teardown(f: Fixture, core: HcCore, slug: string): Promise<void> {
   await core.stop();
-  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: 'repo' }, slug)]);
+  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug)]);
   f.clean();
 }
 
@@ -65,13 +64,13 @@ test('the start verb starts a parentless leaf seat by name, labels, scope, env a
   try {
     const started = await cli(f, ['seat', 'hs-one', 'A'], f.root, core.env);
     expect(started.code).toBe(0);
-    const seat: Terminal = await seatOf(core, 'rp-hs-one-a');
+    const seat: Terminal = await seatOf(core, `${f.prefix}-hs-one-a`);
     expect(started.stdout).toContain(seat.address);
     expect(seat.parent).toBeNull();
     const state = readState(path);
     expect(seat.labels).toEqual({
       akrogon: '1',
-      'akrogon.repo': 'repo',
+      'akrogon.repo': f.repo,
       'akrogon.leaf': 'hs-one',
       'akrogon.seat': 'a',
       'herdr.space': `sp-${core.session}`,
@@ -84,10 +83,10 @@ test('the start verb starts a parentless leaf seat by name, labels, scope, env a
     const pid: number = z.number().parse(seat.pid);
     expect(readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0')).toContain('--model');
     expect(readFileSync(`/proc/${pid}/cmdline`, 'utf8')).toContain('/fake');
-    const slice: string = leafSlice({ name: 'repo' }, 'hs-one');
+    const slice: string = leafSlice({ name: f.repo }, 'hs-one');
     const cgroup: string = readFileSync(`/proc/${pid}/cgroup`, 'utf8').trim();
     expect(cgroup).toMatch(
-      new RegExp(`/${slice.replace('.', '\\.')}/${slice.replace(/\.slice$/, '')}-rp-hs-one-a-[0-9a-f]+\\.scope$`),
+      new RegExp(`/${slice.replace('.', '\\.')}/${slice.replace(/\.slice$/, '')}-${f.prefix}-hs-one-a-[0-9a-f]+\\.scope$`),
     );
     const env: Map<string, string> = environ(pid);
     expect(env.get('GIT_EDITOR')).toBe('true');
@@ -109,11 +108,11 @@ test('slot B starts under the live A, so the sidebar indents it, and outlives it
   setSeat(f, 'b', 'fake', 'work');
   try {
     expect((await cli(f, ['seat', 'hs-pair', 'B'], f.root, core.env)).code).toBe(0);
-    const alone: Terminal = await seatOf(core, 'rp-hs-pair-b');
+    const alone: Terminal = await seatOf(core, `${f.prefix}-hs-pair-b`);
     expect(alone.parent).toBeNull();
     expect((await core.hc(['kill', alone.address])).code).toBe(0);
     expect((await cli(f, ['seat', 'hs-pair', 'A'], f.root, core.env)).code).toBe(0);
-    const a: Terminal = await seatOf(core, 'rp-hs-pair-a');
+    const a: Terminal = await seatOf(core, `${f.prefix}-hs-pair-a`);
     expect((await cli(f, ['seat', 'hs-pair', 'B'], f.root, core.env)).code).toBe(0);
     const b: Terminal = (await core.terminals({ 'akrogon.leaf': 'hs-pair', 'akrogon.seat': 'b' }, false))[0];
     expect(b.parent).toBe(a.address);
@@ -130,8 +129,8 @@ test('a slug that would pass 32 characters is cut and carries 4 hex of repo/slug
   const { f, core } = await setup(slug, 'work');
   try {
     expect((await cli(f, ['seat', slug, 'A'], f.root, core.env)).code).toBe(0);
-    const hex: string = createHash('sha256').update(`repo/${slug}`).digest('hex').slice(0, 4);
-    const name: string = `rp-${slug.slice(0, 22).replace(/-$/, '')}-${hex}-a`;
+    const hex: string = createHash('sha256').update(`${f.repo}/${slug}`).digest('hex').slice(0, 4);
+    const name: string = `${f.prefix}-${slug.slice(0, 22).replace(/-$/, '')}-${hex}-a`;
     expect(name.length).toBeLessThanOrEqual(32);
     await seatOf(core, name);
   } finally {
@@ -144,7 +143,7 @@ test('a seat that never works stays running, is reported started not confirmed, 
   try {
     const started = await cli(f, ['seat', 'hs-idle', 'A'], f.root, core.env);
     expect(started.code).toBe(0);
-    const seat: Terminal = await seatOf(core, 'rp-hs-idle-a');
+    const seat: Terminal = await seatOf(core, `${f.prefix}-hs-idle-a`);
     expect(started.stdout).toContain(`started, not confirmed ${seat.address}`);
     const recorded = readState(path).delivery_error.A;
     expect(recorded).toMatchObject({ code: 'not_confirmed', address: seat.address });
@@ -164,7 +163,7 @@ test('a seat that exits fails the start with its address', async () => {
     const started = await cli(f, ['seat', 'hs-exit', 'A'], f.root, core.env);
     expect(started.code).not.toBe(0);
     const seats: Terminal[] = (await core.terminals({ akrogon: '1' })).filter(
-      (t: Terminal) => t.name === 'rp-hs-exit-a',
+      (t: Terminal) => t.name === `${f.prefix}-hs-exit-a`,
     );
     expect(seats).toHaveLength(1);
     expect(`${started.stdout}\n${started.stderr}`).toContain(seats[0].address);
@@ -181,7 +180,7 @@ test('a core carrying Claude child-session variables starts a seat without them,
   const { f, core } = await setup('hs-env', 'work', inherited);
   try {
     expect((await cli(f, ['seat', 'hs-env', 'A'], f.root, core.env)).code).toBe(0);
-    const seat: Terminal = await seatOf(core, 'rp-hs-env-a');
+    const seat: Terminal = await seatOf(core, `${f.prefix}-hs-env-a`);
     const pid: number = z.number().parse(seat.pid);
     const env: Map<string, string> = environ(pid);
     expect(markers.filter((name: string) => env.has(name))).toEqual([]);

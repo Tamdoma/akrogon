@@ -5,14 +5,13 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, storeDir, type Fixture } from './helpers';
-import { hcCore, setPrefixes, setSeat, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, setSeat, type HcCore, type Terminal } from './hc-fixture';
 import { readState, saveState } from '../src/state';
 import { leafSlice } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
 
 async function setup(slug: string, window: 'open' | 'closed' = 'closed') {
   const f: Fixture = await fixture();
-  setPrefixes(f, { repo: 'rp' });
   setSeat(f, 'a', 'fake', 'work');
   const core: HcCore = await hcCore(f, { window });
   const path: string = leaf(f, slug, 'plan.synthesis');
@@ -22,7 +21,7 @@ async function setup(slug: string, window: 'open' | 'closed' = 'closed') {
 
 async function teardown(f: Fixture, core: HcCore, slug: string): Promise<void> {
   await core.stop();
-  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: 'repo' }, slug)]);
+  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug)]);
   f.clean();
 }
 
@@ -93,7 +92,7 @@ test('a killed seat starts again under its old name without name_taken', async (
     expect(pass.code).toBe(0);
     expect(pass.stderr).not.toContain('name_taken');
     const live: Terminal[] = (await leafTerminals(core, 'ht-restart')).filter((t: Terminal) => t.state === 'live');
-    expect(live.map((t: Terminal) => t.name)).toEqual(['rp-ht-restart-a']);
+    expect(live.map((t: Terminal) => t.name)).toEqual([`${f.prefix}-ht-restart-a`]);
     expect(live[0].address).not.toBe(first.address);
     expect((await leafTerminals(core, 'ht-restart')).map((t: Terminal) => t.address)).not.toContain(first.address);
   } finally {

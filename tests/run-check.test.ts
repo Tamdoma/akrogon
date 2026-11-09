@@ -562,7 +562,7 @@ test('run-check refuses a merge_checks entry in its words, sh -c and printed for
         merge_checks: { suite: text },
         grounding: 'none',
       });
-      const config = readRepo('repo', f.root).config;
+      const config = readRepo(f.repo, f.root).config;
       const forms: string[][] = [text.split(' '), ['sh', '-c', text], ['sh', '-c', setupCommand(config, text)]];
       for (const argv of forms) {
         const result: Result = await cli(f, ['run-check', '--', ...argv], worktree, baseEnv(f));

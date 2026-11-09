@@ -52,7 +52,7 @@ test('F1 dangling entries are removed from stores and the host temp root', async
 test('F2 surviving processes protect leaf entries and leaf temps', async () => {
   const f: HcFixture = await hcFixture();
   const env: NodeJS.ProcessEnv = { ...f.env, ...fakeSystemctl(f).env, AKROGON_PROC_ROOT: procRoot(f) };
-  const repo: Repo = readRepo('repo', f.root);
+  const repo: Repo = readRepo(f.repo, f.root);
   const owned: string = resolve(storeDir(f), 'done-old');
   const temp: string = resolve(leafTempRoot(f), relative(process.env.AKROGON_LEAF_TEMP_ROOT!, leafTemp(repo, 'done')));
   const registered: string = resolve(storeDir(f), 'failed-owned');
@@ -131,7 +131,7 @@ async function reconcileFixture(f: Fixture, panes: Seen[] | null, env: NodeJS.Pr
     [
       process.execPath,
       '-e',
-      `const {reconcile}=await import(${source('reconcile')});const {readRepo}=await import(${source('config')});const {allLeaves}=await import(${source('state')});const r=readRepo('repo',process.cwd());console.log(JSON.stringify(await reconcile(r,allLeaves(r),${JSON.stringify(panes)})));`,
+      `const {reconcile}=await import(${source('reconcile')});const {readRepo}=await import(${source('config')});const {allLeaves}=await import(${source('state')});const r=readRepo('${f.repo}',process.cwd());console.log(JSON.stringify(await reconcile(r,allLeaves(r),${JSON.stringify(panes)})));`,
     ],
     {
       cwd: f.root,
@@ -169,7 +169,7 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
       );
       const temp: string = resolve(
         leafTempRoot(f),
-        relative(process.env.AKROGON_LEAF_TEMP_ROOT!, leafTemp(readRepo('repo', f.root), 'seat')),
+        relative(process.env.AKROGON_LEAF_TEMP_ROOT!, leafTemp(readRepo(f.repo, f.root), 'seat')),
       );
       mkdirSync(temp, { recursive: true });
       const junk: string = resolve(storeDir(f), 'junk');
@@ -201,7 +201,7 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
         JSON.stringify({
           units:
             scenario === 'busy-slice'
-              ? [{ unit: leafSlice({ name: 'repo' }, 'seat'), sub: 'active', cgroup: '/busy' }]
+              ? [{ unit: leafSlice({ name: f.repo }, 'seat'), sub: 'active', cgroup: '/busy' }]
               : [],
         }),
       );
@@ -254,7 +254,7 @@ test('F6 kept filesystem reports include actionable clearing conditions', async 
     const report = z.object({
       kept: z.array(z.object({ path: z.string(), reason: z.string().min(1), clears: z.string().min(1) })),
     });
-    report.parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile/repo.json'), 'utf8')));
+    report.parse(JSON.parse(readFileSync(resolve(f.home, `reconcile/${f.repo}.json`), 'utf8')));
     const worktree: string = resolve(f.home, '.akrogon/worktrees/retired/checkout');
     mkdirSync(worktree, { recursive: true });
     writeFileSync(resolve(worktree, '.git'), 'gitdir: retained');

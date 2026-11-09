@@ -201,7 +201,7 @@ async function seedRunRecord(f: Fixture, fields: Record<string, unknown> = {}): 
     pid: sleeper.pid,
     start_time: statStart(sleeper.pid),
     boot_id: bootId(),
-    repo: 'repo',
+    repo: f.repo,
     leaf: 'seeded',
     check: 'seeded',
     state: 'live',
@@ -544,7 +544,7 @@ test.serial('a verify places its scope under the resolved leaf slice by default'
     const calls: string[] = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
     const scoped: string[] = calls.filter((line) => line.includes('--scope'));
     expect(scoped.length).toBeGreaterThan(0);
-    expect(scoped.some((line) => line.includes(`--slice=${expectedSlice('repo', 'verify-place')}`))).toBe(true);
+    expect(scoped.some((line) => line.includes(`--slice=${expectedSlice(f.repo, 'verify-place')}`))).toBe(true);
   } finally {
     f.clean();
   }
@@ -670,8 +670,8 @@ test.serial(
       expect(held.code).toBe(0);
       const calls: string[] = readFileSync(log, 'utf8').trim().split('\n');
       const scopeCalls: string[] = calls.filter((line) => line.includes('--scope'));
-      expect(scopeCalls.some((line) => line.includes(`--slice=${expectedSlice('repo', 'sliced')}`))).toBe(true);
-      expect(scopeCalls.some((line) => line.includes(`--slice=${expectedSlice('repo', 'explicit')}`))).toBe(true);
+      expect(scopeCalls.some((line) => line.includes(`--slice=${expectedSlice(f.repo, 'sliced')}`))).toBe(true);
+      expect(scopeCalls.some((line) => line.includes(`--slice=${expectedSlice(f.repo, 'explicit')}`))).toBe(true);
       expect(scopeCalls.some((line) => line.includes('--slice=akrogon.slice'))).toBe(true);
       expect(calls.filter((line) => line.includes('--unit=akrogon-run-')).length).toBeGreaterThanOrEqual(6);
     } finally {
@@ -760,7 +760,7 @@ test.serial(
           pid: dead.pid,
           start_time: '1',
           boot_id: 'x',
-          repo: 'repo',
+          repo: f.repo,
           leaf: 'sweeper',
           check: 'old',
           state: 'live',

@@ -142,7 +142,7 @@ test('a green top lands with no seat', async () => {
       JSON.stringify({
         kind: 'visit_start',
         ts: new Date().toISOString(),
-        repo: 'repo',
+        repo: f.repo,
         slug: 'aa',
         phase: 'merge',
         visit: 1,
@@ -435,7 +435,7 @@ test('stop --all stops a tabless command merge', async () => {
         owner: 'command',
       },
     });
-    const slice: string = leafSlice({ name: 'repo' }, 'aa');
+    const slice: string = leafSlice({ name: f.repo }, 'aa');
     writeFileSync(systemctl.db, JSON.stringify({ units: [{ unit: slice, sub: 'active' }] }));
     const stopped: Result = await cli(f, ['stop', '--all'], f.root, {
       ...systemctl.env,
@@ -443,7 +443,7 @@ test('stop --all stops a tabless command merge', async () => {
     });
     expect(stopped.code).toBe(0);
     expect(readFileSync(systemctl.log, 'utf8')).toContain(`stop ${slice}`);
-    expect(readFileSync(resolve(f.home, 'stopped.yaml'), 'utf8')).toContain('repo/aa');
+    expect(readFileSync(resolve(f.home, 'stopped.yaml'), 'utf8')).toContain(`${f.repo}/aa`);
   } finally {
     f.clean();
   }

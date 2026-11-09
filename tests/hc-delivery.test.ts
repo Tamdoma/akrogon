@@ -5,14 +5,13 @@ import { chmodSync, mkdirSync, readFileSync, watch, writeFileSync } from 'node:f
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, type Fixture } from './helpers';
-import { coreBin, hcCore, setPrefixes, setSeat, type HcCore, type Terminal } from './hc-fixture';
+import { coreBin, hcCore, setSeat, type HcCore, type Terminal } from './hc-fixture';
 import { readState } from '../src/state';
 import { leafSlice } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
 
 async function setup(slug: string, harness: 'fake' | 'agy', mode: string) {
   const f: Fixture = await fixture();
-  setPrefixes(f, { repo: 'rp' });
   setSeat(f, 'a', harness, mode);
   const core: HcCore = await hcCore(f);
   const path: string = leaf(f, slug, 'plan.synthesis');
@@ -21,7 +20,7 @@ async function setup(slug: string, harness: 'fake' | 'agy', mode: string) {
 
 async function teardown(f: Fixture, core: HcCore, slug: string): Promise<void> {
   await core.stop();
-  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: 'repo' }, slug)]);
+  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug)]);
   f.clean();
 }
 
@@ -176,7 +175,6 @@ test('an agy seat answers the trust dialog once and its first task, refused unav
 
 test('an unavailable first agy task waits for a new status before retrying', async () => {
   const f: Fixture = await fixture();
-  setPrefixes(f, { repo: 'rp' });
   setSeat(f, 'a', 'agy', 'work');
   const bin: string = resolve(f.home, 'ready-bin');
   const gate: string = resolve(f.home, 'ready.fifo');
@@ -234,7 +232,7 @@ done
   } finally {
     await core.stop();
     await starting;
-    await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: 'repo' }, 'hd-status-retry')]);
+    await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, 'hd-status-retry')]);
     f.clean();
   }
 });

@@ -12,15 +12,15 @@ import { leafSlice } from '../src/scope';
 import { command, spawnCaptured } from '../src/shell';
 import { GONE_CODES, sessions } from '../src/hc';
 
-async function setup(prefixes: Record<string, string> | undefined = { repo: 'rp' }) {
+async function setup(prefixes?: Record<string, string>) {
   const f: Fixture = await fixture();
-  setPrefixes(f, prefixes);
+  setPrefixes(f, prefixes ?? { [f.repo]: f.prefix });
   setSeat(f, 'a', 'fake', 'work');
   return f;
 }
 
-async function stopSlice(slug: string): Promise<void> {
-  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: 'repo' }, slug)]);
+async function stopSlice(f: Fixture, slug: string): Promise<void> {
+  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug)]);
 }
 
 function refused(stderr: string): string[] {
@@ -50,13 +50,13 @@ test('the space named after the repo is found through doc.get with the window cl
     leaf(f, 'hi-find', 'plan.synthesis');
     expect((await cli(f, ['next', 'hi-find'], f.root, core.env)).code).toBe(0);
     expect((await core.terminals({ 'akrogon.leaf': 'hi-find' })).map((t: Terminal) => t.name)).toEqual([
-      'rp-hi-find-a',
+      `${f.prefix}-hi-find-a`,
     ]);
     expect(await other.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
     await core.stop();
     await other.stop();
-    await stopSlice('hi-find');
+    await stopSlice(f, 'hi-find');
     f.clean();
   }
 });
@@ -97,7 +97,7 @@ test('no session, several sessions and an unreadable session refuse with todayâ€
       await spawnCaptured(['hc', 'server', 'stop'], { env: { ...none.env, HC_SESSION: core.session } });
     for (const core of [none, twin, holder]) await core.stop();
     for (const core of stale === undefined ? [] : [stale]) core.discard();
-    await stopSlice('hi-refuse');
+    await stopSlice(f, 'hi-refuse');
     f.clean();
   }
 });
@@ -114,14 +114,14 @@ test('dispatch refuses a repo without a prefix and init refuses a duplicate pref
     const second: string = resolve(f.home, 'second');
     mkdirSync(second);
     await command(['git', 'init', '-b', 'main', second]);
-    setPrefixes(f, { repo: 'rp', second: 'rp' });
+    setPrefixes(f, { [f.repo]: f.prefix, second: f.prefix });
     const init = await cli(f, ['init'], second, core.env);
     expect(init.code).not.toBe(0);
     expect(init.stderr).toContain('prefixes');
     const global = z.object({ repos: z.record(z.string(), z.string()) }).passthrough();
     expect(
       Object.keys(global.parse(Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8'))).repos),
-    ).toEqual(['repo']);
+    ).toEqual([f.repo]);
   } finally {
     await core.stop();
     f.clean();
@@ -182,7 +182,7 @@ test('first-switch inventory reads cleanly with no hc call on old ids, and live 
       slug: 'hi-closed',
       phase: 'merged',
       created: '2026-10-01',
-      repo: 'repo',
+      repo: f.repo,
       'blocked-by': [],
       ...old,
       tab: 'w8:tA3',
@@ -204,7 +204,7 @@ test('first-switch inventory reads cleanly with no hc call on old ids, and live 
     expect(await core.terminals({ 'akrogon.leaf': 'hi-live-old' })).toEqual([]);
   } finally {
     await core.stop();
-    await stopSlice('hi-other');
+    await stopSlice(f, 'hi-other');
     f.clean();
   }
 });
