@@ -1,0 +1,26 @@
+opened: '2026-11-09T09:05:16Z'
+seats:
+  - seat: A
+    address: t15
+    name: null
+    recipe:
+      harness: claude
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/70154c62-73f9-47a5-8e8e-e3f78f692cf8.jsonl
+  - seat: B
+    address: t10p
+    name: ak-slot-b
+    recipe:
+      harness: codex
+      model: gpt-6.1-sol
+      effort: high
+    session: /home/ivan/.codex/sessions/2026/11/09/rollout-2026-11-09T10-05-50-01a1bf8e-82e5-7491-ae86-5ffdff528fdc.jsonl
+  - seat: C
+    address: t10q
+    name: ak-slot-c
+    recipe:
+      harness: pi
+      model: devin/swe-2-max-lightning
+      effort: high
+    session: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-11-09T09-05-50-695Z_d05cea3b-b578-4d03-857b-04375c76a85b.jsonl
+spans:
+  - from: '2026-11-09T09:05:16Z'

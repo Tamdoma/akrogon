@@ -1,0 +1,74 @@
+bun test v1.4.4 (38afee6c8) 4x PARALLEL
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+
+tests/next.test.ts:
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-nmsQNQ/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-nmsQNQ/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-HLO3lJ/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-HLO3lJ/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-nmsQNQ/repo/issues/open","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-nmsQNQ/repo/issues/open/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-3n02ue/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-3n02ue/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-HLO3lJ/repo/issues/open/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-HLO3lJ/repo/issues/open/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-3n02ue/repo/issues/open/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-3n02ue/repo/issues/open/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-3mdhGE/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-3mdhGE/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-KtsZqW/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-KtsZqW/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-SHMV1R/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-SHMV1R/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-3mdhGE/repo/issues/closed","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-3mdhGE/repo/issues/closed/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-KtsZqW/repo/issues/closed/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-KtsZqW/repo/issues/closed/invalid/state.yaml\"\n  }\n]"}
+{"repo":"repo","path":"/tmp/akrogon-suite-4292-KHFJ6i/akrogon-SHMV1R/repo/issues/closed/epic/issue/extra/invalid","error":"[\n  {\n    \"code\": \"custom\",\n    \"path\": [],\n    \"message\": \"Invalid leaf depth: /tmp/akrogon-suite-4292-KHFJ6i/akrogon-SHMV1R/repo/issues/closed/epic/issue/extra/invalid/state.yaml\"\n  }\n]"}
+
+tests/batch.test.ts:
+{"ok":true,"top":"82af3be5c8a4cc9a90d1dca4e2b5bb04927fc45c"}
+
+tests/hc-listener.test.ts:
+68 |       setTimeout(settle, 20);
+69 |     });
+70 |     const timer = setTimeout(() => {
+71 |       finished = true;
+72 |       watcher.close();
+73 |       fail(new Error(`timed out waiting on ${path}: ${readFileSync(path, 'utf8')}`));
+                    ^
+error: timed out waiting on /tmp/akrogon-suite-4291-cCDW2W/akrogon-ZJOaVS/passes.log: start pull --all
+end pull --all
+start next --resume
+end next --resume
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/tests/hc-listener.test.ts:73:16)
+(fail) a cleared foreground from the real core keeps the listener alive through restart [15141.04ms]
+
+tests/install.test.ts:
+Install filesystem evidence: /home/ivan/Work/infra/akrogon/.evidence/install-prune-links/home-listing.json
+
+tests/hc-listener.test.ts:
+68 |       setTimeout(settle, 20);
+69 |     });
+70 |     const timer = setTimeout(() => {
+71 |       finished = true;
+72 |       watcher.close();
+73 |       fail(new Error(`timed out waiting on ${path}: ${readFileSync(path, 'utf8')}`));
+                    ^
+error: timed out waiting on /tmp/akrogon-suite-4291-cCDW2W/akrogon-aBlBSf/passes.log: start pull --all
+end pull --all
+start next --resume
+end next --resume
+start next --wake
+end next --wake
+start next --wake
+end next --wake
+start next --wake
+end next --wake
+start next --wake
+end next --wake
+start next --wake
+end next --wake
+start next --wake
+end next --wake
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/tests/hc-listener.test.ts:73:16)
+(fail) the listener subscribes before its catch-up, wakes on turn end, blocked and exit of labelled terminals only, and folds queued wakes [21509.95ms]
+
+ 1142 pass
+ 2 fail
+ 11967 expect() calls
+Ran 1144 tests across 79 files. [54.84s]
