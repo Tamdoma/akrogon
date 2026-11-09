@@ -1332,14 +1332,13 @@ export async function nextCommand(input: string | undefined, pressureDir: string
     // Cleanup runs last in the pass so a batch released by the merge step is
     // reconciled in the same invocation. The merge step takes the global lock
     // itself, so this call takes it again after the loop, never nested.
-    if (touched.size > 0)
-      await withLock(resolve(globalHome(), '.lock'), async () => {
-        await reconcileRepos(
-          [...touched.values()].map((entry) => entry.repo),
-          invocation,
-          [...touched.values()].some((entry) => entry.isAutomatic),
-        );
-      });
+    await withLock(resolve(globalHome(), '.lock'), async () => {
+      await reconcileRepos(
+        [...touched.values()].map((entry) => entry.repo),
+        invocation,
+        [...touched.values()].some((entry) => entry.isAutomatic),
+      );
+    });
   }
   if (invocation.skipped.size > 0) process.exitCode = 1;
 }
