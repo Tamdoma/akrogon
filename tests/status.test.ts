@@ -44,7 +44,7 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
   const f: Fixture = await fixture();
   const g: Fixture = await fixture();
   try {
-    register(f, { repo: f.root, other: g.root });
+    register(f, { [f.repo]: f.root, other: g.root });
     const failed: string = leaf(
       f,
       'broken',
@@ -68,12 +68,12 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     mkdirSync(resolve(failed, 'review-A.md'));
     const at: number = Date.now();
     log(f, [
-      event('broken', 'failed', 40, '', at),
-      event('broken', 'implement', 1, '', at),
-      event('broken', 'failed', 7, '', at),
-      event('ordinary', 'failed', 0, '', at),
+      event(f, 'broken', 'failed', 40, '', at),
+      event(f, 'broken', 'implement', 1, '', at),
+      event(f, 'broken', 'failed', 7, '', at),
+      event(f, 'ordinary', 'failed', 0, '', at),
     ]);
-    timings(f, [prompt('broken', 30, 'delivered', at)]);
+    timings(f, [prompt(f, 'broken', 30, 'delivered', at)]);
     const env: NodeJS.ProcessEnv = procFixture(f).env;
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const otherBefore: Record<string, string> = snapshot(resolve(g.root, 'issues'));
@@ -81,7 +81,7 @@ test('overview reads multiple repos outside git, retains hierarchy and recorded 
     expect(result.code).toBe(0);
     const rows: string[] = result.stdout.split('\n');
     const row: string = leafRow(result.stdout, 'broken');
-    expect(rows[0]).toContain('repo');
+    expect(rows[0]).toContain(f.repo);
     expect(rows[0]).toContain('broken');
     expect(cell(result.stdout, row, 'PHASE')).toBe('failed');
     const noteText: string = cell(result.stdout, row, 'NOTE');
@@ -125,13 +125,13 @@ test('time runs from the first delivered prompt to now for a running leaf and is
     const first: string = (await cli(f, ['status'])).stdout;
     expect(first).not.toContain('AGE');
     expect(cell(first, leafRow(first, 'timed'), 'TIME')).toBe('-');
-    for (const lines of [[], [prompt('timed', 30, 'failed')], [prompt('other', 30)]]) {
+    for (const lines of [[], [prompt(f, 'timed', 30, 'failed')], [prompt(f, 'other', 30)]]) {
       timings(f, lines);
       const result: Result = await cli(f, ['status']);
       expect(result.code).toBe(0);
       expect(cell(result.stdout, leafRow(result.stdout, 'timed'), 'TIME')).toBe('-');
     }
-    timings(f, [prompt('timed', 40, 'failed'), prompt('timed', 12), prompt('timed', 5)]);
+    timings(f, [prompt(f, 'timed', 40, 'failed'), prompt(f, 'timed', 12), prompt(f, 'timed', 5)]);
     const aged: string = (await cli(f, ['status'])).stdout;
     expect(cell(aged, leafRow(aged, 'timed'), 'TIME')).toBe('0h 12m');
   } finally {
@@ -149,15 +149,15 @@ test('time for a merged or failed leaf stops at its move into that phase and doe
     const at: number = Date.now();
     const write = (shift: number): void => {
       timings(f, [
-        prompt('landed', 1100 + shift, 'delivered', at),
-        prompt('broke', 40 + shift, 'delivered', at),
-        prompt('unmoved', 20 + shift, 'delivered', at),
-        prompt('reversed', 10 + shift, 'delivered', at),
+        prompt(f, 'landed', 1100 + shift, 'delivered', at),
+        prompt(f, 'broke', 40 + shift, 'delivered', at),
+        prompt(f, 'unmoved', 20 + shift, 'delivered', at),
+        prompt(f, 'reversed', 10 + shift, 'delivered', at),
       ]);
       log(f, [
-        event('landed', 'merged', 52 + shift, '', at),
-        event('broke', 'failed', 11 + shift, '', at),
-        event('reversed', 'failed', 15 + shift, '', at),
+        event(f, 'landed', 'merged', 52 + shift, '', at),
+        event(f, 'broke', 'failed', 11 + shift, '', at),
+        event(f, 'reversed', 'failed', 15 + shift, '', at),
       ]);
     };
     write(0);
@@ -179,13 +179,13 @@ for (const directory of ['missing', 'empty']) {
   test(`overview reports no open leaves for a ${directory} open directory without writes`, async () => {
     const f: Fixture = await fixture();
     try {
-      register(f, { repo: f.root });
+      register(f, { [f.repo]: f.root });
       const open: string = resolve(f.root, 'issues/open');
       if (directory === 'missing') rmSync(open, { recursive: true });
       const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
       const result: Result = await cli(f, ['status'], f.home);
       expect(result.code).toBe(0);
-      expect(withoutLiveness(result.stdout)).toBe('repo\n  no open leaves');
+      expect(withoutLiveness(result.stdout)).toBe(`${f.repo}\n  no open leaves`);
       expect(result.stderr).toBe('');
       expect(result.stdout.split('\n').filter((line) => /^\s*\S+\s+failed\b/.test(line))).toHaveLength(0);
       expect(existsSync(open)).toBe(directory === 'empty');
@@ -205,7 +205,7 @@ test('leftovers lists kept paths by reason and host items, skips missing paths a
     const busyDir: string = resolve(f.home, 'busy-worktree');
     mkdirSync(busyDir, { recursive: true });
     const gone: string = resolve(f.home, 'gone-worktree');
-    const report: string = resolve(f.home, 'reconcile/repo.json');
+    const report: string = resolve(f.home, `reconcile/${f.repo}.json`);
     mkdirSync(resolve(f.home, 'reconcile'), { recursive: true });
     writeFileSync(
       report,
@@ -239,7 +239,7 @@ test('leftovers lists kept paths by reason and host items, skips missing paths a
     const result: Result = await cli(f, ['leftovers'], f.home);
     expect(result.code).toBe(0);
     expect(result.stdout).toBe(
-      'repo\n' +
+      `${f.repo}\n` +
         '  uncommitted changes\n' +
         '    ~/kept-worktree\n\n' +
         'host\n' +
@@ -252,7 +252,7 @@ test('leftovers lists kept paths by reason and host items, skips missing paths a
     );
     const board: Result = await cli(f, ['status'], f.home);
     expect(board.code).toBe(0);
-    expect(withoutLiveness(board.stdout)).toBe('repo\n  no open leaves');
+    expect(withoutLiveness(board.stdout)).toBe(`${f.repo}\n  no open leaves`);
     expect(snapshot(f.home)).toEqual(before);
     // Host items still list with zero registered repos.
     const global: object = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
@@ -261,7 +261,7 @@ test('leftovers lists kept paths by reason and host items, skips missing paths a
     expect(empty.code).toBe(0);
     expect(empty.stdout).toContain('host');
     expect(empty.stdout).toContain('akrogon-lstray.slice');
-    expect(empty.stdout).not.toContain('repo\n');
+    expect(empty.stdout).not.toContain(`${f.repo}\n`);
   } finally {
     f.clean();
   }
@@ -272,7 +272,7 @@ test('leftovers fails naming the kept report when it is invalid or unreadable', 
   const folder: string = resolve(f.home, 'reconcile');
   try {
     mkdirSync(folder, { recursive: true });
-    const report: string = resolve(folder, 'repo.json');
+    const report: string = resolve(folder, `${f.repo}.json`);
     writeFileSync(report, '{"kept": [');
     const invalid: Result = await cli(f, ['leftovers'], f.home);
     expect(invalid.code).not.toBe(0);
@@ -321,7 +321,7 @@ test('incomplete repositories report exact paths before readable trees and exit 
     }
     writeFileSync(state, original);
     const history: string = resolve(f.root, 'issues/log.jsonl');
-    for (const malformed of ['{', '{}', event('bad-leaf', 'implement', 1).replace('"slot":"B"', '"slot":"C"')]) {
+    for (const malformed of ['{', '{}', event(f, 'bad-leaf', 'implement', 1).replace('"slot":"B"', '"slot":"C"')]) {
       writeFileSync(history, malformed);
       await verify(history);
     }
@@ -367,21 +367,21 @@ test('repo mismatch identifies both keys in overview and detail while healthy re
   try {
     const path: string = leaf(f, 'wrong-key', 'plan.synthesis', { repo: 'other' });
     leaf(g, 'visible', 'implement', { repo: 'healthy' });
-    register(f, { repo: f.root, healthy: g.root });
+    register(f, { [f.repo]: f.root, healthy: g.root });
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
     const overview: Result = await cli(f, ['status'], f.home);
     expect(overview.code).not.toBe(0);
     const diagnostic: { unreadable: string; path: string; error: string } = z
       .object({ unreadable: z.string(), path: z.string(), error: z.string() })
       .parse(JSON.parse(overview.stdout.split('\n')[0]));
-    expect(diagnostic).toMatchObject({ unreadable: 'repo', path: resolve(path, 'state.yaml') });
+    expect(diagnostic).toMatchObject({ unreadable: f.repo, path: resolve(path, 'state.yaml') });
     expect(overview.stdout).toContain('visible');
     const detail: Result = await cli(f, ['status', 'wrong-key']);
     expect(detail.code).not.toBe(0);
     for (const error of [diagnostic.error, detail.stderr]) {
       expect(error).toContain(path);
       expect(error).toMatch(/stored[^\n]*other/i);
-      expect(error).toMatch(/registered[^\n]*repo/i);
+      expect(error).toMatch(new RegExp(`registered[^\\n]*${f.repo}`, 'i'));
     }
     expect(snapshot(resolve(f.root, 'issues'))).toEqual(before);
   } finally {
@@ -396,7 +396,7 @@ test('a leaf with the removed hand_built key is unreadable while healthy repos r
   try {
     const legacyPath: string = leaf(f, 'legacy', 'implement', { hand_built: true });
     leaf(g, 'visible', 'implement', { repo: 'healthy' });
-    register(f, { repo: f.root, healthy: g.root });
+    register(f, { [f.repo]: f.root, healthy: g.root });
     const result: Result = await cli(f, ['status'], f.home);
     expect(result.code).not.toBe(0);
     const diagnostic: { unreadable: string; path: string; error: string } = z
@@ -416,7 +416,7 @@ test('overview rejects repo mismatches and duplicate slugs within an open repo',
   try {
     const path: string = leaf(f, 'same', 'implement', { repo: 'wrong' });
     expect((await cli(f, ['status'])).code).not.toBe(0);
-    saveState(path, { ...readState(path), repo: 'repo' });
+    saveState(path, { ...readState(path), repo: f.repo });
     leaf(f, 'same', 'implement', {}, 'another');
     const result: Result = await cli(f, ['status']);
     expect(result.code).not.toBe(0);
@@ -440,8 +440,8 @@ test('detail resolves authoritative closed state from a worktree, limits history
     log(
       f,
       Array.from({ length: 13 }, (_, index) =>
-        event('selected', index % 2 === 0 ? 'implement' : 'merged', 20 - index, `record-${index}`),
-      ).flatMap((line) => [line, event('other', 'merged', 0)]),
+        event(f, 'selected', index % 2 === 0 ? 'implement' : 'merged', 20 - index, `record-${index}`),
+      ).flatMap((line) => [line, event(f, 'other', 'merged', 0)]),
     );
     const env: NodeJS.ProcessEnv = procFixture(f).env;
     const before: Record<string, string> = snapshot(resolve(f.root, 'issues'));
@@ -509,7 +509,7 @@ for (const nesting of ['', 'invalid', 'epic/issue/extra/invalid']) {
     const f: Fixture = await fixture();
     const g: Fixture = await fixture();
     try {
-      register(f, { repo: f.root, good: g.root });
+      register(f, { [f.repo]: f.root, good: g.root });
       leaf(g, 'visible', 'implement', { repo: 'good' });
       const source: string = leaf(f, 'invalid', 'implement');
       const path: string = resolve(f.root, 'issues/open', nesting);
@@ -519,7 +519,7 @@ for (const nesting of ['', 'invalid', 'epic/issue/extra/invalid']) {
       const before: Record<string, string> = snapshot(f.root);
       const overview: Result = await cli(f, ['status'], f.home);
       expect(overview.code).toBe(1);
-      expect(overview.stdout).toContain('"unreadable":"repo"');
+      expect(overview.stdout).toContain(`"unreadable":"${f.repo}"`);
       expect(overview.stdout).toContain(resolve(path, 'state.yaml'));
       expect(overview.stdout).toContain('visible');
       expect(snapshot(f.root)).toEqual(before);
@@ -593,7 +593,7 @@ test('--charts lists every chart with taken counts, fog items, stage and age', a
     expect(blank).toMatch(/blank\s+0\/0\s+0\s+empty\s+\d+m$/);
     expect((await cli(f, ['status', 'x', '--charts'])).code).not.toBe(0);
     rmSync(store, { recursive: true });
-    expect(withoutLiveness((await cli(f, ['status', '--charts'])).stdout)).toBe('repo\n  no charts');
+    expect(withoutLiveness((await cli(f, ['status', '--charts'])).stdout)).toBe(`${f.repo}\n  no charts`);
   } finally {
     f.clean();
   }
@@ -723,23 +723,23 @@ test('status prints Missing lines after Failed lines and before the repo section
     leaf(f, 'broken', 'failed');
     leaf(f, 'needy', 'implement');
     const withReadiness: string = leaf(f, 'with-readiness', 'implement');
-    yaml(resolve(withReadiness, 'readiness.yaml'), needs('with-readiness'));
+    yaml(resolve(withReadiness, 'readiness.yaml'), needs(f, 'with-readiness'));
     writeFileSync(resolve(f.root, '.env'), 'OTHER=secretvalue123\n');
     const overview: Result = await cli(f, ['status']);
     expect(overview.code).toBe(0);
-    const missing: string = 'Missing: repo/with-readiness env FOO in repo: ask the vault for FOO';
+    const missing: string = `Missing: ${f.repo}/with-readiness env FOO in ${f.repo}: ask the vault for FOO`;
     expect(overview.stdout).toContain(missing);
     const rows: string[] = overview.stdout.split('\n');
     const failedIndex: number = rows.findIndex((line) => line.startsWith('Failed: '));
     const missingIndex: number = rows.indexOf(missing);
-    const sectionIndex: number = rows.indexOf('repo');
+    const sectionIndex: number = rows.indexOf(f.repo);
     expect(failedIndex).toBeGreaterThanOrEqual(0);
     expect(missingIndex).toBeGreaterThan(failedIndex);
     expect(sectionIndex).toBeGreaterThan(missingIndex);
     expect(rows.filter((line) => line.startsWith('Missing: '))).toHaveLength(1);
     expect(overview.stdout).not.toContain('secretvalue123');
-    expect(overview.stdout).not.toContain('repo/needy ');
-    expect(overview.stdout).not.toContain('repo/broken ');
+    expect(overview.stdout).not.toContain(`${f.repo}/needy `);
+    expect(overview.stdout).not.toContain(`${f.repo}/broken `);
     writeFileSync(resolve(f.root, '.env'), 'OTHER=secretvalue123\nFOO=fill\n');
     const filled: Result = await cli(f, ['status']);
     expect(filled.code).toBe(0);
@@ -754,11 +754,11 @@ test('status detail prints Missing lines between state and History without env v
   const f: Fixture = await fixture();
   try {
     const path: string = leaf(f, 'needs-env', 'implement');
-    yaml(resolve(path, 'readiness.yaml'), needs('needs-env'));
+    yaml(resolve(path, 'readiness.yaml'), needs(f, 'needs-env'));
     writeFileSync(resolve(f.root, '.env'), 'OTHER=secretvalue123\n');
     const detail: Result = await cli(f, ['status', 'needs-env']);
     expect(detail.code).toBe(0);
-    const missing: string = 'Missing: repo/needs-env env FOO in repo: ask the vault for FOO';
+    const missing: string = `Missing: ${f.repo}/needs-env env FOO in ${f.repo}: ask the vault for FOO`;
     expect(detail.stdout).toContain(missing);
     expect(detail.stdout.indexOf(missing)).toBeGreaterThan(detail.stdout.indexOf('phase: implement'));
     expect(detail.stdout.indexOf('History:')).toBeGreaterThan(detail.stdout.indexOf(missing));
@@ -779,7 +779,7 @@ test('merged leaves show gaps in open and closed detail but not overview', async
         {
           kind: 'file',
           name: 'required.pem',
-          holder: 'repo',
+          holder: f.repo,
           purpose: 'certificate',
           consumers: ['done-ready'],
           steps: 'restore required.pem',
@@ -793,14 +793,14 @@ test('merged leaves show gaps in open and closed detail but not overview', async
       proofs: [],
     });
     const open: string = leaf(f, 'still-open', 'implement');
-    yaml(resolve(open, 'readiness.yaml'), needs('still-open'));
+    yaml(resolve(open, 'readiness.yaml'), needs(f, 'still-open'));
     const overview: Result = await cli(f, ['status']);
     expect(overview.code).toBe(0);
-    expect(overview.stdout).toContain('Missing: repo/still-open env FOO');
-    expect(overview.stdout).not.toContain('Missing: repo/done-ready');
+    expect(overview.stdout).toContain(`Missing: ${f.repo}/still-open env FOO`);
+    expect(overview.stdout).not.toContain(`Missing: ${f.repo}/done-ready`);
     const detail: Result = await cli(f, ['status', 'done-ready']);
     expect(detail.code).toBe(0);
-    const missing: string = 'Missing: repo/done-ready file required.pem in repo: restore required.pem';
+    const missing: string = `Missing: ${f.repo}/done-ready file required.pem in ${f.repo}: restore required.pem`;
     expect(detail.stdout).toContain(missing);
     expect(detail.stdout.indexOf('History:')).toBeGreaterThan(detail.stdout.indexOf(missing));
     const closed: string = resolve(f.root, 'issues/closed/issue');
@@ -826,7 +826,7 @@ test('invalid readiness.yaml reports its path in overview and detail', async () 
     const diagnostic: { unreadable: string; path: string; error: string } = z
       .object({ unreadable: z.string(), path: z.string(), error: z.string() })
       .parse(JSON.parse(overview.stdout.split('\n')[0]));
-    expect(diagnostic.unreadable).toBe('repo');
+    expect(diagnostic.unreadable).toBe(f.repo);
     expect(diagnostic.path).toBe(file);
     expect(diagnostic.error).toContain(file);
     const detail: Result = await cli(f, ['status', 'bad-readiness']);
@@ -861,7 +861,7 @@ test('TURN orders unstamped merge leaves by last to: merge record and marks no r
     leaf(f, 'queued', 'merge');
     leaf(f, 'waiting', 'merge');
     leaf(f, 'unmarked', 'merge');
-    log(f, [mergeRecord('queued', 15), mergeRecord('waiting', 10), mergeRecord('queued', 5)]);
+    log(f, [mergeRecord(f, 'queued', 15), mergeRecord(f, 'waiting', 10), mergeRecord(f, 'queued', 5)]);
     const result: Result = await cli(f, ['status']);
     expect(result.code).toBe(0);
     expect(cell(result.stdout, leafRow(result.stdout, 'waiting'), 'TURN')).toBe('holder');
@@ -988,7 +988,7 @@ for (const [name, content] of Object.entries(malformedIndexes)) {
       const diagnostic: { unreadable: string; path: string; error: string } = z
         .object({ unreadable: z.string(), path: z.string(), error: z.string() })
         .parse(JSON.parse(overview.stdout.split('\n')[0]));
-      expect(diagnostic.unreadable).toBe('repo');
+      expect(diagnostic.unreadable).toBe(f.repo);
       expect(diagnostic.path).toBe(index);
       expect(diagnostic.error).toContain(index);
       const detail: Result = await cli(f, ['status', 'indexed']);
@@ -1003,7 +1003,7 @@ for (const [name, content] of Object.entries(malformedIndexes)) {
 test('unpacked folders are listed with their pack command and open .closing names next', async () => {
   const f: Fixture = await fixture();
   try {
-    register(f, { repo: f.root });
+    register(f, { [f.repo]: f.root });
     const closedLog: string = resolve(f.root, 'issues/closed/finished/leaf/check-a-1.log');
     mkdirSync(resolve(closedLog, '..'), { recursive: true });
     writeFileSync(closedLog, 'alpha\n');
@@ -1084,14 +1084,14 @@ test('status shows the run line only while a listed run waits', async () => {
     const board: string = (await cli(f, ['status'])).stdout;
     expect(board).toMatch(/run line/);
     expect(board).toMatch(/REPO\s+LEAF\s+CHECK\s+STATE\s+AGE\s+RUN/);
-    expect(board).toMatch(/repo\s+seeded\s+test\s+running\s+\d+h \d+m\s+r-live/);
-    expect(board).toMatch(/repo\s+leaf-two\s+test\s+waiting 1\s+\d+h \d+m\s+repo-w1/);
-    expect(board).toMatch(/repo\s+leaf-one\s+test\s+waiting 2\s+\d+h \d+m\s+repo-w2/);
+    expect(board).toMatch(new RegExp(`${f.repo}\\s+seeded\\s+test\\s+running\\s+\\d+h \\d+m\\s+r-live`));
+    expect(board).toMatch(new RegExp(`${f.repo}\\s+leaf-two\\s+test\\s+waiting 1\\s+\\d+h \\d+m\\s+repo-w1`));
+    expect(board).toMatch(new RegExp(`${f.repo}\\s+leaf-one\\s+test\\s+waiting 2\\s+\\d+h \\d+m\\s+repo-w2`));
     expect(board).toMatch(/other\s+oleaf\s+test\s+running\s+\d+h \d+m\s+other-h/);
     expect(board).toMatch(/other\s+oleaf2\s+test\s+waiting 1\s+\d+h \d+m\s+other-w/);
     expect(board).not.toMatch(/unlisted/);
     // An ended record still holds its repo's line until removal, so it shows its real state.
-    expect(board).toMatch(/repo\s+seeded\s+test\s+ended\s+\d+h \d+m\s+r-ended/);
+    expect(board).toMatch(new RegExp(`${f.repo}\\s+seeded\\s+test\\s+ended\\s+\\d+h \\d+m\\s+r-ended`));
   } finally {
     f.clean();
   }

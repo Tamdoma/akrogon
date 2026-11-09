@@ -313,7 +313,7 @@ test('wait ends when an operator removes a prerequisite and a picked leaf has mi
         {
           kind: 'file',
           name: 'approval.txt',
-          holder: 'repo',
+          holder: f.repo,
           purpose: 'operator approval',
           consumers: ['waiting'],
           steps: 'create approval.txt',
@@ -353,7 +353,7 @@ test('repo pause event is persisted before its state lock is released', async ()
       .filter((line) => line !== '')
       .map((line) => JSON.parse(line) as Event);
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ kind: 'repo_pause', repo: 'repo', pause: 'on' });
+    expect(events[0]).toMatchObject({ kind: 'repo_pause', repo: f.repo, pause: 'on' });
   } finally {
     await f.clean();
   }

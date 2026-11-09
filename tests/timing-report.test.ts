@@ -14,10 +14,10 @@ function at(minutes: number, seconds = 0, from: string = ZERO): string {
   return new Date(Date.parse(from) + minutes * 60000 + seconds * 1000).toISOString();
 }
 
-function move(over: Row): Row {
+function move(f: Fixture, over: Row): Row {
   return {
     ts: ZERO,
-    repo: 'repo',
+    repo: f.repo,
     slug: 'x',
     from: 'plan.synthesis',
     to: 'implement',
@@ -32,16 +32,16 @@ function move(over: Row): Row {
   };
 }
 
-function event(over: Row): Row {
-  return { ts: ZERO, repo: 'repo', slug: 'x', ...over };
+function event(f: Fixture, over: Row): Row {
+  return { ts: ZERO, repo: f.repo, slug: 'x', ...over };
 }
 
-function visitStart(slug: string, phase: string, visit: number, ts: string): Row {
-  return event({ slug, kind: 'visit_start', phase, visit, ts });
+function visitStart(f: Fixture, slug: string, phase: string, visit: number, ts: string): Row {
+  return event(f, { slug, kind: 'visit_start', phase, visit, ts });
 }
 
-function prompt(slug: string, slot: string, phase: string, visit: number, ts: string): Row {
-  return event({ slug, kind: 'prompt', slot, phase, visit, session: null, outcome: 'delivered', ts });
+function prompt(f: Fixture, slug: string, slot: string, phase: string, visit: number, ts: string): Row {
+  return event(f, { slug, kind: 'prompt', slot, phase, visit, session: null, outcome: 'delivered', ts });
 }
 
 function records(f: Fixture, file: 'log' | 'timings' | 'merge-attempts', rows: Row[]): void {
@@ -60,22 +60,22 @@ test('slug report: each closed visit decomposes into priority waits, prompted ti
   const f: Fixture = await fixture();
   try {
     records(f, 'log', [
-      move({ slug: 't1', from: 'failed', to: 'plan.synthesis', ts: at(0) }),
-      move({ slug: 't1', from: 'plan.synthesis', to: 'implement', ts: at(40) }),
-      move({ slug: 't1', from: 'implement', to: 'check.review', ts: at(50) }),
-      move({ slug: 't1', from: 'check.review', to: 'merge', ts: at(52) }),
-      move({ slug: 't1', from: 'merge', to: 'merged', ts: at(60) }),
+      move(f, { slug: 't1', from: 'failed', to: 'plan.synthesis', ts: at(0) }),
+      move(f, { slug: 't1', from: 'plan.synthesis', to: 'implement', ts: at(40) }),
+      move(f, { slug: 't1', from: 'implement', to: 'check.review', ts: at(50) }),
+      move(f, { slug: 't1', from: 'check.review', to: 'merge', ts: at(52) }),
+      move(f, { slug: 't1', from: 'merge', to: 'merged', ts: at(60) }),
     ]);
     records(f, 'timings', [
-      visitStart('t1', 'plan.synthesis', 0, at(0)),
-      prompt('t1', 'A', 'plan.synthesis', 0, at(10)),
-      event({ slug: 't1', kind: 'wait', reason: 'parked', ts: at(21) }),
-      { ts: at(22), repo: 'repo', kind: 'repo_pause', pause: 'on' },
-      { ts: at(25), repo: 'repo', kind: 'repo_pause', pause: 'off' },
-      event({ slug: 't1', kind: 'wait', reason: 'none', ts: at(26) }),
-      visitStart('t1', 'implement', 0, at(40)),
-      prompt('t1', 'A', 'implement', 0, at(41)),
-      event({
+      visitStart(f, 't1', 'plan.synthesis', 0, at(0)),
+      prompt(f, 't1', 'A', 'plan.synthesis', 0, at(10)),
+      event(f, { slug: 't1', kind: 'wait', reason: 'parked', ts: at(21) }),
+      { ts: at(22), repo: f.repo, kind: 'repo_pause', pause: 'on' },
+      { ts: at(25), repo: f.repo, kind: 'repo_pause', pause: 'off' },
+      event(f, { slug: 't1', kind: 'wait', reason: 'none', ts: at(26) }),
+      visitStart(f, 't1', 'implement', 0, at(40)),
+      prompt(f, 't1', 'A', 'implement', 0, at(41)),
+      event(f, {
         slug: 't1',
         kind: 'check_start',
         run: 'r1',
@@ -84,7 +84,7 @@ test('slug report: each closed visit decomposes into priority waits, prompted ti
         phase: 'implement',
         ts: at(42),
       }),
-      event({
+      event(f, {
         slug: 't1',
         kind: 'check_end',
         run: 'r1',
@@ -96,13 +96,13 @@ test('slug report: each closed visit decomposes into priority waits, prompted ti
         log: 'x',
         ts: at(47),
       }),
-      visitStart('t1', 'check.review', 0, at(50)),
-      prompt('t1', 'A', 'check.review', 0, at(50, 30)),
-      prompt('t1', 'B', 'check.review', 0, at(51)),
-      event({ slug: 't1', kind: 'seat_done', slot: 'A', phase: 'check.review', visit: 0, ts: at(51, 30) }),
-      visitStart('t1', 'merge', 0, at(52)),
-      prompt('t1', 'B', 'merge', 0, at(53)),
-      visitStart('t1', 'merged', 0, at(60)),
+      visitStart(f, 't1', 'check.review', 0, at(50)),
+      prompt(f, 't1', 'A', 'check.review', 0, at(50, 30)),
+      prompt(f, 't1', 'B', 'check.review', 0, at(51)),
+      event(f, { slug: 't1', kind: 'seat_done', slot: 'A', phase: 'check.review', visit: 0, ts: at(51, 30) }),
+      visitStart(f, 't1', 'merge', 0, at(52)),
+      prompt(f, 't1', 'B', 'merge', 0, at(53)),
+      visitStart(f, 't1', 'merged', 0, at(60)),
     ]);
     const result = await timing(f, ['t1']);
     expect(result.code).toBe(0);
@@ -135,25 +135,25 @@ test('slug report: missing expected events are named per visit while exempt visi
   const f: Fixture = await fixture();
   try {
     records(f, 'log', [
-      move({ slug: 't2', from: 'failed', to: 'plan.synthesis', ts: at(0) }),
-      move({ slug: 't2', from: 'plan.synthesis', to: 'implement', ts: at(10) }),
-      move({ slug: 't2', from: 'implement', to: 'check.review', ts: at(20) }),
-      move({ slug: 't2', from: 'check.review', to: 'check.fix', ts: at(30) }),
-      move({ slug: 't2', from: 'check.fix', to: 'check.review', ts: at(40), fix_rounds: 1 }),
-      move({ slug: 't2', from: 'check.review', to: 'merge', ts: at(50), fix_rounds: 1 }),
-      move({ slug: 't2', from: 'merge', to: 'failed', ts: at(60), fix_rounds: 1 }),
-      move({ slug: 't2', from: 'failed', to: 'implement', ts: at(70), fix_rounds: 1 }),
+      move(f, { slug: 't2', from: 'failed', to: 'plan.synthesis', ts: at(0) }),
+      move(f, { slug: 't2', from: 'plan.synthesis', to: 'implement', ts: at(10) }),
+      move(f, { slug: 't2', from: 'implement', to: 'check.review', ts: at(20) }),
+      move(f, { slug: 't2', from: 'check.review', to: 'check.fix', ts: at(30) }),
+      move(f, { slug: 't2', from: 'check.fix', to: 'check.review', ts: at(40), fix_rounds: 1 }),
+      move(f, { slug: 't2', from: 'check.review', to: 'merge', ts: at(50), fix_rounds: 1 }),
+      move(f, { slug: 't2', from: 'merge', to: 'failed', ts: at(60), fix_rounds: 1 }),
+      move(f, { slug: 't2', from: 'failed', to: 'implement', ts: at(70), fix_rounds: 1 }),
     ]);
     records(f, 'timings', [
-      visitStart('t2', 'plan.synthesis', 0, at(0)),
-      prompt('t2', 'A', 'plan.synthesis', 0, at(5)),
-      visitStart('t2', 'implement', 0, at(10)),
-      visitStart('t2', 'check.review', 0, at(20)),
-      prompt('t2', 'A', 'check.review', 0, at(21)),
-      prompt('t2', 'B', 'check.review', 0, at(22)),
-      visitStart('t2', 'check.fix', 0, at(30)),
-      prompt('t2', 'A', 'check.fix', 0, at(31)),
-      event({
+      visitStart(f, 't2', 'plan.synthesis', 0, at(0)),
+      prompt(f, 't2', 'A', 'plan.synthesis', 0, at(5)),
+      visitStart(f, 't2', 'implement', 0, at(10)),
+      visitStart(f, 't2', 'check.review', 0, at(20)),
+      prompt(f, 't2', 'A', 'check.review', 0, at(21)),
+      prompt(f, 't2', 'B', 'check.review', 0, at(22)),
+      visitStart(f, 't2', 'check.fix', 0, at(30)),
+      prompt(f, 't2', 'A', 'check.fix', 0, at(31)),
+      event(f, {
         slug: 't2',
         kind: 'check_start',
         run: 'r5',
@@ -162,12 +162,12 @@ test('slug report: missing expected events are named per visit while exempt visi
         phase: 'check.fix',
         ts: at(32),
       }),
-      visitStart('t2', 'check.review', 1, at(40)),
-      prompt('t2', 'B', 'check.review', 1, at(41)),
-      visitStart('t2', 'merge', 0, at(50)),
-      event({ slug: 't2', kind: 'check_start', run: 'r9', name: 'lint', scope: 'leaf', phase: 'merge', ts: at(55) }),
-      visitStart('t2', 'implement', 1, at(70)),
-      event({
+      visitStart(f, 't2', 'check.review', 1, at(40)),
+      prompt(f, 't2', 'B', 'check.review', 1, at(41)),
+      visitStart(f, 't2', 'merge', 0, at(50)),
+      event(f, { slug: 't2', kind: 'check_start', run: 'r9', name: 'lint', scope: 'leaf', phase: 'merge', ts: at(55) }),
+      visitStart(f, 't2', 'implement', 1, at(70)),
+      event(f, {
         slug: 't2',
         kind: 'check_start',
         run: 'r10',
@@ -218,25 +218,25 @@ type MemberSpec = {
   extraTimings?: Row[];
 };
 
-function member(slug: string, planTs: string, fMin: number, spec: MemberSpec = {}): { log: Row[]; timings: Row[] } {
+function member(f: Fixture, slug: string, planTs: string, fMin: number, spec: MemberSpec = {}): { log: Row[]; timings: Row[] } {
   const implPrompt: string = new Date(Date.parse(planTs) + 10 * 60000).toISOString();
   const implEnd: string = new Date(Date.parse(planTs) + 20 * 60000).toISOString();
   const merged: string = new Date(Date.parse(planTs) + (fMin + 10) * 60000).toISOString();
-  const log: Row[] = [move({ slug, from: 'failed', to: 'plan.synthesis', ts: planTs })];
+  const log: Row[] = [move(f, { slug, from: 'failed', to: 'plan.synthesis', ts: planTs })];
   const timings: Row[] = [
-    visitStart(slug, 'plan.synthesis', 0, planTs),
-    prompt(slug, 'A', 'plan.synthesis', 0, planTs),
+    visitStart(f, slug, 'plan.synthesis', 0, planTs),
+    prompt(f, slug, 'A', 'plan.synthesis', 0, planTs),
   ];
   if (spec.failedFrom !== 'plan.synthesis') {
-    log.push(move({ slug, from: 'plan.synthesis', to: 'implement', ts: implPrompt }));
-    timings.push(visitStart(slug, 'implement', 0, implPrompt), prompt(slug, 'A', 'implement', 0, implPrompt));
-    log.push(move({ slug, from: 'implement', to: 'check.review', ts: implEnd, diff: spec.diff ?? '' }));
+    log.push(move(f, { slug, from: 'plan.synthesis', to: 'implement', ts: implPrompt }));
+    timings.push(visitStart(f, slug, 'implement', 0, implPrompt), prompt(f, slug, 'A', 'implement', 0, implPrompt));
+    log.push(move(f, { slug, from: 'implement', to: 'check.review', ts: implEnd, diff: spec.diff ?? '' }));
   }
   if (spec.extraLog !== undefined) log.push(...spec.extraLog);
   if (spec.failed !== undefined)
-    log.push(move({ slug, from: spec.failedFrom ?? 'implement', to: 'failed', ts: spec.failed }));
+    log.push(move(f, { slug, from: spec.failedFrom ?? 'implement', to: 'failed', ts: spec.failed }));
   if (spec.failed === undefined && spec.stalled !== true)
-    log.push(move({ slug, from: 'merge', to: 'merged', ts: merged }));
+    log.push(move(f, { slug, from: 'merge', to: 'merged', ts: merged }));
   if (spec.waitRows !== undefined) timings.push(...spec.waitRows);
   if (spec.extraTimings !== undefined) timings.push(...spec.extraTimings);
   return { log, timings };
@@ -253,14 +253,14 @@ test('cohort gate: pass applies membership, 600-line exit, stall and failure acc
   try {
     const log: Row[] = [];
     const timings: Row[] = [];
-    const old = member('l_old', at(0, 0, '2026-09-01T00:00:00.000Z'), 30);
+    const old = member(f, 'l_old', at(0, 0, '2026-09-01T00:00:00.000Z'), 30);
     log.push(...old.log);
     timings.push(...old.timings);
     const slugs: string[] = Array.from({ length: 21 }, (_, index) => `l${String(index + 1).padStart(2, '0')}`);
     for (const [index, slug] of slugs.entries()) {
       const planTs: string = at(index + 1);
       if (index === 4) {
-        const big = member('lbig', at(4, 30), 30, { diff: ' 1 file changed, 700 insertions(+)' });
+        const big = member(f, 'lbig', at(4, 30), 30, { diff: ' 1 file changed, 700 insertions(+)' });
         log.push(...big.log);
         timings.push(...big.timings);
       }
@@ -272,19 +272,19 @@ test('cohort gate: pass applies membership, 600-line exit, stall and failure acc
       if (slug === 'l20') spec.stalled = true;
       if (slug === 'l02')
         spec.waitRows = [
-          event({ slug, kind: 'wait', reason: 'parked', ts: at(index + 3) }),
-          event({ slug, kind: 'wait', reason: 'prerequisite', blocking: 'l01', ts: at(index + 8) }),
-          event({ slug, kind: 'wait', reason: 'none', ts: at(index + 11) }),
+          event(f, { slug, kind: 'wait', reason: 'parked', ts: at(index + 3) }),
+          event(f, { slug, kind: 'wait', reason: 'prerequisite', blocking: 'l01', ts: at(index + 8) }),
+          event(f, { slug, kind: 'wait', reason: 'none', ts: at(index + 11) }),
         ];
       if (slug === 'l03') {
-        spec.extraLog = [move({ slug, from: 'check.review', to: 'merge', ts: at(index + 31) })];
+        spec.extraLog = [move(f, { slug, from: 'check.review', to: 'merge', ts: at(index + 31) })];
         spec.extraTimings = [
-          visitStart(slug, 'check.review', 0, at(index + 23)),
-          prompt(slug, 'A', 'check.review', 0, at(index + 24)),
-          prompt(slug, 'B', 'check.review', 0, at(index + 25)),
+          visitStart(f, slug, 'check.review', 0, at(index + 23)),
+          prompt(f, slug, 'A', 'check.review', 0, at(index + 24)),
+          prompt(f, slug, 'B', 'check.review', 0, at(index + 25)),
         ];
       }
-      const part = member(slug, planTs, 30, spec);
+      const part = member(f, slug, planTs, 30, spec);
       log.push(...part.log);
       timings.push(...part.timings);
     }
@@ -316,7 +316,7 @@ test('cohort gate: fail when fewer than 18 members merge', async () => {
     for (let index = 0; index < 20; index++) {
       const slug: string = `f${String(index + 1).padStart(2, '0')}`;
       const spec: MemberSpec = index >= 17 ? { failed: at(90, 0), failedFrom: 'implement' } : {};
-      const part = member(slug, at(index + 1), 20, spec);
+      const part = member(f, slug, at(index + 1), 20, spec);
       log.push(...part.log);
       timings.push(...part.timings);
     }
@@ -336,12 +336,12 @@ test('cohort gate: insufficient while a member is unmerged and younger than 24 h
     const timings: Row[] = [];
     for (let index = 0; index < 19; index++) {
       const slug: string = `s${String(index + 1).padStart(2, '0')}`;
-      const part = member(slug, at(index + 1), 20);
+      const part = member(f, slug, at(index + 1), 20);
       log.push(...part.log);
       timings.push(...part.timings);
     }
     const recent: string = new Date(Date.now() - 60 * 60000).toISOString();
-    const part = member('s20', recent, 20, { stalled: true });
+    const part = member(f, 's20', recent, 20, { stalled: true });
     log.push(...part.log);
     timings.push(...part.timings);
     cohortFixture(f, log, timings);
@@ -361,7 +361,7 @@ test('cohort gate: fails when the two central F values average above 35 minutes'
     const timings: Row[] = [];
     for (let index = 0; index < 20; index++) {
       const fMin: number = index < 10 ? 30 : index < 15 ? 42 : 60;
-      const part: { log: Row[]; timings: Row[] } = member(`median${index}`, at(index + 1), fMin);
+      const part: { log: Row[]; timings: Row[] } = member(f, `median${index}`, at(index + 1), fMin);
       log.push(...part.log);
       timings.push(...part.timings);
     }
@@ -380,7 +380,7 @@ test('cohort gate: remains insufficient with 17 merged and three stalled members
     const log: Row[] = [];
     const timings: Row[] = [];
     for (let index = 0; index < 20; index++) {
-      const part: { log: Row[]; timings: Row[] } = member(`stalled${index}`, at(index + 1), 20, {
+      const part: { log: Row[]; timings: Row[] } = member(f, `stalled${index}`, at(index + 1), 20, {
         stalled: index >= 17,
       });
       log.push(...part.log);
@@ -419,7 +419,7 @@ function carrier(
     slug,
     phase: 'implement',
     created,
-    repo: 'repo',
+    repo: f.repo,
     'blocked-by': [],
     sources,
   });
@@ -444,11 +444,11 @@ test('flow report: carried issues print one sorted line each with day spans and 
     carrier(f, 'closed', 'second-issue', 'a3', '2026-10-10', ['acme/project#2']);
     carrier(f, 'closed', 'gone', 'a5', '2026-10-12', ['other/repo#99']);
     records(f, 'log', [
-      move({ slug: 'a1', from: 'implement', to: 'merge', ts: '2026-10-08T06:00:00.000Z' }),
-      move({ slug: 'a1', from: 'merge', to: 'merged', ts: '2026-10-08T12:00:00.000Z' }),
-      move({ slug: 'a2', from: 'merge', to: 'merged', ts: '2026-10-06T10:00:00.000Z' }),
-      move({ slug: 'a3', from: 'merge', to: 'merged', ts: '2026-10-11T00:00:00.000Z' }),
-      move({ slug: 'a5', from: 'merge', to: 'merged', ts: '2026-10-13T00:00:00.000Z' }),
+      move(f, { slug: 'a1', from: 'implement', to: 'merge', ts: '2026-10-08T06:00:00.000Z' }),
+      move(f, { slug: 'a1', from: 'merge', to: 'merged', ts: '2026-10-08T12:00:00.000Z' }),
+      move(f, { slug: 'a2', from: 'merge', to: 'merged', ts: '2026-10-06T10:00:00.000Z' }),
+      move(f, { slug: 'a3', from: 'merge', to: 'merged', ts: '2026-10-11T00:00:00.000Z' }),
+      move(f, { slug: 'a5', from: 'merge', to: 'merged', ts: '2026-10-13T00:00:00.000Z' }),
     ]);
     ghScript(gh, [
       {
@@ -588,8 +588,8 @@ test('flow report: even counts average the middle two values for merged medians 
     carrier(f, 'closed', 'pair-a', 'm1', '2026-10-13', ['acme/project#20']);
     carrier(f, 'closed', 'pair-b', 'm2', '2026-10-13', ['acme/project#21']);
     records(f, 'log', [
-      move({ slug: 'm1', from: 'merge', to: 'merged', ts: '2026-10-14T00:00:00.000Z' }),
-      move({ slug: 'm2', from: 'merge', to: 'merged', ts: '2026-10-14T12:00:00.000Z' }),
+      move(f, { slug: 'm1', from: 'merge', to: 'merged', ts: '2026-10-14T00:00:00.000Z' }),
+      move(f, { slug: 'm2', from: 'merge', to: 'merged', ts: '2026-10-14T12:00:00.000Z' }),
     ]);
     ghScript(gh, [
       {
@@ -685,9 +685,9 @@ test('cohort member: parked waiting continues after the last phase move', async 
   const f: Fixture = await fixture();
   try {
     const joined: string = new Date(Date.now() - 48 * 60 * 60000).toISOString();
-    const part: { log: Row[]; timings: Row[] } = member('parked', joined, 20, {
+    const part: { log: Row[]; timings: Row[] } = member(f, 'parked', joined, 20, {
       stalled: true,
-      waitRows: [event({ slug: 'parked', kind: 'wait', reason: 'parked', ts: at(25, 0, joined) })],
+      waitRows: [event(f, { slug: 'parked', kind: 'wait', reason: 'parked', ts: at(25, 0, joined) })],
     });
     cohortFixture(f, part.log, part.timings);
     const result: { code: number; stdout: string; stderr: string } = await timing(f, ['--cohort', '--since', SINCE]);

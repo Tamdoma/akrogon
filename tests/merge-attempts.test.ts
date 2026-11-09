@@ -85,7 +85,7 @@ async function batchFixture(
 ): Promise<BatchFixture> {
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
   process.env.HOME = f.home;
-  const repo: Repo = readRepo('repo', f.root);
+  const repo: Repo = readRepo(f.repo, f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
   const branch: Branch = await branchAt(f, 'hold', builtOn, 'file-hold', undefined, inStore);
   const holderPath: string = leaf(f, 'hold', 'merge', {
@@ -117,7 +117,7 @@ function hcProc(f: HcFixture): () => ProcFixture {
 async function soloFixture(f: Fixture): Promise<BatchFixture> {
   process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
   process.env.HOME = f.home;
-  const repo: Repo = readRepo('repo', f.root);
+  const repo: Repo = readRepo(f.repo, f.root);
   const builtOn: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
   const branch: Branch = await branchAt(f, 'hold', builtOn, 'file-hold');
   const holderPath: string = leaf(f, 'hold', 'merge', {
@@ -222,12 +222,15 @@ const nextBody: string =
   JSON.stringify(resolve(import.meta.dir, '../src/next.ts')) +
   ';\ntry { await nextCommand(undefined, process.argv[2]); } catch (e) { console.error(e); process.exit(1); }\n';
 
-const mergePassBody: string =
-  'import { mergePass } from ' +
-  JSON.stringify(resolve(import.meta.dir, '../src/next.ts')) +
-  ';\nimport { readGlobal, readRepo } from ' +
-  JSON.stringify(resolve(import.meta.dir, '../src/config.ts')) +
-  ";\ntry { await mergePass(readGlobal(), readRepo('repo', process.cwd()), { skipped: new Set(), dispatched: new Set() }, false, process.argv[2]); } catch (e) { console.error(e); process.exit(1); }\n";
+function mergePassBody(repo: string): string {
+  return (
+    'import { mergePass } from ' +
+    JSON.stringify(resolve(import.meta.dir, '../src/next.ts')) +
+    ';\nimport { readGlobal, readRepo } from ' +
+    JSON.stringify(resolve(import.meta.dir, '../src/config.ts')) +
+    (';\ntry { await mergePass(readGlobal(), readRepo(' + JSON.stringify(repo) + ", process.cwd()), { skipped: new Set(), dispatched: new Set() }, false, process.argv[2]); } catch (e) { console.error(e); process.exit(1); }\n")
+  );
+}
 
 async function spawn(
   f: Fixture,
@@ -273,7 +276,7 @@ test.serial('a green batch appends one merged attempt line and log.jsonl keeps i
     expect(lines).toHaveLength(1);
     const line: Attempt = lines[0];
     expect(line.outcome).toBe('merged');
-    expect(line.repo).toBe('repo');
+    expect(line.repo).toBe(f.repo);
     expect(line.holder).toBe('hold');
     expect(line.attempt).toBe(record.attempt);
     expect(line.built_on).toMatch(/^[0-9a-f]{40}$/);
@@ -564,7 +567,7 @@ test.serial('legacy held, split and ejected lines still parse beside a recorded 
       resolve(f.root, 'issues/merge-attempts.jsonl'),
       JSON.stringify({
         attempt: 'a0',
-        repo: 'repo',
+        repo: f.repo,
         holder: 'hold',
         members: [],
         built_on: 'a'.repeat(40),
@@ -574,7 +577,7 @@ test.serial('legacy held, split and ejected lines still parse beside a recorded 
         '\n' +
         JSON.stringify({
           attempt: 'a0',
-          repo: 'repo',
+          repo: f.repo,
           holder: 'hold',
           members: ['mem-a'],
           built_on: 'a'.repeat(40),
@@ -584,7 +587,7 @@ test.serial('legacy held, split and ejected lines still parse beside a recorded 
         '\n' +
         JSON.stringify({
           attempt: 'a0',
-          repo: 'repo',
+          repo: f.repo,
           holder: 'hold',
           members: ['mem-a'],
           built_on: 'a'.repeat(40),
@@ -742,7 +745,7 @@ test.serial('a malformed pressure file stops batch creation before any batch or 
     const proc: ProcFixture = procFixture(f);
     const holderPath: string = leaf(f, 'hold', 'merge', { merge_stamp: '2026-10-05T00:00:00.000Z' });
     const dir: string = pressureDir(f, { cpu: 'abc', memory: '90', io: '180' });
-    const merged: Result = await spawn(f, 'create', mergePassBody, proc.env, [dir]);
+    const merged: Result = await spawn(f, 'create', mergePassBody(f.repo), proc.env, [dir]);
     expect(merged.code).not.toBe(0);
     expect(merged.stderr).toContain(resolve(dir, 'cpu'));
     expect(merged.stderr).toContain('total=');
@@ -796,7 +799,7 @@ test.serial('a decimal pressure total stops batch creation before any batch or l
     const dir: string = pressureDir(f, { cpu: '12.5', memory: '90', io: '180' });
     const before: State = readState(holderPath);
     const tip: string = await remoteTip(f);
-    const merged: Result = await spawn(f, 'create', mergePassBody, proc.env, [dir]);
+    const merged: Result = await spawn(f, 'create', mergePassBody(f.repo), proc.env, [dir]);
     expect(merged.code).not.toBe(0);
     expect(merged.stderr).toContain(resolve(dir, 'cpu'));
     expect(merged.stderr).toContain('total=');
@@ -820,7 +823,7 @@ test.serial('a created batch preserves PSI counters through two reruns', async (
       merge_stamp: '2026-10-05T00:00:00.000Z',
     });
     const dir: string = pressureDir(f, { cpu: '5', memory: '6', io: '7' });
-    const created: Result = await spawn(f, 'create', mergePassBody, proc.env, [dir]);
+    const created: Result = await spawn(f, 'create', mergePassBody(f.repo), proc.env, [dir]);
     expect(created.code).toBe(0);
     const batch: Batch = readState(holderPath).batch!;
     expect(batch.pressure_start).toEqual({ cpu: 5, memory: 6, io: 7, boot_id: 'boot-1' });

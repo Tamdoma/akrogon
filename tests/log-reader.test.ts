@@ -145,7 +145,7 @@ test('log resolves against every registered repo outside one and names matches o
 
     const ambiguous: Awaited<ReturnType<typeof logRun>> = await logRun(f, shared, f.home);
     expect(ambiguous.code).not.toBe(0);
-    expect(ambiguous.stderr).toContain('repo');
+    expect(ambiguous.stderr).toContain(f.repo);
     expect(ambiguous.stderr).toContain('repo2');
 
     const missing: Awaited<ReturnType<typeof logRun>> = await logRun(f, 'issues/open/ghost/leaf/x.log', f.home);

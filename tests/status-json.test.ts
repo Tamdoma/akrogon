@@ -100,15 +100,15 @@ test('status --json covers every registered repo from any folder', async () => {
   try {
     leaf(f, 'home-leaf', 'implement');
     leaf(g, 'other-leaf', 'check.review', { repo: 'other' });
-    register(f, { repo: f.root, other: g.root });
+    register(f, { [f.repo]: f.root, other: g.root });
     for (const cwd of [f.root, '/']) {
       const before: number = Date.now();
       const result: Result = await cli(f, ['status', '--json'], cwd);
       expect(result.code).toBe(0);
       const env: Envelope = envelope(result);
       expect(env.generated).toBeGreaterThanOrEqual(before);
-      expect(env.repos.map((r) => r.name)).toEqual(['other', 'repo']);
-      expect(repoOf(env, 'repo').root).toBe(f.root);
+      expect(env.repos.map((r) => r.name)).toEqual([f.repo, 'other']);
+      expect(repoOf(env, f.repo).root).toBe(f.root);
       expect(repoOf(env, 'other').root).toBe(g.root);
       expect(repoOf(env, 'other').leaves.map((l) => l.slug)).toEqual(['other-leaf']);
     }
@@ -129,7 +129,7 @@ test('envelope carries every board alert fact', async () => {
   try {
     leaf(f, 'broken', 'failed', { failure: { cause: 'blocked', phase: 'implement', slot: 'B', reason: 'no key' } });
     const needy: string = leaf(f, 'needy', 'implement');
-    yaml(resolve(needy, 'readiness.yaml'), needs('needy'));
+    yaml(resolve(needy, 'readiness.yaml'), needs(f, 'needy'));
     const bad: string = leaf(f, 'bad-leaf', 'implement');
     writeFileSync(resolve(bad, 'state.yaml'), 'slug: [');
     yaml(resolve(f.home, 'deploy.yaml'), {
@@ -139,12 +139,12 @@ test('envelope carries every board alert fact', async () => {
       error: 'typecheck failed',
     });
     yaml(resolve(f.home, 'paused.yaml'), { other: true });
-    register(f, { repo: f.root, other: '/nonexistent-registered-path' });
+    register(f, { [f.repo]: f.root, other: '/nonexistent-registered-path' });
     mkdirSync(resolve(f.root, 'issues/closed/finished'), { recursive: true });
     writeFileSync(resolve(f.root, 'issues/closed/finished/x.log'), 'x\n');
     const slowLine: string = JSON.stringify({
       run: 'slowrun',
-      repo: 'repo',
+      repo: f.repo,
       leaf: 'old',
       sha: 'a',
       tree: 't',
@@ -161,13 +161,13 @@ test('envelope carries every board alert fact', async () => {
     const result: Result = await cli(f, ['status', '--json']);
     expect(result.code).toBe(1);
     const env: Envelope = envelope(result);
-    const repo = repoOf(env, 'repo');
-    expect(leafOf(env, 'repo', 'broken').red).toBe(true);
-    expect(leafOf(env, 'repo', 'broken').failure).toMatchObject({ cause: 'blocked', reason: 'no key' });
-    expect(leafOf(env, 'repo', 'needy').missing).toEqual([
-      { kind: 'env', name: 'FOO', holder: 'repo', steps: 'ask the vault for FOO' },
+    const repo = repoOf(env, f.repo);
+    expect(leafOf(env, f.repo, 'broken').red).toBe(true);
+    expect(leafOf(env, f.repo, 'broken').failure).toMatchObject({ cause: 'blocked', reason: 'no key' });
+    expect(leafOf(env, f.repo, 'needy').missing).toEqual([
+      { kind: 'env', name: 'FOO', holder: f.repo, steps: 'ask the vault for FOO' },
     ]);
-    expect(leafOf(env, 'repo', 'needy').red).toBe(true);
+    expect(leafOf(env, f.repo, 'needy').red).toBe(true);
     expect(repo.unreadable).toEqual([{ path: resolve(bad, 'state.yaml'), error: expect.any(String) }]);
     expect(repo.slow).toEqual({ leaf: 'firstleaf', run: 'first-run', ms: 600000, normal_ms: 300000 });
     expect(repo.unpacked).toEqual([{ path: 'issues/closed/finished', command: 'akrogon pack issues/closed/finished' }]);
@@ -197,7 +197,7 @@ test('envelope carries row and section facts', async () => {
     leaf(f, 'dep-done', 'merged');
     const depParked = 'resting';
     leaf(f, 'waiter', 'implement', { 'blocked-by': ['dep-open', 'dep-done', depParked, 'ghost'] });
-    yaml(resolve(f.home, 'stopped.yaml'), { 'repo/stopped-leaf': true });
+    yaml(resolve(f.home, 'stopped.yaml'), { [`${f.repo}/stopped-leaf`]: true });
     leaf(f, 'stopped-leaf', 'implement');
     leaf(f, 'holder', 'merge', { merge_stamp: new Date(Date.now() - 20 * 60000).toISOString() });
     leaf(f, 'second', 'merge', { merge_stamp: new Date(Date.now() - 10 * 60000).toISOString() });
@@ -210,7 +210,7 @@ test('envelope carries row and section facts', async () => {
     });
     mkdirSync(resolve(f.home, 'reconcile'), { recursive: true });
     writeFileSync(
-      resolve(f.home, 'reconcile', 'repo.json'),
+      resolve(f.home, 'reconcile', `${f.repo}.json`),
       JSON.stringify({ kept: [{ path: '/kept-one', reason: 'uncommitted changes' }] }) + '\n',
     );
     writeFileSync(
@@ -220,21 +220,21 @@ test('envelope carries row and section facts', async () => {
     mkdirSync(resolve(f.root, 'issues/chart/alpha'), { recursive: true });
     writeFileSync(resolve(f.root, 'issues/chart/alpha/CHART.md'), '# Chart: alpha\n\n## Fog\n- a gap\n');
     const env: Envelope = envelope(await cli(f, ['status', '--json']));
-    const repo = repoOf(env, 'repo');
-    expect(leafOf(env, 'repo', 'stopped-leaf').stopped).toBe(true);
-    expect(leafOf(env, 'repo', 'waiter').stopped).toBe(false);
-    expect(leafOf(env, 'repo', 'waiter').blocked_by).toEqual([
+    const repo = repoOf(env, f.repo);
+    expect(leafOf(env, f.repo, 'stopped-leaf').stopped).toBe(true);
+    expect(leafOf(env, f.repo, 'waiter').stopped).toBe(false);
+    expect(leafOf(env, f.repo, 'waiter').blocked_by).toEqual([
       { slug: 'dep-open', label: 'implement' },
       { slug: 'dep-done', label: 'merged' },
       { slug: 'resting', label: 'parked' },
       { slug: 'ghost', label: 'missing' },
     ]);
-    expect(leafOf(env, 'repo', 'broad').broadcast_pending).toBe(true);
-    expect(leafOf(env, 'repo', 'holder').broadcast_pending).toBe(false);
-    const land = leafOf(env, 'repo', 'landing').land;
+    expect(leafOf(env, f.repo, 'broad').broadcast_pending).toBe(true);
+    expect(leafOf(env, f.repo, 'holder').broadcast_pending).toBe(false);
+    const land = leafOf(env, f.repo, 'landing').land;
     expect(land).not.toBeNull();
     expect(land!.unit).toBe('akrogon-land-xyz123');
-    expect(leafOf(env, 'repo', 'holder').land).toBeNull();
+    expect(leafOf(env, f.repo, 'holder').land).toBeNull();
     expect(repo.queue).toEqual([
       { slug: 'landing', place: 1, no_record: true },
       { slug: 'holder', place: 2, no_record: false },
@@ -266,8 +266,8 @@ test('a leaf waits on parked, missing and unreadable deps while merged and live 
     });
     leaf(f, 'quiet', 'implement', { 'blocked-by': ['dep-live', 'dep-done'] });
     const env: Envelope = envelope(await cli(f, ['status', '--json']));
-    const waiter = leafOf(env, 'repo', 'waiter');
-    const quiet = leafOf(env, 'repo', 'quiet');
+    const waiter = leafOf(env, f.repo, 'waiter');
+    const quiet = leafOf(env, f.repo, 'quiet');
     expect([waiter.attention, quiet.attention]).toEqual([
       ['waiting on resting (parked)', 'waiting on dep-dead (unreadable)', 'waiting on ghost (missing)'],
       [],
@@ -304,9 +304,9 @@ test('a stopped command-owned land job is an attention fact only while unrecorde
       }),
     );
     expect(
-      ['land-dead', 'land-live', 'land-pushed', 'land-seat'].map((slug) => leafOf(env, 'repo', slug).attention),
+      ['land-dead', 'land-live', 'land-pushed', 'land-seat'].map((slug) => leafOf(env, f.repo, slug).attention),
     ).toEqual([['merge job stopped'], [], [], []]);
-    expect(leafOf(env, 'repo', 'land-dead').red).toBe(true);
+    expect(leafOf(env, f.repo, 'land-dead').red).toBe(true);
     expect(env.red).toBe(1);
   } finally {
     f.clean();
@@ -321,7 +321,7 @@ test('a leaf carries failed, missing and prompt facts and a clean leaf carries n
     });
     leaf(f, 'failed-bare', 'failed');
     const needy: string = leaf(f, 'needy', 'implement');
-    yaml(resolve(needy, 'readiness.yaml'), needs('needy'));
+    yaml(resolve(needy, 'readiness.yaml'), needs(f, 'needy'));
     const undeliv: string = leaf(f, 'undeliv', 'implement');
     saveState(undeliv, {
       ...readState(undeliv),
@@ -342,10 +342,10 @@ test('a leaf carries failed, missing and prompt facts and a clean leaf carries n
     const env: Envelope = envelope(await cli(f, ['status', '--json']));
     expect(
       ['failed-rec', 'failed-bare', 'needy', 'undeliv', 'undeliv-busy', 'clean'].map(
-        (slug) => leafOf(env, 'repo', slug).attention,
+        (slug) => leafOf(env, f.repo, slug).attention,
       ),
     ).toEqual([['failed: blocked: no key'], ['failed'], ['missing env FOO'], ['A prompt timeout'], [], []]);
-    expect([leafOf(env, 'repo', 'undeliv-busy').red, leafOf(env, 'repo', 'clean').red]).toEqual([false, false]);
+    expect([leafOf(env, f.repo, 'undeliv-busy').red, leafOf(env, f.repo, 'clean').red]).toEqual([false, false]);
   } finally {
     f.clean();
   }
@@ -364,7 +364,7 @@ test('waits_on names the unfinished idle required seats of the phase', async () 
     const env: Envelope = envelope(await cli(f, ['status', '--json']));
     expect(
       ['both-idle', 'after-fix', 'a-done', 'a-busy', 'single', 'over', 'dead'].map(
-        (slug) => leafOf(env, 'repo', slug).waits_on,
+        (slug) => leafOf(env, f.repo, slug).waits_on,
       ),
     ).toEqual([['A', 'B'], ['B'], ['B'], ['B'], ['A'], [], []]);
   } finally {
@@ -383,7 +383,7 @@ test('blocked_by resolves a merged dependency in a closed owner', async () => {
     const result: Result = await cli(f, ['status', '--json']);
     expect(result.code).toBe(0);
     const env: Envelope = envelope(result);
-    expect(leafOf(env, 'repo', 'waiter').blocked_by).toEqual([{ slug: 'done-dep', label: 'merged' }]);
+    expect(leafOf(env, f.repo, 'waiter').blocked_by).toEqual([{ slug: 'done-dep', label: 'merged' }]);
   } finally {
     f.clean();
   }
@@ -421,15 +421,15 @@ test('each open leaf carries the detail fields status <slug> prints', async () =
       'epic/job',
     );
     const at: number = Date.now();
-    timings(f, [prompt('deep', 30, 'delivered', at)]);
+    timings(f, [prompt(f, 'deep', 30, 'delivered', at)]);
     log(
       f,
       Array.from({ length: 13 }, (_, i) =>
-        event('deep', i % 2 === 0 ? 'implement' : 'check.review', 20 - i, `r${i}`, at),
+        event(f, 'deep', i % 2 === 0 ? 'implement' : 'check.review', 20 - i, `r${i}`, at),
       ),
     );
     const env: Envelope = envelope(await cli(f, ['status', '--json']));
-    const l = leafOf(env, 'repo', 'deep');
+    const l = leafOf(env, f.repo, 'deep');
     expect(l.group).toEqual(['epic', 'job']);
     expect(l.phase).toBe('implement');
     expect(l.phase_since).toBe(at - 8 * 60000);
@@ -459,7 +459,7 @@ test('merges hold the 5 most recent across repos and charts match --charts rows'
   const f: Fixture = await fixture();
   const g: Fixture = await fixture();
   try {
-    register(f, { repo: f.root, other: g.root });
+    register(f, { [f.repo]: f.root, other: g.root });
     const at: number = Date.now();
     mkdirSync(resolve(f.root, 'issues/closed/issue'), { recursive: true });
     const lines: string[] = [];
@@ -467,8 +467,8 @@ test('merges hold the 5 most recent across repos and charts match --charts rows'
     for (let i = 0; i < 4; i++) {
       const p: string = leaf(f, `merged-${i}`, 'merged', {}, 'issue');
       renameSync(p, resolve(f.root, 'issues/closed', `issue/merged-${i}`));
-      lines.push(event(`merged-${i}`, 'merged', 100 - i * 10, '', at));
-      tlines.push(prompt(`merged-${i}`, 130 - i * 10, 'delivered', at));
+      lines.push(event(f, `merged-${i}`, 'merged', 100 - i * 10, '', at));
+      tlines.push(prompt(f, `merged-${i}`, 130 - i * 10, 'delivered', at));
     }
     mkdirSync(resolve(g.root, 'issues/closed/issue'), { recursive: true });
     const glines: string[] = [];
@@ -476,8 +476,8 @@ test('merges hold the 5 most recent across repos and charts match --charts rows'
     for (let i = 0; i < 3; i++) {
       const p: string = leaf(g, `other-${i}`, 'merged', { repo: 'other' }, 'issue');
       renameSync(p, resolve(g.root, 'issues/closed', `issue/other-${i}`));
-      glines.push(JSON.stringify({ ...JSON.parse(event(`other-${i}`, 'merged', 45 - i * 10, '', at)), repo: 'other' }));
-      gtlines.push(prompt(`other-${i}`, 80 - i * 10, 'delivered', at));
+      glines.push(JSON.stringify({ ...JSON.parse(event(g, `other-${i}`, 'merged', 45 - i * 10, '', at)), repo: 'other' }));
+      gtlines.push(prompt(g, `other-${i}`, 80 - i * 10, 'delivered', at));
     }
     // A merged leaf still in open counts once via closed only; a closed non-merged leaf is excluded.
     leaf(f, 'staying', 'failed');
@@ -491,14 +491,14 @@ test('merges hold the 5 most recent across repos and charts match --charts rows'
       'other/other-2',
       'other/other-1',
       'other/other-0',
-      'repo/merged-3',
-      'repo/merged-2',
+      `${f.repo}/merged-3`,
+      `${f.repo}/merged-2`,
     ]);
     expect(env.merges[0].merged).toBe(at - 25 * 60000);
     expect(env.merges[0].total_ms).toBe(35 * 60000);
     const texts: string[] = env.merges.map((m) => `${m.slug}`);
     expect(texts).not.toContain('staying');
-    expect(repoOf(env, 'repo').leaves.map((l) => l.slug)).toEqual(['staying']);
+    expect(repoOf(env, f.repo).leaves.map((l) => l.slug)).toEqual(['staying']);
   } finally {
     f.clean();
     g.clean();
@@ -514,15 +514,15 @@ test('recent merges include merged leaves in unfinished owners', async () => {
     leaf(f, 'latest', 'merged');
     leaf(f, 'unfinished', 'implement');
     const at: number = Date.now();
-    log(f, [event('older', 'merged', 20, '', at), event('latest', 'merged', 5, '', at)]);
-    timings(f, [prompt('older', 60, 'delivered', at), prompt('latest', 15, 'delivered', at)]);
+    log(f, [event(f, 'older', 'merged', 20, '', at), event(f, 'latest', 'merged', 5, '', at)]);
+    timings(f, [prompt(f, 'older', 60, 'delivered', at), prompt(f, 'latest', 15, 'delivered', at)]);
 
     const result: Result = await cli(f, ['status', '--json']);
     expect(result.code).toBe(0);
     const env: Envelope = envelope(result);
     expect(env.merges).toEqual([
-      { repo: 'repo', slug: 'latest', merged: at - 5 * 60000, total_ms: 10 * 60000 },
-      { repo: 'repo', slug: 'older', merged: at - 20 * 60000, total_ms: 40 * 60000 },
+      { repo: f.repo, slug: 'latest', merged: at - 5 * 60000, total_ms: 10 * 60000 },
+      { repo: f.repo, slug: 'older', merged: at - 20 * 60000, total_ms: 40 * 60000 },
     ]);
   } finally {
     f.clean();
@@ -535,7 +535,7 @@ test('red counts real blocks once and never counts amber or time', async () => {
     // Amber-only state: slow merge and a paused repo contribute no red.
     const slowLine: string = JSON.stringify({
       run: 'r',
-      repo: 'repo',
+      repo: f.repo,
       leaf: 'l',
       sha: 's',
       tree: 't',
@@ -557,23 +557,23 @@ test('red counts real blocks once and never counts amber or time', async () => {
         A: { command: ['x'], code: 'timeout', message: 'm', pane: 'p', session: null, at: new Date().toISOString() },
       },
     });
-    yaml(resolve(f.home, 'paused.yaml'), { repo: true });
+    yaml(resolve(f.home, 'paused.yaml'), { [f.repo]: true });
     let env: Envelope = envelope(await cli(f, ['status', '--json']));
     expect(env.red).toBe(0);
-    expect(leafOf(env, 'repo', 'busy-err').red).toBe(false);
-    expect(leafOf(env, 'repo', 'busy-err').delivery_errors.a).toMatchObject({ code: 'timeout' });
-    expect(repoOf(env, 'repo').paused).toBe(true);
+    expect(leafOf(env, f.repo, 'busy-err').red).toBe(false);
+    expect(leafOf(env, f.repo, 'busy-err').delivery_errors.a).toMatchObject({ code: 'timeout' });
+    expect(repoOf(env, f.repo).paused).toBe(true);
     // Now the delivery error is visible and a gap appears: each counts once.
     saveState(busyPath, { ...readState(busyPath), busy_since: {} });
     const needy: string = leaf(f, 'needy', 'implement');
-    yaml(resolve(needy, 'readiness.yaml'), needs('needy'));
+    yaml(resolve(needy, 'readiness.yaml'), needs(f, 'needy'));
     leaf(f, 'dead', 'failed');
     env = envelope(await cli(f, ['status', '--json']));
     expect(env.red).toBe(3);
-    expect(leafOf(env, 'repo', 'busy-err').red).toBe(true);
-    expect(leafOf(env, 'repo', 'needy').red).toBe(true);
-    expect(leafOf(env, 'repo', 'dead').red).toBe(true);
-    expect(leafOf(env, 'repo', 'quiet').red).toBe(false);
+    expect(leafOf(env, f.repo, 'busy-err').red).toBe(true);
+    expect(leafOf(env, f.repo, 'needy').red).toBe(true);
+    expect(leafOf(env, f.repo, 'dead').red).toBe(true);
+    expect(leafOf(env, f.repo, 'quiet').red).toBe(false);
   } finally {
     f.clean();
   }
@@ -583,9 +583,9 @@ test('watch names each repo issues dir and runs plus the named files, never the 
   const f: Fixture = await fixture();
   const g: Fixture = await fixture();
   try {
-    register(f, { repo: f.root, other: g.root });
+    register(f, { [f.repo]: f.root, other: g.root });
     const env: Envelope = envelope(await cli(f, ['status', '--json']));
-    expect(env.watch.folders).toEqual([resolve(g.root, 'issues'), resolve(f.root, 'issues'), resolve(f.home, 'runs')]);
+    expect(env.watch.folders).toEqual([resolve(f.root, 'issues'), resolve(g.root, 'issues'), resolve(f.home, 'runs')]);
     expect(env.watch.files).toEqual([
       resolve(f.home, 'config.yaml'),
       resolve(f.home, 'paused.yaml'),

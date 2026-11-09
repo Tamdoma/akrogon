@@ -9,6 +9,7 @@ export function register(f: Fixture, repos: Record<string, string>): void {
 }
 
 export function event(
+  f: Fixture,
   slug: string,
   to: string,
   minutes: number,
@@ -17,7 +18,7 @@ export function event(
 ): string {
   return JSON.stringify({
     ts: new Date(now - minutes * 60000).toISOString(),
-    repo: 'repo',
+    repo: f.repo,
     slug,
     from: 'implement',
     to,
@@ -31,10 +32,10 @@ export function event(
   });
 }
 
-export function mergeRecord(slug: string, minutes: number, now: number = Date.now()): string {
+export function mergeRecord(f: Fixture, slug: string, minutes: number, now: number = Date.now()): string {
   return JSON.stringify({
     ts: new Date(now - minutes * 60000).toISOString(),
-    repo: 'repo',
+    repo: f.repo,
     slug,
     from: 'check.review',
     to: 'merge',
@@ -53,6 +54,7 @@ export function log(f: Fixture, lines: string[]): void {
 }
 
 export function prompt(
+  f: Fixture,
   slug: string,
   minutes: number,
   outcome: 'delivered' | 'failed' = 'delivered',
@@ -67,7 +69,7 @@ export function prompt(
     session: null,
     outcome,
     ts: new Date(now - minutes * 60000).toISOString(),
-    repo: 'repo',
+    repo: f.repo,
   });
 }
 
@@ -84,13 +86,13 @@ export function snapshot(path: string): Record<string, string> {
   );
 }
 
-export function needs(slug: string, steps: string = 'ask the vault for FOO'): object {
+export function needs(f: Fixture, slug: string, steps: string = 'ask the vault for FOO'): object {
   return {
     inputs: [
       {
         kind: 'env',
         name: 'FOO',
-        holder: 'repo',
+        holder: f.repo,
         purpose: 'authenticate',
         consumers: [slug],
         steps,
@@ -120,7 +122,7 @@ export function seedRunRecord(f: Fixture, fields: Record<string, unknown>): stri
     pid: process.pid,
     start_time: statStart(process.pid),
     boot_id: readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(),
-    repo: 'repo',
+    repo: f.repo,
     leaf: 'seeded',
     check: 'test',
     state: 'live',
