@@ -20,14 +20,14 @@ function at(minutes: number): string {
 function stateFile(f: Fixture, slug: string, fields: object): string {
   const path: string = resolve(f.root, 'issues/open/issue', slug);
   mkdirSync(path, { recursive: true });
-  yaml(resolve(path, 'state.yaml'), { slug, created: '2026-10-25', repo: 'repo', 'blocked-by': [], ...fields });
+  yaml(resolve(path, 'state.yaml'), { slug, created: '2026-10-25', repo: f.repo, 'blocked-by': [], ...fields });
   return path;
 }
 
-function move(slug: string, from: string, to: string, ts: string): object {
+function move(f: Fixture, slug: string, from: string, to: string, ts: string): object {
   return {
     ts,
-    repo: 'repo',
+    repo: f.repo,
     slug,
     from,
     to,
@@ -72,12 +72,12 @@ test('legacy rebuttal repo configs load without the setting and unknown keys sta
     const file: string = resolve(f.root, 'issues/config.yaml');
     for (const rebuttal of [true, false]) {
       yaml(file, { rebuttal, fix_rounds: 2, grounding: 'none' });
-      const config: RepoConfig = readRepo('repo', f.root).config;
+      const config: RepoConfig = readRepo(f.repo, f.root).config;
       expect(config).toMatchObject({ fix_rounds: 2, grounding: 'none' });
       expect(config).not.toHaveProperty('rebuttal');
     }
     yaml(file, { rebuttal: true, scripts_dir: 'retired', grounding: 'none' });
-    expect(() => readRepo('repo', f.root)).toThrow('scripts_dir');
+    expect(() => readRepo(f.repo, f.root)).toThrow('scripts_dir');
   } finally {
     f.clean();
   }
@@ -111,9 +111,9 @@ test('history naming retired phases parses: log moves, timing events and a faile
   const f: Fixture = await fixture();
   try {
     lines(f, 'log', [
-      move('old', 'failed', 'plan.positions', at(0)),
-      move('old', 'plan.positions', 'plan.rebuttal', at(10)),
-      move('old', 'plan.rebuttal', 'plan.synthesis', at(20)),
+      move(f, 'old', 'failed', 'plan.positions', at(0)),
+      move(f, 'old', 'plan.positions', 'plan.rebuttal', at(10)),
+      move(f, 'old', 'plan.rebuttal', 'plan.synthesis', at(20)),
     ]);
     expect(readLog(f.root).map((entry) => [entry.record.from, entry.record.to])).toEqual([
       ['failed', 'plan.positions'],
@@ -121,10 +121,10 @@ test('history naming retired phases parses: log moves, timing events and a faile
       ['plan.rebuttal', 'plan.synthesis'],
     ]);
     const events: object[] = retired.flatMap((phase) => [
-      { ts: at(0), repo: 'repo', slug: 'old', kind: 'visit_start', phase, visit: 0 },
+      { ts: at(0), repo: f.repo, slug: 'old', kind: 'visit_start', phase, visit: 0 },
       {
         ts: at(1),
-        repo: 'repo',
+        repo: f.repo,
         slug: 'old',
         kind: 'prompt',
         slot: 'B',
@@ -133,8 +133,8 @@ test('history naming retired phases parses: log moves, timing events and a faile
         session: null,
         outcome: 'delivered',
       },
-      { ts: at(2), repo: 'repo', slug: 'old', kind: 'seat_done', slot: 'A', phase, visit: 0 },
-      { ts: at(3), repo: 'repo', slug: 'old', kind: 'check_start', run: 'r1', phase, name: 'unit', scope: 'leaf' },
+      { ts: at(2), repo: f.repo, slug: 'old', kind: 'seat_done', slot: 'A', phase, visit: 0 },
+      { ts: at(3), repo: f.repo, slug: 'old', kind: 'check_start', run: 'r1', phase, name: 'unit', scope: 'leaf' },
     ]);
     lines(f, 'timings', events);
     expect(readTimings(f.root)).toHaveLength(events.length);
@@ -155,14 +155,14 @@ test('timing report over retired-phase history completes and counts each retired
   const f: Fixture = await fixture();
   try {
     lines(f, 'log', [
-      move('old', 'failed', 'plan.positions', at(0)),
-      move('old', 'plan.positions', 'plan.rebuttal', at(10)),
-      move('old', 'plan.rebuttal', 'plan.synthesis', at(20)),
-      move('old', 'plan.synthesis', 'implement', at(30)),
+      move(f, 'old', 'failed', 'plan.positions', at(0)),
+      move(f, 'old', 'plan.positions', 'plan.rebuttal', at(10)),
+      move(f, 'old', 'plan.rebuttal', 'plan.synthesis', at(20)),
+      move(f, 'old', 'plan.synthesis', 'implement', at(30)),
     ]);
     const prompt: (slot: string, phase: string, minute: number) => object = (slot, phase, minute) => ({
       ts: at(minute),
-      repo: 'repo',
+      repo: f.repo,
       slug: 'old',
       kind: 'prompt',
       slot,
@@ -173,7 +173,7 @@ test('timing report over retired-phase history completes and counts each retired
     });
     const start: (phase: string, minute: number) => object = (phase, minute) => ({
       ts: at(minute),
-      repo: 'repo',
+      repo: f.repo,
       slug: 'old',
       kind: 'visit_start',
       phase,

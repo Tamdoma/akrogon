@@ -296,12 +296,12 @@ test('listed runs of one repo wait for their repo holder, print the holder, and 
     await waitFor(resolve(dir, 'a.held'));
     const b: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'b')], second);
     caps.push(b);
-    await waitForText(b, /waiting for repo\/leaf-one test/);
+    await waitForText(b, new RegExp(`waiting for ${f.repo}/leaf-one test`));
     expect(existsSync(resolve(dir, 'b'))).toBe(false);
     for (const name of ['w1', 'w2', 'w3']) {
       const waiter: Cap = run(f, ['run-check', '--name', 'test', '--', ...record(name, dir)], first);
       caps.push(waiter);
-      await waitForText(waiter, /waiting for repo\/(leaf-one|leaf-two) test/);
+      await waitForText(waiter, new RegExp(`waiting for ${f.repo}/(leaf-one|leaf-two) test`));
       expect(existsSync(resolve(dir, 'order'))).toBe(false);
     }
     writeFileSync(resolve(dir, 'release'), '');
@@ -348,7 +348,7 @@ test('a listed run waits for the holder record to be removed, not just the holde
     await waitFor(resolve(dir, 'a.held'));
     const b: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'b')], second);
     caps.push(b);
-    await waitForText(b, /waiting for repo\//);
+    await waitForText(b, new RegExp(`waiting for ${f.repo}/`));
     const aId: string = ((await a.text()).match(/run ([0-9a-f-]+)/) ?? [])[1] as string;
     writeFileSync(resolve(dir, 'release'), '');
     // a's command is done and its record is ended, but the shim holds its unit
@@ -397,7 +397,7 @@ test('a listed run of another repo and an unlisted run start at once over the li
     const global: Record<string, unknown> = Bun.YAML.parse(
       readFileSync(resolve(f.home, 'config.yaml'), 'utf8'),
     ) as Record<string, unknown>;
-    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, zzrepo: other } });
+    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { [f.repo]: f.root, zzrepo: other } });
     const otherTree: string = resolve(storeDir(f, 'zzrepo'), 'zz-leaf');
     await command(['git', 'worktree', 'add', otherTree, '-b', 'zz-leaf'], other);
     mkdirSync(resolve(other, 'issues/open/issue/zz-leaf'), { recursive: true });
@@ -417,7 +417,7 @@ test('a listed run of another repo and an unlisted run start at once over the li
     // A same-repo listed run proves the queue itself is engaged.
     const c: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'c')], second);
     caps.push(c);
-    await waitForText(c, /waiting for repo\/leaf-one test/);
+    await waitForText(c, new RegExp(`waiting for ${f.repo}/leaf-one test`));
     const small: Result = await cli(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'small')], second);
     expect(small.code).toBe(0);
     const ob: Result = await cli(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'ob')], otherTree);
@@ -506,10 +506,10 @@ test('a killed holder or waiter does not block the line', async () => {
     await waitFor(resolve(dir, 'h.held'));
     const dead: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('dead', dir)], worktree);
     caps.push(dead);
-    await waitForText(dead, /waiting for repo\//);
+    await waitForText(dead, new RegExp(`waiting for ${f.repo}/`));
     const next: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('next', dir)], worktree);
     caps.push(next);
-    await waitForText(next, /waiting for repo\//);
+    await waitForText(next, new RegExp(`waiting for ${f.repo}/`));
     killTree(dead.proc);
     await dead.proc.exited;
     killTree(holder.proc);
@@ -553,7 +553,7 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
       scoped,
     );
     caps.push(w1, w2, w3);
-    for (const cap of [w1, w2, w3]) await waitForText(cap, /waiting for repo\//);
+    for (const cap of [w1, w2, w3]) await waitForText(cap, new RegExp(`waiting for ${f.repo}/`));
     const wId = async (leafName: string): Promise<string> => {
       const begun: number = Date.now();
       for (;;) {
@@ -616,7 +616,7 @@ test('stop-run cancels the sole waiting run without an id', async () => {
     const scoped: NodeJS.ProcessEnv = { AKROGON_PROC_ROOT: scopedProcRoot(f, 'waiter.scope') };
     const waiter: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'waiter')], worktree, scoped);
     caps.push(waiter);
-    await waitForText(waiter, /waiting for repo\//);
+    await waitForText(waiter, new RegExp(`waiting for ${f.repo}/`));
     const cancelled: Result = await cli(f, ['stop-run'], worktree, scoped);
     expect(cancelled.code).toBe(0);
     expect(existsSync(systemctlLog)).toBe(false);

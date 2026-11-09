@@ -95,7 +95,7 @@ test('a held outcome already in merge-attempts.jsonl still parses and status sti
       resolve(f.root, 'issues/merge-attempts.jsonl'),
       JSON.stringify({
         attempt: 'a1',
-        repo: 'repo',
+        repo: f.repo,
         holder: 'hold',
         built_on: 'a'.repeat(40),
         outcome: 'held',

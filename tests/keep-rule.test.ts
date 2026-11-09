@@ -32,7 +32,7 @@ function report(f: HcFixture): { kept: { path: string; reason: string }[]; remov
       kept: z.array(z.object({ path: z.string(), reason: z.string() })),
       removed: z.array(z.unknown()),
     })
-    .parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile/repo.json'), 'utf8')));
+    .parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile', `${f.repo}.json`), 'utf8')));
 }
 
 // DC1: a registered worktree named neither a leaf slug nor a scratch kind stays
@@ -127,7 +127,7 @@ test('the reconcile report records removed worktrees and still reads pre-change 
       resolve(f.root, 'issues/verify-runs.jsonl'),
       JSON.stringify({
         run: 'ended',
-        repo: 'repo',
+        repo: f.repo,
         leaf: 'report-leaf',
         sha: 'x',
         tree: 'x',
@@ -154,7 +154,7 @@ test('the reconcile report records removed worktrees and still reads pre-change 
     const calmRows: unknown[] = report(f).removed;
     expect(calmRows).toEqual([]);
     // A report written before `removed` existed still reads its kept entries.
-    const file: string = resolve(f.home, 'reconcile/repo.json');
+    const file: string = resolve(f.home, 'reconcile', `${f.repo}.json`);
     writeFileSync(file, JSON.stringify({ kept: [{ path: '/pre-change', reason: 'old report' }] }) + '\n');
     const out: Result = await status(f, 'calm-leaf');
     expect(out.stdout).toContain('Kept: /pre-change — old report');

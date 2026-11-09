@@ -142,11 +142,11 @@ test('a slow merge run is flagged, recorded, printed and notified once', async (
     expect(resultB.stdout).toContain(`first seen at checkout ${bId}`);
     const files = noticeFiles(core);
     expect(files).toHaveLength(1);
-    expect(files[0]).toMatchObject({ title: 'repo merge slow', attention: false });
+    expect(files[0]).toMatchObject({ title: `${f.repo} merge slow`, attention: false });
     expect(files[0].body).toContain(`first seen at checkout ${bId}`);
     expect(records(f).find((run) => run.run === bId)!.slow!.notice).toBe('pending');
     const sha: string = await command(['git', 'rev-parse', 'HEAD'], direct);
-    await requireGreenReceipt(readRepo('repo', f.root), sha, 'merge');
+    await requireGreenReceipt(readRepo(f.repo, f.root), sha, 'merge');
   } finally {
     await core.stop();
     f.clean();
@@ -219,7 +219,7 @@ test('only eligible rows enter the normal and checked bounds follow the design',
     expect(base!.slow).toBeUndefined();
     expect(all.find((run) => run.compares === 'some-head')!.slow).toBeUndefined();
     expect(knownRed.stdout).toContain('verify slow:');
-    expect(noticeFiles(core).some((notice) => notice.title === 'repo merge slow')).toBe(true);
+    expect(noticeFiles(core).some((notice) => notice.title === `${f.repo} merge slow`)).toBe(true);
   } finally {
     await core.stop();
     f.clean();
@@ -331,7 +331,7 @@ test('a failed slow notice is retried by the next in-episode run; a pending one 
       await bump(direct, 'retry.ts');
       const b: VerifyRun = await slowRun(f, direct, holder, env);
       expect(b.slow!.notice).toBe('pending');
-      expect(noticeFiles(core).map((n) => n.title)).toEqual(['repo merge slow']);
+      expect(noticeFiles(core).map((n) => n.title)).toEqual([`${f.repo} merge slow`]);
     } finally {
       await core.stop();
       f.clean();
@@ -348,8 +348,8 @@ test('a failed slow notice is retried by the next in-episode run; a pending one 
       const episode: string = seedEpisode(f);
       setEpisodeNotice(f, 'pending');
       mkdirSync(noticeFolder(core), { recursive: true });
-      const waiting: string = resolve(noticeFolder(core), `${noticeId('repo', 'merge-slow', episode)}.json`);
-      writeFileSync(waiting, JSON.stringify({ title: 'repo merge slow', body: 'seeded', attention: false }));
+      const waiting: string = resolve(noticeFolder(core), `${noticeId(f.repo, 'merge-slow', episode)}.json`);
+      writeFileSync(waiting, JSON.stringify({ title: `${f.repo} merge slow`, body: 'seeded', attention: false }));
       const a: VerifyRun = await slowRun(f, direct, holder, env);
       expect(a.slow!.notice).toBeUndefined();
       expect(noticeFiles(core).map((n) => n.body)).toEqual(['seeded']);
@@ -455,11 +455,11 @@ test('status prints Slow merge only while that repo episode is open', async () =
   const f: Fixture = await fixture();
   const g: Fixture = await fixture();
   try {
-    register(f, { repo: f.root, other: g.root });
+    register(f, { [f.repo]: f.root, other: g.root });
     const episode: string = seedEpisode(f);
     const open: Result = await cli(f, ['status'], f.home, mergeEnv(f));
     const line: string | undefined = open.stdout.split('\n').find((entry) => entry.startsWith('Slow merge:'));
-    expect(line).toBe(`Slow merge: repo first seen at firstleaf ${episode}, last 10m vs normal 5m`);
+    expect(line).toBe(`Slow merge: ${f.repo} first seen at firstleaf ${episode}, last 10m vs normal 5m`);
     expect(open.stdout.split('\n').filter((entry) => entry.startsWith('Slow merge:'))).toHaveLength(1);
 
     seedMerge(f, 5000, {

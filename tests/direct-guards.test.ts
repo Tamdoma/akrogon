@@ -22,7 +22,7 @@ async function withBranch(
     await command(['git', 'worktree', 'add', '-b', 'direct', wt], f.root);
     const run = async (): Promise<RunResult> => {
       const { stderr, code }: Result = await spawnCaptured(
-        [process.execPath, script, wt, 'repo', resolve(f.home, 'chart')],
+        [process.execPath, script, wt, f.repo, resolve(f.home, 'chart')],
         { env: { ...process.env, AKROGON_HOME: f.home } },
       );
       return { code, stderr };
