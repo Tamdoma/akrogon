@@ -368,7 +368,7 @@ export type HcFixture = Omit<Fixture, 'clean'> & {
   clean: () => Promise<void>;
 };
 
-// Engine tests on one fixture core: both seats run the stand-in in `mode` under prefix `rp`; clean
+// Engine tests on one fixture core: both seats run the stand-in in `mode` under the fixture prefix; clean
 // stops the core, which ends every seat and so empties its leaf slice, before removing the fixture.
 // akrogon's systemctl is the fake: a leaf slice is named from repo and slug only, so a real stop
 // from reconcile or `stop` would end the seats of a concurrent case with the same slug. It sits in
