@@ -46,7 +46,10 @@ export async function deployFixture(): Promise<DeployFixture> {
   await command(['git', 'fetch', 'origin', 'main'], f.root);
   await command(['git', 'merge', '--ff-only', 'origin/main'], f.root);
   const global = Bun.YAML.parse(readFileSync(resolve(home, 'config.yaml'), 'utf8')) as object;
-  writeFileSync(resolve(home, 'config.yaml'), Bun.YAML.stringify({ ...global, repos: { [f.repo]: f.root } }));
+  // `akrogon` is load-bearing: deployStage, install and rollback key on that repo name, and
+  // prefixes is dropped because an installed previous release's strict schema refuses it.
+  const { prefixes: _p, ...rest } = global as { prefixes?: unknown };
+  writeFileSync(resolve(home, 'config.yaml'), Bun.YAML.stringify({ ...rest, repos: { akrogon: f.root } }));
   const proc = procFixture(f);
   symlinkSync(resolve(import.meta.dir, 'fake-systemctl.sh'), resolve(home, 'bin/systemctl'));
   const env: NodeJS.ProcessEnv = {
