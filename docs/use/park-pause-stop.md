@@ -54,7 +54,7 @@ Turn it back on:
 akrogon unpause
 ```
 
-Unpause clears the mark and runs one pass right away. That pass resumes leaves that already have a tab or worktree, runs the cleanup that waited, and runs the merge pass.
+Unpause clears the mark and runs one pass right away. That pass resumes leaves that already have a tab or worktree, runs the merge pass, and runs the cleanup that waited last.
 
 Pause and park are different. Park takes whole issues that are not running out of the queue. Pause freezes automatic work for the whole repository, running leaves included.
 

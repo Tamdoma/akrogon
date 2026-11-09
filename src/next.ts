@@ -1292,18 +1292,15 @@ export async function nextCommand(input: string | undefined, pressureDir: string
             await dispatchDependents(global, selection.repo, completedSlug, invocation, false);
         } else await sweep(global, selection.repo, selection.leaves, invocation, true, false);
         touched.set(selection.repo.name, { repo: selection.repo, isAutomatic: false });
-        await reconcileRepos([selection.repo], invocation, false);
       } else if (input === '--all') {
         const current: Repo | null = await currentRepo(global, process.cwd());
         if (current === null) {
           await sweepAll(global, invocation, false);
           const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
           for (const repo of registered.repos) touched.set(repo.name, { repo, isAutomatic: false });
-          await reconcileRepos(registered.repos, invocation, false);
         } else {
           await sweep(global, current, discover(current, invocation).leaves, invocation, true, false);
           touched.set(current.name, { repo: current, isAutomatic: false });
-          await reconcileRepos([current], invocation, false);
         }
       } else if (input === '--resume' || input === '--wake') {
         const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
@@ -1321,7 +1318,6 @@ export async function nextCommand(input: string | undefined, pressureDir: string
             true,
           );
         for (const repo of active) touched.set(repo.name, { repo, isAutomatic: true });
-        await reconcileRepos(active, invocation, true);
       }
     });
     for (const { repo, isAutomatic } of touched.values()) {
@@ -1333,6 +1329,17 @@ export async function nextCommand(input: string | undefined, pressureDir: string
         report(invocation, repo.name, repo.root, error);
       }
     }
+    // Cleanup runs last in the pass so a batch released by the merge step is
+    // reconciled in the same invocation. The merge step takes the global lock
+    // itself, so this call takes it again after the loop, never nested.
+    if (touched.size > 0)
+      await withLock(resolve(globalHome(), '.lock'), async () => {
+        await reconcileRepos(
+          [...touched.values()].map((entry) => entry.repo),
+          invocation,
+          [...touched.values()].some((entry) => entry.isAutomatic),
+        );
+      });
   }
   if (invocation.skipped.size > 0) process.exitCode = 1;
 }
@@ -1351,9 +1358,16 @@ export async function unpausePass(repo: Repo, pressureDir: string = '/proc/press
       false,
       false,
     );
-    await reconcileRepos([repo], invocation, false);
   });
-  await mergePass(global, repo, invocation, false, pressureDir);
+  try {
+    await mergePass(global, repo, invocation, false, pressureDir);
+  } finally {
+    // Cleanup runs last: a batch this merge pass released is reconciled in the
+    // same invocation, and a merge error still leaves one cleanup per pass.
+    await withLock(resolve(globalHome(), '.lock'), async () => {
+      await reconcileRepos([repo], invocation, false);
+    });
+  }
   if (invocation.skipped.size > 0)
     throw new Error(`Unpause pass incomplete for ${repo.name}: ${invocation.skipped.size} skipped`);
 }
