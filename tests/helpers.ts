@@ -30,7 +30,7 @@ process.on('exit', () => {
 export type Fixture = { home: string; root: string; repo: string; prefix: string; clean: () => void };
 // The fixture's registered repo identity: unique per fixture (mkdtemp suffix) so a run's teardown
 // never stops another fixture's leaf slice; the prefix is two letters derived from home.
-function fixtureRepo(home: string): { repo: string; prefix: string } {
+export function fixtureRepo(home: string): { repo: string; prefix: string } {
   const digest: Buffer = createHash('sha256').update(home).digest();
   const prefix: string = [digest[0] % 26, digest[1] % 26].map((n: number) => String.fromCharCode(97 + n)).join('');
   return { repo: basename(home), prefix };
