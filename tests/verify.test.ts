@@ -452,6 +452,16 @@ async function failureScript(f: Fixture, name: string, extra: Record<string, str
   await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
 }
 
+// A failing script with no `(fail)` line yields a nameless red; head and base
+// fail the same command, so the pair is one nameless cover.
+async function namelessFailureScript(f: Fixture): Promise<void> {
+  writeFileSync(resolve(f.root, 'check.sh'), 'echo runner-exploded; exit 7\n');
+  yaml(resolve(f.root, 'issues/config.yaml'), { checks: { test: 'sh check.sh' }, grounding: 'none' });
+  await command(['git', 'add', '.'], f.root);
+  await command(['git', 'commit', '-m', 'add nameless failing check'], f.root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+}
+
 test('verify --known-red reruns the failing command on a fresh checkout of the exact base and records the linked pair', async () => {
   const f: Fixture = await fixture();
   try {
@@ -524,6 +534,29 @@ test('verify --known-red refuses a head failure absent on the base', async () =>
   }
 });
 
+test('verify --known-red covers a red command naming no test when the base run of it also names none', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await namelessFailureScript(f);
+    const { leafPath, worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    const result: Result = await verify(f, ['--known-red'], worktree);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain(`verify known-red ${head}: pass`);
+    const runs: VerifyRun[] = records(f);
+    const headRun: VerifyRun | undefined = runs.find((run) => run.sha === head);
+    const baseRun: VerifyRun | undefined = runs.find((run) => run.compares === headRun?.run);
+    expect(baseRun?.sha).toBe(base);
+    expect(headRun?.commands.map((item) => item.exit)).toEqual([7]);
+    expect(baseRun?.commands.map((item) => item.exit)).toEqual([7]);
+    expect((await cli(f, ['phase', 'caller', 'check.review', '--slot', 'A'], worktree)).code).toBe(0);
+    expect(readState(leafPath).phase).toBe('check.review');
+  } finally {
+    f.clean();
+  }
+});
+
 test('a linked pair fails to satisfy requireGreenReceipt with unnamed or unlinked failing work', async () => {
   const f: Fixture = await fixture();
   try {
@@ -573,6 +606,20 @@ test('a linked pair fails to satisfy requireGreenReceipt with unnamed or unlinke
     reset();
     headRun({ commands: cmds.map((item) => ({ ...item, exit: 7, log: gone })) });
     baseRun(records(f).at(-1)!.run);
+    await refuse();
+
+    reset();
+    headRun();
+    baseRun(records(f).at(-1)!.run, {
+      commands: cmds.map((item) => ({ ...item, exit: 7, log: noNames })),
+    });
+    await refuse();
+
+    reset();
+    headRun();
+    baseRun(records(f).at(-1)!.run, {
+      commands: cmds.map((item) => ({ ...item, exit: 7, log: gone })),
+    });
     await refuse();
 
     reset();
@@ -1469,6 +1516,20 @@ async function memberFailureScript(f: Fixture): Promise<void> {
   await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
 }
 
+// A nameless merge member fails through a script with no `(fail)` line, so the
+// base tree fails the same member the head does.
+async function namelessMemberFailureScript(f: Fixture): Promise<void> {
+  writeFileSync(resolve(f.root, 'check.sh'), 'echo member-exploded; exit 7\n');
+  yaml(resolve(f.root, 'issues/config.yaml'), {
+    checks: { unit: 'echo unit' },
+    merge_checks: { member: 'sh check.sh' },
+    grounding: 'none',
+  });
+  await command(['git', 'add', '.'], f.root);
+  await command(['git', 'commit', '-m', 'add nameless failing member'], f.root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+}
+
 test('known-red passes when the red head member is covered by a fresh base run that fails the same names', async () => {
   const f: Fixture = await fixture();
   try {
@@ -1519,6 +1580,30 @@ test('known-red passes when the red head member is covered by a fresh base run t
     expect(member).toMatchObject({ exit: 7 });
     expect(member).not.toHaveProperty('reused');
     expect(readFileSync(member.log, 'utf8')).toContain('(fail) alpha');
+    await requireGreenReceipt(readRepo(f.repo, f.root), head, 'merge');
+  } finally {
+    f.clean();
+  }
+});
+
+test('known-red covers a red merge member naming no test when its base run also names none', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await namelessMemberFailureScript(f);
+    const { worktree } = await callerWorktree(f, 'caller', {
+      phase: 'merge',
+      batch: { attempt: 'att-knr', built_on: 'x', holder: { base: 'x', head: 'x' }, applied: true },
+    });
+    const head: string = await commitIn(worktree, 'code.ts');
+    const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    const result: Result = await verify(f, ['--attempt', 'att-knr', '--known-red'], worktree);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain(`verify known-red ${head}: pass`);
+    const runs: VerifyRun[] = records(f);
+    const headRun: VerifyRun | undefined = runs.find((run) => run.sha === head && run.compares === undefined);
+    const baseRun: VerifyRun | undefined = runs.find((run) => run.compares === headRun?.run);
+    expect(baseRun?.sha).toBe(base);
+    expect(baseRun?.commands.find((item) => item.name === 'member')).toMatchObject({ exit: 7 });
     await requireGreenReceipt(readRepo(f.repo, f.root), head, 'merge');
   } finally {
     f.clean();
