@@ -67,7 +67,7 @@ Every mode entry's address is A's hc terminal and its transcript path is the one
 - route: <lifecycle | direct>
 - handed off: <each leaf handed off>
 - main step: <each completed step on main or lesson write for handed work>
-- wait: <the exact missing need, approval or prerequisite> — next: <next step>
+- wait: <the needs-sheet row or prerequisite the chart waits on, with its status — pending rows stay pending, a late find's row shows the notice result> — next: <next step>
 - proposal: <the proposed destination, its goal, the criterion that cannot pass without it, the waiting chart and the fixed question>; one line per proposed destination, written beside that chart's wait: line
 - pending step: after <leaf> lands, open a chart door to finish <step>
 - pick against recommendation: <the round, the pick and its reason>
@@ -94,7 +94,7 @@ Every mode entry's address is A's hc terminal and its transcript path is the one
 
 The CHART.md carries `## Mode record` for every chart, empty until a mode or handover entry lands — under autopilot one `- mode` line is appended per mode change (on, off, changed list, "continue autopilot") with its time, A's hc address and A's transcript path, the latest entry governing — and, under autopilot, `## Autopilot`, written as the pass goes with every line a `- ` list item so no line parses as a chart marker; it records observed states only, never "started" or "merged" without evidence. Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts. A CHART.md created for a next chart with no folder holds `pending map by fresh A (<seed path, legacy path or operator note reference>)` under Destination plus the Mode record, plus a verbatim copy of the session's `forks/signposts.md` naming the chart that holds the original, and no INTAKE.md, until fresh A writes the Destination after its map. The `handover` and `continue <mode> (handover <time>)` entries are appended on a chart switch per SKILL.md `## Handover`, so a fresh session resumes where the switch left off — the same handed list under autopilot, the named chart under attended.
 
-`forks/signposts.md` is a fork file in fork shape — `## Question`, `## Findings` optional, `## Taken` — holding the session's signposts: the ranked priorities, hard limits and the order or drop of the session's charts, plus the session's dropped charts or seeds listed in the original. The original lives in the chart where the round ran and names it; every other chart of the session gets a verbatim copy at folder creation, naming the chart that holds the original, and a correction is appended to the original with its date and re-copied verbatim to the session's open charts, so a copy cannot drift from the original. The reply sits under `## Taken` — the operator's reply verbatim, or under full autopilot A's picks labelled as A's — so `akrogon status --charts` counts it taken:
+`forks/signposts.md` is a fork file in fork shape — `## Question`, `## Findings` optional, `## Taken`, then `## Needs` — holding the session's signposts: the ranked priorities, hard limits and the order or drop of the session's charts, plus the session's dropped charts or seeds listed in the original. `## Needs` is its own section after `## Taken`: the session's needs sheet, one line per row with status (pending, supplied, late). The original lives in the chart where the round ran and names it; every other chart of the session gets a verbatim copy at folder creation, naming the chart that holds the original, and a correction or a changed row status is appended to the original with its date and re-copied verbatim to the session's open charts, so a copy cannot drift from the original. The reply sits under `## Taken` — the operator's reply verbatim, or under full autopilot A's picks labelled as A's — so `akrogon status --charts` counts it taken:
 
 ```markdown
 # Signposts: <chart-slug>
@@ -106,6 +106,10 @@ The CHART.md carries `## Mode record` for every chart, empty until a mode or han
 ## Taken
 
 <the operator's answers verbatim, or A's picks labelled as A's>
+
+## Needs
+
+<one line per needs-sheet row with status pending, supplied or late, or "none">
 ```
 
 ```markdown
