@@ -58,7 +58,7 @@ test('config combines defaults and repo values, reports none, and recalculates w
       max_active: 3,
       fix_rounds: 2,
       implement: 'inline',
-      repo: 'repo',
+      repo: f.repo,
       remote: 'upstream',
     });
     expect(Bun.YAML.parse((await cli(f, ['config'], f.home)).stdout)).toMatchObject({
@@ -71,7 +71,7 @@ test('config combines defaults and repo values, reports none, and recalculates w
     const first: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
     expect(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout)).toMatchObject({
       AKROGON_BASE: first,
-      repo: 'repo',
+      repo: f.repo,
     });
     writeFileSync(resolve(f.root, 'file'), 'next\n');
     await command(['git', 'commit', '-am', 'next'], f.root);
@@ -186,7 +186,7 @@ test('config rejects invalid slots shapes and accepts empty slots', async () => 
         b: { harness: 'fake', model: 'strong-b', effort: 'medium' },
       },
       harnesses: { fake: 'fake --model {model} --effort {effort}' },
-      repos: { repo: f.root },
+      repos: { [f.repo]: f.root },
     });
     expect((await cli(f, ['config'])).code).not.toBe(0);
     yaml(resolve(f.home, 'config.yaml'), {
@@ -195,7 +195,7 @@ test('config rejects invalid slots shapes and accepts empty slots', async () => 
         b: { harness: 'fake', model: ' ', effort: 'medium' },
       },
       harnesses: { fake: 'fake --model {model} --effort {effort}' },
-      repos: { repo: f.root },
+      repos: { [f.repo]: f.root },
     });
     expect((await cli(f, ['config'])).code).not.toBe(0);
   } finally {
@@ -243,7 +243,7 @@ test('config prints worktree_store matching the leaf path for every root shape a
     };
     const unset = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
     expect(unset.worktree_root ?? null).toBeNull();
-    check(unset, resolve(f.home, '.akrogon/worktrees/repo'));
+    check(unset, resolve(f.home, '.akrogon/worktrees', f.repo));
     yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', worktree_root: '~/custom/trees' });
     const custom = Bun.YAML.parse((await cli(f, ['config'])).stdout) as StoreParsed;
     expect(custom.worktree_root).toBe('~/custom/trees');
@@ -315,17 +315,17 @@ test('config prints per-repo merged slots with two overrides', async () => {
       slots: { b: { harness: 'fake', model: 'g-b', effort: 'low' } },
     });
     const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
-    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { repo: f.root, other: g.root } });
+    yaml(resolve(f.home, 'config.yaml'), { ...global, repos: { [f.repo]: f.root, [g.repo]: g.root } });
     const fConfig = await cli(f, ['config'], f.root);
     expect(fConfig.code).toBe(0);
     expect(Bun.YAML.parse(fConfig.stdout)).toMatchObject({
-      repo: 'repo',
+      repo: f.repo,
       slots: { a: { model: 'f-a' }, b: { model: 'strong-b' } },
     });
     const gConfig = await cli(f, ['config'], g.root);
     expect(gConfig.code).toBe(0);
     expect(Bun.YAML.parse(gConfig.stdout)).toMatchObject({
-      repo: 'other',
+      repo: g.repo,
       slots: { a: { model: 'strong-a' }, b: { model: 'g-b' } },
     });
   } finally {
@@ -581,7 +581,7 @@ test('seats resolves index seats nearest-first and reports each seat source', as
       slots: { b: { harness: 'fake', model: 'repo-b', effort: 'low' } },
     });
     const global: GlobalConfig = readGlobal();
-    const repo: Repo = readRepo('repo', root);
+    const repo: Repo = readRepo(f.repo, root);
     const repoConfig: string = resolve(root, 'issues/config.yaml');
     const machineConfig: string = resolve(f.home, 'config.yaml');
     const owner: string = resolve(root, 'issues/open/issue');
@@ -641,7 +641,7 @@ test('seats throws SeatIndexError naming the file and seat for malformed indexes
     const root: string = realpathSync(f.root);
     yaml(resolve(root, 'issues/config.yaml'), { grounding: 'none' });
     const global: GlobalConfig = readGlobal();
-    const repo: Repo = readRepo('repo', root);
+    const repo: Repo = readRepo(f.repo, root);
     const owner: string = resolve(root, 'issues/open/issue');
     const leafPath: string = resolve(owner, 'bad');
     mkdirSync(leafPath, { recursive: true });
@@ -764,7 +764,7 @@ test('config refuses unknown merge_covers names and empty merge_checks with cove
     });
     const unknown = await cli(f, ['config']);
     expect(unknown.code).not.toBe(0);
-    expect(unknown.stderr).toContain('repo');
+    expect(unknown.stderr).toContain(f.repo);
     expect(unknown.stderr).toContain('nope');
     yaml(resolve(f.root, 'issues/config.yaml'), {
       checks: { keep: 'true' },
@@ -773,7 +773,7 @@ test('config refuses unknown merge_covers names and empty merge_checks with cove
     });
     const empty = await cli(f, ['config']);
     expect(empty.code).not.toBe(0);
-    expect(empty.stderr).toContain('repo');
+    expect(empty.stderr).toContain(f.repo);
     expect(empty.stderr).toContain('keep');
   } finally {
     f.clean();
@@ -897,17 +897,17 @@ test('machine config accepts a prefixes map without changing commands and refuse
     const global: object = Bun.YAML.parse(readFileSync(file, 'utf8')) as object;
     const before: Result = await cli(f, ['config']);
     expect(before.code).toBe(0);
-    yaml(file, { ...global, prefixes: { repo: 'rp' } });
+    yaml(file, { ...global, prefixes: { [f.repo]: f.prefix } });
     const after: Result = await cli(f, ['config']);
     expect(after.code).toBe(0);
     expect(Bun.YAML.parse(after.stdout)).toEqual({
       ...(Bun.YAML.parse(before.stdout) as object),
-      prefixes: { repo: 'rp' },
+      prefixes: { [f.repo]: f.prefix },
     });
     expect((await cli(f, ['init'])).code).toBe(0);
-    expect(Bun.YAML.parse(readFileSync(file, 'utf8'))).toMatchObject({ prefixes: { repo: 'rp' } });
+    expect(Bun.YAML.parse(readFileSync(file, 'utf8'))).toMatchObject({ prefixes: { [f.repo]: f.prefix } });
     for (const bad of ['RP', 'r', 'rpx', 'r1']) {
-      yaml(file, { ...global, prefixes: { repo: 'rp', framework: bad } });
+      yaml(file, { ...global, prefixes: { [f.repo]: f.prefix, framework: bad } });
       const refused: Result = await cli(f, ['config']);
       expect(refused.code).not.toBe(0);
       expect(refused.stderr).toContain('prefixes');

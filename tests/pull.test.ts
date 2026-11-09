@@ -211,7 +211,7 @@ test('missing and invalid origins fail visibly, and all continues after invalid 
     const invalid: Result = await cli(f, ['pull'], f.root, gh.env);
     expect(invalid.code).not.toBe(0);
     const invalidContext: string = /^error: (\{.*\})$/m.exec(invalid.stderr)![1];
-    expect(JSON.parse(invalidContext)).toMatchObject({ repo: 'repo', origin: 'https://gitlab.com/acme/project' });
+    expect(JSON.parse(invalidContext)).toMatchObject({ repo: f.repo, origin: 'https://gitlab.com/acme/project' });
     await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme'], f.root);
     expect((await cli(f, ['pull'], f.root, gh.env)).code).not.toBe(0);
     await command(['git', 'remote', 'set-url', 'origin', 'https://github.com/acme/project.git'], f.root);
@@ -221,7 +221,7 @@ test('missing and invalid origins fail visibly, and all continues after invalid 
     );
     yaml(resolve(f.home, 'config.yaml'), {
       ...global,
-      repos: { missing: resolve(f.home, 'missing'), bad: bad.root, repo: f.root },
+      repos: { missing: resolve(f.home, 'missing'), bad: bad.root, [f.repo]: f.root },
     });
     script(gh, [{ stdout: JSON.stringify([[issue(5, 'Healthy')]]) }]);
     const all: Result = await cli(f, ['pull', '--all'], f.home, gh.env);
@@ -248,7 +248,7 @@ test('pull --all pulls every registered repo from a repo root, a linked worktree
     );
     yaml(resolve(f.home, 'config.yaml'), {
       ...global,
-      repos: { repo: f.root, second: second.root },
+      repos: { [f.repo]: f.root, second: second.root },
     });
     const worktree: string = resolve(f.home, 'worktree');
     await command(['git', 'worktree', 'add', '-b', 'work', worktree], f.root);
@@ -261,7 +261,7 @@ test('pull --all pulls every registered repo from a repo root, a linked worktree
       ]);
       const pulled: Result = await cli(f, ['pull', '--all'], cwd, gh.env);
       expect(pulled.code).toBe(0);
-      expect(pulled.stdout).toBe('repo: 1 open issues pulled\nsecond: 1 open issues pulled');
+      expect(pulled.stdout).toBe(`${f.repo}: 1 open issues pulled\nsecond: 1 open issues pulled`);
       expect(Object.keys(snapshot(f))).toEqual(['10-from-repo.md']);
       expect(Object.keys(snapshot(second))).toEqual(['20-from-second.md']);
       expect(existsSync(resolve(worktree, 'issues/seeds'))).toBe(false);
@@ -284,14 +284,14 @@ test('pull --all from a registered repo pulls the healthy repos and exits non-ze
     );
     yaml(resolve(f.home, 'config.yaml'), {
       ...global,
-      repos: { repo: f.root, bad: bad.root },
+      repos: { [f.repo]: f.root, bad: bad.root },
     });
     script(gh, [{ stdout: JSON.stringify([[issue(7, 'Still Pulled')]]) }]);
     const pulled: Result = await cli(f, ['pull', '--all'], f.root, gh.env);
     expect(pulled.code).not.toBe(0);
     expect(pulled.stderr).toContain('bad');
     expect(pulled.stderr).toContain('gitlab.com');
-    expect(pulled.stdout).toBe('repo: 1 open issues pulled');
+    expect(pulled.stdout).toBe(`${f.repo}: 1 open issues pulled`);
     expect(snapshot(f)['7-still-pulled.md']).toBeDefined();
   } finally {
     f.clean();

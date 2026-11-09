@@ -27,7 +27,7 @@ test('init writes proposal, registration and toolkit and preserves repeated user
       remote: 'origin',
     });
     expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8'))).toMatchObject({
-      repos: { repo: f.root },
+      repos: { [f.repo]: f.root },
       toolkits: { typescript: 'bun:test' },
     });
     const lessons: string = resolve(f.root, 'learnings/LESSONS.md');

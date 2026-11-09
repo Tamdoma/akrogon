@@ -19,17 +19,17 @@ test('pause and unpause record repo state from root, idempotent', async () => {
     expect(existsSync(pausedFile(f))).toBe(false);
     const first: Result = await cli(f, ['pause']);
     expect(first.code).toBe(0);
-    expect(first.stdout).toContain('repo');
+    expect(first.stdout).toContain(f.repo);
     expect(first.stdout).toContain('paused');
-    expect(pausedKeys(f)).toEqual(['repo']);
+    expect(pausedKeys(f)).toEqual([f.repo]);
     const repeat: Result = await cli(f, ['pause']);
     expect(repeat.code).toBe(0);
-    expect(repeat.stdout).toContain('repo');
+    expect(repeat.stdout).toContain(f.repo);
     expect(repeat.stdout).toContain('paused');
-    expect(pausedKeys(f)).toEqual(['repo']);
+    expect(pausedKeys(f)).toEqual([f.repo]);
     const clear: Result = await cli(f, ['unpause']);
     expect(clear.code).toBe(0);
-    expect(clear.stdout).toContain('repo');
+    expect(clear.stdout).toContain(f.repo);
     expect(clear.stdout).toContain('unpaused');
     expect(pausedKeys(f)).toEqual([]);
     const clearRepeat: Result = await cli(f, ['unpause']);
@@ -46,15 +46,15 @@ test('pause resolves the repo from a subfolder and a leaf worktree', async () =>
     const sub: string = resolve(f.root, 'sub');
     mkdirSync(sub);
     expect((await cli(f, ['pause'], sub)).code).toBe(0);
-    expect(pausedKeys(f)).toEqual(['repo']);
+    expect(pausedKeys(f)).toEqual([f.repo]);
     expect((await cli(f, ['unpause'], sub)).code).toBe(0);
     expect(pausedKeys(f)).toEqual([]);
     const worktree: string = resolve(f.home, 'wt');
     await command(['git', 'worktree', 'add', '-b', 'wt-leaf', worktree], f.root);
     const fromWorktree: Result = await cli(f, ['pause'], worktree);
     expect(fromWorktree.code).toBe(0);
-    expect(fromWorktree.stdout).toContain('repo');
-    expect(pausedKeys(f)).toEqual(['repo']);
+    expect(fromWorktree.stdout).toContain(f.repo);
+    expect(pausedKeys(f)).toEqual([f.repo]);
     expect((await cli(f, ['unpause'], worktree)).code).toBe(0);
     expect(pausedKeys(f)).toEqual([]);
   } finally {
@@ -85,7 +85,7 @@ test('missing pause file means nothing paused, invalid file fails naming the pat
     const clear: Result = await cli(f, ['unpause']);
     expect(clear.code).toBe(0);
     expect(clear.stdout).toContain('unpaused');
-    for (const body of ['not: [valid', '["just", "a", "list"]', '{ repo: false }', 'null']) {
+    for (const body of ['not: [valid', '["just", "a", "list"]', `{ ${f.repo}: false }`, 'null']) {
       writeFileSync(pausedFile(f), body + '\n');
       const paused: Result = await cli(f, ['pause']);
       expect(paused.code).not.toBe(0);

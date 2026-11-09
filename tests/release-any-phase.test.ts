@@ -16,7 +16,7 @@ async function fakes(): Promise<F> {
   return hcFixture();
 }
 
-const repo = (f: Fixture): Repo => readRepo('repo', f.root);
+const repo = (f: Fixture): Repo => readRepo(f.repo, f.root);
 
 // The leaf temp path the subprocess computes: leafTemp(repo, slug) resolves
 // under AKROGON_LEAF_TEMP_ROOT, which cli() sets to leafTempRoot(f), not the
@@ -75,7 +75,7 @@ function paneListUnavailable(f: F): () => void {
 
 // A leaf the sweep must never dispatch: stopped leaves are skipped, not allocated.
 function stopLeaf(f: F, slug: string): void {
-  writeYaml(resolve(f.home, 'stopped.yaml'), { [`repo/${slug}`]: true });
+  writeYaml(resolve(f.home, 'stopped.yaml'), { [`${f.repo}/${slug}`]: true });
 }
 
 // A second registered repo whose leaves only the host slice step can judge:
@@ -169,7 +169,7 @@ function kept(file: string): { path: string; reason: string }[] {
     .parse(JSON.parse(readFileSync(file, 'utf8'))).kept;
 }
 
-const repoKept = (f: F): { path: string; reason: string }[] => kept(resolve(f.home, 'reconcile', 'repo.json'));
+const repoKept = (f: F): { path: string; reason: string }[] => kept(resolve(f.home, 'reconcile', `${f.repo}.json`));
 const hostKept = (f: F): { path: string; reason: string }[] => kept(resolve(f.home, 'reconcile-host.json'));
 const OTHER_REPO: string = 'repo not reconciled by this pass';
 
@@ -295,7 +295,7 @@ test('a live run record keeps an unfinished leaf slice and its temp', async () =
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/busy-run' }]);
     const temp: string = tempFor(f, 'run-held');
     mkdirSync(temp, { recursive: true });
-    liveRunRecord(f, 'held', 'repo', 'run-held', slice, child.pid);
+    liveRunRecord(f, 'held', f.repo, 'run-held', slice, child.pid);
     const result: Result = await cli(f, ['next', '--all'], f.root, env(f, db, log));
     expect(result.code).toBe(1);
     expect(calls(log).some((line) => line.includes(`stop ${slice}`))).toBe(false);
@@ -462,8 +462,8 @@ test('the host slice step keeps unfinished leaf slices under the same tab rules'
     otherLeaf(other, 'other-idle', 'merged', { tab: 'akotheridle' });
     // One write: stopLeaf replaces the file, so all four entries go in together.
     writeYaml(resolve(f.home, 'stopped.yaml'), {
-      'repo/host-tab': true,
-      'repo/host-note': true,
+      [`${f.repo}/host-tab`]: true,
+      [`${f.repo}/host-note`]: true,
       'other/other-gone': true,
       'other/other-run': true,
     });

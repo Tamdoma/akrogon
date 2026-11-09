@@ -136,7 +136,7 @@ test('resume skips the paused repo and still dispatches the unpaused repo', asyn
     expect((await next(f, ['xleaf'])).code).toBe(0);
     const yRoot: string = await secondRepo(f, 'y');
     const yPath: string = leafIn(yRoot, 'y', 'yleaf', 'plan.synthesis');
-    setPrefixes(f, { repo: 'rp', y: 'yp' });
+    setPrefixes(f, { [f.repo]: f.prefix, y: 'yp' });
     await addSpace(f, 'y', yRoot);
     expect((await next(f, ['yleaf'], {}, yRoot)).code).toBe(0);
     expect(readState(yPath).tab).not.toBe(undefined);
@@ -194,7 +194,7 @@ test('manual next target dispatches a paused repo and stays paused', async () =>
     expect(run.code).toBe(0);
     expect((await delivered(f, 'build')).length).toBeGreaterThan(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
-      'repo',
+      f.repo,
     ]);
   } finally {
     await f.clean();
@@ -210,7 +210,7 @@ test('manual next all dispatches a paused repo and stays paused', async () => {
     expect(run.code).toBe(0);
     expect((await delivered(f, 'build')).length).toBeGreaterThan(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
-      'repo',
+      f.repo,
     ]);
   } finally {
     await f.clean();
@@ -226,7 +226,7 @@ test('bare manual next dispatches a paused repo and stays paused', async () => {
     expect(run.code).toBe(0);
     expect((await delivered(f, 'build')).length).toBeGreaterThan(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
-      'repo',
+      f.repo,
     ]);
   } finally {
     await f.clean();
@@ -243,7 +243,7 @@ test('manual next target completes a leaf and dispatches its dependent while pau
     expect(run.code).toBe(0);
     expect((await delivered(f, 'dep')).some((prompt) => prompt.seat === 'a')).toBe(true);
     expect(readState(dependent).tab).not.toBe(undefined);
-    expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8'))).toEqual({ repo: true });
+    expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8'))).toEqual({ [f.repo]: true });
   } finally {
     await f.clean();
   }
@@ -258,7 +258,7 @@ test('manual next target prompts the waiting merge holder while paused', async (
     const run: Result = await next(f, ['build']);
     expect(run.code).toBe(0);
     expect((await delivered(f, 'holder')).some((prompt) => prompt.seat === 'b')).toBe(true);
-    expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8'))).toEqual({ repo: true });
+    expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8'))).toEqual({ [f.repo]: true });
   } finally {
     await f.clean();
   }
@@ -312,7 +312,7 @@ test('unpause runs deferred merged cleanup', async () => {
       '--label',
       'akrogon=1',
       '--label',
-      'akrogon.repo=repo',
+      `akrogon.repo=${f.repo}`,
       '--label',
       'akrogon.leaf=live',
       '--label',
@@ -482,7 +482,7 @@ test('race A: pause recorded before the locked merge section suppresses the laun
     const paused: Result = await cli(f, ['pause']);
     expect(paused.code).toBe(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
-      'repo',
+      f.repo,
     ]);
     writeFileSync(resolve(barrier, 'release'), '');
     const { stdout, stderr, code }: Result = await finishCaptured(child.current, spawned.captured);
@@ -541,7 +541,7 @@ test('race B: pause waits for a held launch lock, later automatic work is suppre
     expect(await pass.exited).toBe(0);
     expect(await pausing.exited).toBe(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
-      'repo',
+      f.repo,
     ]);
     expect(prompts(f).length).toBeGreaterThan(sent);
     const before: number = mutating(f).length;

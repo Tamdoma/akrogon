@@ -38,14 +38,14 @@ test('status marks the paused repo beside its heading, including an empty repo',
     expect((await cli(f, ['pause'], y)).code).toBe(0);
     const run: Result = await cli(f, ['status'], outside);
     expect(run.code).toBe(0);
-    expect(heading(run.stdout, 'repo')).toContain('paused');
+    expect(heading(run.stdout, f.repo)).toContain('paused');
     expect(heading(run.stdout, 'y')).toContain('paused');
     expect(run.stdout).toContain('no open leaves');
     expect(run.stdout).toContain('build');
     expect((await cli(f, ['unpause'], y)).code).toBe(0);
     const after: Result = await cli(f, ['status'], outside);
     expect(after.code).toBe(0);
-    expect(heading(after.stdout, 'repo')).toContain('paused');
+    expect(heading(after.stdout, f.repo)).toContain('paused');
     expect(heading(after.stdout, 'y')).not.toContain('paused');
   } finally {
     rmSync(outside, { recursive: true, force: true });
@@ -62,7 +62,7 @@ test('status charts marks the paused repo heading', async () => {
     expect((await cli(f, ['pause'], f.root)).code).toBe(0);
     const run: Result = await cli(f, ['status', '--charts'], outside);
     expect(run.code).toBe(0);
-    expect(heading(run.stdout, 'repo')).toContain('paused');
+    expect(heading(run.stdout, f.repo)).toContain('paused');
     expect(heading(run.stdout, 'y')).not.toContain('paused');
   } finally {
     rmSync(outside, { recursive: true, force: true });
@@ -82,7 +82,7 @@ test('targeted status names the pause for a leaf of a paused repo', async () => 
     expect(run.code).toBe(0);
     const line: string | undefined = run.stdout.split('\n').find((candidate) => candidate.includes('paused'));
     expect(line).not.toBe(undefined);
-    expect(line).toContain('repo');
+    expect(line).toContain(f.repo);
   } finally {
     f.clean();
   }

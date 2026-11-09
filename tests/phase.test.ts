@@ -72,7 +72,7 @@ test('valid phase transition rejects a mismatched repo key without changing stat
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(path);
     expect(result.stderr).toMatch(/stored[^\n]*other/i);
-    expect(result.stderr).toMatch(/registered[^\n]*repo/i);
+    expect(result.stderr).toContain(`registered key "${f.repo}"`);
     expect(bytes(path)).toBe(before);
     expect(readFileSync(history, 'utf8')).toBe('');
   } finally {
@@ -1082,9 +1082,9 @@ test('stop from implement on dirty worktree records blocked failure and clears b
     const stamp: string = '2026-09-11T12:00:00.000Z';
     const seat = { session: f.core.session, address: 't99' };
     // B's busy notice is still waiting for the window: the move to failed clears it before it shows.
-    const busy: string = resolve(noticeFolder(f.core), `${noticeId('repo', 'busy', 'stop', 'B')}.json`);
+    const busy: string = resolve(noticeFolder(f.core), `${noticeId(f.repo, 'busy', 'stop', 'B')}.json`);
     mkdirSync(noticeFolder(f.core), { recursive: true });
-    writeFileSync(busy, JSON.stringify({ title: 'Busy leaf: repo/stop seat B 1h01m', body: '', attention: false }));
+    writeFileSync(busy, JSON.stringify({ title: `Busy leaf: ${f.repo}/stop seat B 1h01m`, body: '', attention: false }));
     const path: string = leaf(f, 'stop', 'implement', {
       worktree,
       tab: 'aktab1',
@@ -1111,7 +1111,7 @@ test('stop from implement on dirty worktree records blocked failure and clears b
     });
     expect(existsSync(busy)).toBe(false);
     expect(noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }))).toEqual([
-      { title: 'repo/stop failed', body: 'blocked: x', attention: true },
+      { title: `${f.repo}/stop failed`, body: 'blocked: x', attention: true },
     ]);
     expect(renames(f)).toEqual([['aktab1', 'stop failed']]);
     expect(existsSync(resolve(worktree, 'dirty'))).toBe(true);
@@ -1345,17 +1345,17 @@ test('stopped-core moves retain pending notice cleanup until a later pass can re
     );
     expect(failed.code, failed.stderr).toBe(0);
     const waiting: string = noticeFiles(core)[0].path;
-    const merged: string = resolve(noticeFolder(core), `${noticeId('repo', 'merged', 'recovering')}.json`);
-    writeFileSync(merged, JSON.stringify({ title: 'repo/recovering merged, move it back', body: '', attention: true }));
+    const merged: string = resolve(noticeFolder(core), `${noticeId(f.repo, 'merged', 'recovering')}.json`);
+    writeFileSync(merged, JSON.stringify({ title: `${f.repo}/recovering merged, move it back`, body: '', attention: true }));
     const batch: Batch = holding(f).batch;
     saveState(recovering, {
       ...readState(recovering),
       batch: { ...batch, candidate: batch.top, notified: 'pending' },
     });
-    const busy: string = resolve(noticeFolder(core), `${noticeId('repo', 'busy', 'busy-stop', 'B')}.json`);
+    const busy: string = resolve(noticeFolder(core), `${noticeId(f.repo, 'busy', 'busy-stop', 'B')}.json`);
     writeFileSync(
       busy,
-      JSON.stringify({ title: 'Busy leaf: repo/busy-stop seat B 1h01m', body: '', attention: false }),
+      JSON.stringify({ title: `Busy leaf: ${f.repo}/busy-stop seat B 1h01m`, body: '', attention: false }),
     );
     const stopping: string = leaf(f, 'busy-stop', 'implement', { busy_notified: { B: 'pending' } });
     expect((await core.hc(['server', 'stop'])).code).toBe(0);
@@ -1400,16 +1400,16 @@ test('stopped-core moves retain pending notice cleanup until a later pass can re
 }, 30000);
 
 test('failed announce writes the failed notice, renames tabs and tolerates missing tabs', async () => {
-  const failedNotice = (slug: string) => ({ title: `repo/${slug} failed`, body: 'blocked: x', attention: true });
+  const failedNotice = (f: HcFixture, slug: string) => ({ title: `${f.repo}/${slug} failed`, body: 'blocked: x', attention: true });
   const notices = (f: HcFixture) =>
     noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }));
   {
     // Recovery clears a failed notice still waiting for the window.
     const f: HcFixture = await hcFixture({ window: 'open' });
     try {
-      const waiting: string = resolve(noticeFolder(f.core), `${noticeId('repo', 'failed', 'back')}.json`);
+      const waiting: string = resolve(noticeFolder(f.core), `${noticeId(f.repo, 'failed', 'back')}.json`);
       mkdirSync(noticeFolder(f.core), { recursive: true });
-      writeFileSync(waiting, JSON.stringify(failedNotice('back')));
+      writeFileSync(waiting, JSON.stringify(failedNotice(f, 'back')));
       const path: string = parked(f, 'back', 'failed', {
         tab: 'aktab1',
         failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'x', delivery: 'pending' },
@@ -1445,7 +1445,7 @@ test('failed announce writes the failed notice, renames tabs and tolerates missi
       const path: string = leaf(f, 'notab', 'implement');
       const result: Result = await cli(f, ['phase', 'notab', 'failed', '--reason', 'x'], f.root, f.env);
       expect(result.code).toBe(0);
-      expect(notices(f)).toEqual([failedNotice('notab')]);
+      expect(notices(f)).toEqual([failedNotice(f, 'notab')]);
       expect(renames(f)).toEqual([]);
       expect(readState(path).failure?.delivery).toBe('pending');
       expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(1);
@@ -1481,7 +1481,7 @@ test('failed announce writes the failed notice, renames tabs and tolerates missi
       const result: Result = await cli(f, ['phase', 'oops', 'failed', '--reason', 'x'], f.root, f.env);
       expect(result.code).toBe(0);
       expect(readState(path)).toMatchObject({ phase: 'failed', failure: { delivery: 'pending' } });
-      expect(notices(f)).toEqual([failedNotice('oops')]);
+      expect(notices(f)).toEqual([failedNotice(f, 'oops')]);
       expect(renames(f)).toEqual([['aktab1', 'oops failed']]);
       expect(renameWarnings(result)).toHaveLength(1);
     } finally {
@@ -1504,7 +1504,7 @@ for (const { slug, phase, args, failNotice, code, notices, name, delivery } of [
     phase: 'implement',
     args: ['phase', 'stale-fail', 'failed', '--slot', 'A', '--reason', 'x'],
     code: 0,
-    notices: [{ title: 'repo/stale-fail failed', body: 'blocked: x', attention: true }],
+    notices: [{ title: `${'REPO'}/stale-fail failed`, body: 'blocked: x', attention: true }],
     name: 'stale-fail failed',
     delivery: 'pending',
   },
@@ -1544,7 +1544,9 @@ for (const { slug, phase, args, failNotice, code, notices, name, delivery } of [
       expect(warnings[0].error).toContain('not found');
       if (failNotice === true) expect(statSync(noticeFolder(f.core)).isFile()).toBe(true);
       else
-        expect(noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }))).toEqual(notices);
+        expect(noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }))).toEqual(
+          notices.map((n) => ({ ...n, title: n.title.replace('REPO', f.repo) })),
+        );
       expect(renames(f)).toEqual([['aktab1', name]]);
       const state: { phase: string; tab?: string; failure?: { delivery?: string } } = readState(path);
       expect(state.phase).toBe(args[2]);

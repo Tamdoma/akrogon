@@ -16,7 +16,7 @@ test('old attempt and timing lines carrying members still parse', async () => {
     const line = (outcome: string, members: (string | { slug: string; head: string })[]): string =>
       JSON.stringify({
         attempt: 'a0',
-        repo: 'repo',
+        repo: f.repo,
         holder: 'hold',
         built_on: 'a'.repeat(40),
         outcome,
@@ -27,13 +27,13 @@ test('old attempt and timing lines carrying members still parse', async () => {
       resolve(f.root, 'issues/merge-attempts.jsonl'),
       [line('red', ['mem-a']), line('merged', [{ slug: 'mem-a', head: 'b'.repeat(40) }])].join('\n') + '\n',
     );
-    expect(readAttempts(readRepo('repo', f.root)).map((record) => record.outcome)).toEqual(['red', 'merged']);
+    expect(readAttempts(readRepo(f.repo, f.root)).map((record) => record.outcome)).toEqual(['red', 'merged']);
     writeFileSync(
       resolve(f.root, 'issues/timings.jsonl'),
       JSON.stringify({
         kind: 'batch',
         ts: '2026-10-10T00:00:00.000Z',
-        repo: 'repo',
+        repo: f.repo,
         slug: 'hold',
         attempt: 'a0',
         holder: 'hold',

@@ -124,7 +124,7 @@ function ownerRecord(pid: number): string {
   const boot: string = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
   return JSON.stringify({ pid, boot_id: boot, started: new Date().toISOString() });
 }
-function keptReport(f: DispatchFixture, repo: string = 'repo'): { path: string; reason: string }[] {
+function keptReport(f: DispatchFixture, repo: string = f.repo): { path: string; reason: string }[] {
   const file: string = resolve(f.home, 'reconcile', `${repo}.json`);
   if (!existsSync(file)) return [];
   return z
@@ -455,7 +455,7 @@ test('unconfirmed verify worktrees are removed once the run ends', async () => {
     const record = (id: string, path: string): string =>
       JSON.stringify({
         run: id,
-        repo: 'repo',
+        repo: f.repo,
         leaf: 'holder-leaf',
         sha: 'x',
         tree: 'x',
@@ -608,7 +608,7 @@ test('verify scratch copies are removed by owner state and kept while the run is
     const record = (id: string, path: string, pid: number, end?: string): string =>
       JSON.stringify({
         run: id,
-        repo: 'repo',
+        repo: f.repo,
         leaf: 'scratch-holder',
         sha: 'x',
         tree: 'x',
@@ -766,7 +766,7 @@ test('scratch copies stay while a pane is inside or the pane list is unavailable
       resolve(f.root, 'issues/verify-runs.jsonl'),
       JSON.stringify({
         run: 'pane',
-        repo: 'repo',
+        repo: f.repo,
         leaf: 'pane-holder',
         sha: 'x',
         tree: 'x',
@@ -812,7 +812,7 @@ test('a scratch copy with a process inside stays, recorded with the pid', async 
       resolve(f.root, 'issues/verify-runs.jsonl'),
       JSON.stringify({
         run: 'proc',
-        repo: 'repo',
+        repo: f.repo,
         leaf: 'proc-holder',
         sha: 'x',
         tree: 'x',
@@ -1034,7 +1034,7 @@ test('a dead-owner run dir is removed under an unavailable pane list, strays sta
       [
         process.execPath,
         '-e',
-        `const {reconcile}=await import(${src('reconcile')});const {allLeaves}=await import(${src('state')});const {readRepo}=await import(${src('config')});const r=readRepo('repo',process.cwd());const out=await reconcile(r,allLeaves(r),null);console.log(JSON.stringify(out));`,
+        `const {reconcile}=await import(${src('reconcile')});const {allLeaves}=await import(${src('state')});const {readRepo}=await import(${src('config')});const r=readRepo(${JSON.stringify(f.repo)},process.cwd());const out=await reconcile(r,allLeaves(r),null);console.log(JSON.stringify(out));`,
       ],
       {
         cwd: f.root,
@@ -1188,7 +1188,7 @@ async function agentLockText(f: DispatchFixture, dir: string): Promise<string | 
   return line === undefined ? null : line;
 }
 function removedReport(f: DispatchFixture): { path: string; head: string; rule: string; branch?: string }[] {
-  const file: string = resolve(f.home, 'reconcile', 'repo.json');
+  const file: string = resolve(f.home, 'reconcile', `${f.repo}.json`);
   if (!existsSync(file)) return [];
   return (
     z

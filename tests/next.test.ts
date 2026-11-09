@@ -105,9 +105,9 @@ async function seatIdle(f: HcFixture, address: string, turn: number): Promise<Te
   return f.core.waitFor(address, (t: Terminal) => t.turn >= turn && t.status?.state === 'idle');
 }
 // A second registered repo on its own fixture core, linked so akrogon sees both sessions.
-async function otherRepo(f: HcFixture, name: string = 'other', prefix: string = 'ot'): Promise<HcFixture> {
+async function otherRepo(f: HcFixture): Promise<HcFixture> {
   const g: Fixture = await fixture();
-  const core: HcCore = await hcCore(g, { repo: name });
+  const core: HcCore = await hcCore(g, { repo: g.repo });
   f.core.link(core);
   // akrogon runs with HOME at f.home, so the other session's herdr-app home lives there too (plan D12).
   mkdirSync(resolve(f.home, '.config/herdr-app-sessions', core.session), { recursive: true });
@@ -115,7 +115,7 @@ async function otherRepo(f: HcFixture, name: string = 'other', prefix: string = 
     .object({ prefixes: z.record(z.string(), z.string()) })
     .passthrough()
     .parse(Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')));
-  setPrefixes(f, { ...global.prefixes, [name]: prefix });
+  setPrefixes(f, { ...global.prefixes, [g.repo]: g.prefix });
   return {
     ...g,
     core,
@@ -237,7 +237,7 @@ test('next creates one worktree/tab under concurrent passes and starts configure
     expect(results.map((r) => r.code)).toEqual([0, 0]);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).not.toMatch(/^(priority|slot):/m);
     const seats: Terminal[] = await seatTerminals(f, 'build', true);
-    expect(seats.map((t: Terminal) => t.name)).toEqual(['rp-build-a']);
+    expect(seats.map((t: Terminal) => t.name)).toEqual([seatName(f.repo, f.prefix, 'build', 'a')]);
     expect(new Set(seats.map((t: Terminal) => t.labels['herdr.tab']))).toEqual(
       new Set([z.string().parse(readState(path).tab)]),
     );
@@ -392,8 +392,8 @@ test('busy seats persist, warn strictly after an hour, retry a failed notice and
     for (const minutes of [61, 62]) expect((await nextAt(f, 'busy', now + minutes * 60000)).code).toBe(0);
     // One silent notice per seat, written once and kept pending while its file waits.
     expect(shown()).toEqual([
-      { title: 'Busy leaf: repo/busy seat A 1h01m', body: '', attention: false },
-      { title: 'Busy leaf: repo/busy seat B 1h01m', body: '', attention: false },
+      { title: `Busy leaf: ${f.repo}/busy seat A 1h01m`, body: '', attention: false },
+      { title: `Busy leaf: ${f.repo}/busy seat B 1h01m`, body: '', attention: false },
     ]);
     expect(readState(path)).toMatchObject({
       phase: started.phase,
@@ -408,7 +408,7 @@ test('busy seats persist, warn strictly after an hour, retry a failed notice and
     rmSync(seatA!.path);
     expect((await nextAt(f, 'busy', now + 62 * 60000)).code).toBe(0);
     expect(readState(path).busy_notified).toEqual({ A: 'shown', B: 'pending' });
-    expect(shown()).toEqual([{ title: 'Busy leaf: repo/busy seat B 1h01m', body: '', attention: false }]);
+    expect(shown()).toEqual([{ title: `Busy leaf: ${f.repo}/busy seat B 1h01m`, body: '', attention: false }]);
     // Both turns end: the idle observation clears each episode and removes B's notice before it shows.
     release();
     for (const seat of await seatTerminals(f, 'busy')) await seatIdle(f, seat.address, 1);
@@ -505,8 +505,8 @@ test('completing a leaf via targeted next starts only same-repo dependents', asy
     const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
     const loose: string = leaf(f, 'loose', 'plan.synthesis', {}, 'loose-issue');
     const second: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
-    const other: string = leaf(g, 'other', 'plan.synthesis', { repo: 'other' });
-    configure(f, { repos: { repo: f.root, other: g.root } });
+    const other: string = leaf(g, 'other', 'plan.synthesis', { repo: g.repo });
+    configure(f, { repos: { [f.repo]: f.root, [g.repo]: g.root } });
     holdTurns(f);
     expect((await next(f, ['first'])).code).toBe(0);
     saveState(first, { ...readState(first), phase: 'merge', ...holding(f) });
@@ -551,8 +551,8 @@ test('next --all inside a checkout sweeps only that repo', async () => {
   const g: Fixture = await fixture();
   try {
     leaf(f, 'a-one', 'plan.synthesis');
-    leaf(g, 'b-one', 'plan.synthesis', { repo: 'other' });
-    configure(f, { repos: { repo: f.root, other: g.root } });
+    leaf(g, 'b-one', 'plan.synthesis', { repo: g.repo });
+    configure(f, { repos: { [f.repo]: f.root, [g.repo]: g.root } });
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(await liveTabs(f)).toEqual(['a-one']);
   } finally {
@@ -607,8 +607,8 @@ test('machine-wide capacity includes another registered repo and folder selectio
   const g: HcFixture = await otherRepo(f);
   try {
     leaf(f, 'first', 'plan.synthesis');
-    const second: string = leaf(g, 'second', 'plan.synthesis', { repo: 'other' });
-    configure(f, { max_active: 1, repos: { repo: f.root, other: g.root } });
+    const second: string = leaf(g, 'second', 'plan.synthesis', { repo: g.repo });
+    configure(f, { max_active: 1, repos: { [f.repo]: f.root, [g.repo]: g.root } });
     const results: Result[] = await Promise.all([next(f, ['first']), next(f, [resolve(g.root, 'issues/open/issue')])]);
     expect(results.every((result) => result.code === 0)).toBe(true);
     expect([...(await liveTabs(f)), ...(await liveTabs(g))]).toHaveLength(1);
@@ -631,8 +631,8 @@ test('merged leaves do not reserve capacity for other waiting leaves', async () 
     leaf(f, 'merged-c', 'merged');
     const first: string = leaf(f, 'first', 'plan.synthesis');
     const second: string = leaf(f, 'second', 'plan.synthesis');
-    const other: string = leaf(g, 'other', 'plan.synthesis', { repo: 'other' });
-    configure(f, { max_active: 3, repos: { repo: f.root, other: g.root } });
+    const other: string = leaf(g, 'other', 'plan.synthesis', { repo: g.repo });
+    configure(f, { max_active: 3, repos: { [f.repo]: f.root, [g.repo]: g.root } });
     await next(f, [other]);
     await next(f, [first]);
     expect(readState(other).worktree).toBeDefined();
@@ -861,12 +861,12 @@ test('seat names support identical repo-local slugs and long numeric-leading slu
   try {
     const slug: string = '123-this-is-a-valid-leaf-slug-longer-than-thirty-characters';
     leaf(f, slug, 'plan.synthesis');
-    leaf(g, slug, 'plan.synthesis', { repo: 'other' });
-    configure(f, { repos: { repo: f.root, other: g.root } });
+    leaf(g, slug, 'plan.synthesis', { repo: g.repo });
+    configure(f, { repos: { [f.repo]: f.root, [g.repo]: g.root } });
     expect((await next(f, ['--all'], {}, f.home)).code).toBe(0);
     const seats: Terminal[] = [...(await seatTerminals(f, slug)), ...(await seatTerminals(g, slug))];
     const names: string[] = seats.map((t: Terminal) => z.string().parse(t.name));
-    expect(names).toEqual([seatName('repo', 'rp', slug, 'a'), seatName('other', 'ot', slug, 'a')]);
+    expect(names).toEqual([seatName(f.repo, f.prefix, slug, 'a'), seatName(g.repo, g.prefix, slug, 'a')]);
     expect(new Set(names).size).toBe(2);
     expect(names.every((name: string) => /^[a-z0-9][a-z0-9_-]{0,31}$/.test(name))).toBe(true);
     expect([...(await liveTabs(f)), ...(await liveTabs(g))]).toEqual([slug, slug]);
@@ -1001,7 +1001,7 @@ for (const mode of ['startup', 'cwd'] as const) {
       expect((await next(f, ['healthy'])).code).toBe(0);
       await rePromptable(f, healthy);
       const missing: string = resolve(f.home, 'deleted');
-      configure(f, { repos: { missing, repo: f.root } });
+      configure(f, { repos: { missing, [f.repo]: f.root } });
       const result: Result = await next(
         f,
         mode === 'startup' ? ['--all'] : [],
@@ -1122,7 +1122,7 @@ for (const scope of ['global'] as const) {
       const result: Result = await next(f, ['locked']);
       expect(result.code).not.toBe(0);
       expect(result.stderr).toContain('lock');
-      expect(result.stderr).not.toContain('"repo":"repo"');
+      expect(result.stderr).not.toContain(`"repo":"${f.repo}"`);
       expect(await allTasks(f)).toEqual([]);
     } finally {
       await f.clean();
@@ -1141,7 +1141,7 @@ test('lock finalization failures remain fatal', async () => {
     const result: Result = await next(f, ['--all']);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('finalization failure');
-    expect(result.stderr).not.toContain('"repo":"repo"');
+    expect(result.stderr).not.toContain(`"repo":"${f.repo}"`);
     expect(await allTasks(f)).toHaveLength(1);
   } finally {
     await f.clean();
@@ -1161,7 +1161,7 @@ for (const invalid of ['duplicate', 'mismatch']) {
       if (invalid === 'mismatch') {
         expect(skips(result)).toHaveLength(1);
         const summary: z.infer<typeof skipSchema> = skips(result)[0];
-        expect(summary.repo).toBe('repo');
+        expect(summary.repo).toBe(f.repo);
         expect(summary.count).toBe(1);
         expect(summary.paths).toContainEqual({ path, stored: 'wrong' });
         expect(skips(result).some((skip) => skip.error.includes('repo mismatch'))).toBe(false);
@@ -1191,7 +1191,7 @@ test('next selection and sweep report both repo keys without dispatching or chan
     for (const result of [selected, sweep]) {
       expect(skips(result)).toHaveLength(1);
       const diagnostic: z.infer<typeof skipSchema> = skips(result)[0];
-      expect(diagnostic.repo).toBe('repo');
+      expect(diagnostic.repo).toBe(f.repo);
       expect(diagnostic.count).toBe(1);
       expect(diagnostic.paths).toContainEqual({ path, stored: 'other' });
     }
@@ -1215,7 +1215,7 @@ test('foreign leaves summarize once per repo with count and paths', async () => 
     expect(result.code).toBe(1);
     expect(skips(result)).toHaveLength(1);
     const summary: z.infer<typeof skipSchema> = skips(result)[0];
-    expect(summary.repo).toBe('repo');
+    expect(summary.repo).toBe(f.repo);
     expect(summary.count).toBe(3);
     expect(summary.paths).toHaveLength(3);
     expect(summary.paths).toContainEqual({ path: a, stored: 'other' });
@@ -1235,8 +1235,8 @@ test('foreign leaves do not consume capacity while healthy leaves in both repos 
     for (let i: number = 0; i < 5; i++) foreign.push(leaf(f, `foreign-${i}`, 'plan.synthesis', { repo: 'other' }));
     const before: string[] = foreign.map((p: string) => readFileSync(resolve(p, 'state.yaml'), 'utf8'));
     leaf(f, 'healthy', 'plan.synthesis');
-    leaf(g, 'other-healthy', 'plan.synthesis', { repo: 'other' });
-    configure(f, { max_active: 2, repos: { repo: f.root, other: g.root } });
+    leaf(g, 'other-healthy', 'plan.synthesis', { repo: g.repo });
+    configure(f, { max_active: 2, repos: { [f.repo]: f.root, [g.repo]: g.root } });
     const result: Result = await next(f, ['--all'], {}, f.home);
     expect(result.code).toBe(1);
     expect(skips(result)).toHaveLength(1);
@@ -1297,7 +1297,7 @@ test('unreadable leaves reserve capacity while foreign leaves summarize separate
     expect(skips(result)).toHaveLength(2);
     const summary: z.infer<typeof skipSchema> | undefined = skips(result).find((s) => s.count !== undefined);
     expect(summary).toBeDefined();
-    expect(summary!.repo).toBe('repo');
+    expect(summary!.repo).toBe(f.repo);
     expect(summary!.count).toBe(2);
     expect(summary!.paths).toContainEqual({ path: fa, stored: 'other' });
     expect(summary!.paths).toContainEqual({ path: fb, stored: 'other' });
@@ -1374,16 +1374,16 @@ test('two repos summarize once per repo on every invocation', async () => {
   try {
     const fa: string = leaf(f, 'foreign-in-repo', 'plan.synthesis', { repo: 'other' });
     const fb: string = leaf(g, 'foreign-in-other', 'plan.synthesis', { repo: 'repo' });
-    configure(f, { repos: { repo: f.root, other: g.root } });
+    configure(f, { repos: { [f.repo]: f.root, [g.repo]: g.root } });
     for (let i: number = 0; i < 2; i++) {
       const result: Result = await next(f, ['--all'], {}, f.home);
       expect(result.code).toBe(1);
       expect(skips(result)).toHaveLength(2);
       const byRepo: Map<string, z.infer<typeof skipSchema>> = new Map(skips(result).map((s) => [s.repo, s]));
-      expect(byRepo.get('repo')?.count).toBe(1);
-      expect(byRepo.get('other')?.count).toBe(1);
-      expect(byRepo.get('repo')?.paths).toContainEqual({ path: fa, stored: 'other' });
-      expect(byRepo.get('other')?.paths).toContainEqual({ path: fb, stored: 'repo' });
+      expect(byRepo.get(f.repo)?.count).toBe(1);
+      expect(byRepo.get(g.repo)?.count).toBe(1);
+      expect(byRepo.get(f.repo)?.paths).toContainEqual({ path: fa, stored: 'other' });
+      expect(byRepo.get(g.repo)?.paths).toContainEqual({ path: fb, stored: 'repo' });
     }
     expect(await allTasks(f)).toEqual([]);
   } finally {
@@ -1403,7 +1403,7 @@ for (const moved of ['worktree root', 'repo root'] as const) {
       const worktreeRoot: string = moved === 'worktree root' ? resolve(f.home, 'new-store') : storeDir(f);
       if (moved === 'repo root') renameSync(f.root, root);
       else yaml(resolve(root, 'issues/config.yaml'), { worktree_root: worktreeRoot, grounding: 'none' });
-      configure(f, { repos: { repo: root } });
+      configure(f, { repos: { [f.repo]: root } });
       const relocated: HcFixture = { ...f, root };
       const path: string = resolve(root, 'issues/open/issue/relocated');
       const before: string = readFileSync(resolve(path, 'state.yaml'), 'utf8');
@@ -1445,15 +1445,15 @@ test('moving a repo with the same registered key supports status, phase and disp
     leaf(f, 'movable', 'plan.synthesis');
     const root: string = resolve(f.home, 'moved-repo');
     renameSync(f.root, root);
-    configure(f, { repos: { repo: root } });
+    configure(f, { repos: { [f.repo]: root } });
     const moved: HcFixture = { ...f, root };
     const status: Result = await cli(moved, ['status', 'movable']);
     expect(status.code).toBe(0);
-    expect(status.stdout).toContain('repo: repo');
+    expect(status.stdout).toContain(`repo: ${f.repo}`);
     expect((await cli(moved, ['phase', 'movable', 'implement', '--slot', 'A'])).code).toBe(0);
     expect((await next(moved, ['movable'])).code).toBe(0);
     const state: State = readState(resolve(root, 'issues/open/issue/movable'));
-    expect(state.repo).toBe('repo');
+    expect(state.repo).toBe(f.repo);
     expect(state.phase).toBe('implement');
     expect(state.worktree).toBe(resolve(storeDir(f), 'movable'));
     expect(await command(['git', 'branch', '--show-current'], state.worktree)).toBe('movable');
@@ -1826,15 +1826,15 @@ test('next --resume re-prompts allocated idle leaves in every registered repo wi
   const g: HcFixture = await otherRepo(f);
   try {
     const aOld: string = leaf(f, 'a-old', 'plan.synthesis');
-    const bOld: string = leaf(g, 'b-old', 'plan.synthesis', { repo: 'other' });
-    configure(f, { repos: { repo: f.root, other: g.root } });
+    const bOld: string = leaf(g, 'b-old', 'plan.synthesis', { repo: g.repo });
+    configure(f, { repos: { [f.repo]: f.root, [g.repo]: g.root } });
     expect((await next(f, ['a-old'])).code).toBe(0);
     expect((await next(f, ['b-old'], {}, g.root)).code).toBe(0);
     expect([...(await liveTabs(f)), ...(await liveTabs(g))]).toEqual(['a-old', 'b-old']);
     await rePromptable(f, aOld);
     await rePromptable(g, bOld);
     const aNew: string = leaf(f, 'a-new', 'plan.synthesis');
-    const bNew: string = leaf(g, 'b-new', 'plan.synthesis', { repo: 'other' });
+    const bNew: string = leaf(g, 'b-new', 'plan.synthesis', { repo: g.repo });
     const result: Result = await next(f, ['--resume'], {}, f.home);
     expect(result.code).toBe(0);
     const tasks = [...(await allTasks(f)), ...(await allTasks(g))];
@@ -2029,7 +2029,7 @@ test('spaced repo root dispatches leaf= with the complete spaced authoritative f
   try {
     const spaced: string = resolve(f.home, 'repo root');
     renameSync(f.root, spaced);
-    configure(f, { repos: { repo: spaced } });
+    configure(f, { repos: { [f.repo]: spaced } });
     const f2: HcFixture = { ...f, root: spaced };
     leaf(f2, 'spaced', 'plan.synthesis');
     expect((await next(f2, ['spaced'])).code).toBe(0);
@@ -2081,8 +2081,8 @@ test('a failed leaf does not reserve capacity in the unreadable branch', async (
     });
     const malformed: string = leaf(f, 'malformed', 'plan.synthesis', {}, 'bad-issue');
     writeFileSync(resolve(malformed, 'state.yaml'), 'slug: [');
-    const healthy: string = leaf(g, 'healthy', 'plan.synthesis', { repo: 'other' });
-    configure(f, { max_active: 2, repos: { repo: f.root, other: g.root } });
+    const healthy: string = leaf(g, 'healthy', 'plan.synthesis', { repo: g.repo });
+    configure(f, { max_active: 2, repos: { [f.repo]: f.root, [g.repo]: g.root } });
     const result: Result = await next(f, [healthy]);
     expect(result.code).toBe(1);
     expect(skips(result).map((skip) => skip.path)).toContain(malformed);
@@ -2206,7 +2206,7 @@ test('next refuses unknown harness override before allocation', async () => {
     const result: Result = await next(f, ['ghost-leaf']);
     expect(result.code).not.toBe(0);
     expect(skips(result)[0].error).toContain('ghost');
-    expect(skips(result)[0].error).toContain('repo');
+    expect(skips(result)[0].error).toContain(f.repo);
     expect(skips(result)[0].error).toContain('b');
     expect(allStarts(f)).toHaveLength(0);
     expect(await f.core.terminals({ akrogon: '1' }, true)).toHaveLength(0);
@@ -2335,7 +2335,7 @@ async function refusal(f: HcFixture, slug: string, path: string): Promise<Refusa
   expect(result.code).toBe(1);
   const lines: Refusal[] = skips(result);
   expect(lines).toHaveLength(1);
-  expect(lines[0]).toMatchObject({ repo: 'repo', slug, path });
+  expect(lines[0]).toMatchObject({ repo: f.repo, slug, path });
   expect(allStarts(f)).toHaveLength(0);
   expect(await f.core.terminals({ akrogon: '1' }, true)).toHaveLength(0);
   return lines[0];
@@ -2616,12 +2616,12 @@ test('leaf temp path stays inside the socket budget under /tmp for any slug and 
       JSON.stringify(slug) +
       '; ' +
       'const p1 = leafTemp({ name: ' +
-      JSON.stringify('repo') +
+      JSON.stringify(f.repo) +
       ', root: ' +
       JSON.stringify(rootOne) +
       ', config: {} }, slug); ' +
       'const p2 = leafTemp({ name: ' +
-      JSON.stringify('repo') +
+      JSON.stringify(f.repo) +
       ', root: ' +
       JSON.stringify(rootTwo) +
       ', config: {} }, slug); ' +
@@ -2833,16 +2833,16 @@ test('fixture temp root isolates every TMPDIR and envs carry override', async ()
 function readinessInput(leafPath: string, input: object): void {
   yaml(resolve(leafPath, 'readiness.yaml'), { inputs: [input], produces: [], grants: [], retained: [], proofs: [] });
 }
-const envFoo: object = {
+const envFoo = (f: Fixture): object => ({
   kind: 'env',
   name: 'FOO',
-  holder: 'repo',
+  holder: f.repo,
   purpose: 'p',
   consumers: ['x'],
   steps: 's',
   source: 't',
   done: 'd',
-};
+});
 async function undispatched(f: HcFixture, slug: string): Promise<void> {
   expect(existsSync(storeDir(f))).toBe(false);
   expect((await run(['git', 'branch', '--list', slug], f.root)).stdout).toBe('');
@@ -2856,7 +2856,7 @@ test('next refuses an env-gapped leaf in every missing .env state and dispatches
   try {
     leaf(f, 'gapped', 'plan.synthesis');
     const path: string = resolve(f.root, 'issues/open/issue/gapped');
-    readinessInput(path, envFoo);
+    readinessInput(path, envFoo(f));
     for (const env of [undefined, 'BAR=1\n', 'FOO=\n', 'FOO="  "\n']) {
       if (env === undefined) rmSync(resolve(f.root, '.env'), { force: true });
       else writeFileSync(resolve(f.root, '.env'), env);
@@ -2878,7 +2878,7 @@ test('next refuses a leaf whose declared file input is absent or empty', async (
   const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'needsfile', 'plan.synthesis');
-    readinessInput(path, { ...envFoo, kind: 'file', name: 'need.txt' });
+    readinessInput(path, { ...envFoo(f), kind: 'file', name: 'need.txt' });
     const result: Result = await next(f, ['needsfile']);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('need.txt');
@@ -2899,7 +2899,7 @@ test('next --all leaves a gapped leaf undispatched while its ungapped sibling di
   const f: HcFixture = await hcFixture();
   try {
     const gapped: string = leaf(f, 'gapped', 'plan.synthesis');
-    readinessInput(gapped, envFoo);
+    readinessInput(gapped, envFoo(f));
     leaf(f, 'ready', 'plan.synthesis');
     expect((await next(f, ['--all'])).code).toBe(1);
     expect(readState(gapped).worktree).toBeUndefined();
@@ -2916,7 +2916,7 @@ test('an input held by an unregistered absolute directory checks that directory 
   const holder: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-holder-')));
   try {
     const path: string = leaf(f, 'foreign', 'plan.synthesis');
-    readinessInput(path, { ...envFoo, holder });
+    readinessInput(path, { ...envFoo(f), holder });
     const refused: Result = await next(f, ['foreign']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('FOO');
@@ -3625,7 +3625,7 @@ test('unstamped merge dispatch uses log order and refuses unreadable history', a
     const records: string[] = ['bb', 'aa'].map((slug, index) =>
       JSON.stringify({
         ts: `2026-09-1${index + 1}T00:00:00.000Z`,
-        repo: 'repo',
+        repo: f.repo,
         slug,
         from: 'check.review',
         to: 'merge',
@@ -3655,7 +3655,7 @@ test('blocked-report epic folder starts ready and reports dep, input, failed', a
     leaf(f, 'ready', 'plan.synthesis', {}, 'epic');
     leaf(f, 'depblocked', 'plan.synthesis', { 'blocked-by': ['outside'] }, 'epic');
     const inputPath: string = leaf(f, 'inputblocked', 'plan.synthesis', {}, 'epic');
-    readinessInput(inputPath, envFoo);
+    readinessInput(inputPath, envFoo(f));
     leaf(f, 'failedleaf', 'failed', {}, 'epic');
     leaf(f, 'outside', 'plan.synthesis', {}, 'other');
     const result: Result = await next(f, [resolve(f.root, 'issues/open/epic')]);
@@ -3690,7 +3690,7 @@ test('blocked-report dep detail labels parked, missing, unreadable and skips mer
       slug: 'parked-dep',
       phase: 'plan.synthesis',
       created: '2026-10-08',
-      repo: 'repo',
+      repo: f.repo,
       'blocked-by': [],
     });
     const brokenPath: string = leaf(f, 'unreadable-dep', 'plan.synthesis', {}, 'deps');
@@ -3727,7 +3727,7 @@ test('blocked-report input detail names gaps without values and defers to deps',
         {
           kind: 'env',
           name: 'FOO',
-          holder: 'repo',
+          holder: f.repo,
           purpose: 'p',
           consumers: ['x'],
           steps: 's',
@@ -3737,7 +3737,7 @@ test('blocked-report input detail names gaps without values and defers to deps',
         {
           kind: 'file',
           name: 'need.txt',
-          holder: 'repo',
+          holder: f.repo,
           purpose: 'p',
           consumers: ['x'],
           steps: 's',
@@ -3747,7 +3747,7 @@ test('blocked-report input detail names gaps without values and defers to deps',
         {
           kind: 'env',
           name: 'PRESENT',
-          holder: 'repo',
+          holder: f.repo,
           purpose: 'p',
           consumers: ['x'],
           steps: 's',
@@ -3765,7 +3765,7 @@ test('blocked-report input detail names gaps without values and defers to deps',
     readinessInput(bothPath, {
       kind: 'env',
       name: 'BAR',
-      holder: 'repo',
+      holder: f.repo,
       purpose: 'p',
       consumers: ['x'],
       steps: 's',
@@ -3779,7 +3779,7 @@ test('blocked-report input detail names gaps without values and defers to deps',
     expect(inputSkip.error).toContain('FOO');
     expect(inputSkip.error).toContain('file');
     expect(inputSkip.error).toContain('need.txt');
-    expect(inputSkip.error).toContain('repo');
+    expect(inputSkip.error).toContain(f.repo);
     expect(inputSkip.error).not.toContain('PRESENT');
     expect(inputSkip.error).not.toContain('s3cr3t-value-xyz');
     const bothResult: Result = await next(f, ['bothblocked']);
@@ -4461,7 +4461,7 @@ test('next --all, --resume and manual next record the registered or selected rep
   const f: HcFixture = await hcFixture();
   const g: Fixture = await fixture();
   try {
-    configure(f, { repos: { repo: f.root, other: g.root } });
+    configure(f, { repos: { [f.repo]: f.root, [g.repo]: g.root } });
     const picked: string = leaf(f, 'picked', 'plan.synthesis');
     leaf(f, 'sweep', 'implement', {}, 'other-issue');
     const before: number = hcCalls(f).length;
