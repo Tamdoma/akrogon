@@ -81,6 +81,22 @@ test('automatic next --wake does nothing for a paused repo', async () => {
   }
 });
 
+test('automatic passes clean host leftovers when every repo is paused', async () => {
+  const f: DispatchFixture = await hcFixture();
+  try {
+    const env: NodeJS.ProcessEnv = fakeSystemctl(f).env;
+    expect((await cli(f, ['pause'], f.root, env)).code).toBe(0);
+    const leftover: string = resolve(f.home, 'stale.2147483647.tmp');
+    for (const mode of ['--wake', '--resume'] as const) {
+      writeFileSync(leftover, 'interrupted atomic write');
+      expect((await next(f, [mode], env)).code).toBe(0);
+      expect(existsSync(leftover)).toBe(false);
+    }
+  } finally {
+    await f.clean();
+  }
+});
+
 // A second repo's space in the fixture core's herdr-app document, so the core holds both repos.
 async function addSpace(f: DispatchFixture, name: string, folder: string): Promise<void> {
   const doc = z
