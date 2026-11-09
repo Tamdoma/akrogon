@@ -9,9 +9,9 @@ import {
   symlinkSync,
   chmodSync,
 } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 import { readRepo } from '../src/config';
 import { verifyCommands, verifyRunSchema, type VerifyRun, type VerifyScope } from '../src/verify';
@@ -27,11 +27,18 @@ export function registerTemp(path: string): string {
 process.on('exit', () => {
   for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
 });
-export type Fixture = { home: string; root: string; clean: () => void };
+export type Fixture = { home: string; root: string; repo: string; prefix: string; clean: () => void };
+// The fixture's registered repo identity: unique per fixture (mkdtemp suffix) so a run's teardown
+// never stops another fixture's leaf slice; the prefix is two letters derived from home.
+function fixtureRepo(home: string): { repo: string; prefix: string } {
+  const digest: Buffer = createHash('sha256').update(home).digest();
+  const prefix: string = [digest[0] % 26, digest[1] % 26].map((n: number) => String.fromCharCode(97 + n)).join('');
+  return { repo: basename(home), prefix };
+}
 export function leafTempRoot(f: Fixture): string {
   return resolve(f.home, 'leaf-temp');
 }
-export function storeDir(f: Fixture, repo: string = 'repo'): string {
+export function storeDir(f: Fixture, repo: string = f.repo): string {
   return resolve(f.home, '.akrogon/worktrees', repo);
 }
 export function yaml(path: string, data: object): void {
@@ -67,15 +74,17 @@ export async function fixture(): Promise<Fixture> {
   await command(['git', 'remote', 'add', 'origin', resolve(home, 'remote.git')], root);
   await command(['git', 'push', 'origin', 'HEAD:main'], root);
   yaml(resolve(root, 'issues/config.yaml'), { checks: { test: 'bun test' }, grounding: 'none' });
+  const identity: { repo: string; prefix: string } = fixtureRepo(home);
   yaml(resolve(home, 'config.yaml'), {
     slots: {
       a: { harness: 'fake', model: 'strong-a', effort: 'high' },
       b: { harness: 'fake', model: 'strong-b', effort: 'medium' },
     },
     harnesses: { fake: 'fake --model {model} --effort {effort}' },
-    repos: { repo: root },
+    repos: { [identity.repo]: root },
+    prefixes: { [identity.repo]: identity.prefix },
   });
-  const f: Fixture = { home, root, clean: () => rmSync(home, { recursive: true, force: true }) };
+  const f: Fixture = { home, root, ...identity, clean: () => rmSync(home, { recursive: true, force: true }) };
   seedStat(f, 1024 * 1024 * 1024);
   const units: string = unitBin(f);
   mkdirSync(units);
@@ -128,7 +137,7 @@ export function leaf(f: Fixture, slug: string, phase: string, extra: object = {}
     slug,
     phase,
     created: '2026-09-10',
-    repo: 'repo',
+    repo: f.repo,
     'blocked-by': [],
     ...extra,
   });
@@ -241,7 +250,7 @@ export function seedRun(f: Fixture, run: Partial<VerifyRun>): VerifyRun {
   const at: string = new Date().toISOString();
   const record: VerifyRun = verifyRunSchema.parse({
     run: randomUUID(),
-    repo: 'repo',
+    repo: f.repo,
     leaf: 'seeded',
     sha: 'x',
     tree: 'x',
@@ -263,7 +272,7 @@ export function greenReceipt(
   f: Fixture,
   sha: string,
   scope: VerifyScope,
-  commands: { name: string; command: string }[] = verifyCommands(readRepo('repo', f.root).config, scope),
+  commands: { name: string; command: string }[] = verifyCommands(readRepo(f.repo, f.root).config, scope),
 ): void {
   seedRun(f, {
     sha,
@@ -276,7 +285,7 @@ export function greenReceipt(
 }
 
 export async function verified(f: Fixture, slug: string, scope: VerifyScope): Promise<void> {
-  const worktree: string | undefined = readState(findLeaf(readRepo('repo', f.root), slug).path).worktree;
+  const worktree: string | undefined = readState(findLeaf(readRepo(f.repo, f.root), slug).path).worktree;
   greenReceipt(
     f,
     await command(['git', 'rev-parse', worktree === undefined ? `refs/heads/${slug}` : 'HEAD'], worktree ?? f.root),

@@ -62,7 +62,7 @@ async function selfUpdateFixture(): Promise<SelfUpdateFixture> {
   await command(['git', 'config', 'user.name', 'Test'], clone);
   const repo: Repo = { name: 'akrogon', root: clone, config: repoSchema.parse({ grounding: 'none' }) };
   const savedTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
-  const scratchRoot: string = leafTempRoot({ home, root: clone, clean: () => undefined });
+  const scratchRoot: string = leafTempRoot({ home, root: clone, repo: 'stub', prefix: 'st', clean: () => undefined });
   process.env.AKROGON_LEAF_TEMP_ROOT = scratchRoot;
   const savedPath: string | undefined = process.env.PATH;
   const fakeBin: string = resolve(home, 'fake-bin');

@@ -403,7 +403,7 @@ describe('self-update', () => {
       config: repoSchema.parse({ grounding: 'none' }),
     };
     const savedTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
-    const scratchRoot: string = leafTempRoot({ home, root: clone, clean: () => undefined });
+    const scratchRoot: string = leafTempRoot({ home, root: clone, repo: 'stub', prefix: 'st', clean: () => undefined });
     process.env.AKROGON_LEAF_TEMP_ROOT = scratchRoot;
     return {
       home,

@@ -352,7 +352,7 @@ export async function hcCore(
     const written = z.object({ version: z.number() }).parse(
       await rpc('doc.set', {
         name: 'herdr-app',
-        value: recordedDoc(`sp-${session}`, opts.repo ?? 'repo', f.root),
+        value: recordedDoc(`sp-${session}`, opts.repo ?? f.repo, f.root),
         version: 0,
       }),
     );
@@ -376,7 +376,6 @@ export type HcFixture = Omit<Fixture, 'clean'> & {
 // writes through to the shared fake.
 export async function hcFixture(opts: { mode?: string; window?: 'open' | 'closed' } = {}): Promise<HcFixture> {
   const f: Fixture = await fixture();
-  setPrefixes(f, { repo: 'rp' });
   setSeat(f, 'a', 'fake', opts.mode ?? 'work');
   setSeat(f, 'b', 'fake', opts.mode ?? 'work');
   const bin: string = resolve(f.home, 'bin');

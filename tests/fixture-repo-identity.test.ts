@@ -8,7 +8,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, type Fixture } from './helpers';
-import { hcCore, setPrefixes, setSeat, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, setSeat, type HcCore, type Terminal } from './hc-fixture';
 import { leafSlice } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
 
@@ -39,8 +39,6 @@ test("one fixture's teardown stops only its own slices; a second fixture's same-
   const two: Fixture = await fixture();
   const nameOne: string = repoNameOf(one);
   const nameTwo: string = repoNameOf(two);
-  setPrefixes(one, { [nameOne]: 'rp' });
-  setPrefixes(two, { [nameTwo]: 'rp' });
   setSeat(one, 'a', 'fake', 'work');
   setSeat(two, 'a', 'fake', 'work');
   const coreOne: HcCore = await hcCore(one);
