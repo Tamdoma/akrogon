@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, readFileSync, watch, writeFileSync } from 'node:f
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, type Fixture } from './helpers';
-import { coreBin, hcCore, setSeat, type HcCore, type Terminal } from './hc-fixture';
+import { coreBin, hcCore, setSeat, shortStartProof, type HcCore, type Terminal } from './hc-fixture';
 import { readState } from '../src/state';
 import { leafSlice } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
@@ -126,7 +126,7 @@ test('a turn that ends in done without reporting is a silent stop and is re-prom
 test('a working seat gets no send; a send that never starts is recorded, not resent, and resettled once the turn moves', async () => {
   const { f, core, path } = await setup('hd-send', 'fake', 'idle');
   try {
-    expect((await cli(f, ['next', 'hd-send'], f.root, core.env)).code).toBe(0);
+    expect((await cli(f, ['next', 'hd-send'], f.root, { ...core.env, ...shortStartProof })).code).toBe(0);
     const address: string = (await seatA(core, 'hd-send')).address;
     expect(readState(path).delivery_error.A).toMatchObject({ code: 'not_confirmed' });
     // The phase move clears the record; its own pass sends the implement task, which never starts.

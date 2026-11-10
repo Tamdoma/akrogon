@@ -175,6 +175,9 @@ function cleanEnv(
   };
 }
 
+// The start-proof window of a test whose seat never proves its start; every other test waits the product's.
+export const shortStartProof: NodeJS.ProcessEnv = { AKROGON_START_PROOF_MS: '3000' };
+
 export async function hcCore(
   f: Fixture,
   opts: { coreEnv?: Record<string, string>; window?: 'open' | 'closed'; doc?: boolean; repo?: string } = {},
@@ -235,7 +238,6 @@ export async function hcCore(
     FAKE_HERDR_APP: appPlan,
     HC_SHIM_LOG: shimLog,
     HC_SHIM_REAL: realHc,
-    AKROGON_START_PROOF_MS: '3000',
     AKROGON_PANE_WAIT_MS: '2000',
   };
   const hc = (args: string[]): Promise<SpawnResult> =>

@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, leafTempRoot, storeDir, type Fixture } from './helpers';
-import { hcCore, setSeat, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, setSeat, shortStartProof, type HcCore, type Terminal } from './hc-fixture';
 import { readState } from '../src/state';
 import { leafSlice } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
@@ -143,7 +143,7 @@ test('a slug that would pass 32 characters is cut and carries 4 hex of repo/slug
 test('a seat that never works stays running, is reported started not confirmed, and is not resent', async () => {
   const { f, core, path } = await setup('hs-idle', 'idle');
   try {
-    const started = await cli(f, ['seat', 'hs-idle', 'A'], f.root, core.env);
+    const started = await cli(f, ['seat', 'hs-idle', 'A'], f.root, { ...core.env, ...shortStartProof });
     expect(started.code).toBe(0);
     const seat: Terminal = await seatOf(core, `${f.prefix}-hs-idle-a`);
     expect(started.stdout).toContain(`started, not confirmed ${seat.address}`);

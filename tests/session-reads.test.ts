@@ -6,7 +6,15 @@ import { readState, type State } from '../src/state';
 import { command, type SpawnResult } from '../src/shell';
 import type { Result } from '../src/shell';
 import { z } from 'zod';
-import { delivered, hcCore, hcFixture, type HcCore, type HcFixture, type Terminal } from './hc-fixture';
+import {
+  delivered,
+  hcCore,
+  hcFixture,
+  shortStartProof,
+  type HcCore,
+  type HcFixture,
+  type Terminal,
+} from './hc-fixture';
 
 async function dispatchFixture(opts: { mode?: string; window?: 'open' | 'closed' } = {}): Promise<HcFixture> {
   const f: HcFixture = await hcFixture(opts);
@@ -203,9 +211,13 @@ test('a manual next ignores an inherited HC_TERMINAL_ID', async () => {
   try {
     const target: string = leaf(f, 'target', 'plan.synthesis');
     const other: string = leaf(f, 'other-seat', 'plan.synthesis');
-    expect((await next(f, ['other-seat'])).code).toBe(0);
+    expect((await next(f, ['other-seat'], shortStartProof)).code).toBe(0);
     const otherSeat: string = z.string().parse(readState(other).seat.A?.address);
-    const inherited: NodeJS.ProcessEnv = { HC_TERMINAL_ID: otherSeat, HC_SESSION: f.core.session };
+    const inherited: NodeJS.ProcessEnv = {
+      ...shortStartProof,
+      HC_TERMINAL_ID: otherSeat,
+      HC_SESSION: f.core.session,
+    };
     const before: number = (await delivered(f, 'other-seat')).length;
 
     const named: Result = await next(f, ['target'], inherited);

@@ -12,6 +12,7 @@ import {
   noticeFiles,
   setPrefixes,
   setSeat,
+  shortStartProof,
   type HcCore,
   type HcFixture,
   type Terminal,
@@ -250,7 +251,7 @@ test('the busy notice lands in the session holding the repo space', async () => 
   const decoy: HcCore = await hcCore(f, { repo: 'misc' });
   try {
     f.core.link(decoy);
-    const env: NodeJS.ProcessEnv = { ...f.env, HC_SESSION: decoy.session };
+    const env: NodeJS.ProcessEnv = { ...f.env, ...shortStartProof, HC_SESSION: decoy.session };
     const path: string = leaf(f, 'routed2', 'plan.synthesis');
     expect((await cli(f, ['next', 'routed2'], f.root, env)).code).toBe(0);
     saveState(path, { ...readState(path), busy_since: { A: new Date(Date.now() - 61 * 60000).toISOString() } });
