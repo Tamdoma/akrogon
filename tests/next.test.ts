@@ -498,6 +498,25 @@ test('merged phase closes tab on typed next and starts the dependent', async () 
   }
 }, 15000);
 
+test('a dependent whose seat start takes longer than 3 s is counted once', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const first: string = leaf(f, 'first', 'plan.synthesis', {}, 'first-issue');
+    const dependent: string = leaf(f, 'second', 'plan.synthesis', { 'blocked-by': ['first'] }, 'second-issue');
+    holdTurns(f);
+    writeFileSync(resolve(f.core.standin, 'delay-second'), '3.5');
+    expect((await next(f, ['first'])).code).toBe(0);
+    saveState(first, { ...readState(first), phase: 'merge', ...holding(f) });
+    expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
+    expect(readState(dependent).attempts.A).toBe(1);
+    expect((await next(f, [])).code).toBe(0);
+    expect(readState(dependent).attempts.A).toBe(1);
+    expect(await delivered(f, 'second')).toHaveLength(1);
+  } finally {
+    await f.clean();
+  }
+}, 15000);
+
 test('completing a leaf via targeted next starts only same-repo dependents', async () => {
   const f: HcFixture = await hcFixture();
   const g: Fixture = await fixture();

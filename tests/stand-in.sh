@@ -20,6 +20,9 @@ while [ $# -gt 0 ]; do
 	esac
 done
 log="${STANDIN_DIR:?}/${HC_TERMINAL_ID:-unknown}.tasks"
+# A `delay-<folder name>` file holds the seconds to sleep before the first status: a late start.
+delay="$STANDIN_DIR/delay-$(basename "$PWD")"
+if [ -r "$delay" ]; then sleep "$(cat "$delay")"; fi
 status() { printf '\033]7501;state=%s\007' "$1"; }
 turn() {
 	printf '%s\n' "$1" >> "$log"
