@@ -8,7 +8,7 @@ A seat reuses `grants[]` for the operations they cover, within their bounds; bef
 
 ## Environment files and producer keys
 
-A seat never opens, prints, appends to, or writes `.env` or `.env.*` with any tool: declared checks and live operations consume values only inside a run process such as `bun --env-file=<file> <script>` printing only results, never values, and presence is checked with the `Missing:` lines of `akrogon status <slug>`, where absent or empty counts as missing, ending the pass with the seat's operator-blocker stop when a required value is absent. A seat's own exception is named beside its skill's link to this file (the merge seat's is that configured merge checks may read the committed non-secret template `.env.example`).
+A seat never opens, prints, appends to, or writes `.env` or `.env.*` with any tool: declared checks and live operations consume values only inside a run process such as `bun --env-file=<file> <script>` printing only results, never values, and presence is checked with the `Missing:` lines of `akrogon status <slug>`, where absent or empty counts as missing, ending the pass with the seat's operator-blocker stop when a required value is absent. A seat's own exception is named beside its skill's link to this file.
 
 For the plan-issue and implement-issue seats only, a producer's key is saved only through the operation recorded in `produces[].save` (entry point, inspected revision, non-secret `args`, key `name`, the `holder` repo's real file and the private `value_source`): the value passes privately to it, writes the holder repo's real `.env` file and never the worktree `.env`, never returns through seat arguments, output or artifacts, and the new key is revoked when saving fails.
 
