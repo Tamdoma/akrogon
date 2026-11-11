@@ -51,7 +51,7 @@ The command runs with a clean environment. It gets `HOME`, `PATH` and a few othe
 
 run-check refuses a configured `merge_checks` command, given as its words, as `sh -c '<command>'`, or in the `sh -c` form `setup` would add: it exits non-zero, starts no process and saves no log, printing `akrogon verify --attempt <id>` as the merge suite's only runner and that a red merge check is reproduced with a narrower command, never the whole suite.
 
-When to keep output this way, and which commands are exempt, is a seat rule. See [implement-issue](../../skills/implement-issue/SKILL.md), [check-issue](../../skills/check-issue/SKILL.md) and [merge-issue](../../skills/merge-issue/SKILL.md).
+When to keep output this way, and which commands are exempt, is a seat rule. See [lifecycle-rules.md](../../skills/lifecycle-rules.md), with seat-own parts in [implement-issue](../../skills/implement-issue/SKILL.md), [check-issue](../../skills/check-issue/SKILL.md) and [merge-issue](../../skills/merge-issue/SKILL.md).
 
 ## Prove a commit with akrogon verify
 
@@ -90,7 +90,7 @@ A cover is judged per head receipt: one completed run on the head tree matching 
 
 A pass counts as a receipt for the phase moves above.
 
-When a seat should retry a red command, and when it should run known-red, is a seat rule. See the retry and known-red rules in [implement-issue](../../skills/implement-issue/SKILL.md), [check-issue](../../skills/check-issue/SKILL.md) and [merge-issue](../../skills/merge-issue/SKILL.md). Who may replace a wrong proof command is in [plan-issue](../../skills/plan-issue/SKILL.md) and [implement-issue](../../skills/implement-issue/SKILL.md).
+When a seat should retry a red command, and when it should run known-red, is a seat rule. See the retry and known-red rules in [lifecycle-rules.md](../../skills/lifecycle-rules.md), with seat command forms in [implement-issue](../../skills/implement-issue/SKILL.md), [check-issue](../../skills/check-issue/SKILL.md) and [merge-issue](../../skills/merge-issue/SKILL.md). Who may replace a wrong proof command is in [plan-issue](../../skills/plan-issue/SKILL.md) and [implement-issue](../../skills/implement-issue/SKILL.md).
 
 ## Test-change refusals
 
