@@ -1,6 +1,7 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { command } from './shell';
+import { GUARD_USAGE } from './usage';
 
 function offendingAncestor(target: string): string | null {
   for (let literal: string = dirname(target); ; literal = dirname(literal)) {
@@ -23,7 +24,7 @@ export function checkLocation(targetPath: string): void {
 
 export async function guard(cwd: string, positionals: string[]): Promise<number> {
   const verb: string | undefined = positionals.length === 1 ? positionals[0] : undefined;
-  if (verb !== 'ancestors' && verb !== 'own-modules') throw new Error('Usage: akrogon guard <ancestors|own-modules>');
+  if (verb !== 'ancestors' && verb !== 'own-modules') throw new Error(GUARD_USAGE);
   const top: string = realpathSync(await command(['git', 'rev-parse', '--show-toplevel'], cwd));
   if (verb === 'ancestors') {
     const offender: string | null = offendingAncestor(top);

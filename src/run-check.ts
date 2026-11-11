@@ -18,6 +18,7 @@ import { parse } from 'shell-quote';
 import { base, ensureLeafTemp, readGlobal, requireRepo, setupCommand, type Repo } from './config';
 import { repoInventory, RepoMismatchError, readState, type Inventory, type Leaf, type State } from './state';
 import { command, type Result } from './shell';
+import { RUN_CHECK_USAGE } from './usage';
 import { appendTiming } from './timing';
 import { callerScope, withAdmission } from './admission';
 import { locate, type LogTarget } from './evidence';
@@ -201,8 +202,7 @@ export async function runCheck(
   argv: string[],
 ): Promise<number> {
   if (leafOverride !== undefined && holder !== undefined) throw new Error('Use --leaf or --holder, not both');
-  if (argv.length === 0)
-    throw new Error('Usage: akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...');
+  if (argv.length === 0) throw new Error(RUN_CHECK_USAGE);
   refuse();
   const repo: Repo = await requireRepo(readGlobal(), cwd);
   for (const t of Object.values(repo.config.merge_checks)) {

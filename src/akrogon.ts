@@ -15,67 +15,53 @@ import { initialize } from './init';
 import { sourcePattern } from './state';
 import { slotSchema, type Phase } from './routing';
 import { migrateStateHome } from './state-home';
+import {
+  helpText,
+  optionsFor,
+  verbFlags,
+  PACK_USAGE,
+  STOP_USAGE,
+  TIMING_USAGE,
+  VERB_OPTIONS,
+  VERB_USAGE,
+} from './usage';
 import type { SpaceResolution } from './hc';
 import type { Started } from './seat';
-
-await migrateStateHome();
 
 const RETIRED_MERGE_HOLD: string =
   'Merge hold commands are retired; a red merge run follows the red-run endings in skills/merge-issue/SKILL.md';
 
 const verb: string | undefined = process.argv[2];
 if (verb === 'unhold' || verb === 'hold-fix') throw new Error(RETIRED_MERGE_HOLD);
+if (verb === '--help') {
+  console.log(VERB_USAGE);
+  process.exit(0);
+}
 
-const options: Record<string, { type: 'string' | 'boolean' }> =
-  verb === 'init'
-    ? { from: { type: 'string' }, toolkit: { type: 'string' } }
-    : verb === 'phase'
-      ? {
-          slot: { type: 'string' },
-          verdict: { type: 'string' },
-          reason: { type: 'string' },
-          check: { type: 'boolean' },
-          attempt: { type: 'string' },
-        }
-      : verb === 'land'
-        ? { attempt: { type: 'string' } }
-        : verb === 'next'
-          ? { all: { type: 'boolean' }, resume: { type: 'boolean' }, wake: { type: 'boolean' } }
-          : verb === 'seat'
-            ? {
-                task: { type: 'string' },
-                slot: { type: 'string' },
-                harness: { type: 'string' },
-                model: { type: 'string' },
-                effort: { type: 'string' },
-              }
-            : verb === 'pull' || verb === 'park' || verb === 'unpark' || verb === 'stop'
-              ? { all: { type: 'boolean' } }
-              : verb === 'close'
-                ? { by: { type: 'string' } }
-                : verb === 'run-check'
-                  ? { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } }
-                  : verb === 'verify'
-                    ? {
-                        sha: { type: 'string' },
-                        attempt: { type: 'string' },
-                        holder: { type: 'string' },
-                        'known-red': { type: 'boolean' },
-                      }
-                    : verb === 'status'
-                      ? { charts: { type: 'boolean' }, json: { type: 'boolean' } }
-                      : verb === 'timing'
-                        ? { cohort: { type: 'boolean' }, flow: { type: 'boolean' }, since: { type: 'string' } }
-                        : verb === 'notice'
-                          ? { title: { type: 'string' }, body: { type: 'string' }, attention: { type: 'boolean' } }
-                          : {};
+let values: Record<string, string | boolean | undefined>;
+let positionals: string[];
+try {
+  ({ values, positionals } = parseArgs({
+    args: process.argv.slice(3),
+    options: verb === undefined ? {} : optionsFor(verb),
+    allowPositionals: true,
+    strict: true,
+  }));
+} catch (error) {
+  if (error instanceof TypeError && 'code' in error && error.code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION') {
+    const flag: string = /Unknown option '([^']+)'/.exec(error.message)?.[1] ?? '';
+    console.error('akrogon ' + (verb ?? '') + ' ' + verbFlags(verb ?? '').join(' ') + ': unknown flag ' + flag);
+    process.exit(1);
+  }
+  throw error;
+}
 
-const { values, positionals } = parseArgs({
-  args: process.argv.slice(3),
-  options,
-  allowPositionals: true,
-  strict: true,
-});
+if (verb !== undefined && values.help === true && Object.hasOwn(VERB_OPTIONS, verb)) {
+  console.log(helpText(verb));
+  process.exit(0);
+}
+
+await migrateStateHome();
 
 switch (verb) {
   case 'config':
@@ -205,8 +191,7 @@ switch (verb) {
     await (await import('./sync')).syncCommand(process.cwd());
     break;
   case 'pack': {
-    if (positionals.length === 0)
-      throw new Error('Usage: akrogon pack issues/closed/<owner> | issues/chart/<chart> ...');
+    if (positionals.length === 0) throw new Error(PACK_USAGE);
     const repo: Repo = await requireRepo(readGlobal(), process.cwd());
     process.exitCode = await (await import('./pack-command')).packCommand(repo, positionals, process.cwd());
     break;
@@ -229,7 +214,7 @@ switch (verb) {
     break;
   }
   case 'stop':
-    if (positionals.length + Number(values.all === true) !== 1) throw new Error('Usage: akrogon stop <slug> | --all');
+    if (positionals.length + Number(values.all === true) !== 1) throw new Error(STOP_USAGE);
     await (await import('./stop')).stopCommand(positionals[0], values.all === true, process.cwd());
     break;
   case 'stop-run':
@@ -261,24 +246,29 @@ switch (verb) {
     await (await import('./install')).install();
     break;
   case 'timing': {
-    const usage: string = 'Usage: akrogon timing <slug> | --cohort --since <iso> | --flow --since <YYYY-MM-DD>';
     const gate: boolean = values.cohort === true || values.flow === true;
     if (
       (values.cohort === true && values.flow === true) ||
       (gate && (values.since === undefined || positionals.length !== 0)) ||
       (!gate && (values.since !== undefined || positionals.length !== 1))
     )
-      throw new Error(usage);
-    await (
-      await import('./timing-report')
-    ).timingCommand(
-      process.cwd(),
-      values.cohort === true
-        ? { since: z.iso.datetime().parse(values.since) }
-        : values.flow === true
-          ? { flow: z.iso.date().parse(values.since) }
-          : { slug: positionals[0] },
-    );
+      throw new Error(TIMING_USAGE);
+    let mode: { slug: string } | { since: string } | { flow: string };
+    try {
+      mode =
+        values.cohort === true
+          ? { since: z.iso.datetime().parse(values.since) }
+          : values.flow === true
+            ? { flow: z.iso.date().parse(values.since) }
+            : { slug: positionals[0] };
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        console.error(TIMING_USAGE);
+        process.exit(1);
+      }
+      throw error;
+    }
+    await (await import('./timing-report')).timingCommand(process.cwd(), mode);
     break;
   }
   case 'flaky':
@@ -337,7 +327,5 @@ switch (verb) {
     await (await import('./rollback')).rollback();
     break;
   default:
-    throw new Error(
-      'Usage: akrogon <install|listen|init|config|preflight|phase|land|next|seat|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|notice|rollback>',
-    );
+    throw new Error(VERB_USAGE);
 }
