@@ -1995,7 +1995,7 @@ test('a red merge_checks member stores its script name while blocked members sto
     expect(failuresOf(later)).toEqual(['(no test name)']);
     // A red sequential check blocks every member: the copies store none.
     config(f, {
-      checks: { cheap: 'echo blocked', red: 'sh -c "echo \"(fail) gamma\"; exit 7"' },
+      checks: { cheap: 'echo blocked', red: 'echo "(fail) gamma"; exit 7' },
       merge_checks: { member: 'echo member' },
     });
     await commitIn(worktree, 'other.ts');
@@ -2083,11 +2083,15 @@ test('a stored name keeps an unresolved main-red covered after its log is gone w
     expect(freshBase[0].notice).toBeUndefined();
 
     // A different name on main reports a new red; the stored alpha is no cover for beta.
+    // The base run checks out the head's merge-base, so only a head branched after the beta
+    // push makes a base run print beta.
     writeFileSync(resolve(f.root, 'failure'), 'beta\n');
     await command(['git', 'add', 'failure'], f.root);
     await command(['git', 'commit', '-m', 'beta on main'], f.root);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
-    const second: Result = await cli(f, ['verify', '--known-red'], worktree, core.env);
+    const { worktree: afterBeta } = await callerWorktree(f, 'after-beta');
+    await commitIn(afterBeta, 'later.ts');
+    const second: Result = await cli(f, ['verify', '--known-red'], afterBeta, core.env);
     expect(second.code).toBe(0);
     expect(noticesOf(core)).toHaveLength(2);
     const fresh: { title: string; body: string; attention: boolean } | undefined = noticesOf(core).find(
