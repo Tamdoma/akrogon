@@ -14,13 +14,14 @@ function slugify(heading: string): string {
 
 // Text inside a fenced code block is example content: it carries neither links nor headings.
 function proseOnly(markdown: string): string {
-  let fenceChar = '';
+  let openingFence: string = '';
   const kept: string[] = [];
   for (const line of markdown.split('\n')) {
-    const fence = /^ {0,3}(`{3,}|~{3,})/.exec(line);
-    if (fenceChar === '' && fence) fenceChar = fence[1][0];
-    else if (fenceChar !== '' && fence !== null && fence[1][0] === fenceChar) fenceChar = '';
-    else if (fenceChar === '') kept.push(line);
+    const fence: RegExpExecArray | null = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (fence !== null) {
+      if (openingFence === '') openingFence = fence[1];
+      else if (fence[1][0] === openingFence[0] && fence[1].length >= openingFence.length) openingFence = '';
+    } else if (openingFence === '') kept.push(line);
   }
   return kept.join('\n');
 }
