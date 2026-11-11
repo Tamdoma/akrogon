@@ -106,7 +106,12 @@ test('a wrong --since form prints the timing usage line, exits 1 and shows no Zo
 
 test('help and the unknown-flag error do no work on an empty home and stop nothing', async () => {
   const home: string = registerTemp(mkdtempSync(resolve(tmpdir(), 'akrogon-empty-')));
-  for (const args of [['seat', '--help'], ['seat', '--compare'], ['timing', '--help'], ['stop', '--help']]) {
+  for (const args of [
+    ['seat', '--help'],
+    ['seat', '--compare'],
+    ['timing', '--help'],
+    ['stop', '--help'],
+  ]) {
     const before: string[] = readdirSync(home).sort();
     const result: Result = await bareCli(args, home);
     if (args[1] === '--help') expect(result.code, args.join(' ')).toBe(0);
