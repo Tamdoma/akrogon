@@ -462,6 +462,20 @@ async function namelessFailureScript(f: Fixture): Promise<void> {
   await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
 }
 
+// A failing check that mimics a Bun fan-out: one script exits non-zero without
+// printing `(fail)`, so its Bun-style exit line carries the script name.
+async function scriptFailureScript(f: Fixture, name: string): Promise<void> {
+  writeFileSync(
+    resolve(f.root, 'check.sh'),
+    'name=$(cat failure); echo "wrap | $name | Exited with code 7"; exit 7\n',
+  );
+  writeFileSync(resolve(f.root, 'failure'), `${name}\n`);
+  yaml(resolve(f.root, 'issues/config.yaml'), { checks: { test: 'sh check.sh' }, grounding: 'none' });
+  await command(['git', 'add', '.'], f.root);
+  await command(['git', 'commit', '-m', 'add fan-out failing check'], f.root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+}
+
 test('verify --known-red reruns the failing command on a fresh checkout of the exact base and records the linked pair', async () => {
   const f: Fixture = await fixture();
   try {
@@ -552,6 +566,109 @@ test('verify --known-red covers a red command naming no test when the base run o
     expect(baseRun?.commands.map((item) => item.exit)).toEqual([7]);
     expect((await cli(f, ['phase', 'caller', 'check.review', '--slot', 'A'], worktree)).code).toBe(0);
     expect(readState(leafPath).phase).toBe('check.review');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a head red in one script is not covered by a base red in another script', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await scriptFailureScript(f, 'test:x');
+    const { worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const same: Result = await verify(f, ['--known-red'], worktree);
+    expect(same.code).toBe(0);
+    expect(same.stdout).toContain(`verify known-red ${head}: pass`);
+    writeFileSync(resolve(worktree, 'failure'), 'test:y\n');
+    await command(['git', 'add', 'failure'], worktree);
+    await command(['git', 'commit', '-m', 'fail another script'], worktree);
+    const moved: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    const result: Result = await verify(f, ['--known-red'], worktree);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain(`verify known-red ${moved}: fail`);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a red main in one script reports new while the same check\'s other script stays noticed', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  try {
+    await scriptFailureScript(f, 'test:x');
+    const { leafPath, worktree } = await callerWorktree(f);
+    const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    const baseTree: string = await command(['git', 'rev-parse', `${base}^{tree}`], f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
+    const redX: string = resolve(leafPath, 'red-x.log');
+    writeFileSync(redX, 'wrap | test:x | Exited with code 7\n');
+    // An unresolved, already-noticed incident in test:x on landed main.
+    const seeded: VerifyRun = seedRun(f, {
+      sha: base,
+      tree: baseTree,
+      scope: 'leaf',
+      compares: 'earlier-head',
+      notice: 'pending',
+      start: '2026-11-01T00:00:00.000Z',
+      end: '2026-11-01T01:00:00.000Z',
+      commands: verifyCommands(repo.config, 'leaf').map((item) => ({ ...item, exit: 7, log: redX })),
+    });
+    mkdirSync(noticeFolder(core), { recursive: true });
+    writeFileSync(
+      resolve(noticeFolder(core), `${noticeId(f.repo, 'main-red', seeded.run)}.json`),
+      JSON.stringify({ title: `${f.repo} main red`, body: 'earlier', attention: false }),
+    );
+    writeFileSync(resolve(worktree, 'failure'), 'test:y\n');
+    await command(['git', 'add', 'failure'], worktree);
+    await command(['git', 'commit', '-m', 'fail another script'], worktree);
+    const result: Result = await cli(f, ['verify', '--known-red'], worktree, core.env);
+    expect(result.code).toBe(1);
+    expect(noticesOf(core)).toHaveLength(2);
+    const fresh: { title: string; body: string; attention: boolean } | undefined = noticesOf(core).find(
+      (notice) => notice.body !== 'earlier',
+    );
+    expect(fresh?.body).toContain('(script) test:y');
+    expect(noticesOf(core).some((notice) => notice.body.includes('(script) test:x'))).toBe(false);
+
+    // A repeat of test:x stays covered by the pending notice and reports nothing new.
+    writeFileSync(resolve(worktree, 'failure'), 'test:x\n');
+    await command(['git', 'add', 'failure'], worktree);
+    await command(['git', 'commit', '-m', 'fail the noticed script again'], worktree);
+    const repeat: Result = await cli(f, ['verify', '--known-red'], worktree, core.env);
+    expect(repeat.code).toBe(0);
+    expect(noticesOf(core)).toHaveLength(2);
+  } finally {
+    await core.stop();
+    f.clean();
+  }
+});
+
+test('a holder log outside the issues grammar is read on both sides of a known-red pair', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await scriptFailureScript(f, 'test:x');
+    const direct: string = resolve(storeDir(f), 'direct');
+    await command(['git', 'worktree', 'add', direct, '-b', 'direct'], f.root);
+    const holder: string = directHolder(f);
+    const head: string = await commitIn(direct, 'code.ts');
+    const pass: Result = await verify(f, ['--holder', holder, '--known-red'], direct);
+    expect(pass.code).toBe(0);
+    expect(pass.stdout).toContain(`verify known-red ${head}: pass`);
+    const runs: VerifyRun[] = records(f);
+    expect(runs).toHaveLength(2);
+    for (const run of runs)
+      for (const item of run.commands) {
+        expect(item.log.startsWith(holder)).toBe(true);
+        expect(existsSync(item.log)).toBe(true);
+      }
+    writeFileSync(resolve(direct, 'failure'), 'test:y\n');
+    await command(['git', 'add', 'failure'], direct);
+    await command(['git', 'commit', '-m', 'fail another script'], direct);
+    const moved: string = await command(['git', 'rev-parse', 'HEAD'], direct);
+    const fail: Result = await verify(f, ['--holder', holder, '--known-red'], direct);
+    expect(fail.code).toBe(1);
+    expect(fail.stdout).toContain(`verify known-red ${moved}: fail`);
   } finally {
     f.clean();
   }

@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { readRepo, type Repo } from '../src/config';
 import { flakyLines } from '../src/flaky';
@@ -196,6 +196,138 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
         absent.map((step, index) => run(f, step, index)),
       ),
     ).rejects.toThrow(resolve(present, 'evidence.tar.zst'));
+  } finally {
+    f.clean();
+  }
+});
+
+test('a failed script names its innermost token, its wrapper adds nothing and a named stream beside it still lists the title', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const repo: Repo = readRepo(f.repo, f.root);
+    const dir: string = leaf(f, 'leaf', 'merge');
+    const fanout: string = resolve(dir, 'check-red.log');
+    writeFileSync(
+      fanout,
+      [
+        'grp-a | t:custom | Exited with code 3',
+        'grp-a | t:named  | (fail) named > breaks [0.18ms]',
+        'grp-a | t:named  | Exited with code 1',
+        'grp-a | t:sig    | Signaled: SIGTERM',
+        'grp-a | Exited with code 3',
+        'framework:verify:rest-c | test:variant-parity | Exited with code 1',
+        'framework:verify:rest-c | Exited with code 1',
+        // Whole-token prefixes only: test:a is not a token prefix of test:ab.
+        'test:a | Exited with code 2',
+        'test:ab | Exited with code 3',
+        // A bare (fail) on no stream suppresses nothing.
+        '(fail) bare title [1.00ms]',
+      ].join('\n') + '\n',
+    );
+    const green: string = resolve(dir, 'check-green.log');
+    const step = (log: string, exit: number, end: string): Step => ({
+      tree: 'A',
+      command: 'bun run all',
+      exit,
+      log,
+      end,
+    });
+    const steps: Step[] = [
+      step(fanout, 1, '2026-10-14T01:00:00.000Z'),
+      step(green, 0, '2026-10-14T02:00:00.000Z'),
+      // The same failed script under another wrapper is the same name.
+      step(fanout.replace('grp-a', 'wrap-b'), 1, '2026-10-14T03:00:00.000Z'),
+      step(green, 0, '2026-10-14T04:00:00.000Z'),
+    ];
+    writeFileSync(steps[2].log, readFileSync(fanout, 'utf8').replace(/grp-a/g, 'wrap-b'));
+    expect(
+      (
+        await flakyLines(
+          repo,
+          steps.map((item, index) => run(f, item, index)),
+        )
+      ).sort((a, b) => a.test.localeCompare(b.test)),
+    ).toEqual([
+      { name: 'test', test: '(script) t:custom', count: 2, last: '2026-10-14T04:00:00.000Z' },
+      { name: 'test', test: '(script) test:a', count: 2, last: '2026-10-14T04:00:00.000Z' },
+      { name: 'test', test: '(script) test:ab', count: 2, last: '2026-10-14T04:00:00.000Z' },
+      { name: 'test', test: '(script) test:variant-parity', count: 1, last: '2026-10-14T02:00:00.000Z' },
+      { name: 'test', test: 'bare title', count: 2, last: '2026-10-14T04:00:00.000Z' },
+      { name: 'test', test: 'named > breaks', count: 1, last: '2026-10-14T02:00:00.000Z' },
+    ]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('an unnamed failure takes its stream script, an unnamed without one stays bare, and a title holding a pipe survives', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const repo: Repo = readRepo(f.repo, f.root);
+    const dir: string = leaf(f, 'leaf', 'merge');
+    const log: string = resolve(dir, 'check-red.log');
+    writeFileSync(
+      log,
+      [
+        'framework:verify:rest-a      | test:emdash-kit     | (fail) (unnamed) [7668.89ms]',
+        'framework:verify:rest-a      | test:emdash-kit     | (fail) (unnamed) [7201.11ms]',
+        'framework:verify:rest-a      | test:emdash-kit     | Exited with code 1',
+        'framework:verify:rest-a      | Exited with code 1',
+        '(fail) (unnamed) [4.00ms]',
+        '(fail) outer | (fail) inner [2.00ms]',
+      ].join('\n') + '\n',
+    );
+    const green: string = resolve(dir, 'check-green.log');
+    const steps: Step[] = [
+      { tree: 'A', command: 'bun test', exit: 1, log, end: '2026-10-14T01:00:00.000Z' },
+      { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
+    ];
+    expect(
+      (
+        await flakyLines(
+          repo,
+          steps.map((item, index) => run(f, item, index)),
+        )
+      ).sort((a, b) => a.test.localeCompare(b.test)),
+    ).toEqual([
+      { name: 'test', test: '(unnamed)', count: 1, last: '2026-10-14T02:00:00.000Z' },
+      { name: 'test', test: '(unnamed) test:emdash-kit', count: 1, last: '2026-10-14T02:00:00.000Z' },
+      { name: 'test', test: 'outer | (fail) inner', count: 1, last: '2026-10-14T02:00:00.000Z' },
+    ]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a recorded log outside the issues grammar reads as a plain file while a missing one is still gone', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const repo: Repo = readRepo(f.repo, f.root);
+    const held: string = resolve(f.home, 'chart/direct/check-test-1.log');
+    mkdirSync(resolve(f.home, 'chart/direct'), { recursive: true });
+    writeFileSync(held, '(fail) alpha\n');
+    const missing: string = resolve(f.home, 'chart/direct/check-test-2.log');
+    const green: string = resolve(f.home, 'chart/direct/check-green.log');
+    const steps: Step[] = [
+      { tree: 'A', command: 'bun test', exit: 1, log: held, end: '2026-10-14T01:00:00.000Z' },
+      { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
+      { tree: 'B', command: 'bun test', exit: 1, log: missing, end: '2026-10-14T03:00:00.000Z' },
+      { tree: 'B', command: 'bun test', exit: 0, log: green, end: '2026-10-14T04:00:00.000Z' },
+    ];
+    expect(
+      (
+        await flakyLines(
+          repo,
+          steps.map((item, index) => run(f, item, index)),
+        )
+      ).sort((a, b) => a.test.localeCompare(b.test)),
+    ).toEqual([
+      { name: 'test', test: '(log gone)', count: 1, last: '2026-10-14T04:00:00.000Z' },
+      { name: 'test', test: 'alpha', count: 1, last: '2026-10-14T02:00:00.000Z' },
+    ]);
+    const result: Awaited<ReturnType<typeof cli>> = await cli(f, ['flaky']);
+    expect(result.stdout).toContain('alpha');
+    expect(result.stdout).toContain('(log gone)');
   } finally {
     f.clean();
   }

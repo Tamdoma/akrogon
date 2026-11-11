@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, lstatSync, statSync, readdirSync } from 'node:fs';
 import { resolve, dirname, join, relative } from 'node:path';
 
 type FileResolver = (absolutePath: string) => string | null;
@@ -255,6 +255,26 @@ test('chart-issues direct landing names the known-red command', (): void => {
     'utf8',
   );
   expect(content).toContain('verify --holder <chart>/direct --known-red');
+});
+
+test('seat texts and refs name every non-title red name and the runner-verdict rule', (): void => {
+  const root: string = resolve(import.meta.dir, '..');
+  for (const file of ['skills/lifecycle-rules.md', 'skills/chart-issues/assets/direct-route.md']) {
+    const text: string = readFileSync(resolve(root, file), 'utf8');
+    expect(text, `${file} names the non-title branch`).toContain('is not a real test title');
+    expect(text, `${file} lists the script name`).toContain('(script)');
+    expect(text, `${file} lists the nameless name`).toContain('(no test name)');
+    expect(text, `${file} keeps in-run timeouts as verdicts`).toContain('timed out');
+    expect(text, `${file} keeps runner completeness`).toContain('the command ended by its own verdict');
+    for (const link of [join(root, 'skills/plan-issue/lifecycle-rules.md'), join(root, 'skills/implement-issue/lifecycle-rules.md'), join(root, 'skills/check-issue/lifecycle-rules.md'), join(root, 'skills/merge-issue/lifecycle-rules.md')])
+      expect(lstatSync(link).isSymbolicLink(), `${link} stays a symlink`).toBe(true);
+  }
+  const checks: string = readFileSync(resolve(root, 'docs/reference/checks.md'), 'utf8');
+  expect(checks, 'checks.md states the script name').toContain('(script)');
+  const files: string = readFileSync(resolve(root, 'docs/reference/files.md'), 'utf8');
+  expect(files, 'files.md states the script name').toContain('(script)');
+  const area: string = readFileSync(resolve(root, 'src/AREA.md'), 'utf8');
+  expect(area, 'AREA.md states the script name').toContain('(script)');
 });
 
 test('chart-issues skill names akrogon pack at every end-marker site', (): void => {
