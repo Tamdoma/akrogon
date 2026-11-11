@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { readGlobal, requireRepo, type Repo } from './config';
 import { LogError, readLog } from './evidence';
 import { readVerifyRuns, type VerifyRun } from './verify';
@@ -6,19 +8,58 @@ type Flip = { name: string; command: string; test: string; end: string };
 type Line = { name: string; test: string; count: number; last: string };
 type Red = { name: string; command: string; log: string };
 
-// A closed leaf's logs move with its records between issues/<state> owner dirs and packed archives.
+// A `<chain>` before Bun's `|` is a token tuple; wrapper chains are strict tuple prefixes, never
+// string prefixes (`test:a` is not a prefix of `test:ab`).
+function chain(line: string): string[] {
+  return line.split('|').map((token: string) => token.trim());
+}
+
+function prefixOf(short: string[], long: string[]): boolean {
+  return short.length < long.length && short.every((token: string, index: number) => token === long[index]);
+}
+
+// A red log's names come only from lines Bun prints: `(fail)` titles, `(unnamed)` qualified by its
+// stream's innermost token, and `(script) <script>` for a failed script whose own stream printed no
+// `(fail)` line — the stream's wrappers dropped first, `Signaled:` and free text never naming.
+function names(text: string): string[] {
+  const titles: string[] = [];
+  const failedStreams: string[][] = [];
+  for (const match of text.matchAll(/^(?:\(fail\) |(.+?)\| \(fail\) )(.+?)(?: \[[\d.]+m?s\])?$/gm)) {
+    const title: string = match[2];
+    const stream: string[] = match[1] === undefined ? [] : chain(match[1]);
+    failedStreams.push(stream);
+    titles.push(title === '(unnamed)' && stream.length > 0 ? `(unnamed) ${stream[stream.length - 1]}` : title);
+  }
+  const exited: string[][] = [...text.matchAll(/^.+\| Exited with code (?!0\b)\d+\s*$/gm)].map(
+    (match: RegExpMatchArray) => chain(match[0].slice(0, match[0].lastIndexOf('|'))),
+  );
+  const leaf: string[][] = exited.filter(
+    (candidate: string[]) => !exited.some((other: string[]) => prefixOf(candidate, other)),
+  );
+  const sameStream = (a: string[], b: string[]): boolean =>
+    a.length === b.length && a.every((token: string, index: number) => token === b[index]);
+  const scripts: string[] = leaf
+    .filter((tokens: string[]) => !failedStreams.some((stream: string[]) => sameStream(stream, tokens)))
+    .map((tokens: string[]) => `(script) ${tokens[tokens.length - 1]}`);
+  const all: string[] = [...new Set([...titles, ...scripts])];
+  return all.length === 0 ? ['(no test name)'] : all;
+}
+
+// A closed leaf's logs move with its records between issues/<state> owner dirs and packed archives;
+// a recorded path outside the issues grammar (a verify holder) that still exists on disk reads as a
+// plain file.
 export async function failedTests(repo: Repo, recorded: string): Promise<string[]> {
   let bytes: Uint8Array;
   try {
     bytes = await readLog(repo, recorded, repo.root);
   } catch (error) {
-    if (error instanceof LogError && error.kind === 'nomatch') return ['(log gone)'];
-    throw error;
+    if (error instanceof LogError && error.kind === 'nomatch') {
+      const plain: string = resolve(repo.root, recorded);
+      if (existsSync(plain) && statSync(plain).isFile()) bytes = readFileSync(plain);
+      else return ['(log gone)'];
+    } else throw error;
   }
-  const names: string[] = [
-    ...new TextDecoder().decode(bytes).matchAll(/(?:^|\| )\(fail\) (.+?)(?: \[[\d.]+m?s\])?$/gm),
-  ].map((match: RegExpMatchArray) => match[1]);
-  return names.length === 0 ? ['(no test name)'] : [...new Set(names)];
+  return names(new TextDecoder().decode(bytes));
 }
 
 // A command red then green on the same tree, in completed runs whose setup passed, is one flip per failed test.
