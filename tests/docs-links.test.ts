@@ -229,6 +229,17 @@ test('link-shaped text inside a fenced block is not a link', () => {
   expect(broken).toEqual(['/skills/plan-issue/SKILL.md: missing file also-nope.md']);
 });
 
+test('shorter nested fences keep example links inside the outer block', (): void => {
+  const markdown: string = '````markdown\n```text\n[example](missing.md)\n```\n````\n';
+  const broken: string[] = brokenLinks(
+    join(repoRoot, 'skills/chart-issues/assets/questions.md'),
+    markdown,
+    diskResolver,
+    join(repoRoot, 'skills/chart-issues'),
+  );
+  expect(broken).toEqual([]);
+});
+
 test('seat skills name the known-red command', (): void => {
   const root: string = resolve(import.meta.dir, '..');
   for (const site of ['implement-issue', 'check-issue']) {
