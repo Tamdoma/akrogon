@@ -90,7 +90,7 @@ All three are read-only. Code: [timing-report.ts](../../src/timing-report.ts), [
 
 ## Flaky report
 
-`akrogon flaky` reads `verify-runs.jsonl`. It finds a verify command that went red and then green on the same tree. For each failed test in the red log's `(fail)` lines it prints one line: count, last time, check name and test name.
+`akrogon flaky` reads `verify-runs.jsonl`. It finds a verify command that went red and then green on the same tree. For each name the red log records — a `(fail)` title, `(unnamed) <script>` for a `(fail) (unnamed)` line on a script's stream, `(script) <script>` from a failed script's `Exited with code` line with wrappers dropped, `(no test name)` or `(log gone)` — it prints one line: count, last time, check name and that name.
 
 It skips runs that never finished, runs whose setup failed and entries marked `reused` — a reused entry adds no observation. A flip shows an inconsistent result on unchanged code. It does not say whether the test, the code or an outside input caused it. Treat each line as a lead to chart, not a verdict. Code: [flaky.ts](../../src/flaky.ts).
 
