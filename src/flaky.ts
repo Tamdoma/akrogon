@@ -6,7 +6,7 @@ import { readVerifyRuns, type VerifyRun } from './verify';
 
 type Flip = { name: string; command: string; test: string; end: string };
 type Line = { name: string; test: string; count: number; last: string };
-type Red = { name: string; command: string; log: string };
+type Red = VerifyRun['commands'][number];
 
 // A `<chain>` before Bun's `|` is a token tuple; wrapper chains are strict tuple prefixes, never
 // string prefixes (`test:a` is not a prefix of `test:ab`).
@@ -80,7 +80,7 @@ export async function flips(repo: Repo, runs: VerifyRun[]): Promise<Flip[]> {
       const prior: Red | undefined = red.get(key);
       if (prior === undefined) continue;
       red.delete(key);
-      for (const test of await failedTests(repo, prior.log))
+      for (const test of prior.failures ?? (await failedTests(repo, prior.log)))
         out.push({ name: prior.name, command: prior.command, test, end: run.end! });
     }
   return out;

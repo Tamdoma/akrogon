@@ -71,6 +71,11 @@ export const verifyRunSchema = z.strictObject({
       log: z.string(),
       reused: z.string().optional(),
       blocked: z.string().optional(),
+      failures: z
+        .array(z.string())
+        .min(1)
+        .refine((list) => new Set(list).size === list.length)
+        .optional(),
     }),
   ),
   slow: z
@@ -304,7 +309,8 @@ async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[], folder:
   const units: Unit[] = [];
   for (const item of me.commands) {
     if (item.exit === 0 || item.reused !== undefined || item.blocked !== undefined) continue;
-    for (const test of await failedTests(repo, item.log)) units.push({ name: item.name, command: item.command, test });
+    for (const test of item.failures ?? (await failedTests(repo, item.log)))
+      units.push({ name: item.name, command: item.command, test });
   }
   const fresh: string[] = [];
   for (const unit of units) {
@@ -316,7 +322,7 @@ async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[], folder:
       if (item.reused !== undefined) continue;
       if (item.exit === 0) continue;
       if (run.compares === undefined) continue;
-      if (!(await failedTests(repo, item.log)).includes(unit.test)) continue;
+      if (!(item.failures ?? (await failedTests(repo, item.log))).includes(unit.test)) continue;
       const resolved: boolean = await (async () => {
         for (const green of runs) {
           if (!completed(green)) continue;
@@ -522,7 +528,13 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
         ['sh', '-c', item.command],
         target,
       );
-      ran.push({ ...item, exit: code, log });
+      const names: string[] | undefined = code === 0 ? undefined : await failedTests(repo, log);
+      ran.push({
+        ...item,
+        exit: code,
+        log,
+        ...(names === undefined || names.includes('(log gone)') ? {} : { failures: names }),
+      });
       process.stdout.write(`verify ${item.name}: ${code} ${log}\n`);
       if (code !== 0 && !isFull) blockedBy ??= { name: item.name, exit: code, log };
     }
@@ -545,7 +557,13 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
           continue;
         }
         const { code, log } = result.value;
-        ran.push({ ...members[index], exit: code, log });
+        const names: string[] | undefined = code === 0 ? undefined : await failedTests(repo, log);
+        ran.push({
+          ...members[index],
+          exit: code,
+          log,
+          ...(names === undefined || names.includes('(log gone)') ? {} : { failures: names }),
+        });
         process.stdout.write(`verify ${members[index].name}: ${code} ${log}\n`);
       }
       if (first !== undefined) throw first;
