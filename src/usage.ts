@@ -50,8 +50,7 @@ export const VERB_OPTIONS: Record<string, Record<string, FlagSpec>> = {
   rollback: {},
 };
 
-export const VERB_USAGE: string =
-  'Usage: akrogon <install|listen|init|config|preflight|phase|land|next|seat|pull|close|park|unpark|pause|unpause|stop|stop-run|start|sync|status|leftovers|timing|flaky|log|run-check|verify|guard|pack|notice|rollback>';
+export const VERB_USAGE: string = `Usage: akrogon <${Object.keys(VERB_OPTIONS).join('|')}>`;
 export const PACK_USAGE: string = 'Usage: akrogon pack issues/closed/<owner> | issues/chart/<chart> ...';
 export const STOP_USAGE: string = 'Usage: akrogon stop <slug> | --all';
 export const TIMING_USAGE: string =
