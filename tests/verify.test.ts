@@ -2176,3 +2176,39 @@ test('verify --known-red fails a gone head log whose row stores the same names a
     f.clean();
   }
 });
+
+// The chained scenario criterion 2 names: a verify-written red run flips to green on the same
+// tree, its log is gone, and `akrogon flaky` still reports the stored name.
+test('a verify-written red run flips to green on the same tree and flaky reports the stored name after its log is gone', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const flip: string = resolve(f.home, 'pass');
+    writeFileSync(resolve(f.root, 'check.sh'), `test -e ${flip} || { echo "(fail) alpha"; exit 7; }\n`);
+    config(f, { checks: { test: 'sh check.sh' } });
+    await command(['git', 'add', 'check.sh', 'issues/config.yaml'], f.root);
+    await command(['git', 'commit', '-m', 'add flip check'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    const redResult: Result = await verify(f, [], worktree);
+    expect(redResult.code).toBe(1);
+    const redRun: VerifyRun = records(f).at(-1)!;
+    expect(redRun.commands[0].exit).toBe(7);
+    writeFileSync(flip, '\n');
+    const greenResult: Result = await verify(f, [], worktree);
+    expect(greenResult.code).toBe(0);
+    const runs: VerifyRun[] = records(f);
+    const greenRun: VerifyRun = runs.at(-1)!;
+    expect(greenRun.tree).toBe(redRun.tree);
+    expect(greenRun.commands[0].exit).toBe(0);
+    rmSync(redRun.commands[0].log);
+    const repo: Repo = readRepo(f.repo, f.root);
+    expect(await flakyLines(repo, runs)).toEqual([{ name: 'test', test: 'alpha', count: 1, last: greenRun.end! }]);
+    const result: Result = await cli(f, ['flaky']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('alpha');
+    expect(result.stdout).not.toContain('(log gone)');
+  } finally {
+    f.clean();
+  }
+});
