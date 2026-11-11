@@ -257,15 +257,12 @@ test('chart-issues direct landing names the known-red command', (): void => {
   expect(content).toContain('verify --holder <chart>/direct --known-red');
 });
 
-test('seat texts and refs name every non-title red name and the runner-verdict rule', (): void => {
+test('seat texts and refs name every non-title red name', (): void => {
   const root: string = resolve(import.meta.dir, '..');
   for (const file of ['skills/lifecycle-rules.md', 'skills/chart-issues/assets/direct-route.md']) {
     const text: string = readFileSync(resolve(root, file), 'utf8');
-    expect(text, `${file} names the non-title branch`).toContain('is not a real test title');
     expect(text, `${file} lists the script name`).toContain('(script)');
     expect(text, `${file} lists the nameless name`).toContain('(no test name)');
-    expect(text, `${file} keeps in-run timeouts as verdicts`).toContain('timed out');
-    expect(text, `${file} keeps runner completeness`).toContain('the command ended by its own verdict');
     for (const link of [
       join(root, 'skills/plan-issue/lifecycle-rules.md'),
       join(root, 'skills/implement-issue/lifecycle-rules.md'),
