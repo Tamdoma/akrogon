@@ -981,6 +981,7 @@ test.serial(
         if (Date.now() > deadline) throw new Error('pass receipt still incomplete after the caller died');
         await Bun.sleep(200);
       }
+      await waitInactive(`akrogon-verify-${receipt.run}.service`);
       expect(receipt.setup).toBe(0);
       expect(receipt.commands).toHaveLength(1);
       expect(receipt.commands[0].exit).toBe(0);
