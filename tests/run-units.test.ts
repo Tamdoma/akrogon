@@ -682,13 +682,12 @@ test.serial(
 
 test.serial('skills name the run-check keeping rule, its log reader and its exemptions', () => {
   const root: string = resolve(import.meta.dir, '..');
+  // The seat rule lives once in the shared file each lifecycle skill links from its folder;
+  // worker-facing files keep their own copies because a worker sees only its brief.
   const ruled: string[] = [
-    'skills/implement-issue/SKILL.md',
+    'skills/lifecycle-rules.md',
     'skills/implement-issue/worker-protocol.md',
     'skills/implement-issue/brief-template.md',
-    'skills/check-issue/SKILL.md',
-    'skills/merge-issue/SKILL.md',
-    'skills/plan-issue/SKILL.md',
   ];
   for (const file of ruled) {
     const text: string = readFileSync(resolve(root, file), 'utf8');
