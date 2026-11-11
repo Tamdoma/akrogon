@@ -36,7 +36,7 @@ A seat reuses `grants[]` for the operations they cover, within their bounds; bef
 
 When the brief and the locked design disagree, the design wins: the conflict is written into the plan as a note for review, and planning continues.
 
-A reusable lesson found here is one line in `learnings/LESSONS.md` naming mechanism, date and history path, plus `learnings/history/<date>-<slug>.md` with the case, evidence and abstract learning, and the write follows the [lesson rule](../lesson-rule.md).
+A reusable lesson found here is one line in `learnings/LESSONS.md` naming mechanism, date and history path, plus `learnings/history/<date>-<slug>.md` with the case, evidence and abstract learning, and the write follows the [lesson rule](lesson-rule.md).
 
 ## plan.synthesis
 

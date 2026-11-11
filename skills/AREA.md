@@ -14,7 +14,7 @@
 - `skills/implement-issue/worker-protocol.md` defines worker scope and returns.
 - `skills/check-issue/SKILL.md` defines review evidence and Fix/Nit verdicts.
 - `skills/learn-issues/SKILL.md` triages active lessons not yet retired by a leaf: removes stopped lines, prepares operator-approved transfers, prints seed lines for checkable ones.
-- `skills/lesson-rule.md` holds the shared rule every lesson write site follows.
+- `skills/lesson-rule.md` holds the shared rule every lesson write site follows; a file shared by several skills is reached through a link file inside each skill folder, never through `../`.
 - `skills/watch-issues/SKILL.md` runs the operator-started cron watch; `scripts/observe.ts` is its read-only inventory of hc seats (status per recorded address and labels, log path from `src/transcript.ts`) and `scripts/log-tail.ts` summarizes a seat's session log.
 
 ## Non-obvious patterns
