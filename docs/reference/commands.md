@@ -1,6 +1,6 @@
 # Commands
 
-Every `akrogon` command, one line each. Run commands from the registered repository unless a row says otherwise. Angle brackets mark values you supply. Square brackets mark optional parts. `|` separates alternatives.
+Every `akrogon` command, one line each. Run commands from the registered repository unless a row says otherwise. Angle brackets mark values you supply. Square brackets mark optional parts. `|` separates alternatives. `akrogon <verb> --help` prints the verb's declared flags on stdout and exits 0; `akrogon --help` prints the verb list. An unknown flag exits 1 with one stderr line naming the flag and the verb's declared flags.
 
 ## Set up
 
