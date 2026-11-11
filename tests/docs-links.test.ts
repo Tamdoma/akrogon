@@ -243,10 +243,7 @@ test('shorter nested fences keep example links inside the outer block', (): void
 
 test('seat skills name the known-red command', (): void => {
   const root: string = resolve(import.meta.dir, '..');
-  for (const site of ['implement-issue', 'check-issue']) {
-    const content: string = readFileSync(join(root, 'skills', site, 'SKILL.md'), 'utf8');
-    expect(content).toContain('akrogon verify --known-red');
-  }
+  expect(readFileSync(join(root, 'skills/lifecycle-rules.md'), 'utf8')).toContain('akrogon verify --known-red');
   expect(readFileSync(join(root, 'skills/merge-issue/SKILL.md'), 'utf8')).toContain(
     'akrogon verify --attempt <id> --known-red',
   );
