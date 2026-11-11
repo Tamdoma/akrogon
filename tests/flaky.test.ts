@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { readRepo, type Repo } from '../src/config';
 import { flakyLines } from '../src/flaky';
 import { type VerifyRun } from '../src/verify';
-import { cli, fixture, leaf, type Fixture } from './helpers';
+import { cli, fixture, leaf, seedRun, type Fixture } from './helpers';
 
 type Step = { tree: string; command: string; exit: number; log: string; end?: string; setup?: number; reused?: string };
 
@@ -225,6 +225,8 @@ test('a failed script names its innermost token, its wrapper adds nothing and a 
       ].join('\n') + '\n',
     );
     const green: string = resolve(dir, 'check-green.log');
+    const wrapped: string = resolve(dir, 'check-wrapped.log');
+    writeFileSync(wrapped, readFileSync(fanout, 'utf8').replace(/grp-a/g, 'wrap-b'));
     const step = (log: string, exit: number, end: string): Step => ({
       tree: 'A',
       command: 'bun run all',
@@ -236,10 +238,9 @@ test('a failed script names its innermost token, its wrapper adds nothing and a 
       step(fanout, 1, '2026-10-14T01:00:00.000Z'),
       step(green, 0, '2026-10-14T02:00:00.000Z'),
       // The same failed script under another wrapper is the same name.
-      step(fanout.replace('grp-a', 'wrap-b'), 1, '2026-10-14T03:00:00.000Z'),
+      step(wrapped, 1, '2026-10-14T03:00:00.000Z'),
       step(green, 0, '2026-10-14T04:00:00.000Z'),
     ];
-    writeFileSync(steps[2].log, readFileSync(fanout, 'utf8').replace(/grp-a/g, 'wrap-b'));
     expect(
       (
         await flakyLines(
@@ -251,9 +252,9 @@ test('a failed script names its innermost token, its wrapper adds nothing and a 
       { name: 'test', test: '(script) t:custom', count: 2, last: '2026-10-14T04:00:00.000Z' },
       { name: 'test', test: '(script) test:a', count: 2, last: '2026-10-14T04:00:00.000Z' },
       { name: 'test', test: '(script) test:ab', count: 2, last: '2026-10-14T04:00:00.000Z' },
-      { name: 'test', test: '(script) test:variant-parity', count: 1, last: '2026-10-14T02:00:00.000Z' },
+      { name: 'test', test: '(script) test:variant-parity', count: 2, last: '2026-10-14T04:00:00.000Z' },
       { name: 'test', test: 'bare title', count: 2, last: '2026-10-14T04:00:00.000Z' },
-      { name: 'test', test: 'named > breaks', count: 1, last: '2026-10-14T02:00:00.000Z' },
+      { name: 'test', test: 'named > breaks', count: 2, last: '2026-10-14T04:00:00.000Z' },
     ]);
   } finally {
     f.clean();
@@ -325,7 +326,12 @@ test('a recorded log outside the issues grammar reads as a plain file while a mi
       { name: 'test', test: '(log gone)', count: 1, last: '2026-10-14T04:00:00.000Z' },
       { name: 'test', test: 'alpha', count: 1, last: '2026-10-14T02:00:00.000Z' },
     ]);
+    seedRun(f, run(f, steps[0], 10));
+    seedRun(f, run(f, steps[1], 11));
+    seedRun(f, run(f, steps[2], 12));
+    seedRun(f, run(f, steps[3], 13));
     const result: Awaited<ReturnType<typeof cli>> = await cli(f, ['flaky']);
+    expect(result.code).toBe(0);
     expect(result.stdout).toContain('alpha');
     expect(result.stdout).toContain('(log gone)');
   } finally {

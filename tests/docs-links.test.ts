@@ -266,7 +266,12 @@ test('seat texts and refs name every non-title red name and the runner-verdict r
     expect(text, `${file} lists the nameless name`).toContain('(no test name)');
     expect(text, `${file} keeps in-run timeouts as verdicts`).toContain('timed out');
     expect(text, `${file} keeps runner completeness`).toContain('the command ended by its own verdict');
-    for (const link of [join(root, 'skills/plan-issue/lifecycle-rules.md'), join(root, 'skills/implement-issue/lifecycle-rules.md'), join(root, 'skills/check-issue/lifecycle-rules.md'), join(root, 'skills/merge-issue/lifecycle-rules.md')])
+    for (const link of [
+      join(root, 'skills/plan-issue/lifecycle-rules.md'),
+      join(root, 'skills/implement-issue/lifecycle-rules.md'),
+      join(root, 'skills/check-issue/lifecycle-rules.md'),
+      join(root, 'skills/merge-issue/lifecycle-rules.md'),
+    ])
       expect(lstatSync(link).isSymbolicLink(), `${link} stays a symlink`).toBe(true);
   }
   const checks: string = readFileSync(resolve(root, 'docs/reference/checks.md'), 'utf8');

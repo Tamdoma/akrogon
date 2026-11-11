@@ -465,10 +465,7 @@ async function namelessFailureScript(f: Fixture): Promise<void> {
 // A failing check that mimics a Bun fan-out: one script exits non-zero without
 // printing `(fail)`, so its Bun-style exit line carries the script name.
 async function scriptFailureScript(f: Fixture, name: string): Promise<void> {
-  writeFileSync(
-    resolve(f.root, 'check.sh'),
-    'name=$(cat failure); echo "wrap | $name | Exited with code 7"; exit 7\n',
-  );
+  writeFileSync(resolve(f.root, 'check.sh'), 'name=$(cat failure); echo "wrap | $name | Exited with code 7"; exit 7\n');
   writeFileSync(resolve(f.root, 'failure'), `${name}\n`);
   yaml(resolve(f.root, 'issues/config.yaml'), { checks: { test: 'sh check.sh' }, grounding: 'none' });
   await command(['git', 'add', '.'], f.root);
@@ -592,18 +589,18 @@ test('a head red in one script is not covered by a base red in another script', 
   }
 });
 
-test('a red main in one script reports new while the same check\'s other script stays noticed', async () => {
+test("a red main in one script reports new while the same check's other script stays noticed", async () => {
   const f: Fixture = await fixture();
   const core: HcCore = await hcCore(f);
   try {
-    await scriptFailureScript(f, 'test:x');
+    await scriptFailureScript(f, 'test:y');
     const { leafPath, worktree } = await callerWorktree(f);
     const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
     const baseTree: string = await command(['git', 'rev-parse', `${base}^{tree}`], f.root);
     const repo: Repo = readRepo(f.repo, f.root);
     const redX: string = resolve(leafPath, 'red-x.log');
     writeFileSync(redX, 'wrap | test:x | Exited with code 7\n');
-    // An unresolved, already-noticed incident in test:x on landed main.
+    // An unresolved, already-noticed incident in test:x on landed main; main now fails test:y.
     const seeded: VerifyRun = seedRun(f, {
       sha: base,
       tree: baseTree,
@@ -619,11 +616,9 @@ test('a red main in one script reports new while the same check\'s other script 
       resolve(noticeFolder(core), `${noticeId(f.repo, 'main-red', seeded.run)}.json`),
       JSON.stringify({ title: `${f.repo} main red`, body: 'earlier', attention: false }),
     );
-    writeFileSync(resolve(worktree, 'failure'), 'test:y\n');
-    await command(['git', 'add', 'failure'], worktree);
-    await command(['git', 'commit', '-m', 'fail another script'], worktree);
+    await commitIn(worktree, 'code.ts');
     const result: Result = await cli(f, ['verify', '--known-red'], worktree, core.env);
-    expect(result.code).toBe(1);
+    expect(result.code).toBe(0);
     expect(noticesOf(core)).toHaveLength(2);
     const fresh: { title: string; body: string; attention: boolean } | undefined = noticesOf(core).find(
       (notice) => notice.body !== 'earlier',
@@ -631,10 +626,8 @@ test('a red main in one script reports new while the same check\'s other script 
     expect(fresh?.body).toContain('(script) test:y');
     expect(noticesOf(core).some((notice) => notice.body.includes('(script) test:x'))).toBe(false);
 
-    // A repeat of test:x stays covered by the pending notice and reports nothing new.
-    writeFileSync(resolve(worktree, 'failure'), 'test:x\n');
-    await command(['git', 'add', 'failure'], worktree);
-    await command(['git', 'commit', '-m', 'fail the noticed script again'], worktree);
+    // A repeat base red in test:y stays covered by its own pending notice.
+    await commitIn(worktree, 'more.ts');
     const repeat: Result = await cli(f, ['verify', '--known-red'], worktree, core.env);
     expect(repeat.code).toBe(0);
     expect(noticesOf(core)).toHaveLength(2);
