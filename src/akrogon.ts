@@ -61,7 +61,7 @@ if (verb !== undefined && values.help === true && Object.hasOwn(VERB_OPTIONS, ve
   process.exit(0);
 }
 
-await migrateStateHome();
+if (verb !== 'timing') await migrateStateHome();
 
 switch (verb) {
   case 'config':
@@ -268,6 +268,7 @@ switch (verb) {
       }
       throw error;
     }
+    await migrateStateHome();
     await (await import('./timing-report')).timingCommand(process.cwd(), mode);
     break;
   }
