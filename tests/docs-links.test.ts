@@ -253,12 +253,18 @@ test('seat skills name the known-red command', (): void => {
 });
 
 test('chart-issues direct landing names the known-red command', (): void => {
-  const content: string = readFileSync(resolve(import.meta.dir, '../skills/chart-issues/SKILL.md'), 'utf8');
+  const content: string = readFileSync(
+    resolve(import.meta.dir, '../skills/chart-issues/assets/direct-route.md'),
+    'utf8',
+  );
   expect(content).toContain('verify --holder <chart>/direct --known-red');
 });
 
 test('chart-issues skill names akrogon pack at every end-marker site', (): void => {
-  const content: string = readFileSync(resolve(import.meta.dir, '../skills/chart-issues/SKILL.md'), 'utf8');
+  const root: string = resolve(import.meta.dir, '..');
+  const content: string = ['skills/chart-issues/SKILL.md', 'skills/chart-issues/assets/direct-route.md']
+    .map((file: string) => readFileSync(join(root, file), 'utf8'))
+    .join('\n');
   const markers: string[] = ['Handed off', 'Closed', 'Held'];
   for (const marker of markers) expect(content).toContain(marker);
   // C6 is a doc contract: the pack command literal must stand at each of the
