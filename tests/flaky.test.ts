@@ -6,7 +6,16 @@ import { flakyLines } from '../src/flaky';
 import { type VerifyRun } from '../src/verify';
 import { cli, fixture, leaf, seedRun, type Fixture } from './helpers';
 
-type Step = { tree: string; command: string; exit: number; log: string; end?: string; setup?: number; reused?: string };
+type Step = {
+  tree: string;
+  command: string;
+  exit: number;
+  log: string;
+  end?: string;
+  setup?: number;
+  reused?: string;
+  failures?: string[];
+};
 
 function run(f: Fixture, step: Step, index: number): VerifyRun {
   return {
@@ -27,6 +36,7 @@ function run(f: Fixture, step: Step, index: number): VerifyRun {
         exit: step.exit,
         log: step.log,
         ...(step.reused === undefined ? {} : { reused: step.reused }),
+        ...(step.failures === undefined ? {} : { failures: step.failures }),
       },
     ],
     start: '2026-10-14T00:00:00.000Z',
@@ -320,6 +330,48 @@ test('a recorded log outside the issues grammar reads as a plain file while a mi
         await flakyLines(
           repo,
           steps.map((item, index) => run(f, item, index)),
+        )
+      ).sort((a, b) => a.test.localeCompare(b.test)),
+    ).toEqual([
+      { name: 'test', test: '(log gone)', count: 1, last: '2026-10-14T04:00:00.000Z' },
+      { name: 'test', test: 'alpha', count: 1, last: '2026-10-14T02:00:00.000Z' },
+    ]);
+    seedRun(f, run(f, steps[0], 10));
+    seedRun(f, run(f, steps[1], 11));
+    seedRun(f, run(f, steps[2], 12));
+    seedRun(f, run(f, steps[3], 13));
+    const result: Awaited<ReturnType<typeof cli>> = await cli(f, ['flaky']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('alpha');
+    expect(result.stdout).toContain('(log gone)');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a stored failures name survives its red log while a fieldless row still reads its log', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const repo: Repo = readRepo(f.repo, f.root);
+    const dir: string = leaf(f, 'leaf', 'merge');
+    const storedLog: string = resolve(dir, 'check-stored.log');
+    writeFileSync(storedLog, '(fail) alpha\n');
+    rmSync(storedLog);
+    const goneLog: string = resolve(dir, 'check-gone.log');
+    const green: string = resolve(dir, 'check-green.log');
+    const steps: Step[] = [
+      // The stored names answer for the red run whose log is gone; no log is opened.
+      { tree: 'A', command: 'bun test', exit: 1, log: storedLog, end: '2026-10-14T01:00:00.000Z', failures: ['alpha'] },
+      { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
+      // A row without the field keeps reading its log and reports a retired one as gone.
+      { tree: 'B', command: 'bun test', exit: 1, log: goneLog, end: '2026-10-14T01:00:00.000Z' },
+      { tree: 'B', command: 'bun test', exit: 0, log: green, end: '2026-10-14T04:00:00.000Z' },
+    ];
+    expect(
+      (
+        await flakyLines(
+          repo,
+          steps.map((step, index) => run(f, step, index)),
         )
       ).sort((a, b) => a.test.localeCompare(b.test)),
     ).toEqual([

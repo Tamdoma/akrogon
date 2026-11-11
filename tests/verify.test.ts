@@ -1915,3 +1915,260 @@ test('a leaf-scope green on main resolves a merge-scope main-red unit and re-not
     f.clean();
   }
 });
+
+// The entry's stored list, absent until the field lands; reads through the parsed row only.
+function failuresOf(item: VerifyRun['commands'][number]): string[] | undefined {
+  return (item as { failures?: string[] }).failures;
+}
+
+// A red command entry stores its log's names at write time; setup-copied, blocked and green
+// entries store none.
+test('a red check stores its failure names while green, blocked and setup-failed entries store none', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    // Setup failed: every entry copies the setup exit and log, none is a checked run.
+    config(f, {
+      setup: 'exit 9',
+      checks: { red: 'sh check.sh', ok: 'echo ok', full1: 'echo full' },
+      full: ['full1'],
+    });
+    const { worktree } = await callerWorktree(f);
+    expect((await verify(f, [], worktree)).code).toBe(1);
+    const setupRow: VerifyRun = records(f).at(-1)!;
+    expect(setupRow.setup).toBe(9);
+    expect(setupRow.commands.map((item) => [item.name, item.exit])).toEqual([
+      ['red', 9],
+      ['ok', 9],
+      ['full1', 9],
+    ]);
+    for (const item of setupRow.commands) expect(item).not.toHaveProperty('failures');
+
+    // The red check's own run stores its names; the green check and the blocked full check store none.
+    config(f, {
+      checks: { red: 'sh check.sh', ok: 'echo ok', full1: 'echo full' },
+      full: ['full1'],
+    });
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, [], worktree)).code).toBe(1);
+    const run: VerifyRun = records(f).at(-1)!;
+    const [red, ok, blocked] = run.commands;
+    expect([red.name, red.exit]).toEqual(['red', 7]);
+    expect(failuresOf(red)).toEqual(['alpha']);
+    expect(ok).toMatchObject({ name: 'ok', exit: 0 });
+    expect(ok).not.toHaveProperty('failures');
+    expect(blocked).toMatchObject({ name: 'full1', exit: 7, blocked: 'red' });
+    expect(blocked).not.toHaveProperty('failures');
+    for (const item of run.commands) expect(failuresOf(item) ?? []).not.toContain('(log gone)');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a red merge_checks member stores its script name while blocked members store none', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, {
+      checks: { cheap: 'echo cheap' },
+      merge_checks: {
+        member: 'name=$(cat failure); echo "wrap | $name | Exited with code 7"; exit 7',
+        later: 'echo later; exit 8',
+      },
+    });
+    writeFileSync(resolve(f.root, 'failure'), 't:m\n');
+    await command(['git', 'add', 'failure'], f.root);
+    await command(['git', 'commit', '-m', 'add member name'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const { worktree } = await callerWorktree(f, 'caller', {
+      phase: 'merge',
+      batch: { attempt: 'att-store', built_on: 'x', holder: { base: 'x', head: 'x' }, applied: true },
+    });
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, ['--attempt', 'att-store'], worktree)).code).toBe(1);
+    const run: VerifyRun = records(f).at(-1)!;
+    const member: VerifyRun['commands'][number] = run.commands.find((item) => item.name === 'member')!;
+    expect(member).toMatchObject({ exit: 7 });
+    expect(failuresOf(member)).toEqual(['(script) t:m']);
+    expect(member).not.toHaveProperty('blocked');
+    const later: VerifyRun['commands'][number] = run.commands.find((item) => item.name === 'later')!;
+    expect(later).toMatchObject({ exit: 8 });
+    expect(failuresOf(later)).toEqual(['(no test name)']);
+    // A red sequential check blocks every member: the copies store none.
+    config(f, {
+      checks: { cheap: 'echo blocked', red: 'sh -c "echo \"(fail) gamma\"; exit 7"' },
+      merge_checks: { member: 'echo member' },
+    });
+    await commitIn(worktree, 'other.ts');
+    expect((await verify(f, ['--attempt', 'att-store'], worktree)).code).toBe(1);
+    const second: VerifyRun = records(f).at(-1)!;
+    const redMember: VerifyRun['commands'][number] | undefined = second.commands.find((item) => item.name === 'red');
+    expect(redMember).toMatchObject({ exit: 7 });
+    expect(failuresOf(redMember!)).toEqual(['gamma']);
+    const copiedMember: VerifyRun['commands'][number] = second.commands.find((item) => item.name === 'member')!;
+    expect(copiedMember).toMatchObject({ exit: 7, blocked: 'red' });
+    expect(copiedMember).not.toHaveProperty('failures');
+  } finally {
+    f.clean();
+  }
+});
+
+test('the receipt schema rejects an empty or duplicated failures list while accepting a stored list', async () => {
+  const command = {
+    name: 'test',
+    command: 'bun test',
+    exit: 7,
+    log: '/tmp/x.log',
+  };
+  const row = (list: string[] | undefined): object => ({
+    run: 'r1',
+    repo: 'repo',
+    leaf: 'leaf',
+    sha: 's',
+    tree: 't',
+    scope: 'leaf',
+    path: '/tmp/x',
+    pid: 1,
+    boot_id: 'b',
+    setup: 0,
+    commands: [{ ...command, ...(list === undefined ? {} : { failures: list }) }],
+    start: '2026-11-11T00:00:00.000Z',
+    end: '2026-11-11T01:00:00.000Z',
+  });
+  expect(verifyRunSchema.safeParse(row(['alpha', 'beta'])).success).toBe(true);
+  expect(verifyRunSchema.safeParse(row(undefined)).success).toBe(true);
+  expect(verifyRunSchema.safeParse(row([])).success).toBe(false);
+  expect(verifyRunSchema.safeParse(row(['alpha', 'alpha'])).success).toBe(false);
+});
+
+// Stored names answer for an earlier red row whose log is gone: the same unit stays covered by its
+// unresolved notice, a different name still reports.
+test('a stored name keeps an unresolved main-red covered after its log is gone while a different name reports', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  try {
+    await failureScript(f, 'alpha');
+    const { leafPath, worktree } = await callerWorktree(f);
+    const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    const baseTree: string = await command(['git', 'rev-parse', `${base}^{tree}`], f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
+    const goneLog: string = resolve(leafPath, 'red-gone.log');
+    const seeded: VerifyRun = seedRun(f, {
+      sha: base,
+      tree: baseTree,
+      scope: 'leaf',
+      compares: 'earlier-head',
+      notice: 'pending',
+      start: '2026-11-01T00:00:00.000Z',
+      end: '2026-11-01T01:00:00.000Z',
+      commands: verifyCommands(repo.config, 'leaf').map((item) => ({
+        ...item,
+        exit: 7,
+        log: goneLog,
+        failures: ['alpha'],
+      })),
+    });
+    mkdirSync(noticeFolder(core), { recursive: true });
+    writeFileSync(
+      resolve(noticeFolder(core), `${noticeId(f.repo, 'main-red', seeded.run)}.json`),
+      JSON.stringify({ title: `${f.repo} main red`, body: 'seeded alpha', attention: false }),
+    );
+    await commitIn(worktree, 'code.ts');
+    // The fresh base run fails alpha too; the seeded row's stored name covers it, log or not.
+    const first: Result = await cli(f, ['verify', '--known-red'], worktree, core.env);
+    expect(first.code).toBe(0);
+    expect(noticesOf(core)).toHaveLength(1);
+    expect(noticesOf(core)[0].body).toBe('seeded alpha');
+    const freshBase: VerifyRun[] = records(f).filter((run) => run.compares !== undefined && run.run !== seeded.run);
+    expect(freshBase).toHaveLength(1);
+    expect(freshBase[0].notice).toBeUndefined();
+
+    // A different name on main reports a new red; the stored alpha is no cover for beta.
+    writeFileSync(resolve(f.root, 'failure'), 'beta\n');
+    await command(['git', 'add', 'failure'], f.root);
+    await command(['git', 'commit', '-m', 'beta on main'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const second: Result = await cli(f, ['verify', '--known-red'], worktree, core.env);
+    expect(second.code).toBe(0);
+    expect(noticesOf(core)).toHaveLength(2);
+    const fresh: { title: string; body: string; attention: boolean } | undefined = noticesOf(core).find(
+      (notice) => notice.body !== 'seeded alpha',
+    );
+    expect(fresh?.body).toContain('beta');
+    const betaBase: VerifyRun[] = records(f).filter(
+      (run) => run.compares !== undefined && run.run !== seeded.run && run.notice === 'pending',
+    );
+    expect(betaBase).toHaveLength(1);
+  } finally {
+    await core.stop();
+    f.clean();
+  }
+});
+
+// The receipt gate never reads the field: a gone head or base log refuses even when both rows store
+// the same names.
+test('stored names never satisfy the receipt when a linked head or base log is gone', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { leafPath, worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], worktree);
+    const base: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    const baseTree: string = await command(['git', 'rev-parse', `${base}^{tree}`], f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
+    const cmds: { name: string; command: string }[] = verifyCommands(repo.config, 'leaf');
+    const headLog: string = resolve(leafPath, 'check-test-head.log');
+    const baseLog: string = resolve(leafPath, 'check-test-base.log');
+    writeFileSync(headLog, '(fail) alpha\n');
+    writeFileSync(baseLog, '(fail) alpha\n');
+    const headRun: VerifyRun = seedRun(f, {
+      sha: head,
+      tree,
+      scope: 'leaf',
+      commands: cmds.map((item) => ({ ...item, exit: 7, log: headLog, failures: ['alpha'] })),
+    });
+    seedRun(f, {
+      sha: base,
+      tree: baseTree,
+      scope: 'leaf',
+      compares: headRun.run,
+      commands: cmds.map((item) => ({ ...item, exit: 7, log: baseLog, failures: ['alpha'] })),
+    });
+    const size: number = records(f).length;
+    // Both logs present: the stored-equal pair satisfies the gate exactly as its logs do.
+    await requireGreenReceipt(repo, head, 'leaf');
+    rmSync(headLog);
+    await expect(requireGreenReceipt(repo, head, 'leaf')).rejects.toThrow(`No green leaf verify receipt for ${head}`);
+    writeFileSync(headLog, '(fail) alpha\n');
+    rmSync(baseLog);
+    await expect(requireGreenReceipt(repo, head, 'leaf')).rejects.toThrow(`No green leaf verify receipt for ${head}`);
+    expect(records(f)).toHaveLength(size);
+  } finally {
+    f.clean();
+  }
+});
+
+// `verify --known-red` on a gone head log stays a fail even though the recorded pair stores equal
+// names; the base run it starts compares as before.
+test('verify --known-red fails a gone head log whose row stores the same names as its base', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const { worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const pass: Result = await verify(f, ['--known-red'], worktree);
+    expect(pass.code).toBe(0);
+    const headRun: VerifyRun = records(f).find((run) => run.compares === undefined)!;
+    const baseRun: VerifyRun = baseRecord(f, headRun);
+    expect(failuresOf(headRun.commands[0])).toEqual(['alpha']);
+    expect(failuresOf(baseRun.commands[0])).toEqual(['alpha']);
+    rmSync(headRun.commands[0].log);
+    const size: number = records(f).length;
+    const result: Result = await verify(f, ['--known-red'], worktree);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain(`verify known-red ${head}: fail`);
+    // The fresh base run's readable log is compared as today; every row stays recorded.
+    expect(records(f).length).toBeGreaterThan(size);
+  } finally {
+    f.clean();
+  }
+});
