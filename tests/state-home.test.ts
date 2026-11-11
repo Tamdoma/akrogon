@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnCaptured, command, type SpawnResult } from '../src/shell';
 import { withAdmissionLock } from '../src/admission';
+import { TIMING_USAGE } from '../src/usage';
 
 const worktreeRoot: string = resolve(import.meta.dir, '..');
 const tempDirs: Set<string> = new Set();
@@ -76,6 +77,24 @@ const liveRecord = (): string =>
     unit: 'u',
     since: new Date().toISOString(),
   });
+
+test('malformed timing forms reject before migrating an empty state home', async () => {
+  const root: string = toolCopy(temp(), globalConfig);
+  const before: string[] = readdirSync(root).sort();
+  const cases: string[][] = [
+    ['timing', '--flow', '--since', '2026-10-25T00:00:00Z'],
+    ['timing', '--cohort', '--since', '2026-10-25'],
+  ];
+  for (const args of cases) {
+    const home: string = temp();
+    const result: SpawnResult = await cli(root, home, args);
+    expect(result.code, args.join(' ')).toBe(1);
+    expect(result.stdout, args.join(' ')).toBe('');
+    expect(readdirSync(home), args.join(' ')).toEqual([]);
+    expect(readdirSync(root).sort(), args.join(' ')).toEqual(before);
+    expect(result.stderr.trim(), args.join(' ')).toBe(TIMING_USAGE);
+  }
+});
 
 test('unmigrated state in the tool root moves to ~/.akrogon on the first command, once', async () => {
   const home: string = temp();
