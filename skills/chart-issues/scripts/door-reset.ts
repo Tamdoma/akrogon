@@ -3,13 +3,18 @@
 // `hc run --bg --no-notify --rm --no-parent -- sh -c 'log=$1; shift; exec bun "$@" >>"$log" 2>&1' sh <log>
 // door-reset.ts <A address> <log> "<start prompt>"`, so its output and any uncaught error land in <log> too.
 // It follows A's turn end on hc events, cancels on operator input, types the reset as keys and sends the
-// start prompt. It confirms nothing after the reset: the session that receives the start prompt checks its
-// own transcript against the handover entry before it continues (chart-issues SKILL.md, Handover). One
-// JSON line per stage goes to <log>; a stage that fails logs its result and the helper exits non-zero.
+// start prompt. Between the input check and the reset keys the name stage keeps a claude door's own name
+// across the reset: a session whose transcript already records a custom title keeps it (claude carries it
+// over /clear), and an unnamed session gets the name of the tab holding it sent as `/rename <name>`, the
+// reset typed only after that rename turn ends. Codex, pi and agy are skipped, as is a tab that cannot
+// supply a safe name. It confirms nothing after the reset: the session that receives the start prompt
+// checks its own transcript against the handover entry before it continues (chart-issues SKILL.md,
+// Handover). One JSON line per stage goes to <log>; a stage that fails logs its result and the helper
+// exits non-zero.
 import { appendFileSync } from 'node:fs';
 import { z } from 'zod';
 import { readGlobal, requireRepo } from '../../../src/config';
-import { hc, repoSpace, send, waitFor, type Seen, type SpaceResolution } from '../../../src/hc';
+import { docGet, hc, repoSpace, send, waitFor, type Seen, type SpaceResolution } from '../../../src/hc';
 import {
   transcriptEnd,
   transcriptFor,
@@ -92,6 +97,49 @@ const input: boolean = transcriptRecords(pre, boundary).some(
 );
 if (input) stop('input-check', 'superseded');
 step('input-check', 'none');
+
+// A claude session with its own name keeps it across /clear: the customTitle of the last custom-title
+// record is its name (a blank one counts as none), and nothing is sent. An unnamed session takes the
+// name of the tab holding A, sent as text (a pasted `/rename` runs as the command on claude); the reset
+// waits for that rename turn to end, since keys typed into an open turn glue to it. A skip continues
+// the handover; a thrown error keeps today's failing path — it lands in the log and nothing more is
+// typed, which matters most for a send that may have pasted the rename without enter.
+const controlChar: RegExp = /[\x00-\x1f\x7f-\x9f]/;
+if (kind !== 'claude') step('name', 'skipped', { reason: 'harness is not claude' });
+else {
+  const own: string | undefined = transcriptRecords(pre, 0)
+    .map((r: TranscriptRecord) =>
+      z.object({ type: z.literal('custom-title'), customTitle: z.string() }).safeParse(r.value),
+    )
+    .flatMap((r) => (r.success ? [r.data.customTitle] : []))
+    .at(-1);
+  if (own !== undefined && own.trim() !== '') step('name', 'kept', { name: own });
+  else {
+    const doc = await docGet(session);
+    const name: string | undefined = doc.spaces
+      .find((s) => s.id === space.space.id)
+      ?.tabs.find((t) => t.terminals.includes(a))?.name;
+    if (name === undefined || name.trim() === '')
+      step('name', 'skipped', { reason: 'no tab lists A or its name is blank' });
+    else if (controlChar.test(name))
+      step('name', 'skipped', { reason: 'name holds a control character or line break' });
+    else {
+      const sent = await send(session, a, `/rename ${name}`);
+      if (sent.started === false) await hc(session, ['keys', a, 'enter']);
+      // A wait on idle alone can return on the snapshot from before the rename: the turn count must
+      // pass the one the send answered.
+      const renamed: Seen | null = await waitFor(
+        session,
+        a,
+        (t) => gone(t) || (idle(t) && t.turn > sent.turn),
+        env.DOOR_RESET_TURN_BOUND_MS,
+      );
+      if (renamed === null) stop('name', 'turn open');
+      if (gone(renamed)) stop('name', 'identity changed');
+      step('name', 'sent', { name });
+    }
+  }
+}
 
 // Keys, not a send: a sent `/clear` would arrive as chat text, not as the harness command.
 await hc(session, ['keys', a, '/', ...resetWord[kind].split(''), 'enter']);
