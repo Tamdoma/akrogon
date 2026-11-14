@@ -200,13 +200,17 @@ async function reset(run: Run, start: string, env: Record<string, string> = {}):
 }
 
 // Waits on hc until the helper has exited (its --rm terminal is then gone or finished), so its log is
-// complete and nothing more can reach A.
-async function exited(run: Run, address: string): Promise<void> {
+// complete and nothing more can reach A. Returns the helper's exit code when the wait observed it — the
+// wait's JSON carries exit_code even though --rm then removes the terminal; null when the terminal was
+// already gone at attach.
+async function exited(run: Run, address: string): Promise<number | null> {
   const waited: SpawnResult = await run.core.hc(['wait', '--json', '--timeout', '15', address]);
   const left = (await run.core.terminals({}, true)).find((t) => t.address === address);
   // --rm removes the terminal at exit; a helper done before wait attaches answers 3 for a gone address.
   expect(waited.code === 0 || waited.code === 3).toBe(true);
   expect(left === undefined || left.state === 'finished').toBe(true);
+  if (waited.code !== 0) return null;
+  return z.object({ exit_code: z.number().nullable() }).parse(JSON.parse(waited.stdout)).exit_code;
 }
 
 async function release(run: Run): Promise<void> {
@@ -573,7 +577,9 @@ test('claude: a rename turn still open at the bound stops the helper before the 
     const address: string = await reset(run, '/chart-issues continue handover t door x next /charts/next', {
       DOOR_RESET_TURN_BOUND_MS: '3000',
     });
-    await exited(run, address);
+    // Criterion 4: the helper exits non-zero, not merely finishes — the wait's JSON carries its exit code.
+    const exit: number | null = await exited(run, address);
+    expect(exit).toBe(1);
     expect(steps(run.log).map((s: Step) => [s.step, s.result])).toEqual([
       ['started', expect.any(String)],
       ['wait-turn-end', expect.any(String)],
