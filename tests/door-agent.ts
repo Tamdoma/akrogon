@@ -14,7 +14,10 @@
 //           (WAL) from its first prompt and locks presence/<id>.lock; /clear runs no turn, opens the new
 //           id's database and lock at once and keeps the earlier database open
 // `noswitch` keeps the first transcript after the reset line. A first task starting with `hold` keeps
-// the turn open until <out>/release is opened for writing.
+// the turn open until <out>/release is opened for writing. claude's `/rename <name>` is a short turn that
+// writes custom-title and agent-name records to the current transcript and stores the name, which the next
+// /clear carries as the new transcript's first record; a name starting with `hold` keeps the rename turn
+// open on <out>/release the same way.
 // <out>/inputs.jsonl gets one line per received input ({input, busy, label}, label being the terminal's
 // akrogon.transcript at receipt) and one {turnEnd, transcript} line after each turn's idle status, naming
 // the transcript that turn wrote.
@@ -132,6 +135,15 @@ function received(input: string): void {
   appendFileSync(resolve(out, 'inputs.jsonl'), `${JSON.stringify({ input, busy, label: label() })}\n`);
 }
 
+function endTurn(): void {
+  status('idle');
+  busy = false;
+  appendFileSync(
+    resolve(out, 'inputs.jsonl'),
+    `${JSON.stringify({ turnEnd: new Date().toISOString(), transcript })}\n`,
+  );
+}
+
 async function turn(input: string): Promise<void> {
   busy = true;
   status('working');
@@ -143,12 +155,21 @@ async function turn(input: string): Promise<void> {
   if (input.startsWith('hold')) await readFile(resolve(out, 'release'));
   else await Bun.sleep(300);
   write(record('assistant', 'done'));
-  status('idle');
-  busy = false;
-  appendFileSync(
-    resolve(out, 'inputs.jsonl'),
-    `${JSON.stringify({ turnEnd: new Date().toISOString(), transcript })}\n`,
-  );
+  endTurn();
+}
+
+// claude answers a pasted `/rename <name>` with the command alone (no model reply): one hc turn writing
+// custom-title and agent-name records; the stored name is carried to the next /clear transcript.
+let agentName: string | null = null;
+async function renameTurn(input: string): Promise<void> {
+  busy = true;
+  status('working');
+  agentName = input.slice('/rename '.length);
+  write({ type: 'custom-title', customTitle: agentName });
+  write({ type: 'agent-name', agentName });
+  if (agentName.startsWith('hold')) await readFile(resolve(out, 'release'));
+  else await Bun.sleep(300);
+  endTurn();
 }
 
 // claude runs /clear as a short turn of its own: its status leaves working once (hc's turn moves) and the
@@ -161,6 +182,7 @@ async function clearTurn(): Promise<void> {
   status('working');
   if (mode === 'switch') {
     transcript = open(randomUUID());
+    if (agentName !== null) write({ type: 'custom-title', customTitle: agentName });
     write({ type: 'system', subtype: 'local_command', content: '<command-name>/clear</command-name>' });
   }
   await new Promise<void>((done) => {
@@ -179,6 +201,10 @@ function take(input: string): void {
   if (endClear !== null) {
     endClear();
     endClear = null;
+  }
+  if (kind === 'claude' && input.startsWith('/rename ')) {
+    queue = queue.then(() => renameTurn(input));
+    return;
   }
   if (input === resetLine) {
     queue = queue.then(() => {

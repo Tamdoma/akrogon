@@ -12,10 +12,19 @@ import { spawnCaptured, type SpawnResult } from '../src/shell';
 
 const agent: string = resolve(import.meta.dir, 'door-agent.ts');
 const helper: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/door-reset.ts');
-const STAGES: string[] = ['started', 'wait-turn-end', 'input-check', 'reset-keys', 'start-prompt'];
+const STAGES: string[] = ['started', 'wait-turn-end', 'input-check', 'name', 'reset-keys', 'start-prompt'];
 
 type Kind = 'claude' | 'codex' | 'pi' | 'agy';
-type Step = { t: string; step: string; result: string; pre?: string; code?: string; path?: string };
+type Step = {
+  t: string;
+  step: string;
+  result: string;
+  pre?: string;
+  code?: string;
+  path?: string;
+  name?: string;
+  reason?: string;
+};
 type Received = { input: string; busy: boolean; label: string | null };
 type Run = { f: Fixture; core: HcCore; a: string; out: string; log: string };
 
@@ -27,6 +36,8 @@ const stepSchema = z
     pre: z.string().optional(),
     code: z.string().optional(),
     path: z.string().optional(),
+    name: z.string().optional(),
+    reason: z.string().optional(),
   })
   .passthrough();
 const lineSchema = z.union([
@@ -202,6 +213,40 @@ async function release(run: Run): Promise<void> {
   expect((await spawnCaptured(['sh', '-c', `printf 'go\\n' > ${resolve(run.out, 'release')}`])).code).toBe(0);
 }
 
+// The helper reads the tab holding A from the herdr-app document; the fixture's repo space starts with
+// none, so a test writes its own tab whose block lists A's address (plan D8).
+async function addTab(run: Run, name: string): Promise<void> {
+  const docSchema = z.object({
+    version: z.number(),
+    value: z
+      .object({
+        spaces: z.array(z.object({ id: z.string(), name: z.string(), tabs: z.array(z.unknown()) }).passthrough()),
+      })
+      .passthrough(),
+  });
+  const doc = docSchema.parse(await run.core.rpc('doc.get', { name: 'herdr-app' }));
+  const space = doc.value.spaces.find((s) => s.name === run.f.repo);
+  if (space === undefined) throw new Error(`doc spaces: ${JSON.stringify(doc.value.spaces.map((s) => s.name))}`);
+  const tab = {
+    id: `tb-${name}`,
+    name,
+    type: 'row',
+    root: {
+      children: [{ content: { terminal: run.a }, id: `p-${run.a}`, type: 'block' }],
+      id: `tb-${name}`,
+      type: 'row',
+    },
+  };
+  await run.core.rpc('doc.set', {
+    name: 'herdr-app',
+    value: {
+      ...doc.value,
+      spaces: doc.value.spaces.map((s) => (s.id === space.id ? { ...s, tabs: [tab] } : s)),
+    },
+    version: doc.version,
+  });
+}
+
 test.each([
   ['claude', '/clear'],
   ['codex', '/new'],
@@ -219,6 +264,13 @@ test.each([
       await exited(run, address);
       const log: Step[] = steps(run.log);
       expect(log.map((s: Step) => s.step)).toEqual(STAGES);
+      // The name stage logs one skipped line per handover: only claude is named, and the fixture's repo
+      // space holds no tab (criterion 3's no-tab and not-claude cases).
+      const nameStep: Step | undefined = log.find((s: Step) => s.step === 'name');
+      expect(nameStep?.result).toBe('skipped');
+      expect(nameStep?.reason).toBe(
+        kind === 'claude' ? 'no tab lists A or its name is blank' : 'harness is not claude',
+      );
       const pre: string = z.string().parse(began.pre);
       // The first task was written before the helper started, so it is no operator input past the boundary.
       expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', key, start]);
@@ -359,6 +411,8 @@ test('a helper that fails before its first stage leaves its error in the log', a
 test('an operator input record in A transcript after the helper started cancels the reset with nothing sent', async () => {
   const run: Run = await startA('claude', 'switch');
   try {
+    // A named tab alone would send a rename: the cancel must stop before the name stage too (criterion 5).
+    await addTab(run, 'c-akrogon');
     const address: string = await reset(run, '/chart-issues continue handover t door x next /charts/next');
     const began: Step = await logged(run.log, 'started');
     appendFileSync(
@@ -406,12 +460,131 @@ test('a reset that leaves A on the same transcript lands the start prompt there,
     await release(run);
     await exited(run, address);
     expect(steps(run.log).map((s: Step) => s.step)).toEqual(STAGES);
+    expect(steps(run.log).find((s: Step) => s.step === 'name')).toMatchObject({
+      result: 'skipped',
+      reason: 'no tab lists A or its name is blank',
+    });
     expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/clear', start]);
     const pre: string = z.string().parse(began.pre);
     // The receiving session's check (chart-issues SKILL.md) compares this answer with the entry and stops.
     expect(await turnOf(run, start)).toBe(pre);
     expect(await lookup(run, {})).toBe(pre);
   } finally {
+    await run.core.stop();
+    run.f.clean();
+  }
+});
+
+test('claude: a session with its own name logs name kept and sends no rename', async () => {
+  const run: Run = await startA('claude', 'switch');
+  try {
+    await release(run);
+    const pre: string = await turnOf(run, 'hold first task');
+    // The session's own name is the last custom-title in the pre-reset transcript (criterion 1).
+    appendFileSync(
+      pre,
+      `${JSON.stringify({ type: 'custom-title', customTitle: 'first-name' })}\n${JSON.stringify({ type: 'custom-title', customTitle: 'c-Last Name_2' })}\n`,
+    );
+    const start: string = '/chart-issues continue handover t door x next /charts/next';
+    const address: string = await reset(run, start);
+    await exited(run, address);
+    const nameStep: Step | undefined = steps(run.log).find((s: Step) => s.step === 'name');
+    expect(nameStep).toMatchObject({ result: 'kept', name: 'c-Last Name_2' });
+    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/clear', start]);
+    expect(
+      inputs(run)
+        .slice(1)
+        .filter((r: Received) => r.busy),
+    ).toEqual([]);
+    expect(await turnOf(run, start)).not.toBe(pre);
+  } finally {
+    await run.core.stop();
+    run.f.clean();
+  }
+});
+
+test('claude: a session with no name in a named tab gets the tab name sent and the reset waits for the rename turn', async () => {
+  const run: Run = await startA('claude', 'switch');
+  try {
+    await release(run);
+    const pre: string = await turnOf(run, 'hold first task');
+    // A blank customTitle counts as no name of its own, so the tab name is sent verbatim.
+    appendFileSync(pre, `${JSON.stringify({ type: 'custom-title', customTitle: '' })}\n`);
+    await addTab(run, 'C Tab_4');
+    const start: string = '/chart-issues continue handover t door x next /charts/next';
+    const address: string = await reset(run, start);
+    await exited(run, address);
+    expect(steps(run.log).find((s: Step) => s.step === 'name')).toMatchObject({
+      result: 'sent',
+      name: 'C Tab_4',
+    });
+    const got = agentLines(run);
+    const rename: number = got.findIndex((l) => 'input' in l && l.input === '/rename C Tab_4');
+    const clear: number = got.findIndex((l) => 'input' in l && l.input === '/clear');
+    expect(rename).toBeGreaterThan(0);
+    expect(clear).toBeGreaterThan(rename);
+    // The reset is typed only after the rename turn has ended, so it cannot glue to it (criterion 2).
+    expect(got.slice(rename + 1, clear).some((l) => 'turnEnd' in l)).toBe(true);
+    expect(
+      inputs(run)
+        .slice(1)
+        .filter((r: Received) => r.busy),
+    ).toEqual([]);
+    // The receiving session reads the name from its transcript, not the log or the inputs.
+    const fresh: string = await turnOf(run, start);
+    expect(fresh).not.toBe(pre);
+    expect(JSON.parse(readFileSync(fresh, 'utf8').split('\n')[0])).toEqual({
+      type: 'custom-title',
+      customTitle: 'C Tab_4',
+    });
+  } finally {
+    await run.core.stop();
+    run.f.clean();
+  }
+});
+
+test.each([
+  ['', 'no tab lists A or its name is blank'],
+  ['Tab\tName', 'name holds a control character or line break'],
+])('claude: the name stage logs skipped for tab name %j', async (tabName: string, reason: string) => {
+  const run: Run = await startA('claude', 'switch');
+  try {
+    await release(run);
+    await turnOf(run, 'hold first task');
+    await addTab(run, tabName);
+    const start: string = '/chart-issues continue handover t door x next /charts/next';
+    const address: string = await reset(run, start);
+    await exited(run, address);
+    expect(steps(run.log).map((s: Step) => s.step)).toEqual(STAGES);
+    expect(steps(run.log).find((s: Step) => s.step === 'name')).toMatchObject({ result: 'skipped', reason });
+    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/clear', start]);
+  } finally {
+    await run.core.stop();
+    run.f.clean();
+  }
+});
+
+test('claude: a rename turn still open at the bound stops the helper before the reset', async () => {
+  const run: Run = await startA('claude', 'switch');
+  try {
+    await release(run);
+    await turnOf(run, 'hold first task');
+    await addTab(run, 'hold Door');
+    const address: string = await reset(run, '/chart-issues continue handover t door x next /charts/next', {
+      DOOR_RESET_TURN_BOUND_MS: '3000',
+    });
+    await exited(run, address);
+    expect(steps(run.log).map((s: Step) => [s.step, s.result])).toEqual([
+      ['started', expect.any(String)],
+      ['wait-turn-end', expect.any(String)],
+      ['input-check', 'none'],
+      ['name', 'turn open'],
+    ]);
+    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/rename hold Door']);
+  } finally {
+    // The rename turn holds on the fifo; release it only if it was ever sent (a helper that stopped
+    // earlier leaves no reader, and a write would block).
+    if (agentLines(run).some((l) => 'input' in l && l.input === '/rename hold Door')) await release(run);
     await run.core.stop();
     run.f.clean();
   }
