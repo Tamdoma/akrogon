@@ -1,0 +1,43 @@
+slug: nameless-base-red
+phase: merged
+created: 2026-11-09
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#133"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 1
+done: []
+fix_rounds: 0
+verdict: {}
+tab: akb30bb2d339e3732d33ee9229bed3d1
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t11w
+  B:
+    session: infra
+    address: t11x
+prompted:
+  B:
+    turn: 1
+    address: t11x
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-09T20:09:26.139Z
+broadcast:
+  kind: issue
+  name: known-red-nameless
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/known-red-nameless
+  pushed: 6352653739fcd32727c809c42a0955811071d98d
+  sources:
+    - "Tamdoma/akrogon#133"
+frozen:
+  tests/verify.test.ts: f204119e5e3335a8b5244af2b6ed47cfc4563d5f
+frozen_cited: []

@@ -1,0 +1,11 @@
+# Brief: fork notes, fork change, slot B
+
+You are slot B. Write your blind notes for the fork in /home/ivan/Work/infra/akrogon/issues/chart/round-rewrites/forks/change.md (sections Question and Carries). The note shape is defined in /home/ivan/Work/infra/akrogon/skills/chart-issues/assets/questions.md, section "Blind peer exchange" (the five parts per question). Your notes are your own position, not a review of A. Offer your own options for each question; none is given on purpose.
+
+Permitted context: the intake /home/ivan/Work/infra/akrogon/issues/chart/round-rewrites/INTAKE.md; the related fork /home/ivan/Work/infra/akrogon/issues/chart/round-rewrites/forks/cause.md (sections Question, Carries, Taken); the signposts /home/ivan/Work/infra/akrogon/issues/chart/round-rewrites/forks/signposts.md (section Taken); your own earlier returns; the live surface (/home/ivan/Work/infra/akrogon/skills/chart-issues, its scripts and assets, the door transcripts and chart records you already used). Do not read slots/map-A.md, slots/map-merged.md or any other file under /home/ivan/Work/infra/akrogon/issues/chart/round-rewrites/slots/ that you did not write, except this brief.
+
+Keep it proportional: three questions, under 900 words in all. Per signpost 3a give the factory-record number behind each pick and an outside practitioner or primary source for a design claim, with URL and date read, or say none found with the searches run. Edit no file except your return, run only read-only commands, start no agents, make no paid call.
+
+Reading rule: read process text by named section for the step you answer, locate the section before reading it, batch independent reads in one call with output bounded to those sections, and read content you already hold at most once per session. A section you have not read, content changed since you read it and content lost to compaction stay readable; the full source stays allowed when the source is the subject of the work. Name sections, never line ranges.
+
+Return: write /home/ivan/Work/infra/akrogon/issues/chart/round-rewrites/slots/change-B.md, then run: hc send t126 "done B: /home/ivan/Work/infra/akrogon/issues/chart/round-rewrites/slots/change-B.md"

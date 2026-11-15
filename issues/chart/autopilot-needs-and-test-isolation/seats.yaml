@@ -24,3 +24,4 @@ seats:
     session: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-11-09T09-05-50-695Z_d05cea3b-b578-4d03-857b-04375c76a85b.jsonl
 spans:
   - from: '2026-11-09T09:05:16Z'
+    to: '2026-11-09T09:36:31Z'

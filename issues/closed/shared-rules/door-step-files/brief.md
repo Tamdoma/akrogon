@@ -1,0 +1,21 @@
+# Brief: door-step-files
+
+## What
+
+The chart door skill, `skills/chart-issues/SKILL.md`, keeps what every door session needs and moves the detail of three steps into three files beside it: `skills/chart-issues/assets/direct-route.md` (the direct route's protocol, repair bound, growth stop and continuations), `skills/chart-issues/assets/autopilot.md` (how the door runs under autopilot and full autopilot) and `skills/chart-issues/assets/handover.md` (how old A hands over and what the reset helper does). The door reads each file when its step arrives: the direct-route file when the direct route is chosen, the autopilot file when the session's mode is autopilot or full autopilot, the handover file when Drain moves on to a named next chart. The headings `## Direct route`, `## Autopilot` and `## Handover` stay in `SKILL.md`, and under each stays what a door needs before the step arrives: the direct-route refusal list and the route question; the three-mode definition, how autopilot starts and how the mode record is read on resume; the check a session runs when it receives a handover start prompt. No rule changes meaning and none is lost.
+
+From `skill-links-in-folder` this leaf consumes the link check that reads files under a skill's `assets/` folder.
+
+## Why
+
+An agent program loads the whole `SKILL.md` when the door starts, and a fresh door loads it again after every handover. The file is 8,387 words (counted at a33d967b); with their headings Direct route is 1,266 of them, Autopilot 1,728 and Handover 767, together 3,761 or 44.8%. (A,B) A manual session that hands off through the lifecycle uses none of the direct-route and autopilot detail, and it needs the handover detail only at the moment it switches charts. Anthropic's skill authoring page, read 2026-11-10: "Claude reads `SKILL.md` only when the Skill becomes relevant, and reads additional files only as needed", "If workflows become large or complicated with many steps, consider pushing them into separate files", "Keep references one level deep from `SKILL.md`". A reading rule by named section inside one large file does not help, because the whole file loads on use.
+
+## Done-criteria
+
+1. A door reads each step's detail only when that step arrives. Every rule of today's Direct route, Autopilot and Handover sections is either in `SKILL.md` or in the step file that `SKILL.md` names at the point the step begins, and `SKILL.md` says when each file is read.
+2. No rule is lost. The implementation report holds a table with one row per clause of today's three sections, giving its old place and its new place. The reviewing seat follows the table along these reading paths and finds every rule each path needs reachable on it: a manual session that hands off through the lifecycle; a session that takes the direct route; a session under autopilot and one under full autopilot; old A at a chart switch; a fresh A that receives a handover start prompt; a door that resumes after compaction.
+3. A session that never opens a step file still has what it needs before the step: the direct-route refusal list and the route question for the handoff review; the three-mode definition and the mode-record reading rule that tell it whether autopilot is on; the start-prompt check a fresh A runs before any chart work.
+4. Every place that cites one of the three sections by name still lands on it: `SKILL.md`'s other sections, `assets/questions.md` and `assets/shapes.md`.
+5. The command literals a door runs as written stay findable and exact: `verify --holder <chart>/direct --known-red` in the direct-route text, and `akrogon pack <chart>` at each of the three end-marker sites; the existing command-literal tests, inside the `test` command, read the files that now carry them, and the link check delivered by `skill-links-in-folder` accepts `SKILL.md` and the three new files. (A,B)
+6. A manual session that hands off through the lifecycle loads fewer words: the report records `wc -w` of `SKILL.md` before and after and of each new file.
+7. `skills/AREA.md` names the three new files among the door's assets, and every page under `docs/` that says where a moved door rule lives points at its new place; the report lists each match it checked.

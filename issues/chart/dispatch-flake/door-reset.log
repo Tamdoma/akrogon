@@ -1,0 +1,5 @@
+{"t":"2026-11-10T13:53:10.825Z","step":"started","result":"queued","pre":"/home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/1160556f-c628-4449-8d45-fa8fb6899642.jsonl","boundary":5720954,"kind":"claude"}
+{"t":"2026-11-10T13:53:16.961Z","step":"wait-turn-end","result":"turn ended","turn":11}
+{"t":"2026-11-10T13:53:16.963Z","step":"input-check","result":"none"}
+{"t":"2026-11-10T13:53:17.182Z","step":"reset-keys","result":"sent","reset":"/clear"}
+{"t":"2026-11-10T13:53:17.404Z","step":"start-prompt","result":"sent","turn":12}

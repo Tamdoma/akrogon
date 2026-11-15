@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: today's failure of help and of a wrong timing --since form, and the designed forms that stay
+    command: akrogon seat --help; akrogon --help; akrogon timing --flow --since 2026-10-25T00:00:00Z; akrogon timing --cohort --since 2026-10-25T00:00:00Z
+    identity: operator's local user, read-only, no credential
+    target: installed akrogon command at the registered root
+    version: akrogon release 63526537
+    date: '2026-11-10'
+    result: seat --help exits 1 with TypeError Unknown option '--help' and a code frame; --help exits 1 with the verb-list usage error; --flow with a timestamp exits 1 with ZodError Invalid ISO date; --cohort with the same timestamp exits 0 and prints the cohort report
+    cleanup: none needed, read-only
+    limits: shows the base behavior criteria 1 to 4 change and the cohort form criterion 4 keeps; does not show the new output, which is the leaf's own proof
+    record: issues/chart/factory-wins/forks/contracts.md
+  - operation: existing option declaration, single strict parse, usage strings and migration order the criteria rest on
+    command: sed -n 20,82p src/akrogon.ts; grep -n since src/akrogon.ts
+    identity: operator's local user, read-only, no credential
+    target: akrogon main 63526537
+    version: '63526537'
+    date: '2026-11-10'
+    result: migrateStateHome() precedes argument handling; options are declared per verb in one chain; one parseArgs call with strict true; the timing usage string names both --since forms; cohort parses z.iso.datetime(), flow z.iso.date()
+    cleanup: none needed, read-only
+    limits: shows the data help is built from exists and where the order changes; does not show that every verb's flags are complete in that declaration beyond what the parser accepts today
+    record: issues/chart/factory-wins/forks/contracts.md

@@ -1,0 +1,35 @@
+slug: failure-names
+phase: merged
+created: 2026-11-11
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#134"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: akeb51927a9157b190cc8f985c3957c4
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t1d5
+  B:
+    session: infra
+    address: t1d6
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-11T22:27:59.488Z
+frozen:
+  tests/docs-links.test.ts: 86438e602d95b9a345db3da4334faf40e5ed66ec
+  tests/flaky.test.ts: 9b9e832fb4512dacd9db52650e1706d0c56f3944
+  tests/verify.test.ts: 26d22adde9f907d7a04c1546f653215befd32f14
+frozen_cited: []

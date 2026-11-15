@@ -1,0 +1,33 @@
+slug: door-step-files
+phase: merged
+created: 2026-11-11
+repo: akrogon
+blocked-by:
+  - skill-links-in-folder
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: akdae7adfc11b8d4a47de15a95bbc84b
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t13j
+  B:
+    session: infra
+    address: t13n
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-11T10:50:24.427Z
+frozen:
+  tests/docs-links.test.ts: 25e12130c4603c41df20654a1f4b8b18fe852b8a
+frozen_cited: []

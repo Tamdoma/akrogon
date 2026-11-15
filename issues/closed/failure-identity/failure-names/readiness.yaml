@@ -1,0 +1,35 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: Bun fan-out failure lines (exit, nested exit with wrapper, prefixed fail title, signal)
+    command: bun run all, in a throwaway package whose scripts fan out with bun run --parallel --no-exit-on-error over a wrapper and four scripts
+    identity: operator's local user, no credential
+    target: a scratch folder under the door session's scratchpad
+    version: Bun 1.4.4
+    date: '2026-11-11'
+    result: "stderr held 'grp-a | t:custom | Exited with code 3', 'grp-a | t:named  | (fail) named > breaks [0.18ms]', 'grp-a | t:named  | Exited with code 1', 'grp-a | t:sig    | Signaled: SIGTERM' and the wrapper's 'grp-a | Exited with code 3'; without --no-exit-on-error healthy siblings printed 'Signaled: SIGINT'"
+    cleanup: scratch folder removed with the session scratchpad
+    limits: one Bun version; shows the line shapes the reader parses exist, not the new reader's output, which is the leaf's own red-first test
+    record: issues/chart/failure-identity/forks/identity-rule.md
+  - operation: recorded consumer log with a bare unnamed hook failure beside a failed script
+    command: akrogon log issues/open/dilutor-overlap/dilutor-rebalance/implementation/check-verify-1793306012300-1260164.log, filtered for (unnamed) and Exited with code
+    identity: operator's local user, read-only, no credential
+    target: /home/ivan/Work/infra/tamdoma/framework closed evidence
+    version: akrogon release 97e88038
+    date: '2026-11-11'
+    result: "'framework:verify:rest-a      | test:emdash-kit     | (fail) (unnamed) [7668.89ms]' twice, 'framework:verify:rest-a      | test:emdash-kit     | Exited with code 1', 'framework:verify:rest-c      | test:variant-parity                        | Exited with code 1' and both wrappers' own exit lines"
+    cleanup: none needed, read-only
+    limits: a recorded log from an unrecorded Bun version; shows the padded nested shape and the unnamed line exist in real consumer output, not how the new reader names them
+    record: issues/chart/failure-identity/forks/identity-rule.md
+  - operation: existing name reader, known-red covers and refusals, notice grouping, log reader and doc-phrase guards on the base
+    command: bun test --timeout=60000 tests/verify.test.ts tests/receipt-gates.test.ts tests/flaky.test.ts tests/log-reader.test.ts tests/docs-links.test.ts tests/run-units.test.ts
+    identity: operator's local user, isolated test fixtures (temp Git repos)
+    target: akrogon main 97e88038
+    version: '97e88038'
+    date: '2026-11-11'
+    result: 102 pass 0 fail (issues/chart/failure-identity/slots/evidence/guards-main-97e88038.log)
+    cleanup: fixtures self-clean
+    limits: shows the cases criteria 2, 4, 5, 6 and 7 keep (prefixed title, nameless cover, refusal matrix, notice dedup, owner and archive lookup, pinned skill phrases) hold on the base; does not show any new name, the script X against script Y refusal or the file read on a miss, which are the leaf's own tests
+    record: issues/chart/failure-identity/forks/identity-rule.md

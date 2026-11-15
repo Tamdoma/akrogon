@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: today's run record schema against a command entry holding failures
+    command: "bun -e parsing one row whose command entry holds failures: ['a'] through verifyRunSchema.safeParse from src/verify.ts"
+    identity: operator's local user, no credential
+    target: akrogon main 97e88038
+    version: '97e88038'
+    date: '2026-11-11'
+    result: "false, unrecognized_keys [\"failures\"] at commands[0]"
+    cleanup: none needed, nothing written
+    limits: shows the command entry is a strict object today, which is the stated rollback cost and the reason the field must be added to the schema; does not show the new schema or any stored name, which are the leaf's own tests
+    record: issues/chart/failure-identity/forks/identity-rule.md
+  - operation: existing old-row schema acceptance, flaky reading of plain, packed, deleted and corrupt logs, known-red gone-log refusal and notice grouping on the base
+    command: bun test --timeout=60000 tests/verify.test.ts tests/receipt-gates.test.ts tests/flaky.test.ts tests/log-reader.test.ts tests/docs-links.test.ts tests/run-units.test.ts
+    identity: operator's local user, isolated test fixtures (temp Git repos)
+    target: akrogon main 97e88038
+    version: '97e88038'
+    date: '2026-11-11'
+    result: 102 pass 0 fail (issues/chart/failure-identity/slots/evidence/guards-main-97e88038.log)
+    cleanup: fixtures self-clean
+    limits: shows the old-row cases criterion 5 keeps and the gone-head-log refusal criterion 4 extends hold on the base; does not show a written failures field, reading after log removal or the refusal with stored names present, which are the leaf's own tests
+    record: issues/chart/failure-identity/forks/identity-rule.md

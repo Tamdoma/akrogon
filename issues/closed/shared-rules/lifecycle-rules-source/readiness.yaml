@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: a link file inside a skill folder, the reach criterion 5 rests on
+    command: ls -l <root>/check-issue/ponytail.md over ~/.claude/skills, ~/.agents/skills, ~/.codex/skills, ~/.pi/agent/skills; claude Read tool on /home/ivan/.claude/skills/check-issue/ponytail.md; grep of pi session records since 2026-10-14 for read-tool calls on /home/ivan/.pi/agent/skills/check-issue/ponytail.md and for failed accesses of that path
+    identity: operator's local user, read-only, no credential
+    target: installed akrogon release linked into the four agent program skill roots
+    version: akrogon release a33d967b, pi 1.5.2
+    date: '2026-11-11'
+    result: the git link ponytail.md -> ../implement-issue/ponytail.md is present on 4 of 4 roots; claude's Read tool opens it; 149 pi read-tool calls on it and 0 failed accesses
+    cleanup: none needed, read-only
+    limits: shows an in-folder link file whose target lies outside the folder opens in a shell, claude's Read and pi's read on a layout that links skill folders whole; does not cover an agent program that copies skill folders, which none of the four roots does today
+    record: issues/chart/shared-rules/forks/shape.md
+  - operation: the existing tests and copies criteria 1, 2 and 6 start from
+    command: read tests/docs-links.test.ts; wc -w and paragraph counts over the four lifecycle SKILL.md; git log --since=2026-10-01 over the four files
+    identity: operator's local user, read-only, no credential
+    target: akrogon main a33d967b
+    version: a33d967b (skills identical to release 63526537)
+    date: '2026-11-10'
+    result: the test "seat skills name the known-red command" requires the literal commands in implement-issue, check-issue and merge-issue SKILL.md; grant paragraphs total 1,074 words in four places, .env 281, producer save 123 in two, the red-check rule about 430 words in each of three skills; 18 commits edited three or four of the files together, 8 about the red-check rule
+    cleanup: none needed, read-only
+    limits: shows where the copies and the pinned literals are today; does not show the clause table, which is the leaf's own proof judged by the reviewing seat
+    record: issues/chart/shared-rules/forks/shape.md

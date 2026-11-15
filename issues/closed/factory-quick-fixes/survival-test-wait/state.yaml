@@ -1,0 +1,32 @@
+slug: survival-test-wait
+phase: merged
+created: 2026-11-10
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak0be8c5957a3b509395e3986beb23c7
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t137
+  B:
+    session: infra
+    address: t13b
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-11T10:36:38.609Z
+frozen:
+  tests/run-units.test.ts: 392c846a65cfd023e46e4a74802cf00364885b62
+frozen_cited: []

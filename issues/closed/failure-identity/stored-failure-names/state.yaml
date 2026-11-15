@@ -1,0 +1,45 @@
+slug: stored-failure-names
+phase: merged
+created: 2026-11-11
+repo: akrogon
+blocked-by:
+  - failure-names
+sources:
+  - "Tamdoma/akrogon#134"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 1
+done: []
+fix_rounds: 1
+verdict: {}
+tab: ak4d622682de849bb2e1b1127a6fb96f
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t1d7
+  B:
+    session: infra
+    address: t1d8
+prompted:
+  B:
+    turn: 3
+    address: t1d8
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-11T22:52:37.458Z
+broadcast:
+  kind: issue
+  name: failure-identity
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/failure-identity
+  pushed: d44920b8d45e0713450b374d9f0ec18bce5a2112
+  sources:
+    - "Tamdoma/akrogon#134"
+frozen:
+  tests/flaky.test.ts: 0e9891c61f4584038afee61847709543f9fb7f12
+  tests/verify.test.ts: 85b8a6b4272edd8666be1127a61c4a499841977f
+frozen_cited: []

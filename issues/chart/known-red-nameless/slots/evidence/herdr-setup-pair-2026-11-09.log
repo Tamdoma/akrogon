@@ -1,0 +1,12 @@
+# Read-only observation, 2026-11-09, door t15. Source: /home/ivan/Work/infra/herdr-setup/issues/verify-runs.jsonl (records of the reported red), akrogon release a93fec755e9b4481d96feda0001841a5eb072ca9
+# command: jq over runs 980c6312 (head) and ce2cf1f4 (base); then each shell log
+{"run":"980c6312-45bf-4297-a0f7-25ee2007d1df","sha":"3f369b1c1be9cfce1b260d4ec8ed97048dc2a160","compares":null,"notice":null,"setup":0,"start":"2026-11-09T15:29:08.204Z","end":"2026-11-09T15:29:10.450Z","shell":{"command":"bash -n install && bash -n bin/herdrapp && bash -n omarchy/apply-herdr-app-theme","exit":127,"log":"/home/ivan/Work/infra/herdr-setup/issues/open/link-hints-nested/deeper-path-lookup/implementation/check-shell-1794238148928-1265638.log","blocked":null,"reused":null}}
+{"run":"ce2cf1f4-7eef-49b6-8dc8-5748641b67e1","sha":"3cef1ac2ee195f079b6c55ca05677566b5f0dd59","compares":"980c6312-45bf-4297-a0f7-25ee2007d1df","notice":"shown","setup":0,"start":"2026-11-09T15:29:17.315Z","end":"2026-11-09T15:29:19.440Z","shell":{"command":"bash -n install && bash -n bin/herdrapp && bash -n omarchy/apply-herdr-app-theme","exit":127,"log":"/home/ivan/Work/infra/herdr-setup/issues/open/link-hints-nested/deeper-path-lookup/implementation/check-shell-1794238158036-1275398.log","blocked":null,"reused":null}}
+## log of run 980c6312-45bf-4297-a0f7-25ee2007d1df: /home/ivan/Work/infra/herdr-setup/issues/open/link-hints-nested/deeper-path-lookup/implementation/check-shell-1794238148928-1265638.log
+bash: bin/herdrapp: No such file or directory
+(fail)-lines: 0
+## log of run ce2cf1f4-7eef-49b6-8dc8-5748641b67e1: /home/ivan/Work/infra/herdr-setup/issues/open/link-hints-nested/deeper-path-lookup/implementation/check-shell-1794238158036-1275398.log
+bash: bin/herdrapp: No such file or directory
+(fail)-lines: 0
+## merge-base check
+3cef1ac2ee195f079b6c55ca05677566b5f0dd59

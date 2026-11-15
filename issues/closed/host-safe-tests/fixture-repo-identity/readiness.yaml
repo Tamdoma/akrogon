@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: concurrent same-slug fixture runs on one host (pre-existing key part of done-criterion 1, the red on base)
+    command: "bun test --timeout=30000 tests/hc-delivery.test.ts -t 'a working seat' twice, the second started 3, 7 and 10 s after the first"
+    identity: operator user ivan, user systemd manager, no credential
+    target: registered checkout /home/ivan/Work/infra/akrogon; fixture state under the suite temp root, fixture core runtime and sockets under /run/user/1000/akt*/core (tests/hc-fixture.ts hcCore), and the operator user's shared systemd user manager whose leaf slices collided
+    version: akrogon main 49d2c916, bun 1.4.4, hc 0.1.19
+    date: '2026-11-09'
+    result: "3 s offset: both pass (twice). 7 s and 10 s offsets: second run fails at hc-delivery.test.ts:145 (cli exit 3, expected 0) in 11.4 s and 8.8 s"
+    cleanup: test teardowns stopped their slices and removed fixtures; no leftover
+    limits: a launch delay, not a synchronized overlap; shows the mechanism, not its frequency in real verifies
+    record: issues/chart/autopilot-needs-and-test-isolation/forks/report-130.md

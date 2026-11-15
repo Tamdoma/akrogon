@@ -1,0 +1,43 @@
+slug: cleanup-last-in-pass
+phase: merged
+created: 2026-11-09
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#132"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 1
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak10dff1f53561af3ea5803d24700890
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t11g
+  B:
+    session: infra
+    address: t11j
+prompted:
+  B:
+    turn: 2
+    address: t11j
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-09T15:08:46.908Z
+broadcast:
+  kind: issue
+  name: merged-batch-cleanup
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/merged-batch-cleanup
+  pushed: a93fec755e9b4481d96feda0001841a5eb072ca9
+  sources:
+    - "Tamdoma/akrogon#132"
+frozen:
+  tests/batch-dispatch.test.ts: 29e49076039cafa473cec7f76d368bdf8df80051
+frozen_cited: []

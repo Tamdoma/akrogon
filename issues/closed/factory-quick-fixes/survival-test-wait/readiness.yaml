@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: recorded red of the survival proof and its failing expectation
+    command: akrogon log issues/chart/tasks-panel/direct/check-test-1793744593130-1258102.log, read around the test name; akrogon flaky
+    identity: operator's local user, read-only, no credential
+    target: akrogon kept check log of 2026-11-03 and the flaky list
+    version: akrogon release 63526537
+    date: '2026-11-10'
+    result: the log shows (fail) for the survival test at the receipt.path expectation, Expected false, Received true; akrogon flaky lists 5 flips for the test, latest 2026-11-08T07:48:55.432Z
+    cleanup: none needed, read-only
+    limits: shows the failure criterion 1 reproduces exists in kept records; does not rerun the test and does not show the scratch-delay reproduction, which is the leaf's own proof
+    record: issues/chart/factory-wins/forks/contracts.md
+  - operation: existing bounded wait, service naming and publish-then-remove order the criteria rest on
+    command: sed -n 140,151p and 955,998p tests/run-units.test.ts; grep -n waitInactive tests/run-units.test.ts; sed -n 596,608p src/verify.ts; sed -n 50,60p src/verify-pass.ts
+    identity: operator's local user, read-only, no credential
+    target: akrogon main 63526537
+    version: '63526537'
+    date: '2026-11-10'
+    result: waitInactive exists with a 12000 ms default and is called with akrogon-verify-<receipt.run>.service in five other tests; the survival test does not call it; runOnce renames the receipt file before git worktree remove; passUnit returns akrogon-verify-<id>
+    cleanup: none needed, read-only
+    limits: shows the helper and the order exist as the design states; does not show that the wait makes the proof green, which is the leaf's own proof
+    record: issues/chart/factory-wins/forks/contracts.md

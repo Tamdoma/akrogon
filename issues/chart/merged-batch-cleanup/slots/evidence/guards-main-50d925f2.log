@@ -1,0 +1,10 @@
+bun test v1.4.4 (38afee6c8)
+
+tests/batch-dispatch.test.ts:
+moved merged
+issue complete issue
+
+ 46 pass
+ 0 fail
+ 409 expect() calls
+Ran 46 tests across 3 files. [7.45s]

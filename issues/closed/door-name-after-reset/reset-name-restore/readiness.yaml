@@ -1,0 +1,55 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: claude `/rename <name>` sent as text to an idle session
+    command: env -u HC_TERMINAL_ID hc send --json t1v6 "/rename c-Probe_2 x"
+    identity: operator's local claude login, throwaway hc terminal, no credential handled
+    target: claude 2.1.325, haiku, terminal t1v6 in /home/ivan/Work/infra/akrogon
+    version: claude 2.1.325
+    date: '2026-11-14'
+    result: ran as the command (Session renamed to c-Probe_2 x), wrote custom-title and agent-name records with the exact name, no model reply, counted as one hc turn
+    cleanup: terminal killed and removed, hc ls shows no probe terminal
+    limits: one claude version and account; does not show the helper's code sending it
+    record: issues/chart/door-name-after-reset/forks/name-restore.md
+  - operation: claude carries a name set by `/rename` across `/clear`
+    command: hc send "/rename c-Tab Name_4" to unnamed t1v9, hc wait, hc keys t1v9 / c l e a r enter, hc send of one prompt, then grep of custom-title in the new transcript
+    identity: operator's local claude login, throwaway hc terminal, no credential handled
+    target: claude 2.1.325, haiku, terminal t1v9 in /home/ivan/Work/infra/akrogon
+    version: claude 2.1.325
+    date: '2026-11-14'
+    result: send answered started true at turn 1, the terminal reached done at turn 2, the new transcript differs from the old and its first line is custom-title c-Tab Name_4
+    cleanup: terminal killed and removed, hc ls shows no probe terminal
+    limits: proves this order on claude 2.1.325 only; a later claude that stops carrying the name is not covered; does not prove the helper's code
+    record: issues/chart/door-name-after-reset/forks/name-restore.md
+  - operation: claude carries an operator-given name across `/clear`
+    command: hc run of claude --model haiku -n probe-kept with one prompt, hc keys t1v2 / c l e a r enter, hc send of one prompt, then grep of custom-title in the new transcript; plus read of the first line of each transcript written after the door-reset logs of charts dispatch-flake, shared-rules and round-rewrites
+    identity: operator's local claude login, throwaway hc terminal, and read-only reads of the operator's own transcripts
+    target: claude 2.1.325 haiku terminal t1v2; door t126 transcripts on claude 2.1.322 and 2.1.323
+    version: claude 2.1.322, 2.1.323, 2.1.325
+    date: '2026-11-14'
+    result: the probe's new transcript starts with custom-title probe-kept; each of the three real post-handover transcripts and the transcript after the operator's own /clear starts with custom-title c-akrogon
+    cleanup: terminal killed and removed; the reads change nothing
+    limits: three claude versions on one machine; a later claude that stops carrying the name is not covered, and nothing in the leaf detects it beyond the log showing sent at every handover
+    record: issues/chart/door-name-after-reset/forks/name-restore.md
+  - operation: tab lookup through the herdr-app document
+    command: bun -e calling repoSpace and docGet from src/hc.ts at the registered root
+    identity: operator's local user, read-only
+    target: live herdr-app document of the akrogon space
+    version: akrogon d44920b8
+    date: '2026-11-14'
+    result: tabs t-akrogon, c-akrogon, w-akrogon; only c-akrogon lists t126 among its terminals
+    cleanup: none needed, read-only
+    limits: one live document; does not show a blank tab name or a door outside any tab
+    record: issues/chart/door-name-after-reset/forks/name-restore.md
+  - operation: existing reset helper tests on the base
+    command: bun test --timeout=60000 tests/door-reset.test.ts
+    identity: operator's local user, isolated test hc cores
+    target: akrogon main d44920b8
+    version: d44920b8
+    date: '2026-11-14'
+    result: 11 pass 0 fail (issues/chart/door-name-after-reset/slots/evidence/door-reset-main-d44920b8.log)
+    cleanup: fixtures self-clean
+    limits: shows the stand-in, the hc test core and today's stages work on the base; shows nothing about the name stage, which is the leaf's own tests
+    record: issues/chart/door-name-after-reset/forks/name-restore.md

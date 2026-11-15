@@ -1,0 +1,41 @@
+slug: cli-help
+phase: merged
+created: 2026-11-10
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 1
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak73094a90b4fd7b192be0858ab9041c
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t136
+  B:
+    session: infra
+    address: t139
+prompted:
+  B:
+    turn: 2
+    address: t139
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-11T10:40:45.080Z
+broadcast:
+  kind: issue
+  name: factory-quick-fixes
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/factory-quick-fixes
+  pushed: 81c6bc8338846fb397c55fd46988bcd03d945573
+  sources: []
+frozen:
+  tests/cli-help.test.ts: bcbf6126ffb7027763c05e1e833187b3341882e9
+frozen_cited: []

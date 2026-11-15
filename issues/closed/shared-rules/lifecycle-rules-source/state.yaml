@@ -1,0 +1,42 @@
+slug: lifecycle-rules-source
+phase: merged
+created: 2026-11-11
+repo: akrogon
+blocked-by:
+  - skill-links-in-folder
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 1
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak8acdca90184c429adcec9e576cf8db
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t13h
+  B:
+    session: infra
+    address: t13p
+prompted:
+  B:
+    turn: 2
+    address: t13p
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-11T11:00:58.440Z
+broadcast:
+  kind: issue
+  name: shared-rules
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/shared-rules
+  pushed: 452a2f1441bf82e8afcf0ce0f21b696eecd0c4b2
+  sources: []
+frozen:
+  tests/docs-links.test.ts: f73ecc98ee89d855dad04109e8cf64cc4416665f
+frozen_cited: []

@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: existing retention guards and merged-leaf cleanup path on the base
+    command: bun test --timeout=60000 tests/batch-dispatch.test.ts tests/hc-teardown.test.ts tests/pause-next.test.ts; bun test --timeout=60000 tests/green-merge.test.ts
+    identity: operator's local user, isolated test fixtures (temp Git repos, private hc core, stand-in seats, fake systemctl)
+    target: akrogon main 50d925f2
+    version: 50d925f2
+    date: '2026-11-09'
+    result: 46 pass 0 fail; 13 pass 0 fail (issues/chart/merged-batch-cleanup/slots/evidence/guards-main-50d925f2.log, green-merge-main-50d925f2.log)
+    cleanup: fixtures self-clean
+    limits: proves the retention guards of criterion 3 and the existing merged-leaf cleanup pass on the base; does not reproduce the strand of criteria 1 and 2 (the leaf's own red-first tests) and touches no real session
+    record: issues/chart/merged-batch-cleanup/forks/cleanup-after-release.md

@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: existing linked head and base verify records for a red check that names no test
+    command: jq over runs 980c6312 (head) and ce2cf1f4 (base) in /home/ivan/Work/infra/herdr-setup/issues/verify-runs.jsonl, then cat of each run's shell log
+    identity: operator's local user, read-only, no credential
+    target: herdr-setup verify records and kept logs of leaf deeper-path-lookup
+    version: akrogon release a93fec755e9b4481d96feda0001841a5eb072ca9
+    date: '2026-11-09'
+    result: completed head run and completed base run linked through compares at merge-base 3cef1ac2, shell exit 127 on both, both logs present with the same single line and no (fail) line (issues/chart/known-red-nameless/slots/evidence/herdr-setup-pair-2026-11-09.log)
+    cleanup: none needed, read-only
+    limits: shows that the records the changed rule reads exist for a nameless red; does not rerun verify and does not show the changed verdict, which is the leaf's own red-first test
+    record: issues/chart/known-red-nameless/forks/coverage-rule.md
+  - operation: existing known-red covers, refusals and receipt gates on the base
+    command: bun test --timeout=60000 tests/verify.test.ts tests/receipt-gates.test.ts tests/flaky.test.ts
+    identity: operator's local user, isolated test fixtures (temp Git repos)
+    target: akrogon main a93fec75
+    version: a93fec75
+    date: '2026-11-09'
+    result: 64 pass 0 fail (issues/chart/known-red-nameless/slots/evidence/guards-main-a93fec75.log)
+    cleanup: fixtures self-clean
+    limits: shows the named covers and refusals, the nameless-head-against-named-base refusal, the gone-head-log refusal and the receipt gates that criterion 2 keeps hold on the base; does not show the new nameless cover of criterion 1, the named-head-against-nameless-base refusal or the gone-base-log refusal, which are the leaf's own tests
+    record: issues/chart/known-red-nameless/forks/coverage-rule.md

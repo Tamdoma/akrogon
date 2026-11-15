@@ -1,0 +1,35 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: a link that climbs out of an installed skill folder with `..`, the base failure criterion 1 removes
+    command: wc -w <root>/plan-issue/../lesson-rule.md and ls <root>/lesson-rule.md over ~/.claude/skills, ~/.agents/skills, ~/.codex/skills, ~/.pi/agent/skills; claude Read tool on /home/ivan/.claude/skills/chart-issues/../lesson-rule.md; grep of pi session records under ~/.pi/agent/sessions since 2026-10-14 for read-tool calls on lesson-rule.md and for the failed access
+    identity: operator's local user, read-only, no credential
+    target: installed akrogon release linked into the four agent program skill roots
+    version: akrogon release a33d967b, pi 1.5.2
+    date: '2026-11-11'
+    result: the shell read prints 391 words on 4 of 4 roots; the shortened path is missing on 4 of 4; claude's Read tool answers File does not exist; 21 of 24 pi session files with a read-tool call on lesson-rule.md hold ENOENT on /home/ivan/.pi/agent/skills/lesson-rule.md, the latest on 2026-11-09
+    cleanup: none needed, read-only
+    limits: shows the `..` link fails in claude's and pi's read tools on the installed layout; does not show what a seat did after the failed read, and does not cover agy
+    record: issues/chart/shared-rules/forks/shape.md
+  - operation: a link file inside a skill folder, the form criteria 1 and 2 rest on
+    command: ls -l <root>/check-issue/ponytail.md over the four roots; claude Read tool on /home/ivan/.claude/skills/check-issue/ponytail.md; grep of pi session records since 2026-10-14 for read-tool calls on /home/ivan/.pi/agent/skills/check-issue/ponytail.md and for failed accesses of that path
+    identity: operator's local user, read-only, no credential
+    target: installed akrogon release linked into the four agent program skill roots
+    version: akrogon release a33d967b, pi 1.5.2
+    date: '2026-11-11'
+    result: the git link ponytail.md -> ../implement-issue/ponytail.md is present on 4 of 4 roots; claude's Read tool opens it; 149 pi read-tool calls on it and 0 failed accesses
+    cleanup: none needed, read-only
+    limits: shows an in-folder link file whose target lies outside the folder opens in a shell, claude's Read and pi's read on a layout that links skill folders whole; does not cover an agent program that copies skill folders, which none of the four roots does today
+    record: issues/chart/shared-rules/forks/shape.md
+  - operation: the existing link check the criteria extend, and what a wider file set meets today
+    command: read tests/docs-links.test.ts; grep of relative links that leave their skill folder; a scratch run of the same path-text resolution over every markdown file under skills/
+    identity: operator's local user, read-only, no credential
+    target: akrogon main a33d967b
+    version: a33d967b
+    date: '2026-11-11'
+    result: the check reads skills/<name>/SKILL.md only and resolves a link as path text; the only out-of-folder links are ../lesson-rule.md in five SKILL.md (seven sites); over 19 markdown files and 24 relative links the wider run reports 5 missing targets, all template examples inside fenced blocks in chart-issues/assets/shapes.md
+    cleanup: scratch script deleted
+    limits: shows the base the check starts from; does not show the new check, which is the leaf's own proof, and did not follow link files or the two links inside skills/lesson-rule.md, which slot B's check found
+    record: issues/chart/shared-rules/forks/shape.md

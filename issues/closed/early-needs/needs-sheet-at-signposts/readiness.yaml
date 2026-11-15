@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: akrogon notice --attention (the late-find notice the changed rules name)
+    command: "akrogon notice --attention --title 'chart autopilot-needs-and-test-isolation: notice proof' --body 'Charting proof for Tamdoma/akrogon#129. No action needed.'"
+    identity: chart door A (t15) at the registered root, operator user ivan, no credential
+    target: herdr-app session infra, folder /home/ivan/.config/herdr-app-sessions/infra/akrogon-notices
+    version: akrogon release 49d2c916
+    date: '2026-11-09'
+    result: rc 0; printed the notice path (150-byte JSON); the file was consumed (shown) within about 4 s
+    cleanup: none needed, consumed by herdr-app
+    limits: proves publication to and consumption by the operator's session; not that a person saw it; not run outside hc or in an unregistered repo
+    record: issues/chart/autopilot-needs-and-test-isolation/forks/needs-before-charting.md

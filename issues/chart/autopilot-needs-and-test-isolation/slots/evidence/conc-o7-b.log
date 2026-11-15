@@ -1,0 +1,23 @@
+bun test v1.4.4 (38afee6c8)
+
+tests/hc-delivery.test.ts:
+140 |     expect(core.tasks(address)).toHaveLength(2);
+141 |     // C5.1: nothing is resent while the turn is unchanged.
+142 |     expect((await cli(f, ['next', 'hd-send'], f.root, core.env)).code).toBe(0);
+143 |     expect(core.tasks(address)).toHaveLength(2);
+144 |     // The seat's turn moves; the next pass resettles the send as delivered.
+145 |     expect((await core.hc(['send', '--json', address, 'WORK'])).code).toBe(0);
+                                                                            ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 3
+
+      at <anonymous> (/home/ivan/Work/infra/akrogon/tests/hc-delivery.test.ts:145:71)
+(fail) a working seat gets no send; a send that never starts is recorded, not resent, and resettled once the turn moves [11420.21ms]
+
+ 0 pass
+ 5 filtered out
+ 1 fail
+ 9 expect() calls
+Ran 1 test across 1 file. [11.45s]

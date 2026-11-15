@@ -1,0 +1,43 @@
+slug: fixture-repo-identity
+phase: merged
+created: 2026-11-09
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#130"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 1
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak3ad027084f94600ce5fbe0da998e6d
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t113
+  B:
+    session: infra
+    address: t11c
+prompted:
+  B:
+    turn: 2
+    address: t11c
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-09T10:24:29.025Z
+broadcast:
+  kind: issue
+  name: host-safe-tests
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/host-safe-tests
+  pushed: 50d925f2d952fcfca06db529b49b9cfe21efe22c
+  sources:
+    - "Tamdoma/akrogon#130"
+frozen:
+  tests/fixture-repo-identity.test.ts: 3dd2975c60398f5344571a8f7ee49466c32ad8cb
+frozen_cited: []

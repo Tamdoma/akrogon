@@ -1,0 +1,42 @@
+slug: reset-name-restore
+phase: merged
+created: 2026-11-14
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 1
+done: []
+fix_rounds: 1
+verdict: {}
+tab: akf49348bde9d7dfde066ce7917c61b1
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t1vn
+  B:
+    session: infra
+    address: t1vv
+prompted:
+  B:
+    turn: 3
+    address: t1vv
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-14T10:32:27.046Z
+broadcast:
+  kind: issue
+  name: door-name-after-reset
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/door-name-after-reset
+  pushed: c4e0ef383bbcb1b4e2b8dfa4cd9da547fb5de188
+  sources: []
+frozen:
+  tests/door-agent.ts: 0c833475bd06fb0bd575dfc14a8b2628f9c05328
+  tests/door-reset.test.ts: 8023d8e124c1aec5eb6e61ada176d880814a0e97
+frozen_cited: []

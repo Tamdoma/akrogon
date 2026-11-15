@@ -1,0 +1,32 @@
+slug: skill-links-in-folder
+phase: merged
+created: 2026-11-11
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: akfa42fd7f3f823dd656816644191790
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t135
+  B:
+    session: infra
+    address: t138
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-11T10:37:57.219Z
+frozen:
+  tests/docs-links.test.ts: 38828d0568a73d8473d71b8460bbf5f8becc792e
+frozen_cited: []

@@ -1,0 +1,42 @@
+slug: needs-sheet-at-signposts
+phase: merged
+created: 2026-11-09
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#129"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 1
+done: []
+fix_rounds: 0
+verdict: {}
+tab: akf711341f447a0ad34001ad8cafdf73
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t112
+  B:
+    session: infra
+    address: t116
+prompted:
+  B:
+    turn: 1
+    address: t116
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-09T09:42:41.278Z
+broadcast:
+  kind: issue
+  name: early-needs
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/early-needs
+  pushed: 8647fc24247a6841c9fa85dcc1b05be484a0afb6
+  sources:
+    - "Tamdoma/akrogon#129"
+frozen: {}
+frozen_cited: []

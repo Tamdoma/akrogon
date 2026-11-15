@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: a file under the door's assets folder read from the installed skill folder, the reach criterion 1 rests on (observation O4 in the record)
+    command: claude Read tool on /home/ivan/.claude/skills/chart-issues/assets/questions.md, assets/shapes.md and assets/standing-design.md; ls -ld <root>/chart-issues over ~/.claude/skills, ~/.agents/skills, ~/.codex/skills, ~/.pi/agent/skills
+    identity: operator's local user, read-only, no credential
+    target: installed akrogon release linked into the four agent program skill roots
+    version: akrogon release a33d967b
+    date: '2026-11-11'
+    result: the three existing asset files open through the installed folder link in this door session; the folder is linked whole on the four roots
+    cleanup: none needed, read-only
+    limits: shows an asset file is reachable by the path SKILL.md names on a layout that links the skill folder whole; does not show that a door opens a step file at the right moment, which the reviewing seat judges from the text
+    record: issues/chart/shared-rules/forks/shape.md
+  - operation: the existing tests and section sizes criteria 5 and 6 start from
+    command: read tests/docs-links.test.ts; wc -w skills/chart-issues/SKILL.md and of its Direct route, Autopilot and Handover sections; grep of the pack literal per section
+    identity: operator's local user, read-only, no credential
+    target: akrogon main a33d967b
+    version: a33d967b (skills identical to release 63526537)
+    date: '2026-11-11'
+    result: two tests require command literals in chart-issues/SKILL.md; the pack literal stands once in Handoff and twice in Direct route; SKILL.md is 8,387 words, and with their headings Direct route is 1,266, Autopilot 1,728 and Handover 767, together 3,761; the link check reads SKILL.md but no file under assets/
+    cleanup: none needed, read-only
+    limits: shows where the pinned literals and the words are today; does not show the clause table or the new link check coverage, which are this leaf's and the prerequisite leaf's own proofs
+    record: issues/chart/shared-rules/forks/shape.md
