@@ -7,7 +7,7 @@ Re-read this file only after compaction. A file already read in this thread and 
 
 # Mine issues
 
-Operator-invoked, on every harness, with no `akrogon install`, registration or leaf needed. It reads what was actually done in a window of time and writes two files: materials for a writing agent, and a source list that stays with the operator. It writes no post, headline, hook line or call to action, edits no repository, runs no project command, makes no paid call and loads no web page. A lifecycle seat never runs it.
+Operator-invoked, on every harness, with no `akrogon install`, registration or leaf needed. It reads what was actually done in a window of time and writes two files: materials for a writing agent, and a source list that stays with the operator. It writes no post, headline, hook line or call to action, edits no repository, runs no project command other than the read-only akrogon commands named under Sources, makes no paid call and loads no web page. A lifecycle seat never runs it.
 
 The value is the hard data and how each thing was solved, so the materials give everything important and lean toward too much: the writer cuts and edits. Only the client's identity is removed. The work can be of any kind: website builds, automations, operations, marketing, data and reporting, agent workflows, or the tooling that runs them. No kind of work is favoured; the window's own records decide what the stories are about. Each story still leads with what a business loses or gains, shows what broke and how it was locked down, and ends in one rule a reader can apply without this system.
 
@@ -20,14 +20,16 @@ Print the window and scope as understood, in local time with the UTC offset, bef
 
 ## Sources
 
+Facts come only from records on disk read during this pass. What the agent remembers from its own conversation is not a source: the invoking conversation is read from its transcript file like any other, and a fact found only in memory is left out. Issues keep moving while the pass runs, so every leaf and chart is found through akrogon's own records, never from a path remembered or written in a summary.
+
 Read in this order. Written records come first because they are already checked and cited; transcripts come last because they are large and hold what nobody wrote down.
 
 1. `git log` of the consumer repository over the window, all branches: what landed, with its SHA.
-2. When the repository has an `issues/` folder: the leaf moves, merge outcomes and check runs of the window from its dated records, to list the leaves and charts that were active.
-3. Each active chart: its intake, forks (decisions, operator rounds, held disagreements), slot files (maps, rebuttals, final checks: rejected options and their evidence live here), approvals and usage record.
-4. Each active leaf: `brief.md` criteria, `readiness.yaml` grants with their bounds and hands-on proofs, the implementation report (attempts, what failed, count lines, costs) and the review verdicts.
+2. When the repository has an `issues/` folder, akrogon's records name the work of the window: `akrogon status --json` and `akrogon status --charts` for the board, recent merges and charts, `akrogon timing --flow --since <window start date>` for issue flow, then the rows of `issues/log.jsonl`, `issues/merge-attempts.jsonl`, `issues/verify-runs.jsonl` and `issues/timings.jsonl` whose timestamps fall in the window. Each `log.jsonl` row gives a leaf's slug, its phase move, verdict, head and the seat's `session` transcript path.
+3. Each chart under `issues/chart/` that a record names or whose files changed in the window: its intake, forks (decisions, operator rounds, held disagreements), slot files (maps, rebuttals, final checks: rejected options and their evidence live here), approvals, usage record and `seats.yaml` (each seat's `session` transcript path).
+4. Each leaf the records name, found by its slug wherever it lives now (`issues/open/`, `issues/parked/` or `issues/closed/`; `akrogon status <slug>` shows its state and history): `brief.md` criteria, `readiness.yaml` grants with their bounds and hands-on proofs, the implementation report (attempts, what failed, count lines, costs) and the review verdicts. A check log the report cites is read with `akrogon log <path>`, which also reads logs packed into a closed issue's archive.
 5. Run and cost records that 3 and 4 cite by path, such as a recorded run's cost file. Only cited ones; never search the repository for more.
-6. Transcripts of the window: the invoking conversation, each session path a chart's seat record names, and the harness session folders for this repository (`~/.claude/projects/<cwd with slashes as dashes>/`, `~/.codex/sessions/<YYYY>/<MM>/<DD>/`, `~/.pi/agent/sessions/`), chosen by modification time inside the window.
+6. Transcripts of the window, read from their files: the `session` paths named in steps 2 and 3, the invoking conversation, and the operator's own sessions in the harness folders for this repository (`~/.claude/projects/<cwd with slashes as dashes>/`, `~/.codex/sessions/<YYYY>/<MM>/<DD>/`, `~/.pi/agent/sessions/`), chosen by modification time inside the window.
 
 A transcript is never loaded whole. Search it for messages the operator typed inside the window, read those with their line numbers, and follow one to the nearby agent text only when a candidate story needs it. Tool results, system notes and messages relayed from another agent are not operator messages. A repository with no `issues/` folder is mined from 1 and 6 alone.
 
