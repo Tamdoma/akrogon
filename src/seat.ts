@@ -65,6 +65,8 @@ export type Started =
 
 type Harness = { kind: string; argv: string[] };
 
+const settingsSchema = z.looseObject({ permissions: z.looseObject({}).optional() });
+
 export function harnessArgv(global: GlobalConfig, config: SlotConfig): Harness {
   if (!Object.hasOwn(global.harnesses, config.harness)) throw new Error(`Missing harness template "${config.harness}"`);
   const line: string = global.harnesses[config.harness]
@@ -72,6 +74,41 @@ export function harnessArgv(global: GlobalConfig, config: SlotConfig): Harness {
     .replaceAll('{effort}', quote(config.effort));
   const argv: string[] = z.array(z.string()).min(1).parse(parse(line));
   if (argv[0] !== config.harness) throw new Error(`Harness launch must start with ${config.harness}`);
+  if (config.harness === 'claude') {
+    // Merge permissions.denyInsteadOfPrompting into the line's one --settings JSON object or append
+    // the pair; refuse a line that cannot be merged without dropping a setting (plan D1/D2).
+    const refuse = (operand: string, reason: string): never => {
+      throw new Error(`Harness claude: --settings operand '${operand}' ${reason}`);
+    };
+    const settingsAt: number[] = argv.flatMap((arg: string, i: number) =>
+      arg === '--settings' || arg.startsWith('--settings=') ? [i] : [],
+    );
+    const bare: number = argv.indexOf('--');
+    if (bare !== -1) refuse(argv[bare], 'ends option parsing');
+    if (settingsAt.length > 1) refuse('--settings', 'appears more than once');
+    if (settingsAt.length === 0) {
+      argv.push('--settings', JSON.stringify({ permissions: { denyInsteadOfPrompting: true } }));
+    } else {
+      const at: number = settingsAt[0];
+      const arg: string = argv[at];
+      const pair: boolean = arg === '--settings';
+      const value: string | undefined = pair ? argv[at + 1] : arg.slice('--settings='.length);
+      if (value === undefined) refuse('--settings', 'needs a value');
+      const settings = ((): z.infer<typeof settingsSchema> => {
+        try {
+          return settingsSchema.parse(JSON.parse(value));
+        } catch {
+          return refuse(value, 'is not a JSON object with an object "permissions"');
+        }
+      })();
+      const merged: string = JSON.stringify({
+        ...settings,
+        permissions: { ...(settings.permissions ?? {}), denyInsteadOfPrompting: true },
+      });
+      if (pair) argv[at + 1] = merged;
+      else argv[at] = `--settings=${merged}`;
+    }
+  }
   const extra: string[] =
     config.harness === 'pi'
       ? ['--session-id', randomUUID()]
