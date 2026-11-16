@@ -9,7 +9,7 @@ Re-read this file only after compaction. A file already read in this thread and 
 
 Operator-invoked, on every harness, with no `akrogon install`, registration or leaf needed. It reads what was actually done in a window of time and writes two files: materials for a writing agent, and a source list that stays with the operator. It writes no post, headline, hook line or call to action, edits no repository, runs no project command, makes no paid call and loads no web page. A lifecycle seat never runs it.
 
-The value is the hard data and how each thing was solved, so the materials give everything important and lean toward too much: the writer cuts and edits. Only the client's identity is removed. Each story still leads with what a business loses or gains, shows what broke and how it was locked down, and ends in one rule a reader can apply without this system.
+The value is the hard data and how each thing was solved, so the materials give everything important and lean toward too much: the writer cuts and edits. Only the client's identity is removed. The work can be of any kind: website builds, automations, operations, marketing, data and reporting, agent workflows, or the tooling that runs them. No kind of work is favoured; the window's own records decide what the stories are about. Each story still leads with what a business loses or gains, shows what broke and how it was locked down, and ends in one rule a reader can apply without this system.
 
 ## Window
 
@@ -43,25 +43,27 @@ A story needs a turn: something that went differently from what a competent pers
 - An obvious approach rejected in writing, with the reason and who rejected it.
 - A correction from the operator: the person said no, and the work changed.
 - A method: how a hard thing was done cheaply or reliably, with what it cost.
+- A default refused: the tool, model or usual practice had an out-of-the-box answer, and the work chose differently for a stated reason.
 
-Two tests then apply. Only here: at least one detail could come from no other team's work. Checkable: its facts have sources. An item failing either is dropped, along with routine progress, anything true of AI work in general, and any story an earlier materials file already delivered unless the window adds a new number or a new turn. Read the earlier files' story labels for that check.
+Three tests then apply. Insight: the item changes how a reader should think about this kind of work, beyond the one fix. Only here: at least one detail could come from no other team's work. Checkable: its facts have sources. An item failing any of them is dropped, along with routine progress, anything true of AI work in general, and any story an earlier materials file already delivered unless the window adds a new number or a new turn. Read the earlier files' story labels for that check.
 
 There is no cap on stories. Order them by business stake, and when unsure whether an item is material, keep it. A window with no turn returns no stories and says so; never pad. Dropped items are listed in one line each with the reason, so the operator can overrule.
 
 ## Story record
 
-Each story is a block of plain fragments, not prose. Give every number, phrase and step the story rests on, whole lists included, never a sample. Every fact that is a number, a count, a price, a duration, a search phrase or a quote carries an id (`S2.4`) that the source list resolves.
+Each story is a block of plain fragments, not prose. Give every number, phrase and step the story rests on, whole lists included, never a sample. Every fact that is a number, a count, a price, a duration, a verbatim string or a quote carries an id (`S2.4`) that the source list resolves.
 
 ```markdown
 ## S<n> <working label, plain, not a headline>
-- Stake: <who loses or gains what, in business words>
-- Setting: <the work, with the client's identity removed; trade, town and size stay>
+- Stake: <who loses or gains what (money, time, customers, risk, workload), in business words>
+- Setting: <the work, with the client's identity removed; industry, place and size stay>
 - Hook fact: <the single most surprising checkable fact> [S<n>.1]
-- Obvious route: <what most teams or tools would do, and its cost if known>
+- Default: <what the tool, model, agency or usual practice does out of the box, what it costs, and the fact that shows it fails here> [ids]
 - Before: <what happened, with every number and real phrase> [ids]
 - Caught by: <a person reading, a named kind of check, a reviewer; and what had passed>
 - How: <what was done, step by step, in order: each step, what does it, what checks it> [ids]
-- Why: <the reason for this way, in the words of the decision>
+- Why: <why this way instead of the default, in the words of the decision>
+- Insight: <the mental model this changes: what a competent person assumes, what the facts showed instead, and the principle that still holds outside this industry and this system> [ids]
 - Lock: <what now makes the mistake impossible or visible>
 - After: <the result, with every number; before and after pairs given whole> [ids]
 - Cost: <money, calls, runs and time, with caps and what was used> [ids]
@@ -69,15 +71,15 @@ Each story is a block of plain fragments, not prose. Give every number, phrase a
 - Rule: <one check a reader can run tomorrow with no tool of ours>
 - Next snag: <the problem that showed up right behind this one, and its story id>
 - Plain words: <mechanism term> = <the same thing as a business owner would say it>
-- Phrases: <verbatim search phrases, tool outputs and odd strings worth quoting> [ids]
+- Verbatim: <exact inputs, outputs, error text and odd strings worth quoting> [ids]
 - Operator said: "<verbatim>" [id]
 - Closed engine: <the part of How the operator would sell, not give away; the writer decides how much to show>
 - Status: <true now | decided, not built | in progress | unverified>, per claim where they differ
 ```
 
-A field with nothing true to put in it is written `none`, never filled. `Stake`, `How` and `Rule` are required: a story without them is not a story. Vendors, tools and model makers are named, with their real prices.
+A field with nothing true to put in it is written `none`, never filled. `Stake`, `Default`, `How`, `Why`, `Insight` and `Rule` are required: a story without them is not a story. `Insight` is the part a reader keeps after forgetting the numbers. Each part of it rests on a fact id, and a principle the facts do not show is not written. Vendors, tools and model makers are named, with their real prices.
 
-The file opens with a header: the window and scope, one plain line on what was at stake across it, the story ids in snag-after-snag order, the dropped items, and an `Operator checks` list of every fact whose status is not `true now`.
+The file opens with a header: the window and scope, one plain line on what was at stake across it, the story ids in snag-after-snag order, the insights that run across several stories with their story ids, the dropped items, and an `Operator checks` list of every fact whose status is not `true now`.
 
 ## Truth
 
@@ -86,14 +88,14 @@ The file opens with a header: the window and scope, one plain line on what was a
 - Status is `measured` when a run or record shows it, `decided` when a written decision exists and the work is not built, `planned`, or `unverified` when it appears only in a summary or a message and no primary record was found.
 - When two sources disagree, both values are given with both rows. The pass does not pick one.
 - Operator words are quoted only when the operator typed them, copied character for character from the operator's own transcript. A quote an agent relayed is found there first or left out. No paraphrase sits inside quotation marks.
-- A stake states only what the facts support. An expected benefit is not a measured saving, and no revenue, ranking or savings figure appears that no source measured.
+- A stake states only what the facts support. An expected benefit is not a measured saving, and no revenue, savings, speed or other result figure appears that no source measured.
 - Last step before writing: reopen the cited line of every row. A fact its line does not show is corrected, marked `unverified` or removed.
 
 ## Client identity
 
-Before writing, build the keep-out list from the window's sources: the client's name, its company and brand names, its domains and URLs, its staff names, its street addresses and phone numbers, and folder names that hold its name. Nothing else is on the list. Towns, the trade, vendors, search phrases, numbers and mechanisms stay.
+Before writing, build the keep-out list from the window's sources: the client's name, its company and brand names, its domains and URLs, its staff names, its street addresses and phone numbers, and folder names that hold its name. Nothing else is on the list. Places, the industry, vendors, verbatim strings, numbers and mechanisms stay.
 
-In the materials each keep-out entry is replaced by one consistent generic label ("the client", "the office manager"). A search phrase stays verbatim unless it holds a keep-out entry, and then only that part becomes `<brand>`.
+In the materials each keep-out entry is replaced by one consistent generic label ("the client", "the client's staff member"). A verbatim string stays as it is unless it holds a keep-out entry, and then only that part becomes `<brand>`.
 
 Paths, file names and slugs go in the source list, not the materials: they hold the client's name often and teach a reader nothing. What a script or step does is described in full.
 
@@ -107,10 +109,10 @@ The name is the window in local time, then up to three topic words taken from th
 
 ```text
 <YYYY-MM-DD>_<HHMM>_to_<YYYY-MM-DD>_<HHMM>_<topic>_<topic>_<topic>.md
-2026-11-16_0912_to_2026-11-17_0041_hiring-keywords_retyped-results_town-pages.md
+2026-03-02_0900_to_2026-03-03_1830_invoice-matching_approval-limits_vendor-pricing.md
 ```
 
-A part run puts `part` before its topics (`..._to_2026-11-17_0041_part_hiring-keywords.md`), and the default window ignores it. A run with no stories uses the topic `none`.
+A part run puts `part` before its topics (`..._to_2026-03-03_1830_part_invoice-matching.md`), and the default window ignores it. A run with no stories uses the topic `none`.
 
 - `materials/<repository name>/<name>.md`: the materials. Only this folder's files are handed to the writer.
 - `materials/<repository name>/sources/<name>.md`: the window, the sources read and skipped, one row per id, and the keep-out list. It stays with the operator.
