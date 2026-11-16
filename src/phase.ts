@@ -63,6 +63,27 @@ export async function clearBusyNotices(repo: Repo, path: string, state: State): 
   return cleared;
 }
 
+export async function clearBlockedNotices(repo: Repo, path: string, state: State, seat?: Slot): Promise<State> {
+  const seats: Slot[] =
+    seat === undefined
+      ? (['A', 'B'] as const).filter((slot: Slot): boolean => state.blocked_notified[slot] !== undefined)
+      : state.blocked_notified[seat] === undefined
+        ? []
+        : [seat];
+  if (seats.length === 0) return state;
+  const pending: Slot[] = seats.filter((slot: Slot): boolean => state.blocked_notified[slot] === 'pending');
+  if (pending.length > 0) {
+    const folder: string = await repoNotices(repo);
+    for (const slot of pending) removeNotice(folder, noticeId(repo.name, 'blocked', state.slug, slot));
+  }
+  const cleared: State =
+    seat === undefined
+      ? { ...state, blocked_notified: {} }
+      : { ...state, blocked_notified: { ...state.blocked_notified, [seat]: undefined } };
+  saveState(path, cleared);
+  return cleared;
+}
+
 // The leaf tab is renamed only while a window shows it; a closed window leaves the name to the next
 // pass that finds it open (plan D11). Pre-hc state carries an old tab id and is skipped.
 async function renameTab(repo: Repo, state: State, name: string): Promise<void> {
@@ -184,8 +205,11 @@ export async function commitMove(
     const folder: string = await repoNotices(repo);
     for (const id of stale) removeNotice(folder, id);
   }
-  const cleared: State =
-    to === 'merged' || leavingFailed ? await clearBusyNotices(repo, leaf.path, recorded) : recorded;
+  const cleared: State = await clearBlockedNotices(
+    repo,
+    leaf.path,
+    to === 'merged' || leavingFailed ? await clearBusyNotices(repo, leaf.path, recorded) : recorded,
+  );
   const after: State = {
     ...cleared,
     phase: to,
