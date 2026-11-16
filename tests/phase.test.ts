@@ -1292,7 +1292,8 @@ test('a phase move clears the blocked notice field and removes its pending file'
     expect(result.code).toBe(0);
     // phaseWake dispatches the new phase's seat, printing its address after the move line.
     expect(result.stdout).toContain('moved implement');
-    expect(readState(path)).toMatchObject({ phase: 'implement', blocked_notified: {} });
+    expect(readState(path).phase).toBe('implement');
+    expect(readState(path).blocked_notified).toEqual({});
     expect(existsSync(blocked)).toBe(false);
     expect(noticeFiles(f.core)).toEqual([]);
   } finally {
