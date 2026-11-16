@@ -119,6 +119,7 @@ export const stateSchema = z
     sources: z.array(z.string().regex(sourcePattern)).optional(),
     busy_since: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     busy_notified: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
+    blocked_notified: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     attempts: counts.prefault({}),
     done: z.array(slotSchema).default([]),
     fix_rounds: z.number().int().nonnegative().default(0),
