@@ -1290,7 +1290,8 @@ test('a phase move clears the blocked notice field and removes its pending file'
     const path: string = leaf(f, 'move', 'plan.synthesis', { blocked_notified: { A: 'pending' } });
     const result: Result = await cli(f, ['phase', 'move', 'implement', '--slot', 'A'], f.root, f.env);
     expect(result.code).toBe(0);
-    expect(result.stdout).toBe('moved implement');
+    // phaseWake dispatches the new phase's seat, printing its address after the move line.
+    expect(result.stdout).toContain('moved implement');
     expect(readState(path)).toMatchObject({ phase: 'implement', blocked_notified: {} });
     expect(existsSync(blocked)).toBe(false);
     expect(noticeFiles(f.core)).toEqual([]);
