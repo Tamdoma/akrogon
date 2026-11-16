@@ -1731,20 +1731,19 @@ test('blocked merge seat B prevents fetch and clean checks in a dirty worktree',
     );
     const before: State = readState(path);
     const tasksBefore = await allTasks(f);
-    const observedAt: number = Date.now();
     const result: Result = await next(f, ['blocked-merge'], { REAL_GIT: realGit, GIT_CALL_LOG: gitLog });
     const gitCalls: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');
     expect(gitCalls).not.toContain('status --porcelain');
     expect(result.code).toBe(0);
     const after: State = readState(path);
-    const since: string = z.string().datetime().parse(after.busy_since.B);
+    // A blocked seat sets no busy clock: the pass records its blocked notice, nothing else.
     expect(before.busy_since.B).toBeUndefined();
-    expect(Date.parse(since)).toBeGreaterThanOrEqual(observedAt);
-    expect(Date.parse(since)).toBeLessThanOrEqual(Date.now());
+    expect(after.busy_since.B).toBeUndefined();
+    expect(after.blocked_notified.B).toBe('pending');
     // The batch pass built and applied a member-less record without touching the seat.
     expect(after.batch?.applied).toBe(true);
     const { batch, ...rest }: State = after;
-    expect(rest).toEqual({ ...before, busy_since: { B: since }, busy_notified: {} });
+    expect(rest).toEqual({ ...before, blocked_notified: { B: 'pending' }, busy_notified: {} });
     expect(await allTasks(f)).toEqual(tasksBefore);
     expect(await seatTerminals(f, 'blocked-merge', true)).toHaveLength(2);
     expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
@@ -1797,7 +1796,8 @@ test('a blocked non-merge seat does not stall a merge leaf', async () => {
     const merges = (await delivered(f, 'blocked-merge')).filter((task) => task.seat === 'b');
     expect(merges.map((task) => task.text)).toEqual([mergeText(path)]);
     expect(merges[0].address).toBe(z.string().parse(readState(path).seat.B?.address));
-    expect(readState(path).busy_since.A).toBeDefined();
+    expect(readState(path).busy_since.A).toBeUndefined();
+    expect(readState(path).blocked_notified.A).toBe('pending');
     expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
   } finally {
     await f.clean();

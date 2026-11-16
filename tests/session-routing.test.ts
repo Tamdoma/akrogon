@@ -245,8 +245,8 @@ test('a failed session list is reported once per invocation', async () => {
   }
 });
 
-test('the busy notice lands in the session holding the repo space', async () => {
-  // `trust` reports blocked and waits: a busy seat.
+test('the blocked notice lands in the session holding the repo space', async () => {
+  // `trust` reports blocked and waits: a blocked seat, noticed at once under blocked-seat-notice.
   const f: HcFixture = await hcFixture({ mode: 'trust' });
   const decoy: HcCore = await hcCore(f, { repo: 'misc' });
   try {
@@ -254,10 +254,9 @@ test('the busy notice lands in the session holding the repo space', async () => 
     const env: NodeJS.ProcessEnv = { ...f.env, ...shortStartProof, HC_SESSION: decoy.session };
     const path: string = leaf(f, 'routed2', 'plan.synthesis');
     expect((await cli(f, ['next', 'routed2'], f.root, env)).code).toBe(0);
-    saveState(path, { ...readState(path), busy_since: { A: new Date(Date.now() - 61 * 60000).toISOString() } });
     expect((await cli(f, ['next', 'routed2'], f.root, env)).code).toBe(0);
     expect(noticeFiles(f.core).map((notice) => notice.title)).toEqual([
-      expect.stringContaining(`Busy leaf: ${f.repo}/routed2 seat A`),
+      expect.stringContaining(`Blocked leaf: ${f.repo}/routed2 seat A`),
     ]);
     expect(noticeFiles(decoy)).toEqual([]);
   } finally {
