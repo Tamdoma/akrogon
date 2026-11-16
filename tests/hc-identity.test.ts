@@ -9,8 +9,9 @@ import { z } from 'zod';
 import { cli, fixture, leaf, yaml, type Fixture } from './helpers';
 import { hcCore, pinnedSchema, setPrefixes, setSeat, type HcCore, type Terminal } from './hc-fixture';
 import { leafSlice } from '../src/scope';
-import { command, spawnCaptured } from '../src/shell';
+import { command, spawnCaptured, type SpawnResult } from '../src/shell';
 import { GONE_CODES, sessions } from '../src/hc';
+import { readState } from '../src/state';
 
 async function setup(prefixes?: Record<string, string>) {
   const f: Fixture = await fixture();
@@ -57,6 +58,48 @@ test('the space named after the repo is found through doc.get with the window cl
     await core.stop();
     await other.stop();
     await stopSlice(f, 'hi-find');
+    f.clean();
+  }
+});
+
+test('dispatch never adopts another session terminal after the repo core changes', async () => {
+  const f: Fixture = await setup();
+  const old: HcCore = await hcCore(f);
+  const current: HcCore = await hcCore(f);
+  const path: string = leaf(f, 'hi-session-change', 'plan.synthesis');
+  try {
+    expect((await cli(f, ['next', 'hi-session-change'], f.root, old.env)).code).toBe(0);
+    const address: string = z.string().parse(readState(path).seat.A?.address);
+    await old.stop();
+    const started: SpawnResult = await current.hc([
+      'run',
+      '--bg',
+      '--json',
+      '--no-parent',
+      '--name',
+      'unrelated',
+      '--cwd',
+      f.root,
+      '--',
+      'fake',
+      '--model',
+      'work',
+      '--effort',
+      'low',
+      'USER_TASK',
+    ]);
+    expect(started.code).toBe(0);
+    const unrelated: string = z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
+    expect(unrelated).toBe(address);
+    await current.waitFor(unrelated, (t: Terminal) => t.turn >= 1 && t.status?.state === 'idle');
+    expect((await cli(f, ['next', 'hi-session-change'], f.root, current.env)).code).toBe(0);
+    expect(current.tasks(unrelated)).toEqual(['USER_TASK']);
+    expect(readState(path).seat.A?.session).toBe(current.session);
+    expect(readState(path).seat.A?.address).not.toBe(unrelated);
+  } finally {
+    await old.stop();
+    await current.stop();
+    await stopSlice(f, 'hi-session-change');
     f.clean();
   }
 });
