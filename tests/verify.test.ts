@@ -19,6 +19,7 @@ import {
   greenReceipt,
   killTree,
   leaf,
+  leafTempRoot,
   seedRun,
   storeDir,
   unitBin,
@@ -26,9 +27,11 @@ import {
   type Fixture,
 } from './helpers';
 import { command, finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
-import { readRepo, type Repo } from '../src/config';
-import { readState } from '../src/state';
+import { readRepo, setupCommand, type Repo } from '../src/config';
+import { readState, saveState } from '../src/state';
 import { requireGreenReceipt, verifyCommands, verifyRunSchema, type VerifyRun } from '../src/verify';
+import { bootId, writePassRecord } from '../src/verify-pass';
+import { readTimings, type TimingEvent } from '../src/timing';
 import { flakyLines } from '../src/flaky';
 import { blockNotices, hcCore, noticeFiles, noticeFolder, type HcCore } from './hc-fixture';
 import { noticeId } from '../src/notice';
@@ -2208,6 +2211,141 @@ test('a verify-written red run flips to green on the same tree and flaky reports
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('alpha');
     expect(result.stdout).not.toContain('(log gone)');
+  } finally {
+    f.clean();
+  }
+});
+
+test('verify refuses its stages for a failed leaf, starts no check command and leaves an incomplete receipt', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const marker: string = resolve(f.home, 'verify-probe-ran');
+    config(f, { checks: { probe: `touch ${marker}` } });
+    const { leafPath, worktree } = await callerWorktree(f);
+    saveState(leafPath, {
+      ...readState(leafPath),
+      phase: 'failed',
+      failure: { cause: 'attempts', phase: 'implement', slot: 'A', reason: 'seat A ended 3 turns without reporting' },
+    });
+    const result: Result = await verify(f, [], worktree);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain(
+      `Refusing run-check setup for leaf ${f.repo}/caller: the leaf is failed (seat A ended 3 turns without reporting)`,
+    );
+    expect(existsSync(marker)).toBe(false);
+    const runs: VerifyRun[] = records(f);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].setup).toBeUndefined();
+    expect(runs[0].end).toBeUndefined();
+    expect(
+      readTimings(f.root).some(
+        (event) => event.kind === 'check_refused' && event.name === 'setup' && event.slug === 'caller',
+      ),
+    ).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+test('verify --holder is not refused for a failed leaf phase', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'failed-elsewhere', 'failed', {
+      failure: { cause: 'attempts', phase: 'implement', slot: 'A', reason: 'ended' },
+    });
+    config(f, { checks: { unit: 'echo unit' }, merge_checks: { full: 'echo full' } });
+    const direct: string = resolve(storeDir(f), 'direct');
+    await command(['git', 'worktree', 'add', direct, '-b', 'direct'], f.root);
+    await commitIn(direct, 'code.ts');
+    const holder: string = resolve(f.home, 'chart/direct');
+    const result: Result = await verify(f, ['--holder', holder], direct);
+    expect(result.code).toBe(0);
+    const run: VerifyRun = records(f)[0];
+    expect(run).toMatchObject({ leaf: 'checkout', scope: 'merge' });
+    expect(run.end).not.toBeUndefined();
+    expect(readTimings(f.root).some((event) => event.kind === 'check_refused')).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('verify reusing a green receipt on a failed leaf starts no child', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { checks: { probe: 'echo probe' } });
+    const { leafPath, worktree } = await callerWorktree(f);
+    const sha: string = await commitIn(worktree, 'code.ts');
+    greenReceipt(f, sha, 'leaf');
+    saveState(leafPath, { ...readState(leafPath), phase: 'failed' });
+    const result: Result = await verify(f, [], worktree);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('reuse receipt');
+    expect(records(f)).toHaveLength(1);
+    expect(readTimings(f.root).some((event) => event.kind === 'check_refused')).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('verify joining a live pass on a failed leaf starts no child', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { checks: { probe: 'echo probe' } });
+    const { leafPath, worktree } = await callerWorktree(f);
+    const sha: string = await commitIn(worktree, 'code.ts');
+    saveState(leafPath, { ...readState(leafPath), phase: 'failed' });
+    const repo: Repo = readRepo(f.repo, f.root);
+    const dir: string = resolve(f.home, 'verify-passes', 'jointest');
+    mkdirSync(dir, { recursive: true });
+    writePassRecord(dir, {
+      run: 'jointest',
+      repo: f.repo,
+      root: f.root,
+      unit_name: `akrogon-verify-jointest`,
+      caller: {
+        slug: 'caller',
+        target: resolve(leafPath, 'implementation'),
+        scope: 'leaf',
+        phase: 'failed',
+      },
+      caller_scope: 'jointest-scope',
+      sha,
+      tree: await command(['git', 'rev-parse', `${sha}^{tree}`], worktree),
+      scope: 'leaf',
+      commands: verifyCommands(repo.config, 'leaf'),
+      member_count: 0,
+      setup: setupCommand(repo.config, 'true'),
+      akrogon_base: 'x',
+      pid: 1,
+      boot_id: bootId(),
+      pending: false,
+      created: new Date().toISOString(),
+    });
+    writeFileSync(resolve(dir, 'status'), '0\n');
+    const spawned = spawnFiles([process.execPath, entry, 'verify'], {
+      cwd: worktree,
+      env: {
+        ...process.env,
+        AKROGON_HOME: f.home,
+        HOME: f.home,
+        AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+        AKROGON_RETIRED_TEMP_ROOT: resolve(f.home, 'retired-temp'),
+        AKROGON_RUN: '',
+        AKROGON_SCOPE: 'jointest-scope',
+        PATH: `${unitBin(f)}:${process.env.PATH}`,
+      },
+    });
+    const deadline: number = Date.now() + 20000;
+    while (!existsSync(spawned.captured.errPath) || !readFileSync(spawned.captured.errPath, 'utf8').includes('run jointest')) {
+      if (Date.now() > deadline) throw new Error('verify never printed run jointest');
+      await Bun.sleep(50);
+    }
+    rmSync(resolve(dir, 'record.yaml'), { force: true });
+    const result: SpawnResult = await finishCaptured(spawned.child, spawned.captured);
+    expect(result.code).toBe(0);
+    expect(result.stderr).toContain('run jointest');
+    expect(records(f)).toEqual([]);
+    expect(readTimings(f.root).some((event) => event.kind === 'check_refused')).toBe(false);
   } finally {
     f.clean();
   }

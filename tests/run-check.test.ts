@@ -2,9 +2,24 @@ import { test, expect } from 'bun:test';
 import { z } from 'zod';
 import { basename, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
-import { fixture, cli, entry, leaf, yaml, fakeAkrogon, printedChecks, leafTempRoot, type Fixture } from './helpers';
-import { command, spawnCaptured, type Result } from '../src/shell';
+import {
+  fixture,
+  cli,
+  entry,
+  leaf,
+  yaml,
+  fakeAkrogon,
+  printedChecks,
+  leafTempRoot,
+  storeDir,
+  unitBin,
+  type Fixture,
+} from './helpers';
+import { command, finishCaptured, spawnCaptured, spawnFiles, type Result } from '../src/shell';
 import { readRepo, setupCommand } from '../src/config';
+import { readState, saveState } from '../src/state';
+import { readTimings, type TimingEvent } from '../src/timing';
+import type { Phase } from '../src/routing';
 
 const sh = (script: string): string[] => ['sh', '-c', script];
 
@@ -34,6 +49,44 @@ const baseEnv = (f: Fixture, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv =
   HOME: f.home,
   ...extra,
 });
+
+function runEnv(f: Fixture): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    AKROGON_HOME: f.home,
+    HERDR_PANE_ID: '',
+    HOME: f.home,
+    AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+    AKROGON_RETIRED_TEMP_ROOT: resolve(f.home, 'retired-temp'),
+    AKROGON_RUN: '',
+    PATH: `${unitBin(f)}:${process.env.PATH}`,
+  };
+}
+
+async function waitForFile(path: string, ms: number = 20000): Promise<void> {
+  const begun: number = Date.now();
+  while (!existsSync(path)) {
+    if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${path}`);
+    await Bun.sleep(20);
+  }
+}
+
+async function waitForText(path: string, pattern: RegExp, ms: number = 20000): Promise<void> {
+  const begun: number = Date.now();
+  for (;;) {
+    if (existsSync(path) && pattern.test(readFileSync(path, 'utf8'))) return;
+    if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${pattern} in ${path}`);
+    await Bun.sleep(50);
+  }
+}
+
+function failLeaf(leafPath: string, reason: string, phase: Phase = 'implement'): void {
+  saveState(leafPath, {
+    ...readState(leafPath),
+    phase: 'failed',
+    failure: { cause: 'attempts', phase, slot: 'A', reason },
+  });
+}
 
 function scratchRuns(f: Fixture): string[] {
   const root: string = leafTempRoot(f);
@@ -650,6 +703,243 @@ test('run-check preserves failed executable errors and removes their capture dir
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(executable);
     expect(readdirSync(captureRoot)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('run-check refuses a failed leaf before admission for a worktree cwd and a --leaf target', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { leafPath, worktree } = await leafWorktree(f, 'doomed');
+    const marker: string = resolve(f.home, 'doomed-ran');
+    failLeaf(leafPath, 'operator asked', 'plan.synthesis');
+    const cwd_result: Result = await cli(
+      f,
+      ['run-check', '--name', 'probe', '--', 'touch', marker],
+      worktree,
+      baseEnv(f),
+    );
+    expect(cwd_result.code).toBe(1);
+    expect(cwd_result.stderr).toContain(
+      `Refusing run-check probe for leaf ${f.repo}/doomed: the leaf is failed (operator asked).`,
+    );
+    expect(cwd_result.stderr).toContain('akrogon phase doomed plan.synthesis');
+    expect(cwd_result.stderr).not.toMatch(/^run [0-9a-f-]{36}/m);
+    expect(cwd_result.stderr).not.toMatch(/^capture /m);
+    expect(existsSync(marker)).toBe(false);
+    const folder: string = resolve(leafPath, 'implementation');
+    if (existsSync(folder))
+      expect(readdirSync(folder).every((name) => !name.startsWith('check-') && !name.startsWith('capture-'))).toBe(
+        true,
+      );
+    expect(readTimings(f.root).some((event) => event.kind === 'check_refused' && event.name === 'probe')).toBe(true);
+    const { worktree: healthy } = await leafWorktree(f, 'healthy');
+    const leaf_result: Result = await cli(
+      f,
+      ['run-check', '--leaf', leafPath, '--', 'touch', marker],
+      healthy,
+      baseEnv(f),
+    );
+    expect(leaf_result.code).toBe(1);
+    expect(leaf_result.stderr).toContain(`Refusing run-check run for leaf ${f.repo}/doomed`);
+    expect(existsSync(marker)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('run-check refuses a failed leaf with no failure record and names no recovery phase', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const leafPath: string = leaf(f, 'recordless', 'failed', {});
+    const { worktree } = await leafWorktree(f, 'elsewhere');
+    const marker: string = resolve(f.home, 'recordless-ran');
+    const result: Result = await cli(
+      f,
+      ['run-check', '--leaf', leafPath, '--name', 'probe', '--', 'touch', marker],
+      worktree,
+      baseEnv(f),
+    );
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('the leaf is failed (failure record unavailable)');
+    expect(result.stderr).toContain('the operator recovers it with akrogon phase recordless.');
+    expect(result.stderr).not.toMatch(/phase recordless \S+/);
+    expect(existsSync(marker)).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('run-check refuses a worker-scoped run for a failed leaf', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const leafPath: string = leaf(f, 'wfail', 'failed', {
+      failure: { cause: 'attempts', phase: 'implement', slot: 'A', reason: 'seat A ended 3 turns without reporting' },
+    });
+    const worker: string = resolve(storeDir(f), 'wfail-u1');
+    await command(['git', 'worktree', 'add', '--detach', worker, 'HEAD'], f.root);
+    const marker: string = resolve(f.home, 'worker-ran');
+    const result: Result = await cli(f, ['run-check', '--', 'touch', marker], worker, baseEnv(f));
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(`Refusing run-check run for leaf ${f.repo}/wfail: the leaf is failed`);
+    expect(result.stderr).toContain('(seat A ended 3 turns without reporting)');
+    expect(existsSync(marker)).toBe(false);
+    await command(['git', 'worktree', 'remove', '--force', worker], f.root);
+    expect(readTimings(f.root).some((event) => event.kind === 'check_refused' && event.scope === 'worker')).toBe(true);
+    void leafPath;
+  } finally {
+    f.clean();
+  }
+});
+
+test('run-check waiting on the full line is refused after the leaf fails while it waits', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      full: ['test'],
+      grounding: 'none',
+    });
+    const dir: string = resolve(f.home, 'line');
+    mkdirSync(dir);
+    const { worktree: first } = await leafWorktree(f, 'holder');
+    const { leafPath: waitingLeaf, worktree: second } = await leafWorktree(f, 'waiter');
+    const held: string = resolve(dir, 'a.held');
+    const release: string = resolve(dir, 'release');
+    const marker: string = resolve(dir, 'waiter-ran');
+    const a = spawnFiles(
+      [
+        process.execPath,
+        entry,
+        'run-check',
+        '--name',
+        'test',
+        '--',
+        'sh',
+        '-c',
+        `touch ${held}; while [ ! -e ${release} ]; do sleep 0.05; done`,
+      ],
+      { cwd: first, env: runEnv(f) },
+    );
+    await waitForFile(held);
+    const b = spawnFiles(
+      [process.execPath, entry, 'run-check', '--name', 'test', '--', 'touch', marker],
+      { cwd: second, env: runEnv(f) },
+    );
+    await waitForText(b.captured.errPath, new RegExp(`waiting for ${f.repo}/holder test`));
+    failLeaf(waitingLeaf, 'seat A ended 3 turns without reporting');
+    writeFileSync(release, '');
+    const aResult = await finishCaptured(a.child, a.captured);
+    const bResult = await finishCaptured(b.child, b.captured);
+    expect(aResult.code).toBe(0);
+    expect(bResult.code).toBe(1);
+    expect(bResult.stderr).toContain(`waiting for ${f.repo}/holder test`);
+    expect(bResult.stderr).toMatch(/run [0-9a-f-]{36}/);
+    expect(bResult.stderr).toContain(
+      `Refusing run-check test for leaf ${f.repo}/waiter: the leaf is failed (seat A ended 3 turns without reporting)`,
+    );
+    expect(existsSync(marker)).toBe(false);
+    expect(
+      readTimings(f.root).some(
+        (event) => event.kind === 'check_refused' && event.slug === 'waiter' && event.name === 'test',
+      ),
+    ).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a refused run appends exactly one check_refused row with the run identity', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const head: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+    const leafPath: string = leaf(f, 'timing-leaf', 'implement', {
+      batch: { attempt: 'att-9', built_on: head, holder: { base: head, head }, applied: true },
+    });
+    failLeaf(leafPath, 'seat A ended 3 turns without reporting');
+    const { worktree } = await leafWorktree(f, 'caller');
+    const result: Result = await cli(
+      f,
+      ['run-check', '--leaf', leafPath, '--name', 'audit', '--', 'true'],
+      worktree,
+      baseEnv(f),
+    );
+    expect(result.code).toBe(1);
+    const refused: TimingEvent[] = readTimings(f.root).filter((event) => event.kind === 'check_refused');
+    expect(refused).toHaveLength(1);
+    expect(refused[0]).toMatchObject({
+      slug: 'timing-leaf',
+      name: 'audit',
+      scope: 'leaf',
+      phase: 'failed',
+      attempt: 'att-9',
+    });
+    expect(refused[0].kind === 'check_refused' && /^[0-9a-f-]{36}$/.test(refused[0].run)).toBe(true);
+    const events: TimingEvent[] = readTimings(f.root);
+    const run: string = refused[0].kind === 'check_refused' ? refused[0].run : '';
+    expect(
+      events.some(
+        (event) => (event.kind === 'check_start' || event.kind === 'check_end') && event.run === run,
+      ),
+    ).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a run whose command already started finishes and publishes when the leaf fails mid-run', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { leafPath, worktree } = await leafWorktree(f, 'midway');
+    const dir: string = resolve(f.home, 'mid');
+    mkdirSync(dir);
+    const started: string = resolve(dir, 'started');
+    const marker: string = resolve(dir, 'done');
+    const spawned = spawnFiles(
+      [
+        process.execPath,
+        entry,
+        'run-check',
+        '--name',
+        'slow',
+        '--',
+        'sh',
+        '-c',
+        `touch ${started}; sleep 0.4; touch ${marker}`,
+      ],
+      { cwd: worktree, env: runEnv(f) },
+    );
+    await waitForFile(started);
+    failLeaf(leafPath, 'seat A ended 3 turns without reporting');
+    const result = await finishCaptured(spawned.child, spawned.captured);
+    expect(result.code).toBe(0);
+    expect(existsSync(marker)).toBe(true);
+    const events: TimingEvent[] = readTimings(f.root);
+    expect(events.some((event) => event.kind === 'check_end' && event.slug === 'midway')).toBe(true);
+    expect(events.some((event) => event.kind === 'check_refused')).toBe(false);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a --holder run-check is never refused for a leaf phase', async () => {
+  const f: Fixture = await fixture();
+  try {
+    leaf(f, 'failed-elsewhere', 'failed', {
+      failure: { cause: 'attempts', phase: 'implement', slot: 'A', reason: 'ended' },
+    });
+    const holder: string = resolve(f.home, 'holder');
+    mkdirSync(holder);
+    const result: Result = await cli(
+      f,
+      ['run-check', '--name', 'h', '--holder', holder, '--', 'echo', 'holder-out'],
+      f.root,
+      baseEnv(f),
+    );
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('holder-out');
+    expect(readTimings(f.root).some((event) => event.kind === 'check_refused')).toBe(false);
   } finally {
     f.clean();
   }
