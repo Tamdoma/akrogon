@@ -192,3 +192,30 @@ test('a core carrying Claude child-session variables starts a seat without them,
     await teardown(f, core, 'hs-env');
   }
 });
+
+test('a claude seat launch carries --disallowedTools=AskUserQuestion once before its task, which stays last and arrives unchanged', async () => {
+  const { f, core, path } = await setup('hs-disallowed', 'work');
+  try {
+    setSeat(f, 'a', 'claude', 'work');
+    const task: string = `plan-issue hs-disallowed slot=A phase=plan.synthesis leaf=${path}`;
+    expect((await cli(f, ['seat', 'hs-disallowed', 'A'], f.root, core.env)).code).toBe(0);
+    const seat: Terminal = await seatOf(core, `${f.prefix}-hs-disallowed-a`);
+    const runLine: string = z.string().parse(
+      readFileSync(core.shimLog, 'utf8')
+        .split('\n')
+        .find((line: string) => line.startsWith('run\t')),
+    );
+    const fields: string[] = runLine.split('\t');
+    const cmd: string[] = fields.slice(fields.lastIndexOf('--') + 1);
+    // The recorded hc run argv holds --disallowedTools=AskUserQuestion once, as one element, before
+    // the appended task; the task stays the last element (brief criterion 1).
+    expect(cmd.filter((arg: string) => arg.startsWith('--disallowedTools'))).toEqual([
+      '--disallowedTools=AskUserQuestion',
+    ]);
+    expect(cmd.at(-2)).toBe('--disallowedTools=AskUserQuestion');
+    expect(cmd.at(-1)).toBe(task);
+    expect(core.tasks(seat.address)).toEqual([task]);
+  } finally {
+    await teardown(f, core, 'hs-disallowed');
+  }
+});

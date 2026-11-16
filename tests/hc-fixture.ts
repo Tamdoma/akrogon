@@ -140,8 +140,9 @@ export function setPrefixes(f: Fixture, prefixes: Record<string, string> | undef
   writeFileSync(path, Bun.YAML.stringify(prefixes === undefined ? rest : { ...rest, prefixes }));
 }
 
-// Points a slot at a harness and stand-in mode (the --model value), adding the agy entry the start verb keys on.
-export function setSeat(f: Fixture, slot: 'a' | 'b', harness: 'fake' | 'agy', model: string): void {
+// Points a slot at a harness and stand-in mode (the --model value), adding the stand-in template the
+// start verb keys on (every harness name in standinBin maps to the stand-in).
+export function setSeat(f: Fixture, slot: 'a' | 'b', harness: string, model: string): void {
   const path: string = resolve(f.home, 'config.yaml');
   const global = z
     .object({ slots: z.record(z.string(), z.unknown()), harnesses: z.record(z.string(), z.string()) })
@@ -152,7 +153,7 @@ export function setSeat(f: Fixture, slot: 'a' | 'b', harness: 'fake' | 'agy', mo
     Bun.YAML.stringify({
       ...global,
       slots: { ...global.slots, [slot]: { harness, model, effort: 'low' } },
-      harnesses: { ...global.harnesses, agy: 'agy --model {model} --effort {effort}' },
+      harnesses: { ...global.harnesses, [harness]: `${harness} --model {model} --effort {effort}` },
     }),
   );
 }
@@ -203,7 +204,8 @@ export async function hcCore(
     resolve(coreRuntime, 'herdr-core'),
   ];
   for (const dir of dirs) mkdirSync(dir, { recursive: true });
-  for (const name of ['fake', 'agy']) symlinkSync(resolve(import.meta.dir, 'stand-in.sh'), resolve(standinBin, name));
+  for (const name of ['fake', 'agy', 'claude'])
+    symlinkSync(resolve(import.meta.dir, 'stand-in.sh'), resolve(standinBin, name));
   symlinkSync(resolve(realRuntime, 'bus'), resolve(runtime, 'bus'));
   symlinkSync(resolve(realRuntime, 'systemd'), resolve(runtime, 'systemd'));
   symlinkSync(resolve(realRuntime, 'bus'), resolve(coreRuntime, 'bus'));
