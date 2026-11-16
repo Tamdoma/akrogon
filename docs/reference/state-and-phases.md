@@ -32,7 +32,7 @@ akrogon phase <slug> <next-phase> --slot <A|B> [--verdict <ready|nits|fix>] [--r
 - `--check` runs the same gates and moves nothing. It prints `ok` when the move would pass.
 - The gates refuse a move when the worktree has uncommitted work, the branch changes files under `issues/`, or a changed test file has no `Test-Change:` trailer. The move into check.review also needs a non-empty branch and a green `akrogon verify` receipt for HEAD. The move from check.repair to merge needs the same receipt.
 - In merge, `merged` and `check.fix` calls need `--attempt` with the current batch attempt, and only the leaf holding the repo's merge turn may make them. See [merge-issue](../../skills/merge-issue/SKILL.md).
-- Every completed move clears the pass records: `done`, `verdict`, `prompted`, `prompted_at`, `delivery_error` and `attempts`.
+- Every completed move clears the pass records: `done`, `verdict`, `prompted`, `prompted_at`, `delivery_error`, `attempts` and `lost`.
 
 Any seat can stop the leaf:
 
@@ -84,7 +84,8 @@ Leave these to the commands. Editing them by hand makes the file disagree with t
 | `busy_since`     | Per seat, when the seat was first seen busy. Cleared when the seat goes idle.                                                                                                                      | `akrogon next`                                       |
 | `busy_notified`  | Per seat, `pending` once the busy-over-an-hour notice file is written, `shown` once it is gone (old timestamps read as shown). The seat going idle or a move to failed or merged removes the file. | `akrogon next`                                       |
 | `blocked_notified` | Per seat, `pending` once the blocked-seat notice file is written, `shown` once it is gone. The seat leaving blocked, that seat's replacement or any phase move removes the file. | `akrogon next`, `akrogon phase`                  |
-| `attempts`       | Per seat, how many prompt deliveries in a row failed. Reset on a delivered prompt and on every move.                                                                                               | `akrogon next`, `akrogon phase`                      |
+| `attempts`       | Per seat, how many prompted turns in a row ended without a report. Counted only at a seen silent turn end; starts and deliveries cost none. Reset on every move.                                  | `akrogon next`, `akrogon phase`                      |
+| `lost`           | Per seat, how many recorded seats were replaced because their terminal finished or vanished before ending a turn. Reset on a seen turn end and on every move.                                      | `akrogon next`, `akrogon phase`                      |
 | `done`           | Seats that finished the current phase.                                                                                                                                                             | `akrogon phase`                                      |
 | `fix_rounds`     | How many times the leaf went to check.fix from check.repair or merge. Kept across recovery.                                                                                                        | `akrogon phase`                                      |
 | `verdict`        | Per seat, the review verdict in check.review.                                                                                                                                                      | `akrogon phase`                                      |
