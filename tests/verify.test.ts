@@ -2336,7 +2336,10 @@ test('verify joining a live pass on a failed leaf starts no child', async () => 
       },
     });
     const deadline: number = Date.now() + 20000;
-    while (!existsSync(spawned.captured.errPath) || !readFileSync(spawned.captured.errPath, 'utf8').includes('run jointest')) {
+    while (
+      !existsSync(spawned.captured.errPath) ||
+      !readFileSync(spawned.captured.errPath, 'utf8').includes('run jointest')
+    ) {
       if (Date.now() > deadline) throw new Error('verify never printed run jointest');
       await Bun.sleep(50);
     }

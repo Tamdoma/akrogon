@@ -823,10 +823,10 @@ test('run-check waiting on the full line is refused after the leaf fails while i
       { cwd: first, env: runEnv(f) },
     );
     await waitForFile(held);
-    const b = spawnFiles(
-      [process.execPath, entry, 'run-check', '--name', 'test', '--', 'touch', marker],
-      { cwd: second, env: runEnv(f) },
-    );
+    const b = spawnFiles([process.execPath, entry, 'run-check', '--name', 'test', '--', 'touch', marker], {
+      cwd: second,
+      env: runEnv(f),
+    });
     await waitForText(b.captured.errPath, new RegExp(`waiting for ${f.repo}/holder test`));
     failLeaf(waitingLeaf, 'seat A ended 3 turns without reporting');
     writeFileSync(release, '');
@@ -879,9 +879,7 @@ test('a refused run appends exactly one check_refused row with the run identity'
     const events: TimingEvent[] = readTimings(f.root);
     const run: string = refused[0].kind === 'check_refused' ? refused[0].run : '';
     expect(
-      events.some(
-        (event) => (event.kind === 'check_start' || event.kind === 'check_end') && event.run === run,
-      ),
+      events.some((event) => (event.kind === 'check_start' || event.kind === 'check_end') && event.run === run),
     ).toBe(false);
   } finally {
     f.clean();
