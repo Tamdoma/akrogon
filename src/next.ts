@@ -170,8 +170,7 @@ async function observeBusy(
   if (t.status?.state === 'blocked') {
     const blocked: string = noticeId(repo.name, 'blocked', state.slug, seat);
     if (state.blocked_notified[seat] === 'pending') {
-      if (noticeState(await repoNotices(repo), blocked) === 'pending')
-        return { state, notified: false };
+      if (noticeState(await repoNotices(repo), blocked) === 'pending') return { state, notified: false };
       const shown: State = {
         ...state,
         blocked_notified: { ...state.blocked_notified, [seat]: 'shown' },
