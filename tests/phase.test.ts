@@ -1005,10 +1005,16 @@ test('failed exits by command reset attempts and keep fix_rounds', async () => {
     const path: string = leaf(f, 'stuck', 'failed', {
       fix_rounds: 3,
       attempts: { A: 1, B: 2 },
+      lost: { A: 2, B: 1 },
       done: ['A'],
     });
     expect((await cli(f, ['phase', 'stuck', 'plan.synthesis'])).code).toBe(0);
-    expect(readState(path)).toMatchObject({ attempts: { A: 0, B: 0 }, done: [], fix_rounds: 3 });
+    expect(readState(path)).toMatchObject({
+      attempts: { A: 0, B: 0 },
+      lost: { A: 0, B: 0 },
+      done: [],
+      fix_rounds: 3,
+    });
     const second: string = leaf(f, 'still-stuck', 'failed', { fix_rounds: 2 });
     const result: Result = await cli(f, ['phase', 'still-stuck', 'check.fix']);
     expect(result.stdout).toBe('moved check.fix');

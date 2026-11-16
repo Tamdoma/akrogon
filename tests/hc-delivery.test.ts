@@ -1,14 +1,15 @@
 // Criteria 4 and 5: one prompt per seat per turn, the silent-stop bound and the send guards,
 // on a real hc core with the stand-in agent. `next <slug>` stands in for the listener's wake.
 import { test, expect } from 'bun:test';
-import { chmodSync, mkdirSync, readFileSync, watch, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, watch, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { cli, fixture, leaf, type Fixture } from './helpers';
+import { cli, entry, fixture, leaf, leafTempRoot, killTree, unitBin, yaml, type Fixture } from './helpers';
 import { coreBin, hcCore, setSeat, shortStartProof, type HcCore, type Terminal } from './hc-fixture';
 import { readState } from '../src/state';
 import { leafSlice } from '../src/scope';
-import { spawnCaptured } from '../src/shell';
+import { readTimings, type TimingEvent } from '../src/timing';
+import { finishCaptured, spawnCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 
 async function setup(slug: string, harness: 'fake' | 'agy', mode: string) {
   const f: Fixture = await fixture();
@@ -83,20 +84,26 @@ test('silent stops are re-prompted, the third fails the leaf, and a phase move r
   try {
     expect((await cli(f, ['next', 'hd-silent'], f.root, core.env)).code).toBe(0);
     const address: string = (await seatA(core, 'hd-silent')).address;
+    // A start or a delivery counts nothing: the count moves only at a seen silent turn end.
+    expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
+    expect(readState(path).lost).toEqual({ A: 0, B: 0 });
     // plan.synthesis: initial prompt, two silent stops re-prompted.
     for (const turn of [1, 2]) {
       await core.waitFor(address, idleAfter(turn));
       expect((await cli(f, ['next', 'hd-silent'], f.root, core.env)).code).toBe(0);
+      expect(readState(path).attempts).toEqual({ A: turn, B: 0 });
     }
     expect(core.tasks(address)).toHaveLength(3);
     // C4.2: a phase move resets the count, so implement gets its own three prompts.
     await core.waitFor(address, idleAfter(3));
     expect((await cli(f, ['phase', 'hd-silent', 'implement', '--slot', 'A'], f.root, core.env)).code).toBe(0);
+    expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
     expect(core.tasks(address)).toHaveLength(4);
     for (const turn of [4, 5]) {
       await core.waitFor(address, idleAfter(turn));
       expect((await cli(f, ['next', 'hd-silent'], f.root, core.env)).code).toBe(0);
       expect(readState(path).phase).toBe('implement');
+      expect(readState(path).attempts).toEqual({ A: turn - 3, B: 0 });
     }
     expect(core.tasks(address)).toHaveLength(6);
     await core.waitFor(address, idleAfter(6));
@@ -110,14 +117,280 @@ test('silent stops are re-prompted, the third fails the leaf, and a phase move r
   }
 });
 
+test('one silent turn end is counted once, including a pass where the redelivery send throws', async () => {
+  const { f, core, path } = await setup('hd-once', 'fake', 'work');
+  const hold: string = resolve(core.standin, 'hold');
+  writeFileSync(
+    resolve(core.standin, 'hook'),
+    `#!/bin/sh\nwhile [ -e '${hold}' ]; do sleep 0.05; done\n`,
+  );
+  chmodSync(resolve(core.standin, 'hook'), 0o755);
+  try {
+    expect((await cli(f, ['next', 'hd-once'], f.root, core.env)).code).toBe(0);
+    const address: string = (await seatA(core, 'hd-once')).address;
+    await core.waitFor(address, idleAfter(1));
+    // The count is written before the redelivery send: a throwing send leaves it charged once.
+    writeFileSync(hold, '');
+    const unavailable: string = resolve(f.home, 'unavailable-once');
+    writeFileSync(unavailable, '');
+    const thrown = await cli(f, ['next', 'hd-once'], f.root, { ...core.env, HC_SHIM_UNAVAILABLE: unavailable });
+    expect(thrown.code).not.toBe(0);
+    expect(readState(path).attempts).toEqual({ A: 1, B: 0 });
+    expect(core.tasks(address)).toHaveLength(1);
+    // The same ended turn is not recounted: the retry delivers and leaves the count at 1. The
+    // delivered turn is held open working.
+    expect((await cli(f, ['next', 'hd-once'], f.root, core.env)).code).toBe(0);
+    await core.waitFor(address, (t: Terminal) => t.status?.state === 'working');
+    expect(readState(path).attempts).toEqual({ A: 1, B: 0 });
+    expect(core.tasks(address)).toHaveLength(2);
+    // A pass over the still-open turn neither counts nor sends.
+    expect((await cli(f, ['next', 'hd-once'], f.root, core.env)).code).toBe(0);
+    expect(readState(path).attempts).toEqual({ A: 1, B: 0 });
+    expect(core.tasks(address)).toHaveLength(2);
+  } finally {
+    rmSync(hold, { force: true });
+    await teardown(f, core, 'hd-once');
+  }
+});
+
+type RunRecordRow = { state: string; repo: string; leaf: string; check: string; pid: number };
+
+// The admission records a run-check leaves in the fixture's AKROGON_HOME while it runs.
+function runRecords(f: Fixture): RunRecordRow[] {
+  const dir: string = resolve(f.home, 'runs');
+  const records: RunRecordRow[] = [];
+  if (!existsSync(dir)) return records;
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.yaml')) continue;
+    records.push(
+      z
+        .object({ state: z.string(), repo: z.string(), leaf: z.string(), check: z.string(), pid: z.number() })
+        .parse(Bun.YAML.parse(readFileSync(resolve(dir, name), 'utf8'))),
+    );
+  }
+  return records;
+}
+
+async function waitRunRecord(f: Fixture, state: string, ms: number = 15000): Promise<RunRecordRow> {
+  const deadline: number = Date.now() + ms;
+  for (;;) {
+    const found: RunRecordRow | undefined = runRecords(f).find((record) => record.state === state);
+    if (found !== undefined) return found;
+    if (Date.now() > deadline) throw new Error(`No ${state} run record`);
+    await Bun.sleep(50);
+  }
+}
+
+type LiveCheck = { proc: Bun.Subprocess; result: Promise<SpawnResult> };
+
+function spawnRunCheck(f: Fixture, args: string[], env: NodeJS.ProcessEnv): LiveCheck {
+  const { child, captured } = spawnFiles([process.execPath, entry, ...args], {
+    cwd: f.root,
+    env: {
+      ...process.env,
+      AKROGON_HOME: f.home,
+      HERDR_PANE_ID: '',
+      HOME: f.home,
+      AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+      AKROGON_RUN: '',
+      PATH: `${resolve(f.home, 'bin')}:${unitBin(f)}:${process.env.PATH}`,
+      ...env,
+    },
+  });
+  return { proc: child, result: finishCaptured(child, captured) };
+}
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// What liveRuns() sees: live or waiting records whose recorded pid still runs.
+function liveRecords(f: Fixture): RunRecordRow[] {
+  return runRecords(f).filter(
+    (record) => (record.state === 'live' || record.state === 'waiting') && alive(record.pid),
+  );
+}
+
+test('a live or waiting run-check record suppresses counting and redelivery until it is gone', async () => {
+  const { f, core, path } = await setup('hd-runs', 'fake', 'work');
+  try {
+    expect((await cli(f, ['next', 'hd-runs'], f.root, core.env)).code).toBe(0);
+    const address: string = (await seatA(core, 'hd-runs')).address;
+    // A real admission record for this repo and leaf, from a sleeping run-check.
+    const held = spawnRunCheck(
+      f,
+      ['run-check', '--leaf', path, '--name', 'held', '--', 'sh', '-c', 'sleep 60'],
+      core.env,
+    );
+    const live: RunRecordRow = await waitRunRecord(f, 'live');
+    expect(live).toMatchObject({ repo: f.repo, leaf: 'hd-runs', check: 'held' });
+    await core.waitFor(address, idleAfter(1));
+    // The seat's turn ended silently, but its own run is live: no count, no prompt.
+    expect((await cli(f, ['next', 'hd-runs'], f.root, core.env)).code).toBe(0);
+    expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
+    expect(core.tasks(address)).toHaveLength(1);
+    // A waiting record behind the live one suppresses the same way.
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { held: 'sleep 60', queued: 'sleep 60' },
+      full: ['held', 'queued'],
+      grounding: 'none',
+    });
+    const queued = spawnRunCheck(
+      f,
+      ['run-check', '--leaf', path, '--name', 'queued', '--', 'sh', '-c', 'sleep 60'],
+      core.env,
+    );
+    expect((await waitRunRecord(f, 'waiting')).check).toBe('queued');
+    expect((await cli(f, ['next', 'hd-runs'], f.root, core.env)).code).toBe(0);
+    expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
+    expect(core.tasks(address)).toHaveLength(1);
+    killTree(held.proc);
+    killTree(queued.proc);
+    const deadline: number = Date.now() + 15000;
+    while (liveRecords(f).length > 0) {
+      if (Date.now() > deadline) throw new Error('run records never cleared');
+      await Bun.sleep(50);
+    }
+    // With the record gone, the ended turn counts and the seat is re-prompted once.
+    expect((await cli(f, ['next', 'hd-runs'], f.root, core.env)).code).toBe(0);
+    expect(readState(path).attempts).toEqual({ A: 1, B: 0 });
+    expect(core.tasks(address)).toHaveLength(2);
+  } finally {
+    await teardown(f, core, 'hd-runs');
+  }
+});
+
+function seatLostRows(f: Fixture): TimingEvent[] {
+  return readTimings(f.root).filter((event) => event.kind === 'seat_lost');
+}
+
+test('a lost seat is charged and rowed, a finished silent end is not, and the third loss fails', async () => {
+  const f: Fixture = await fixture();
+  setSeat(f, 'a', 'fake', 'work');
+  setSeat(f, 'b', 'fake', 'work');
+  const core: HcCore = await hcCore(f);
+  const path: string = leaf(f, 'hd-lost', 'check.review');
+  const hold: string = resolve(core.standin, 'hold');
+  writeFileSync(hold, '');
+  writeFileSync(
+    resolve(core.standin, 'hook'),
+    `#!/bin/sh\nwhile [ -e '${hold}' ] && [ ! -e "${core.standin}/free-$1" ]; do sleep 0.05; done\n`,
+  );
+  chmodSync(resolve(core.standin, 'hook'), 0o755);
+  try {
+    expect((await cli(f, ['next', 'hd-lost'], f.root, core.env)).code).toBe(0);
+    const first: string = (await seatA(core, 'hd-lost')).address;
+    // Loss 1: A dies mid-turn (held working) and is replaced; the row lands before the removal.
+    expect((await core.hc(['kill', first])).code).toBe(0);
+    expect((await cli(f, ['next', 'hd-lost'], f.root, core.env)).code).toBe(0);
+    expect(readState(path).lost).toEqual({ A: 1, B: 0 });
+    const second: string = (await seatA(core, 'hd-lost')).address;
+    expect(second).not.toBe(first);
+    expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
+    // The row's terminal fields are read before end()'s kill/rm pair removes the terminal.
+    const calls1: string[] = readFileSync(core.shimLog, 'utf8')
+      .split('\n')
+      .map((line: string) => line.split('\t'))
+      .filter((args: string[]) => args.includes(first))
+      .map((args: string[]) => args[0]);
+    expect(calls1.filter((call: string) => call === 'get' || call === 'read')).not.toHaveLength(0);
+    expect(calls1.indexOf('kill')).toBeGreaterThan(-1);
+    expect(calls1.indexOf('kill')).toBeLessThan(calls1.indexOf('rm'));
+    expect(Math.max(calls1.lastIndexOf('get'), calls1.lastIndexOf('read'))).toBeLessThan(calls1.indexOf('kill'));
+    const lost1: TimingEvent[] = seatLostRows(f);
+    expect(lost1).toHaveLength(1);
+    expect(lost1[0]).toMatchObject({ slot: 'A', phase: 'check.review', slug: 'hd-lost', address: first, turn: 0 });
+    expect(lost1[0]).not.toHaveProperty('gone');
+    expect((lost1[0] as { signal?: number | null }).signal).toBe(15);
+    expect(typeof (lost1[0] as { screen?: string }).screen).toBe('string');
+    expect(((lost1[0] as { screen?: string }).screen ?? '').split('\n').length).toBeLessThanOrEqual(40);
+    // Loss 2: the terminal is already removed (hc get not_found): the row records gone, no screen.
+    expect((await core.hc(['kill', second])).code).toBe(0);
+    expect((await core.hc(['rm', second])).code).toBe(0);
+    expect((await cli(f, ['next', 'hd-lost'], f.root, core.env)).code).toBe(0);
+    expect(readState(path).lost).toEqual({ A: 2, B: 0 });
+    const third: string = (await seatA(core, 'hd-lost')).address;
+    expect(third).not.toBe(second);
+    const lost2: TimingEvent[] = seatLostRows(f);
+    expect(lost2).toHaveLength(2);
+    expect(lost2[1]).toMatchObject({ slot: 'A', phase: 'check.review', slug: 'hd-lost', address: second, gone: true });
+    expect(lost2[1]).not.toHaveProperty('screen');
+    // A gone terminal is never read, sent to or removed by the pass (test kills bypass the shim log):
+    // the only shim-logged call naming it is the not_found get.
+    const calls2: string[] = readFileSync(core.shimLog, 'utf8')
+      .split('\n')
+      .map((line: string) => line.split('\t'))
+      .filter((args: string[]) => args.includes(second))
+      .map((args: string[]) => args[0]);
+    expect(calls2.length).toBeGreaterThan(0);
+    expect(calls2.every((call: string) => call === 'get')).toBe(true);
+    // A seen turn end resets the count: free the hold so the turn ends, kill the seat after the
+    // end, and the pass counts a silent end instead of a loss.
+    writeFileSync(resolve(core.standin, `free-${third}`), '');
+    await core.waitFor(third, idleAfter(1));
+    expect((await core.hc(['kill', third])).code).toBe(0);
+    expect((await cli(f, ['next', 'hd-lost'], f.root, core.env)).code).toBe(0);
+    expect(readState(path).lost).toEqual({ A: 0, B: 0 });
+    expect(readState(path).attempts).toEqual({ A: 1, B: 0 });
+    expect(seatLostRows(f)).toHaveLength(2);
+    const fourth: string = (await seatA(core, 'hd-lost')).address;
+    expect(fourth).not.toBe(third);
+    // Losses 2 and 3 after the reset; the third charges the leaf as failed and starts nothing.
+    expect((await core.hc(['kill', fourth])).code).toBe(0);
+    expect((await cli(f, ['next', 'hd-lost'], f.root, core.env)).code).toBe(0);
+    expect(readState(path).lost).toEqual({ A: 1, B: 0 });
+    const fifth: string = (await seatA(core, 'hd-lost')).address;
+    expect(fifth).not.toBe(fourth);
+    expect((await core.hc(['kill', fifth])).code).toBe(0);
+    expect((await cli(f, ['next', 'hd-lost'], f.root, core.env)).code).toBe(0);
+    const failed = readState(path);
+    expect(failed.phase).toBe('failed');
+    expect(failed.failure?.cause).toBe('attempts');
+    expect(failed.failure?.reason).toBe('seat A was lost 3 times before ending a turn');
+    // B still stands; no replacement A was started for the third loss.
+    expect(await core.terminals({ 'akrogon.leaf': 'hd-lost', 'akrogon.seat': 'a' }, false)).toHaveLength(0);
+    expect(seatLostRows(f)).toHaveLength(4);
+  } finally {
+    rmSync(hold, { force: true });
+    await teardown(f, core, 'hd-lost');
+  }
+});
+
+test('a seat that dies during its start proof is charged as a loss', async () => {
+  const f: Fixture = await fixture();
+  setSeat(f, 'a', 'fake', 'exit');
+  setSeat(f, 'b', 'fake', 'exit');
+  const core: HcCore = await hcCore(f);
+  const path: string = leaf(f, 'hd-dead-start', 'plan.synthesis');
+  try {
+    const first: Result = await cli(f, ['next', 'hd-dead-start'], f.root, core.env);
+    expect(first.code).not.toBe(0);
+    expect(readState(path).lost).toEqual({ A: 0, B: 0 });
+    const second = await cli(f, ['next', 'hd-dead-start'], f.root, core.env);
+    expect(second.code).not.toBe(0);
+    expect(readState(path).lost).toEqual({ A: 1, B: 0 });
+    const rows: TimingEvent[] = seatLostRows(f);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ slot: 'A', phase: 'plan.synthesis', slug: 'hd-dead-start', exit_code: 3 });
+  } finally {
+    await teardown(f, core, 'hd-dead-start');
+  }
+});
+
 test('a turn that ends in done without reporting is a silent stop and is re-prompted', async () => {
-  const { f, core } = await setup('hd-done', 'fake', 'done');
+  const { f, core, path } = await setup('hd-done', 'fake', 'done');
   try {
     expect((await cli(f, ['next', 'hd-done'], f.root, core.env)).code).toBe(0);
     const address: string = (await seatA(core, 'hd-done')).address;
     await core.waitFor(address, (t: Terminal) => t.turn >= 1 && t.status?.state === 'done');
     expect((await cli(f, ['next', 'hd-done'], f.root, core.env)).code).toBe(0);
     expect(core.tasks(address)).toHaveLength(2);
+    expect(readState(path).attempts).toEqual({ A: 1, B: 0 });
   } finally {
     await teardown(f, core, 'hd-done');
   }
@@ -148,7 +421,11 @@ test('a working seat gets no send; a send that never starts is recorded, not res
     // The late turn counts as the delivered prompt (D13 step 3); it ended without a report, so the same
     // pass prompts the new idle turn once (step 6), which the idle stand-in again never starts.
     expect(settled.prompted.A).toMatchObject({ turn: error.turn, address });
+    // The settled turn ended silently: it counts once and clears prompted, then the resettled send
+    // fails not_started again and counts nothing.
+    expect(settled.prompted.A).toBeUndefined();
     expect(settled.delivery_error.A).toMatchObject({ code: 'not_started', turn: error.turn + 1, address });
+    expect(settled.attempts).toEqual({ A: 1, B: 0 });
   } finally {
     await teardown(f, core, 'hd-send');
   }

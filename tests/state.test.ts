@@ -30,7 +30,7 @@ test('canonical states parse and save without retired fields and retain defaults
     expect(Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8'))).not.toHaveProperty('priority');
     expect(Bun.YAML.parse(readFileSync(resolve(path, 'state.yaml'), 'utf8'))).not.toHaveProperty('slot');
     const state: State = stateSchema.parse(canonical);
-    expect(state).toMatchObject({ attempts: { A: 0, B: 0 }, done: [], prompted: {} });
+    expect(state).toMatchObject({ attempts: { A: 0, B: 0 }, lost: { A: 0, B: 0 }, done: [], prompted: {} });
     saveState(path, state);
     expect(readState(path)).toEqual(state);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).not.toMatch(/^(priority|slot):/m);

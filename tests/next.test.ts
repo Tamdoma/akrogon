@@ -220,7 +220,7 @@ for (const kind of ['leaf folder', 'worktree path']) {
       const path: string = leaf(f, 'build', 'plan.synthesis', kind === 'worktree path' ? { worktree } : {});
       expect((await next(f, [kind === 'worktree path' ? worktree : path])).code).toBe(0);
       expect(await allTasks(f)).toHaveLength(1);
-      expect(readState(path).attempts.A).toBe(1);
+      expect(readState(path).attempts.A).toBe(0);
     } finally {
       await f.clean();
     }
@@ -247,7 +247,7 @@ test('next creates one worktree/tab under concurrent passes and starts configure
     expect(tasks[0].text.endsWith(` leaf=${f.root}/issues/open/issue/build`)).toBe(true);
     expect(tasks[0].text.split(' leaf=')[1]).not.toContain('issues/worktrees');
     expect(tasks[0].address).toBe(z.string().parse(readState(path).seat.A?.address));
-    expect(readState(path).attempts.A).toBe(1);
+    expect(readState(path).attempts.A).toBe(0);
     expect(noticeFiles(f.core)).toEqual([]);
     expect(await command(['git', 'branch', '--show-current'], readState(path).worktree)).toBe('build');
   } finally {
@@ -261,7 +261,7 @@ test('bare next from the repo dispatches by cwd instead of returning silently', 
     const path: string = leaf(f, 'shell', 'plan.synthesis');
     expect((await next(f, [])).code).toBe(0);
     expect(await allTasks(f)).toHaveLength(1);
-    expect(readState(path).attempts.A).toBe(1);
+    expect(readState(path).attempts.A).toBe(0);
   } finally {
     await f.clean();
   }
@@ -280,7 +280,7 @@ test('next re-prompts an idle seat whose turn ended while the phase never moved,
     await seatIdle(f, a, 1);
     expect((await next(f, ['stalled'])).code).toBe(0);
     expect(f.core.tasks(a)).toHaveLength(2);
-    expect(readState(path).attempts.A).toBe(2);
+    expect(readState(path).attempts.A).toBe(1);
     expect(readState(path).phase).toBe('plan.synthesis');
   } finally {
     await f.clean();
@@ -295,10 +295,10 @@ test('an ended turn never re-prompts a busy or done seat', async () => {
     expect((await next(f, ['misses'])).code).toBe(0);
     const a: string = z.string().parse(readState(path).seat.A?.address);
     expect(f.core.tasks(a)).toEqual([`plan-issue misses slot=A phase=plan.synthesis leaf=${path}`]);
-    expect(readState(path).attempts).toEqual({ A: 1, B: 0 });
+    expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
     expect((await next(f, ['misses'])).code).toBe(0);
     expect(f.core.tasks(a)).toHaveLength(1);
-    expect(readState(path).attempts).toEqual({ A: 1, B: 0 });
+    expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
     saveState(path, { ...readState(path), done: ['A'] });
     release();
     await seatIdle(f, a, 1);
@@ -321,7 +321,7 @@ test('next waits on a blocked agent instead of counting attempts or flipping sea
     expect((await next(f, ['dialog'])).code).toBe(0);
     expect(f.core.tasks(a)).toHaveLength(1);
     expect(readState(path).busy_since.A).toBeUndefined();
-    expect(readState(path).attempts.A).toBe(1);
+    expect(readState(path).attempts.A).toBe(0);
     expect(readState(path).delivery_error.A).toBeUndefined();
     expect(readState(path).seat.B).toBeUndefined();
     expect(readState(path).phase).toBe('plan.synthesis');
@@ -604,7 +604,7 @@ test('a merged leaf with its tab still open does not count toward max_active', a
     expect(await liveTabs(f)).toEqual(['first', 'second']);
     expect((await next(f, [])).code).toBe(0);
     expect(await liveTabs(f)).toEqual(['second']);
-    expect(readState(dependent).attempts.A).toBe(1);
+    expect(readState(dependent).attempts.A).toBe(0);
   } finally {
     await f.clean();
   }
@@ -623,7 +623,7 @@ test('merged phase closes tab on typed next and starts the dependent', async () 
     expect(await liveTabs(f)).toEqual(['first', 'second']);
     expect((await next(f, [])).code).toBe(0);
     expect(await liveTabs(f)).toEqual(['second']);
-    expect(readState(dependent).attempts.A).toBe(1);
+    expect(readState(dependent).attempts.A).toBe(0);
     expect((await next(f, ['--all'])).code).toBe(0);
     expect(await liveTabs(f)).toEqual(['second']);
   } finally {
@@ -641,9 +641,9 @@ test('a dependent whose seat start takes longer than 3 s is counted once', async
     expect((await next(f, ['first'])).code).toBe(0);
     saveState(first, { ...readState(first), phase: 'merge', ...holding(f) });
     expect((await cli(f, ['phase', 'first', 'merged'], f.root, f.env)).code).toBe(0);
-    expect(readState(dependent).attempts.A).toBe(1);
+    expect(readState(dependent).attempts.A).toBe(0);
     expect((await next(f, [])).code).toBe(0);
-    expect(readState(dependent).attempts.A).toBe(1);
+    expect(readState(dependent).attempts.A).toBe(0);
     expect(await delivered(f, 'second')).toHaveLength(1);
   } finally {
     await f.clean();
@@ -666,7 +666,7 @@ test('completing a leaf via targeted next starts only same-repo dependents', asy
     expect((await next(f, ['first'])).code).toBe(0);
     // The targeted pass closes the merged tab through reconciliation.
     expect(await liveTabs(f)).toEqual(['second']);
-    expect(readState(second).attempts.A).toBe(1);
+    expect(readState(second).attempts.A).toBe(0);
     for (const untouched of [loose, other]) {
       expect(readState(untouched).tab).toBeUndefined();
       expect(readState(untouched).worktree).toBeUndefined();
@@ -900,7 +900,8 @@ test('a finished seat restarts with its task and the surviving slot keeps its te
     expect(readState(path).seat.B?.address).toBe(b);
     const restarted: string = z.string().parse(readState(path).seat.A?.address);
     expect(restarted).not.toBe(a);
-    expect(readState(path).attempts).toEqual({ A: 2, B: 1 });
+    expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
+    expect(readState(path).lost).toEqual({ A: 1, B: 0 });
     expect(f.core.tasks(restarted)).toEqual([`check-issue exited slot=A phase=check.review leaf=${path}`]);
     expect(f.core.tasks(b)).toHaveLength(1);
     expect(await liveTabs(f)).toEqual(['exited']);
@@ -2041,7 +2042,7 @@ test('next --resume completes and cleans a merged leaf and starts its dependent'
     ]);
     expect(readState(dependent).tab).toBeDefined();
     expect(readState(dependent).worktree).toBeDefined();
-    expect(readState(dependent).attempts).toEqual({ A: 1, B: 0 });
+    expect(readState(dependent).attempts).toEqual({ A: 0, B: 0 });
   } finally {
     await f.clean();
   }
@@ -2210,7 +2211,7 @@ test('a failed leaf with its tab still open does not count toward max_active', a
     });
     expect((await next(f, ['second'])).code).toBe(0);
     expect(await liveTabs(f)).toEqual(['first', 'second']);
-    expect(readState(second).attempts.A).toBe(1);
+    expect(readState(second).attempts.A).toBe(0);
     expect(readState(second).worktree).toBeDefined();
   } finally {
     await f.clean();
@@ -2239,7 +2240,7 @@ test('a failed leaf does not reserve capacity in the unreadable branch', async (
     expect(result.code).toBe(1);
     expect(skips(result).map((skip) => skip.path)).toContain(malformed);
     expect([...(await liveTabs(f)), ...(await liveTabs(g))].sort()).toEqual(['failed-one', 'healthy']);
-    expect(readState(healthy).attempts.A).toBe(1);
+    expect(readState(healthy).attempts.A).toBe(0);
     expect(readState(healthy).worktree).toBeDefined();
   } finally {
     await f.clean();
@@ -2277,15 +2278,17 @@ test('failed seat starts keep the leaf in phase, uncharged, until a start succee
   const f: HcFixture = await hcFixture({ mode: 'exit' });
   try {
     const path: string = leaf(f, 'start-fails', 'plan.synthesis');
-    for (let pass: number = 0; pass < 3; pass++) {
+    // Each exit is a lost seat: a prompt never started, so the charge is a replacement, not a turn.
+    for (let pass: number = 1; pass <= 2; pass++) {
       const failed: Result = await next(f, ['start-fails']);
-      // A seat that exits fails its start with its address (plan D8); the pass charges no prompt.
+      // A seat that exits fails its start with its address (plan D8).
       expect(failed.code).not.toBe(0);
       const seats: Terminal[] = await seatTerminals(f, 'start-fails', true);
       expect(failed.stderr).toContain(`failed ${seats[seats.length - 1].address}`);
       const state: State = readState(path);
       expect(state.phase).toBe('plan.synthesis');
       expect(state.attempts.A).toBe(0);
+      expect(state.lost.A).toBe(pass - 1);
       expect(state.prompted.A).toBeUndefined();
       expect(state.failure).toBeUndefined();
       expect(await allTasks(f)).toEqual([]);
@@ -2294,9 +2297,10 @@ test('failed seat starts keep the leaf in phase, uncharged, until a start succee
     expect((await next(f, ['start-fails'])).code).toBe(0);
     const fourth: State = readState(path);
     expect(fourth.phase).toBe('plan.synthesis');
+    expect(fourth.lost.A).toBe(2);
     expect(fourth.delivery_error.A).toBeUndefined();
     expect(fourth.prompted.A).toBeDefined();
-    expect(fourth.attempts.A).toBe(1);
+    expect(fourth.attempts.A).toBe(0);
     expect(await allTasks(f)).toHaveLength(1);
   } finally {
     await f.clean();
