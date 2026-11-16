@@ -66,7 +66,10 @@ const claudeTemplate = (settings?: object): string =>
     ? 'claude --model {model} --effort {effort} --dangerously-skip-permissions'
     : `claude --model {model} --effort {effort} --settings ${quote(JSON.stringify(settings))} --dangerously-skip-permissions`;
 const filled = (line: string): string[] =>
-  z.array(z.string()).min(1).parse(parse(line.replaceAll('{model}', quote('m1')).replaceAll('{effort}', quote('low'))));
+  z
+    .array(z.string())
+    .min(1)
+    .parse(parse(line.replaceAll('{model}', quote('m1')).replaceAll('{effort}', quote('low'))));
 const denyOnly: object = { permissions: { denyInsteadOfPrompting: true } };
 
 test("harnessArgv appends --disallowedTools=AskUserQuestion once as argv's last element for a claude harness", async () => {
@@ -189,29 +192,66 @@ test('a claude line without --settings gains the pair after the template and bef
 });
 
 test.each([
-  { name: 'a --settings element with no value', line: 'claude --model {model} --effort {effort} --settings', operand: '--settings' },
-  { name: 'a --settings file path', line: 'claude --model {model} --effort {effort} --settings ./claude.json', operand: './claude.json' },
-  { name: 'malformed --settings JSON', line: 'claude --model {model} --effort {effort} --settings {broken', operand: '{broken' },
-  { name: 'a --settings JSON array', line: `claude --model {model} --effort {effort} --settings ${quote('[1,2]')}`, operand: '[1,2]' },
-  { name: 'a --settings scalar', line: `claude --model {model} --effort {effort} --settings ${quote('42')}`, operand: '42' },
-  { name: 'a non-object permissions value', line: `claude --model {model} --effort {effort} --settings ${quote('{"permissions":["*"]}')}`, operand: '{"permissions":["*"]}' },
-  { name: 'a null permissions value', line: `claude --model {model} --effort {effort} --settings ${quote('{"permissions":null}')}`, operand: '{"permissions":null}' },
-  { name: 'two --settings flags', line: `claude --model {model} --effort {effort} --settings ${quote('{"a":1}')} --settings ${quote('{"b":2}')}`, operand: '--settings' },
-  { name: 'two spellings of --settings', line: `claude --model {model} --effort {effort} --settings=${quote('{"a":1}')} --settings ${quote('{"b":2}')}`, operand: '--settings' },
-  { name: 'a bare -- token', line: `claude --model {model} --effort {effort} --settings ${quote('{"a":1}')} -- --verbose`, operand: '--' },
-])(
-  'harnessArgv refuses a claude line with $name, naming harness and operand',
-  async ({ line, operand }) => {
-    const global: GlobalConfig = await globalConfig({ claude: line });
-    let thrown: unknown;
-    try {
-      harnessArgv(global, slot('claude'));
-    } catch (error) {
-      thrown = error;
-    }
-    expect(thrown).toBeInstanceOf(Error);
-    const message: string = (thrown as Error).message;
-    expect(message).toContain('claude');
-    expect(message).toContain(`'${operand}'`);
+  {
+    name: 'a --settings element with no value',
+    line: 'claude --model {model} --effort {effort} --settings',
+    operand: '--settings',
   },
-);
+  {
+    name: 'a --settings file path',
+    line: 'claude --model {model} --effort {effort} --settings ./claude.json',
+    operand: './claude.json',
+  },
+  {
+    name: 'malformed --settings JSON',
+    line: 'claude --model {model} --effort {effort} --settings {broken',
+    operand: '{broken',
+  },
+  {
+    name: 'a --settings JSON array',
+    line: `claude --model {model} --effort {effort} --settings ${quote('[1,2]')}`,
+    operand: '[1,2]',
+  },
+  {
+    name: 'a --settings scalar',
+    line: `claude --model {model} --effort {effort} --settings ${quote('42')}`,
+    operand: '42',
+  },
+  {
+    name: 'a non-object permissions value',
+    line: `claude --model {model} --effort {effort} --settings ${quote('{"permissions":["*"]}')}`,
+    operand: '{"permissions":["*"]}',
+  },
+  {
+    name: 'a null permissions value',
+    line: `claude --model {model} --effort {effort} --settings ${quote('{"permissions":null}')}`,
+    operand: '{"permissions":null}',
+  },
+  {
+    name: 'two --settings flags',
+    line: `claude --model {model} --effort {effort} --settings ${quote('{"a":1}')} --settings ${quote('{"b":2}')}`,
+    operand: '--settings',
+  },
+  {
+    name: 'two spellings of --settings',
+    line: `claude --model {model} --effort {effort} --settings=${quote('{"a":1}')} --settings ${quote('{"b":2}')}`,
+    operand: '--settings',
+  },
+  {
+    name: 'a bare -- token',
+    line: `claude --model {model} --effort {effort} --settings ${quote('{"a":1}')} -- --verbose`,
+    operand: '--',
+  },
+])('harnessArgv refuses a claude line with $name, naming harness and operand', async ({ line, operand }) => {
+  const global: GlobalConfig = await globalConfig({ claude: line });
+  let thrown: unknown;
+  try {
+    harnessArgv(global, slot('claude'));
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toBeInstanceOf(Error);
+  const message: string = (thrown as Error).message;
+  expect(message).toContain('claude');
+  expect(message).toContain(`'${operand}'`);
+});
