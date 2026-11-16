@@ -1,0 +1,32 @@
+slug: door-reads-live-address
+phase: merged
+created: 2026-11-16
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#138"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak469df3e6b26a8b7b482fc13ba3377e
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t1yj
+  B:
+    session: infra
+    address: t1yk
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-16T15:56:07.782Z
+frozen: {}
+frozen_cited: []

@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: hc reports a blocked status with kind and no msg
+    command: "hc run --bg --no-notify --no-parent -- sh -c 'printf \"\\033]7501;state=blocked:kind=permission:msg=Allow?\\007\"; exec sleep 120' then hc get --json"
+    identity: operator's local user, throwaway hc terminal, no credential
+    target: hc 0.1.21 on this machine, terminal t1y5 (and t1y2 for kind question)
+    version: hc 0.1.21
+    date: '2026-11-16'
+    result: "status was {kind: permission, state: blocked} with no msg; the earlier question probe showed {kind: question, state: blocked}"
+    cleanup: terminals killed and removed; hc ls --all shows neither
+    limits: shows hc's reporting of an OSC 7501 blocked status; does not show which status a real harness prompt raises; does not prove the leaf's notice code
+    record: issues/chart/unattended-runs/forks/blocked-prompts.md

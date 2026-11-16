@@ -1,0 +1,56 @@
+slug: count-silent-turns
+phase: merged
+created: 2026-11-16
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#136"
+  - "Tamdoma/akrogon#137"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 1
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak8de1bdbb9e73c94aef02d8c64319ac
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t1yd
+  B:
+    session: infra
+    address: t1yq
+prompted:
+  B:
+    turn: 2
+    address: t1yq
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-16T16:38:33.094Z
+broadcast:
+  kind: epic
+  name: unattended-runs
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/unattended-runs
+  pushed: ea55ea7ed4cfee0cbfb0d7db9803ac67ba92ccb1
+  sources:
+    - "Tamdoma/akrogon#136"
+    - "Tamdoma/akrogon#137"
+    - "Tamdoma/akrogon#138"
+frozen:
+  docs/reference/files.md: 672f240bd3895cfb6ff17edd3a488737fd9c7ead
+  docs/reference/state-and-phases.md: e0f0ff145d807e524d43dd9cb5c23f4fecee68fd
+  src/AREA.md: e0848fcf293fc4f5d0faa2a57e97110bf0a6c279
+  tests/hc-delivery.test.ts: 6a493626be96f36d9c2f128561a368c76568148a
+  tests/next.test.ts: c85861f1808a4371d44d62f0575e6d8af31590d7
+  tests/phase.test.ts: da8073bf965797bc1ab146dc402efba1c13c196c
+  tests/state.test.ts: 2a01b35238567557a3c7a3bf9e51e112102633c0
+frozen_cited: []

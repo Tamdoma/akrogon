@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: claude --disallowedTools=AskUserQuestion removes the question tool from an interactive session and keeps the trailing task
+    command: env ANTHROPIC_BASE_URL=http://127.0.0.1:<port> ANTHROPIC_AUTH_TOKEN=probe-token claude --model haiku --effort low --dangerously-skip-permissions [--disallowedTools=AskUserQuestion] "say hi", run in throwaway hc terminals against a local stub recording each POST /v1/messages tool list
+    identity: operator's local user, a stub token against a local stub server, no real credential and no paid call
+    target: Claude Code 2.1.325 interactive, terminals t1y9 and t1yb in /home/ivan/Work/infra/akrogon
+    version: Claude Code 2.1.325
+    date: '2026-11-16'
+    result: without the flag every request carried 14 tools including AskUserQuestion; with the flag every request carried 13 and no AskUserQuestion; both sent requests, so "say hi" was taken as the task
+    cleanup: both terminals killed and removed, hc ls --all shows neither; both stub servers stopped, pgrep empty
+    limits: one Claude Code version; the operator's claude.ai login path and a later Claude Code version are not covered; does not prove the leaf's argv code
+    record: issues/chart/unattended-runs/forks/blocked-prompts.md

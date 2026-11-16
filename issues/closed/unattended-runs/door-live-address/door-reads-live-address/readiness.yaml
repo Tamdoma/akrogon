@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: herdr-consultant-column with the door's live HC_TERMINAL_ID lays out the consultant column
+    command: herdr-consultant-column t126 t1xx t1xy, run from the door's shell where HC_TERMINAL_ID=t126
+    identity: operator's local user, the live door session
+    target: herdr-app on this machine, door t126 with consultants t1xx and t1xy
+    version: akrogon 8532a1f7 release, herdr-setup as installed 2026-11-16
+    date: '2026-11-16'
+    result: exit 0, door on the left and both consultants in one column on the right
+    cleanup: none needed, the layout is the session's own
+    limits: shows the helper works with the live address; does not reproduce the stale-address failure, which is the report's own observation
+    record: issues/chart/unattended-runs/forks/door-address.md

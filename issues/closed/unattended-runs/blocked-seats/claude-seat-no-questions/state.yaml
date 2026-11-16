@@ -1,0 +1,34 @@
+slug: claude-seat-no-questions
+phase: merged
+created: 2026-11-16
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: aka176832a9c72a0de7286e69ac90db7
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t1yg
+  B:
+    session: infra
+    address: t1ym
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-16T16:03:16.135Z
+frozen:
+  tests/hc-fixture.ts: fa1fbbe30da5e71e8c1f161a516859c6e6cbf027
+  tests/hc-start.test.ts: 4baf7e62db13e93a5e7b1baf52fcd8ecb0d3351f
+  tests/seat.test.ts: 9fafef46b9c30eaf4693ed9aa9750c37f4c1291e
+frozen_cited: []

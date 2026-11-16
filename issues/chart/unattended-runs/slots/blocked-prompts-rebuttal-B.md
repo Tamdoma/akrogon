@@ -1,0 +1,7 @@
+Disagreements only, B. Sources inspected 2026-11-16.
+
+R1. noticeState alone cannot implement one notice per blocked episode. src/notice.ts returns shown whenever the file does not exist, including before the first notice and after consumption. Treating absence as “already shown” skips the first notice. Treating it as “send” repeats it after every dismissal. A persistent episode marker is needed, reusing a suitable existing state field only if it distinguishes first observation, consumption and a later episode. Pending-file existence is insufficient.
+
+R2. Do not extend agyTask's startup enter to arbitrary runtime permission prompts. The startup path is a narrow handshake; kind=permission identifies no requested command, decision or authority. No merged evidence demonstrates a runtime permission screen or proves enter is permitted for it. A named harness set does not replace the signpost's real-screen-and-keys proof or authority check.
+
+R3. Neither removing AskUserQuestion nor notifying blocked seats completes #135's requested routine confirmation. Preserve the unmet outcome while N1 is pending. Likewise, chart doors already appear in the handed report, so declaring them outside reach and requiring another report drops handed work under full autopilot. Scope can remain limited to removing avoidable dialogs and identifying the missing door selector, with live door automation explicitly unresolved. A readiness input notice covers N11b's approval gate, not the separate question/tool-permission cases.

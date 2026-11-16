@@ -1,0 +1,37 @@
+slug: refuse-failed-runs
+phase: merged
+created: 2026-11-16
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#136"
+  - "Tamdoma/akrogon#137"
+busy_since: {}
+busy_notified: {}
+attempts:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak93de368eaa46a67766922c935d26d9
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t1yf
+  B:
+    session: infra
+    address: t1yp
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-16T16:15:55.838Z
+frozen:
+  tests/run-check.test.ts: d6ea816857620f67eece1e98ea9c53f4d40ca92c
+  tests/verify.test.ts: 7e4223526ae162126ad736b9bd7da641a4ce8689
+frozen_cited:
+  - tests/run-check.test.ts adds six tests for the failed-leaf refusal; no existing expectation changed
+  - tests/verify.test.ts adds four tests for the failed-leaf refusal and unchanged reuse/join/holder paths; no existing expectation changed

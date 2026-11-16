@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: hc get --json reports exit_code and signal on a finished terminal
+    command: hc run --bg --no-notify --no-parent --json -- sh -c 'echo bye; exit 3'; hc run ... -- sleep 300 then kill -TERM <pid>; hc get --json on each
+    identity: operator's local user, throwaway hc terminals, no credential
+    target: hc 0.1.21 on this machine, terminals t1y3 and t1y6
+    version: hc 0.1.21
+    date: '2026-11-16'
+    result: t1y3 finished with exit_code 3 and signal null; t1y6 finished with exit_code null and signal 15
+    cleanup: both removed with hc rm; hc ls --all shows neither
+    limits: shows the fields on terminals ended by exit and by SIGTERM; does not show what a harness killed by systemd or a reboot reports; does not prove the leaf's parsing
+    record: issues/chart/unattended-runs/forks/turn-count.md
