@@ -121,6 +121,7 @@ export const stateSchema = z
     busy_notified: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     blocked_notified: z.object({ A: z.string().optional(), B: z.string().optional() }).default({}),
     attempts: counts.prefault({}),
+    lost: counts.prefault({}),
     done: z.array(slotSchema).default([]),
     fix_rounds: z.number().int().nonnegative().default(0),
     verdict: z.object({ A: verdictSchema.optional(), B: verdictSchema.optional() }).default({}),

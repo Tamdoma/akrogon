@@ -28,6 +28,8 @@ const terminalSchema = z.object({
   cwd: z.string(),
   labels: z.record(z.string(), z.string()),
   status: statusSchema.nullable().default(null),
+  exit_code: z.number().int().nullable().default(null),
+  signal: z.number().int().nullable().default(null),
   foreground: foregroundSchema.nullable().default(null),
   keep: z.boolean().default(false),
 });
@@ -45,6 +47,8 @@ export type Seen = {
   cwd: string;
   labels: Record<string, string>;
   status: { state: string; kind: string | null; msg: string | null } | null;
+  exit_code?: number | null;
+  signal?: number | null;
   foreground: { pid: number; cwd: string; argv: string[] } | null;
   keep?: boolean;
 };

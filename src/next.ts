@@ -58,6 +58,7 @@ import {
   type SpaceResolution,
 } from './hc';
 import { expectedTabName, startSeat, type Place, type Started } from './seat';
+import { liveRuns } from './admission';
 import { transcriptFor } from './transcript';
 import { checkBase, localBase, trackingRef } from './preflight';
 import { checkLocation } from './guard';
@@ -459,9 +460,92 @@ async function dispatchSlot(
       await removeEmptyUntrackedDirs(recorded.worktree);
   };
   const known: Seen | undefined = allocation.seats[slot];
-  const seat: Seen | undefined = known === undefined ? undefined : await terminal(place.session, known.address);
+  const ref = recorded.seat[slot];
+  // An unlisted or removed recorded terminal is probed once; not_found means gone (a finished
+  // terminal still answers get), any other error still propagates.
+  const lookup = async (address: string): Promise<Seen | undefined> => {
+    try {
+      return await terminal(place.session, address);
+    } catch (error) {
+      if (error instanceof HcError && error.kind === 'not_found') return undefined;
+      throw error;
+    }
+  };
+  const seat: Seen | undefined =
+    known !== undefined ? await lookup(known.address) : ref === undefined ? undefined : await lookup(ref.address);
   if (seat === undefined || seat.state === 'finished') {
-    if (seat !== undefined) await end(place.session, seat.address);
+    const recordedPrompt = ref === undefined ? undefined : recorded.prompted[slot];
+    const silentEnd: boolean =
+      seat !== undefined &&
+      typeof recordedPrompt === 'object' &&
+      recordedPrompt !== undefined &&
+      recordedPrompt.address === seat.address &&
+      recordedPrompt.turn < seat.turn;
+    // The recorded seat's turn ended silently before its terminal finished: count it at the same point
+    // a live seat's end counts, then replace without charging a loss.
+    if (silentEnd && seat !== undefined) {
+      if (liveRuns().some((record) => record.repo === repo.name && record.leaf === leaf.state.slug)) return;
+      const count: State = readState(leaf.path);
+      const counted: State = {
+        ...count,
+        attempts: { ...count.attempts, [slot]: count.attempts[slot] + 1 },
+        prompted: { ...count.prompted, [slot]: undefined },
+        lost: { ...count.lost, [slot]: 0 },
+      };
+      saveState(leaf.path, counted);
+      if (counted.attempts[slot] >= 3) {
+        await commitMove(repo, { path: leaf.path, state: counted }, counted, 'failed', slot, {
+          cause: 'attempts',
+          phase: counted.phase,
+          slot,
+          reason: `seat ${slot} ended ${counted.attempts[slot]} turns without reporting`,
+        });
+        return;
+      }
+      const address: string = seat.address;
+      await end(place.session, address);
+      await clearBlockedNotices(repo, leaf.path, readState(leaf.path), slot);
+      await prepare();
+      const started: Started = await startSeat(global, repo, { path: leaf.path, state: recorded }, slot, prompt, place);
+      if (started.outcome === 'failed')
+        throw new Error(`Seat ${slot} of ${recorded.slug} failed to start at ${started.seat.address}`);
+      await timing(started.outcome === 'confirmed' ? 'delivered' : 'failed', started.seat.address);
+      return;
+    }
+    if (ref !== undefined) {
+      // The recorded seat died before ending a turn: evidence first (one row, before any removal),
+      // then the loss charge, then the bound or the replacement.
+      appendTiming(
+        repo,
+        seat === undefined
+          ? { kind: 'seat_lost', slug: recorded.slug, slot, phase: recorded.phase, address: ref.address, gone: true }
+          : {
+              kind: 'seat_lost',
+              slug: recorded.slug,
+              slot,
+              phase: recorded.phase,
+              address: seat.address,
+              turn: seat.turn,
+              status: seat.status?.state ?? null,
+              exit_code: seat.exit_code,
+              signal: seat.signal,
+              screen: (await screen(place.session, seat.address)).split('\n').slice(-40).join('\n'),
+            },
+      );
+      if (seat !== undefined) await end(place.session, seat.address);
+      const now: State = readState(leaf.path);
+      const charged: State = { ...now, lost: { ...now.lost, [slot]: now.lost[slot] + 1 } };
+      saveState(leaf.path, charged);
+      if (charged.lost[slot] >= 3) {
+        await commitMove(repo, { path: leaf.path, state: charged }, charged, 'failed', slot, {
+          cause: 'attempts',
+          phase: charged.phase,
+          slot,
+          reason: `seat ${slot} was lost 3 times before ending a turn`,
+        });
+        return;
+      }
+    } else if (seat !== undefined) await end(place.session, seat.address);
     await clearBlockedNotices(repo, leaf.path, readState(leaf.path), slot);
     await prepare();
     const started: Started = await startSeat(global, repo, { path: leaf.path, state: recorded }, slot, prompt, place);
@@ -488,7 +572,6 @@ async function dispatchSlot(
             ...base,
             prompted: { ...base.prompted, [slot]: { turn: reply.turn, address: seat.address } },
             delivery_error: { ...base.delivery_error, [slot]: undefined },
-            attempts: { ...base.attempts, [slot]: base.attempts[slot] + 1 },
           }
         : {
             ...base,
@@ -530,13 +613,23 @@ async function dispatchSlot(
     });
   if (prompted === undefined) return deliver();
   if (prompted.turn >= seat.turn) return;
-  const current: State = readState(leaf.path);
-  if (current.attempts[slot] < 3) return deliver();
-  await commitMove(repo, { path: leaf.path, state: current }, current, 'failed', slot, {
+  // A prompted turn ended without a report: while the leaf's own run-check is live or waiting it
+  // may be mid-report, so the end counts and redelivers only once the record is gone.
+  if (liveRuns().some((record) => record.repo === repo.name && record.leaf === leaf.state.slug)) return;
+  const countedState: State = readState(leaf.path);
+  const counted: State = {
+    ...countedState,
+    attempts: { ...countedState.attempts, [slot]: countedState.attempts[slot] + 1 },
+    prompted: { ...countedState.prompted, [slot]: undefined },
+    lost: { ...countedState.lost, [slot]: 0 },
+  };
+  saveState(leaf.path, counted);
+  if (counted.attempts[slot] < 3) return deliver();
+  await commitMove(repo, { path: leaf.path, state: counted }, counted, 'failed', slot, {
     cause: 'attempts',
-    phase: current.phase,
+    phase: counted.phase,
     slot,
-    reason: `seat ${slot} ended ${current.attempts[slot]} turns without reporting`,
+    reason: `seat ${slot} ended ${counted.attempts[slot]} turns without reporting`,
   });
 }
 

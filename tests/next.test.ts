@@ -895,6 +895,7 @@ test('a finished seat restarts with its task and the surviving slot keeps its te
     const a: string = z.string().parse(readState(path).seat.A?.address);
     const b: string = z.string().parse(readState(path).seat.B?.address);
     expect((await f.core.hc(['kill', a])).code).toBe(0);
+    expect((await f.core.hc(['rm', a])).code).toBe(0);
     const recovered: Result = await next(f, ['exited']);
     expect(recovered.code).toBe(0);
     expect(readState(path).seat.B?.address).toBe(b);

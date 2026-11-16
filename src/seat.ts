@@ -277,7 +277,6 @@ export async function startSeat(
       ? {
           ...s,
           prompted: { ...s.prompted, [slot]: { turn: started.turn, address: launched.address } },
-          attempts: { ...s.attempts, [slot]: s.attempts[slot] + 1 },
         }
       : {
           ...s,

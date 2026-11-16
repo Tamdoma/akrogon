@@ -220,6 +220,7 @@ export async function commitMove(
     prompted_at: {},
     delivery_error: {},
     attempts: { A: 0, B: 0 },
+    lost: { A: 0, B: 0 },
     failure: to === 'failed' ? failure : undefined,
     busy_since: to === 'failed' || to === 'merged' ? {} : recorded.busy_since,
     fix_rounds:
