@@ -65,10 +65,6 @@ test('one bad leaf stops only itself: next, phase, config, run-check and status 
     const worktree: string = readState(healthy).worktree!;
     expect(worktree.startsWith(storeDir(f))).toBe(true);
 
-    const moved: Result = await cli(f, ['phase', 'healthy', 'failed', '--reason', 'done'], f.root, f.env);
-    expect(moved.code).toBe(0);
-    expect(readState(healthy).phase).toBe('failed');
-
     const config: Result = await cli(f, ['config'], worktree, f.env);
     expect(config.code).toBe(0);
     expect(Bun.YAML.parse(config.stdout)).toMatchObject({ repo: f.repo });
@@ -84,6 +80,10 @@ test('one bad leaf stops only itself: next, phase, config, run-check and status 
     );
     expect(check.code).toBe(0);
     expect(check.stdout).toContain('probe-ok');
+
+    const moved: Result = await cli(f, ['phase', 'healthy', 'failed', '--reason', 'done'], f.root, f.env);
+    expect(moved.code).toBe(0);
+    expect(readState(healthy).phase).toBe('failed');
 
     const status: Result = await cli(f, ['status'], f.root, f.env);
     expect(status.code).toBe(1);
