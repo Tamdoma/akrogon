@@ -14,7 +14,7 @@ mode=work
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--model) mode="$2"; shift 2 ;;
-	--effort | --session-id) shift 2 ;;
+	--effort | --session-id | --settings) shift 2 ;;
 	--*) shift ;;
 	*) break ;;
 	esac
