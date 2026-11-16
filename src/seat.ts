@@ -72,7 +72,13 @@ export function harnessArgv(global: GlobalConfig, config: SlotConfig): Harness {
     .replaceAll('{effort}', quote(config.effort));
   const argv: string[] = z.array(z.string()).min(1).parse(parse(line));
   if (argv[0] !== config.harness) throw new Error(`Harness launch must start with ${config.harness}`);
-  return { kind: config.harness, argv: config.harness === 'pi' ? [...argv, '--session-id', randomUUID()] : argv };
+  const extra: string[] =
+    config.harness === 'pi'
+      ? ['--session-id', randomUUID()]
+      : config.harness === 'claude'
+        ? ['--disallowedTools=AskUserQuestion']
+        : [];
+  return { kind: config.harness, argv: [...argv, ...extra] };
 }
 
 function ended(t: Seen): boolean {
