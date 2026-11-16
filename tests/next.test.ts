@@ -320,7 +320,7 @@ test('next waits on a blocked agent instead of counting attempts or flipping sea
     await f.core.waitFor(a, (t: Terminal) => t.status?.state === 'blocked');
     expect((await next(f, ['dialog'])).code).toBe(0);
     expect(f.core.tasks(a)).toHaveLength(1);
-    expect(readState(path).busy_since.A).toBeDefined();
+    expect(readState(path).busy_since.A).toBeUndefined();
     expect(readState(path).attempts.A).toBe(1);
     expect(readState(path).delivery_error.A).toBeUndefined();
     expect(readState(path).seat.B).toBeUndefined();
@@ -425,6 +425,139 @@ test('busy seats persist, warn strictly after an hour, retry a failed notice and
     expect((await nextAt(f, 'busy', now + 125 * 60000)).code).toBe(0);
     expect(noticeFiles(f.core)).toHaveLength(2);
     expect(readState(path).busy_notified).toEqual({ A: 'pending', B: 'pending' });
+  } finally {
+    await f.clean();
+  }
+}, 30000);
+
+// A blocked seat gets one attention notice per episode at once: the title names seat and kind, the
+// body is the screen tail, and `blocked_notified` gates repeat passes. Nothing is typed into it.
+test('a blocked leaf seat writes one attention notice per episode, sends it nothing', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const path: string = leaf(f, 'blocked-one', 'plan.synthesis');
+    holdTurns(f, 'blocked:kind=permission:msg=Allow?');
+    expect((await next(f, ['blocked-one'])).code).toBe(0);
+    const a: string = z.string().parse(readState(path).seat.A?.address);
+    await f.core.waitFor(a, (t: Terminal) => t.status?.state === 'blocked');
+    const notices = () => noticeFiles(f.core).map(({ title, body, attention }) => ({ title, body, attention }));
+    expect((await next(f, ['blocked-one'])).code).toBe(0);
+    const tail: string = (await f.core.hc(['read', a])).stdout.split('\n').slice(-40).join('\n');
+    expect(notices()).toEqual([
+      { title: `Blocked leaf: ${f.repo}/blocked-one seat A (permission)`, body: tail, attention: true },
+    ]);
+    expect(readState(path).blocked_notified.A).toBe('pending');
+    // Later passes in the same episode write no second notice and send the seat nothing.
+    expect((await next(f, ['blocked-one'])).code).toBe(0);
+    expect((await next(f, ['blocked-one'])).code).toBe(0);
+    expect(notices()).toHaveLength(1);
+    expect(f.core.tasks(a)).toHaveLength(1);
+    expect(hcCalls(f).filter((args) => ['send', 'keys'].includes(args[0]) && args.slice(1).includes(a))).toEqual([]);
+    // The handler showing the notice folds the field to shown without writing again.
+    rmSync(noticeFiles(f.core)[0].path);
+    expect((await next(f, ['blocked-one'])).code).toBe(0);
+    expect(readState(path).blocked_notified.A).toBe('shown');
+    expect(notices()).toHaveLength(0);
+  } finally {
+    await f.clean();
+  }
+}, 20000);
+
+// A pass that sees the seat leave blocked removes its pending notice and clears the field, so the
+// next blocked episode gets a fresh notice.
+test('an unblocked seat has its notice removed and its next blocked episode notices again', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const path: string = leaf(f, 'reblocked', 'plan.synthesis');
+    const release: () => void = holdTurns(f, 'blocked:kind=permission:msg=Allow?');
+    expect((await next(f, ['reblocked'])).code).toBe(0);
+    const a: string = z.string().parse(readState(path).seat.A?.address);
+    await f.core.waitFor(a, (t: Terminal) => t.status?.state === 'blocked');
+    expect((await next(f, ['reblocked'])).code).toBe(0);
+    expect(readState(path).blocked_notified.A).toBe('pending');
+    release();
+    await seatIdle(f, a, 1);
+    expect((await next(f, ['reblocked'])).code).toBe(0);
+    expect(readState(path).blocked_notified).toEqual({});
+    expect(noticeFiles(f.core)).toEqual([]);
+    // A new blocked episode notices again: a sent task runs a held blocked turn.
+    await seatIdle(f, a, 2);
+    holdTurns(f, 'blocked:kind=permission:msg=Allow?');
+    expect((await f.core.hc(['send', a, 'again'])).code).toBe(0);
+    await f.core.waitFor(a, (t: Terminal) => t.turn >= 3 && t.status?.state === 'blocked');
+    expect((await next(f, ['reblocked'])).code).toBe(0);
+    expect(readState(path).blocked_notified.A).toBe('pending');
+    expect(f.core.tasks(a)).toHaveLength(3);
+    expect(noticeFiles(f.core).map(({ title, attention }) => ({ title, attention }))).toEqual([
+      { title: `Blocked leaf: ${f.repo}/reblocked seat A (permission)`, attention: true },
+    ]);
+  } finally {
+    await f.clean();
+  }
+}, 25000);
+
+// A blocked seat whose terminal is gone is a new seat: the replacing pass clears the field and the
+// old pending notice, so the replacement's blocked episode gets its own notice.
+test('a replaced blocked seat gets a fresh notice', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const path: string = leaf(f, 'swapped', 'plan.synthesis');
+    holdTurns(f, 'blocked:kind=permission:msg=Allow?');
+    expect((await next(f, ['swapped'])).code).toBe(0);
+    const a: string = z.string().parse(readState(path).seat.A?.address);
+    await f.core.waitFor(a, (t: Terminal) => t.status?.state === 'blocked');
+    expect((await next(f, ['swapped'])).code).toBe(0);
+    expect(readState(path).blocked_notified.A).toBe('pending');
+    expect(noticeFiles(f.core)).toHaveLength(1);
+    expect((await f.core.hc(['kill', a])).code).toBe(0);
+    expect((await f.core.hc(['rm', a])).code).toBe(0);
+    expect((await next(f, ['swapped'])).code).toBe(0);
+    const restarted: string = z.string().parse(readState(path).seat.A?.address);
+    expect(restarted).not.toBe(a);
+    expect(readState(path).blocked_notified).toEqual({});
+    expect(noticeFiles(f.core)).toEqual([]);
+    await f.core.waitFor(restarted, (t: Terminal) => t.status?.state === 'blocked');
+    expect((await next(f, ['swapped'])).code).toBe(0);
+    expect(readState(path).blocked_notified.A).toBe('pending');
+    expect(noticeFiles(f.core).map(({ title }) => title)).toEqual([
+      `Blocked leaf: ${f.repo}/swapped seat A (permission)`,
+    ]);
+  } finally {
+    await f.clean();
+  }
+}, 25000);
+
+// The blocked branch owns the pass and sets no busy clock: a seat blocked for over an hour holds
+// only its blocked notices, never the 60-minute busy notice.
+test('a seat blocked over an hour gets a blocked notice, never a busy notice', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const path: string = leaf(f, 'blocked-long', 'check.review');
+    const now: number = Date.parse('2026-11-16T12:00:00Z');
+    holdTurns(f, 'blocked:kind=permission:msg=Allow?');
+    expect((await nextAt(f, 'blocked-long', now)).code).toBe(0);
+    const seats: Terminal[] = await seatTerminals(f, 'blocked-long');
+    expect(seats).toHaveLength(2);
+    for (const seat of seats) await f.core.waitFor(seat.address, (t: Terminal) => t.status?.state === 'blocked');
+    const titles = () =>
+      noticeFiles(f.core)
+        .map(({ title }) => title)
+        .sort();
+    for (const minutes of [0, 59, 60]) expect((await nextAt(f, 'blocked-long', now + minutes * 60000)).code).toBe(0);
+    expect(titles()).toEqual([
+      `Blocked leaf: ${f.repo}/blocked-long seat A (permission)`,
+      `Blocked leaf: ${f.repo}/blocked-long seat B (permission)`,
+    ]);
+    expect(readState(path).busy_since).toEqual({});
+    expect(readState(path).blocked_notified).toEqual({ A: 'pending', B: 'pending' });
+    // Past the hour the episode is still gated and no busy notice ever appears.
+    expect((await nextAt(f, 'blocked-long', now + 61 * 60000)).code).toBe(0);
+    expect(titles()).toEqual([
+      `Blocked leaf: ${f.repo}/blocked-long seat A (permission)`,
+      `Blocked leaf: ${f.repo}/blocked-long seat B (permission)`,
+    ]);
+    expect(readState(path).busy_since).toEqual({});
+    expect(readState(path).busy_notified).toEqual({});
   } finally {
     await f.clean();
   }

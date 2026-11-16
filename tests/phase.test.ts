@@ -1276,6 +1276,29 @@ test('merge to merged clears busy fields', async () => {
   }
 });
 
+// Every phase move clears `blocked_notified` and removes a pending blocked notice, including moves
+// whose busy clearing would not run (busy clears only on merged, failed and leaving failed).
+test('a phase move clears the blocked notice field and removes its pending file', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const blocked: string = resolve(noticeFolder(f.core), `${noticeId(f.repo, 'blocked', 'move', 'A')}.json`);
+    mkdirSync(noticeFolder(f.core), { recursive: true });
+    writeFileSync(
+      blocked,
+      JSON.stringify({ title: `Blocked leaf: ${f.repo}/move seat A (permission)`, body: 'tail', attention: true }),
+    );
+    const path: string = leaf(f, 'move', 'plan.synthesis', { blocked_notified: { A: 'pending' } });
+    const result: Result = await cli(f, ['phase', 'move', 'implement', '--slot', 'A'], f.root, f.env);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe('moved implement');
+    expect(readState(path)).toMatchObject({ phase: 'implement', blocked_notified: {} });
+    expect(existsSync(blocked)).toBe(false);
+    expect(noticeFiles(f.core)).toEqual([]);
+  } finally {
+    await f.clean();
+  }
+});
+
 test('check.fix request at the configured round count moves and increments', async () => {
   const f: Fixture = await fixture();
   try {
