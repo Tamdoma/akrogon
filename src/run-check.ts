@@ -234,6 +234,35 @@ export class PublishRefusedError extends Error {
   }
 }
 
+// A leaf- or worker-scoped run refuses to start while its leaf's live phase is
+// `failed`; the recorded caller phase may be stale, so the decision re-reads
+// state.yaml at each point. The checkout holder target carries no phase and is
+// never refused here. Each refusal appends one check_refused timing row and no
+// refusal.json; a failure committed after the late read does not cancel the run.
+function failedRefusal(caller: LeafTarget, repo: Repo, name: string, run: string): void {
+  if (caller.phase === undefined) return;
+  const fresh: State = readState(dirname(caller.target));
+  if (fresh.phase !== 'failed') return;
+  appendTiming(repo, {
+    kind: 'check_refused',
+    slug: caller.slug,
+    run,
+    name,
+    scope: caller.scope,
+    phase: fresh.phase,
+    ...(caller.unit === undefined ? {} : { unit: caller.unit }),
+    ...(caller.attempt === undefined ? {} : { attempt: caller.attempt }),
+  });
+  const reason: string = fresh.failure === undefined ? 'failure record unavailable' : fresh.failure.reason;
+  const recovery: string =
+    fresh.failure === undefined
+      ? `the operator recovers it with akrogon phase ${caller.slug}.`
+      : `the operator recovers it with akrogon phase ${caller.slug} ${fresh.failure.phase}.`;
+  throw new PublishRefusedError(
+    `Refusing run-check ${name} for leaf ${repo.name}/${caller.slug}: the leaf is failed (${reason}). Stop work on this leaf; ${recovery}`,
+  );
+}
+
 // A publish target under an owner that already sits in issues/closed, or that
 // holds .closing while packing, is refused; chart-direct holders resolve to a
 // single owner dir and stay allowed. The late rule adds the vanished-owner
@@ -271,6 +300,18 @@ export async function checkedRun(
 ): Promise<{ code: number; log: string; stderr_final_nl: boolean }> {
   const early: string | undefined = await ownerRefusal(target, repo, false);
   if (early !== undefined) throw new PublishRefusedError(early);
+  const run: string = randomUUID();
+  const caller: LeafTarget = { slug, target, scope, unit, phase, attempt };
+  const check = {
+    slug,
+    run,
+    name,
+    scope,
+    ...(phase === undefined ? {} : { phase }),
+    ...(unit === undefined ? {} : { unit }),
+    ...(attempt === undefined ? {} : { attempt }),
+  };
+  failedRefusal(caller, repo, name, run);
   const runRoot: string = mkdtempSync(resolve(ensureLeafTemp(repo, slug), 'run-'));
   let refused: boolean = false;
   try {
@@ -284,17 +325,7 @@ export async function checkedRun(
     const env: Record<string, string> = constructedEnv(repo, runRoot);
     env.AKROGON_BASE = akrogonBase;
     const log: string = join(runRoot, 'out.log');
-    const run: string = randomUUID();
     const { path: owner, kind }: { path: string; kind: 'holder' | 'issue' } = await captureOwner(target, repo);
-    const check = {
-      slug,
-      run,
-      name,
-      scope,
-      ...(phase === undefined ? {} : { phase }),
-      ...(unit === undefined ? {} : { unit }),
-      ...(attempt === undefined ? {} : { attempt }),
-    };
     const slice: string = runSlice(slug === 'checkout' ? 'akrogon.slice' : leafSlice(repo, slug));
     const runUnit: string = `${runUnitBase(run)}.scope`;
     return await withAdmission(
@@ -329,6 +360,7 @@ export async function checkedRun(
         try {
           const fenced: string | undefined = await ownerRefusal(target, repo, true);
           if (fenced !== undefined) refusePublish(fenced);
+          failedRefusal(caller, repo, name, run);
           const ownerFd: number = openSync(owner, 'r');
           try {
             mkdirSync(resolve(`/proc/self/fd/${ownerFd}`, relative(owner, target)), { recursive: true });

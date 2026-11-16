@@ -47,6 +47,7 @@ export const timingEventSchema = z.discriminatedUnion('kind', [
     duration_ms: z.number().int().nonnegative(),
     log: z.string(),
   }),
+  z.strictObject({ ...slugged, kind: z.literal('check_refused'), ...checkCore }),
   z.strictObject({
     ...slugged,
     kind: z.literal('batch'),
